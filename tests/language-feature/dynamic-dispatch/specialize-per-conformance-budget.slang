@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -conformance Number<0>:ICode=0 -conformance Number<1>:ICode=1 -conformance Number<2>:ICode=2 -conformance Number<3>:ICode=3 -conformance Number<4>:ICode=4 -conformance Number<5>:ICode=5 -conformance Number<6>:ICode=6 -conformance Number<7>:ICode=7 -conformance Number<8>:ICode=8
+// Diagnostic coverage below checks the same resource limit separately.
+#pragma warning(disable:55219)
 
 interface ICode
 {

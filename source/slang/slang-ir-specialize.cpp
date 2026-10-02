@@ -3749,125 +3749,162 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-// Build concrete helper calls before lowering their bodies to dynamic operations.
+// Specialize a helper for each concrete type in a closed dynamic type set.
 // Consider this example:
 //
 //     [__specializePerConformance]
-//     void visit<G : IGeometry>(G geometry, inout Handler handler, inout State state)
-//     {
-//         Candidate candidate;
-//         if (G.intersect(handler.getContext(state), candidate))
-//             handler.accept(candidate, state);
-//     }
+//     uint combine<T : IA & IB>(T value) { return value.a() * value.b(); }
 //
-// Typeflow normally specializes `visit` once for the whole set of geometry types.
-// Here we instead specialize its original generic with each concrete type and witness,
-// then use the existing dispatcher to select the entire visit. Context reads and acceptance
-// consequently stay in the same concrete body without moving either operation across a call.
-// Return a dispatcher with `dispatchType`, or null when the optimization does not apply.
-// Unsupported shapes retain normal set specialization: the attribute is an optimization hint.
-// Failed attempts can leave unused concrete specializations for normal dead-code elimination.
+// Typeflow supplies one dynamic type
+// argument and separate witness sets for IA and IB. The constraints belong to T,
+// so each concrete copy must receive the witnesses for the same concrete type.
+// Pair witnesses by getConcreteType(), never by their positions or numeric tags.
+// This keeps the whole helper, including its callers of IA and IB, in one arm.
+//
+// Return a dispatcher with the ordinary set-specialization signature, or null.
+// A marked helper that cannot be specialized supplies a diagnostic reason;
+// unmarked helpers leave that reason null. Failed attempts can leave unused
+// concrete specializations for normal dead-code elimination.
 static IRFunc* trySpecializeHelperPerConformance(
     IRSpecialize* specializeInst,
     IRFuncType* dispatchType,
     SpecializationContext* context,
-    UInt specializationDepth)
+    UInt specializationDepth,
+    const char*& failureReason)
 {
+    failureReason = nullptr;
     auto generic = cast<IRGeneric>(specializeInst->getBase());
     auto originalFunc = cast<IRFunc>(findGenericReturnVal(generic));
     if (!originalFunc->findDecoration<IRSpecializePerConformanceDecoration>())
         return nullptr;
 
-    // Limit the prototype to one dynamic type and one witness set. In particular, do not
-    // form a Cartesian product of independent sets or guess correlations between them.
-    IRWitnessTableSet* witnessSet = nullptr;
+    failureReason = "expected one dynamic type with a closed set of conformances";
     IRUntaggedUnionType* unionType = nullptr;
-    UInt witnessArgIndex = 0;
+    IRParam* typeParam = nullptr;
     UInt typeArgIndex = 0;
-    for (UInt i = 0; i < specializeInst->getArgCount(); ++i)
+    List<IRParam*> witnessParams;
+    List<UInt> witnessArgIndices;
+    List<IRWitnessTableSet*> witnessSets;
+    UInt argIndex = 0;
+    for (auto param : generic->getFirstBlock()->getParams())
     {
-        auto arg = specializeInst->getArg(i);
+        auto arg = specializeInst->getArg(argIndex);
         if (auto set = as<IRWitnessTableSet>(arg))
         {
-            if (witnessSet)
+            if (set->isUnbounded() || set->isEmpty())
                 return nullptr;
-            witnessSet = set;
-            witnessArgIndex = i;
+            witnessParams.add(param);
+            witnessArgIndices.add(argIndex);
+            witnessSets.add(set);
         }
         else if (auto type = as<IRUntaggedUnionType>(arg))
         {
             if (unionType)
+            {
+                failureReason = "multiple independent dynamic types are not supported";
                 return nullptr;
+            }
             unionType = type;
-            typeArgIndex = i;
+            typeParam = param;
+            typeArgIndex = argIndex;
         }
         else if (as<IRSetBase>(arg))
             return nullptr;
+        ++argIndex;
     }
-    static const UInt kMaxConformers = 8;
-    if (!witnessSet || !unionType || witnessSet->isUnbounded() || witnessSet->isEmpty() ||
-        witnessSet->getCount() > kMaxConformers)
+    if (!unionType || witnessSets.getCount() == 0)
         return nullptr;
 
-    // Bound directly duplicated IR as well as the number of copies. This is a compile-time
-    // budget, not a prediction of native code size after downstream inlining.
+    // Lowering preserves the checked subtype on each witness parameter. Require
+    // that exact parameter, not merely equal sets or matching interface names.
+    failureReason = "witness constraints do not all belong to the dynamic type parameter";
+    for (auto param : witnessParams)
+    {
+        auto constraint = param->findDecoration<IRConstrainedTypeDecoration>();
+        if (!constraint || constraint->getConstrainedType() != typeParam)
+            return nullptr;
+    }
+
+    IRBuilder builder(specializeInst->getModule());
+    builder.setInsertInto(specializeInst->getModule());
+    List<Dictionary<IRInst*, IRWitnessTable*>> witnessesByType;
+    failureReason = "witness sets must uniquely describe constraints of the same dynamic type";
+    for (auto set : witnessSets)
+    {
+        Dictionary<IRInst*, IRWitnessTable*> witnesses;
+        HashSet<IRInst*> concreteTypes;
+        for (UInt i = 0; i < set->getCount(); ++i)
+        {
+            auto witness = as<IRWitnessTable>(set->getElement(i));
+            if (!witness)
+                return nullptr;
+            auto type = witness->getConcreteType();
+            if (witnesses.containsKey(type))
+                return nullptr;
+            witnesses.add(type, witness);
+            concreteTypes.add(type);
+        }
+        if (builder.getSet(kIROp_TypeSet, concreteTypes) != unionType->getSet())
+            return nullptr;
+        witnessesByType.add(witnesses);
+    }
+
+    // These provisional resource limits protect explicit requests from excessive
+    // duplication. They do not estimate profitability or bound downstream inlining.
+    static const UInt kMaxConformers = 8;
+    auto witnessSet = witnessSets[0];
+    failureReason = "the request exceeds the current resource limit of 8 concrete copies";
+    if (witnessSet->getCount() > kMaxConformers)
+        return nullptr;
     static const UInt kMaxDuplicatedInsts = 1024;
+    failureReason =
+        "the request exceeds the current resource limit of 1024 duplicated IR instructions";
     UInt instCount = 0;
     for (auto block : originalFunc->getBlocks())
         for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
             if (++instCount > kMaxDuplicatedInsts / witnessSet->getCount())
                 return nullptr;
 
-    // Witnesses are the source of truth for their concrete types. Compare canonical sets,
-    // never pair the type and witness collections by their element positions.
-    IRBuilder builder(specializeInst->getModule());
-    builder.setInsertInto(specializeInst->getModule());
-    HashSet<IRInst*> concreteTypes;
-    for (UInt i = 0; i < witnessSet->getCount(); ++i)
-    {
-        auto witness = as<IRWitnessTable>(witnessSet->getElement(i));
-        if (!witness)
-            return nullptr;
-        concreteTypes.add(witness->getConcreteType());
-    }
-    if (builder.getSet(kIROp_TypeSet, concreteTypes) != unionType->getSet())
-        return nullptr;
-
-    // Keep the initial experiment to void helpers with by-value dynamic payloads and
-    // concrete state references. Marshalling two references to a dynamic payload through
-    // independent temporary values could change aliasing; that needs a separate design.
-    if (dispatchType->getResultType()->getOp() != kIROp_VoidType)
-        return nullptr;
     Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>> mapping;
+    auto tagCount = UInt(witnessSets.getCount());
     for (UInt i = 0; i < witnessSet->getCount(); ++i)
     {
         auto witness = cast<IRWitnessTable>(witnessSet->getElement(i));
+        auto concreteType = witness->getConcreteType();
         List<IRInst*> args;
         for (UInt j = 0; j < specializeInst->getArgCount(); ++j)
             args.add(specializeInst->getArg(j));
-        args[typeArgIndex] = witness->getConcreteType();
-        args[witnessArgIndex] = witness;
+        args[typeArgIndex] = concreteType;
+        for (Index j = 0; j < witnessSets.getCount(); ++j)
+            args[witnessArgIndices[j]] = witnessesByType[j].getValue(concreteType);
         auto concreteSpec = cast<IRSpecialize>(
             builder.emitSpecializeInst(specializeInst->getFullType(), generic, args));
         if (context)
             context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
                 concreteSpec,
                 specializationDepth);
+        failureReason = "concrete generic specialization could not be completed";
         auto concreteFunc =
             context ? specializeGeneric(context, concreteSpec) : specializeGeneric(concreteSpec);
         if (!concreteFunc)
             return nullptr;
         auto concreteFuncType = cast<IRFuncType>(concreteFunc->getDataType());
-        // The leading parameter selects the witness. Concrete specialization can also
-        // expand parameter packs; retain the ordinary path if that changes the arity.
-        if (dispatchType->getParamCount() != concreteFuncType->getParamCount() + 1)
+
+        // Fixed concrete results need no conversion. Dynamic results would require
+        // choosing a common representation and possibly reconstructing a result tag.
+        failureReason = "the return type changes across concrete specializations";
+        if (dispatchType->getResultType() != concreteFuncType->getResultType())
             return nullptr;
+        failureReason = "concrete specialization changes the parameter count";
+        if (dispatchType->getParamCount() != concreteFuncType->getParamCount() + tagCount)
+            return nullptr;
+        failureReason = "type-changing reference or nested payload parameters are not supported";
         for (UInt j = 0; j < concreteFuncType->getParamCount(); ++j)
         {
-            auto paramType = dispatchType->getParamType(j + 1);
+            auto paramType = dispatchType->getParamType(j + tagCount);
             auto concreteParamType = concreteFuncType->getParamType(j);
             if (paramType != concreteParamType &&
-                !(paramType == unionType && concreteParamType == witness->getConcreteType()))
+                !(paramType == unionType && concreteParamType == concreteType))
                 return nullptr;
         }
         auto tag = builder.emitGetTagOfElementInSet(
@@ -3876,9 +3913,15 @@ static IRFunc* trySpecializeHelperPerConformance(
             witnessSet);
         mapping.add(tag, {concreteFunc, concreteFuncType});
     }
-    auto dispatcher = createDispatchFunc(dispatchType, mapping);
+    // All leading witness tags concern the same T. Select with the first tag and
+    // consume the others only to preserve the existing set-specialization ABI.
+    auto dispatcher = createDispatchFunc(
+        dispatchType,
+        mapping,
+        context && context->targetProgram ? context->targetProgram->getTargetReq() : nullptr,
+        tagCount);
     builder.addNameHintDecoration(dispatcher, UnownedStringSlice("perConformance"));
-    builder.addForceInlineDecoration(dispatcher);
+    failureReason = nullptr;
     return dispatcher;
 }
 
@@ -4030,14 +4073,24 @@ IRInst* specializeGenericWithSetArgs(
 
             // Decide the dispatch boundary before cloning a shared body. The concrete path
             // uses the same tag-parameter ABI, so callers need no special handling.
+            const char* specializationFailure = nullptr;
             if (auto dispatcher = trySpecializeHelperPerConformance(
                     specializeInst,
                     dispatchType,
                     context,
-                    specializationDepth))
+                    specializationDepth,
+                    specializationFailure))
             {
                 loweredFunc->removeAndDeallocate();
                 return dispatcher;
+            }
+
+            if (specializationFailure && context && context->sink)
+            {
+                Diagnostics::SpecializePerConformanceNotApplied diag = {};
+                diag.location = returnedFunc->sourceLoc;
+                diag.reason = specializationFailure;
+                context->sink->diagnose(diag);
             }
 
             builder.setInsertBefore(loweredFunc->getFirstBlock());

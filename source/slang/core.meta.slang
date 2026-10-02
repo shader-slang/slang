@@ -4819,6 +4819,8 @@ attribute_syntax [ForceInline] : ForceInlineAttribute;
 
 /// @internal
 /// Request whole-function specialization over a small, closed conformance set.
+/// Unsupported dynamic specializations issue warning 55219 and use the ordinary path.
+/// Promote that warning to an error when specialization is required.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__specializePerConformance] : SpecializePerConformanceAttribute;
 

@@ -4,6 +4,8 @@
 // Deliberately compare the existing copy-in/copy-out behavior for aliased state
 // arguments against the annotated helper, without prescribing an alias ordering.
 #pragma warning(disable:30051)
+// Fallback semantics are checked here; dedicated diagnostics tests check the warning.
+#pragma warning(disable:55219)
 
 interface IValue
 {
@@ -31,8 +33,8 @@ void consume<T : IValue, let Bias : uint = 4>(T value, inout uint result)
     result = value.get() + Bias;
 }
 
-// These shapes deliberately retain the normal specialization path. The attribute
-// must not change return values, mutation of a dynamic payload, or independent tags.
+// Concrete returns specialize; dynamic references and independent types retain
+// their ordinary semantics.
 [__specializePerConformance]
 uint returnValue<T : IValue>(T value)
 {

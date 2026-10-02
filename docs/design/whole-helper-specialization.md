@@ -1,191 +1,139 @@
 # Whole-helper specialization prototype
 
-This prototype addresses the shared helper-based request in
-[#13267](https://github.com/shader-slang/slang/issues/13267) and
-[#13268](https://github.com/shader-slang/slang/issues/13268). It introduces the internal
-optimization hint `[__specializePerConformance]`. The spelling and limits are experimental,
-not a proposed stable language contract.
+The internal `[__specializePerConformance]` attribute requests concrete copies of an
+ordinary generic helper when called with a dynamically selected type. It addresses
+the helper-based requests in [#13268](https://github.com/shader-slang/slang/issues/13268)
+and [#13267](https://github.com/shader-slang/slang/issues/13267), without adding another
+interface, callback requirement, or conformance registration. Its spelling and policy
+remain experimental. It is a general generic-function feature, with no geometry or
+RayQuery-specific implementation.
 
 ## Source contract
 
-Consider a traversal-owned helper:
-
 ```slang
-interface IGeometry
-{
-    static float distance(float3 origin, float limit);
-}
+interface IA { uint a(); }
+interface IB { uint b(); }
+interface IValue : IA, IB {}
 
 [__specializePerConformance]
-void intersectCase<G : IGeometry>(G geometry, inout RayQuery<0> query)
+uint combine<T : IA & IB>(T value)
 {
-    float distance = G.distance(query.CandidateObjectRayOrigin(), query.CommittedRayT());
-    if (distance > query.RayTMin())
-        query.CommitProceduralPrimitiveHit(distance);
+    return value.a() * value.b();
 }
+
+// Given existing IValue conformance registrations:
+// combine(createDynamicObject<IValue>(typeID, payload));
 ```
 
-Inside a traversal loop, call
-`intersectCase(createDynamicObject<IGeometry>(geometryType, 0u), query)` using the existing
-type-conformance registrations. The compiler selects a concrete specialization of the entire
-helper. Query reads, intersection, and acceptance remain together. Geometry providers do not
-need another interface, a callback requirement, or additional registrations.
+The compiler selects a concrete copy of the entire helper. Both interface calls and
+their surrounding computation stay together. Multiple constraints on the same type
+do not require a Cartesian product of independent choices. Additional generic
+arguments may be static, including a traversal handler and its query-state type.
 
-Without the hint, Slang specializes the helper for a set of possible conformances and dispatches
-its interface operations internally. That can leave reads before the dispatch and acceptance
-after the result merge. Merely inlining the ordinary helper does not change that boundary.
+This supports `void` and fixed concrete results such as `bool`, `float`, and concrete
+structs. A result is fixed when the ordinary and every concrete function signature
+have the identical result type; no new result conversion is introduced. Concrete
+`out` and `inout` parameters are forwarded unchanged. A direct by-value dynamic
+payload uses the existing dispatcher marshalling.
 
-The prototype applies when all of the following hold:
+The current implementation requires one dynamic type represented by typeflow as an
+untagged union, with finite witness sets whose witnesses uniquely identify its
+concrete alternatives. Each witness parameter must explicitly constrain that same
+generic type parameter. Type-changing results, type-changing references, nested
+payload conversions, independent dynamic type arguments, and parameter-pack arity
+changes are unsupported. Some partially specialized generic type representations
+also fall outside this contract and are diagnosed rather than structurally guessed.
 
-- There is exactly one dynamic type argument and one finite witness-table set, with at most
-  eight conformers. Other generic arguments may be static.
-- The canonical type set equals the set of concrete types carried by those witnesses.
-- The helper returns `void`. Results can use concrete `out` parameters.
-- Parameter types are identical across the shared and concrete signatures, except for direct
-  by-value dynamic payload parameters. Dynamic payload references and nested type-changing
-  parameters retain ordinary specialization.
-- The original helper's block-child instruction count multiplied by the conformer count is
-  at most 1,024. This bounds directly duplicated IR, not native code after downstream inlining.
+## Diagnostics and resource policy
 
-Unsupported cases retain ordinary specialization. Static calls continue to specialize normally.
-This is a best-effort hint, not a guarantee about final driver code or performance. Early forced
-inlining can erase the helper boundary before this optimization runs and is not needed here.
+An unsupported marked dynamic specialization emits warning
+`specialize-per-conformance-not-applied` (55219), explaining the reason, and retains
+ordinary specialization. Suppress it explicitly when fallback is acceptable, or
+make the request mandatory with:
 
-The optimization uses existing tag construction and dispatcher defaults. It does not change or
-strengthen the contract of `createDynamicObject` for unregistered IDs.
+```text
+-warnings-as-errors specialize-per-conformance-not-applied
+```
 
-## Compiler boundary and invariants
+Static calls continue to specialize normally. Combining the attribute with
+`[__unsafeForceInlineEarly]` produces the same warning because early inlining removes
+the boundary on which the request operates. Ordinary `[ForceInline]` is compatible.
 
-`analyzeSpecialize` in `slang-ir-typeflow-specialize.cpp` records the finite type and witness
-sets. `specializeGenericWithSetArgs` constructs the signature used to pass runtime witness tags.
-Before cloning a shared body, `trySpecializeHelperPerConformance` checks the hint and limits.
+The experiment retains resource limits of eight concrete copies and 1,024 original
+block-child instructions multiplied by copy count. These are provisional compiler
+resource safeguards, not measured profitability thresholds or promises of final
+native code size. Exceeding either limit now produces a diagnostic. They do not
+bound transitive callees, aggregate copies across helpers, downstream inlining, or
+register allocation. Existing recursive-specialization depth protection remains
+separate. Public spelling, configurable budgets, and whether a supported version
+should diagnose failure as an error by default remain maintainer decisions.
 
-Each witness's `getConcreteType()` supplies the corresponding type argument. Types and witnesses
-are never paired by collection index. Canonical set identity verifies the applicable shape;
-there is no new structural equivalence relation or witness representation.
+The requested compiler transformation does not guarantee final driver instruction
+placement or faster execution. Unknown conformance IDs retain the existing
+`createDynamicObject` contract; this feature does not define a new one.
 
-The existing `specializeGeneric` path constructs each concrete helper. The existing
-`createDispatchFunc` and `emitWitnessTableWrapper` adapt its signature and generate selection.
-The resulting dispatcher has the same tag-parameter calling convention as normal set
-specialization, so typeflow call lowering needs no special case. The temporary shared-function
-shell is discarded when the concrete path succeeds.
+## Representation and compiler boundary
 
-Concrete state references pass through unchanged. Only direct by-value union payloads can
-require unpacking. In particular, the prototype does not marshal dynamic reference arguments
-through separate temporaries, which would require an aliasing design. Query operations retain
-their source order inside each concrete body; no new query-effect analysis or read-motion rule
-is introduced.
+`emitGenericConstraintValue` already knows the checked subtype of each constraint.
+It now records a `ConstrainedTypeDecoration` on direct generic witness parameters.
+For `T : IA & IB`, both witness parameters point to the same T parameter. Interface
+`This` witness parameters carry the corresponding relation too. This preserves
+semantic information at its producer: equal possible-type sets or matching interface
+names alone cannot prove that witnesses constrain the same parameter.
 
-The input shape is valid existing typeflow IR, not malformed semantic data. The optional change
-is the scope of specialization: the whole helper instead of its individual interface calls.
+`analyzeSpecialize` supplies typeflow's canonical type and witness sets.
+`specializeGenericWithSetArgs` builds the ordinary signature with one leading tag
+per witness set. Before cloning a shared helper body, it attempts the requested
+whole-helper specialization and diagnoses any unsupported shape.
+
+`trySpecializeHelperPerConformance` verifies the constrained-type relation, then
+indexes each witness set by `getConcreteType()`. Every set must cover exactly the
+canonical union alternatives, with one witness per type. It uses these keys to
+specialize the original generic with the matching witnesses through
+`specializeGeneric`. No witness-entry positions, numeric-tag equality, structural
+equivalence relation, or new substitution algorithm are used.
+
+`createDispatchFunc` accepts the count of leading witness tags (one by default).
+For this caller they all describe the same concrete T, so only the first selects a
+branch. The remaining tags preserve the ordinary caller ABI but are not passed to
+the concrete body. Existing callers retain their one-tag behavior. Existing
+`emitWitnessTableWrapper` handles direct by-value payloads and fixed returns;
+identical concrete references pass through without additional temporaries.
+
+This is valid existing dynamic IR, not malformed data being patched downstream.
+The producer-side metadata supplies a relationship needed to safely handle multiple
+constraints. The feature changes the specialization boundary; it does not move
+individual query reads across `Proceed`, commits, or other state mutations.
 
 ## Relationship to #13245
 
-The associated-result test demonstrates the relevant overlap: constructing and consuming a
-concrete associated result inside the helper removes the intermediate `AnyValue` box in emitted
-HLSL. This is a small instance of keeping consumers inside dispatch branches.
+The associated-result regression constructs and consumes a concrete associated
+result within the helper, avoiding an intermediate `AnyValue` in emitted HLSL.
+That is distinct from returning a dynamically changing result across the helper
+boundary. Tag-namespace unification, arbitrary caller-tail duplication, and removal
+of all existential conversions remain separate work.
 
-This prototype does not unify tag namespaces, optimize arbitrary callers, remove all repeated
-dispatch, or guarantee handwritten-code parity. It deliberately excludes non-void dynamic
-results and multiple independent dynamic type parameters. Broader #13245 work can share the
-specialization boundary without becoming a prerequisite for this experiment.
+## Validation
 
-## Validation and measurements
+The broadened implementation was built on master `feb2452bf` with Windows Release
+tools. On RTX 4090 / driver 591.86:
 
-Validation used checkout `e57a377b3` plus this prototype, a Windows Release build, an RTX 4090,
-and driver 591.86. These are separate measurements from the reporter's RTX 5090 results.
+- Dynamic-dispatch suite: 539/539 passed; 318 unsupported/excluded checks skipped.
+- Interface suite: 78/78 passed; 34 skipped.
+- Generic suite: 229/229 passed; 87 skipped.
+- Six focused diagnostic/budget checks pass, including warning-to-error promotion,
+  eight versus nine concrete copies, unsupported signatures, and early inlining.
+- Concrete scalar/struct return and multiple-constraint tests check D3D12/Vulkan
+  results and emitted structure. Detailed IR validation passes the multiple-constraint case.
+- A generated 600-call helper diagnoses the instruction budget; promoting the
+  named warning to an error rejects compilation.
+- Both original repros compile in five modes for HLSL, DXIL, and SPIR-V (30 controls).
+  GPU correctness checks pass for both repros on D3D12/Vulkan, with five modes,
+  two independently linked copies, 65,536 rays, and 512 CPU-reference rays.
 
-The two public standalone repros were extended with an ordinary generic helper (mode 3) and
-the same helper with the hint (mode 4). The existing callback is mode 2. All 30 source/mode/target
-controls compiled for HLSL, DXIL, and SPIR-V at `-O3`; SPIR-V validation was enabled.
-
-| Control, for either repro | DXIL commits | DXIL phi nodes |
-| --- | ---: | ---: |
-| Ordinary generic helper | 1 | 16 |
-| Existing callback | 2 | 13 |
-| Annotated generic helper | 2 | 13 |
-
-In the context-read repro, SPIR-V has one object-ray-origin read site for the ordinary helper
-and two for the callback and annotated helper. The latter sites belong to mutually exclusive
-branches; static site counts are not executed instruction counts.
-
-GPU checks used both backends, five variants, and two independently linked copies per variant.
-Outputs matched exactly within each backend. The runner independently checked 512 rays against
-double-precision CPU intersection calculations, including inside starts and clipped roots.
-The 1,048,576-ray timing runs used four warmup rounds and 24 measured rounds, with rotated and
-reversed variant order, four warmup dispatches, and sixteen timestamped dispatches per sample.
-Outputs were checked again after timing.
-
-The annotated-helper versus callback paired median difference was 0% in each copy of all four
-source/backend runs, including a repeat on the final build. Dispatches were about 56–69
-microseconds and timestamps were visibly
-quantized; this does not establish sub-percent equivalence or a speedup. Independently linked
-copies produced identical backend binaries for each source variant. The shared-commit D3D12
-helper and callback also produced identical DXIL binaries; other equal-sized outputs are not
-claimed to be identical.
-
-| Captured shader binary | Callback bytes | Annotated helper bytes |
-| --- | ---: | ---: |
-| Context reads, DXIL | 7,080 | 7,080 |
-| Context reads, SPIR-V | 7,780 | 7,676 |
-| Shared commit, DXIL | 6,744 | 6,744 |
-| Shared commit, SPIR-V | 7,796 | 7,860 |
-
-These are intermediate shader binaries, not native driver binaries. Five compilation samples
-per source/mode/target gave the following medians, including process startup:
-
-| Compilation | Callback ms | Annotated helper ms |
-| --- | ---: | ---: |
-| Context reads, DXIL | 205.76 | 208.30 |
-| Context reads, SPIR-V | 195.92 | 198.68 |
-| Shared commit, DXIL | 205.14 | 202.44 |
-| Shared commit, SPIR-V | 194.33 | 193.67 |
-
-The sample ranges overlap, and the first samples overlapped the tail of test execution.
-These measurements do not establish a compilation-time improvement or regression.
-
-Regression coverage includes module-separated providers, success and miss paths, state
-mutation, payload values, aliased concrete state, multiple-type/non-void/reference fallback,
-the conformer budget, RayQuery code shape, and associated-result consumption. The D3D12/Vulkan
-dynamic-dispatch suite passes 529/529 tests, with 314 unsupported/excluded tests skipped.
-All 14 new checks pass. Removing the attribute from copied fixtures causes exactly four
-intended code-shape failures while the other ten checks pass. A generated 600-call helper
-also confirms that the instruction-count budget retains one shared body.
-
-The matching larger-renderer source snapshot, scene, and launch command have not been identified. Its register allocation,
-native binary size, and application performance remain unverified. Those measurements are
-required before claiming that the original larger-shader observations are resolved. The public
-excerpts cannot substitute for a runnable full renderer.
-
-## Review decisions still needed
-
-Decide whether the function-level opt-in and best-effort fallback are the desired user contract,
-and choose stable spelling and budget policy if this becomes a supported feature. Evaluate
-larger-shader measurements before enabling any automatic heuristic. A focused PR can cover
-both helper-based requests; arbitrary caller-tail duplication and automatic query-read placement
-remain separate optimization projects.
-
-## Attribute and specialization policy review
-
-The prototype establishes the requested specialization boundary, but these choices need
-agreement before exposing a supported attribute:
-
-| Decision | Prototype behavior | Recommendation for design review |
-| --- | --- | --- |
-| Placement and spelling | Internal function attribute `__specializePerConformance` | Keep the experiment internal; a function attribute naturally expresses helper ownership. Decide public spelling separately. |
-| Hint or requirement | Silently falls back to shared specialization | Add an opt-in optimization remark explaining success or the fallback reason. Consider a strict diagnostic mode if users need a reliable specialization contract. Neither promises final driver instructions. |
-| Copy budget | At most 8 conformers and 1,024 block-child instructions times conformer count | Treat these as provisional safety limits, not measured profitability thresholds. Adding a ninth provider or enlarging a helper can change code shape. |
-| Budget scope | Counts one original helper before concrete specialization and downstream inlining | Does not bound transitive callees, aggregate copies across many helpers, compile time, or final native code size. Existing recursion-depth protection is separate. |
-| Results | Only `void`; concrete `out` parameters work | Fixed concrete return types are a reasonable first extension: the existing dispatcher and wrapper already forward returns. Add specialization/code-shape coverage before enabling them. Dynamic or associated returns need separate conversion analysis. |
-| Dynamic inputs | One dynamic type and one witness set; direct by-value payloads | Keep this initial scope. Multiple sets require correlation or Cartesian-product policy, and multiple constraints on one type can also exceed this implementation's one-witness-set restriction. |
-| References | Identical concrete reference types pass through; type-changing references fall back | Preserve this restriction until aliasing and copy-back semantics are established. |
-| Other attributes | Early forced inlining can remove the helper boundary | Define precedence or diagnose incompatible combinations rather than letting a supported request disappear silently. |
-
-The budget constants are not correctness requirements. The signature restrictions avoid
-introducing new conversion and aliasing behavior. Canonical witness/type correspondence is
-an invariant of the supported input shape, not a profitability heuristic.
-
-These decisions do not require demonstrating a speedup over the callback implementation.
-The feature's value is expressing the same specialization boundary with simpler shader code.
-Larger-renderer validation remains useful to check applicability and preserve the existing
-workaround's performance characteristics.
+Earlier compact timing experiments on `e57a377b3` plus the initial prototype found
+no measurable helper/callback difference. Those are historical measurements, not
+timings of this revision. No speedup is claimed. The matching larger-renderer
+snapshot, scene, and launch command remain unidentified; its native register count,
+native code size, and performance with this feature remain unverified. The
+demonstrated benefit is cleaner source with per-conformer helper specialization.

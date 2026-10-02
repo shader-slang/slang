@@ -54,5 +54,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // HLSL: acceptCandidate
 // HLSL: = readContext
 // HLSL: acceptCandidate
-// HLSL: switch
 // SPIRV: OpEntryPoint GLCompute

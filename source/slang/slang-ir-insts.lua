@@ -2348,6 +2348,13 @@ local insts = {
 					operands = { { "constraintType" } },
 				},
 			},
+			{
+				ConstrainedTypeDecoration = {
+					-- On a generic witness parameter, records the type parameter whose
+					-- conformance this witness supplies. Multiple constraints may share it.
+					operands = { { "constrainedType" } },
+				},
+			},
 			{ BuiltinDecoration = {} },
 			{
 				requiresNVAPI = {
