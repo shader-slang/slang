@@ -11,9 +11,6 @@ struct ArrayBuiltinCastLoweringContext
 {
     IRModule* module;
 
-    // The same limit as `lowerCopyLogical` uses for unrolling an element-wise copy.
-    static const IRIntegerValue kMaxUnrolledElementCount = 16;
-
     List<IRInst*> workList;
 
     void collectCasts(IRInst* inst)
@@ -24,24 +21,10 @@ struct ArrayBuiltinCastLoweringContext
             collectCasts(child);
     }
 
-    /// Move every instruction from `inst` to the end of its block into a new block of the same
-    /// parent, and return the new block.
-    IRBlock* splitBlockBefore(IRBuilder& builder, IRInst* inst)
-    {
-        builder.setInsertBefore(inst);
-        auto tailBlock = builder.emitBlock();
-        for (auto cur = inst; cur;)
-        {
-            auto next = cur->getNextInst();
-            cur->insertAtEnd(tailBlock);
-            cur = next;
-        }
-        return tailBlock;
-    }
-
     /// Replace the array cast `cast` with a conversion of each element, adding any nested array
-    /// cast this creates to the work list. Return the function or global variable whose blocks
-    /// were split for a loop, or null if the conversion was unrolled.
+    /// cast this creates to the work list. If the conversion is a loop, return the function or
+    /// global variable whose blocks were split for it, which needs its blocks re-sorted;
+    /// otherwise return null.
     IRGlobalValueWithCode* lowerCast(IRInst* cast)
     {
         auto toType = as<IRArrayType>(cast->getDataType());
@@ -71,8 +54,11 @@ struct ArrayBuiltinCastLoweringContext
 
         IRGlobalValueWithCode* splitCode = nullptr;
         IRInst* result = nullptr;
+        // A loop needs a control-flow graph, so a cast directly in module scope, such as one in
+        // a `static const` initializer, is unrolled whatever its length.
         auto count = as<IRIntLit>(toType->getElementCount());
-        if (count && count->getValue() <= kMaxUnrolledElementCount)
+        auto block = as<IRBlock>(cast->getParent());
+        if (count && (count->getValue() <= kMaxUnrolledArrayElementCount || !block))
         {
             List<IRInst*> elements;
             for (IRIntegerValue i = 0; i < count->getValue(); i++)
@@ -87,11 +73,11 @@ struct ArrayBuiltinCastLoweringContext
         }
         else
         {
-            // A loop needs a control-flow graph, so the cast must be in a block of a function
-            // or of a global variable's initializer. A cast directly in module scope can only
-            // come from a `static const` initializer, whose array length is always a literal.
-            auto block = as<IRBlock>(cast->getParent());
-            SLANG_RELEASE_ASSERT(block && "array cast with a non-literal length outside a block");
+            // A module-scope array whose length is a specialization constant cannot be emitted
+            // even without a conversion, so we do not try to convert one.
+            if (!block)
+                SLANG_UNIMPLEMENTED_X("array layout conversion of a module-scope array whose "
+                                      "length is not a literal");
             splitCode = as<IRGlobalValueWithCode>(block->getParent());
 
             builder.setInsertBefore(splitCode->getFirstBlock()->getFirstOrdinaryInst());

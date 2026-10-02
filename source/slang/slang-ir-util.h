@@ -16,6 +16,11 @@ constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
 constexpr SlangInt kRTTIHandleSize = 8;
 
+/// The longest array whose element-wise copy or conversion we unroll inside a function; a longer
+/// array, or one whose length is not a literal, is handled in a loop so that code size does not
+/// grow with it.
+constexpr IRIntegerValue kMaxUnrolledArrayElementCount = 16;
+
 /// Return whether a struct contains only void fields or recursively empty structs. Other types,
 /// including arrays of empty elements, return false. This preserves DCE's existing structural
 /// query: type decorations do not affect its result.
@@ -464,6 +469,11 @@ IRInst* emitLoopBlocks(
     IRBlock*& loopBreakBlock);
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
+
+/// Move `inst` and every instruction after it in its block into a new block, and return the new
+/// block. The new block is appended at the end of the parent's block list, so callers that need
+/// dominance order call `sortBlocksInFunc` afterwards, and `builder` is left inserting into it.
+IRBlock* splitBlockBefore(IRBuilder& builder, IRInst* inst);
 
 // Remove all linkage decorations from func.
 void removeLinkageDecorations(IRInst* inst);

@@ -1,4 +1,4 @@
-// Minimal raw-Vulkan compute helper for the shader-coverage demos.
+// Shared raw-Vulkan compute helper for the shader-coverage demos.
 //
 // Single-queue, single-pipeline, storage-buffer-only. No swap chain, no
 // graphics, no images. Host-coherent memory for everything to keep the
@@ -18,21 +18,21 @@
 //
 // Once #739 merges and the slang-rhi submodule is bumped, the
 // migration is:
-//   1. Delete `vk_compute_demo.h` and `vk_compute_demo.cpp`.
-//   2. In main.cpp, replace `vkdemo::Context` + Buffer/Pipeline calls
+//   1. In each main.cpp, replace `vkdemo::Context` + Buffer/Pipeline calls
 //      with slang-rhi's IDevice / IBuffer / IComputePipeline / etc.
-//   3. Replace the raw vkUpdateDescriptorSets for the coverage buffer
+//   2. Replace the raw vkUpdateDescriptorSets for the coverage buffer
 //      with `bindSyntheticResource(...)`.
-//   4. Switch the demo's CMakeLists.txt to use the `example()` helper
+//   3. Switch the demo's CMakeLists.txt to use the `example()` helper
 //      (which links slang-rhi via the standard slang examples convention).
-//   5. Drop the `[[vk::binding]]` annotations on the user-visible
+//   4. Drop the `[[vk::binding]]` annotations on the user-visible
 //      resources in the slang sources if you want — slang-rhi binds by
 //      name and doesn't need them. (Leaving them in is harmless.)
+//   5. Once all callers have migrated, remove this shared header and
+//      `vk_compute_demo.cpp` from shader-coverage-common.
 //
-// This file (header + cpp) is duplicated verbatim across the
-// shader-coverage example directories. Keeping per-demo copies
-// (rather than a shared helper) reduces coupling and makes each
-// demo a self-contained reference.
+// Image-pipeline, BVH-traversal, and the Vulkan path of the selectable-backend
+// example use this same implementation. It handles only Vulkan runtime work;
+// Slang compilation, counter decoding, and reporting remain in the callers.
 
 #pragma once
 
@@ -127,11 +127,26 @@ public:
 // inline in the header because they're tiny and need to be reachable
 // from main.cpp without dragging in the rest of the implementation
 // unit.
+
+// The exception `check` throws on a failing Vulkan call. Carries the
+// failing VkResult so callers can react to specific failures — the
+// demos catch VK_ERROR_DEVICE_LOST to suggest batching remedies for
+// OS watchdog resets — without parsing the message text.
+struct VulkanError : std::runtime_error
+{
+    VkResult result;
+    VulkanError(VkResult r, const std::string& message)
+        : std::runtime_error(message), result(r)
+    {
+    }
+};
+
 inline void check(VkResult r, const char* what)
 {
     if (r != VK_SUCCESS)
     {
-        throw std::runtime_error(
+        throw VulkanError(
+            r,
             std::string("Vulkan error in ") + what + ": " + std::to_string(int(r)));
     }
 }
