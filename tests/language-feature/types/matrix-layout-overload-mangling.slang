@@ -4,12 +4,17 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type -Xslang -matrix-layout-row-major
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 func pickArray(m : row_major float2x3[2]) -> float { return 1.0; }
 func pickArray(m : column_major float2x3[2]) -> float { return 2.0; }
 func pickArray(m : float2x3[2]) -> float { return 3.0; }
+
+// An argument whose layout matches one overload exactly picks it over the overload that needs a
+// layout conversion, for an explicit layout and for the default one.
+func exactLayout(x : row_major float4x4[2]) -> float { return 1.0; }
+func exactLayout(x : float4x4[2]) -> float { return 2.0; }
 
 float pickBare(row_major float2x3 m) { return 4.0; }
 float pickBare(column_major float2x3 m) { return 5.0; }
@@ -69,6 +74,11 @@ void computeMain()
 
     outputBuffer[11] = callTag(row);
     outputBuffer[12] = callTag(column);
+
+    row_major float4x4 rowMajor4x4[2] = { float4x4(1), float4x4(2) };
+    float4x4 plain4x4[2] = { float4x4(1), float4x4(2) };
+    outputBuffer[13] = exactLayout(rowMajor4x4);
+    outputBuffer[14] = exactLayout(plain4x4);
 }
 
 // CHECK: type: float
@@ -85,3 +95,5 @@ void computeMain()
 // CHECK-NEXT: 2.0
 // CHECK-NEXT: 10.0
 // CHECK-NEXT: 11.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 2.0
