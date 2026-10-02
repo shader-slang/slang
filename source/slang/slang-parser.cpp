@@ -3371,12 +3371,7 @@ static Expr* _moveTypeModifiersToTypeExpr(
     Modifier** baseModifierLink = &ioBaseModifiers.first;
     while (auto baseModifier = *baseModifierLink)
     {
-        // We want to detect whether we have a modifier to move or not.
-        //
         auto typeModifier = as<TTypeModifier>(baseModifier);
-
-        // The easy case is when we *don't* have a modifier to move.
-        //
         if (!typeModifier)
         {
             // We want to leave the modifier where it is (in the list
