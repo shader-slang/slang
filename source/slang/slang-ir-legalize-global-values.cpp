@@ -248,30 +248,59 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
 
 struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
 {
+    // Return true if a value of `type` can live in target device-global storage
+    // as an immutable constant, and therefore need not be reconstructed once per
+    // invocation: a basic scalar, vector, matrix, an array of such, or a struct
+    // whose every field is itself a simple constant.
+    //
+    // The struct case recurses through the fields, which is what admits a POD
+    // `static const` table of structs (e.g. `static const Record records[2]`).
+    // It still (correctly) rejects any struct that directly or transitively
+    // contains a resource, pointer, or other opaque/handle field, because such a
+    // field type is not basic/vector/matrix/array/struct and so falls through to
+    // `return false`. Returning false is the conservative answer here: it forces
+    // the value to be inlined to its use sites, which is always legal, so a
+    // non-simple struct is handled safely rather than wrongly placed in global
+    // storage.
     static bool isSimpleConstantType(IRType* type)
     {
-        for (;;)
+        if (!type)
+            return true;
+        if (as<IRBasicType>(type))
+            return true;
+        if (as<IRVectorType>(type))
+            return true;
+        if (as<IRMatrixType>(type))
+            return true;
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return isSimpleConstantType(arrayType->getElementType());
+        if (auto structType = as<IRStructType>(type))
         {
-            if (!type)
-                return true;
-            if (as<IRBasicType>(type))
-                return true;
-            if (as<IRVectorType>(type))
-                return true;
-            if (as<IRMatrixType>(type))
-                return true;
-            if (auto arrayType = as<IRArrayTypeBase>(type))
+            for (auto field : structType->getFields())
             {
-                type = arrayType->getElementType();
-                continue;
+                if (!isSimpleConstantType(field->getFieldType()))
+                    return false;
             }
-            return false;
+            return true;
         }
+        return false;
     }
     bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
-        auto type = inst->getDataType();
-        return isSimpleConstantType(type);
+        // A call is a runtime computation, never a compile-time constant, even
+        // when its result type is a simple constant type. This matters because
+        // the struct case of `isSimpleConstantType` above now accepts POD
+        // structs: a synthesized member-wise constructor call is folded to a
+        // `makeStruct` by `legalizeConstantConstructorCallsForGlobalScope`
+        // before this pass, but any constructor call it does not fold (a
+        // base-initializing derived constructor, or a user-defined constructor)
+        // must stay illegal here so it is inlined into its use sites. Leaving
+        // such a call at module scope would otherwise emit an illegal dynamic
+        // global initializer — e.g. a `__device__` variable initialized by a
+        // constructor call, which NVRTC rejects.
+        if (as<IRCall>(inst))
+            return false;
+        return isSimpleConstantType(inst->getDataType());
     }
 
     bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
@@ -280,6 +309,197 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
 
     IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
 };
+
+// Build and return the `makeStruct` equivalent of a call to a *member-wise*
+// synthesized constructor, or return nullptr if `call` is not such a call (the
+// caller performs the replacement). A member-wise synthesized constructor
+// allocates a temporary, stores each argument into the corresponding field in
+// declaration order, then returns the loaded value — which is semantically
+// identical to a `makeStruct` of the arguments.
+//
+// Not every synthesized constructor is member-wise: a derived struct's
+// synthesized constructor, for example, initializes its base through a nested
+// base-constructor call. So the body is verified field-by-field rather than
+// trusting the `synthesizedConstructor` decoration alone; anything that is not a
+// plain member-wise store of the parameters — a base-struct initializer, a
+// default field value, a conversion, any control flow — causes a conservative
+// bail, leaving the call to be inlined as before.
+//
+// A synthesized member-wise constructor call is the general lowering of struct
+// construction, and in a function body it correctly stays a call: a local
+// struct really is constructed at runtime there (a direct local `Record r =
+// {1,2}` emits a `Record.$init(...)` call, not a `makeStruct`). The shape only
+// becomes a problem for a module-scope `static const` initializer, e.g.
+// `static const Record records[2] = { {1,2}, {3,4} }`, whose value must be a
+// compile-time-constant aggregate to live in device-global storage:
+//
+//     let %r = globalConstant(makeArray(call Record.$init(1,2),
+//                                        call Record.$init(3,4)))
+//
+// A `Call` is never a legal global constant on any target, so left as-is the
+// whole table is force-inlined and reconstructed per-invocation in every using
+// function. When the constructor is provably member-wise (verified below) the
+// call is equivalent to a `makeStruct` of its arguments — the canonical
+// constant-aggregate form the legality gate and the emitter's global brace-init
+// folder already recognize. Normalizing to it here, at the module-global
+// legality boundary and only after proving the body shape, is what lets the
+// table stay a global constant.
+static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(IRCall* call)
+{
+    auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
+    if (!callee)
+        return nullptr;
+    auto ctorDecor = callee->findDecoration<IRConstructorDecoration>();
+    if (!ctorDecor || !ctorDecor->getSynthesizedStatus())
+        return nullptr;
+
+    auto structType = as<IRStructType>(call->getDataType());
+    if (!structType)
+        return nullptr;
+
+    // Only fold when the struct is itself a simple constant (POD). A struct with a
+    // resource, pointer, or other opaque field is not a legal global constant, so
+    // folding its constructor would produce a `makeStruct` that must be inlined
+    // anyway and would feed a non-constant aggregate into legalization; leave such
+    // calls for the normal inlining path.
+    if (!GlobalInstLegalizationInliningContext::isSimpleConstantType(structType))
+        return nullptr;
+
+    // A member-wise constructor has no control flow, so it is a single block.
+    auto block = callee->getFirstBlock();
+    if (!block || block->getNextBlock())
+        return nullptr;
+
+    // Map each parameter to the corresponding call argument.
+    Dictionary<IRInst*, IRInst*> paramToArg;
+    UInt paramCount = 0;
+    for (auto param : block->getParams())
+    {
+        if (paramCount >= call->getArgCount())
+            return nullptr;
+        paramToArg[param] = call->getArg(paramCount);
+        paramCount++;
+    }
+    if (paramCount != call->getArgCount())
+        return nullptr;
+
+    // Symbolically evaluate the body, recording the value stored into each
+    // field. Bail on anything outside the recognized member-wise shape.
+    IRVar* localVar = nullptr;
+    IRInst* loadedResult = nullptr;
+    Dictionary<IRInst*, IRInst*> fieldKeyToValue;
+    HashSet<IRInst*> consumedParams;
+    for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+            if (localVar) // more than one temporary is not the simple shape
+                return nullptr;
+            localVar = as<IRVar>(inst);
+            if (localVar->getDataType()->getValueType() != structType)
+                return nullptr;
+            break;
+        case kIROp_FieldAddress:
+            if (as<IRFieldAddress>(inst)->getBase() != localVar)
+                return nullptr;
+            break;
+        case kIROp_Store:
+            {
+                // A store after the value has been loaded would not be reflected
+                // in the returned struct, so it is not the member-wise shape.
+                if (loadedResult)
+                    return nullptr;
+                auto store = as<IRStore>(inst);
+                auto fieldAddr = as<IRFieldAddress>(store->getPtr());
+                if (!fieldAddr || fieldAddr->getBase() != localVar)
+                    return nullptr;
+                IRInst* arg = nullptr;
+                if (!paramToArg.tryGetValue(store->getVal(), arg))
+                    return nullptr; // stored value is not a plain parameter
+                if (consumedParams.contains(store->getVal()))
+                    return nullptr; // a parameter used for two fields is not 1:1 member-wise
+                consumedParams.add(store->getVal());
+                if (fieldKeyToValue.containsKey(fieldAddr->getField()))
+                    return nullptr; // a field written twice is not member-wise
+                fieldKeyToValue[fieldAddr->getField()] = arg;
+                break;
+            }
+        case kIROp_Load:
+            if (as<IRLoad>(inst)->getPtr() != localVar)
+                return nullptr;
+            loadedResult = inst;
+            break;
+        case kIROp_Return:
+            if (as<IRReturn>(inst)->getVal() != loadedResult)
+                return nullptr;
+            break;
+        default:
+            return nullptr; // any other instruction: bail conservatively
+        }
+    }
+
+    // Assemble the makeStruct operands in field-declaration order, requiring
+    // every field to have been initialized exactly once from a parameter.
+    List<IRInst*> args;
+    UInt fieldCount = 0;
+    for (auto field : structType->getFields())
+    {
+        IRInst* value = nullptr;
+        if (!fieldKeyToValue.tryGetValue(field->getKey(), value))
+            return nullptr; // a field was never initialized
+        args.add(value);
+        fieldCount++;
+    }
+
+    // A member-wise constructor initializes one field per parameter, one-to-one.
+    // Require exactly that: with the per-field/per-parameter uniqueness enforced
+    // above and the earlier `paramCount == call->getArgCount()` check, this makes
+    // the reconstruction a 1:1 field/parameter/argument mapping, so the rebuilt
+    // `makeStruct` faithfully evaluates every argument (none dropped or reused) and
+    // satisfies `IRMakeStruct`'s one-operand-per-field contract.
+    if (fieldCount != paramCount)
+        return nullptr;
+    SLANG_ASSERT((UInt)args.getCount() == fieldCount && fieldCount == call->getArgCount());
+
+    IRBuilder builder(call->getModule());
+    builder.setInsertBefore(call);
+    return builder.emitMakeStruct(structType, args);
+}
+
+// Restore the canonical `makeStruct` representation for module-scope constant
+// initializers that were lowered as synthesized member-wise constructor calls.
+// This runs just before `inlineGlobalConstantsForLegalization` so the resulting
+// `makeStruct` (whose type the extended `isSimpleConstantType` now recognizes)
+// stays a legal global constant instead of being reconstructed per-invocation.
+// The same call shape also occurs inside function bodies, where it is left
+// alone (a local struct is legitimately constructed at runtime); only a
+// module-scope occurrence needs this normalization, because only there must the
+// value be a compile-time-constant aggregate. See
+// `tryBuildMakeStructFromSynthesizedConstructorCall` for why folding it is the
+// principled fix.
+void legalizeConstantConstructorCallsForGlobalScope(IRModule* module)
+{
+    // The domain is exactly the module's own children: a `static const`
+    // initializer's constructor calls are hoisted to module scope, so they are
+    // direct global insts here (never nested inside a function body). Collect
+    // them first, then transform, because the transform mutates this same
+    // global-inst list (`replaceUsesWith` + `removeAndDeallocate`).
+    List<IRCall*> globalCalls;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto call = as<IRCall>(inst))
+            globalCalls.add(call);
+    }
+    for (auto call : globalCalls)
+    {
+        if (auto makeStruct = tryBuildMakeStructFromSynthesizedConstructorCall(call))
+        {
+            call->replaceUsesWith(makeStruct);
+            call->removeAndDeallocate();
+        }
+    }
+}
 
 void inlineGlobalConstantsForLegalization(IRModule* module)
 {
