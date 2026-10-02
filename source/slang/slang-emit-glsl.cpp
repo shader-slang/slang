@@ -69,16 +69,19 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
             SLANG_ASSERT(m_entryPointStage == Stage::Compute);
 
             // Grouping may be explicit or already inferred for an earlier derivative operation.
-            bool hasDerivativeGroupDecoration =
-                entryPoint->findDecoration<IRDerivativeGroupQuadDecoration>() ||
-                entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-            if (!hasDerivativeGroupDecoration)
+            if (!entryPoint->findDecoration<IRDerivativeGroupDecoration>())
             {
-                builder.addDecoration(
-                    entryPoint,
-                    shouldUseQuadDerivativeGroup(entryPoint)
-                        ? kIROp_DerivativeGroupQuadDecoration
-                        : kIROp_DerivativeGroupLinearDecoration);
+                switch (inferDerivativeGroupMode(entryPoint))
+                {
+                case DerivativeGroupMode::Quad:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+                    break;
+                case DerivativeGroupMode::Linear:
+                    builder.addDecoration(entryPoint, kIROp_DerivativeGroupLinearDecoration);
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unexpected derivative-group mode");
+                }
             }
         }
     }
