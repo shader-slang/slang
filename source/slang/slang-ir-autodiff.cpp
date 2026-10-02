@@ -1354,7 +1354,10 @@ bool isDiffInst(IRInst* inst)
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
-    // Copy debug decorations.
+    // cloneDecoration re-references (shares) a decoration's operands rather than deep-copying them,
+    // which is fine for the decorations cloned below: they reference shared source/scope context.
+    // A function's IRDebugFunction, however, uniquely names and identifies one function body, so
+    // DebugFuncDecoration is not cloned -- each derivative gets its own record, rebuilt below.
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
@@ -1363,9 +1366,49 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
         case kIROp_DebugScope:
         case kIROp_DebugNoScope:
         case kIROp_DebugInlinedVariable:
-        case kIROp_DebugFuncDecoration:
         case kIROp_DebugLocationDecoration:
             cloneDecoration(decor, destFunc);
+            break;
+        case kIROp_DebugFuncDecoration:
+            {
+                // Each derivative needs its OWN IRDebugFunction: a DebugFunction record identifies
+                // a single function body (one DebugFunctionDefinition per record) and supplies its
+                // debug name.
+                auto srcDebugFunc =
+                    cast<IRDebugFunction>(as<IRDebugFuncDecoration>(decor)->getDebugFunc());
+
+                // Name the record from the derivative's own name hint. generateName /
+                // translateFuncHeader add that hint before this runs, but only when the original
+                // had one, so a missing hint means the original was itself unnamed (its debug name
+                // came from a linkage name) -- asserted below. In that case we reuse the source
+                // name; the derivative still gets its own IRDebugFunction instance, only the name
+                // text is shared.
+                IRInst* name;
+                if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
+                {
+                    name = nameHint->getNameOperand();
+                }
+                else
+                {
+                    SLANG_RELEASE_ASSERT(!srcFunc->findDecoration<IRNameHintDecoration>());
+                    name = srcDebugFunc->getName();
+                }
+
+                // Insert the record in the derivative's own scope (before destFunc), as
+                // lower-to-ir does. copyDebugInfo can run while a derivative is still nested in an
+                // IRGeneric, and its type operand may reference that generic's parameters, so the
+                // record must share the derivative's scope rather than sit at module scope.
+                IRBuilder builder(destFunc->getModule());
+                builder.setInsertBefore(destFunc);
+                auto derivativeDebugFunc = builder.emitDebugFunction(
+                    name,
+                    srcDebugFunc->getLine(),
+                    srcDebugFunc->getCol(),
+                    srcDebugFunc->getFile(),
+                    destFunc->getDataType(),
+                    srcDebugFunc->getParentScope());
+                builder.addDecoration(destFunc, kIROp_DebugFuncDecoration, derivativeDebugFunc);
+            }
             break;
         default:
             break;
