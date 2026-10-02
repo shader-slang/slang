@@ -231,25 +231,11 @@ ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourc
     {
         auto handle = cudaView->memoryResource->getBindlessHandle();
         setData(offset, &handle, sizeof(handle));
-        auto sizeOffset = offset;
-        sizeOffset.uniformOffset += sizeof(handle);
-        auto& desc = *cudaView->memoryResource->getDesc();
-        size_t size = desc.sizeInBytes;
-        if (desc.elementSize > 1)
-            size /= desc.elementSize;
-        setData(sizeOffset, &size, sizeof(size));
     }
     else if (cudaView->proxyBuffer)
     {
         auto handle = cudaView->proxyBuffer;
         setData(offset, &handle, sizeof(handle));
-        auto sizeOffset = offset;
-        sizeOffset.uniformOffset += sizeof(handle);
-        auto& desc = *cudaView->memoryResource->getDesc();
-        size_t size = desc.sizeInBytes;
-        if (desc.elementSize > 1)
-            size /= desc.elementSize;
-        setData(sizeOffset, &size, sizeof(size));
     }
     return SLANG_OK;
 }

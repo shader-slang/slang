@@ -203,7 +203,7 @@ standard output = {
         },
         {
             "name": "sb",
-            "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
+            "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0},
             "type": {
                 "kind": "resource",
                 "baseShape": "structuredBuffer",
@@ -299,7 +299,7 @@ standard output = {
                     ]
                 },
                 "sizes": [
-                    {"kind": "uniform", "value": 16, "alignment": 8}
+                    {"kind": "uniform", "value": 8, "alignment": 8}
                 ]
             }
         }
@@ -506,7 +506,7 @@ standard output = {
             },
             {
                 "name": "sb",
-                "binding": {"kind": "uniform", "offset": 8, "size": 16, "elementStride": 0},
+                "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0},
                 "type": {
                     "kind": "resource",
                     "baseShape": "structuredBuffer",
@@ -602,7 +602,7 @@ standard output = {
                         ]
                     },
                     "sizes": [
-                        {"kind": "uniform", "value": 16, "alignment": 8}
+                        {"kind": "uniform", "value": 8, "alignment": 8}
                     ]
                 }
             }

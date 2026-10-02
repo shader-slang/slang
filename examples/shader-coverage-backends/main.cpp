@@ -22,9 +22,8 @@
 //            the counter buffer is a (pointer, count) pair written into
 //            the kernel's global-parameter payload at the metadata's
 //            `uniformOffset`.
-//   cuda   — the same uniform-marshaling contract as cpu, with the
-//            differences inherent to the driver model: the pair holds a
-//            device pointer, the payload is copied into the module's
+//   cuda   — the buffer reference holds only a device pointer.
+//            The payload is copied into the module's
 //            `SLANG_globalParams` constant symbol, and readback is a
 //            device-to-host copy. Slang emits PTX through NVRTC.
 //   vulkan — the counter buffer is an ordinary storage buffer bound at
@@ -503,11 +502,10 @@ void runCpu(int counterByteWidth)
 
 // ## Backend: CUDA
 //
-// CUDA uses the same uniform-marshaling contract as CPU: the coverage
-// buffer is one more (pointer, count) pair in the global-parameter
+// CUDA represents the coverage buffer as a single device pointer in the global-parameter
 // payload, at the byte offset the metadata reports in `uniformOffset`.
 // The differences are the ones inherent to the driver model: the
-// pointer in the pair is a device pointer from `cuMemAlloc`, the
+// pointer comes from `cuMemAlloc`, the
 // payload is copied into the module's `SLANG_globalParams` constant
 // symbol rather than passed as a function argument (the emitted kernel
 // takes no launch-time parameters — this entry point has no uniform
@@ -570,31 +568,30 @@ void runCuda(int counterByteWidth)
     checkCuda(cuMemAlloc(&counterBuffer, counterBytes), "cuMemAlloc(counters)");
     checkCuda(cuMemsetD8(counterBuffer, 0, counterBytes), "cuMemsetD8(counters)");
 
-    // Build the global-parameter payload exactly like the CPU path —
-    // (pointer, count) pairs in declaration order, the coverage buffer
+    // Build the global-parameter payload with device pointers in
+    // declaration order, with the coverage buffer
     // appended at `uniformOffset` — and copy it into the module's
     // SLANG_globalParams symbol, which is where the emitted kernel
     // reads its global parameters from.
     struct CudaBufferView
     {
         CUdeviceptr data = 0;
-        size_t count = 0;
     };
     static_assert(
-        sizeof(CudaBufferView) == 16,
-        "the CUDA prelude's (RW)StructuredBuffer is a 16-byte (pointer, count) pair");
+        sizeof(CudaBufferView) == 8,
+        "the CUDA prelude's (RW)StructuredBuffer is a single 8-byte device pointer");
     // The fixed-offset writes below assume the two user buffers pack
     // first in declaration order with the coverage view appended after
     // them, so check that contract (like the coverage runtime unit
     // tests do) instead of letting a regressed offset turn into an
     // out-of-bounds write.
     if (program.resourceInfo.uniformStride != int32_t(sizeof(CudaBufferView)))
-        fail("coverage buffer uniform stride is not the (pointer, count) pair size");
+        fail("coverage buffer uniform stride is not the device pointer size");
     if (size_t(program.resourceInfo.uniformOffset) < 2 * sizeof(CudaBufferView))
         fail("coverage buffer uniform offset overlaps the user buffers' payload");
-    CudaBufferView inputView = {inputBuffer, kThreadCount};
-    CudaBufferView outputView = {outputBuffer, kThreadCount};
-    CudaBufferView coverageView = {counterBuffer, program.counterCount};
+    CudaBufferView inputView = {inputBuffer};
+    CudaBufferView outputView = {outputBuffer};
+    CudaBufferView coverageView = {counterBuffer};
 
     std::vector<uint8_t> globalParams(
         size_t(program.resourceInfo.uniformOffset) + sizeof(CudaBufferView),

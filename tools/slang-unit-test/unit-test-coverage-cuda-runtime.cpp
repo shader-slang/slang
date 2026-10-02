@@ -29,7 +29,7 @@ using namespace Slang;
 //   2. discover the hidden `__slang_coverage` buffer through
 //      `ISyntheticResourceMetadata`'s uniform-marshaling contract — the same
 //      `uniformOffset` / `uniformStride` fields the CPU path uses, with the
-//      difference that the (pointer, count) pair holds a device pointer,
+//      difference that the buffer reference holds only a device pointer,
 //   3. build the global-params payload on the host and copy it into the
 //      module's `SLANG_globalParams` constant symbol (the CUDA analogue of
 //      passing the payload pointer to the kernel function),
@@ -185,15 +185,13 @@ struct CudaPrimaryContextGuard
 };
 
 // The device-side representation of a (RW)StructuredBuffer<T> parameter, as
-// declared in `prelude/slang-cuda-prelude.h`: a data pointer followed by an
-// element count — the same 16-byte shape as the CPU path, except the pointer
-// is a device pointer. This is the value a host must store at
+// declared in `prelude/slang-cuda-prelude.h`: a single 8-byte device pointer.
+// This is the value a host must store at
 // `uniformOffset` inside the global-params payload to bind the coverage
 // counter buffer.
 struct CudaStructuredBufferView
 {
     CudaDevicePtr data = 0;
-    size_t count = 0;
 };
 
 // Every line we assert on holds exactly one statement, so one coverage
@@ -348,7 +346,7 @@ static void runCoverageCudaRuntimeTest(
     SLANG_CHECK_ABORT(syntheticResources->getResourceInfo(0, &resourceInfo) == SLANG_OK);
     SLANG_CHECK(resourceInfo.uniformOffset >= 0);
     // The CUDA representation of the coverage buffer is a
-    // (device pointer, element count) pair; the reported stride is the size
+    // device pointer; the reported stride is the size
     // of that representation in the global-params payload. Abort on
     // mismatch: the payload below is sized from these fields, so continuing
     // with an out-of-contract stride (e.g. the `0` "unavailable" sentinel)
@@ -394,10 +392,8 @@ static void runCoverageCudaRuntimeTest(
     SLANG_CHECK_ABORT(resourceInfo.uniformOffset >= int32_t(sizeof(CudaStructuredBufferView)));
     CudaStructuredBufferView outputView;
     outputView.data = outputBuffer;
-    outputView.count = kThreadCount;
     CudaStructuredBufferView coverageView;
     coverageView.data = counterBuffer;
-    coverageView.count = counterCount;
 
     List<uint8_t> globalParams;
     globalParams.setCount(Index(resourceInfo.uniformOffset) + Index(resourceInfo.uniformStride));

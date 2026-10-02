@@ -1176,8 +1176,14 @@ Compound Capabilities
 `cpp_glsl_hlsl_spirv`
 > CPP, GLSL, HLSL, and SPIRV code-gen targets
 
+`cpp_glsl_hlsl_spirv_llvm`
+> CPP, GLSL, HLSL, SPIRV and LLVM code-gen targets
+
 `cpp_glsl_hlsl_spirv_wgsl`
 > CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
+
+`cpp_glsl_hlsl_spirv_wgsl_llvm`
+> CPP, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
 
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets

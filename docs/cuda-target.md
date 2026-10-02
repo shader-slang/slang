@@ -96,7 +96,7 @@ struct UniformState
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
     SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
-    RWStructuredBuffer<int32_t> outputBuffer;    // This is implemented as a template in the CUDA prelude. It's just a pointer, and a size
+    RWStructuredBuffer<int32_t> outputBuffer;    // The CUDA prelude wrapper contains only a pointer.
     Thing* thing3;                  // Constant buffers map to pointers
 };
 
@@ -112,15 +112,33 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
 
 ```
     T* data;
-    size_t count;
 ```
 
 `ByteAddressBuffer`, `RWByteAddressBuffer` become
 
 ```
     uint32_t* data;
-    size_t sizeInBytes;
 ```
+
+Each buffer reference occupies 8 bytes with 8-byte alignment. The read-only
+`ByteAddressBuffer` wrapper stores a `const uint32_t*`. Buffer contents retain their
+CUDA element layout; this representation only describes the resource reference.
+
+Buffer `GetDimensions` and `getCount()` queries are unsupported on CUDA, as on Metal.
+Pass the element count or byte length as a separate shader parameter when needed.
+Buffer accesses do not perform bounds checks. Fixed-size and unsized arrays retain
+their bounds-checking hooks and support `SLANG_ENABLE_BOUND_ZERO_INDEX`, which
+redirects out-of-range accesses to element zero. Unsized arrays still carry their
+element count. `SLANG_BOUND_CHECK` and `SLANG_BOUND_CHECK_FIXED_ARRAY` overrides
+continue to apply to these arrays. Texture and surface boundary controls are
+unaffected.
+
+This replaces the legacy CUDA representation consisting of a pointer followed by a
+`size_t` element count or byte length. Hosts that pack shader arguments directly
+must use the layout reflected by the compiler that generated the shader. In
+particular, resource-array strides and the offsets of following fields change.
+Append/consume buffers contain two buffer references: one for the elements and one
+for the counter, for a total of 16 bytes.
 
 ## Texture
 

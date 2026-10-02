@@ -735,29 +735,12 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
     case kIROp_StructuredBufferGetDimensions:
         {
-            auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
-            auto stride = _generateUniqueName(UnownedStringSlice("_stride"));
-
-            m_writer->emit("uint ");
-            m_writer->emit(count);
-            m_writer->emit(";\n");
-            m_writer->emit("uint ");
-            m_writer->emit(stride);
-            m_writer->emit(";\n");
-            emitOperand(
-                inst->getOperand(0),
-                leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
-            m_writer->emit(".GetDimensions(&");
-            m_writer->emit(count);
-            m_writer->emit(", &");
-            m_writer->emit(stride);
-            m_writer->emit(");\n");
-            emitInstResultDecl(inst);
-            m_writer->emit("make_uint2(");
-            m_writer->emit(count);
-            m_writer->emit(", ");
-            m_writer->emit(stride);
-            m_writer->emit(");\n");
+            // A generic IArray.getCount() call can specialize to this operation after capability
+            // checking. CUDA buffer references have no length, so diagnose it here as well.
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "buffer dimensions",
+                .location = inst->sourceLoc});
+            _emitInstAsDefaultInitializedVar(inst, inst->getDataType());
             return true;
         }
     case kIROp_AtomicLoad:
