@@ -25,7 +25,8 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                     userSet.add(use->getUser());
 
                 // Check if the variable is initialized in the same block.
-                for (auto nextInst = inst->next; nextInst; nextInst = nextInst->next)
+                for (auto nextInst = inst->getNextInst(); nextInst;
+                     nextInst = nextInst->getNextInst())
                 {
                     switch (nextInst->getOp())
                     {

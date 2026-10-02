@@ -443,7 +443,8 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
 {
     if (branchBlock != switchInst->getBreakLabel())
     {
-        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr; inst = inst->next)
+        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr;
+             inst = inst->getNextInst())
         {
             switch (inst->getOp())
             {
@@ -584,7 +585,7 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
         {
             auto block = as<IRBlock>(targetUse->get());
             IRUnconditionalBranch* branch = nullptr;
-            for (auto inst = block->getFirstInst(); inst && !branch; inst = inst->next)
+            for (auto inst = block->getFirstInst(); inst && !branch; inst = inst->getNextInst())
             {
                 switch (inst->getOp())
                 {

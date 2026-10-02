@@ -3,6 +3,7 @@
 #include "core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang-ir.h"
+#include "slang.h" // `ISlangBlob`, named by `readSerializedModuleIR`
 
 namespace Slang
 {
@@ -23,10 +24,19 @@ void writeSerializedModuleIR(
     IRModule* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
+/// Reads an IR module out of `chunk`.
+///
+/// `blobHoldingSerializedData` is the blob those bytes live in, or null if the caller
+/// read them from storage it owns itself. It matters because instruction bodies can be
+/// left encoded and decoded on demand, out of spans that point into these bytes rather
+/// than copies of them: when a blob is supplied it is retained for as long as bodies can
+/// still be decoded, and when it is not, bodies are loaded eagerly instead. Passing null
+/// is therefore always safe, and never wrong -- only slower.
 [[nodiscard]] Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule);
 
 /// Reads module metadata without deserializing the IR or checking the semantic module version.
@@ -36,7 +46,8 @@ void writeSerializedModuleIR(
 /// `compilerVersion` and `name` are written only on success. A well-formed metadata record with a
 /// null module pointer returns `SLANG_FAIL`. A non-data chunk or missing Fossil root triggers
 /// `SLANG_UNEXPECTED`. The distinct unsupported-format result lets metadata callers issue a
-/// specific diagnostic before attempting IR deserialization.
+/// specific diagnostic before attempting IR deserialization. This path decodes no instruction
+/// bodies, so the on-demand deferral `readSerializedModuleIR` performs never applies here.
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     String* compilerVersion,
@@ -77,7 +88,7 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
         {
             List<IRInst*> lits;
             List<IRInst*> strings;
-            for (const auto c : inst->m_decorationsAndChildren)
+            for (const auto c : inst->getDecorationsAndChildren())
             {
                 if (c->m_op == kIROp_BoolLit || c->m_op == kIROp_IntLit ||
                     c->m_op == kIROp_FloatLit || c->m_op == kIROp_PtrLit ||
@@ -105,7 +116,7 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
         }
         else
         {
-            for (const auto c : inst->m_decorationsAndChildren)
+            for (const auto c : inst->getDecorationsAndChildren())
             {
                 go(go, c, depth + 1);
             }
