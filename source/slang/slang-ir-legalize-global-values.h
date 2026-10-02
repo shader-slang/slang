@@ -8,6 +8,7 @@ struct IRBuilder;
 struct IRCloneEnv;
 struct IRInst;
 struct IRModule;
+class DiagnosticSink;
 
 struct GlobalInstInliningContextGeneric
 {
@@ -48,7 +49,13 @@ struct GlobalInstInliningContextGeneric
 // For global constant values that are resource typed or struct containing resource types,
 // we need to inline their uses to concrete function bodies so they can be legalized during
 // resource legalization.
-void inlineGlobalConstantsForLegalization(IRModule* module);
+// CUDA callers set preserveStaticAggregates to retain literal aggregate initializers.
+// This also canonicalizes eligible synthesized constructors, reporting diagnostics
+// through sink. With preservation disabled, constructor bodies are left unchanged.
+void inlineGlobalConstantsForLegalization(
+    IRModule* module,
+    bool preserveStaticAggregates = false,
+    DiagnosticSink* sink = nullptr);
 
 
 } // namespace Slang
