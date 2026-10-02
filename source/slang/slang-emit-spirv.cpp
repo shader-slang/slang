@@ -4949,7 +4949,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_DebugLexicalBlock:
             if (shouldEmitExtendedDebugInfo)
-                *emittedSpvInst = ensureInst(inst);
+            {
+                *emittedSpvInst = emitDebugLexicalBlock(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    as<IRDebugLexicalBlock>(inst));
+            }
             return true;
 
         case kIROp_DebugInlinedAt:
@@ -10847,6 +10851,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Emit the explicit lexical parent chain recorded during lowering.
     SpvInst* emitDebugLexicalBlock(SpvInstParent* parent, IRDebugLexicalBlock* debugLexicalBlock)
     {
+        // A scope reference may have emitted this record before its own instruction is visited.
+        SpvInst* debugBlockInfo = nullptr;
+        if (m_mapIRInstToSpvInst.tryGetValue(debugLexicalBlock, debugBlockInfo))
+            return debugBlockInfo;
+
         auto parentScope = debugLexicalBlock->getParentScope();
         SLANG_RELEASE_ASSERT(
             as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
