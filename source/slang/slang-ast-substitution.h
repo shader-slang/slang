@@ -14,7 +14,9 @@ namespace Slang
 struct LinkTimeSubstitution
 {
     virtual Val* trySubstitute(Val* val) = 0;
-    virtual Val* diagnoseCycle(Val* val) = 0;
+    /// Report a cycle in this operation and abort compilation. No substitute value is returned:
+    /// a cycle can close on any semantic category, including a conformance witness.
+    [[noreturn]] virtual void diagnoseCycle() = 0;
 };
 
 /// Caches the completed Val substitutions performed by one substitution operation.
@@ -121,8 +123,7 @@ Val* substituteValWithCache(
     auto bindings = subst.linkTimeSubstitution;
     if (bindings && !cache->beginLinkTimeSubstitution(key))
     {
-        ++*ioDiff;
-        return bindings->diagnoseCycle(val);
+        bindings->diagnoseCycle();
     }
     SLANG_DEFER(if (bindings) cache->endLinkTimeSubstitution(key));
 
@@ -135,11 +136,23 @@ Val* substituteValWithCache(
         {
             // Follow dependencies in the selected definition with the same bindings and cache.
             result = replacement->substituteImpl(astBuilder, subst, &diff);
+            SLANG_RELEASE_ASSERT(result);
             ++diff;
         }
     }
     if (!result)
+    {
         result = dispatcher(subst, &diff);
+        if (bindings && result != val)
+        {
+            // Requirement lookup can expose another link-time dependency. For example,
+            // A.Assoc can resolve to B.Assoc, whose implementation refers back to A.Assoc.
+            // Finish resolving that result before leaving this visit, so the same active
+            // set detects the cycle instead of layout starting a fresh substitution query.
+            SLANG_RELEASE_ASSERT(result);
+            result = result->substituteImpl(astBuilder, subst, &diff);
+        }
+    }
     cache->add(key, {result, diff});
     *ioDiff += diff;
     return result;

@@ -1564,9 +1564,10 @@ struct TypeLayoutContext
     std::optional<Dictionary<String, Type*>> externTypeMap;
 
     /// Resolve all link-time dependencies before computing layout or varying bindings.
-    Type* resolveLinkTimeType(Type* type);
+    Type* resolveLinkTimeType(DeclRefType* type);
 
-    // Select the export without discarding the wrapper's checked conformance witnesses.
+    // Return the selected export wrapper, or the input if no export is selected. This does
+    // not unwrap aliases; resolveLinkTimeType uses the wrapper's checked proof before unwrapping.
     Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
 

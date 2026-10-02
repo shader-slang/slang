@@ -6610,22 +6610,21 @@ DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
 struct LayoutLinkTimeSubstitution : LinkTimeSubstitution
 {
     TypeLayoutContext& context;
+    Decl* requestedDecl;
 
-    LayoutLinkTimeSubstitution(TypeLayoutContext& inContext)
-        : context(inContext)
+    LayoutLinkTimeSubstitution(TypeLayoutContext& inContext, DeclRefType* requestedType)
+        : context(inContext), requestedDecl(requestedType->getDeclRef().getDecl())
     {
     }
 
-    Val* diagnoseCycle(Val* val) override
+    [[noreturn]] void diagnoseCycle() override
     {
-        // Only binding replacements introduce cycles: they replace a named type with another
-        // named type that ultimately depends on the original declaration.
-        auto type = as<DeclRefType>(val);
-        SLANG_RELEASE_ASSERT(type);
+        // Anchor the diagnostic at the requested type, regardless of whether the cycle
+        // closes on a type, declaration reference, or conformance witness. A witness
+        // cannot be replaced by ErrorType, so abort this query even without a sink.
         if (context.sink)
-            context.sink->diagnose(
-                Diagnostics::CyclicReference{.decl = type->getDeclRef().getDecl()});
-        return context.astBuilder->getErrorType();
+            context.sink->diagnose(Diagnostics::CyclicReference{.decl = requestedDecl});
+        SLANG_ABORT_COMPILATION("cyclic link-time type reference");
     }
 
     Val* trySubstitute(Val* val) override
@@ -6641,6 +6640,15 @@ struct LayoutLinkTimeSubstitution : LinkTimeSubstitution
                     context.lookupExternDeclRefType(as<DeclRefType>(witness->getSub()));
                 if (auto selected = isDeclRefTypeOf<AggTypeDecl>(selectedType))
                 {
+                    // Conformance checking stores an alias wrapper's checked proof in its
+                    // direct inheritance clause's witnessVal. Select that proof by the exact
+                    // substituted interface type, using normal semantic equality. This is a
+                    // direct conformance boundary; inherited paths remain represented by
+                    // TransitiveSubtypeWitness, not rediscovered here. Matching clauses ask
+                    // tryGetSubtypeWitness for the same aliased type and interface during
+                    // conformance checking, so selecting the first checked proof suffices.
+                    // No match is valid for an unresolved extern or an ordinary concrete
+                    // conformance (which has a witness table rather than witnessVal).
                     for (auto clause : getMembersOfType<InheritanceDecl>(astBuilder, selected))
                     {
                         if (!clause.getDecl()->witnessVal)
@@ -6669,9 +6677,9 @@ struct LayoutLinkTimeSubstitution : LinkTimeSubstitution
     }
 };
 
-Type* TypeLayoutContext::resolveLinkTimeType(Type* type)
+Type* TypeLayoutContext::resolveLinkTimeType(DeclRefType* type)
 {
-    LayoutLinkTimeSubstitution bindings(*this);
+    LayoutLinkTimeSubstitution bindings(*this, type);
     SubstitutionSet subst;
     subst.linkTimeSubstitution = &bindings;
     auto result = as<Type>(type->substitute(astBuilder, subst));

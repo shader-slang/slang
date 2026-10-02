@@ -1195,6 +1195,7 @@ DeclRefBase* DeclRefBase::getParent()
 
 SubstitutionSet::operator bool() const
 {
+    // Either a non-direct generic decl-ref or a link-time provider makes the set non-empty.
     return linkTimeSubstitution || (declRef != nullptr && !as<DirectDeclRef>(declRef));
 }
 

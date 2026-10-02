@@ -3144,7 +3144,9 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
             continue;
-        // A specialized payload/attribute struct must retain a struct layout, even when empty.
+        // A resolved struct gets StructTypeLayout even with no fields; lowerTypeLayout turns
+        // that into IRStructTypeLayout. resolveLinkTimeType ensures associated payload/attribute
+        // types reach that struct-layout path instead of retaining an unresolved empty layout.
         // Otherwise an unresolved frontend layout can make a live ray payload look like a
         // private variable, and optimization can silently discard all of its writes (#13276).
         auto valueType = param->getDataType();
