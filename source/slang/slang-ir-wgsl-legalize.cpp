@@ -349,10 +349,10 @@ struct WGSLAddressSpaceAssigner : InitialAddressSpaceAssigner
     }
 };
 
-void specializeAddressSpaceForWGSL(IRModule* module)
+void specializeAddressSpaceForWGSL(IRModule* module, DiagnosticSink* sink)
 {
     WGSLAddressSpaceAssigner wgslAddressSpaceAssigner;
-    specializeAddressSpace(module, &wgslAddressSpaceAssigner);
+    specializeAddressSpace(module, &wgslAddressSpaceAssigner, sink);
 }
 
 } // namespace Slang
