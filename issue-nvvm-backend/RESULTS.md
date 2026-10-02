@@ -1579,3 +1579,77 @@ opcodes have 8 failed materialization attempts per mode (driver error 500), not 
 `readelf -sW` confirms kernel symbols and the failing cubins' extra weak undefined descriptor-size
 symbol. No private symbol value is supplied. These are standalone CUDA/PTX mechanism results,
 not fresh Slang capability or full-corpus acceptance. All earlier failures remain retained.
+
+## Optional SlangPy CUDA suite
+
+Use the sibling checkout's opt-in qualification integration. Current outcomes and exact failing
+nodes live in [slangpy-cuda-status.json](slangpy-cuda-status.json); raw commands, JUnit, logs and
+loaded-library hashes are under ignored `build/nvvm-slangpy/`. This is the CUDA-selected Python
+suite, not the Vulkan/D3D12, C++, sample or benchmark suites. It is not a full Torch qualification
+when Torch is absent. Existing authored optimization settings remain in effect.
+
+Preserve `../slangpy/build/linux-gcc` and its source-package extension. Stage Python sources into
+a separate package, excluding generated binaries; synchronize this tree after Python changes:
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+import shutil
+source = Path('../slangpy/slangpy')
+stage = Path('build/nvvm-slangpy/python/slangpy')
+shutil.copytree(source, stage, dirs_exist_ok=True,
+    ignore=shutil.ignore_patterns('*.so', '*.dwarf', '__pycache__', '.build_dir', '.pytest_cache'))
+PY
+cmake --preset linux-gcc -S ../slangpy -B "$PWD/build/nvvm-slangpy/native" \
+  -DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR="$PWD" \
+  -DSGL_LOCAL_SLANG_BUILD_DIR=build/RelWithDebInfo \
+  -DSGL_LOCAL_RHI=ON -DSGL_LOCAL_RHI_DIR="$PWD/../slang-rhi" \
+  -DSGL_ENABLE_NVVM_TESTING=ON \
+  -DSLANGPY_PACKAGE_DIR="$PWD/build/nvvm-slangpy/python/slangpy" \
+  -DPython_EXECUTABLE="$PWD/../slangpy/.venv/bin/python" \
+  -DSGL_BUILD_TESTS=OFF -DSGL_BUILD_EXAMPLES=OFF -DSGL_ENABLE_CRASHPAD=OFF
+cmake --build build/nvvm-slangpy/native --config RelWithDebInfo --parallel 8 --target slangpy_ext
+```
+
+The accepted configure additionally reuses the existing SlangPy vcpkg tree with
+`VCPKG_MANIFEST_INSTALL=OFF`, imgui/Vulkan headers source caches, and the RHI OptiX8.0/8.1/9.0 SDK
+source caches with `FETCHCONTENT_FULLY_DISCONNECTED=ON`. `configure-1.json` records exact arguments.
+On a new checkout, use its ordinary dependency setup or supply those cache paths explicitly.
+Hydrate the pinned `data` submodule's LFS images and reference arrays before testing. The current
+checkpoint required `test_images/albert.jpg`, `monalisa.jpg`, `dds/bc1-unorm.dds` and
+`dds/bc1-unorm-ref.npz`. Validate downloads against their LFS SHA-256 and byte counts. Do not enable
+unsafe NumPy pickle loading to read an unresolved LFS pointer.
+
+From this Slang repository root, select the local artifacts and staged package explicitly:
+
+```sh
+export CUDA_PATH=/usr/local/cuda-12.9
+export CUDA_HOME="$CUDA_PATH"
+export LIBNVVM_HOME="$CUDA_PATH"
+export SLANG_NVVM_BUILDER_PATH="$PWD/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so"
+export LD_LIBRARY_PATH="$PWD/build/RelWithDebInfo/lib:$PWD/build/RelWithDebInfo/bin:$CUDA_PATH/nvvm/lib64:$CUDA_PATH/lib64:${LD_LIBRARY_PATH:-}"
+export SLANG_PATH="$PWD/build/RelWithDebInfo/bin"
+export PYTHONPATH="$PWD/build/nvvm-slangpy/python:$PWD/../slangpy"
+export SLANGPY_TEST_CUDA_COMPILER=nvvm
+../slangpy/.venv/bin/python -m pytest -c ../slangpy/pyproject.toml \
+  --rootdir="$PWD/build/nvvm-slangpy/python" \
+  -o "pythonpath=$PWD/build/nvvm-slangpy/python $PWD/../slangpy" \
+  --import-mode=importlib --device-types=cuda \
+  build/nvvm-slangpy/python/slangpy/tests/device/test_cuda_compiler_route.py -v
+```
+
+Verify `slangpy.__file__`, the extension path and `/proc/self/maps` after a real NVVM dispatch.
+The source checkout must follow the staged package on `sys.path`: collection imports `tools.ci`
+from the checkout. The staged pytest root prevents importlib from inventing a second package name.
+For collection, replace the final test path with `build/nvvm-slangpy/python/slangpy/tests` and add
+`--collect-only -q`. For a full checkpoint, use that directory with `-v --tb=short -n 1
+--max-worker-restart=100 --junitxml=<fresh-output.xml>`, capturing the complete console log as well.
+Reconcile all collected IDs with terminal/JUnit outcomes; module collection skips are additional
+records, and xfails are separate from ordinary skips. A crash or timeout requires explicit accounting
+and fresh-process execution of unrun IDs, never a successful checkpoint inferred from exit alone.
+
+For selected NVRTC comparisons, use the same build and exact test IDs in a fresh process with
+`SLANGPY_TEST_CUDA_COMPILER=nvrtc`. Keep the environment choice fixed for the entire process.
+The five route checks cover helper/direct/custom sessions and missing/invalid selection. RHI
+internal direct NVRTC kernels are outside this SlangPy-session selection claim. Broad runs remain
+on demand; keep failure histories and use focused families between checkpoints.

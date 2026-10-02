@@ -7,6 +7,11 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
+**Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout
+against local Slang and RHI, verify explicit NVVM execution, run its complete CUDA-selected Python
+suite, and group failures into complete feature families. This work proceeds independently of the
+parked legacy HitObject semantic decision below. Preserve the existing SlangPy build and package.
+
 **Resumed on 2026-10-02:** the maintainer approved explicit OptiX8.0/8.1/9.0 targeting,
 common raygen/trace/callable qualification, then the older-version HitObject family. Version targeting
 and the common family are accepted. **Current decision boundary:** await the maintainer's choice
@@ -205,3 +210,28 @@ into a checked-in archive. `.gitignore` guards against accidental numbered snaps
 Format changed files, inspect the final diff, verify live links/inputs and exact evidence preservation,
 and obtain independent review. Update current status and stop/resume authority, then make the
 reviewed local commit. Do not commit completed working plans or report drafts. No Slack notifications.
+
+## Optional application validation with SlangPy
+
+The sibling `../slangpy` checkout is an on-demand application checkpoint, rebuilt against this
+Slang compiler and sibling RHI. It creates independent Slang sessions: selecting NVVM only on the
+RHI test device is insufficient. Use the opt-in local `SGL_ENABLE_NVVM_TESTING` build and a fixed
+`SLANGPY_TEST_CUDA_COMPILER=nvvm` or `nvrtc` for each process. The session producer records the
+explicit route, SM80 capability and actual device OptiX version in typed compiler options and the
+existing session digest. Normal SlangPy builds keep their defaults.
+
+[RESULTS](RESULTS.md#optional-slangpy-cuda-suite) owns setup and invocation;
+[slangpy-cuda-status.json](slangpy-cuda-status.json) owns current exact outcomes, comparisons and
+failure histories. Preserve the existing extension/build, use a staged matching Python package,
+verify loaded compiler/provider identity, and run the route gates before broad qualification.
+Use one GPU worker. CUDA selection skips functions without a `device_type` parameter; missing
+optional dependencies can also skip whole modules during collection. Report both boundaries,
+expected failures, crashes and unrun tests explicitly. Keep required LFS assets hydrated. The maintainer pulled the LFS resources during this checkpoint;
+preserve that state.
+
+Group first-failure diagnostics into whole feature families, without assuming one repair will
+make every grouped test pass. Start with fixed numeric aggregate entry ABI and correct byval
+aggregate forwarding, then resource/helper transport, normalized surface conversions and intrinsic
+TensorView operations. Keep resource provenance, type roles and representation caches explicit.
+Application failures do not automatically alter the compiler working corpus. Full application
+runs remain deliberate checkpoints; use affected tests and smoke between them.

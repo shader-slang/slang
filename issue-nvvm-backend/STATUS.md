@@ -26,6 +26,34 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
 
+## SlangPy application checkpoint
+
+The requested on-demand CUDA-selected SlangPy checkpoint is complete: **1,054 passed,
+536 failed, 807 skipped and 3 expected failures across 2,400 test nodes**, plus 14 module-level
+collection skips (12 Torch-related, imgui_bundle and tev). No crashes, collection errors or unrun
+collected nodes remain. The corrected full run took 95 seconds. CUDA selection excludes functions
+without a `device_type` parameter; this is not qualification of every SlangPy platform or Torch.
+
+The isolated SlangPy build uses local Slang/RHI, eight build jobs, and explicit typed NVVM/SM80/
+actual OptiX options in every CUDA session. Five route/selector tests pass; helper, direct and
+custom-session GPU outputs distinguish NVVM from NVRTC. The original source-package extension
+and build marker remain unchanged. LFS images/reference data are hydrated and preserved at the
+maintainer's request. SlangPy pre-commit passes. No compiler implementation was changed here.
+
+[slangpy-cuda-status.json](slangpy-cuda-status.json) retains exact failures, skips, comparisons,
+loaded binary hashes and initial failure histories. The first NVRTC selection passed 32 of 35;
+shared image failures were unresolved LFS pointers and a texture-format restriction. After setup
+repair, all 13 final targeted controls pass. The original full run's six asset failures are resolved;
+the order-sensitive command-buffer cleanup assertion is retained separately from its isolated
+entry-parameter rejection. Do not infer full NVRTC acceptance from representative comparisons.
+
+Next complete families, in order: fixed numeric aggregate entry ABI (408 first diagnostics,
+including generated grid arrays); byval entry-record forwarding (12 value-call failures);
+resource helper wrappers/arrays and checked layout; normalized surface conversions (50 imageStore
+failures); intrinsic TensorView/DiffTensorView ABI and operations. Diagnostic clusters can hide
+later gaps, so these counts are not promised gains. Preserve type roles and address provenance.
+The legacy OptiX8 HitObject semantic decision remains parked independently of this backlog.
+
 ## Current full acceptance
 
 The requested post-cleanup/Half checkpoint is accepted after independent review.
