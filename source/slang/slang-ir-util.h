@@ -690,21 +690,19 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
 bool isReadNoneCallee(IRInst* callee);
 
-/// True iff `callee` is read-none AND every user-supplied derivative variant
-/// of it whose read-none-ness is not already implied by the primary is also
-/// read-none.
-///
-/// In practice this checks the `ForwardDerivative` annotation and the
-/// `BackwardDerivativePropagate` annotation. `BackwardDerivativeApply` is
-/// intentionally not consulted because the apply wrapper inherits
-/// read-none-ness from the primary callee — see the implementation comment
-/// in `slang-ir-util.cpp` for the unwrapping chain.
+/// True iff `callee` is read-none AND every derivative callee associated with
+/// it (its `ForwardDerivative`, `BackwardDerivativeApply` and
+/// `BackwardDerivativePropagate` annotations) is also read-none. Annotations
+/// are looked up on the resolved inner function, so the derivatives of a
+/// generic primary are not consulted; see the implementation comment in
+/// `slang-ir-util.cpp`.
 ///
 /// The carry-set analysis in slang-ir-check-differentiability needs this
 /// stronger property: a primary callee can be `[__readNone]` while its
-/// user-supplied `[ForwardDerivative]` or `[BackwardDerivative]` has side
-/// effects, in which case a call to the primary still produces observable
-/// derivative state through differentiation. Other callers of
+/// user-supplied `[ForwardDerivative]`, `[BackwardDerivative]` or
+/// `__func_extension __apply` (the apply function or its context's
+/// `operator()`) has side effects, in which case a call to the primary still
+/// produces observable derivative state through differentiation. Other callers of
 /// `isReadNoneCallee` reason about the local function's own read-none-ness
 /// and should not use this variant.
 bool isReadNoneCalleeAndAllDerivatives(IRInst* callee);
