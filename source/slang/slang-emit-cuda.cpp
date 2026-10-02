@@ -1662,6 +1662,23 @@ bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
 
 void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
+    auto& options = getTargetProgram()->getOptionSet();
+    if (!options.hasValidOptixVersion())
+    {
+        sink->diagnoseRaw(
+            Severity::Error,
+            "unsupported OptiX version; expected 80000, 80100, or 90000");
+        return;
+    }
+    if (options.hasOption(CompilerOptionName::OptixVersion))
+    {
+        // SDK headers have already been included by the prelude. An explicit target contract
+        // must not silently compile against a different set of device APIs.
+        m_writer->emit("\n#if defined(OPTIX_VERSION) && OPTIX_VERSION != ");
+        m_writer->emit(options.getOptixVersion());
+        m_writer->emit(
+            "\n#error Slang OptiX target version does not match the SDK headers\n#endif\n");
+    }
     // Set up with all of the base types used in the module
     m_extensionTracker->requireBaseTypes(_findBaseTypesUsed(module));
 

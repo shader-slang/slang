@@ -120,6 +120,9 @@ public:
                                                                   : nullptr;
     }
 
+    bool supportsOptixVersion(uint32_t version) const;
+    SlangResult setOptixVersion(SlangNVVMModuleHandle module, uint32_t version) const;
+
     bool supportsCallable() const { return m_callableOperations.emitCall != nullptr; }
     SlangResult emitCallable(
         SlangNVVMModuleHandle module,
@@ -490,6 +493,7 @@ private:
     SlangNVVMBuilderInstanceTransformOperationsAPI m_instanceTransformOperations = {};
     SlangNVVMBuilderCurrentTransformOperationsAPI m_currentTransformOperations = {};
     SlangNVVMBuilderCallableOperationsAPI m_callableOperations = {};
+    SlangNVVMBuilderOptixTargetAPI m_optixTarget = {};
     SlangNVVMBuilderHitObjectOperationsAPI m_hitObjectOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};

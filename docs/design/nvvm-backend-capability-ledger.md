@@ -31,6 +31,38 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## Explicit OptiX versions
+
+`OptixVersion` / `-optix-version 80000|80100|90000` selects an SDK contract independent of CUDA
+and GPU architecture. RHI supplies its actual context version. Existing target/link hashes include
+the selection; explicit NVRTC selection checks the SDK headers. Default NVVM remains90000.
+Optional provider interface12 configures an empty module; ABI46/module43/container2 are unchanged.
+
+| SDK | NVVM common runtime                          | Selected NVRTC controls | HitObject status                                               |
+| --- | -------------------------------------------- | ----------------------- | -------------------------------------------------------------- |
+| 8.0 | 9 pass / 1 inherited skip, 1,401 assertions  | 2 pass,24 assertions    | Rejected; legacy contract pending                              |
+| 8.1 | 9 pass / 1 inherited skip, 1,401 assertions  | 2 pass,24 assertions    | Rejected; legacy contract pending                              |
+| 9.0 | 10 pass / 1 inherited skip, 2,527 assertions | 2 pass,24 assertions    | Retained supported lifecycle passes; arbitraryMakeHit excluded |
+
+Common coverage is raygen/bindings, triangle tracing, recursive payload layout and callable families;
+the latter payload/callable fixtures exerciseO0/O3. SDK 9 includes the retained lifecycle. The
+entry-parameter write/cache fixture is a runtime skip on all three, not an executed pass.16 version/
+routing cells,13 existing stdout rejection controls and all 16 smoke cells pass. This is focused
+qualification on L4/driver595.71.05/CUDA12.9/SM80, not complete SDK or full-suite acceptance.
+The new no-o source rejection fixture also repairs CLI target-option ownership: target creation
+now copies options independently of output-file association. The13 existing stdout fixtures are
+freshly requalified; their historical successes alone could have exercisedNVRTC.
+
+Raw SDK probes show native 8.x Traverse/Invoke and explicit constructor/Invoke both expose zero
+incoming RayFlags, while9 preserves flags. Ordinary Trace independently preserves flags on all three.
+For flag 8, native 8 Invoke executes CH while9Invoke suppresses CH. Treat this as empirical SDK behavior,
+not an inferred Vulkan/D3D standaloneInvoke rule. Modern flag visibility inside invoked CH/MS
+cannot be recovered merely by storing flags alongside an older snapshot. A private context ABI
+preserving 32 payload words or an explicit native 8semantic exception remains a maintainer decision.
+The [D3D HitObject contract](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hitobject-invoke)
+and [SPIR-V EXT contract](https://github.khronos.org/SPIRV-Registry/extensions/EXT/SPV_EXT_shader_invocation_reorder.html)
+remain comparison references; oldNV/OptiX8 API shape is not automatic modern semantic parity.
+
 ## HitObject lifecycle and boundaries
 
 The OptiX9 implementation retains independent noncopyable objects in caller-owned storage,

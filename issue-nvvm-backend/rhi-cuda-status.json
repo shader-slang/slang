@@ -977,6 +977,180 @@
         "failed": 0
       },
       "scope": "Focused 15-case repair control after the full RHI run; other full results retain their earlier identity."
+    },
+    "optix-versions-common-final-80000": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/common-final-80000.json",
+        "sha256": "7bb98f4c5bf571bbffa22010f1f391171e207a5d613c2e26aab078037d6e0052",
+        "return_code": 0,
+        "elapsed_seconds": 4.7266011238098145
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/common-final-80000.log",
+        "sha256": "7e18bb1db0fa5f8a87dd99f388b490c3bb5a041dcb5401d4a8a9762dd297b2d4"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvvm",
+      "optix_version": 80000,
+      "counts": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 1
+      },
+      "assertions": {
+        "total": 1401,
+        "passed": 1401,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "optix-versions-common-final-80100": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/common-final-80100.json",
+        "sha256": "7d3b6058372c2e0c8fe3bceefac43cbac26e6e29cf8aa5b9e69c6c69e2dff641",
+        "return_code": 0,
+        "elapsed_seconds": 4.6263651847839355
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/common-final-80100.log",
+        "sha256": "7fbadcfbf89adfe4474fe0df06aa59f2787d8548f24fea35b12bb57d993d0491"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvvm",
+      "optix_version": 80100,
+      "counts": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 1
+      },
+      "assertions": {
+        "total": 1401,
+        "passed": 1401,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "optix-versions-common-final-90000": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/common-final-90000.json",
+        "sha256": "dc5525a48015b60a5daa60f79422ca4011c1fb80452fa8e3dd09ad8b9898c46a",
+        "return_code": 0,
+        "elapsed_seconds": 6.002567529678345
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/common-final-90000.log",
+        "sha256": "6c7ab0e74125e362c95f133f81a2743a575fe2bfcf24b35230e60462852aa2d6"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvvm",
+      "optix_version": 90000,
+      "counts": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 1
+      },
+      "assertions": {
+        "total": 2527,
+        "passed": 2527,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "optix-versions-nvrtc-final-80000": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-80000.json",
+        "sha256": "728ab64420916c8c0797d82ac46b3fe1e63a65e6d8313f8f48686aab644ac564",
+        "return_code": 0,
+        "elapsed_seconds": 2.113389730453491
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-80000.log",
+        "sha256": "3104c78634d60b636a46e887e2187f0929ff10989c1990dfc3d0ed0fc15f6a62"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvrtc",
+      "optix_version": 80000,
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 24,
+        "passed": 24,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "optix-versions-nvrtc-final-80100": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-80100.json",
+        "sha256": "aea5410e118469278dcbd21d7952f62b8d923b9d6f25c7410301a64988179dc6",
+        "return_code": 0,
+        "elapsed_seconds": 2.1228342056274414
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-80100.log",
+        "sha256": "e696d4ae07dd7401f5d796ad4ab01933cd6c357f84f5a9536dabae882191c637"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvrtc",
+      "optix_version": 80100,
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 24,
+        "passed": 24,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "optix-versions-nvrtc-final-90000": {
+      "gate": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-90000.json",
+        "sha256": "4f104bce0eea5e0157e17aa663e73244478b23f36b2c240f2d06bcc24db6dd28",
+        "return_code": 0,
+        "elapsed_seconds": 2.128262519836426
+      },
+      "log": {
+        "path": "build/nvvm-optix-versions/nvrtc-final-90000.log",
+        "sha256": "3816346ade5c37140a92cea967605f83e9aff5ad4361aafb025989f4d0a6149a"
+      },
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "compiler_selection": "nvrtc",
+      "optix_version": 90000,
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 24,
+        "passed": 24,
+        "failed": 0
+      },
+      "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
     }
   },
   "reconciliation": {
@@ -11933,6 +12107,36 @@
           "terminal_line": 104,
           "detail": "0.06s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 7,
+          "detail": "0.25s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 7,
+          "detail": "0.25s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 8,
+          "detail": "0.26s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "callable_abi",
@@ -13179,6 +13383,36 @@
           "terminal_line": 87,
           "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 9,
+          "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 9,
+          "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 10,
+          "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache"
@@ -13229,6 +13463,36 @@
           "terminal_line": 102,
           "detail": "0.42s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 24,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 24,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 25,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -13277,6 +13541,66 @@
           "reported_status": "passed",
           "terminal_line": 110,
           "detail": "0.17s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 32,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 32,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 33,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-80000",
+          "compiler_selection": "nvrtc",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 11,
+          "detail": "0.38s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-80100",
+          "compiler_selection": "nvrtc",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 11,
+          "detail": "0.39s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-90000",
+          "compiler_selection": "nvrtc",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 11,
+          "detail": "0.40s",
           "failed_assertion_records": 0
         }
       ]
@@ -14874,6 +15198,36 @@
           "reported_status": "passed",
           "terminal_line": 183,
           "detail": "0.64s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 33,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 33,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 34,
+          "detail": "0.06s",
           "failed_assertion_records": 0
         }
       ]
@@ -18850,6 +19204,16 @@
           "terminal_line": 427,
           "detail": "1.43s",
           "failed_assertion_records": 2
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 7,
+          "detail": "1.20s",
+          "failed_assertion_records": 0
         }
       ],
       "qualification": "Independent guarded533-word lifecycle oracle at O0/O3; new after initial full checkpoint.",
@@ -19343,6 +19707,36 @@
           "terminal_line": 7,
           "detail": "0.82s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "0.80s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "0.79s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "0.79s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -19435,6 +19829,36 @@
           "reported_status": "passed",
           "terminal_line": 9,
           "detail": "0.74s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "0.68s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "0.68s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "0.69s",
           "failed_assertion_records": 0
         }
       ],
@@ -19924,6 +20348,36 @@
           "terminal_line": 10,
           "detail": "0.85s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "0.80s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "0.79s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "0.80s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -20012,26 +20466,135 @@
           "terminal_line": 105,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 8,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 8,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 9,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [],
       "qualification": "Callable family regression; nested control imported with RHI stack fix 81d5ded4. The family checks deferred descriptor ownership and recursive numeric/empty payloads at O0/O3."
+    },
+    {
+      "id": "cuda-optix-compiler-version.cuda#occurrence-1",
+      "name": "cuda-optix-compiler-version.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-device-features.cpp",
+          "line": 76
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "optix-versions-common-final-80000",
+          "compiler_selection": "nvvm",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.63s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-80100",
+          "compiler_selection": "nvvm",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.63s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-common-final-90000",
+          "compiler_selection": "nvvm",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.64s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-80000",
+          "compiler_selection": "nvrtc",
+          "optix_version": 80000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.65s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-80100",
+          "compiler_selection": "nvrtc",
+          "optix_version": 80100,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.64s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "optix-versions-nvrtc-final-90000",
+          "compiler_selection": "nvrtc",
+          "optix_version": 90000,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "0.65s",
+          "failed_assertion_records": 0
+        }
+      ],
+      "failure_history": [],
+      "qualification": "Reject a session compiler version conflicting with the actual OptiX context; accept the same explicit version. Qualified on8.0/8.1/9.0."
     }
   ],
   "current_known_outcomes": {
-    "registration_count": 280,
-    "unique_name_count": 279,
-    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity.",
+    "registration_count": 281,
+    "unique_name_count": 280,
+    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite.",
     "by_compiler": {
       "nvvm": {
-        "passed": 269,
+        "passed": 270,
         "failed": 1,
         "skipped": 10
       },
       "nvrtc": {
-        "passed": 265,
-        "failed": 5,
-        "skipped": 10
+        "passed": 266,
+        "skipped": 10,
+        "failed": 5
       }
     },
     "original_nvvm_failures_resolved": 60,
@@ -20055,19 +20618,19 @@
   "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
   "current_inventory": {
     "gate": {
-      "path": "build/nvvm-optix-callable/rhi-inventory.json",
-      "sha256": "2668b62ddadb1d6b909e6eca3e922f9cde2a8357b2b75db9806a9a7e92c69b35",
+      "path": "build/nvvm-optix-versions/rhi-inventory.json",
+      "sha256": "16992c02266f63354cb78b18a5b1b0520e42741b8981d4c698cafc12831edcbd",
       "return_code": 0,
-      "elapsed_seconds": 0.26447558403015137
+      "elapsed_seconds": 0.24794936180114746
     },
     "listing": {
-      "path": "build/nvvm-optix-callable/rhi-inventory.log",
-      "sha256": "f237f758de5dc5174a40a424a2b42184dd95b592eef52e6b408472d234ef22d5"
+      "path": "build/nvvm-optix-versions/rhi-inventory.log",
+      "sha256": "693a9abeae96bfbf2d64ad33b34011726016226e68c81e4e918ea72d81e163d5"
     },
-    "registration_count": 280,
-    "unique_name_count": 279,
+    "registration_count": 281,
+    "unique_name_count": 280,
     "manifest_multiset_matches": true,
-    "scope": "Includes imported nested-call and new complete callable-family registration; original duplicate retained."
+    "scope": "Adds the version conflict regression; original duplicate remains. Version8 results are separately qualified."
   },
   "current_reconciliation": {
     "raw": {
@@ -20232,5 +20795,24 @@
         "failed": 6
       }
     }
+  },
+  "optix_version_qualification": {
+    "identity": {
+      "path": "build/nvvm-optix-versions/identity-closeout.json",
+      "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+    },
+    "reconciliation": {
+      "path": "build/nvvm-optix-versions/reconciliation.json",
+      "sha256": "ca3005e1c4ded3aa1903185adb78d351267949aaa37c306084aa26bae74f1ba6"
+    },
+    "runs": [
+      "optix-versions-common-final-80000",
+      "optix-versions-common-final-80100",
+      "optix-versions-common-final-90000",
+      "optix-versions-nvrtc-final-80000",
+      "optix-versions-nvrtc-final-80100",
+      "optix-versions-nvrtc-final-90000"
+    ],
+    "scope": "NVVM common raygen/triangle/recursive payload/callable families on8.0,8.1,9.0.8.x HitObject rejected before emission. NVRTC matching-header raygen/device controls only; no mixed-backend callable ABI promise."
   }
 }

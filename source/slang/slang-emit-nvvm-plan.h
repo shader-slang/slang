@@ -532,6 +532,7 @@ struct NVVMTextureOperationRequirement
 /// Owns every provider capability required before module creation.
 struct NVVMOperationRequirements
 {
+    uint32_t optixVersion = 90000;
     NVVMValueOperationRequirements valueOperations;
     List<NVVMAtomicOperationRequirement> atomicOperations;
     List<NVVMSurfaceOperationRequirement> surfaceOperations;

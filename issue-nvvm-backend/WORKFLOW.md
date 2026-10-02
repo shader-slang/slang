@@ -7,9 +7,12 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-**Current stop:** on 2026-10-02 the maintainer requested finishing callable work and then stopping
-for discussion. That closeout, including the RHI checkpoint and focused working-corpus repairs,
-is complete. The general feature loop below requires an explicit resume before another family starts.
+**Resumed on 2026-10-02:** the maintainer approved explicit OptiX8.0/8.1/9.0 targeting,
+common raygen/trace/callable qualification, then the older-version HitObject family. Version targeting
+and the common family are accepted. **Current decision boundary:** await the maintainer's choice
+between modern flag visibility with a private cross-stage ABI preserving32payloadwords and an
+explicitly documented native8Invoke semantic difference. Do not enable legacy HitObjects before
+that contract is settled. Keep each version's capabilities and tested semantics explicit.
 
 The maintainer approved the corpus-tier and OptiX proposal and explicitly resumed development on
 2026-10-01. The earlier stop after four bounded items is superseded. First organize smoke, working

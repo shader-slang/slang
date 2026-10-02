@@ -1009,6 +1009,11 @@ void initCommandOptions(CommandOptions& options)
          "-emit-cuda-via-nvrtc",
          nullptr,
          "Generate PTX by compiling generated CUDA source with NVRTC (default)"},
+        {OptionKind::OptixVersion,
+         "-optix-version",
+         "-optix-version <80000|80100|90000>",
+         "Select the OptiX SDK contract for CUDA ray tracing. Direct NVVM defaults to 90000; "
+         "an explicit version must match the SDK headers used by NVRTC."},
         {OptionKind::EmitCUDAViaNVVM,
          "-emit-cuda-via-nvvm",
          nullptr,
@@ -4177,6 +4182,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 getCurrentTarget()->optionSet.set(OptionKind::EmitCPUMethod, selectMethod);
             }
             break;
+        case OptionKind::OptixVersion:
+            {
+                Int version = 0;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, version));
+                if (version != 80000 && version != 80100 && version != 90000)
+                {
+                    m_sink->diagnoseRaw(
+                        Severity::Error,
+                        "unsupported OptiX version; expected 80000, 80100, or 90000");
+                    return SLANG_FAIL;
+                }
+                getCurrentTarget()->optionSet.set(optionKind, int(version));
+            }
+            break;
         case OptionKind::EmitCUDAViaNVRTC:
         case OptionKind::EmitCUDAViaNVVM:
             {
@@ -4758,6 +4777,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 m_compileRequest->setTargetEmbedDownstreamIR(targetID, true);
             }
+
+            // Target options belong to the target even when output goes to stdout. For example,
+            // omitting -o must not discard -emit-cuda-via-nvvm or -optix-version.
+            linkage->targets[targetID]->getOptionSet().overrideWith(rawTarget.optionSet);
         }
 
         // Next we need to sort out the output files specified with `-o`, and
@@ -4937,7 +4960,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             targetInfo = new EndToEndCompileRequest::TargetInfo();
             m_requestImpl->m_targetInfos[target] = targetInfo;
         }
-        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
         if (rawOutput.isWholeProgram)
         {
             if (targetInfo->wholeTargetOutputPath != "")

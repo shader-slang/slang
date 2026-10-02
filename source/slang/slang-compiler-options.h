@@ -309,6 +309,20 @@ struct CompilerOptionSet
 
     CodeGenTarget getTarget() { return getEnumOption<CodeGenTarget>(CompilerOptionName::Target); }
 
+    /// Returns the target SDK contract, independent of the CUDA driver or GPU architecture.
+    int getOptixVersion()
+    {
+        return hasOption(CompilerOptionName::OptixVersion)
+                   ? getIntOption(CompilerOptionName::OptixVersion)
+                   : 90000;
+    }
+
+    bool hasValidOptixVersion()
+    {
+        const int version = getOptixVersion();
+        return version == 80000 || version == 80100 || version == 90000;
+    }
+
     /// Returns the CUDA emission method represented by this effective option set.
     SlangEmitCUDAMethod getEmitCUDAMethod()
     {

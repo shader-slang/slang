@@ -743,6 +743,8 @@ _getHitObjectType(SlangNVVMModuleHandle module, SlangNVVMTypeHandle* outType)
     auto state = _getModule(module);
     if (!state || !outType)
         return SLANG_E_INVALID_ARG;
+    if (state->optixVersion < 90000)
+        return SLANG_E_NOT_AVAILABLE;
     *outType = reinterpret_cast<SlangNVVMTypeHandle>(HitObjectEmitter::getStorageType(state));
     return SLANG_OK;
 }
@@ -804,6 +806,8 @@ static SlangResult SLANG_NVVM_CALL _emitHitObjectOperation(
     if (SLANG_FAILED(_isHitObjectOperationSupported(desc, &supported)) || !supported || !outValue ||
         !block || (!operands && operandCount))
         return SLANG_E_INVALID_ARG;
+    if (state->optixVersion < 90000)
+        return SLANG_E_NOT_AVAILABLE;
     bool hasObject = desc->operation != SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY &&
                      desc->operation != SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT &&
                      desc->operation != SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION;

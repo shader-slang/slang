@@ -69,6 +69,7 @@ struct ModuleState
     llvm::LLVMContext context;
     std::unique_ptr<llvm::Module> module;
     llvm::IRBuilder<> builder;
+    uint32_t optixVersion = 90000;
     llvm::StructType* hitObjectType = nullptr;
     llvm::Function* hitObjectCapture = nullptr;
     llvm::Function* hitObjectRestore = nullptr;
@@ -312,6 +313,28 @@ static bool _isValueUsableOnIncomingEdge(
 static bool _isValidAlignment(uint32_t alignment)
 {
     return llvm::isPowerOf2_32(alignment);
+}
+
+static SlangResult SLANG_NVVM_CALL
+_isOptixVersionSupported(uint32_t version, uint32_t* outSupported)
+{
+    if (!outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = version == 80000 || version == 80100 || version == 90000;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _setOptixVersion(SlangNVVMModuleHandle module, uint32_t version)
+{
+    auto state = _getModule(module);
+    uint32_t supported = 0;
+    _isOptixVersionSupported(version, &supported);
+    // Version-dependent declarations and private representations cannot change after creation.
+    if (!state || !supported || !state->module->empty() || !state->module->global_empty() ||
+        !state->module->getIdentifiedStructTypes().empty() || state->hitObjectType)
+        return SLANG_E_INVALID_ARG;
+    state->optixVersion = version;
+    return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -5608,8 +5631,18 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitCallable,
     };
 
+    static const SlangNVVMBuilderOptixTargetAPI optixTarget = {
+        sizeof(SlangNVVMBuilderOptixTargetAPI),
+        SLANG_NVVM_OPTIX_TARGET_VERSION,
+        _isOptixVersionSupported,
+        _setOptixVersion,
+    };
+
     switch (interfaceID)
     {
+    case SLANG_NVVM_BUILDER_INTERFACE_OPTIX_TARGET:
+        *outInterface = &optixTarget;
+        return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_CALLABLE_OPERATIONS:
         *outInterface = &callableOperations;
         return SLANG_OK;

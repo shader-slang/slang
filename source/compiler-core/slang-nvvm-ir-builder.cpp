@@ -263,6 +263,23 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
             return SLANG_E_NO_INTERFACE;
         callableOperations = candidate;
     }
+    SlangNVVMBuilderOptixTargetAPI optixTarget = {};
+    const void* optixTargetRaw = nullptr;
+    const auto optixTargetResult =
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_OPTIX_TARGET, &optixTargetRaw);
+    if (optixTargetResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(optixTargetResult);
+        if (!optixTargetRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate = *static_cast<const SlangNVVMBuilderOptixTargetAPI*>(optixTargetRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_OPTIX_TARGET_VERSION || !candidate.isVersionSupported ||
+            !candidate.setVersion)
+            return SLANG_E_NO_INTERFACE;
+        optixTarget = candidate;
+    }
+    outBuilder.m_optixTarget = optixTarget;
     outBuilder.m_callableOperations = callableOperations;
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
@@ -639,6 +656,22 @@ SlangResult NVVMIRBuilder::emitInstanceTransform(
         m_instanceTransformOperations
             .emitOperation(module, &operation, operands, operandCount, &outValue),
         outValue);
+}
+
+bool NVVMIRBuilder::supportsOptixVersion(uint32_t version) const
+{
+    // Providers predating this optional interface implement only the original SDK9 contract.
+    if (!m_optixTarget.isVersionSupported)
+        return version == 90000;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(m_optixTarget.isVersionSupported(version, &supported)) && supported;
+}
+
+SlangResult NVVMIRBuilder::setOptixVersion(SlangNVVMModuleHandle module, uint32_t version) const
+{
+    if (!supportsOptixVersion(version))
+        return SLANG_E_NOT_AVAILABLE;
+    return m_optixTarget.setVersion ? m_optixTarget.setVersion(module, version) : SLANG_OK;
 }
 
 SlangResult NVVMIRBuilder::emitCallable(

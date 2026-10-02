@@ -103,6 +103,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS ((SlangNVVMBuilderInterfaceID)9u)
 #define SLANG_NVVM_BUILDER_INTERFACE_CURRENT_TRANSFORM_OPERATIONS ((SlangNVVMBuilderInterfaceID)10u)
 #define SLANG_NVVM_BUILDER_INTERFACE_CALLABLE_OPERATIONS ((SlangNVVMBuilderInterfaceID)11u)
+#define SLANG_NVVM_BUILDER_INTERFACE_OPTIX_TARGET ((SlangNVVMBuilderInterfaceID)12u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -710,6 +711,18 @@ extern "C"
     typedef SlangNVVMBuilderInstanceTransformOperationsAPI
         SlangNVVMBuilderCurrentTransformOperationsAPI;
 #define SLANG_NVVM_CURRENT_TRANSFORM_OPERATIONS_VERSION 1u
+
+#define SLANG_NVVM_OPTIX_TARGET_VERSION 1u
+    /** Configures the SDK contract before an output module acquires declarations or types. */
+    typedef struct SlangNVVMBuilderOptixTargetAPI
+    {
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(
+            SLANG_NVVM_CALL* isVersionSupported)(uint32_t version, uint32_t* outSupported);
+        SlangNVVMResult(
+            SLANG_NVVM_CALL* setVersion)(SlangNVVMModuleHandle module, uint32_t version);
+    } SlangNVVMBuilderOptixTargetAPI;
 
     /** Optional private callable ABI. Index is UInt32. A non-null numeric aggregate payload
         is copied into provider-local Value(T) storage, passed as a generic pointer and returned

@@ -11,11 +11,13 @@ and architecture refresh are accepted. Native Half ceil/floor/trunc and single-r
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
 below; development has resumed with corpus tiers and an initial OptiX path.
 
-The callable family and requested RHI/working integration are complete. **Stopped for maintainer
-discussion on 2026-10-02**, as requested; do not start the next feature family without a resume.
-Use eight-job builds and economical focused validation when work resumes. No push, external
-messages or system changes. Preserve the user's untracked
-`tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
+The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
+targeting and common raygen/trace/callable qualification are now accepted. **Awaiting the maintainer's
+legacy HitObject compatibility decision:** native8.x Invoke loses ray flags that9 retains;
+preserving modern visibility without reducing the32-word payload capacity needs a private
+cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
+economical focused validation when work resumes. No push, external messages or system changes.
+Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
@@ -77,7 +79,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Subsequent implementations have passed focused review; [focused evidence](focused-evidence.json)
-now contains 86 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 87 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -93,7 +95,7 @@ These batches used eight-job builds and focused validation. The authorized seque
 then executable OptiX raygen, triangle hit/miss and representative material paths. Smoke runs after
 implementation iterations; working runs every three to five iterations or sooner for broad changes.
 Explore application-relevant failures in bounded batches and preserve intentional semantic differences.
-That earlier four-item stop was superseded; the new stop after callable closeout now applies.
+The callable discussion stop was superseded by the explicit multi-version OptiX resume.
 Approximate Half policies remain separate work.
 
 The tier selector is implemented and reviewed: 1,713 working configurations, 459 exploratory
@@ -442,9 +444,40 @@ Exact identities, original failures, retries and comparisons are maintained in
 [focused evidence](focused-evidence.json), [RHI status](rhi-cuda-status.json) and ignored
 `build/nvvm-optix-callable`. The original full baseline remains unchanged.
 
-**Next action: discuss priorities before resuming.** A concrete candidate is immutable global
-aggregate initialization (the retained synthesized record-constructor failure). Exploratory ranking
-also needs to distinguish untested directive variants from real gaps and intentional CUDA boundaries.
-Neither item has been started. Raw SDK object-ray queries remain AnyHit/Intersection-only;
-unsupported payload leaves and recursive callback tracing remain separate until qualified. Custom
-RHI devices/sessions and internal NVRTC kernels retain their documented compiler ownership.
+Explicit version targeting is accepted. `-optix-version 80000|80100|90000` and API option163
+participate in existing target/link cache identity. RHI forwards the actual selected context SDK
+and rejects conflicting session options; explicit NVRTC targets check their included SDK headers.
+Optional provider interface12 configures empty modules, with the historical90000 fallback for
+older providers. Module43/providerABI46/container2 remain unchanged. The common path qualifies
+8.0/8.1/9.0; SDK 8 HitObject storage and operations remain rejected before emission.
+
+Focused final results:16 compiler version/routing cells,13 existing stdout rejection controls,
+NVVM9 pass/1 skip/1,401 assertions each on 8.0 and8.1,10 pass/1 skip/2,527 assertions on 9.0 (including the
+retained lifecycle), and2NVRTC controls/24 assertions perversion. The runtime skip is the existing
+entry-parameter write/cache test. All16 smoke cells pass in21.95 seconds, with no input changes. This is the
+first accepted implementation since the working checkpoint. No new full-suite or legacy lifecycle
+claim. The281-registration current RHI inventory has mixed-age SDK 9 outcomes: NVVM270pass/1 fail/
+10 skip and NVRTC266pass/5fail/10 skip; the remaining failures retain their previous histories.
+
+A new no-o rejection fixture uncovered an existing CLI producer bug: target options were copied
+only while associating output files. PTX stdout could silently lose the NVVM selector and use
+NVRTC. Moving the existing option merge to target creation fixes the source of truth, with no
+emitter fallback. All13 existing no-o SIMPLE rejection fixtures were audited and requalified;
+their historical passes alone did not establish NVVM routing. API/provider, explicit-output and
+runtime evidence retains its own identity. Initial failures and exact final evidence remain in
+[focused evidence](focused-evidence.json) and `build/nvvm-optix-versions`.
+
+Native SDK probes on both8.x versions validate ordinary Trace flags and guards but observe zero
+incoming RayFlags after both immediate Traverse/Invoke and explicit constructor/Invoke. SDK 9 retains
+flags 1/2/8; with flag 8 its Invoke also suppresses CH, while8.x invokesCH. These are observed SDK
+version differences, not a claim about Vulkan/D3D standaloneInvoke suppression. Retaining flags
+beside an older snapshot would answer saved-object queries but would not repair RayFlags inside
+invoked shaders. Retracing is not valid because it repeats traversal side effects.
+
+**Next action: settle the pending8.x HitObject contract, then implement the complete chosen
+family.** The recommended next step preserves modern flag visibility and all32 payload words by
+investigating a private cross-stage context ABI. The alternative explicitly accepts and documents
+native 8 Invoke differences. Attribute-budget ownership and full topology reconstruction also require
+qualification; there is no hidden downgrade. This is the current human decision boundary.
+Immutable global aggregate initialization and exploratory ranking remain queued and unstarted.
+Custom RHI devices/sessions and internal NVRTC kernels retain their documented compiler ownership.

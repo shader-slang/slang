@@ -74,6 +74,34 @@ but require review; a working failure remains a regression. Preserve these histo
 the compact metadata. The selector's CPU contracts are `test-nvvm-corpus-tiers.py` together with the
 existing census, discovery and results contracts.
 
+### Explicit OptiX versions
+
+Use `-optix-version 80000`, `80100`, or `90000` (API `CompilerOptionName::OptixVersion`)
+to select the SDK contract. This is independent of the CUDA toolkit and SM capability. RHI's
+`--optix-version=...` test option selects the actual device context and forwards its selected SDK
+to Slang. Explicit NVRTC options must match its SDK include path. Unspecified standalone NVVM
+retains90000. SDK8 HitObject operations currently reject before emission; selecting a version
+qualifies only the families listed in the feature matrix.
+
+Focused compiler checks:
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  slang-unit-test-tool/optixTargetVersionLinkOptionsAffectHash.internal \
+  slang-unit-test-tool/optixTargetVersionRejectsInvalidAPIValue.internal \
+  slang-unit-test-tool/nvvmIRBuilderOptixVersionIsModuleOwned.internal \
+  tests/pipeline/ray-tracing/nvvm-optix-version.slang \
+  tests/pipeline/ray-tracing/nvvm-optix-version-hitobject.slang
+```
+
+For common runtime qualification, run the optional RHI command below once per SDK with
+`--optix-version=80000`, `80100`, and `90000`. Select `cuda-optix-compiler-version.cuda`, the
+three `ray-tracing-raygen-entrypoint` cases, `ray-tracing-triangle-intersection.cuda`, the
+three callable cases, and `ray-tracing-array-payload-layout.cuda` plus
+`ray-tracing-array-payload-singleton-matrices.cuda`. The payload/callable family fixtures
+exercise O0/O3 internally; do not label every simple control an O0/O3 test. Keep these version
+results separate from the historical full-suite OptiX9 inventory.
+
 ### OptiX raygen gate
 
 Build matching compiler, provider and unit tools with eight jobs, then run the permanent O0/O3 PTX

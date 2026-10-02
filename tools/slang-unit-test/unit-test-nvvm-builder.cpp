@@ -14259,3 +14259,48 @@ SLANG_UNIT_TEST(nvvmIRBuilderCallableRejectsBeforeMutation)
         }
     }
 }
+
+SLANG_UNIT_TEST(nvvmIRBuilderOptixVersionIsModuleOwned)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (uint32_t version : {80000u, 80100u, 90000u})
+    {
+        SLANG_CHECK(builder.supportsOptixVersion(version));
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("version"), scope.module)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setOptixVersion(scope.module, version)));
+        if (version < 90000)
+        {
+            SlangNVVMTypeHandle hitObjectType = nullptr;
+            SLANG_CHECK(SLANG_FAILED(builder.getHitObjectType(scope.module, hitObjectType)));
+            SLANG_CHECK(!hitObjectType);
+        }
+
+        SLANG_CHECK(!builder.supportsOptixVersion(80200));
+        SLANG_CHECK(SLANG_FAILED(builder.setOptixVersion(scope.module, 80200)));
+        SlangNVVMTypeHandle type = nullptr;
+        SlangNVVMValueHandle global = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, type)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareGlobalStorage(
+            scope.module,
+            type,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_ADDRESS_SPACE_CONSTANT,
+            4,
+            toSlice("value"),
+            global)));
+        ComPtr<ISlangBlob> before, after;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            before)));
+        SLANG_CHECK(SLANG_FAILED(builder.setOptixVersion(scope.module, 90000)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            after)));
+        SLANG_CHECK(_getBlobText(before) == _getBlobText(after));
+    }
+}

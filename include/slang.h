@@ -1346,6 +1346,9 @@ typedef uint32_t SlangSizeT;
         EmitCUDAViaNVRTC = 161, // CLI-only selector; the parser stores `EmitCUDAMethod` instead.
         EmitCUDAViaNVVM = 162,  // CLI-only selector; the parser stores `EmitCUDAMethod` instead.
 
+        OptixVersion = 163, // int: target OptiX SDK contract (80000, 80100, or 90000).
+                            // Absent selects 90000 for direct NVVM; NVRTC uses its SDK headers.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

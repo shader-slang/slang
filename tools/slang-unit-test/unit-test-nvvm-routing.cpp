@@ -281,3 +281,51 @@ SLANG_UNIT_TEST(nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection)
         SLANG_CHECK(getBlobSlice(code).indexOf(toSlice("llvm.nvvm")) < 0);
     }
 }
+
+SLANG_UNIT_TEST(optixTargetVersionLinkOptionsAffectHash)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::ISession> session;
+    auto input = createMinimalPTXProgram(globalSession, session);
+    List<ComPtr<slang::IBlob>> hashes;
+    for (int version : {80000, 80100, 90000, 80000})
+    {
+        slang::CompilerOptionEntry option = {};
+        option.name = slang::CompilerOptionName::OptixVersion;
+        option.value.kind = slang::CompilerOptionValueKind::Int;
+        option.value.intValue0 = version;
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(input->linkWithOptions(program.writeRef(), 1, &option, nullptr)));
+        ComPtr<slang::IBlob> hash;
+        program->getEntryPointHash(0, 0, hash.writeRef());
+        SLANG_CHECK_ABORT(hash);
+        hashes.add(hash);
+    }
+    for (Index i = 1; i < hashes.getCount(); ++i)
+        SLANG_CHECK((getBlobSlice(hashes[0]) == getBlobSlice(hashes[i])) == (i == 3));
+}
+
+SLANG_UNIT_TEST(optixTargetVersionRejectsInvalidAPIValue)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::ISession> session;
+    auto route = makeCUDAEmissionMethodOption(SLANG_EMIT_CUDA_VIA_NVVM);
+    auto input = createMinimalPTXProgram(globalSession, session, &route);
+    slang::CompilerOptionEntry option = {};
+    option.name = slang::CompilerOptionName::OptixVersion;
+    option.value.kind = slang::CompilerOptionValueKind::Int;
+    option.value.intValue0 = 80200;
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(input->linkWithOptions(program.writeRef(), 1, &option, nullptr)));
+    ComPtr<slang::IBlob> code, diagnostics;
+    SLANG_CHECK(
+        SLANG_FAILED(program->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())));
+    SLANG_CHECK(
+        diagnostics && getBlobSlice(diagnostics).indexOf(toSlice("OptiX target version")) >= 0);
+}

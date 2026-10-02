@@ -10742,6 +10742,10 @@ SlangResult validateNVVMSupportedIR(
     NVVMOperationRequirements& outRequirements)
 {
     outRequirements = {};
+    auto& options = codeGenContext->getTargetProgram()->getOptionSet();
+    if (!options.hasValidOptixVersion())
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX target version"));
+    outRequirements.optixVersion = uint32_t(options.getOptixVersion());
     if (!linkedIR.module || linkedIR.entryPoints.getCount() != 1)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point count"));
 
@@ -10806,6 +10810,10 @@ SlangResult validateNVVMSupportedIR(
             functionSet,
             outRequirements));
     }
+
+    if (outRequirements.optixVersion < 90000 &&
+        outRequirements.emissionPlan.hitObjectOperations.getCount())
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX 8 HitObject operations"));
 
     NVVMConventionalGlobalParams conventionalGlobalParams;
     for (auto globalInst : linkedIR.module->getGlobalInsts())
@@ -11079,6 +11087,12 @@ SlangResult emitNVVMIRFromLinkedIR(
 {
     outArtifact.setNull();
     SLANG_RELEASE_ASSERT(linkedIR.entryPoints.getCount() == 1);
+    if (!builder.supportsOptixVersion(requirements.optixVersion))
+        return _requireBuilderOperation(
+            codeGenContext,
+            "OptiX target version",
+            SLANG_E_NOT_AVAILABLE);
+
 
     ScopedNVVMDeviceLibrary libraryScope;
     libraryScope.builder = &builder;
@@ -11248,6 +11262,10 @@ SlangResult emitNVVMIRFromLinkedIR(
         "module creation",
         builder.createModule(toSlice("slang-direct-nvvm"), moduleScope.module)));
 
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "OptiX target configuration",
+        builder.setOptixVersion(moduleScope.module, requirements.optixVersion)));
     NVVMTypeLoweringContext typeContext(codeGenContext, builder, moduleScope.module);
     Dictionary<IRFunc*, SlangNVVMValueHandle> functionMap;
     NVVMValueMap valueMap;

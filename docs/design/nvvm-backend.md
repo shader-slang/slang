@@ -110,6 +110,20 @@ supported public operations, widths and pointer-output qualifications.
 
 ### OptiX entry and binding ownership
 
+`OptixVersion` (`-optix-version 80000|80100|90000`) selects the device SDK contract and
+participates in the existing target/link option hash. It is independent of CUDA toolkit, GPU
+architecture and driver selection. Absent an explicit option, NVVM retains its OptiX9 default;
+NVRTC retains header-based selection. When specified, generated CUDA checks `OPTIX_VERSION`
+against the requested version. RHI forwards the SDK actually selected by its context and rejects
+conflicting session options.
+
+NVVM preflight retains this version in its checked requirements. Optional provider interface12
+configures each empty module before declarations; older providers without the interface accept
+only the historical90000 contract. No process-global SDK state or module-format bump is needed.
+The common entry/trace/callable path uses shared signatures. The SDK9 HitObject representation
+and operations reject8.x both in preflight and through the direct provider API until an older
+state-preserving representation is qualified. Version selection does not imply full SDK coverage.
+
 Ray-generation, miss, closest-hit, any-hit, intersection and callable entries reuse the shared OptiX uniform-collection pass.
 That producer moves entry uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`;
 it leaves compute parameters unchanged. After payload/varying legalization, NVVM preflight accepts

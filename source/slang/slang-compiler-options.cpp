@@ -311,6 +311,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                     sb << " -emit-cuda-via-nvvm";
             }
             break;
+        case CompilerOptionName::OptixVersion:
         case CompilerOptionName::BindlessSpaceIndex:
         case CompilerOptionName::SPIRVResourceHeapStride:
         case CompilerOptionName::SPIRVSamplerHeapStride:

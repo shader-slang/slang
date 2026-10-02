@@ -88146,7 +88146,7 @@
       "scope": "Complete registered CUDA application suite in the tested sibling RHI binary, across all registered feature areas. Initial full NVVM/NVRTC comparison and maintained failure inventory; not full NVVM acceptance.",
       "manifest": {
         "path": "issue-nvvm-backend/rhi-cuda-status.json",
-        "sha256": "66a35d61222db93e531f4a9779652f9a3ce3f7f613ad244724c899acfafebb4f"
+        "sha256": "da2b1f464d41cfbe02cdc834f7080d188cc0ba0f541e18d53a8d32b7c76b43df"
       },
       "identity": {
         "path": "build/nvvm-rhi-full/identity.json",
@@ -88258,19 +88258,19 @@
       ],
       "failure_family_counts_scope": "Initial full checkpoint; current focused resolution is separate.",
       "current_focused_resolution": {
-        "registration_count": 280,
-        "unique_name_count": 279,
-        "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity.",
+        "registration_count": 281,
+        "unique_name_count": 280,
+        "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite.",
         "by_compiler": {
           "nvvm": {
-            "passed": 269,
+            "passed": 270,
             "failed": 1,
             "skipped": 10
           },
           "nvrtc": {
-            "passed": 265,
-            "failed": 5,
-            "skipped": 10
+            "passed": 266,
+            "skipped": 10,
+            "failed": 5
           }
         },
         "original_nvvm_failures_resolved": 60,
@@ -90475,6 +90475,311 @@
         }
       },
       "accepted_rhi_commit": "382b6e71e9e19e4397e78fcc0c8c48fc3bb34185"
+    },
+    "nvvm-optix-version-targeting": {
+      "accepted_rhi_commit": "11afe3b20da67609ccab31984950d887c8500e00",
+      "status": "accepted-version-targeting; legacy-hitobject-decision-pending",
+      "scope": "Explicit SDK8.0/8.1/9.0 target contract, common raygen/trace/callable execution, versioned cache identity, empty-module configuration and SDK8 HitObject rejection. Legacy constructor/lifecycle support is not enabled.",
+      "identity": {
+        "path": "build/nvvm-optix-versions/identity-closeout.json",
+        "sha256": "f0593d170665414dc7f20ced68df637e6d1261e02589cb9f83f30da19d2cffa0"
+      },
+      "validation": {
+        "build-4": {
+          "path": "build/nvvm-optix-versions/build-4.json",
+          "sha256": "e01a0fc9fba0408f6aa02a32a6d112b4ff148bc37f531127f0f1653cfdefdb8c",
+          "return_code": 0,
+          "elapsed_seconds": 317.8327226638794
+        },
+        "build-cli-fix": {
+          "path": "build/nvvm-optix-versions/build-cli-fix.json",
+          "sha256": "28e28b8cf5f192bf422b878eddfd6a2e9619e418939f0029998efaa657302345",
+          "return_code": 0,
+          "elapsed_seconds": 27.38864302635193
+        },
+        "rhi-build-final": {
+          "path": "build/nvvm-optix-versions/rhi-build-final.json",
+          "sha256": "ff88c37db7476dab51e229fa3ea2fcaf604f4250b977f1e4cc57c05137855a6b",
+          "return_code": 0,
+          "elapsed_seconds": 0.618211030960083
+        },
+        "units-source-cli-fixed": {
+          "path": "build/nvvm-optix-versions/units-source-cli-fixed.json",
+          "sha256": "c519728dd1df43445cf373e3b1f21dd0d751b0db41ca9ec4be71ee7320942249",
+          "return_code": 0,
+          "elapsed_seconds": 2.726454496383667
+        },
+        "stdout-controls": {
+          "path": "build/nvvm-optix-versions/stdout-controls.json",
+          "sha256": "64f3d24c731130d9790b4fc081663c06bff1d3f3075a06a646c9976eda69d04b",
+          "return_code": 0,
+          "elapsed_seconds": 1.5367467403411865
+        },
+        "negative-cli-fixed": {
+          "path": "build/nvvm-optix-versions/negative-cli-fixed.json",
+          "sha256": "98b5e755bd5239efb39d65ed3e3e05f8859bd2c55935e55cfe8ededfd09036cf",
+          "return_code": 0,
+          "elapsed_seconds": 0.7159414291381836
+        },
+        "smoke": {
+          "path": "build/nvvm-optix-versions/smoke.json",
+          "sha256": "4ae1f45bdc4e45a32fa3b3dc9eeaf6174eba1ec6286a88b38ab5d659bdadeea5",
+          "return_code": 0,
+          "elapsed_seconds": 21.94631290435791
+        },
+        "common-final-80000": {
+          "path": "build/nvvm-optix-versions/common-final-80000.json",
+          "sha256": "7bb98f4c5bf571bbffa22010f1f391171e207a5d613c2e26aab078037d6e0052",
+          "return_code": 0,
+          "elapsed_seconds": 4.7266011238098145
+        },
+        "common-final-80100": {
+          "path": "build/nvvm-optix-versions/common-final-80100.json",
+          "sha256": "7d3b6058372c2e0c8fe3bceefac43cbac26e6e29cf8aa5b9e69c6c69e2dff641",
+          "return_code": 0,
+          "elapsed_seconds": 4.6263651847839355
+        },
+        "common-final-90000": {
+          "path": "build/nvvm-optix-versions/common-final-90000.json",
+          "sha256": "dc5525a48015b60a5daa60f79422ca4011c1fb80452fa8e3dd09ad8b9898c46a",
+          "return_code": 0,
+          "elapsed_seconds": 6.002567529678345
+        },
+        "nvrtc-final-80000": {
+          "path": "build/nvvm-optix-versions/nvrtc-final-80000.json",
+          "sha256": "728ab64420916c8c0797d82ac46b3fe1e63a65e6d8313f8f48686aab644ac564",
+          "return_code": 0,
+          "elapsed_seconds": 2.113389730453491
+        },
+        "nvrtc-final-80100": {
+          "path": "build/nvvm-optix-versions/nvrtc-final-80100.json",
+          "sha256": "aea5410e118469278dcbd21d7952f62b8d923b9d6f25c7410301a64988179dc6",
+          "return_code": 0,
+          "elapsed_seconds": 2.1228342056274414
+        },
+        "nvrtc-final-90000": {
+          "path": "build/nvvm-optix-versions/nvrtc-final-90000.json",
+          "sha256": "4f104bce0eea5e0157e17aa663e73244478b23f36b2c240f2d06bcc24db6dd28",
+          "return_code": 0,
+          "elapsed_seconds": 2.128262519836426
+        }
+      },
+      "outcomes": {
+        "version_and_route_cells": 16,
+        "stdout_negative_controls": 13,
+        "rhi_nvvm": {
+          "80000": {
+            "passed": 9,
+            "failed": 0,
+            "skipped": 1,
+            "assertions": 1401
+          },
+          "80100": {
+            "passed": 9,
+            "failed": 0,
+            "skipped": 1,
+            "assertions": 1401
+          },
+          "90000": {
+            "passed": 10,
+            "failed": 0,
+            "skipped": 1,
+            "assertions": 2527
+          }
+        },
+        "rhi_nvrtc": {
+          "80000": {
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "assertions": 24
+          },
+          "80100": {
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "assertions": 24
+          },
+          "90000": {
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "assertions": 24
+          }
+        },
+        "smoke": {
+          "passed": 16,
+          "regressions": 0,
+          "input_changes": 0,
+          "selection": {
+            "path": "build/nvvm-optix-versions/smoke-1/selection.json",
+            "sha256": "de91b57dfe5a3a4aae61a8108e553a69b37081bfb59589246d2d4a24a1cf2829"
+          }
+        }
+      },
+      "contracts": [
+        "OptixVersion option163 uses the existing target/link option hash; defaultNVVM90000 and absentNVRTC header selection remain compatible.",
+        "Optional provider interface12 configures an empty module; rootABI46/module43/container2 unchanged. Older providers without this interface accept only the established90000 contract.",
+        "RHI forwards actual selectedSDK, including fallback, and rejects conflicting explicitsessionoptions. ExplicitNVRTC versions must match includedSDKheaders.",
+        "Canonical CLI target creation now owns rawtargetoptions even without-o; output association no longer controls backend selection.",
+        "SDK8 HitObject storage/operations remain explicitly unavailable. No weakening of32-word payloadcapacity, no retracing and no modern flag-visibility claim."
+      ],
+      "failure_history": [
+        {
+          "gate": {
+            "path": "build/nvvm-optix-versions/build-1.json",
+            "sha256": "d92a0616ec5a5546707968bd256cd8bde6b8206165aced89a7ad0e1964fed5f8",
+            "return_code": 1,
+            "elapsed_seconds": 6.104027509689331
+          },
+          "log": {
+            "path": "build/nvvm-optix-versions/build-1.log",
+            "sha256": "eb6929e32e2c1cecf0dcc88e176dd2955d157e7d34eb93c8d30ff1764b41d2c9"
+          },
+          "detail": "Optional provider API typedef was initially nested inside another declaration; fixed before accepted build."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-versions/probe81-runtime-1.json",
+            "sha256": "f74612c60f0bf8db255ce5b7e8e59258e4e2ceff0d56885a139f7f730d15b3e2",
+            "return_code": 1,
+            "elapsed_seconds": 0.9205887317657471
+          },
+          "log": {
+            "path": "build/nvvm-optix-versions/probe81-runtime-1.log",
+            "sha256": "ad1abce436d264958d1775192513f7ee767b6e6d39a67bb37217fc71548dbf1b"
+          },
+          "detail": "Probe directGAS launch incorrectly declared an instancing-only graph; validation rejected before semantic interpretation. Corrected to ALLOW_ANY."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-versions/probe81-runtime-2.json",
+            "sha256": "7cb1f8b6e4f6108b1736cd6dfa82ce0ce4a5842b1786c067dec62358722c5032",
+            "return_code": 2,
+            "elapsed_seconds": 0.8210926055908203
+          },
+          "log": {
+            "path": "build/nvvm-optix-versions/probe81-runtime-2.log",
+            "sha256": "fbfdf7dcd2a88e52d0516dd48ea60ad3eab38b058748bd51aa6cd998f28d8b5d"
+          },
+          "detail": "AssumedSDK9 Invoke flag expectations failed even for immediate8.1Traverse/Invoke. Added ordinaryTrace independent controls; native8behavior is not a snapshot-specific defect."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-versions/units-source-final.json",
+            "sha256": "4c9764158bbf98dfc53b01025ec34d6c98957436872b45d11e9084fef6977d9e",
+            "return_code": 1,
+            "elapsed_seconds": 2.535123586654663
+          },
+          "log": {
+            "path": "build/nvvm-optix-versions/units-source-final.log",
+            "sha256": "ea338eeb52a29b69be76f810d5f8f9755c2b3ccf51418b8f14c93e08f279979f"
+          },
+          "detail": "Two negative no-o fixtures silently compiled throughNVRTC because existing CLI rawTarget options were copied only inside RawOutput processing."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-versions/units-hitobject-retry.json",
+            "sha256": "ec190c1ab17e65b4b05ad47dd254c3731dd7feab3cd59265e5bba9badac1b973",
+            "return_code": 1,
+            "elapsed_seconds": 1.7913343906402588
+          },
+          "log": {
+            "path": "build/nvvm-optix-versions/units-hitobject-retry.log",
+            "sha256": "77b2e9ea31677d2bc8e1ca3ed31af04fd0a8469530491be61ab7812e1a9ffa6c"
+          },
+          "detail": "A liveTraverse fixture reproduced no-o option loss; adding-o to identical arguments gave expectedSDK8 rejection. Moved canonical option transfer to target creation, retained no-o regression."
+        }
+      ],
+      "historical_stdout_qualification": {
+        "audit": {
+          "path": "build/nvvm-optix-versions/stdout-audit.json",
+          "sha256": "fa1fdaa2ca3f255ceb63577fd6e7abf2d2837e8a8a43ac804ff06c5743936919"
+        },
+        "scope": "13 existing no-o SIMPLE rejection fixtures historically could have usedNVRTC. All13 requalified on the final NVVM route; API/provider/explicit-output/runtime evidence retains its own identity."
+      },
+      "legacy_sdk_probe": {
+        "identity": "CUDA12.9 targetSM80, L4 driver595.71.05; native SDK constructors/Trace/Traverse/Invoke bypass bothSlangbackends.",
+        "sources": {
+          "legacy-flags.cu": {
+            "path": "build/nvvm-optix-versions/legacy-flags.cu",
+            "sha256": "ca0f05bfb6c3ae9dae71decacefdc50b6eb8bbf54d970f4d5eb3f4d2e784dc77"
+          },
+          "run-legacy-flags.cpp": {
+            "path": "build/nvvm-optix-versions/run-legacy-flags.cpp",
+            "sha256": "1140c851fc5df96475715698383b9d7bc41893f460c31d5194ec919aa0f98dbe"
+          },
+          "flags-control9.cu": {
+            "path": "build/nvvm-optix-versions/flags-control9.cu",
+            "sha256": "96bfd742dfcf47b03b091506f9021eb6ccb68d2076ba3ebbbd3465b4e9a53dc4"
+          },
+          "run-flags-control9.cpp": {
+            "path": "build/nvvm-optix-versions/run-flags-control9.cpp",
+            "sha256": "4cd2c8431856983d323b469c025f12304be42aff9545f972abb129238603fd39"
+          }
+        },
+        "results": {
+          "80000": {
+            "gate": {
+              "path": "build/nvvm-optix-versions/probe80-runtime-final.json",
+              "sha256": "4f0bb8951c09de53719226bc385a55d4038f10aabd11a7f35fc66b9db17b63b4",
+              "return_code": 0,
+              "elapsed_seconds": 0.8046860694885254
+            },
+            "log": {
+              "path": "build/nvvm-optix-versions/probe80-runtime-final.log",
+              "sha256": "4e78e4751b99469de99cf3dd29dd6605a097a4615b17da7cf85f3891145f0d59"
+            },
+            "observations": [
+              "flags=0 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(0,1) direct-miss=(0,2)",
+              "flags=1 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(1,1) direct-miss=(1,2)",
+              "flags=2 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(2,1) direct-miss=(2,2)",
+              "flags=8 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(30583,34952) direct-miss=(8,2)",
+              "sdk=80000 baseline_and_guards_pass=1 failures=0"
+            ]
+          },
+          "80100": {
+            "gate": {
+              "path": "build/nvvm-optix-versions/probe81-runtime-final.json",
+              "sha256": "c0c349206f5a68cf815765f597b920e1aaa91dd4e41b43230f8fd791165a68a9",
+              "return_code": 0,
+              "elapsed_seconds": 0.842444896697998
+            },
+            "log": {
+              "path": "build/nvvm-optix-versions/probe81-runtime-final.log",
+              "sha256": "bf84d2f987c67a755d39617bc3239d12850c7165046cb3e90608069097911677"
+            },
+            "observations": [
+              "flags=0 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(0,1) direct-miss=(0,2)",
+              "flags=1 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(1,1) direct-miss=(1,2)",
+              "flags=2 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(2,1) direct-miss=(2,2)",
+              "flags=8 trace-hit=(0,1) make-hit=(0,1) trace-miss=(0,2) make-miss=(0,2) direct-hit=(30583,34952) direct-miss=(8,2)",
+              "sdk=80100 baseline_and_guards_pass=1 failures=0"
+            ]
+          },
+          "90000": {
+            "gate": {
+              "path": "build/nvvm-optix-versions/probe9-runtime.json",
+              "sha256": "2857ddb5f1a063b2f961ae218fd05a222bcca3baf0fcde23d54ccd4c18ed8e70",
+              "return_code": 0,
+              "elapsed_seconds": 0.7882909774780273
+            },
+            "log": {
+              "path": "build/nvvm-optix-versions/probe9-runtime.log",
+              "sha256": "8b9987b2821d1f140ae213092e55ff356ce390ef9ce23f2d03ad120259d68abc"
+            },
+            "observations": [
+              "flags=0 trace-hit=(0,1) make-hit=(0,0) trace-miss=(0,2) make-miss=(0,0) direct-hit=(0,1) direct-miss=(0,2)",
+              "flags=1 trace-hit=(1,1) make-hit=(0,0) trace-miss=(1,2) make-miss=(0,0) direct-hit=(1,1) direct-miss=(1,2)",
+              "flags=2 trace-hit=(2,1) make-hit=(0,0) trace-miss=(2,2) make-miss=(0,0) direct-hit=(2,1) direct-miss=(2,2)",
+              "flags=8 trace-hit=(30583,34952) make-hit=(0,0) trace-miss=(8,2) make-miss=(0,0) direct-hit=(30583,34952) direct-miss=(8,2)",
+              "sdk=90000 baseline_and_guards_pass=1 failures=0"
+            ]
+          }
+        },
+        "interpretation": "8.0/8.1 incomingRayFlags returns0 after both immediateTraverse/Invoke and explicitconstruction/Invoke.9 preservesflags and skipsCH forflag8; ordinaryTrace controls preserveflags and suppressCH onall3. This is empiricalSDKversionbehavior, not proof of Vulkan/D3D standaloneInvoke suppression. Modern8.x flagvisibility requires a crossstageABI decision; no productionlegacyimplementation enabled.",
+        "pending": "Choose modern semantics with a privatecontextABI preserving32payloadwords, or explicitly accept/document native8Invoke differences. Attribute budget and full topology reconstruction still require qualification."
+      }
     }
   }
 }
