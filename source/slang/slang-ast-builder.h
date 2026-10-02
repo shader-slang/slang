@@ -453,11 +453,6 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    ConstantBitwiseIntVal* getBitwiseIntVal(Type* type, IntegerLiteralValue value)
-    {
-        return getOrCreate<ConstantBitwiseIntVal>(type, value);
-    }
-
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {
         // Unwrap any existing type casts.

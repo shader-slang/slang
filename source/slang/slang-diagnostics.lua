@@ -1911,6 +1911,13 @@ warning(
 )
 
 warning(
+    "unrecommended-implicit-conversion2",
+    30124,
+    "implicit conversion not recommended (TBD)",
+    span { loc = "location", message = "implicit conversion from '~fromType' to '~toType' is not recommended" }
+)
+
+warning(
     "implicit-conversion-to-double",
     30082,
     "implicit float-to-double conversion",
@@ -4409,7 +4416,28 @@ warning(
     "integer-constant-overflow",
     40016,
     "integer constant overflow in conversion",
-    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
+    span { loc = "location", message = "integer value '~value' does not fit in type '~type'" }
+)
+
+warning(
+    "integer-bin-op-target-defined",
+    98765,
+    "target-defined behavior in expression",
+    span { loc = "location", message = "'~value1 ~op ~value2' has target-defined behavior (result type: '~type')" }
+)
+
+warning(
+    "integer-bin-op-overflow",
+    40025,
+    "overflow in expression",
+    span { loc = "location", message = "'~value1 ~op ~value2' overflows (result type: '~type')" }
+)
+
+err(
+    "integer-bin-op-undefined",
+    40026,
+    "undefined behavior in expression",
+    span { loc = "location", message = "'~value1 ~op ~value2' has undefined behavior (result type: '~type')" }
 )
 
 warning(

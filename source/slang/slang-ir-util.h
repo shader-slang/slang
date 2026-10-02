@@ -615,6 +615,10 @@ bool shouldHaveSpecConstRate(
     IRInst* const* operands);
 bool isInstHoistable(IROp op);
 
+/// Return true if `op` is a type-conversion instruction such as `IntCast`, `FloatCast`, or
+/// `BuiltinCast`. Only these instructions carry an `IRImplicitConversionDecoration`.
+bool isTypeConversionOp(IROp op);
+
 // most of <algorithm> doesn't work on out non-const iterators, so define this
 // version
 template<typename Range, typename Predicate>

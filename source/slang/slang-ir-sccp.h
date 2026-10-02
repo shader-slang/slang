@@ -18,6 +18,11 @@ class TargetProgram;
 /// always evaluate to a constant (which can lead to entire blocks
 /// becoming dead code)
 /// Returns true if IR is changed.
+///
+/// If `diagnoseConstantEvaluation` is true, the pass also reports problems that constant
+/// evaluation reveals, such as integer division by zero and implicit integer conversions of
+/// constants that change the value. The front end enables this once per user module, right
+/// after lowering; later runs over the same code leave it off so that nothing is reported twice.
 bool applySparseConditionalConstantPropagation(
     IRModule* module,
     TargetProgram* targetProgram,

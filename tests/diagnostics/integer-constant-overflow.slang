@@ -141,19 +141,19 @@ void computeMain()
     // signed or unsigned int (matching target)
     funcUint8(~128U);
 //CHECK:       ^^^^ integer constant overflow in conversion
-//CHECK:       ^^^^ integer value '4294967167' does not fit in type 'uint8_t'
+//CHECK:       ^^^^ integer value '0xFFFFFF7FU' does not fit in type 'uint8_t'
 
     funcUint8(~128);
 //CHECK:       ^^^ integer constant overflow in conversion
-//CHECK:       ^^^ integer value '4294967167' does not fit in type 'uint8_t'
+//CHECK:       ^^^ integer value '0xFFFFFF7F' does not fit in type 'uint8_t'
 
     funcInt8(~128U);
 //CHECK:      ^^^^ integer constant overflow in conversion
-//CHECK:      ^^^^ integer value '-129' does not fit in type 'int8_t'
+//CHECK:      ^^^^ integer value '0xFFFFFF7FU' does not fit in type 'int8_t'
 
     funcInt8(~128);
 //CHECK:      ^^^ integer constant overflow in conversion
-//CHECK:      ^^^ integer value '-129' does not fit in type 'int8_t'
+//CHECK:      ^^^ integer value '0xFFFFFF7F' does not fit in type 'int8_t'
 
     funcUint32(4294967295u);
 

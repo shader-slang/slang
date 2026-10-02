@@ -2430,10 +2430,7 @@ Expr* SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
 
 IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
 {
-    if (expr->bitwiseLiteral)
-        return m_astBuilder->getBitwiseIntVal(expr->type.type, expr->value);
-    else
-        return m_astBuilder->getIntVal(expr->type.type, expr->value);
+    return m_astBuilder->getIntVal(expr->type.type, expr->value);
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -2738,30 +2735,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             return nullptr;
         }
-    }
-
-    switch (argCount)
-    {
-        case 1:
-            fprintf(stderr, "%s:%d: OP %lu = %lu\n",
-                    __FILE__,
-                    __LINE__,
-                    constArgVals[0], resultValue);
-            break;
-        case 2:
-            fprintf(stderr, "%s:%d: %lu OP %lu = %lu\n",
-                    __FILE__,
-                    __LINE__,
-                    constArgVals[0], constArgVals[1], resultValue);
-            break;
-        case 3:
-            fprintf(stderr, "%s:%d: OP(%lu,%lu,%lu) = %lu\n",
-                    __FILE__,
-                    __LINE__,
-                    constArgVals[0], constArgVals[1], constArgVals[2], resultValue);
-            break;
-        default:
-            break;
     }
 
     IntVal* result = m_astBuilder->getIntVal(invokeExpr.getExpr()->type.type, resultValue);

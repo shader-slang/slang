@@ -31,22 +31,6 @@
 namespace Slang
 {
 
-TypedIntegerLiteralValue::TypedIntegerLiteralValue(ConstantIntVal& val)
-{
-    auto basicType = as<BasicExpressionType>(unwrapModifiedType(val.getType()));
-    SLANG_RELEASE_ASSERT(basicType);
-
-    auto baseType = basicType->getBaseType();
-
-    const auto baseTypeInfo = BaseTypeInfo::getInfo(baseType);
-    SLANG_RELEASE_ASSERT(
-        (baseTypeInfo.flags & BaseTypeInfo::Flag::Integer) || (baseType == BaseType::Bool));
-
-    m_rawValue = val.getValue();
-    m_signedType = (baseTypeInfo.flags & BaseTypeInfo::Flag::Signed) != 0U;
-    m_bitwiseValue = (as<ConstantBitwiseIntVal>(&val) != nullptr);
-}
-
 TypedIntegerLiteralValue::TypedIntegerLiteralValue(IntegerLiteralExpr& val)
 {
     auto basicType = as<BasicExpressionType>(unwrapModifiedType(val.type));

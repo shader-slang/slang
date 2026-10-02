@@ -63,40 +63,99 @@ void computeMain()
     funcUint16(1 << 15);
     funcInt32(1 << 31);
     funcUint32(1 << 31);
-    funcInt64(1 << 63);
-    funcUint64(1 << 63);
+    funcInt64(1LL << 63);
+    funcUint64(1ULL << 63);
+
+    funcInt8(-200 + 100);
 
     // then the variants with warnings
     funcInt8 (0x80 | 0x108);
+//CHECK:           ^ integer constant overflow in conversion
+//CHECK:           ^ integer value '0x188' does not fit in type 'int8_t'
     funcInt16(0x8000 | 0x10008);
+//CHECK:             ^ integer constant overflow in conversion
+//CHECK:             ^ integer value '0x18008' does not fit in type 'int16_t'
     funcInt32(0x80000000 | 0x100000008);
+//CHECK:                 ^ integer constant overflow in conversion
+//CHECK:                 ^ integer value '0x180000008' does not fit in type 'int'
 
     funcInt8(~0x00000080);
+//CHECK:      ^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^^^^^^^ integer value '0xFFFFFF7F' does not fit in type 'int8_t'
     funcInt16(~0x00008000);
+//CHECK:       ^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:       ^^^^^^^^^^ integer value '0xFFFF7FFF' does not fit in type 'int16_t'
     funcInt32(~0x80000000);
     funcUint8(~0xFFFFFF00);
     funcUint16(~0xFFFF0000);
     funcUint32(~0x00000000);
 
     funcInt8(0xffffffff & 0x1ff);
+//CHECK:                ^ integer constant overflow in conversion
+//CHECK:                ^ integer value '0x1FFU' does not fit in type 'int8_t'
     funcInt16(0xffffffff & 0x1ffff);
+//CHECK:                 ^ integer constant overflow in conversion
+//CHECK:                 ^ integer value '0x1FFFFU' does not fit in type 'int16_t'
     funcInt32(0xffffffffffffffff & 0x1ffffffff);
+//CHECK:                         ^ integer constant overflow in conversion
+//CHECK:                         ^ integer value '0x1FFFFFFFFU' does not fit in type 'int'
     funcUint8(0xffffffff & 0x1ff);
+//CHECK:                 ^ integer constant overflow in conversion
+//CHECK:                 ^ integer value '0x1FFU' does not fit in type 'uint8_t'
     funcUint16(0xffffffff & 0x1ffff);
+//CHECK:                  ^ integer constant overflow in conversion
+//CHECK:                  ^ integer value '0x1FFFFU' does not fit in type 'uint16_t'
     funcUint32(0xffffffffffffffff & 0x1ffffffff);
+//CHECK:                          ^ integer constant overflow in conversion
+//CHECK:                          ^ integer value '0x1FFFFFFFFU' does not fit in type 'uint'
 
     funcInt8  (0xefffffff ^ 0xffffff00);
+//CHECK:                  ^ integer constant overflow in conversion
+//CHECK:                  ^ integer value '0x100000FFU' does not fit in type 'int8_t'
     funcInt16 (0xefffffff ^ 0xffff0000);
+//CHECK:                  ^ integer constant overflow in conversion
+//CHECK:                  ^ integer value '0x1000FFFFU' does not fit in type 'int16_t'
     funcInt32 (0xefffffffffffffff ^ 0xffffffff00000000);
-    funcUint8 (0xefffffff ^ 0xffffff00);
-    funcUint16(0xefffffff ^ 0xffff0000);
+//CHECK:                          ^ integer constant overflow in conversion
+//CHECK:                          ^ integer value '0x10000000FFFFFFFFU' does not fit in type 'int'
+     funcUint8 (0xefffffff ^ 0xffffff00);
+//CHECK:                   ^ integer constant overflow in conversion
+//CHECK:                   ^ integer value '0x100000FFU' does not fit in type 'uint8_t'
+     funcUint16(0xefffffff ^ 0xffff0000);
+//CHECK:                   ^ integer constant overflow in conversion
+//CHECK:                   ^ integer value '0x1000FFFFU' does not fit in type 'uint16_t'
     funcUint32(0xefffffffffffffff ^ 0xffffffff00000000);
+//CHECK:                          ^ integer constant overflow in conversion
+//CHECK:                          ^ integer value '0x10000000FFFFFFFFU' does not fit in type 'uint'
 
     funcInt8(1 << 8);
+//CHECK:       ^^ integer constant overflow in conversion
+//CHECK:       ^^ integer value '0x100' does not fit in type 'int8_t'
     funcUint8(1 << 8);
+//CHECK:        ^^ integer constant overflow in conversion
+//CHECK:        ^^ integer value '0x100' does not fit in type 'uint8_t'
     funcInt16(1 << 16);
+//CHECK:        ^^ integer constant overflow in conversion
+//CHECK:        ^^ integer value '0x10000' does not fit in type 'int16_t'
     funcUint16(1 << 16);
-    funcInt32(1 << 32);
-    funcUint32(1 << 32);
-    funcInt64(1 << 64);
+//CHECK:         ^^ integer constant overflow in conversion
+//CHECK:         ^^ integer value '0x10000' does not fit in type 'uint16_t'
+   funcInt32(1 << 32);
+//CHECK:       ^^ target-defined behavior in expression
+//CHECK:       ^^ '1 << 32' has target-defined behavior (result type: 'int')
+   funcUint32(1 << 32);
+//CHECK:        ^^ target-defined behavior in expression
+//CHECK:        ^^ '1 << 32' has target-defined behavior (result type: 'int')
+   funcInt64(1 << 63);
+//CHECK:       ^^ target-defined behavior in expression
+//CHECK:       ^^ '1 << 63' has target-defined behavior (result type: 'int')
+   funcInt64(1LL << 64);
+//CHECK:         ^^ target-defined behavior in expression
+//CHECK:         ^^ '1 << 64' has target-defined behavior (result type: 'int64_t')
+
+   funcInt8(254 + 1);
+//CHECK:        ^ integer constant overflow in conversion
+//CHECK:        ^ integer value '255' does not fit in type 'int8_t'
+
+
 }

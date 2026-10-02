@@ -1928,6 +1928,11 @@ local insts = {
 			{
 				readNone = { struct_name = "ReadNoneDecoration" },
 			},
+			-- A decoration that marks a cast instruction as lowered from an implicit
+			-- conversion in the source (an `ImplicitCastExpr`), as opposed to an explicit
+			-- cast written by the user or a cast synthesized by the compiler. The
+			-- decoration exists only for diagnostics and has no effect on code generation.
+			{ implicitConversion = { struct_name = "ImplicitConversionDecoration" } },
 			-- A decoration that indicates that a variable represents
 			-- a vulkan callable shader payload, and should have a location assigned
 			-- to it.
@@ -2760,6 +2765,11 @@ local insts = {
 	-- a regular reinterpret on the inner value if present.
 	{ ReinterpretOptional = { operands = { { "val" } } } },
 	{ unmodified = { operands = { { "val" } } } },
+	-- Marks an integer literal written in bitwise form (binary, octal, or hexadecimal, or with
+	-- a folded `~`) so that the implicit-conversion value check can relax its rules for it. The
+	-- value is `value` itself. Lowering emits it only inside function bodies, and the front-end
+	-- SCCP pass replaces every instance with its operand.
+	{ bitwiseIntValue = { operands = { { "value" } } } },
 	{ outImplicitCast = { operands = { { "value" } } } },
 	{ inOutImplicitCast = { operands = { { "value" } } } },
 	{ intCast = { operands = { { "value" } } } },

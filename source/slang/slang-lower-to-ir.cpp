@@ -1023,6 +1023,44 @@ LoweredValInfo emitCallToDeclRef(
         tryEnv);
 }
 
+/// Add an `IRImplicitConversionDecoration` to `loweredCast` if it is a type-conversion
+/// instruction.
+///
+/// We call this on the result of lowering an `ImplicitCastExpr`. Consider this example:
+///
+///     int x = ...;
+///     uint a = x;       // implicit conversion
+///     uint b = uint(x); // explicit cast
+///
+/// Both conversions call the same core-module `__init`, which is an
+/// `__intrinsic_op(IntCast)`, so both lower to an identical `IntCast` instruction. The
+/// decoration records which one came from an implicit conversion so that later IR passes can
+/// diagnose it differently. Implicit conversions whose callee has a body (instead of mapping to
+/// a single conversion instruction) lower to a `Call` and are not marked.
+static void maybeMarkImplicitConversion(LoweredValInfo const& loweredCast, IRBuilder* builder)
+{
+    if (loweredCast.flavor != LoweredValInfo::Flavor::Simple)
+        return;
+
+    auto inst = loweredCast.val;
+    if (isTypeConversionOp(inst->getOp()))
+        builder->addDecoration(inst, kIROp_ImplicitConversionDecoration);
+}
+
+/// Return `inst` as an `IRIntLit` if it is an integer literal, looking through a
+/// `BitwiseIntValue` marker.
+///
+/// A bitwise literal such as `0x1` in a function body lowers to a marker around the literal,
+/// and the marker stays until the front-end SCCP pass removes it. Lowering code that needs a
+/// compile-time integer from an expression uses this helper so that `v.xy[0x1]` is handled
+/// the same way as `v.xy[1]`.
+static IRIntLit* asLoweredIntLit(IRInst* inst)
+{
+    if (auto marker = as<IRBitwiseIntValue>(inst))
+        inst = marker->getValue();
+    return as<IRIntLit>(inst);
+}
+
 /// Emit a call to the given `accessorDeclRef`.
 ///
 /// The `base` value represents the object on which the accessor is being invoked.
@@ -5774,6 +5812,9 @@ struct ExprLoweringContext
                 emitCallToDeclRef(context, type, funcDeclRef, funcTypeInfo.type, irArgs, tryEnv);
             applyOutArgumentFixups(context, argFixups);
 
+            if (as<ImplicitCastExpr>(expr))
+                maybeMarkImplicitConversion(callResult, context->irBuilder);
+
             if (funcTypeInfo.returnViaLastRefParam)
                 return result;
             return callResult;
@@ -7057,7 +7098,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         auto type = lowerType(context, expr->type);
-        return LoweredValInfo::simple(context->irBuilder->getIntValue(type, expr->value));
+        auto builder = context->irBuilder;
+        IRInst* value = builder->getIntValue(type, expr->value);
+
+        // Integer literals are deduplicated module-wide, so `0xff` and `255` are the same
+        // `IRIntLit` and cannot carry the bitwise property themselves. Inside a function body
+        // we wrap a bitwise literal in a `BitwiseIntValue` marker, which the front-end SCCP
+        // pass consumes and replaces with the literal. We do not emit the marker at module
+        // scope, where SCCP does not visit initializer code and where the front end folds
+        // constant initializers before lowering.
+        if (expr->bitwiseLiteral && getParentFunc(builder->getInsertLoc().getInst()))
+            value = builder->emitIntrinsicInst(type, kIROp_BitwiseIntValue, 1, &value);
+
+        return LoweredValInfo::simple(value);
     }
 
     LoweredValInfo visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
@@ -7629,7 +7682,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         //
         baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
 
-        if (auto indexLit = as<IRIntLit>(indexVal))
+        auto indexLit = asLoweredIntLit(indexVal);
+        if (indexLit)
         {
             const auto indexValue = indexLit->getValue();
             if (indexValue >= 0)
@@ -7680,7 +7734,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
         }
 
-        if (!as<IRIntLit>(indexVal) && isLValueContext() &&
+        if (!indexLit && isLValueContext() &&
             (baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
              baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue))
         {
@@ -15845,6 +15899,21 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
         ensureAllDeclsRec(context, genericDecl->inner);
     }
 }
+
+#ifdef _DEBUG
+/// Return true if `inst` or any of its descendants is a `BitwiseIntValue` marker.
+static bool containsBitwiseIntValueMarker(IRInst* inst)
+{
+    if (as<IRBitwiseIntValue>(inst))
+        return true;
+    for (auto child : inst->getDecorationsAndChildren())
+    {
+        if (containsBitwiseIntValueMarker(child))
+            return true;
+    }
+    return false;
+}
+#endif
 
 RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,

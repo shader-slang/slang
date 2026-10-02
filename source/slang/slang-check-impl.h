@@ -88,7 +88,6 @@ public:
     TypedIntegerLiteralValue(TypedIntegerLiteralValue&&) = default;
     TypedIntegerLiteralValue& operator=(const TypedIntegerLiteralValue&) & = default;
     TypedIntegerLiteralValue& operator=(TypedIntegerLiteralValue&&) & = default;
-    TypedIntegerLiteralValue(ConstantIntVal& val);
     TypedIntegerLiteralValue(IntegerLiteralExpr& val);
 };
 

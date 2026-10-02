@@ -9686,6 +9686,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
+    case kIROp_BitwiseIntValue:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:
     case kIROp_CastFloatToInt:

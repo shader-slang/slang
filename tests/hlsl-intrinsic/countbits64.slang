@@ -1,13 +1,13 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu -xslang -Wno-40024
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -xslang -Wno-40024
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl -xslang -Wno-40024
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute -xslang -Wno-40024
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -xslang -Wno-40024
 // No support for uint64_t on fxc - we need SM6.0 and dxil to use uint64_t with d3d12
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device -xslang -Wno-40024
 // wgpu only has 32-bit support, so we do not try and test it here
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -llvm -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -llvm -compute -xslang -Wno-40024
 
 //CHK:1
 

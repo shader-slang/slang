@@ -9997,10 +9997,13 @@ static Expr* parsePrefixExpr(Parser* parser)
                             nullptr);
                     }
 
-                    newLiteral->value = value;
+                    if ((tokenType == TokenType::OpSub) && newLiteral->value == 1)
+                        newLiteral->bitwiseLiteral = true;
 
                     if (tokenType == TokenType::OpBitNot)
                         newLiteral->bitwiseLiteral = true;
+
+                    newLiteral->value = value;
                 }
 
                 return newLiteral;

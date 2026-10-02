@@ -1,9 +1,12 @@
 // slang-ir-sccp.cpp
 #include "slang-ir-sccp.h"
 
+#include "core/slang-math-int-ops.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
+
+#include <optional>
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -22,6 +25,38 @@ struct SharedSCCPContext
     DiagnosticSink* sink;
     TranslationContext* translationContext = nullptr;
 };
+
+MathIntType irTypeToMathIntType(IRType *type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_BoolType:
+        return MathIntType { .width = 1, .isSigned = false };
+    case kIROp_Int8Type:
+        return MathIntType { .width = 8, .isSigned = true };
+    case kIROp_Int16Type:
+        return MathIntType { .width = 16, .isSigned = true };
+    case kIROp_IntType:
+        return MathIntType { .width = 32, .isSigned = true };
+    case kIROp_Int64Type:
+        return MathIntType { .width = 64, .isSigned = true };
+    case kIROp_UInt8Type:
+        return MathIntType { .width = 8, .isSigned = false };
+    case kIROp_UInt16Type:
+        return MathIntType { .width = 16, .isSigned = false };
+    case kIROp_UIntType:
+        return MathIntType { .width = 32, .isSigned = false };
+    case kIROp_UInt64Type:
+        return MathIntType { .width = 64, .isSigned = false };
+    case kIROp_IntPtrType:
+        return MathIntType { .width = 64, .isSigned = true };
+    case kIROp_UIntPtrType:
+        return MathIntType { .width = 64, .isSigned = false };
+    default:
+        return MathIntType{};
+    }
+}
+
 //
 // Next we have a context struct that will be applied for each function (or other
 // code-bearing value) that we optimize:
@@ -72,6 +107,8 @@ struct SCCPContext
         // For all other flavors it should be null.
         IRInst* value = nullptr;
 
+        bool bitwiseValue = false;
+
         // For convenience, we define `static` factory functions to
         // produce values of each of the flavors.
 
@@ -89,11 +126,12 @@ struct SCCPContext
             return result;
         }
 
-        static LatticeVal getConstant(IRInst* value)
+        static LatticeVal getConstant(IRInst* value, bool bitwiseValue = false)
         {
             LatticeVal result;
             result.flavor = Flavor::Constant;
             result.value = value;
+            result.bitwiseValue = bitwiseValue;
             return result;
         }
 
@@ -104,16 +142,43 @@ struct SCCPContext
         //
         bool operator==(LatticeVal const& that)
         {
-            return this->flavor == that.flavor && this->value == that.value;
+            return this->flavor == that.flavor && this->value == that.value && this->bitwiseValue == that.bitwiseValue;
         }
 
         bool operator!=(LatticeVal const& that) { return !(*this == that); }
+
+        MathIntValue toMathIntValue() const
+        {
+            switch (flavor)
+            {
+                case Flavor::Constant:
+                {
+                    auto irConstant = as<IRConstant>(value);
+                    MathIntValue ret{};
+
+                    ret.setValue(irTypeToMathIntType(irConstant->getDataType()), irConstant->value.intVal, bitwiseValue);
+                    return ret;
+                }
+
+                case Flavor::Any:
+                {
+                    MathIntValue ret{};
+                    ret.setUnderermined();
+                    return ret;
+                }
+
+                default:
+                    SLANG_RELEASE_ASSERT(!"SCCPContext::LatticeVal::toMathIntValue(): Bad flavor");
+                    return {};
+            }
+        }
     };
 
     static bool isEvaluableOpCode(IROp op)
     {
         switch (op)
         {
+        case kIROp_BitwiseIntValue:
         case kIROp_IntLit:
         case kIROp_BoolLit:
         case kIROp_FloatLit:
@@ -331,6 +396,219 @@ struct SCCPContext
         break;                              \
     }
 
+    /// Return the result of converting the integer constant `v0` to the integer type `type`,
+    /// or `std::nullopt` if `v0` is not an integer constant or `type` is not an integer type.
+    ///
+    /// Both `evalCast` and the post-convergence diagnostics use this helper, so the value SCCP
+    /// folds a conversion to and the overflow it reports for that conversion always agree.
+    MathIntResult evalIntegerCast(IRType* type, const LatticeVal& v0)
+    {
+        SLANG_RELEASE_ASSERT((v0.value->getOp() == kIROp_IntLit) || (v0.value->getOp() == kIROp_BoolLit));
+
+        MathIntType resultType = irTypeToMathIntType(type);
+        SLANG_RELEASE_ASSERT(resultType.isValid());
+
+        if (type->getOp() == kIROp_BoolType)
+            return MathIntOps::castToBool(v0.toMathIntValue());
+        else
+            return MathIntOps::cast(irTypeToMathIntType(type), v0.toMathIntValue());
+    }
+
+    void diagnoseIntegerCast(IRInst *inst, const LatticeVal& v0)
+    {
+        // diagnose constants using their value
+        if (v0.flavor == LatticeVal::Flavor::Constant)
+        {
+            switch (inst->getOperand(0)->getDataType()->getOp())
+            {
+            case kIROp_Int8Type:
+            case kIROp_Int16Type:
+            case kIROp_IntType:
+            case kIROp_Int64Type:
+            case kIROp_UInt8Type:
+            case kIROp_UInt16Type:
+            case kIROp_UIntType:
+            case kIROp_UInt64Type:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
+            {
+                auto res = evalIntegerCast(inst->getDataType(), v0);
+                if (res.flags & MathIntResult::Overflow)
+                {
+                    StringBuilder typeName;
+                    getTypeNameHint(typeName, inst->getDataType());
+                    shared->sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                            .value = v0.toMathIntValue().toString(),
+                            .type = typeName.toString(),
+                            .location = inst->sourceLoc});
+                }
+                return;
+            }
+
+            default:
+                break;
+            }
+        }
+
+        // the operand value is not known, so we do a type-based diagnostics
+        // check
+
+        switch (inst->getOperand(0)->getDataType()->getOp())
+        {
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        {
+            // integer types: diagnose a width-narrowing cast
+            MathIntType resultType = irTypeToMathIntType(inst->getDataType());
+            MathIntType sourceType = irTypeToMathIntType(inst->getOperand(0)->getDataType());
+
+            // non-width-narrowing cast (note that we accept signedness changes)
+            if (sourceType.width <= resultType.width)
+                return;
+
+            break;
+        }
+
+        // bool -> integer is always allowed
+        case kIROp_BoolType:
+            return;
+
+        // other -> integer: always a warning
+        default:
+            break;
+        }
+
+        StringBuilder fromTypeName;
+        getTypeNameHint(fromTypeName, inst->getOperand(0)->getDataType());
+
+        StringBuilder toTypeName;
+        getTypeNameHint(toTypeName, inst->getDataType());
+
+        shared->sink->diagnose(Diagnostics::UnrecommendedImplicitConversion2{
+                .fromType = fromTypeName.toString(),
+                .toType = toTypeName.toString(),
+                .location = inst->getOperand(0)->sourceLoc});
+    }
+
+    using IntegerUnaryFunc = MathIntResult(const MathIntType& resultType, const MathIntValue& v0);
+    using IntegerBinaryFunc = MathIntResult(const MathIntType& resultType, const MathIntValue& v0, const MathIntValue& v1);
+
+    LatticeVal evalIntegerUnaryV2(
+        IRType* type, LatticeVal const& v0, const IntegerUnaryFunc &func)
+    {
+        SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0);
+
+        const MathIntType resultType{irTypeToMathIntType(type)};
+        if (!resultType.isValid())
+            return LatticeVal::getAny();
+
+        const MathIntValue val0{v0.toMathIntValue()};
+        if (!val0.isValid())
+            return LatticeVal::getAny();
+
+        const MathIntResult result{func(resultType, val0)};
+
+        if (result.flags & MathIntResult::Undefined)
+            return LatticeVal::getAny();
+
+        IRInst* const resultVal = getBuilder()->getIntValue(type, result.value.getTypedValue<IRIntegerValue>());
+        return LatticeVal::getConstant(resultVal, result.value.isBitwise);
+    }
+
+    LatticeVal evalIntegerBinaryV2(
+        IRType* type, LatticeVal const& v0, LatticeVal const& v1, const IntegerBinaryFunc &func)
+    {
+        SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0);
+        SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v1);
+
+        const MathIntType resultType{irTypeToMathIntType(type)};
+        if (!resultType.isValid())
+            return LatticeVal::getAny();
+
+        const MathIntValue val0{v0.toMathIntValue()};
+        if (!val0.isValid())
+            return LatticeVal::getAny();
+
+        const MathIntValue val1{v1.toMathIntValue()};
+        if (!val1.isValid())
+            return LatticeVal::getAny();
+
+        const MathIntResult result{func(resultType, val0, val1)};
+
+        if (result.flags & MathIntResult::Undefined)
+        {
+            // prevent folding on undefined behavior
+            return LatticeVal::getAny();
+        }
+
+        IRInst* const resultVal = getBuilder()->getIntValue(type, result.value.getTypedValue<IRIntegerValue>());
+        return LatticeVal::getConstant(resultVal, result.value.isBitwise);
+    }
+
+    void diagnoseIntegerBinaryV2(
+        IRInst* inst, LatticeVal const& v0, LatticeVal const& v1, const IntegerBinaryFunc &func, const char* opName)
+    {
+        if (v0.flavor == LatticeVal::Flavor::None)
+            return;
+
+        if (v1.flavor == LatticeVal::Flavor::None)
+            return;
+
+        IRType* type = inst->getDataType();
+
+        const MathIntType resultType{irTypeToMathIntType(type)};
+        if (!resultType.isValid())
+            return;
+
+        const MathIntValue val0{v0.toMathIntValue()};
+        if (!val0.isValid())
+            return;
+
+        const MathIntValue val1{v1.toMathIntValue()};
+        if (!val1.isValid())
+            return;
+
+        const MathIntResult result{func(resultType, val0, val1)};
+
+        // diagnose possible warnings/errors
+        if (result.flags && shared->sink)
+        {
+            StringBuilder typeName;
+            getTypeNameHint(typeName, type);
+
+            if (result.flags & MathIntResult::Undefined)
+                shared->sink->diagnose(Diagnostics::IntegerBinOpUndefined{
+                        .value1 = val0.toString(),
+                        .op = opName,
+                        .value2 = val1.toString(),
+                        .type = typeName.toString(),
+                        .location = inst->sourceLoc});
+            else if (result.flags & MathIntResult::TargetDefined)
+                shared->sink->diagnose(Diagnostics::IntegerBinOpTargetDefined{
+                        .value1 = val0.toString(),
+                        .op = opName,
+                        .value2 = val1.toString(),
+                        .type = typeName.toString(),
+                        .location = inst->sourceLoc});
+            else if (result.flags & MathIntResult::Overflow)
+                shared->sink->diagnose(Diagnostics::IntegerBinOpOverflow{
+                        .value1 = val0.toString(),
+                        .op = opName,
+                        .value2 = val1.toString(),
+                        .type = typeName.toString(),
+                        .location = inst->sourceLoc});
+
+        }
+    }
+
     LatticeVal evalCast(IRType* type, LatticeVal v0)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -361,8 +639,11 @@ struct SCCPContext
             case kIROp_IntLit:
             case kIROp_BoolLit:
                 {
-                    IRIntegerValue intVal = irConstant->value.intVal;
-                    resultVal = getBuilder()->getIntValue(type, (IRIntegerValue)intVal);
+                    auto res = evalIntegerCast(type, v0);
+                    SLANG_ASSERT(res.value.isValue());
+                    resultVal = getBuilder()->getIntValue(
+                        type,
+                        res.value.getTypedValue<IRIntegerValue>());
                 }
                 break;
             default:
@@ -411,6 +692,36 @@ struct SCCPContext
         if (!resultVal)
             return LatticeVal::getAny();
         return LatticeVal::getConstant(resultVal);
+    }
+
+    void diagnoseCast(IRInst* inst, const LatticeVal& v0)
+    {
+        switch (inst->getDataType()->getOp())
+        {
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
+        case kIROp_UInt64Type:
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+            diagnoseIntegerCast(inst, v0);
+            break;
+
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
+            break;
+
+        default:
+            break;
+        }
     }
 
     LatticeVal evalDefaultConstruct(IRType* type)
@@ -747,95 +1058,27 @@ struct SCCPContext
     }
     LatticeVal evalBitAnd(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        return evalBinaryIntImpl(
-            type,
-            v0,
-            v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 & c1; });
+        return evalIntegerBinaryV2(type, v0, v1, MathIntOps::bitwiseAnd);
     }
     LatticeVal evalBitOr(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        return evalBinaryIntImpl(
-            type,
-            v0,
-            v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 | c1; });
+        return evalIntegerBinaryV2(type, v0, v1, MathIntOps::bitwiseOr);
     }
     LatticeVal evalBitNot(IRType* type, LatticeVal v0)
     {
-        return evalUnaryIntImpl(type, v0, [](IRIntegerValue c0) { return ~c0; });
+        return evalIntegerUnaryV2(type, v0, MathIntOps::bitwiseNot);
     }
     LatticeVal evalBitXor(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        return evalBinaryIntImpl(
-            type,
-            v0,
-            v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 ^ c1; });
+        return evalIntegerBinaryV2(type, v0, v1, MathIntOps::bitwiseXor);
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        const auto bitWidthOpt = maybeGetIntTypeWidth(type);
-        const IRUnsignedIntegerValue bitWidth =
-            bitWidthOpt ? static_cast<IRUnsignedIntegerValue>(*bitWidthOpt)
-                        : std::numeric_limits<IRUnsignedIntegerValue>::digits;
-        bool isSigned = getIntTypeSigned(type);
-        if (isSigned == false)
-        {
-            return evalBinaryIntImpl(
-                type,
-                v0,
-                v1,
-                [bitWidth](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
-                {
-                    if (c1 >= bitWidth)
-                        return IRUnsignedIntegerValue(0);
-                    return c0 << c1;
-                });
-        }
-        return evalBinaryIntImpl(
-            type,
-            v0,
-            v1,
-            [bitWidth](IRIntegerValue c0, IRIntegerValue c1)
-            {
-                if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
-                    return IRIntegerValue(0);
-                return static_cast<IRIntegerValue>(
-                    static_cast<IRUnsignedIntegerValue>(c0)
-                    << static_cast<IRUnsignedIntegerValue>(c1));
-            });
+        return evalIntegerBinaryV2(type, v0, v1, MathIntOps::lsh);
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        const auto bitWidthOpt = maybeGetIntTypeWidth(type);
-        const IRUnsignedIntegerValue bitWidth =
-            bitWidthOpt ? static_cast<IRUnsignedIntegerValue>(*bitWidthOpt)
-                        : std::numeric_limits<IRUnsignedIntegerValue>::digits;
-        bool isSigned = getIntTypeSigned(type);
-        if (isSigned == false)
-        {
-            return evalBinaryIntImpl(
-                type,
-                v0,
-                v1,
-                [bitWidth](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
-                {
-                    if (c1 >= bitWidth)
-                        return IRUnsignedIntegerValue(0);
-                    return c0 >> c1;
-                });
-        }
-        return evalBinaryIntImpl(
-            type,
-            v0,
-            v1,
-            [bitWidth](IRIntegerValue c0, IRIntegerValue c1)
-            {
-                if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
-                    return (c0 < 0) ? IRIntegerValue(-1) : IRIntegerValue(0);
-                return c0 >> static_cast<IRUnsignedIntegerValue>(c1);
-            });
+        return evalIntegerBinaryV2(type, v0, v1, MathIntOps::rsh);
     }
     LatticeVal evalNeg(IRType* type, LatticeVal v0)
     {
@@ -972,6 +1215,12 @@ struct SCCPContext
         case kIROp_BoolLit:
             return LatticeVal::getConstant(inst);
 
+        case kIROp_BitwiseIntValue:
+        {
+            IRBitwiseIntValue* bitwiseIntValue = as<IRBitwiseIntValue>(inst);
+            return LatticeVal::getConstant(bitwiseIntValue->getValue(), true);
+        }
+
         // We might also want to special-case certain
         // instructions where we shouldn't bother trying to
         // constant-fold them and should just default to the
@@ -1070,44 +1319,22 @@ struct SCCPContext
         case kIROp_Div:
         case kIROp_ConstexprDiv:
             {
-                // Detect divide by zero error.
+                // Integer division by zero is undefined, so we never fold it. The error is
+                // reported by `diagnoseConstantEvaluation` once the lattice has converged.
                 auto divisor = getLatticeVal(inst->getOperand(1));
-                if (divisor.flavor == LatticeVal::Flavor::Constant)
-                {
-                    if (isIntegralType(divisor.value->getDataType()))
-                    {
-                        auto c = as<IRConstant>(divisor.value);
-                        if (c->value.intVal == 0)
-                        {
-                            if (shared->sink)
-                                shared->sink->diagnose(
-                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
-                            return LatticeVal::getAny();
-                        }
-                    }
-                }
+                if (isConstantIntegerZero(divisor))
+                    return LatticeVal::getAny();
                 return evalDiv(inst->getDataType(), getLatticeVal(inst->getOperand(0)), divisor);
             }
         case kIROp_FRem:
         case kIROp_IRem:
         case kIROp_ConstexprIRem:
             {
-                // Detect divide by zero error.
+                // Integer division by zero is undefined, so we never fold it. The error is
+                // reported by `diagnoseConstantEvaluation` once the lattice has converged.
                 auto divisor = getLatticeVal(inst->getOperand(1));
-                if (divisor.flavor == LatticeVal::Flavor::Constant)
-                {
-                    if (isIntegralType(divisor.value->getDataType()))
-                    {
-                        auto c = as<IRConstant>(divisor.value);
-                        if (c->value.intVal == 0)
-                        {
-                            if (shared->sink)
-                                shared->sink->diagnose(
-                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
-                            return LatticeVal::getAny();
-                        }
-                    }
-                }
+                if (isConstantIntegerZero(divisor))
+                    return LatticeVal::getAny();
                 return evalRem(inst->getDataType(), getLatticeVal(inst->getOperand(0)), divisor);
             }
         case kIROp_Eql:
@@ -1503,6 +1730,98 @@ struct SCCPContext
         return changed;
     }
 
+    /// Return true if `v` is the constant integer zero.
+    static bool isConstantIntegerZero(LatticeVal const& v)
+    {
+        if (v.flavor != LatticeVal::Flavor::Constant)
+            return false;
+        if (!isIntegralType(v.value->getDataType()))
+            return false;
+        return as<IRConstant>(v.value)->value.intVal == 0;
+    }
+
+    /// Report problems that constant evaluation of `inst` reveals, based on the converged
+    /// lattice values of its operands.
+    ///
+    /// We run this after the lattice has converged rather than while interpreting an
+    /// instruction, because interim lattice values can be optimistic. Consider this example:
+    ///
+    ///     int d = 0;
+    ///     if (c) d = 5;
+    ///     return x / d;
+    ///
+    /// If the work list reaches the merge block before the `c` branch, the phi for `d` is
+    /// briefly `Constant(0)` and only later becomes `Any`. Checking converged values also
+    /// means each instruction is reported at most once.
+    void diagnoseConstantEvaluation(IRInst* inst)
+    {
+        auto sink = shared->sink;
+        if (!sink)
+            return;
+
+        switch (inst->getOp())
+        {
+        case kIROp_Div:
+        case kIROp_ConstexprDiv:
+        case kIROp_IRem:
+        case kIROp_FRem:
+        case kIROp_ConstexprIRem:
+            if (isConstantIntegerZero(getLatticeVal(inst->getOperand(1))))
+                sink->diagnose(Diagnostics::DivideByZero{.location = inst->sourceLoc});
+            break;
+
+        case kIROp_IntCast:
+        case kIROp_ConstexprIntCast:
+        case kIROp_FloatCast:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
+        {
+            auto decoration = inst->findDecoration<IRImplicitConversionDecoration>();
+            if (!decoration)
+                break;
+
+            // SCCP runs repeatedly over the same IR as the compilation pipeline
+            // progresses. We remove the decoration once we've diagnosed it to
+            // avoid duplicate diagnostic messages.
+            decoration->removeAndDeallocate();
+
+            if (inst->getOperandCount() == 1)
+                return diagnoseCast(inst, getLatticeVal(inst->getOperand(0)));
+
+            break;
+        }
+
+        case kIROp_Lsh:
+        case kIROp_ConstexprShl:
+            diagnoseIntegerBinaryV2(
+                inst,
+                getLatticeVal(inst->getOperand(0)),
+                getLatticeVal(inst->getOperand(1)),
+                MathIntOps::lsh,
+                "<<");
+            break;
+
+        case kIROp_Rsh:
+        case kIROp_ConstexprShr:
+            diagnoseIntegerBinaryV2(
+                inst,
+                getLatticeVal(inst->getOperand(0)),
+                getLatticeVal(inst->getOperand(1)),
+                MathIntOps::rsh,
+                ">>");
+            break;
+
+        default:
+            break;
+        }
+    }
+
     bool applyOnScope(IRInst* scopeInst)
     {
         builderStorage = IRBuilder(scopeInst);
@@ -1534,6 +1853,9 @@ struct SCCPContext
                 continue;
             instsToProcess.add(child);
         }
+
+        for (auto child : instsToProcess)
+            diagnoseConstantEvaluation(child);
 
         for (auto child : instsToProcess)
         {
@@ -1678,7 +2000,19 @@ struct SCCPContext
         // We are now equiped to start using the information we've gathered
         // to modify the code.
 
-        // First, we will walk through all the code and replace instructions
+        // Before we change any code, we report problems found by constant evaluation,
+        // using the converged lattice values. Blocks that were never marked as executed
+        // are skipped, because their instructions have no meaningful lattice values.
+        //
+        for (auto block : code->getBlocks())
+        {
+            if (!isMarkedAsExecuted(block))
+                continue;
+            for (auto inst : block->getChildren())
+                diagnoseConstantEvaluation(inst);
+        }
+
+        // Next, we will walk through all the code and replace instructions
         // with constants where it is possible.
         //
         List<IRInst*> instsToRemove;
@@ -2027,6 +2361,7 @@ bool isEvaluableOpCode(IROp op)
 {
     switch (op)
     {
+    case kIROp_BitwiseIntValue:
     case kIROp_IntLit:
     case kIROp_BoolLit:
     case kIROp_FloatLit:

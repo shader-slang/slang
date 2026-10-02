@@ -3186,6 +3186,28 @@ bool isInstHoistable(IROp op)
     return (getIROpInfo(op).flags & kIROpFlag_Hoistable);
 }
 
+bool isTypeConversionOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_BuiltinCast:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_CastPtrToBool:
+    case kIROp_CastPtrToInt:
+    case kIROp_CastIntToPtr:
+    case kIROp_PtrCast:
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
+        return true;
+    default:
+        return false;
+    }
+}
+
 IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
 {
     SLANG_RELEASE_ASSERT(isSignedType(type));

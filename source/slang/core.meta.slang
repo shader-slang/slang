@@ -1689,8 +1689,8 @@ extension int64_t : IRangedValue
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
 
-    static const int64_t maxValue =  0x7FFFFFFFFFFFFFFFLL;
-    static const int64_t minValue = -0x8000000000000000LL;
+    static const int64_t maxValue = 0x7FFFFFFFFFFFFFFFLL;
+    static const int64_t minValue = (int64_t)0x8000000000000000LL;
 }
 
 extension intptr_t : IRangedValue
@@ -1708,7 +1708,7 @@ extension uintptr_t : IRangedValue
     __generic<$(ptrTypeParameterList)>
     __intrinsic_op($(kIROp_CastPtrToInt))
     __init($(fullPtrType) ptr);
-    static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFz":"0xFFFFFFFFz");
+    static const uintptr_t maxValue = $(SLANG_PROCESSOR_X86_64?"0xFFFFFFFFFFFFFFFFuz":"0xFFFFFFFFuz");
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }

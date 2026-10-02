@@ -1462,6 +1462,15 @@ struct PeepholeContext : InstPassBase
                 if (auto newCast =
                         builder.emitCast(inst->getFullType(), inst->getOperand(0), false))
                 {
+                    // An implicit vector or matrix conversion lowers to a `BuiltinCast`, which
+                    // we resolve here into a concrete cast such as `IntCast`. We move the
+                    // `ImplicitConversionDecoration` to that cast so that diagnostics still
+                    // see the conversion as implicit.
+                    if (inst->findDecoration<IRImplicitConversionDecoration>() &&
+                        isTypeConversionOp(newCast->getOp()))
+                    {
+                        builder.addDecoration(newCast, kIROp_ImplicitConversionDecoration);
+                    }
                     inst->replaceUsesWith(newCast);
                     maybeRemoveOldInst(inst);
                     changed = true;
