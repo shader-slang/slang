@@ -170,7 +170,7 @@ struct ContainerConcreteRef
     property float val
     {
         get { return stored; }
-        ref { return stored; }
+        [mutating] ref { return stored; }
     }
 }
 
@@ -208,7 +208,7 @@ struct ContainerComRef
     property ICom val
     {
         get { return stored; }
-        ref { return stored; }
+        [mutating] ref { return stored; }
     }
 }
 

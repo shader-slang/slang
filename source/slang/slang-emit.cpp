@@ -102,6 +102,7 @@
 #include "slang-ir-missing-return.h"
 #include "slang-ir-nvvm-legalize.h"
 #include "slang-ir-nvvm-surface-legalize.h"
+#include "slang-ir-nvvm-tensor-view.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
@@ -1863,6 +1864,8 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(lowerTuples, sink);
+    if (emitNVVMDirectly)
+        SLANG_PASS(lowerNVVMTensorViews);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

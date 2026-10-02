@@ -9638,6 +9638,10 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_ImageSubscript:
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
+    case kIROp_GetTensorViewData:
+    case kIROp_GetTensorViewStride:
+    case kIROp_GetTensorViewSize:
+    case kIROp_GetTensorViewDimensionCount:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:

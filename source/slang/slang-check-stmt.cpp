@@ -600,8 +600,26 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         {
             if (!m_parentLambdaExpr && expectedReturnType)
             {
-                stmt->expression =
-                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
+                if (as<RefAccessorDecl>(function) &&
+                    !expectedReturnType->equals(m_astBuilder->getErrorType()))
+                {
+                    // A reference selects existing mutable storage. Value conversion and
+                    // inout-style copyback would instead return the address of a temporary.
+                    if (!returnType->equals(expectedReturnType))
+                        getSink()->diagnose(Diagnostics::TypeMismatch{
+                            .expectedType = expectedReturnType,
+                            .actualType = stmt->expression->type,
+                            .expr = stmt->expression});
+                    else if (!stmt->expression->type.isLeftValue)
+                        getSink()->diagnose(Diagnostics::RefAccessorReturnRequiresMutableStorage{
+                            .location = stmt->expression->loc});
+                }
+                else
+                    stmt->expression = coerce(
+                        CoercionSite::Return,
+                        expectedReturnType,
+                        stmt->expression,
+                        getSink());
             }
         }
     }

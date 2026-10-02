@@ -3086,6 +3086,13 @@ err(
     span { loc = "attr", message = "a publicly visible custom derivative cannot reference '~derivative:Decl' from a module that is imported but not re-exported with '__exported import'." }
 )
 
+err(
+    "ref-accessor-return-requires-mutable-storage",
+    31163,
+    "ref accessor must return mutable storage",
+    span { loc = "location", message = "a 'ref' accessor must return an l-value naming mutable storage." }
+)
+
 
 -- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
 -- (inlined from slang-diagnostics-semantic-checking-6.lua)

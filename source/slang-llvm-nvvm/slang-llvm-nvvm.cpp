@@ -1451,14 +1451,18 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         // exact register and pointer types required by the inline-assembly constraints.
         llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
         llvm::PointerType* int32PointerType =
-            llvm::PointerType::get(int32Type, SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+            llvm::PointerType::get(int32Type, operation->addressSpace);
         llvm::Value* integerPointer = state->builder.CreateBitCast(llvmPointer, int32PointerType);
         llvm::Value* integerValue = state->builder.CreateBitCast(llvmValues[0], int32Type);
         llvm::FunctionType* functionType =
             llvm::FunctionType::get(int32Type, {int32PointerType, int32Type}, false);
         llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(
             functionType,
-            "atom.global.add.noftz.f16x2 $0, [$1], $2;",
+            operation->addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL
+                ? "atom.global.add.noftz.f16x2 $0, [$1], $2;"
+            : operation->addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
+                ? "atom.shared.add.noftz.f16x2 $0, [$1], $2;"
+                : "atom.add.noftz.f16x2 $0, [$1], $2;",
             "=r,l,r",
             true);
         llvm::Value* resultBits =
@@ -1474,17 +1478,21 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
         // CUDA's canonical scalar Half operation is the PTX `atom.add.noftz.f16` instruction.
         // Keep the provider input typed as Half, then cross the PTX inline-assembly boundary using
         // the exact i16 register bits accepted by LLVM's `h` constraint. The pointer stays in the
-        // already-validated global address space and the returned bits restore the Half result.
+        // already-validated address space and the returned bits restore the Half result.
         llvm::Type* int16Type = llvm::Type::getInt16Ty(state->context);
         llvm::PointerType* int16PointerType =
-            llvm::PointerType::get(int16Type, SLANG_NVVM_ADDRESS_SPACE_GLOBAL);
+            llvm::PointerType::get(int16Type, operation->addressSpace);
         llvm::Value* integerPointer = state->builder.CreateBitCast(llvmPointer, int16PointerType);
         llvm::Value* integerValue = state->builder.CreateBitCast(llvmValues[0], int16Type);
         llvm::FunctionType* functionType =
             llvm::FunctionType::get(int16Type, {int16PointerType, int16Type}, false);
         llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(
             functionType,
-            "atom.global.add.noftz.f16 $0, [$1], $2;",
+            operation->addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL
+                ? "atom.global.add.noftz.f16 $0, [$1], $2;"
+            : operation->addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED
+                ? "atom.shared.add.noftz.f16 $0, [$1], $2;"
+                : "atom.add.noftz.f16 $0, [$1], $2;",
             "=h,l,h",
             true);
         llvm::Value* resultBits =
@@ -2770,7 +2778,8 @@ static bool _isSelectedLegacyAtomicAccess(
     const bool hasNaturalAlignment = (bitWidth == 32 && alignment == llvm::Align(4)) ||
                                      (bitWidth == 64 && alignment == llvm::Align(8));
     return pointerType &&
-           (pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+           (pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GENERIC ||
+            pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
             pointerType->getAddressSpace() == SLANG_NVVM_ADDRESS_SPACE_SHARED) &&
            hasSelectedType && hasNaturalAlignment && ordering == llvm::AtomicOrdering::Monotonic &&
            syncScope == llvm::SyncScope::System && !isVolatile;
@@ -3038,6 +3047,7 @@ static SlangResult _writeLegacyNVVMAssembly(
                         (bitWidth == 32 && atomic->getAlign() == llvm::Align(4)) ||
                         (bitWidth == 64 && atomic->getAlign() == llvm::Align(8));
                     const bool isAtomicAddressSpace =
+                        addressSpace == SLANG_NVVM_ADDRESS_SPACE_GENERIC ||
                         addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
                         addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
                     const bool isSelectedIntegerOperation =
@@ -3052,12 +3062,11 @@ static SlangResult _writeLegacyNVVMAssembly(
                          atomic->getOperation() == llvm::AtomicRMWInst::Max ||
                          atomic->getOperation() == llvm::AtomicRMWInst::UMax ||
                          atomic->getOperation() == llvm::AtomicRMWInst::Xchg);
-                    const bool isSelectedGlobalFloatingReduction =
-                        addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-                        atomic->getType()->isFloatingPointTy() &&
+                    const bool isSelectedFloatingReduction =
+                        isAtomicAddressSpace && atomic->getType()->isFloatingPointTy() &&
                         (bitWidth == 32 || bitWidth == 64) && hasNaturalAlignment &&
                         atomic->getOperation() == llvm::AtomicRMWInst::FAdd;
-                    if ((!isSelectedIntegerOperation && !isSelectedGlobalFloatingReduction) ||
+                    if ((!isSelectedIntegerOperation && !isSelectedFloatingReduction) ||
                         atomic->getOrdering() != llvm::AtomicOrdering::Monotonic ||
                         atomic->getSyncScopeID() != llvm::SyncScope::System || atomic->isVolatile())
                     {
@@ -3106,14 +3115,36 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef atomicMarker(" = atomicrmw ");
     const llvm::StringRef llvm14I32AlignmentSuffix(", align 4");
     const llvm::StringRef llvm14I64AlignmentSuffix(", align 8");
-    const llvm::StringRef llvm14GlobalF32AtomicAddMarker(" = atomicrmw fadd float addrspace(1)* ");
-    const llvm::StringRef llvm14GlobalF64AtomicAddMarker(" = atomicrmw fadd double addrspace(1)* ");
-    const llvm::StringRef llvm14F32AtomicAddSuffix(" monotonic, align 4");
-    const llvm::StringRef llvm14F64AtomicAddSuffix(" monotonic, align 8");
-    const llvm::StringRef llvm14F32AtomicAddSeparator(", float ");
-    const llvm::StringRef llvm14F64AtomicAddSeparator(", double ");
-    const llvm::StringRef legacyGlobalF32AtomicAddName("@llvm.nvvm.atomic.load.add.f32.p1f32");
-    const llvm::StringRef legacyGlobalF64AtomicAddName("@llvm.nvvm.atomic.load.add.f64.p1f64");
+    // The legacy reader spells floating atomic add as an address-space-overloaded intrinsic.
+    // Keep the exact LLVM 14 marker, pointer spelling and legacy name in one dialect table.
+    struct FloatingAtomicSpelling
+    {
+        llvm::StringRef marker;
+        llvm::StringRef pointerType;
+        llvm::StringRef intrinsic;
+        llvm::StringRef valueType;
+        bool used = false;
+    };
+    FloatingAtomicSpelling floatingAtomics[] = {
+        {" = atomicrmw fadd float* ", "float*", "@llvm.nvvm.atomic.load.add.f32.p0f32", "float"},
+        {" = atomicrmw fadd double* ", "double*", "@llvm.nvvm.atomic.load.add.f64.p0f64", "double"},
+        {" = atomicrmw fadd float addrspace(1)* ",
+         "float addrspace(1)*",
+         "@llvm.nvvm.atomic.load.add.f32.p1f32",
+         "float"},
+        {" = atomicrmw fadd double addrspace(1)* ",
+         "double addrspace(1)*",
+         "@llvm.nvvm.atomic.load.add.f64.p1f64",
+         "double"},
+        {" = atomicrmw fadd float addrspace(3)* ",
+         "float addrspace(3)*",
+         "@llvm.nvvm.atomic.load.add.f32.p3f32",
+         "float"},
+        {" = atomicrmw fadd double addrspace(3)* ",
+         "double addrspace(3)*",
+         "@llvm.nvvm.atomic.load.add.f64.p3f64",
+         "double"},
+    };
     const llvm::StringRef floatNegateMarker(" = fneg float ");
     const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
     const llvm::StringRef llvm14SpecialRegisterAttributeMarker(
@@ -3129,8 +3160,6 @@ static SlangResult _writeLegacyNVVMAssembly(
     size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
     size_t rewrittenIntegerScanDeclarationCount = 0;
     size_t rewrittenByValueParameterCount = 0;
-    bool needsLegacyGlobalF32AtomicAdd = false;
-    bool needsLegacyGlobalF64AtomicAdd = false;
     while (!remaining.empty())
     {
         const size_t newlineIndex = remaining.find('\n');
@@ -3138,24 +3167,22 @@ static SlangResult _writeLegacyNVVMAssembly(
         const llvm::StringRef line = hasNewline ? remaining.take_front(newlineIndex) : remaining;
 
         const llvm::StringRef trimmedLine = line.ltrim();
-        const bool isGlobalF32AtomicAdd =
-            trimmedLine.startswith("%") && line.contains(llvm14GlobalF32AtomicAddMarker);
-        const bool isGlobalF64AtomicAdd =
-            trimmedLine.startswith("%") && line.contains(llvm14GlobalF64AtomicAddMarker);
-        if (isGlobalF32AtomicAdd || isGlobalF64AtomicAdd)
+        FloatingAtomicSpelling* floatingAtomic = nullptr;
+        if (trimmedLine.startswith("%"))
+            for (auto& spelling : floatingAtomics)
+                if (line.contains(spelling.marker))
+                {
+                    floatingAtomic = &spelling;
+                    break;
+                }
+        if (floatingAtomic)
         {
-            // LLVM 7/libNVVM models floating-point atomic add with an NVVM intrinsic rather than
-            // the newer `atomicrmw fadd` operation. Translate the one provider-produced scalar
-            // global form at the isolated dialect boundary; all other instructions stay typed IR.
-            const llvm::StringRef marker = isGlobalF32AtomicAdd ? llvm14GlobalF32AtomicAddMarker
-                                                                : llvm14GlobalF64AtomicAddMarker;
-            const llvm::StringRef suffix =
-                isGlobalF32AtomicAdd ? llvm14F32AtomicAddSuffix : llvm14F64AtomicAddSuffix;
-            const llvm::StringRef separator =
-                isGlobalF32AtomicAdd ? llvm14F32AtomicAddSeparator : llvm14F64AtomicAddSeparator;
-            const llvm::StringRef intrinsicName =
-                isGlobalF32AtomicAdd ? legacyGlobalF32AtomicAddName : legacyGlobalF64AtomicAddName;
-            const llvm::StringRef valueType = isGlobalF32AtomicAdd ? "float" : "double";
+            const llvm::StringRef marker = floatingAtomic->marker;
+            const bool isF32 = floatingAtomic->valueType == "float";
+            const llvm::StringRef suffix = isF32 ? " monotonic, align 4" : " monotonic, align 8";
+            const llvm::StringRef separator = isF32 ? ", float " : ", double ";
+            const llvm::StringRef intrinsicName = floatingAtomic->intrinsic;
+            const llvm::StringRef valueType = floatingAtomic->valueType;
             const size_t markerIndex = line.find(marker);
             if (!line.endswith(suffix))
                 return SLANG_E_NOT_AVAILABLE;
@@ -3179,15 +3206,16 @@ static SlangResult _writeLegacyNVVMAssembly(
             outSerializedData.push_back(' ');
             outSerializedData.append(intrinsicName.begin(), intrinsicName.end());
             outSerializedData.push_back('(');
-            outSerializedData.append(valueType.begin(), valueType.end());
-            outSerializedData.append(" addrspace(1)* ", " addrspace(1)* " + 15);
+            outSerializedData.append(
+                floatingAtomic->pointerType.begin(),
+                floatingAtomic->pointerType.end());
+            outSerializedData.push_back(' ');
             outSerializedData.append(pointer.begin(), pointer.end());
             outSerializedData.append(separator.begin(), separator.end());
             outSerializedData.append(value.begin(), value.end());
             outSerializedData.push_back(')');
             ++rewrittenAtomicCount;
-            needsLegacyGlobalF32AtomicAdd |= isGlobalF32AtomicAdd;
-            needsLegacyGlobalF64AtomicAdd |= isGlobalF64AtomicAdd;
+            floatingAtomic->used = true;
         }
         else if (
             trimmedLine.startswith("%") &&
@@ -3291,18 +3319,13 @@ static SlangResult _writeLegacyNVVMAssembly(
         remaining = remaining.drop_front(newlineIndex + 1);
     }
 
-    if (needsLegacyGlobalF32AtomicAdd)
+    for (const auto& spelling : floatingAtomics)
     {
-        const llvm::StringRef declaration =
-            "declare float @llvm.nvvm.atomic.load.add.f32.p1f32(float addrspace(1)* nocapture, "
-            "float)\n";
-        outSerializedData.append(declaration.begin(), declaration.end());
-    }
-    if (needsLegacyGlobalF64AtomicAdd)
-    {
-        const llvm::StringRef declaration =
-            "declare double @llvm.nvvm.atomic.load.add.f64.p1f64(double addrspace(1)* nocapture, "
-            "double)\n";
+        if (!spelling.used)
+            continue;
+        const std::string declaration =
+            "declare " + spelling.valueType.str() + " " + spelling.intrinsic.str() + "(" +
+            spelling.pointerType.str() + " nocapture, " + spelling.valueType.str() + ")\n";
         outSerializedData.append(declaration.begin(), declaration.end());
     }
 

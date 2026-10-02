@@ -93150,6 +93150,615 @@
         "No new full SlangPy/RHI/working checkpoint. Cadence2implementations since compact-pointer working run; due full checkpoint remains queued.",
         "Existing NVRTC normalized compile failures retain their earlier evidence; no new NVRTC numerical qualification."
       ]
+    },
+    "nvvm-tensor-views": {
+      "status": "accepted-focused-with-working-and-application-checkpoint",
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build34.json",
+        "sha256": "8d89314bfe73e53715ad2f3d7ac0ef8239a9c920b96ae9b166ba140dee6eef1b"
+      },
+      "unit_and_standard_module_repair_identity": {
+        "path": "build/nvvm-tensor-views/identity-build32.json",
+        "sha256": "4795b2ba13507217ab082162f68c8322df86f5a8869b9ec2346e0407d3641b9e"
+      },
+      "runtime_family_identity": {
+        "path": "build/nvvm-tensor-views/identity-build23.json",
+        "sha256": "05853b19442dfa8d8b780fe8b93ee1b6bf1f862e85ff3d25b36ea8fefda1c384"
+      },
+      "application_and_working_identity": {
+        "path": "build/nvvm-tensor-views/identity-build30.json",
+        "sha256": "8fd1cc7ace92eebb5ee858700a3fbf3519882b90cb5b52a11dedeab7c0a148e9"
+      },
+      "scope": "Typed TensorView/DiffTensorView methods, exact reference-accessor return lowering, generic/shared atomics and canonical structured numeric storage; stopped after this bounded slice.",
+      "validation": {
+        "build23": {
+          "path": "build/nvvm-tensor-views/build23.json",
+          "sha256": "e6c5588d6308306acd6fc5b4580b9490656476731f17484dd48431d210669305",
+          "return_code": 0,
+          "elapsed_seconds": 32.99622631072998
+        },
+        "build30": {
+          "path": "build/nvvm-tensor-views/build30.json",
+          "sha256": "455c326b229c4ce3922d5d6f23c3681d417527b3f9d91232996f12203dcef504",
+          "return_code": 0,
+          "elapsed_seconds": 34.41746211051941
+        },
+        "build32": {
+          "path": "build/nvvm-tensor-views/build32.json",
+          "sha256": "1d1442dc9ab81f76f5f6fb73708007adf0e57a711223a1731bfc0d9bb6c6c425",
+          "return_code": 0,
+          "elapsed_seconds": 22.387918949127197
+        },
+        "build34": {
+          "path": "build/nvvm-tensor-views/build34.json",
+          "sha256": "1abe1cac6f07ade52730ed8eff21daf90784b2a3bb87c00797cda3e65be05472",
+          "return_code": 0,
+          "elapsed_seconds": 85.26459455490112
+        },
+        "tensor-descriptor-final": {
+          "path": "build/nvvm-tensor-views/tensor-descriptor-final.json",
+          "sha256": "c53c3128cb80e7c4c23fda3bb57fd19a28078440e63301397d1ba26e2e8a5f61",
+          "return_code": 0,
+          "elapsed_seconds": 2.307866096496582
+        },
+        "ref-final": {
+          "path": "build/nvvm-tensor-views/ref-final.json",
+          "sha256": "df626e104261d98d36c8b7c1e36bc34354c97db11b91657bd3ae8d211fe43676",
+          "return_code": 0,
+          "elapsed_seconds": 2.7988805770874023
+        },
+        "tensor-nvrtc2": {
+          "path": "build/nvvm-tensor-views/tensor-nvrtc2.json",
+          "sha256": "a022e3965cc86aee722202404e16f5f3a96b1f2948430b73a2d4d757151f21a2",
+          "return_code": 1,
+          "elapsed_seconds": 2.530010938644409
+        },
+        "structured-rhi6": {
+          "path": "build/nvvm-tensor-views/structured-rhi6.json",
+          "sha256": "3c87b30c2abef5dc2a0054f7533b6c3200245383e18b0577c792bbbc88af7045",
+          "return_code": 0,
+          "elapsed_seconds": 115.61484217643738
+        },
+        "tensor-rhi3": {
+          "path": "build/nvvm-tensor-views/tensor-rhi3.json",
+          "sha256": "ba3465273dd339a8ea700a05181cf89228ae64ef8b4f6a8c2aa46ae00789332d",
+          "return_code": 0,
+          "elapsed_seconds": 126.14271545410156
+        },
+        "source-unit8": {
+          "path": "build/nvvm-tensor-views/source-unit8.json",
+          "sha256": "c88d0c58148a78ea1f13fa6c0bb2e11eeb5ed7d2dc680020edfe68b27232b66f",
+          "return_code": 0,
+          "elapsed_seconds": 6.1624486446380615
+        },
+        "nvvm-units1": {
+          "path": "build/nvvm-tensor-views/nvvm-units1.json",
+          "sha256": "633ea5cd27a45c21bad33539049eb289eaa74941861e961be0567cb1fb7afc33",
+          "return_code": 1,
+          "elapsed_seconds": 225.764741897583
+        },
+        "unit-repairs3": {
+          "path": "build/nvvm-tensor-views/unit-repairs3.json",
+          "sha256": "578b79908036dc633da3807f52b9336411af198d17119cd3566ec85e69358ae4",
+          "return_code": 0,
+          "elapsed_seconds": 31.993473529815674
+        },
+        "matrix-closure-unit2": {
+          "path": "build/nvvm-tensor-views/matrix-closure-unit2.json",
+          "sha256": "a4129f9734974dabd64dfa6294e2fede21881989dc5ff03f2488584165a33c9e",
+          "return_code": 0,
+          "elapsed_seconds": 1.6978707313537598
+        },
+        "working-repair2": {
+          "path": "build/nvvm-tensor-views/working-repair2.json",
+          "sha256": "5ed682ea3d4c2fe21a61085577dfc613f95a621d829df50ce067170990554abc",
+          "return_code": 0,
+          "elapsed_seconds": 6.806330919265747
+        },
+        "numerics1": {
+          "path": "build/nvvm-tensor-views/numerics1.json",
+          "sha256": "3de1d4000c1950cb64b24374308872cf1a22dc0a03bc06c8d81c6896ca50d754",
+          "return_code": 0,
+          "elapsed_seconds": 10.406535387039185
+        },
+        "slangpy-full3": {
+          "path": "build/nvvm-tensor-views/slangpy-full3.json",
+          "sha256": "7be3077ba7d22efd222622cacf9b7cd39c70b6d923b3d5f83d63fe7b5eab697c",
+          "return_code": 1,
+          "elapsed_seconds": 110.62168383598328
+        },
+        "tensor-nvrtc1": {
+          "path": "build/nvvm-tensor-views/tensor-nvrtc1.json",
+          "sha256": "967a3a8a3617e19e7b64a9647a0942da70dee6ee8981de77f6257a2c25fb6336",
+          "return_code": 1,
+          "elapsed_seconds": 11.164483308792114
+        },
+        "inventory": {
+          "path": "build/nvvm-tensor-views/inventory.json",
+          "sha256": "eaa0a855fa388bdd3d809cd0538216ad16679606a51f0ca0bd91d9a53dcbd8e4",
+          "return_code": 0,
+          "elapsed_seconds": 0.32257747650146484
+        }
+      },
+      "outcomes": {
+        "tensor_family": {
+          "registrations": 3,
+          "numeric_cells": 204,
+          "atomic_cells": 16,
+          "assertions": 21633
+        },
+        "structured_numeric": {
+          "cells": 204,
+          "assertions": 18121
+        },
+        "source_and_rejection_controls": {
+          "passed": 12,
+          "final_reference_controls": 3
+        },
+        "standard_module_controls": {
+          "passed": 59,
+          "ignored": 1
+        },
+        "nvvm_units": {
+          "initial_passed": 548,
+          "initial_failed": 17,
+          "total_initial": 565,
+          "repaired_selection": 19,
+          "new_matrix_regression": 1,
+          "scope": "Initial full units plus exact repairs and added regressions, not a fresh all-green full unit run."
+        },
+        "slangpy": {
+          "selected": 2400,
+          "passed": 1561,
+          "failed": 29,
+          "skipped": 807,
+          "xfailed": 3,
+          "module_skips": 14,
+          "resolved": 30,
+          "regressions": 0,
+          "previous_passes_preserved": 1531,
+          "transitions": {
+            "path": "build/nvvm-tensor-views/application-transitions3.json",
+            "sha256": "793249a2f4f0a2e946d37512f37632c5bb40049bd1a2f71ec99ecabaf0be7da1"
+          }
+        },
+        "smoke": {
+          "passed": 16,
+          "selection": {
+            "path": "build/nvvm-tensor-views/smoke1/selection.json",
+            "sha256": "9ff51f0abb5b74f5d9d0bdf30316a39142ed1728d64a8e1c598fdc17bb783430"
+          }
+        },
+        "working": {
+          "initial_passed": 1713,
+          "initial_crashed": 3,
+          "repaired": 3,
+          "unresolved": 0,
+          "input_changes": 0,
+          "scope": "Full checkpoint plus exact repairs after rebuilding stale standard modules; not a fresh all-green full run.",
+          "repair": {
+            "path": "build/nvvm-tensor-views/working-repair2.json",
+            "sha256": "5ed682ea3d4c2fe21a61085577dfc613f95a621d829df50ce067170990554abc"
+          },
+          "repair_results": {
+            "path": "build/nvvm-tensor-views/working-repair2/results.json",
+            "sha256": "c244360358cc8ed3a81d35b67acc40d610e66eaecef0f5205a785625bee05e6c"
+          },
+          "selection": {
+            "path": "build/nvvm-tensor-views/working1/selection.json",
+            "sha256": "846f5d9071212b88776a97a95e55f1f2452c41562d0f119d009cb2f86c41bd22"
+          },
+          "provenance": {
+            "path": "build/nvvm-tensor-views/working1/provenance.json",
+            "sha256": "78c2d0c6b6eb283fed6e13900e58bd4db115b7162e19fb6c2140645142fcae2c"
+          }
+        }
+      },
+      "contracts": [
+        "One ordinary descriptor after AD/tuple lowering: offsets0/8/28/48, size56,align8; four typed queries retain exact field keys. Module43/ABI46/container2 unchanged.",
+        "Scalar ranks1\u20135/vector widths1\u20134, noncontiguous strides, nested descriptor transport, direct mutable references and full public atomics use ordinary typed composition.",
+        "Reference returns require exact mutable storage; lvalue lowering supplies its address. Speculative pointer-result fallbacks removed.",
+        "Known-local provenance is distinct from physical AS0; generic/global/shared atomics preserve exact operation/type/order contracts and preflight no-mutation boundaries.",
+        "Default structured buffers reuse canonical finite CUDA value storage across UserPointer/StorageBuffer caches; actual pointer roles/access/layout remain distinct. Unsized tails retain role-specific recipes.",
+        "Declaration closure follows admitted nested buffer elements and arrays, even after scalarization removes whole-element instructions.",
+        "Independent runtime numeric/byte/guard oracles cover both matrix orders, Bool0x80 truthiness, Half3 padding and mutable aliasing. CUDA is comparison evidence only.",
+        "No new compiler-corpus cells automatically admitted;1716accepted working cells retained with zero input changes."
+      ],
+      "failure_history": {
+        "gates": {
+          "atomic-rhi1": {
+            "path": "build/nvvm-tensor-views/atomic-rhi1.json",
+            "sha256": "62d1ff5e46f1d5c0daa0b2c6eec21ab22e96a8f67c20c45674a6682e0943a69e",
+            "return_code": 1,
+            "elapsed_seconds": 1.394618034362793
+          },
+          "build1": {
+            "path": "build/nvvm-tensor-views/build1.json",
+            "sha256": "9ce6d06993bb3f02f8c2e55d6ff500bc2c1307d15ee3e47a0b7bc453d6740241",
+            "return_code": 1,
+            "elapsed_seconds": 3.979201316833496
+          },
+          "build16": {
+            "path": "build/nvvm-tensor-views/build16.json",
+            "sha256": "72df0b9ac190322aabeb7f53de855e9eb0ad8c73747df12463c1c598dec4ea5d",
+            "return_code": 1,
+            "elapsed_seconds": 16.678001403808594
+          },
+          "build2": {
+            "path": "build/nvvm-tensor-views/build2.json",
+            "sha256": "58f02f8a7c4ac3963278d87807d8c7c373382d6741c0be3cedc5b43b1aa913c8",
+            "return_code": 1,
+            "elapsed_seconds": 338.79011964797974
+          },
+          "build25": {
+            "path": "build/nvvm-tensor-views/build25.json",
+            "sha256": "57de0202eb4b5c771a711d65f5ce8cbece485943a063a057aed0034ccc7bd429",
+            "return_code": 1,
+            "elapsed_seconds": 3.692171573638916
+          },
+          "build26": {
+            "path": "build/nvvm-tensor-views/build26.json",
+            "sha256": "812a40dee8ea2edf83f675c4cb7590fc4fe3602df40f5414619fd60e49241b50",
+            "return_code": 1,
+            "elapsed_seconds": 3.658215045928955
+          },
+          "build31": {
+            "path": "build/nvvm-tensor-views/build31.json",
+            "sha256": "02430c8083e23bdd2de6b8aa0da6de11106d885e727c2143b26ab28d4a26bf24",
+            "return_code": 1,
+            "elapsed_seconds": 0.14620685577392578
+          },
+          "build6": {
+            "path": "build/nvvm-tensor-views/build6.json",
+            "sha256": "cb09a0aab6c51c916833d4d6e0d084d67c0690cd15683c48a9a381be8431afdf",
+            "return_code": 1,
+            "elapsed_seconds": 5.329125642776489
+          },
+          "build9": {
+            "path": "build/nvvm-tensor-views/build9.json",
+            "sha256": "ed99e3fbcf8f453c193fd6e8e97e4345c4329f6a6323baea4335f99b80c32c37",
+            "return_code": 1,
+            "elapsed_seconds": 28.885326862335205
+          },
+          "descriptor-compile1": {
+            "path": "build/nvvm-tensor-views/descriptor-compile1.json",
+            "sha256": "b7c4b322a2b73d5897bbe99c0eca7c1e910524907c468dcc7d3ab9e1048fbf32",
+            "return_code": 1,
+            "elapsed_seconds": 0.259871244430542
+          },
+          "descriptor-compile2": {
+            "path": "build/nvvm-tensor-views/descriptor-compile2.json",
+            "sha256": "c9734b7983ea46763ce4a08e968ac11f0e56ecda458aa7443320318d0c5d2c26",
+            "return_code": 1,
+            "elapsed_seconds": 0.2826497554779053
+          },
+          "descriptor-compile3": {
+            "path": "build/nvvm-tensor-views/descriptor-compile3.json",
+            "sha256": "b9da524695dcde667ca04959c71a0bfb0d8b75b88558fedcbc0247b7703f3b47",
+            "return_code": 255,
+            "elapsed_seconds": 0.3264946937561035
+          },
+          "descriptor-compile4": {
+            "path": "build/nvvm-tensor-views/descriptor-compile4.json",
+            "sha256": "c4fefde505d965a8ab267d763a246b6b797db4fb1193eecdcbe79ca3d8a33619",
+            "return_code": 255,
+            "elapsed_seconds": 0.28611278533935547
+          },
+          "descriptor-compile5": {
+            "path": "build/nvvm-tensor-views/descriptor-compile5.json",
+            "sha256": "fdbe628319f4e2303e50f8bddd05ca80ab8e076dd7778fed95c076d1d4e7d099",
+            "return_code": 255,
+            "elapsed_seconds": 0.31153178215026855
+          },
+          "descriptor-compile6": {
+            "path": "build/nvvm-tensor-views/descriptor-compile6.json",
+            "sha256": "84e7983ec6af18ce8d88725e1fb25a6098e0ae6be98e4bce94342796b3c43489",
+            "return_code": 255,
+            "elapsed_seconds": 0.32068514823913574
+          },
+          "descriptor-compile7": {
+            "path": "build/nvvm-tensor-views/descriptor-compile7.json",
+            "sha256": "6d79cbbfcadd9199343376ad4029aae038e8443f4a345f1a6d29056d98105bf7",
+            "return_code": 255,
+            "elapsed_seconds": 0.33815884590148926
+          },
+          "descriptor-compile8": {
+            "path": "build/nvvm-tensor-views/descriptor-compile8.json",
+            "sha256": "c440212b381722b6277b4bb7a6eb3fa29911cfad6585a1a2fd1040752260116c",
+            "return_code": 255,
+            "elapsed_seconds": 0.36741185188293457
+          },
+          "descriptor-compile9": {
+            "path": "build/nvvm-tensor-views/descriptor-compile9.json",
+            "sha256": "f0e75d0c3fd8ddb22f681262471c0cc7549552cb0ab92fb510af2e0fb1af3438",
+            "return_code": 255,
+            "elapsed_seconds": 0.3430042266845703
+          },
+          "descriptor-debug1": {
+            "path": "build/nvvm-tensor-views/descriptor-debug1.json",
+            "sha256": "a3fc8ed49e35f79f8a0b90f9434995c899cf5c2e9e480802c7ef13b619f06e03",
+            "return_code": 1,
+            "elapsed_seconds": 2.6318678855895996
+          },
+          "descriptor-ir1": {
+            "path": "build/nvvm-tensor-views/descriptor-ir1.json",
+            "sha256": "54a272cce574a4084f78da10a1c61b88b0ec47ad405bbfbbfaf8fe42ff0282e6",
+            "return_code": 255,
+            "elapsed_seconds": 0.3584756851196289
+          },
+          "descriptor-ir2": {
+            "path": "build/nvvm-tensor-views/descriptor-ir2.json",
+            "sha256": "4dcee155741f0e76bdb7be5cb11af8a3be1d45468017c64633fb4d5446d81139",
+            "return_code": 255,
+            "elapsed_seconds": 0.3878049850463867
+          },
+          "descriptor-numeric-rhi1": {
+            "path": "build/nvvm-tensor-views/descriptor-numeric-rhi1.json",
+            "sha256": "a68600edbe2faf864d551ecbcd6e39871820b15d09f70e22cf8fc47fc254fb65",
+            "return_code": 1,
+            "elapsed_seconds": 53.63350987434387
+          },
+          "differentiable-gdb2": {
+            "path": "build/nvvm-tensor-views/differentiable-gdb2.json",
+            "sha256": "cb4c125b9d684ed3b321e8b18293bee254d6d947ad4eeb560ccc5aac29dd0889",
+            "return_code": 1,
+            "elapsed_seconds": 2.4945082664489746
+          },
+          "differentiable-gdb3": {
+            "path": "build/nvvm-tensor-views/differentiable-gdb3.json",
+            "sha256": "de69c9b918fb332b3db9c8262af4e454fd681e7c185295439c476aaffe3ce892",
+            "return_code": 1,
+            "elapsed_seconds": 2.44089674949646
+          },
+          "differentiable-gdb8": {
+            "path": "build/nvvm-tensor-views/differentiable-gdb8.json",
+            "sha256": "e4ca17b2c134c6b93c16462db9fef9a7f58ed45de2856e96f9b8f1320435d47a",
+            "return_code": 1,
+            "elapsed_seconds": 27.68157696723938
+          },
+          "double3-probe1": {
+            "path": "build/nvvm-tensor-views/double3-probe1.json",
+            "sha256": "302638ac79576a88fc9d1726d2b28d7c58f95aa45572e5ad1aab08b48c1a4f89",
+            "return_code": 255,
+            "elapsed_seconds": 0.31865501403808594
+          },
+          "local-atomic-direct1": {
+            "path": "build/nvvm-tensor-views/local-atomic-direct1.json",
+            "sha256": "b9c811c92881ae71578ed1dc3532a20902e564697f8786560dfcefb8fdff1102",
+            "return_code": 255,
+            "elapsed_seconds": 0.28417420387268066
+          },
+          "local-atomic-probe1": {
+            "path": "build/nvvm-tensor-views/local-atomic-probe1.json",
+            "sha256": "5307624dd022a541638c8feb46bd676e370ba790a14db40579f2bbab47644889",
+            "return_code": 255,
+            "elapsed_seconds": 0.3179922103881836
+          },
+          "matrix-closure-unit1": {
+            "path": "build/nvvm-tensor-views/matrix-closure-unit1.json",
+            "sha256": "9514877f45df29fcf850e7313020e268215c3bcc36b5f734df81a88b85df6686",
+            "return_code": 1,
+            "elapsed_seconds": 1.719250202178955
+          },
+          "matrix-probe1": {
+            "path": "build/nvvm-tensor-views/matrix-probe1.json",
+            "sha256": "f934bad394f3e087efa33790d9138d4dd5feb3c181c8441abff95ed64cafc58e",
+            "return_code": 255,
+            "elapsed_seconds": 0.3000931739807129
+          },
+          "numpy-matrix-gdb1": {
+            "path": "build/nvvm-tensor-views/numpy-matrix-gdb1.json",
+            "sha256": "bbe7686e5931765650d56bf5f0663630c15b39ae88f7cc2318c4a5698ae06d33",
+            "return_code": 1,
+            "elapsed_seconds": 4.334627866744995
+          },
+          "numpy-matrix-probe2": {
+            "path": "build/nvvm-tensor-views/numpy-matrix-probe2.json",
+            "sha256": "493290ef1e04b75df44d4a2808c6b36ded43cfd886cfa385369b8a6aa78c9bda",
+            "return_code": 255,
+            "elapsed_seconds": 1.9909296035766602
+          },
+          "nvvm-units1": {
+            "path": "build/nvvm-tensor-views/nvvm-units1.json",
+            "sha256": "633ea5cd27a45c21bad33539049eb289eaa74941861e961be0567cb1fb7afc33",
+            "return_code": 1,
+            "elapsed_seconds": 225.764741897583
+          },
+          "readonly-probe1": {
+            "path": "build/nvvm-tensor-views/readonly-probe1.json",
+            "sha256": "ebed4620c532bc7d14e5435cded15ca1222332032514f71045f35251574a6d2f",
+            "return_code": 255,
+            "elapsed_seconds": 0.3087458610534668
+          },
+          "ref-ir1": {
+            "path": "build/nvvm-tensor-views/ref-ir1.json",
+            "sha256": "6a90a2a49395a5dc8aca8f1317b6e68a9d03e3551fbc7c2476bdc5679d89c21b",
+            "return_code": 255,
+            "elapsed_seconds": 0.29306912422180176
+          },
+          "ref-source1": {
+            "path": "build/nvvm-tensor-views/ref-source1.json",
+            "sha256": "c1f66688e985d22a4ff0f0f2004193e00e358767fb665e0271bf57d770dd65c3",
+            "return_code": 1,
+            "elapsed_seconds": 1.4935581684112549
+          },
+          "ref-source2": {
+            "path": "build/nvvm-tensor-views/ref-source2.json",
+            "sha256": "87b2b033e2f6da09f45f0cd8d039ac12247bfe9baddef188bac288c1f67779e7",
+            "return_code": 1,
+            "elapsed_seconds": 3.225872039794922
+          },
+          "ref-source3": {
+            "path": "build/nvvm-tensor-views/ref-source3.json",
+            "sha256": "eff337041f1db88e8700d6819a4ae13c2141a6cbfb1a0669dc339a8361794068",
+            "return_code": 1,
+            "elapsed_seconds": 3.7405614852905273
+          },
+          "slangpy-full1": {
+            "path": "build/nvvm-tensor-views/slangpy-full1.json",
+            "sha256": "0f72289d36f1286b8e4264ce851e1f6416b4340f3ee2c55f318f08708c137744",
+            "return_code": 1,
+            "elapsed_seconds": 121.13763475418091
+          },
+          "slangpy-full2": {
+            "path": "build/nvvm-tensor-views/slangpy-full2.json",
+            "sha256": "6eac247f7fda8daf256345a77fc015b5d6fe730856d6e86859d5133eb1ab3314",
+            "return_code": 1,
+            "elapsed_seconds": 131.64122581481934
+          },
+          "slangpy-full3": {
+            "path": "build/nvvm-tensor-views/slangpy-full3.json",
+            "sha256": "7be3077ba7d22efd222622cacf9b7cd39c70b6d923b3d5f83d63fe7b5eab697c",
+            "return_code": 1,
+            "elapsed_seconds": 110.62168383598328
+          },
+          "slangpy1": {
+            "path": "build/nvvm-tensor-views/slangpy1.json",
+            "sha256": "c951bcd4def82440ecd34754d5b8fb0a65759d4533229d7e35fe11a73271a57a",
+            "return_code": 1,
+            "elapsed_seconds": 3.5906965732574463
+          },
+          "slangpy2": {
+            "path": "build/nvvm-tensor-views/slangpy2.json",
+            "sha256": "9e2ad930ba24d4316c7c87cccab7e4e4972efd1adf47bebf310549cc4fdb7fa8",
+            "return_code": 1,
+            "elapsed_seconds": 3.9254798889160156
+          },
+          "source-unit6": {
+            "path": "build/nvvm-tensor-views/source-unit6.json",
+            "sha256": "afa223da692bc2ac48ccb2c465fbd2406242e85113b30a4d698067b5baa15289",
+            "return_code": 1,
+            "elapsed_seconds": 1.7349181175231934
+          },
+          "structured-bool-probe1": {
+            "path": "build/nvvm-tensor-views/structured-bool-probe1.json",
+            "sha256": "32f0406e0255899201fc89ef26b120e39c1d22bb6da561c53c1fa8116e54fd23",
+            "return_code": 255,
+            "elapsed_seconds": 0.3193542957305908
+          },
+          "structured-bool-probe2": {
+            "path": "build/nvvm-tensor-views/structured-bool-probe2.json",
+            "sha256": "ad715d81cb68455ddce908c82d5464a09d4c071aceb6bbe517b1a50be63ce401",
+            "return_code": 255,
+            "elapsed_seconds": 0.30435705184936523
+          },
+          "structured-rhi1": {
+            "path": "build/nvvm-tensor-views/structured-rhi1.json",
+            "sha256": "89fd5d627d17802879defb5a019aeb7c749a0a48ff09cd02ac6f3f3cfb1c6e31",
+            "return_code": 1,
+            "elapsed_seconds": 3.6368305683135986
+          },
+          "structured-rhi2": {
+            "path": "build/nvvm-tensor-views/structured-rhi2.json",
+            "sha256": "3e67d5ab355199fb262c0f4dcdad0cb952ca4f253cc065af89ebe7b7f464d293",
+            "return_code": 1,
+            "elapsed_seconds": 1.3498437404632568
+          },
+          "structured-rhi3": {
+            "path": "build/nvvm-tensor-views/structured-rhi3.json",
+            "sha256": "33601e8945d7af43ce7c4eceac822e56b35ca68740469cbfaefcab779c152ba9",
+            "return_code": 1,
+            "elapsed_seconds": 1.911536455154419
+          },
+          "structured-rhi4": {
+            "path": "build/nvvm-tensor-views/structured-rhi4.json",
+            "sha256": "135a4595eefbfa74ba4f85654773a99a0d2260de7434e220f6dfc8d4c1364397",
+            "return_code": 1,
+            "elapsed_seconds": 3.575969934463501
+          },
+          "structured-rhi5": {
+            "path": "build/nvvm-tensor-views/structured-rhi5.json",
+            "sha256": "aee545d2a026c596d86c5264dd73f2da2f6c9dfac30985790d1c5cf47851ac8f",
+            "return_code": 1,
+            "elapsed_seconds": 115.98347878456116
+          },
+          "tensor-nvrtc1": {
+            "path": "build/nvvm-tensor-views/tensor-nvrtc1.json",
+            "sha256": "967a3a8a3617e19e7b64a9647a0942da70dee6ee8981de77f6257a2c25fb6336",
+            "return_code": 1,
+            "elapsed_seconds": 11.164483308792114
+          },
+          "tensor-nvrtc2": {
+            "path": "build/nvvm-tensor-views/tensor-nvrtc2.json",
+            "sha256": "a022e3965cc86aee722202404e16f5f3a96b1f2948430b73a2d4d757151f21a2",
+            "return_code": 1,
+            "elapsed_seconds": 2.530010938644409
+          },
+          "unit-repairs1": {
+            "path": "build/nvvm-tensor-views/unit-repairs1.json",
+            "sha256": "3afcc636a72117b7debc8b0f8446c3cd9795ee16943cecbc64957f96d7e4b8f5",
+            "return_code": 1,
+            "elapsed_seconds": 20.995875120162964
+          },
+          "unit-repairs2": {
+            "path": "build/nvvm-tensor-views/unit-repairs2.json",
+            "sha256": "9383839ed37cae2823fffe578bf0256138ff22b340ea8674da8095b9ec755af9",
+            "return_code": 1,
+            "elapsed_seconds": 23.977564096450806
+          },
+          "units-source4": {
+            "path": "build/nvvm-tensor-views/units-source4.json",
+            "sha256": "f5be4e413202b453fe539c1aa216fd66fdd2355d03ec2b0b81101a5a5e2d7ccf",
+            "return_code": 1,
+            "elapsed_seconds": 5.831468343734741
+          },
+          "units-source5": {
+            "path": "build/nvvm-tensor-views/units-source5.json",
+            "sha256": "4c6095db97b8d8e49e3bd60c2273ae778cd7e1a131f67e78152abaf58499d76c",
+            "return_code": 1,
+            "elapsed_seconds": 3.9785590171813965
+          },
+          "working-repair1": {
+            "path": "build/nvvm-tensor-views/working-repair1.json",
+            "sha256": "7aee81d93558a0b12f83043748979c502a11a70883c46e9a6160d7bdca798570",
+            "return_code": 1,
+            "elapsed_seconds": 0.12271332740783691
+          }
+        },
+        "explanations": [
+          "Initial descriptor probes exposed illegal scalar-pointer roots and old ref-accessor value returns. Producer address lowering and exact checked pointer qualification resolve the valid shapes; speculative local CastIntToPtr fallbacks were removed.",
+          "Reverse AD and RHI atomics exposed generic/shared pointer support and FloatExchange out-old composition. Pointer facts retain local provenance separately; known local atomic negatives still reject before provider creation.",
+          "Double3 borrowed arrays exposed representation selection coupled to readonly access. Checked parent buffer/helper facts now select storage while retaining readonly permission.",
+          "Structured Bool/half matrices exposed Natural layout and separate nominal UserPointer/StorageBuffer wrappers. Canonical finite CUDA producer cache fixes both; provisional emitter storage fastpaths and alignment bypass were deleted.",
+          "The initial RO/RW alias fixture observed stale reads because shared StructuredBuffer lowering treats source reads as immutable. Final oracle uses separate immutable input and two RW aliases; this is a recorded semantic limitation, not a universal language prohibition.",
+          "Direct immutable global aggregate constref experiment produced a provider pointer mismatch and was reverted. Byvalue-to-local constref is qualified; direct forwarding remains rejected.",
+          "SlangPy full1:1551/39 with matrix ValueRef regression; full2:1560/30 fixes that and exposes NumPy matrix-return regression. Nested buffer element declaration closure repairs it; full3:1561/29 with30resolved and no prior-pass regressions.",
+          "Full NVVM units548/565 exposed stale negative/layout expectations and recording-fake aggregate identity limits. Original aggregate sources now use the real builder; fake scalar edge/no-mutation checks remain. All17failures repaired in19-case focused selection. Matrix regression unit initial expected column-major string corrected to actual API row-major layout.",
+          "Working1716:1713pass/3crash across all routes of differentiable-from-scalar. Stale serialized standard modules retained old synthesized AST opcodes after4IRop additions. Existing numerics/neural/workgraph targets rebuilt; all3exact cells pass. No compiler workaround or version bump. Before hashes retained and final module hashes captured.",
+          "NVRTC descriptor comparison initially failed to compile because eight CUDA ref templates returned the prelude T& where canonical pointer IR requires T*. Taking the address of that existing lvalue repairs all forms; ordinary value-load templates stay unchanged. Final O0/O3 descriptor comparison passes1135assertions and fails only the two documented wide-stride expectations.",
+          "Compilation, command-shape and diagnostic assertion mistakes in intermediate build/unit attempts retain raw gates above; none is counted as final acceptance."
+        ]
+      },
+      "standard_modules_before": {
+        "path": "build/nvvm-tensor-views/standard-modules-before.json",
+        "sha256": "39abbda63566b2b66cd2311f8d2a17f1ef9115c03cd752866057367b4ce01d01"
+      },
+      "comparisons": {
+        "nvrtc_tensor_initial": {
+          "path": "build/nvvm-tensor-views/tensor-nvrtc1.json",
+          "sha256": "967a3a8a3617e19e7b64a9647a0942da70dee6ee8981de77f6257a2c25fb6336"
+        },
+        "nvrtc_descriptor_final": {
+          "path": "build/nvvm-tensor-views/tensor-nvrtc2.json",
+          "sha256": "a022e3965cc86aee722202404e16f5f3a96b1f2948430b73a2d4d757151f21a2"
+        },
+        "nvrtc_descriptor_assertions": {
+          "passed": 1135,
+          "failed": 2
+        },
+        "exact_difference": "O0/O3 output29: CUDA28 versus 64-bit oracle4294967324; all other checks pass.",
+        "scope": "Selected descriptor and public atomic registration comparison; two new numeric registrations are unrun under NVRTC."
+      },
+      "limits": [
+        "Torch MakeTensorView unavailable/unqualified; no general Torch, lifetime, bounds or pointer-validity guarantee.",
+        "Unknown generic helper atomic pointers require global/shared backing at runtime; no whole-program provenance analysis.",
+        "24remaining SlangPy compiler failures and5RHI RGB32 creation failures remain queued. The OptiX8HitObject semantic decision remains parked.",
+        "No fresh full RHI, native CPU, surface or material campaign. Runtime family evidence retains build23; later changes fix nested declaration closure and CUDA ref intrinsic pointer results; final descriptor/reference controls retain build34."
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Source/test/docs approved; exact final evidence reviewed before commit."
+      }
     }
   }
 }

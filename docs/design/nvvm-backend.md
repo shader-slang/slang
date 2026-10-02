@@ -405,13 +405,34 @@ A physical entry address is never used as an ordinary aggregate value.
 
 Ordinary raw pointer offsets require a compatible CUDA/LLVM pointee layout before typed GEP
 emission. Shared storage legalization selects a canonical CUDA recipe for default UserPointer
-pointees and addressable Generic locals, including numeric vectors, matrices, records and arrays.
+pointees, addressable Generic locals and default structured-buffer elements, including numeric
+vectors, matrices, records and arrays. Finite CUDA values share one storage recipe across pointer
+and buffer roles, preventing independently nominal wrappers at specialized helper boundaries.
+Pointer address spaces, access, layout metadata and emitter representation caches remain distinct.
+Unsized tails retain role-specific recipes because UserPointer lowering omits the trailing field.
+Declaration reachability follows admitted buffer elements and fixed-array children inside records,
+including when scalarization leaves no whole-element value instruction to retain the element type.
 Native LLVM chunks express CUDA size/alignment: float3 uses three scalars; Half3 uses two half2
 chunks and preserves its padding. Logical loads/stores convert semantic lanes, while pointer calls
 retain the original object and aliases. Explicit storage layouts and BF16/FP8 keep their own owners.
 Matrix orientation is selected before matrix value legalization; compact vector storage runs after
 CUDA system values. OptiX register payload packing and its entry-point prerequisites run before
 matrix storage lowering so physical column order cannot change the payload ABI.
+
+TensorView lowering replaces the magic type after AD/tuple lowering with one ordinary descriptor:
+a 64-bit address, five 32-bit byte strides, five 32-bit sizes and a 32-bit rank, followed by explicit
+padding to the host ABI's 56 bytes/alignment 8. Four typed queries become exact field/element
+extracts. Core indexing, load/store, reference and atomic methods compose existing IR operations;
+stride products widen to 64 bits before multiplication. Scalar indexing covers ranks 1–5 and
+vector indexing widths 1–4. No runtime bounds or address-validity checks are implied.
+
+Reference accessors return the address of exact mutable storage. Semantic checking rejects value
+coercion; ordinary lvalue lowering owns addressability and emits the declared pointer result.
+CUDA TensorView ref templates take the address of the prelude load's existing `T&`, matching that
+canonical pointer result; ordinary value-load templates retain their value semantics.
+Defined internal helper pointer results use the existing HelperResult role and checked root facts.
+Readonly borrows retain their access restriction; direct immutable global aggregate reference
+forwarding is not qualified by byvalue-to-local forwarding.
 
 Removing AssumeAddress preserves a canonical PtrCast when the declared UserPointer type differs
 from the local address. Storage conversion commutes through exact-pointee qualification casts;
@@ -580,9 +601,10 @@ rewritten to OutParam. Calls and child-address plans require a local Var or a fi
 parameter of an internal defined helper; type equality alone does not prove that origin. Mutable
 formals require writable actuals. Readonly child addresses retain local storage layout and cannot
 become writable, while their loads remain ordinary because the caller can mutate its storage between
-calls. Native array/pointer results, external/exported references, wrapper/multidimensional forms and
-BF3/BF4 record-array combinations remain excluded even after a successful layout-cache lookup. Their
-exact boundaries remain in the role matrix.
+calls. Array returns must first become OutParam; exact ordinary pointer results use the reference
+result contract above. External/exported references and unqualified BF3/BF4 record-array combinations
+remain excluded even after a successful layout-cache lookup. Their exact boundaries remain in the
+role matrix.
 
 General per-root physical-storage rewriting is not implemented by these plans. Shared buffer-element
 lowering already owns physical types and packing, but its selected roots do not include every Generic
@@ -603,6 +625,14 @@ ordinary programs; a coherent request requires support before module creation. A
 table fails initialization. The provider validates the actual typed AS1/AS3 pointer and exact scalar
 operands before emitting any casts or calls. LLVM atomic loads/stores are not substituted for these
 operations because the qualified libNVVM dialect does not support them.
+
+Canonical atomics retain their exact operation/type/order contract for physical AS0/AS1/AS3.
+The address plan tracks known-local allocation provenance separately from physical space: LLVM
+allocas use AS0 but cannot satisfy PTX's global/shared atomic contract. Qualifications and offsets
+preserve that provenance; qualified shared formals retain AS3, and nested checked resource children
+retain AS1. Unknown generic helper pointers require global/shared backing at runtime. Half/Half2
+addition uses the matching primitive space and `noftz`; F32/F64 intrinsic dialect adaptation owns
+all three spaces. Provider checks remain before mutation.
 
 LLVM modules use `nvptx64-nvidia-cuda`, the specified DataLayout, `nvvmir.version` and kernel
 annotations; a calling convention alone does not mark a kernel. The current direct emitter writes

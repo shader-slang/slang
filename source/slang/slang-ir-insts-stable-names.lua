@@ -906,5 +906,9 @@ return {
 	["optixHitObjectPayload"] = 930,
 	["optixCurrentTransformRow"] = 931,
 	["optixCurrentHitQuery"] = 932,
-	["optixCallShader"] = 933
+	["optixCallShader"] = 933,
+	["GetTensorViewData"] = 934,
+	["GetTensorViewStride"] = 935,
+	["GetTensorViewSize"] = 936,
+	["GetTensorViewDimensionCount"] = 937
 }

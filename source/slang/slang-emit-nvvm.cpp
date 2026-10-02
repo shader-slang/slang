@@ -260,7 +260,7 @@ IRPtrTypeBase* _getNVVMHitObjectPointer(const NVVMAddressPlan& addresses, IRInst
     return nullptr;
 }
 
-// Returns a local value reference only from a variable/helper root or its checked child.
+// Returns a value reference from a variable, helper parameter/result, or its checked child.
 // For `initialize(out wrapper.textures[i])`, the explicit child pointer spelling is not sufficient:
 // the address plan must retain the local wrapper root and its access restriction.
 IRPtrTypeBase* _getNVVMLocalValueReference(
@@ -285,10 +285,18 @@ IRPtrTypeBase* _getNVVMLocalValueReference(
         rootPointer = asNVVMSupportedHelperReferencePointerType(root->getDataType());
     auto block = as<IRBlock>(root->getParent());
     auto function = block ? as<IRFunc>(block->getParent()) : nullptr;
+    auto call = as<IRCall>(root);
+    auto callee = call ? as<IRFunc>(call->getCallee()) : nullptr;
+    const bool isHelperResult =
+        callee && callee->getFirstBlock() && !callee->findDecoration<IREntryPointDecoration>() &&
+        !callee->findDecoration<IRCudaKernelDecoration>() &&
+        isTypeEqual(root->getDataType(), callee->getResultType()) &&
+        classifyNVVMType(root->getDataType()).supports(NVVMTypeUse::HelperResult);
     if (!rootPointer || !function ||
-        (root->getOp() != kIROp_Var && (!as<IRParam>(root) || block != function->getFirstBlock() ||
-                                        function->findDecoration<IREntryPointDecoration>() ||
-                                        function->findDecoration<IRCudaKernelDecoration>())))
+        (root->getOp() != kIROp_Var && root->getOp() != kIROp_PtrCast && !isHelperResult &&
+         (!as<IRParam>(root) || block != function->getFirstBlock() ||
+          function->findDecoration<IREntryPointDecoration>() ||
+          function->findDecoration<IRCudaKernelDecoration>())))
         return nullptr;
     if (outIsReadOnly)
         *outIsReadOnly = rootPointer->getAccessQualifier() == AccessQualifier::Read ||
@@ -575,6 +583,7 @@ bool _getNVVMStructFieldAddress(
     }
 
     if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage ||
+        addresses.findRootBuffer(fieldAddress->getBase()) ||
         _getNVVMLocalValueReference(addresses, fieldAddress->getBase()))
     {
         return _getNVVMExecutableValueAlignment(fieldType) != 0 ||
@@ -1136,7 +1145,8 @@ bool _getNVVMSequentialElementPointer(
             if (field)
             {
                 arrayType =
-                    field->selection.isMutable
+                    (field->selection.isMutable || addresses.findRootBuffer(base) ||
+                     _getNVVMLocalValueReference(addresses, base))
                         ? asNVVMSupportedHelperArrayType(field->selection.field->getFieldType())
                         : asNVVMSupportedAggregateStorageArrayType(
                               field->selection.field->getFieldType());
@@ -1238,8 +1248,9 @@ bool _getNVVMSequentialElementPointer(
          !resultLayout) ||
         (resultType && resultType->getOperandCount() == 4 && resultLayout &&
          (resultLayout->getOp() == kIROp_ScalarBufferLayoutType ||
-          (baseType && baseType->getAddressSpace() == AddressSpace::UserPointer &&
-           resultLayout->getOp() == kIROp_CUDABufferLayoutType) ||
+          (baseType && resultLayout->getOp() == kIROp_CUDABufferLayoutType &&
+           (baseType->getAddressSpace() == AddressSpace::UserPointer ||
+            (addresses.findRootBuffer(base) && baseType->getDataLayout() == resultLayout))) ||
           ((isLocalSubstandardRecordStorage && isImmutable ||
             isNVVMHitObjectStorageType(resultType->getValueType())) &&
            resultLayout->getOp() == kIROp_DefaultBufferLayoutType)));
@@ -1917,7 +1928,19 @@ void _addNVVMReachableStructTypes(
         type = parameterGroupElementType;
         allowZeroStateStructs = true;
     }
-    while (auto arrayType = as<IRArrayType>(type))
+    // A buffer inside a value record still owns its element declaration, even when
+    // constant folding leaves only scalar stores and no whole-element value in a function.
+    NVVMRawBufferType bufferType;
+    if (getNVVMSupportedRawBufferType(type, bufferType) &&
+        bufferType.kind == NVVMRawBufferKind::Structured)
+    {
+        _addNVVMReachableStructTypes(
+            bufferType.structuredElementType,
+            reachableTypes,
+            allowZeroStateStructs);
+        return;
+    }
+    if (auto arrayType = as<IRArrayType>(type))
     {
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
             !asNVVMSupportedResourceArrayType(arrayType) &&
@@ -1927,7 +1950,11 @@ void _addNVVMReachableStructTypes(
               isNVVMSupportedParameterGroupElementStorageType(arrayType)) &&
             !isNVVMSupportedStructuredBufferStorageType(arrayType))
             return;
-        type = arrayType->getElementType();
+        _addNVVMReachableStructTypes(
+            arrayType->getElementType(),
+            reachableTypes,
+            allowZeroStateStructs);
+        return;
     }
     auto structType = as<IRStructType>(type);
     if (!structType ||
@@ -1944,24 +1971,6 @@ void _addNVVMReachableStructTypes(
     {
         _addNVVMReachableStructTypes(field->getFieldType(), reachableTypes, allowZeroStateStructs);
     }
-}
-
-// Returns the retained aggregate declaration required by the selected external-storage family.
-// The view itself is the canonical producer of this dependency; requiring an unrelated local of
-// the same type would make otherwise identical raw and conventional entry signatures diverge.
-IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
-{
-    NVVMRawBufferType rawBufferType;
-    if (!getNVVMSupportedRawBufferType(type, rawBufferType) ||
-        rawBufferType.kind != NVVMRawBufferKind::Structured)
-    {
-        return nullptr;
-    }
-    auto structType = as<IRStructType>(rawBufferType.structuredElementType);
-    return structType &&
-                   isNVVMSupportedStructuredBufferStorageType(rawBufferType.structuredElementType)
-               ? structType
-               : nullptr;
 }
 
 IRIntLit* _asExecutableInteger32Constant(IRInst* value);
@@ -3860,7 +3869,7 @@ struct NVVMResolvedValueOperation
 // Describes the CUDA floating-remainder recipe selected for one canonical `kIROp_FRem`.
 // LLVM `frem` is not a semantic substitute for CUDA `fmod` near an exactly representable
 // multiple, so selected vectors are explicitly decomposed into scalar libdevice operations.
-struct NVVMPointerBitCast
+struct NVVMPointerConversion
 {
     IRInst* value = nullptr;
     IRPtrTypeBase* pointerType = nullptr;
@@ -4048,13 +4057,21 @@ bool _isNVVMPointerBitPatternType(IRInst* type)
     return asNVVMSupportedI32VectorType(type, &isSigned, &laneCount) && !isSigned && laneCount == 2;
 }
 
-// Resolves the exact pointer bit transport produced by AnyValue marshalling. The canonical
-// representation is one complete UserPointer and its canonical unsigned 64-bit scalar or 2x32-bit
-// vector payload; no integer-pointer conversion is inferred from an arbitrary numeric bitcast.
-bool _getNVVMPointerBitCast(IRInst* inst, NVVMPointerBitCast& outCast)
+// CUDA pointer addresses are 64-bit integers regardless of signedness.
+bool _isNVVMAddressIntegerType(IRType* type)
+{
+    uint32_t width = 0;
+    return isNVVMSupportedIntegerScalarType(type, &width) && width == 64;
+}
+
+// Resolves explicit pointer/address conversions and the pointer bit transport used by AnyValue.
+// CastIntToPtr carries a signed or unsigned 64-bit address; BitCast retains its
+// established unsigned 64-bit or 2x32-bit payload contract.
+bool _getNVVMPointerConversion(IRInst* inst, NVVMPointerConversion& outCast)
 {
     outCast = {};
-    if (!inst || inst->getOp() != kIROp_BitCast || inst->getOperandCount() != 1)
+    if (!inst || inst->getOperandCount() != 1 ||
+        (inst->getOp() != kIROp_BitCast && inst->getOp() != kIROp_CastIntToPtr))
         return false;
 
     IRInst* value = inst->getOperand(0);
@@ -4062,8 +4079,14 @@ bool _getNVVMPointerBitCast(IRInst* inst, NVVMPointerBitCast& outCast)
         asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType());
     IRPtrTypeBase* valuePointer =
         value ? asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) : nullptr;
-    const bool hasResultBits = _isNVVMPointerBitPatternType(inst->getDataType());
-    const bool hasValueBits = value && _isNVVMPointerBitPatternType(value->getDataType());
+    const bool isBitCast = inst->getOp() == kIROp_BitCast;
+    const bool hasResultBits = isBitCast ? _isNVVMPointerBitPatternType(inst->getDataType())
+                                         : _isNVVMAddressIntegerType(inst->getDataType());
+    const bool hasValueBits =
+        value && (isBitCast ? _isNVVMPointerBitPatternType(value->getDataType())
+                            : _isNVVMAddressIntegerType(value->getDataType()));
+    if (inst->getOp() == kIROp_CastIntToPtr && !resultPointer)
+        return false;
     if ((!resultPointer || !hasValueBits || valuePointer || hasResultBits) &&
         (!valuePointer || !hasResultBits || resultPointer || hasValueBits))
     {
@@ -4154,59 +4177,6 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
 
     outValue = value;
     return true;
-}
-
-struct NVVMResolvedAtomicPointer
-{
-    IRPtrTypeBase* type = nullptr;
-    SlangNVVMAddressSpace addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
-};
-
-// Resolves an exact writable producer and its physical provider address space.
-bool _resolveNVVMAtomicPointer(IRInst* value, NVVMResolvedAtomicPointer& outPointer)
-{
-    outPointer = {};
-    if (!value)
-        return false;
-
-    NVVMSharedGlobal sharedGlobal;
-    if (getNVVMSupportedSharedGlobal(value, &sharedGlobal))
-    {
-        outPointer.type = as<IRPtrTypeBase>(value->getDataType());
-        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
-        return outPointer.type &&
-               isTypeEqual(outPointer.type->getValueType(), sharedGlobal.storageType);
-    }
-
-    if (value->getOp() == kIROp_GetElementPtr && value->getOperandCount() == 2)
-    {
-        NVVMSharedGlobal sharedArray;
-        auto resultType = asNVVMSupportedSharedElementPointerType(value->getDataType());
-        auto sharedArrayType = getNVVMSupportedSharedGlobal(value->getOperand(0), &sharedArray)
-                                   ? asNVVMSupportedHelperArrayType(sharedArray.storageType)
-                                   : nullptr;
-        if (sharedArrayType && resultType &&
-            isTypeEqual(sharedArrayType->getElementType(), resultType->getValueType()))
-        {
-            outPointer.type = resultType;
-            outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
-            return true;
-        }
-    }
-
-    if (as<IRGlobalVar>(value) || as<IRParam>(value))
-    {
-        outPointer.type = asNVVMSupportedDeviceNumericPointerType(value->getDataType());
-        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
-        return outPointer.type != nullptr;
-    }
-    if (value->getOp() == kIROp_RWStructuredBufferGetElementPtr)
-    {
-        outPointer.type = asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType());
-        outPointer.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
-        return outPointer.type != nullptr;
-    }
-    return false;
 }
 
 // Resolves one canonical scalar atomic to the complete descriptor consumed by both preflight and
@@ -4300,16 +4270,15 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMPlannedAtomicOperation& outOp
     auto failureMemoryOrder = hasFailureOrder
                                   ? _asExecutableI32Constant(inst->getOperand(failureOrderIndex))
                                   : memoryOrder;
-    NVVMResolvedAtomicPointer resolvedPointer;
+    auto pointerType = as<IRPtrTypeBase>(pointer->getDataType());
     SlangNVVMValueTypeDesc valueType = {};
     IRType* physicalValueType = nullptr;
-    if (!_resolveNVVMAtomicPointer(pointer, resolvedPointer) ||
-        resolvedPointer.type->getAccessQualifier() != AccessQualifier::ReadWrite || !memoryOrder ||
-        !failureMemoryOrder)
+    if (!pointerType || pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        !memoryOrder || !failureMemoryOrder)
     {
         return false;
     }
-    physicalValueType = resolvedPointer.type->getValueType();
+    physicalValueType = pointerType->getValueType();
     IRType* atomicValueType = nullptr;
     if (asNVVMSupportedAtomicType(physicalValueType, &atomicValueType))
         physicalValueType = atomicValueType;
@@ -4336,7 +4305,7 @@ bool _resolveNVVMAtomicOperation(IRInst* inst, NVVMPlannedAtomicOperation& outOp
     outOperation.desc = {
         providerOperation,
         valueType,
-        resolvedPointer.addressSpace,
+        SLANG_NVVM_ADDRESS_SPACE_GENERIC,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
         SLANG_NVVM_MEMORY_ORDER_RELAXED,
     };
@@ -4461,6 +4430,16 @@ const T* _findPlannedNVVMOperation(const List<T>& operations, IRInst* source)
         if (operation.source == source)
             return &operation;
     }
+    return nullptr;
+}
+
+// Allows the availability pass to complete a selected record with checked producer facts.
+template<typename T>
+T* _findPlannedNVVMOperation(List<T>& operations, IRInst* source)
+{
+    for (auto& operation : operations)
+        if (operation.source == source)
+            return &operation;
     return nullptr;
 }
 
@@ -5474,15 +5453,18 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("raw RWStructuredBuffer numeric load or store consumer"));
     }
+    const auto childField = requirements.emissionPlan.addresses.findFieldAddress(consumer);
+    const bool hasCheckedChild = hasSequentialChild || (childField && childField->base == value);
     if (hasStructuredBufferElementProducer &&
         structuredBufferElementPointer->bufferType.access == NVVMBufferAccess::ReadOnly &&
-        consumer->getOp() != kIROp_Load && !hasSequentialChild)
+        consumer->getOp() != kIROp_Load && !hasCheckedChild)
     {
         return _diagnoseUnsupportedIR(
             codeGenContext,
             toSlice("read-only structured-buffer element access"));
     }
-    bool isReadOnlyResourceUse = false;
+    const auto rootBuffer = requirements.emissionPlan.addresses.findRootBuffer(value);
+    bool isReadOnlyResourceUse = rootBuffer && hasCheckedChild;
     if (_getNVVMLocalValueReference(requirements.emissionPlan.addresses, value))
     {
         auto childField = requirements.emissionPlan.addresses.findFieldAddress(consumer);
@@ -5702,6 +5684,22 @@ bool _isSupportedNVVMHelperArgument(
     }
     if (isTypeEqual(argumentType, parameterType))
         return true;
+
+    // A returned reference uses the ordinary generic pointer spelling. Converting a checked
+    // local reference or device pointer to that spelling preserves storage and access.
+    if (auto parameter = asNVVMSupportedLocalCopyableValuePointerType(parameterType))
+    {
+        bool isReadOnly = false;
+        auto local = _getNVVMLocalValueReference(addresses, argument, &isReadOnly);
+        if (local && !isReadOnly && isTypeEqual(local->getValueType(), parameter->getValueType()))
+            return true;
+        auto actual = asNVVMSupportedDeviceCopyableValuePointerType(argumentType);
+        if (actual && actual->getAccessQualifier() == AccessQualifier::ReadWrite &&
+            isTypeEqual(actual->getValueType(), parameter->getValueType()) &&
+            (!actual->getDataLayout() ||
+             actual->getDataLayout()->getOp() == kIROp_DefaultBufferLayoutType))
+            return true;
+    }
 
     IRType* parameterSharedValueType = nullptr;
     auto parameterSharedPointer =
@@ -6547,15 +6545,35 @@ bool _getNVVMScopedPointerSpace(
     const NVVMEmissionPlan& plan,
     IRFunc* entryPoint,
     IRInst* pointer,
-    SlangNVVMAddressSpace& outSpace)
+    SlangNVVMAddressSpace& outSpace,
+    bool* outIsKnownLocalStorage = nullptr)
 {
+    if (outIsKnownLocalStorage)
+        *outIsKnownLocalStorage = false;
+    auto element = plan.addresses.findElementAddress(pointer);
+    if (plan.addresses.findRootBuffer(pointer) ||
+        (element && element->kind == NVVMElementAddressKind::RawBuffer))
+    {
+        outSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+        return true;
+    }
     IRInst* root = plan.addresses.getRoot(pointer);
     if (const auto space = plan.scopedPointerSpaces.tryGetValue(root))
     {
-        outSpace = *space;
+        outSpace = space->addressSpace;
+        if (outIsKnownLocalStorage)
+            *outIsKnownLocalStorage = space->isKnownLocalStorage;
         return true;
     }
-    if (getNVVMSupportedSharedGlobal(root))
+    if (root->getOp() == kIROp_Var)
+    {
+        outSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+        if (outIsKnownLocalStorage)
+            *outIsKnownLocalStorage = true;
+        return true;
+    }
+    if (getNVVMSupportedSharedGlobal(root) ||
+        asNVVMSupportedSharedHelperPointerType(root->getDataType()))
     {
         outSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
         return true;
@@ -7300,6 +7318,8 @@ SlangResult _validateNVVMFunction(
                     auto result = asNVVMSupportedDeviceHelperValuePointerType(inst->getDataType());
                     if (!result)
                         result = asNVVMSupportedSharedHelperPointerType(inst->getDataType());
+                    if (!result)
+                        result = asNVVMSupportedLocalCopyableValuePointerType(inst->getDataType());
                     auto source = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
                     if (!result || !source ||
                         !isTypeEqual(result->getValueType(), source->getValueType()))
@@ -7309,6 +7329,7 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CastIntToPtr:
             case kIROp_BitCast:
                 {
                     NVVMPlannedResourceBitCast resourceBitCast;
@@ -7320,8 +7341,8 @@ SlangResult _validateNVVMFunction(
                         requirements.emissionPlan.resourceBitCasts.add(resourceBitCast);
                         break;
                     }
-                    NVVMPointerBitCast pointerCast;
-                    if (_getNVVMPointerBitCast(inst, pointerCast))
+                    NVVMPointerConversion pointerCast;
+                    if (_getNVVMPointerConversion(inst, pointerCast))
                         break;
                     NVVMResolvedValueOperation operation;
                     if (!_resolveNVVMValueOperation(inst, operation))
@@ -7353,7 +7374,6 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
-                    _requireNVVMAtomicOperations(requirements, operation);
                     requirements.emissionPlan.atomicOperations.add(operation);
                 }
                 break;
@@ -7481,8 +7501,7 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_CastPtrToInt:
-                if (inst->getOperandCount() != 1 ||
-                    inst->getDataType()->getOp() != kIROp_UInt64Type)
+                if (inst->getOperandCount() != 1 || !_isNVVMAddressIntegerType(inst->getDataType()))
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
                         toSlice("pointer address conversion"));
@@ -8047,24 +8066,28 @@ SlangResult _validateNVVMFunction(
             case kIROp_CastPtrToInt:
                 {
                     auto value = inst->getOperand(0);
-                    SlangNVVMAddressSpace space;
-                    const bool completeDevicePointer =
-                        asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) &&
-                        _getNVVMScopedPointerSpace(
-                            requirements.emissionPlan,
-                            entryPoint,
-                            value,
-                            space) &&
-                        space == SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
                     if (!_getNVVMLayoutPointerRoot(
                             requirements.emissionPlan,
                             entryPoint,
                             function,
-                            value) &&
-                        !completeDevicePointer)
-                        return _diagnoseUnsupportedIR(
+                            value))
+                    {
+                        auto pointer =
+                            asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType());
+                        if (!pointer)
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("pointer address producer"));
+                        SLANG_RETURN_ON_FAIL(_validatePointerValue(
                             codeGenContext,
-                            toSlice("pointer address producer"));
+                            requirements,
+                            value,
+                            inst,
+                            availableValues,
+                            dominatorTree,
+                            false,
+                            pointer->getValueType()));
+                    }
                     SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                         codeGenContext,
                         value,
@@ -8101,19 +8124,25 @@ SlangResult _validateNVVMFunction(
                         result->getAccessQualifier() == AccessQualifier::ReadWrite,
                         result->getValueType()));
                     requirements.emissionPlan.pointerQualificationValues[inst] = value;
-                    SlangNVVMAddressSpace space;
-                    // Shared qualification retains AS3. Ordinary UserPointer values use AS0
-                    // and must not inherit an AS1-only scoped-memory representation proof.
-                    if (resultIsShared && _getNVVMScopedPointerSpace(
-                                              requirements.emissionPlan,
-                                              entryPoint,
-                                              value,
-                                              space))
+                    NVVMPlannedPointerSpace space;
+                    if (_getNVVMScopedPointerSpace(
+                            requirements.emissionPlan,
+                            entryPoint,
+                            value,
+                            space.addressSpace,
+                            &space.isKnownLocalStorage))
+                    {
+                        // Qualification changes the physical pointer to AS0, except for shared
+                        // pointers. Preserve allocation provenance independently of that change.
+                        if (!resultIsShared)
+                            space.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
                         requirements.emissionPlan.scopedPointerSpaces[inst] = space;
+                    }
                     availableValues.add(inst);
                 }
                 break;
 
+            case kIROp_CastIntToPtr:
             case kIROp_BitCast:
                 {
                     const auto resourceBitCast =
@@ -8129,8 +8158,8 @@ SlangResult _validateNVVMFunction(
                         availableValues.add(inst);
                         break;
                     }
-                    NVVMPointerBitCast pointerCast;
-                    if (_getNVVMPointerBitCast(inst, pointerCast))
+                    NVVMPointerConversion pointerCast;
+                    if (_getNVVMPointerConversion(inst, pointerCast))
                     {
                         if (pointerCast.resultIsPointer)
                         {
@@ -8194,6 +8223,24 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         true,
                         cast<IRPtrTypeBase>(operation->pointer->getDataType())->getValueType()));
+                    // Type admission precedes address planning. Complete the descriptor only after
+                    // pointer availability/access checks, using the same physical-space facts as
+                    // coherent loads/stores. A helper pointer can carry either global or shared
+                    // memory.
+                    SlangNVVMAddressSpace space = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+                    bool isKnownLocalStorage = false;
+                    _getNVVMScopedPointerSpace(
+                        requirements.emissionPlan,
+                        entryPoint,
+                        operation->pointer,
+                        space,
+                        &isKnownLocalStorage);
+                    operation->desc.addressSpace = space;
+                    if (isKnownLocalStorage || !NVVMSemantics::isSupported(operation->desc))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("atomic pointer address space"));
+                    _requireNVVMAtomicOperations(requirements, *operation);
                     for (uint32_t i = 0; i < operation->valueCount; ++i)
                     {
                         SLANG_RETURN_ON_FAIL(_validateSelectedValue(
@@ -8599,12 +8646,13 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
-                    SlangNVVMAddressSpace space;
+                    NVVMPlannedPointerSpace space;
                     if (_getNVVMScopedPointerSpace(
                             requirements.emissionPlan,
                             entryPoint,
                             basePointer,
-                            space))
+                            space.addressSpace,
+                            &space.isKnownLocalStorage))
                         requirements.emissionPlan.scopedPointerSpaces[inst] = space;
                     availableValues.add(inst);
                 }
@@ -11270,7 +11318,6 @@ SlangResult validateNVVMSupportedIR(
                     selectedReachableStructTypes,
                     true);
             }
-            IRStructType* elementStruct = _getNVVMRawBufferAggregateElementType(fieldType);
             if (resourceStruct)
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, resourceStruct))
@@ -11289,10 +11336,7 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("structured-buffer element layout"));
             }
-            if (elementStruct)
-            {
-                _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
-            }
+            _addNVVMReachableStructTypes(fieldType, selectedReachableStructTypes);
         }
     }
 
@@ -11309,11 +11353,6 @@ SlangResult validateNVVMSupportedIR(
                 _addNVVMReachableStructTypes(
                     reference->getValueType(),
                     selectedReachableStructTypes);
-            }
-            if (auto elementStruct =
-                    _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
-            {
-                _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
             }
             NVVMRawBufferType rawBufferType;
             if (getNVVMSupportedRawBufferType(parameter->getDataType(), rawBufferType) &&
@@ -12816,6 +12855,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_CastIntToPtr:
                 case kIROp_BitCast:
                     {
                         const auto resourceBitCast = planIndex.findResourceBitCast(inst);
@@ -12833,8 +12873,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap[inst] = loweredValue;
                             break;
                         }
-                        NVVMPointerBitCast pointerCast;
-                        if (!_getNVVMPointerBitCast(inst, pointerCast))
+                        NVVMPointerConversion pointerCast;
+                        if (!_getNVVMPointerConversion(inst, pointerCast))
                         {
                             const auto plannedOperation = planIndex.findValueOperation(inst);
                             SLANG_RELEASE_ASSERT(plannedOperation);

@@ -17,16 +17,22 @@ struct Payload
 };
 
 // CUDA storage is three 16-byte groups: one Boolean byte, padding, then three floats.
-//TEST_INPUT: ubuffer(data=[1 1065353216 1073741824 1077936128 0 1082130432 1084227584 1086324736 1 1088421888 1090519040 1091567616], stride=48):name=sourceBuffer
+//TEST_INPUT: ubuffer(data=[128 1065353216 1073741824 1077936128 0 1082130432 1084227584 1086324736 1 1088421888 1090519040 1091567616], stride=48):name=sourceBuffer
 StructuredBuffer<Payload> sourceBuffer;
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=48):name=destination
 RWStructuredBuffer<Payload> destination;
-//TEST_INPUT: ubuffer(data=[99 99 99 99 99 3735928559], stride=4):out,name=outputBuffer
+//TEST_INPUT: ubuffer(data=[99 99 99 99 99 99 99 99 99 99 99 3735928559], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 uint encode(float3 value)
 {
     return uint(value.x + 10 * value.y + 100 * value.z);
+}
+
+[noinline]
+void change(__ref float3 value)
+{
+    value += 1.0;
 }
 
 [numthreads(1, 1, 1)]
@@ -48,6 +54,17 @@ void computeMain()
     outputBuffer[2] = encode(loaded.items[0].value);
     outputBuffer[3] = encode(loaded.items[1].value);
     outputBuffer[4] = encode(loaded.tail);
+    uint row = sourceBuffer[0].items[1].enabled ? 0 : 1;
+    destination[0].items[row].value.y = 22.0;
+    destination[0].items[row].enabled = true;
+    outputBuffer[5] = uint(destination[0].items[row].value.y);
+    outputBuffer[6] = uint(sourceBuffer[0].items[row].enabled);
+    outputBuffer[7] = uint(destination[0].items[row].enabled);
+    change(destination[0].items[0].value);
+    outputBuffer[8] = encode(destination[0].items[0].value);
+    outputBuffer[9] = encode(destination[0].items[1].value);
+    destination[0].items = sourceBuffer[0].items;
+    outputBuffer[10] = uint(destination[0].items[0].enabled);
 }
 
 // CHECK: type: uint
@@ -56,4 +73,10 @@ void computeMain()
 // CHECK-NEXT: 321{{$}}
 // CHECK-NEXT: 654{{$}}
 // CHECK-NEXT: 2097{{$}}
+// CHECK-NEXT: 22{{$}}
+// CHECK-NEXT: 0{{$}}
+// CHECK-NEXT: 1{{$}}
+// CHECK-NEXT: 432{{$}}
+// CHECK-NEXT: 824{{$}}
+// CHECK-NEXT: 1{{$}}
 // CHECK-NEXT: 3735928559{{$}}

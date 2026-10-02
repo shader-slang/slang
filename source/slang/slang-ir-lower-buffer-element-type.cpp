@@ -945,8 +945,36 @@ struct LoweredElementTypeContext
         return leafTypeLoweringPolicy->lowerLeafLogicalType(type, config);
     }
 
-    LoweredTypeMap& getTypeLoweringMap(TypeLoweringConfig config)
+    // Unsized tails have a UserPointer-specific rewrite and must retain a separate recipe.
+    // Pointer/resource fields themselves have fixed storage; their pointees are separate objects.
+    bool hasUnsizedStorage(IRType* type)
     {
+        if (as<IRUnsizedArrayType>(type))
+            return true;
+        if (auto array = as<IRArrayType>(type))
+            return hasUnsizedStorage(array->getElementType());
+        if (auto record = as<IRStructType>(type))
+            for (auto field : record->getFields())
+                if (hasUnsizedStorage(field->getFieldType()))
+                    return true;
+        return false;
+    }
+
+    LoweredTypeMap& getTypeLoweringMap(TypeLoweringConfig config, IRType* type)
+    {
+        // Consider a bool3x3 loaded from a buffer into a local and passed by reference.
+        // Both objects use the same finite CUDA value layout. Creating separate nominal
+        // array wrappers gives their otherwise identical fields different keys when helper
+        // specialization crosses that boundary. Share the value recipe, while preserving
+        // the actual address space and access on pointers and storage casts.
+        if (target->shouldEmitNVVMDirectly() &&
+            (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::LLVM ||
+             options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM) &&
+            config.layoutRuleName == IRTypeLayoutRuleName::CUDA && !config.lowerToPhysicalType &&
+            (config.addressSpace == AddressSpace::UserPointer ||
+             config.addressSpace == AddressSpace::StorageBuffer) &&
+            !hasUnsizedStorage(type))
+            config.addressSpace = AddressSpace::Generic;
         RefPtr<LoweredTypeMap> map;
         if (loweredTypeInfoMaps.tryGetValue(config, map))
             return *map;
@@ -959,7 +987,7 @@ struct LoweredElementTypeContext
     {
         // If `type` is already a lowered type, no more lowering is required.
         LoweredElementTypeInfo info;
-        auto& map = getTypeLoweringMap(config);
+        auto& map = getTypeLoweringMap(config, type);
         auto& mapLoweredTypeToInfo = map.mapLoweredTypeToInfo;
         auto& loweredTypeInfo = map.loweredTypeInfo;
         if (mapLoweredTypeToInfo.tryGetValue(type))
@@ -2460,8 +2488,8 @@ struct LoweredElementTypeContext
         SLANG_ASSERT(baseCast);
         auto storageBase = baseCast->getOperand(0);
         auto loweredMatrixType = tryGetPointedToType(&builder, storageBase->getFullType());
-        auto matrixTypeInfo =
-            getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
+        auto matrixTypeInfo = getTypeLoweringMap(workItem.config, loweredMatrixType)
+                                  .mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
         SLANG_ASSERT(matrixTypeInfo);
         if (matrixTypeInfo->loweredType == matrixTypeInfo->originalType)
             return;
@@ -2626,10 +2654,17 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
-    // Explicit Device pointer layouts are semantic even when NVVM otherwise uses CUDA defaults.
-    // Keep ordinary buffer layout selection and the CUDA source backend on their existing paths.
+    // Default CUDA pointers and structured resources share the host CUDA byte layout. In
+    // particular Bool is one byte and Half3 has an eight-byte stride. Explicit layouts and
+    // the CUDA source backend retain their existing contracts.
     if (target->shouldEmitNVVMDirectly())
     {
+        if (auto buffer = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+        {
+            auto layout = buffer->getDataLayout();
+            if (!layout || layout->getOp() == kIROp_DefaultBufferLayoutType)
+                return IRTypeLayoutRuleName::CUDA;
+        }
         if (auto pointerType = as<IRPtrTypeBase>(bufferType))
         {
             auto layout = pointerType->getDataLayout();
@@ -3547,7 +3582,8 @@ struct NVVMBufferElementTypeLoweringPolicy : LLVMBufferElementTypeLoweringPolicy
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
-        if (config.addressSpace != AddressSpace::UserPointer ||
+        if ((config.addressSpace != AddressSpace::UserPointer &&
+             config.addressSpace != AddressSpace::StorageBuffer) ||
             config.layoutRuleName != IRTypeLayoutRuleName::CUDA)
             return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
 

@@ -17489,17 +17489,9 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     // By default, the return type of an accessor is treated as
     // the type of the abstract storage location being accessed.
     //
-    // A `ref`  accessor currently relies on this logic even though
-    // it isn't quite correct, because we don't have support
-    // for by-reference return values today. This is a non-issue
-    // for now because we don't support user-defined `ref`
-    // accessors yet.
-    //
-    // TODO: Once we can support the by-reference return value
-    // correctly *or* we can move to something like a coroutine-based
-    // `modify` accessor (a la Swift), we should split out
-    // handling of `RefAccessorDecl` and only use this routine
-    // for `GetterDecl`s.
+    // A `ref` accessor keeps the storage type here. Return checking requires an exact
+    // mutable l-value; IR lowering represents both the signature and returned expression
+    // as pointers to that storage type.
     //
     decl->returnType.type = _getAccessorStorageType(decl);
 

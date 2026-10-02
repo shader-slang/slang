@@ -471,6 +471,14 @@ struct NVVMPlannedLayoutPointerOffset
     NVVMValueRecipeStep scaleIndex;
 };
 
+// Physical LLVM space and known allocation provenance are distinct: an alloca uses AS0
+// but still cannot be the target of a PTX atomic, which requires global or shared memory.
+struct NVVMPlannedPointerSpace
+{
+    SlangNVVMAddressSpace addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+    bool isKnownLocalStorage = false;
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
@@ -504,7 +512,7 @@ struct NVVMEmissionPlan
     List<NVVMPlannedSurfaceOperation> surfaceOperations;
     List<NVVMPlannedAtomicOperation> atomicOperations;
     // Offset and qualification instructions retain their source's checked physical space.
-    Dictionary<IRInst*, SlangNVVMAddressSpace> scopedPointerSpaces;
+    Dictionary<IRInst*, NVVMPlannedPointerSpace> scopedPointerSpaces;
 };
 
 struct NVVMAtomicOperationRequirement

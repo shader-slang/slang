@@ -2205,7 +2205,9 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
         !_isNVVMSupportedResourceElementType(ptrType->getValueType(), activeTypes) ||
         ptrType->getAccessQualifier() != AccessQualifier::ReadWrite || !hasResourceAddressSpace ||
-        !dataLayout || dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
+        !dataLayout ||
+        (dataLayout->getOp() != kIROp_ScalarBufferLayoutType &&
+         dataLayout->getOp() != kIROp_CUDABufferLayoutType))
     {
         return nullptr;
     }

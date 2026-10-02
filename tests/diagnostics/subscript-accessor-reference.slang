@@ -14,7 +14,7 @@ struct RefOnly
 
     __subscript(int index) -> float
     {
-        ref { return value; }
+        [mutating] ref { return value; }
     }
 }
 

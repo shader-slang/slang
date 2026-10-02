@@ -13,7 +13,10 @@ The expanded discovery corpus also requires the standard numerics modules from t
 Ensure the existing `slang-numerics-modules` target is included when building through `slang-build`;
 it produces `slang/numerics.slang-module` and the three serialized modules under
 `slang/numerics/` in the configured standard-module directory. Do not copy serialized modules from
-a different compiler build. For a results-only refresh, verify these artifacts against the accepted
+a different compiler build. After core or IR-operation changes, rebuild `slang-numerics-modules`,
+`slang-neural-module` and `slang-workgraph-module` along with the compiler: serialized synthesized AST
+operations can become stale even when the shared module version remains unchanged. Capture those
+module hashes with the loaded compiler identity. For a results-only refresh, verify these artifacts against the accepted
 ledger along with the compiler/core module. Missing modules are a packaging failure, not evidence
 that the shader or backend is unsupported. Preserve such failed attempts before restoring the
 matching layout or rebuilding and requalifying it.

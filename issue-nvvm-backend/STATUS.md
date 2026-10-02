@@ -9,11 +9,11 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; development has resumed with corpus tiers and an initial OptiX path.
+below; development is stopped at the requested discussion point.
 
 The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
 targeting and common raygen/trace/callable qualification are now accepted. Application-led feature
-development is active. **The legacy HitObject compatibility decision remains parked:** native8.x
+development is stopped at the maintainer-requested discussion point. **The legacy HitObject compatibility decision remains parked:** native8.x
 Invoke loses ray flags that9 retains;
 preserving modern visibility without reducing the32-word payload capacity needs a private
 cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
@@ -27,63 +27,67 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
 
-## Current application feature work
+## Current application feature work — stopped for discussion
 
-Compact CUDA pointer storage is qualified: standard numeric scalar/vector/matrix and nested
-record/array pointers share canonical local/device storage, preserving aliases, Half3 padding and
-Bool byte truthiness. Exact pointer qualification preserves access and physical address spaces;
-bare copyable entry pointers retain AS1 for coherent memory. OptiX callable storage and logical
-register-payload ordering retain their existing contracts.
+The TensorView/structured-storage slice is complete. TensorView and DiffTensorView use a typed,
+host-compatible descriptor and ordinary core composition for queries, indexing, load/store,
+references and public atomics. Scalar ranks 1–5, vector widths 1–4 and noncontiguous strides are
+qualified. Exact reference-accessor returns preserve addresses; checked generic/shared/global atomics
+retain local-storage rejection. Default structured buffers share canonical CUDA numeric storage
+with ordinary pointers, preserving Bool bytes, width-3 packing, matrix orientation and aliases.
+Module 43, ABI 46 and container 2 remain unchanged.
 
-The 353-node SlangPy selection passes **338 / fails 15**, resolving **75** previous failures and
-preserving **263** prior passes. Current mixed-age inventory is **1,385 pass / 205 fail / 807 skip /
-3 expected failures**. The original full checkpoint below is unchanged. Remaining selected failures:
-six atomicAdd, six uint field addresses, two updateElement and one nested cbuffer field address.
+A fresh full CUDA-selected SlangPy run has **1,561 passes, 29 failures, 807 skips and 3 expected
+failures** across the same 2,400 nodes, plus 14 module-level skips. This slice resolves **30 failures**,
+preserves all **1,531 prior passes** and introduces **zero regressions**. The matrix-return regression
+found during validation is repaired in the nested buffer type-declaration closure. The original full
+1,054/536 checkpoint and intermediate failures remain in [SlangPy status](slangpy-cuda-status.json).
 
-Qualification includes 204 numeric GPU cells at O0/O3, three existing OptiX controls (18,931
-assertions), nested record/entry controls (437 assertions), 34 NVVM static tests, one address test,
-six provider units, ten coherent positive/negative cells and all 16 smoke cells. The due 1,716-cell
-working run passed 1,708 and found eight regressions; all eight exact configurations pass after
-producer repairs. This is a full run plus focused repairs, not a fresh all-green full run.
+The **1,716-cell working checkpoint passed 1,713 and found 3 crashes**, all in the differentiable
+scalar-to-shaped-value test. Serialized numerics modules predated the new IR operations; rebuilding
+the existing standard-module targets repairs all three exact configurations without a compiler
+workaround. The affected numerics suite also passes 59 tests, with one ignored. This is a full run
+plus focused repairs, with zero changed inputs, not a fresh all-green full run. All **16 smoke cells
+pass**. This checkpoint plus exact repairs owns the new cadence baseline. The initial full NVVM unit
+run passed 548/565; all 17 failures are repaired in a 19-case focused selection, with one additional
+nested matrix regression unit passing. These are full-unit results plus exact repairs.
 
-RHI has 286 registrations (285 unique), with mixed-age NVVM **275/1/10** and NVRTC **270/6/10**.
-NVRTC passes the record comparison (283 assertions; ordinary tag access, not coherent semantics).
-Its numeric comparison retains five Bool0x80-to-float differences and a column-major Bool3x3 helper
-ABI compile failure; later numeric cases and O3 were unrun. Independent NVVM byte oracles remain.
-Raw evidence: `build/nvvm-pointer-storage/`; exact histories and identities live in the current
-focused, SlangPy and RHI manifests. Root source base is `f2a34ee90`, sibling RHI base `c7d26fe9`;
-the accepted feature record identifies the changed sources and binaries.
+GPU qualification includes 204 Tensor numeric cells and 204 structured numeric cells at O0/O3, both
+matrix orders, independent byte guards, Bool 0x80 and Half3 padding. Three Tensor registrations pass
+21,633 assertions, including the 16-cell public atomic family; structured storage passes 18,121
+assertions. Twelve source/unit controls pass, including CPU/NVRTC/NVVM reference returns, invalid-return
+diagnostics, shared floating/nested-resource atomics and preflight no-mutation boundaries. After the
+final CUDA reference-template repair, the NVVM descriptor and all three general reference-return
+controls pass again. Exact build identities, failed attempts and acceptance are in
+[focused evidence](focused-evidence.json); raw evidence is under `build/nvvm-tensor-views/`.
+No full RHI/native/surface/material rerun is claimed.
 
-Normalized surfaces are now qualified for all12UNORM/SNORM formats (8/16-bit,1/2/4channels),
-Half/Float logical values, all five admitted geometries and whole/static/dynamic component writes.
-All60grouped NVVM cells pass; focused enhanced SNORM minimum-code checks preserve untouched bits.
-Three surface units, two wrapper PTX checks, the existing provenance rejection, four native surface
-controls and16smoke cells pass. Four NVRTC comparisons fail compilation at missing conversion helpers;
-no numerical equivalence is claimed. Raw evidence: `build/nvvm-normalized-surfaces/`.
+RHI now has 290 registrations (289 unique): mixed-age NVVM **279 pass / 1 fail / 10 skip**; NVRTC
+**271 pass / 7 fail / 10 skip / 2 unrun**. Four new NVVM registrations pass. The selected NVRTC atomic
+comparison passes. Its descriptor comparison initially failed to compile because reference templates
+returned values where pointer results were required; all eight templates now return the existing
+lvalue's address. The retry passes 1,135 assertions and fails only the two O0/O3 wide-stride checks:
+CUDA wraps the product to `0x1c`, while NVVM produces the intended 64-bit `0x10000001c`. Both numeric
+NVRTC registrations remain unrun. Existing MakeHit and comparison failures retain their histories in
+[RHI status](rhi-cuda-status.json).
 
-The484-node application selection passes388/fails96: all50normalized-format failures resolve and
-all338prior controls remain passing. Current mixed-age inventory is **1,435 pass /155 fail /807 skip /
-3 expected failures**. The original full checkpoint remains unchanged. The96remaining texture cases
-call ordinary helper methods whose resource parameters lack format provenance; direct entry/global
-wrapper selectors now work, but do not establish an arbitrary helper's physical format.
+Limits remain explicit: Torch MakeTensorView is unavailable/unqualified; no new lifetime or bounds
+analysis is claimed. Direct immutable global aggregate constref forwarding remains rejected. Current
+shared StructuredBuffer lowering can retain stale reads through a writable alias; qualified mutable
+alias observations use two RWStructuredBuffer views. The failed exploratory alias attempt is retained.
 
-Surface helper format preservation is now qualified. Required type-based inlining exposes caller
-bindings before physical storage lowering; existing memory forwarding and safe load deferral handle
-local records/arrays without a new resource ABI. Twelve GPU cells pass atO0/O3, including native and
-Half storage, normalized operations, aggregate returns, out/inout/readonly references, actual handle
-overwrites and side effects. Three provider units, two static memory/snapshot checks, two formatted
-helper PTX checks, required recursion rejection,157CPU cases and16smoke cells pass.
+**Stop here for discussion.** No next feature family has started. The 29 remaining SlangPy failures
+suggest these queued groups (first diagnostics, not completed root-cause analyses):
 
-The484-node application selection now passes completely: **96failures resolve and388prior passes
-remain**. Current mixed-age inventory is **1,531 pass /59 fail /807 skip /3 expected failures**.
-Raw evidence: `build/nvvm-surface-helpers/`. Original full checkpoints and RHI counts remain unchanged.
-Required inlining may increase code size; runtime incompatible-format selections, unproven pointer
-bindings and recursion remain rejected. Failed prototype/annotation attempts remain recorded.
+- 10 pointer/reference/helper-layout and generated-symbol identity cases;
+- 7 nested resource/parameter-group cases;
+- 3 differentiable aggregate update cases;
+- 4 link-time type/struct cases;
+- 5 RHI RGB32 texture-creation cases, before shader compilation.
 
-**Next:** intrinsic TensorView/DiffTensorView and remaining representation families. Working cadence
-is two implementations since the compact-pointer checkpoint; use focused application selections
-and smoke. A full checkpoint follows queued families, or the working cadence threshold. Legacy
-OptiX8HitObject semantics remain parked independently.
+The legacy OptiX 8 HitObject semantic decision remains parked independently. Resume only after the
+maintainer's next instruction; retain eight-job builds, complete-family batching and economical
+focused validation between deliberate checkpoints.
 
 ## SlangPy application checkpoint
 

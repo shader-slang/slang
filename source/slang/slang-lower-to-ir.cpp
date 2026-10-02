@@ -8983,6 +8983,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 return;
             }
 
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                // Consider a subscript `ref { return data[index]; }`. Its IR signature
+                // returns Ptr<T>, so preserve the selected storage instead of loading T.
+                // The unqualified result transports the address without changing its pointee.
+                auto loweredExpr = lowerLValueExpr(context, expr);
+                auto address = getAddress(context, loweredExpr, expr->loc);
+                if (!address)
+                    return;
+                auto resultType = getBuilder()->getPtrType(
+                    lowerType(context, context->funcDecl->returnType.type));
+                if (address->getDataType() != resultType)
+                    address =
+                        getBuilder()->emitIntrinsicInst(resultType, kIROp_PtrCast, 1, &address);
+                getBuilder()->emitReturn(address);
+                return;
+            }
+
             // If the AST `return` statement had an expression, then we
             // need to lower it to the IR at this point, both to
             // compute its value and (in case we are returning a

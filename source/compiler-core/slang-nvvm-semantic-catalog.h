@@ -581,7 +581,8 @@ inline bool isSupported(const SlangNVVMMemoryOperationDesc& desc)
 /// Returns whether an atomic descriptor is in the currently established direct-NVVM family.
 inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
 {
-    const bool isAtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
+    const bool isAtomicAddressSpace = desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GENERIC ||
+                                      desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL ||
                                       desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
     const bool isSelectedInteger =
         (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
@@ -600,8 +601,7 @@ inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
          desc.operation == SLANG_NVVM_ATOMIC_OP_BIT_XOR ||
          desc.operation == SLANG_NVVM_ATOMIC_OP_MIN || desc.operation == SLANG_NVVM_ATOMIC_OP_MAX);
     const bool isSelectedFloatingReduction =
-        desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
-        desc.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
+        isAtomicAddressSpace && desc.operation == SLANG_NVVM_ATOMIC_OP_ADD &&
         ((desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
           (desc.valueType.bitWidth == 16 || desc.valueType.bitWidth == 32 ||
            desc.valueType.bitWidth == 64) &&

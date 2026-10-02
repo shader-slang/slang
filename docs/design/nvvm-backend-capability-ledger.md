@@ -31,6 +31,30 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## TensorView, references and canonical numeric storage
+
+TensorView/DiffTensorView use a typed 56-byte descriptor with the existing host offsets and alignment.
+Query, address, load/store, reference and public atomic methods compose ordinary NVVM operations.
+Scalar indexing covers ranks 1–5 and vector indexing widths 1–4; noncontiguous byte strides and
+nested helper/entry descriptors are qualified. Address products widen before multiplication, avoiding
+the CUDA-text route's 32-bit product wrap. Torch-dependent MakeTensorView is unqualified because the
+optional dependency is unavailable; this is not a claim of complete Torch interoperability.
+
+The sibling `tensor-view-descriptor`, `tensor-view-numeric-storage`, `tensor-view-atomic` and
+`structured-numeric-child-storage` fixtures retain independent descriptor, numerical and byte oracles.
+Numeric storage covers 204 cells per family at O0/O3, both matrix orders, standard scalar widths,
+width3 packing, Bool byte0x80, padding/guards, immutable input and two mutable aliases. Tensor atomics
+cover the complete public overload family in 16 cells. [Reference returns](../../tests/compute/ref-accessor-return.slang)
+execute on CPU, NVRTC and NVVM; [invalid returns](../../tests/diagnostics/ref-accessor-return.slang)
+reject values/coercions instead of manufacturing a temporary address. General reference lifetime
+analysis is outside this qualification.
+
+Canonical integer and floating atomics retain their operation/type/order restrictions while admitting
+checked generic, global and shared pointers. [Shared floating atomics](../../tests/cuda/nvvm-shared-floating-atomics.slang)
+cover shared helper transport and nested resource children. Known local allocation roots reject before
+provider creation; unknown generic helper pointers require global/shared backing at runtime.
+The maintained focused manifest owns exact build identities, comparisons and validation histories.
+
 ## Pointer-bearing entry values and checked local addresses
 
 Finite helper records and fixed arrays now decode canonical UserPointer leaves from CUDA launch
@@ -622,7 +646,13 @@ Structured-buffer roots and direct loads also retain their checked view/access/o
 Recursive Boolean/aggregate/vector3 conversions use recipes built during preflight, including
 explicit-stride construction; children inherit checked parent address facts in dominance order.
 The [recursive round trip](../../tests/cuda/nvvm-structured-bool-vector-roundtrip.slang) covers nested
-Boolean fields and float3 storage in both directions. No transforming Slang IR storage pass is claimed.
+Boolean fields and float3 storage in both directions, noncanonical Boolean bytes, nested partial
+writes, whole-array copies and mutable helper-reference aliases. Default structured buffers now use
+the shared CUDA storage legalizer, including Bool-byte encoding, compact width3 vectors, Half3
+padding and row/column-major matrices. Child plans retain readonly access independently of value
+representation. Current shared lowering treats StructuredBuffer reads as immutable; post-write alias
+observations use two RWStructuredBuffer views. The exploratory RO/RW alias attempt and its stale
+reads remain a recorded semantic limitation, not an accepted mutable-read contract.
 
 Half-vector helper parameters/results use physical integer lane transport while body arithmetic and
 storage retain their selected Half representations. [Parameter transport](../../tests/cuda/nvvm-half-vector-helper-parameters.slang)

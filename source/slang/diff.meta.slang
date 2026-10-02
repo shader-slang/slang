@@ -204,6 +204,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return Ptr<T>(__nvvmTensorViewAddress(this));
         case cuda:
             __intrinsic_asm "$0.data_ptr<$[0]>()", T;
         }
@@ -215,6 +217,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return Ptr<T>(__nvvmTensorViewAddress(this) + uint64_t(stride(0)) * uint64_t(index));
         case cuda:
             __intrinsic_asm "$0.data_ptr_at<$[0]>($1)", T;
         }
@@ -227,6 +231,12 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            static_assert(N >= 1 && N <= 4, "TensorView vector indices have one to four components");
+            uint64_t offset = 0;
+            [ForceUnroll] for (uint i = 0; i < N; ++i)
+                offset += uint64_t(stride(i)) * uint64_t(index[i]);
+            return Ptr<T>(__nvvmTensorViewAddress(this) + offset);
         case cuda:
             __intrinsic_asm "$0.data_ptr_at<$[0]>($1)", T;
         }
@@ -242,6 +252,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return data_ptr_at(x)[0];
         case cuda:
             __intrinsic_asm "$0.load<$[0]>($1)", T;
         }
@@ -253,6 +265,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return data_ptr_at(vector<uint, 2>(x, y))[0];
         case cuda:
             __intrinsic_asm "$0.load<$[0]>($1, $2)", T;
         }
@@ -264,6 +278,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return data_ptr_at(vector<uint, 3>(x, y, z))[0];
         case cuda:
             __intrinsic_asm "$0.load<$[0]>($1, $2, $3)", T;
         }
@@ -275,6 +291,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return data_ptr_at(vector<uint, 4>(x, y, z, w))[0];
         case cuda:
             __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4)", T;
         }
@@ -286,6 +304,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return __nvvmTensorViewPointerAt5(this, i0, i1, i2, i3, i4)[0];
         case cuda:
             __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4, $5)", T;
         }
@@ -298,6 +318,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return data_ptr_at(index)[0];
         case cuda:
             __intrinsic_asm "$0.load<$TR>($1)";
         }
@@ -308,6 +330,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            data_ptr_at(x)[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T2>($1, $2)";
         }
@@ -318,6 +342,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            data_ptr_at(vector<uint, 2>(x, y))[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T3>($1, $2, $3)";
         }
@@ -328,6 +354,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            data_ptr_at(vector<uint, 3>(x, y, z))[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T4>($1, $2, $3, $4)";
         }
@@ -338,6 +366,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            data_ptr_at(vector<uint, 4>(x, y, z, w))[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T5>($1, $2, $3, $4, $5)";
         }
@@ -348,6 +378,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            __nvvmTensorViewPointerAt5(this, i0, i1, i2, i3, i4)[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T6>($1, $2, $3, $4, $5, $6)";
         }
@@ -359,6 +391,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            data_ptr_at(index)[0] = val;
         case cuda:
             __intrinsic_asm "$0.store<$T2>($1, $2)";
         }
@@ -369,6 +403,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_add(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -379,6 +415,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_add(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -389,6 +427,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return __nvvmTensorViewDimensionCount(this);
         case cuda: __intrinsic_asm "$0.dimensionCount";
         }
     }
@@ -399,6 +439,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return __nvvmTensorViewSize(this, i);
         case cuda: __intrinsic_asm "$0.sizes[$1]";
         }
     }
@@ -409,6 +451,8 @@ struct TensorView
     {
         __target_switch
         {
+        case nvvm:
+            return __nvvmTensorViewStride(this, i);
         case cuda: __intrinsic_asm "$0.strides[$1]";
         }
     }
@@ -429,8 +473,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(index)[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1))", T;
             }
         }
     }
@@ -450,8 +496,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(vector<uint, 2>(i1, i2))[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1, $2))", T;
             }
         }
     }
@@ -472,8 +520,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(i)[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1.x, $1.y))", T;
             }
         }
     }
@@ -494,8 +544,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(vector<uint, 3>(i1, i2, i3))[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1, $2, $3))", T;
             }
         }
     }
@@ -516,8 +568,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(i)[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y, $1.z)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1.x, $1.y, $1.z))", T;
             }
         }
     }
@@ -539,8 +593,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(vector<uint, 4>(i1, i2, i3, i4))[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1, $2, $3, $4))", T;
             }
         }
     }
@@ -560,8 +616,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return data_ptr_at(i)[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y, $1.z, $1.w)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1.x, $1.y, $1.z, $1.w))", T;
             }
         }
     }
@@ -582,8 +640,10 @@ struct TensorView
         {
             __target_switch
             {
+            case nvvm:
+                return __nvvmTensorViewPointerAt5(this, i1, i2, i3, i4, i5)[0];
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4, $5)", T;
+                __intrinsic_asm "&($0.load<$[0]>($1, $2, $3, $4, $5))", T;
             }
         }
     }
@@ -602,6 +662,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_min(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -612,6 +674,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_min(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicMin($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -621,6 +685,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_max(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -631,6 +697,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_max(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicMax($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -640,6 +708,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_and(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -650,6 +720,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_and(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicAnd($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -659,6 +731,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_or(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -669,6 +743,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_or(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicOr($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -678,6 +754,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_xor(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -688,6 +766,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_xor(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicXor($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -697,6 +777,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVall = __atomic_exchange(data_ptr_at(index)[0], va);
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -707,6 +789,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_exchange(data_ptr_at(index)[0], val);
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)";
         }
     }
@@ -716,6 +800,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            __atomic_compare_exchange(data_ptr_at(index)[0], compare, val);
         case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)";
         }
     }
@@ -726,6 +812,8 @@ extension TensorView<$(atomicIntegerTypeName)>
     {
         __target_switch
         {
+        case nvvm:
+            __atomic_compare_exchange(data_ptr_at(index)[0], compare, val);
         case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)";
         }
     }
@@ -742,6 +830,9 @@ extension TensorView<float>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_exchange(data_ptr_at(index)[0], val);
+            return oldVal;
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)";
         }
     }
@@ -752,6 +843,9 @@ extension TensorView<float>
     {
         __target_switch
         {
+        case nvvm:
+            oldVal = __atomic_exchange(data_ptr_at(index)[0], val);
+            return oldVal;
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)";
         }
     }
@@ -761,6 +855,8 @@ extension TensorView<float>
     {
         __target_switch
         {
+        case nvvm:
+            __atomic_compare_exchange(data_ptr_at(index)[0], compare, val);
         case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))";
         }
     }
@@ -771,10 +867,35 @@ extension TensorView<float>
     {
         __target_switch
         {
+        case nvvm:
+            __atomic_compare_exchange(data_ptr_at(index)[0], compare, val);
         case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<uint32_t>($1), slang_bit_cast<uint32_t>($2), slang_bit_cast<uint32_t>($3))";
         }
     }
 }
+
+// Five-dimensional views use scalar indices because Slang vectors have at most four components.
+[__readNone] [require(nvvm)]
+internal Ptr<T> __nvvmTensorViewPointerAt5<T>(TensorView<T> view, uint i0, uint i1, uint i2, uint i3, uint i4)
+{
+    return Ptr<T>(uint64_t(view.data_ptr_at(uint4(i0, i1, i2, i3))) +
+                  uint64_t(view.stride(4)) * uint64_t(i4));
+}
+
+// Typed descriptor queries are lowered before NVVM entry/helper/storage analysis. Keep the data
+// word as device-address bits: strides are byte counts, independent of the logical element type.
+__intrinsic_op($(kIROp_GetTensorViewData))
+[__readNone] [require(nvvm)]
+internal uint64_t __nvvmTensorViewAddress<T>(TensorView<T> value);
+__intrinsic_op($(kIROp_GetTensorViewStride))
+[__readNone] [require(nvvm)]
+internal uint __nvvmTensorViewStride<T>(TensorView<T> value, uint axis);
+__intrinsic_op($(kIROp_GetTensorViewSize))
+[__readNone] [require(nvvm)]
+internal uint __nvvmTensorViewSize<T>(TensorView<T> value, uint axis);
+__intrinsic_op($(kIROp_GetTensorViewDimensionCount))
+[__readNone] [require(nvvm)]
+internal uint __nvvmTensorViewDimensionCount<T>(TensorView<T> value);
 
 interface IDiffTensorWrapper
 {

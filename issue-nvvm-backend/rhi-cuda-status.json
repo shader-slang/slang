@@ -1301,6 +1301,86 @@
         "sha256": "685d5bfa1a66c79559cc778e17a53c3cf028d38c673fe26afd993a0ef40f2228"
       },
       "scope": "nested record/mutable-root comparison; ordinary increment instead of NVVM coherent access"
+    },
+    "tensor-views-tensor-rhi3": {
+      "gate": {
+        "path": "build/nvvm-tensor-views/tensor-rhi3.json",
+        "sha256": "ba3465273dd339a8ea700a05181cf89228ae64ef8b4f6a8c2aa46ae00789332d"
+      },
+      "log": {
+        "path": "build/nvvm-tensor-views/tensor-rhi3.log",
+        "sha256": "02ca36b1a80383ea77714c0a7714dbfe4b5d33e6fc4c7058e519d4939328b64b"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 126.14271545410156,
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build23.json",
+        "sha256": "05853b19442dfa8d8b780fe8b93ee1b6bf1f862e85ff3d25b36ea8fefda1c384"
+      }
+    },
+    "tensor-views-structured-rhi6": {
+      "gate": {
+        "path": "build/nvvm-tensor-views/structured-rhi6.json",
+        "sha256": "3c87b30c2abef5dc2a0054f7533b6c3200245383e18b0577c792bbbc88af7045"
+      },
+      "log": {
+        "path": "build/nvvm-tensor-views/structured-rhi6.log",
+        "sha256": "1f14736ada5950cc3d5069eb26964594bc2a4ead9bd0cf72959b8b00fe46476f"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 115.61484217643738,
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build23.json",
+        "sha256": "05853b19442dfa8d8b780fe8b93ee1b6bf1f862e85ff3d25b36ea8fefda1c384"
+      }
+    },
+    "tensor-views-tensor-nvrtc1": {
+      "gate": {
+        "path": "build/nvvm-tensor-views/tensor-nvrtc1.json",
+        "sha256": "967a3a8a3617e19e7b64a9647a0942da70dee6ee8981de77f6257a2c25fb6336"
+      },
+      "log": {
+        "path": "build/nvvm-tensor-views/tensor-nvrtc1.log",
+        "sha256": "1d639d83f4590856ee87f5fe6b63de419f138a64bd9a6f21cd2f3cffd64a605a"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 11.164483308792114,
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build32.json",
+        "sha256": "4795b2ba13507217ab082162f68c8322df86f5a8869b9ec2346e0407d3641b9e"
+      }
+    },
+    "tensor-views-tensor-nvrtc2": {
+      "gate": {
+        "path": "build/nvvm-tensor-views/tensor-nvrtc2.json",
+        "sha256": "a022e3965cc86aee722202404e16f5f3a96b1f2948430b73a2d4d757151f21a2"
+      },
+      "log": {
+        "path": "build/nvvm-tensor-views/tensor-nvrtc2.log",
+        "sha256": "6e8b2089eface2b57fb06737892b0c509d69d70fe5291ba7217e96c9e53043a1"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 2.530010938644409,
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build34.json",
+        "sha256": "8d89314bfe73e53715ad2f3d7ac0ef8239a9c920b96ae9b166ba140dee6eef1b"
+      }
+    },
+    "tensor-views-tensor-descriptor-final": {
+      "gate": {
+        "path": "build/nvvm-tensor-views/tensor-descriptor-final.json",
+        "sha256": "c53c3128cb80e7c4c23fda3bb57fd19a28078440e63301397d1ba26e2e8a5f61"
+      },
+      "log": {
+        "path": "build/nvvm-tensor-views/tensor-descriptor-final.log",
+        "sha256": "07659f2e7cb0b36c07c23286c37b9d5ff644f4637959c225e7c5362625042ad8"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 2.307866096496582,
+      "identity": {
+        "path": "build/nvvm-tensor-views/identity-build34.json",
+        "sha256": "8d89314bfe73e53715ad2f3d7ac0ef8239a9c920b96ae9b166ba140dee6eef1b"
+      }
     }
   },
   "reconciliation": {
@@ -20860,22 +20940,128 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "tensor-view-descriptor.cuda#occurrence-1",
+      "name": "tensor-view-descriptor.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "failed"
+      },
+      "history": [
+        {
+          "run": "tensor-views-tensor-rhi3",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        },
+        {
+          "run": "tensor-views-tensor-nvrtc1",
+          "compiler_selection": "nvrtc",
+          "status": "failed"
+        },
+        {
+          "run": "tensor-views-tensor-nvrtc2",
+          "compiler_selection": "nvrtc",
+          "status": "failed",
+          "reason": "Only the 32-bit stride product differs at O0/O3; 1135 assertions pass and 2 fail."
+        },
+        {
+          "run": "tensor-views-tensor-descriptor-final",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "tensor-view-numeric-storage.cuda#occurrence-1",
+      "name": "tensor-view-numeric-storage.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "unrun"
+      },
+      "history": [
+        {
+          "run": "tensor-views-tensor-rhi3",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "tensor-view-atomic.cuda#occurrence-1",
+      "name": "tensor-view-atomic.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "tensor-views-tensor-rhi3",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        },
+        {
+          "run": "tensor-views-tensor-nvrtc1",
+          "compiler_selection": "nvrtc",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "structured-numeric-child-storage.cuda#occurrence-1",
+      "name": "structured-numeric-child-storage.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "unrun"
+      },
+      "history": [
+        {
+          "run": "tensor-views-structured-rhi6",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "current_known_outcomes": {
-    "registration_count": 286,
-    "unique_name_count": 285,
-    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite. Numeric-entry and exact-span PTX cache fixtures add two passing registrations per route with their own focused identities; no full rerun. Pointer-entry fixture adds one passing registration per route with O0/O3 focused evidence; no full rerun. Compact pointer fixtures add2NVVMpasses; NVRTC adds1pass/1failure with explicit Bool/column-major differences. No full rerun.",
+    "registration_count": 290,
+    "unique_name_count": 289,
+    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite. Numeric-entry and exact-span PTX cache fixtures add two passing registrations per route with their own focused identities; no full rerun. Pointer-entry fixture adds one passing registration per route with O0/O3 focused evidence; no full rerun. Compact pointer fixtures add2NVVMpasses; NVRTC adds1pass/1failure with explicit Bool/column-major differences. No full rerun. TensorView descriptor/numeric/atomic and structured numeric storage add4NVVMpassing registrations. Selected NVRTC comparison adds1pass/1intentional-address-difference failure; two numeric registrations unrun. No fresh full RHI run.",
     "by_compiler": {
       "nvvm": {
-        "passed": 275,
+        "passed": 279,
         "failed": 1,
         "skipped": 10
       },
       "nvrtc": {
-        "passed": 270,
+        "passed": 271,
         "skipped": 10,
-        "failed": 6
+        "failed": 7,
+        "unrun": 2
       }
     },
     "original_nvvm_failures_resolved": 60,
@@ -20886,7 +21072,9 @@
       "array-payload-singleton-matrices: CUDA source rejects matrices with one row/column (E39999), NVVM O0/O3 independent oracle passes",
       "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3",
       "callable-family: CUDA source rejects singleton matrices with E39999 at deferred binding; the NVVM numeric/empty/deferred oracle passes at O0/O3.",
-      "compact-pointer-storage: Bool byte0x80 converts to float -128 instead of logical1; column-major Bool3x3 local pointer mismatches lowered helper and stops O0; later cells/O3 unrun. NVVM204cells pass independent bytes/aliases oracle."
+      "compact-pointer-storage: Bool byte0x80 converts to float -128 instead of logical1; column-major Bool3x3 local pointer mismatches lowered helper and stops O0; later cells/O3 unrun. NVVM204cells pass independent bytes/aliases oracle.",
+      "TensorView descriptor: >4GiB stride product wraps to0x1c in CUDA text; NVVM widens before multiplication and produces0x10000001c. Exact O0/O3 failures retained; independent 64-bit oracle unchanged.",
+      "Initial tensor-nvrtc1 descriptor comparison failed at O0 compilation: eight ref accessors returned T& where canonical IR requires T*. All eight CUDA templates now take the address of the existing lvalue. Retry tensor-nvrtc2 compiles and executes O0/O3: 1135 assertions pass; only the two wide-product expectations differ. Atomic tensor-nvrtc1 already passed16cells/2785assertions."
     ],
     "nvvm_failures": ["ray-tracing-hitobject-make-hit.cuda"],
     "nvrtc_failures": [
@@ -20895,23 +21083,28 @@
       "ray-tracing-array-payload-singleton-matrices.cuda",
       "ray-tracing-hitobject-padded-attributes.cuda",
       "ray-tracing-callable-family.cuda",
-      "compact-pointer-storage.cuda"
+      "compact-pointer-storage.cuda",
+      "tensor-view-descriptor.cuda"
+    ],
+    "nvrtc_unrun": [
+      "tensor-view-numeric-storage.cuda",
+      "structured-numeric-child-storage.cuda"
     ]
   },
   "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
   "current_inventory": {
     "gate": {
-      "path": "build/nvvm-pointer-storage/inventory.json",
-      "sha256": "5f74c2d157a5421697b57c3c0dcf0a3ab8633ef9e25ca2ba14d64ef1055263a5"
+      "path": "build/nvvm-tensor-views/inventory.json",
+      "sha256": "eaa0a855fa388bdd3d809cd0538216ad16679606a51f0ca0bd91d9a53dcbd8e4"
     },
     "listing": {
-      "path": "build/nvvm-pointer-storage/inventory.log",
-      "sha256": "14c3416d0d486dc31d66dc2f5a59e603c81dc0607efb1f30b4b6bad681c70b9d"
+      "path": "build/nvvm-tensor-views/inventory.log",
+      "sha256": "ba5a2f58914e3a52991b12981c20ab338c5a57eaf878c57ce5500d6dc7ca8b29"
     },
-    "registration_count": 286,
-    "unique_name_count": 285,
+    "registration_count": 290,
+    "unique_name_count": 289,
     "manifest_multiset_matches": true,
-    "scope": "Adds compact numeric and nested record pointer fixtures; prior duplicate/histories retained."
+    "scope": "Adds four TensorView/structured-storage registrations; prior duplicate and histories retained."
   },
   "current_reconciliation": {
     "raw": {
@@ -21075,6 +21268,23 @@
         "passed": 5693678,
         "failed": 6
       }
+    },
+    "tensor_view_focused": {
+      "nvvm_passes": [
+        "tensor-view-descriptor.cuda",
+        "tensor-view-numeric-storage.cuda",
+        "tensor-view-atomic.cuda",
+        "structured-numeric-child-storage.cuda"
+      ],
+      "nvrtc_outcomes": {
+        "tensor-view-descriptor.cuda": "failed",
+        "tensor-view-atomic.cuda": "passed"
+      },
+      "nvrtc_unrun": [
+        "tensor-view-numeric-storage.cuda",
+        "structured-numeric-child-storage.cuda"
+      ],
+      "exact_registration_multiset": true
     }
   },
   "optix_version_qualification": {

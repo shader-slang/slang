@@ -9399,9 +9399,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderValidatesAtomicOperations)
     SlangNVVMAtomicOperationDesc selectedHalf2AddOperation = selectedHalfAddOperation;
     selectedHalf2AddOperation.valueType.laneCount = 2;
     SLANG_CHECK(builder.supportsAtomicOperation(selectedHalf2AddOperation));
-    SlangNVVMAtomicOperationDesc unsupportedSharedHalf2AddOperation = selectedHalf2AddOperation;
-    unsupportedSharedHalf2AddOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
-    SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedSharedHalf2AddOperation));
+    SlangNVVMAtomicOperationDesc selectedSharedHalf2AddOperation = selectedHalf2AddOperation;
+    selectedSharedHalf2AddOperation.addressSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    SLANG_CHECK(builder.supportsAtomicOperation(selectedSharedHalf2AddOperation));
     SlangNVVMAtomicOperationDesc unsupportedHalf3AddOperation = selectedHalf2AddOperation;
     unsupportedHalf3AddOperation.valueType.laneCount = 3;
     SLANG_CHECK(!builder.supportsAtomicOperation(unsupportedHalf3AddOperation));
