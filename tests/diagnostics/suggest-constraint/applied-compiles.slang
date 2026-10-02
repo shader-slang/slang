@@ -90,7 +90,8 @@ void computeMain()
     ShadowInMethod<Thing> shadow;
     outputBuffer[11] = int(shadow.read<int>(t).y);
     outputBuffer[12] = reachedTwice(t);
-    // CHECK: 3
+    // CHECK: type: int32_t
+    // CHECK-NEXT: 3
     // CHECK-NEXT: 4
     // CHECK-NEXT: 5
     // CHECK-NEXT: 6
