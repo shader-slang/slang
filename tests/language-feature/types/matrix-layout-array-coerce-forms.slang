@@ -6,6 +6,8 @@
 //TEST:SIMPLE(filecheck=SPV):-target spirv -entry main -stage compute -matrix-layout-column-major
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute -matrix-layout-column-major
 
 struct S
 {
@@ -54,10 +56,13 @@ void main()
     output[8] = same[1][2][3];
 }
 
-// The explicit layouts stay on the buffer arrays (Slang `row_major` is SPIR-V `ColMajor`), and the
-// converted value is a separate plain array that is built from the loaded elements.
+// The buffer arrays keep their explicit layouts (Slang `row_major` is SPIR-V `ColMajor`). No form
+// copies a whole array: each use reads the one matrix it needs from the buffer, and `use` is
+// specialized to read the buffer directly instead of taking a plain array argument.
 // SPV-DAG: OpMemberDecorate %{{.*}} 0 ColMajor
 // SPV-DAG: OpMemberDecorate %{{.*}} 0 RowMajor
-// HLSL: float use_0(float4x4  x_0[int(2)])
-// HLSL: float4x4  [[ARG:_S[0-9]+]][int(2)] = {
-// HLSL: use_0([[ARG]])
+// SPV-NOT: %_ptr_Function__arr_
+// HLSL: float use_0()
+// HLSL-NOT: float4x4 {{.*}}[int(2)] =
+// HLSL: void main()
+// GLSL: void main()

@@ -1747,6 +1747,11 @@ bool isMatrixLayoutConversion(Type* toType, Type* fromType)
     return false;
 }
 
+bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType)
+{
+    return as<ArrayExpressionType>(toType) && isMatrixLayoutConversion(toType, fromType);
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1942,8 +1947,9 @@ bool SemanticsVisitor::_coerce(
                     return true;
                 }
 
-                // A sized array whose matrix elements differ from the unsized parameter's only in
-                // layout first converts to a sized array of the parameter's element type.
+                // We convert only the element layout and keep the argument's length, because the
+                // rule above passes a sized array to an unsized parameter unchanged. Adding the two
+                // costs keeps an overload that takes the sized array preferred.
                 if (toArrayType->isUnsized() && !fromArrayType->isUnsized() &&
                     isMatrixLayoutConversion(
                         toArrayType->getElementType(),
@@ -2358,6 +2364,8 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    // An array-typed cast lowers to an array `BuiltinCast`, which `lowerArrayBuiltinCasts` expands
+    // element by element once matrix layouts are resolved.
     if (isMatrixLayoutConversion(toType, fromType))
     {
         if (outCost)

@@ -4531,9 +4531,10 @@ QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase>
 
 bool isUnsizedArrayType(Type* type);
 
-/// Return whether a value of `fromType` converts to `toType` by changing only the layout of
-/// matrices: either two matrices that agree on element type, row count and column count, or two
-/// sized arrays of the same length whose element types are again convertible this way.
+/// Return whether `toType` and `fromType` are equal up to the layout of their matrices: either two
+/// matrices that agree on element type, row count and column count, or two sized arrays of the same
+/// length whose element types again satisfy this predicate. It also holds for two identical types,
+/// so callers test for equality first.
 ///
 /// The array case exists because a layout modifier on an array declaration applies to its matrix
 /// element. Consider this example:
@@ -4543,10 +4544,14 @@ bool isUnsizedArrayType(Type* type);
 ///     ... skin(bones, i, p) ...
 ///
 /// `bones` has type `matrix<float,4,4,RowMajor>[4]` and the parameter has `matrix<float,4,4>[4]`.
-/// Layout only describes how a matrix is stored in memory, so these are the same values and the
-/// argument converts element by element. Only the element types are related; an `int[2]` does not
-/// convert to a `float[2]` through this rule.
+/// Layout only describes how a matrix is stored in memory, so a value converts element by element.
+/// Array elements are related only through this predicate, never through general coercion, so an
+/// `int[2]` does not convert to a `float[2]` this way. Unsized arrays are excluded because an
+/// element-by-element conversion needs a length.
 bool isMatrixLayoutConversion(Type* toType, Type* fromType);
+
+/// Return whether `toType` and `fromType` are arrays for which `isMatrixLayoutConversion` holds.
+bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType);
 
 bool isInterfaceType(Type* type);
 
