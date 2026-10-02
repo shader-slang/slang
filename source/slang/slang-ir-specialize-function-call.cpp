@@ -621,6 +621,16 @@ struct FunctionParameterSpecializationContext
             auto irType = getBuilder()->getAttributedType(oldIndex->getDataType(), irAttrs);
             ioInfo.key.vals.add(irType);
 
+            // getSpecializedValueForArg bakes any operands beyond the base/index pair into the
+            // specialized callee, so they must also distinguish specializations here; otherwise two
+            // accesses that differ only in a trailing operand share one clone and inherit whichever
+            // operand was specialized first. A `ByteAddressBufferLoad`'s alignment is such an
+            // operand: `LoadAligned<T>(o, 16)` and `LoadAligned<T>(o, 4)` on the same buffer must
+            // stay distinct so each keeps its own wide-vs-scalarized decision. See
+            // shader-slang/slang#13126.
+            for (UInt i = 2; i < oldArg->getOperandCount(); i++)
+                ioInfo.key.vals.add(oldArg->getOperand(i));
+
             ioInfo.newArgs.add(oldIndex);
         }
         else if (isFieldAccessInst(oldArg))
@@ -930,9 +940,32 @@ struct FunctionParameterSpecializationContext
             // is set.
             //
             builder->setInsertInto(ioInfo.newBodyInsts);
-            IRInst* newOperands[] = {newBase, newIndex};
-            auto newVal =
-                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
+
+            // Rebuild the access from the specialized base and index, copying any operands past the
+            // base/index pair (e.g. a `ByteAddressBufferLoad`'s trailing `alignment`) so they
+            // survive into the specialized body, which references them -- so each must be
+            // module-scope, not function-local, or the reference would cross function boundaries.
+            // Every alignment form reaching this pass is a module-scope integer literal: plain
+            // `Load` and explicit `LoadAligned<T>(loc, N)` pass a literal, and the
+            // natural-alignment `LoadAligned<T>(loc)` overload's `__naturalAlignmentOf<T>()` is
+            // folded to one before this pass runs (including at -O0; see
+            // byte-address-buffer-loadaligned-natural-13126). The release-assert enforces that
+            // loudly rather than silently forming a cross-function reference if a future producer
+            // ever violates it.
+            List<IRInst*> newOperands;
+            newOperands.add(newBase);
+            newOperands.add(newIndex);
+            for (UInt i = 2; i < oldArg->getOperandCount(); i++)
+            {
+                auto trailingOperand = oldArg->getOperand(i);
+                SLANG_RELEASE_ASSERT(!getParentFunc(trailingOperand));
+                newOperands.add(trailingOperand);
+            }
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                oldArg->getOp(),
+                newOperands.getCount(),
+                newOperands.getBuffer());
 
             return newVal;
         }
