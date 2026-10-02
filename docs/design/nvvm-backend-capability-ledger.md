@@ -690,7 +690,18 @@ each scalar or vector2/3/4. Shared CUDA layout owns size/alignment; entry-only b
 carry vectors, Bool uses byte transport, and Half uses integer bit transport. Half3's fourth storage
 lane is padding. Ordinary value, helper and storage caches keep their own roles. The sibling RHI
 `numeric-entry-abi` fixture independently checks all 48 shapes, exact bits and neighboring words at
-O0/O3. General arrays/matrices, BF16/FP8 and unsupported pointer roles are not added.
+O0/O3. Fixed arrays and numeric records now use recursive checked CUDA launch plans and canonical
+value reconstruction. The sibling `aggregate-entry-abi` fixture covers all twelve scalar kinds,
+vector widths 2/3/4, nested arrays/records, whole-record helper forwarding, mixed Half/non-Half
+records and neighboring argument/output guards at O0/O3. Half leaves use recursive integer helper
+transport. Zero/oversized arrays and explicit strides inconsistent with CUDA packing reject.
+BF16/FP8 and unsupported pointer/resource roles remain excluded.
+
+Explicit row-major non-square matrices are qualified after physical array lowering. Column-major
+entry matrices remain an open shared CUDA ABI issue: reflection honors column-major packing,
+while the CUDA Matrix representation uses rows. The retained mixed float2x3/float3x2 fixture fails
+11 output lanes per optimization on both NVVM and NVRTC. This is not a resource-buffer matrix
+layout change; do not infer column-major entry qualification from the row-major fixture.
 
 Byte/structured buffers retain pointer/count transport, with counts in bytes/elements respectively.
 Equivalent structured views divide byte extents by the checked element stride (2/4/8), including

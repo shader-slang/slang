@@ -2575,11 +2575,66 @@ SlangResult _emitNVVMHalfHelperABIReinterpretation(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& typeContext,
     IRType* canonicalType,
     bool toPhysical,
     SlangNVVMValueHandle value,
     SlangNVVMValueHandle& outValue)
 {
+    if (!hasNVVMHalfHelperABITransport(canonicalType))
+    {
+        outValue = value;
+        return SLANG_OK;
+    }
+    if (!getNVVMHalfHelperABILaneCount(canonicalType))
+    {
+        List<IRType*> elementTypes;
+        uint32_t count = 0;
+        if (auto array = as<IRArrayType>(canonicalType))
+        {
+            elementTypes.add(array->getElementType());
+            count = uint32_t(cast<IRIntLit>(array->getElementCount())->getValue());
+        }
+        else
+        {
+            for (auto field : cast<IRStructType>(canonicalType)->getFields())
+                elementTypes.add(field->getFieldType());
+            count = uint32_t(elementTypes.getCount());
+        }
+        List<SlangNVVMValueHandle> elements;
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            SlangNVVMValueHandle element = nullptr, converted = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "Half helper aggregate element",
+                builder.emitAggregateElementExtract(module, value, i, element)));
+            SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
+                codeGenContext,
+                builder,
+                module,
+                typeContext,
+                elementTypes[as<IRArrayType>(canonicalType) ? 0 : i],
+                toPhysical,
+                element,
+                converted));
+            elements.add(converted);
+        }
+        SlangNVVMTypeHandle resultType = nullptr;
+        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+            canonicalType,
+            toPhysical ? NVVMTypeUse::HelperParameter : NVVMTypeUse::Value,
+            resultType));
+        return _requireBuilderOperation(
+            codeGenContext,
+            "Half helper aggregate reconstruction",
+            builder.emitAggregateConstruct(
+                module,
+                resultType,
+                elements.getBuffer(),
+                elements.getCount(),
+                outValue));
+    }
     const NVVMHalfHelperABIOperation operation(canonicalType, toPhysical);
     return _requireBuilderOperation(
         codeGenContext,
@@ -4426,6 +4481,19 @@ void _requireNVVMHalfHelperABIOperations(
     NVVMValueOperationRequirements& requirements,
     IRType* canonicalType)
 {
+    if (!hasNVVMHalfHelperABITransport(canonicalType))
+        return;
+    if (auto array = as<IRArrayType>(canonicalType))
+    {
+        _requireNVVMHalfHelperABIOperations(requirements, array->getElementType());
+        return;
+    }
+    if (auto record = as<IRStructType>(canonicalType))
+    {
+        for (auto field : record->getFields())
+            _requireNVVMHalfHelperABIOperations(requirements, field->getFieldType());
+        return;
+    }
     const NVVMHalfHelperABIOperation encode(canonicalType, true);
     const NVVMHalfHelperABIOperation decode(canonicalType, false);
     _requireValueOperation(requirements, encode.getDesc(), "physical Half helper ABI encoding");
@@ -5666,18 +5734,20 @@ SlangResult _emitNVVMFunctionValueReturn(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& typeContext,
     IRFunc* function,
     const char* diagnosticName,
     SlangNVVMValueHandle value)
 {
     SLANG_RELEASE_ASSERT(function && !as<IRVoidType>(function->getResultType()));
-    if (getNVVMHalfHelperABILaneCount(function->getResultType()))
+    if (hasNVVMHalfHelperABITransport(function->getResultType()))
     {
         SlangNVVMValueHandle physicalValue = nullptr;
         SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
             codeGenContext,
             builder,
             module,
+            typeContext,
             function->getResultType(),
             true,
             value,
@@ -6587,14 +6657,14 @@ SlangResult _validateNVVMFunction(
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("HitObject reference stage"));
     if (!isEntryPoint)
     {
-        if (getNVVMHalfHelperABILaneCount(function->getResultType()))
+        if (hasNVVMHalfHelperABITransport(function->getResultType()))
             _requireNVVMHalfHelperABIOperations(
                 requirements.valueOperations,
                 function->getResultType());
         for (UInt parameterIndex = 0; parameterIndex < function->getParamCount(); ++parameterIndex)
         {
             IRType* parameterType = function->getParamType(parameterIndex);
-            if (getNVVMHalfHelperABILaneCount(parameterType))
+            if (hasNVVMHalfHelperABITransport(parameterType))
                 _requireNVVMHalfHelperABIOperations(requirements.valueOperations, parameterType);
         }
     }
@@ -6630,21 +6700,30 @@ SlangResult _validateNVVMFunction(
                 usesKernelParameters ? toSlice("entry-point parameter")
                                      : toSlice("helper function parameter"));
         }
-        if (usesKernelParameters && isNVVMSupportedValueType(param->getDataType()))
+        if (usesKernelParameters && isNVVMSupportedCopyableValueType(param->getDataType()))
         {
             NVVMEntryNumericLayout layout;
             if (!getNVVMEntryNumericLayout(codeGenContext, param->getDataType(), layout))
                 return _diagnoseUnsupportedIR(codeGenContext, toSlice("numeric entry layout"));
             requirements.emissionPlan.entryNumericParameters[param] = layout;
-            if (layout.isBoolean)
-                _requireValueOperation(
-                    requirements.valueOperations,
-                    kNVVMStructuredBoolLoadOperation,
-                    "numeric entry Boolean decode");
-            if (layout.isHalf)
-                _requireNVVMHalfHelperABIOperations(
-                    requirements.valueOperations,
-                    layout.scalarType);
+            List<const NVVMEntryNumericLayout*> pending;
+            pending.add(&layout);
+            while (pending.getCount())
+            {
+                auto node = pending.getLast();
+                pending.removeLast();
+                if (node->isBoolean)
+                    _requireValueOperation(
+                        requirements.valueOperations,
+                        kNVVMStructuredBoolLoadOperation,
+                        "numeric entry Boolean decode");
+                if (node->isHalf)
+                    _requireNVVMHalfHelperABIOperations(
+                        requirements.valueOperations,
+                        node->scalarType);
+                for (const auto& child : node->children)
+                    pending.add(&child);
+            }
         }
         NVVMRawBufferType rawBufferType;
         if (usesKernelParameters &&
@@ -6655,7 +6734,8 @@ SlangResult _validateNVVMFunction(
                 codeGenContext,
                 toSlice("structured-buffer element layout"));
         }
-        if (usesKernelParameters && asNVVMSupportedResourceStructType(param->getDataType()))
+        if (usesKernelParameters && asNVVMSupportedResourceStructType(param->getDataType()) &&
+            !requirements.emissionPlan.entryNumericParameters.containsKey(param))
         {
             uint32_t alignment = 0;
             if (!_getNVVMByValueParameterAlignment(codeGenContext, param->getDataType(), alignment))
@@ -9659,8 +9739,53 @@ SlangResult _emitNVVMStructuredBufferStorageConversion(
                                         outValue));
 }
 
+SlangResult _getNVVMRecipeIntegerConstant(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    uint32_t bitWidth,
+    int64_t value,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMTypeHandle integerType = nullptr;
+    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+        codeGenContext,
+        "scalar intrinsic recipe integer type",
+        builder.getIntegerType(module, bitWidth, integerType)));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "scalar intrinsic recipe integer constant",
+        builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+// Executes a retained byte displacement without interpreting the logical record layout.
+SlangResult _emitNVVMLayoutByteAddress(
+    CodeGenContext* context,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle base,
+    uint64_t offset,
+    SlangNVVMTypeHandle pointee,
+    SlangNVVMValueHandle& result)
+{
+    SlangNVVMValueHandle byteOffset = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(context, builder, module, 64, int64_t(offset), byteOffset));
+    if (!pointee)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            context,
+            "layout address byte type",
+            builder.getIntegerType(module, 8, pointee)));
+    }
+    return _requireBuilderOperation(
+        context,
+        "layout field byte address",
+        builder.emitByteOffsetPointer(module, base, byteOffset, pointee, result));
+}
+
 // Decodes only logical lanes from the checked CUDA entry carrier. Padding (notably Half3's
-// fourth storage lane) never becomes a semantic value, and helper calls see ordinary vector SSA.
+// fourth storage lane) never becomes a semantic value, and helpers see canonical SSA values.
 SlangResult _emitNVVMEntryNumericDecode(
     CodeGenContext* context,
     const NVVMIRBuilder& builder,
@@ -9670,6 +9795,56 @@ SlangResult _emitNVVMEntryNumericDecode(
     SlangNVVMValueHandle parameter,
     SlangNVVMValueHandle& outValue)
 {
+    if (layout.isAggregate())
+    {
+        List<SlangNVVMValueHandle> elements;
+        const uint32_t count =
+            layout.elementCount ? layout.elementCount : uint32_t(layout.children.getCount());
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            const auto& child = layout.children[layout.elementCount ? 0 : i];
+            const uint32_t offset =
+                layout.elementCount ? i * layout.elementStride : layout.fieldOffsets[i];
+            SlangNVVMTypeHandle childParameterType = nullptr, childStorageType = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                types.lowerEntryNumericType(child, childParameterType, childStorageType));
+            SlangNVVMValueHandle address = nullptr;
+            SLANG_RETURN_ON_FAIL(_emitNVVMLayoutByteAddress(
+                context,
+                builder,
+                module,
+                parameter,
+                offset,
+                childStorageType,
+                address));
+            SlangNVVMValueHandle input = address;
+            if (!child.isByValue())
+                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                    context,
+                    "numeric entry scalar load",
+                    builder.emitLoad(
+                        module,
+                        address,
+                        child.alignment,
+                        SLANG_NVVM_LOAD_FLAG_NONE,
+                        input)));
+            SlangNVVMValueHandle value = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                _emitNVVMEntryNumericDecode(context, builder, module, types, child, input, value));
+            elements.add(value);
+        }
+        SlangNVVMTypeHandle valueType = nullptr;
+        SLANG_RETURN_ON_FAIL(types.lowerType(layout.type, NVVMTypeUse::Value, valueType));
+        return _requireBuilderOperation(
+            context,
+            "numeric entry aggregate decode",
+            builder.emitAggregateConstruct(
+                module,
+                valueType,
+                elements.getBuffer(),
+                elements.getCount(),
+                outValue));
+    }
     SlangNVVMValueHandle storage = parameter;
     if (layout.isVector)
     {
@@ -9723,6 +9898,7 @@ SlangResult _emitNVVMEntryNumericDecode(
                 context,
                 builder,
                 module,
+                types,
                 layout.scalarType,
                 false,
                 lane,
@@ -9857,51 +10033,6 @@ SlangResult _emitNVVMValueRecipeStep(
         codeGenContext,
         step.diagnosticName,
         builder.emitValueOperation(module, step.getDesc(), operands, operandCount, outValue));
-}
-
-SlangResult _getNVVMRecipeIntegerConstant(
-    CodeGenContext* codeGenContext,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    uint32_t bitWidth,
-    int64_t value,
-    SlangNVVMValueHandle& outValue)
-{
-    SlangNVVMTypeHandle integerType = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "scalar intrinsic recipe integer type",
-        builder.getIntegerType(module, bitWidth, integerType)));
-    return _requireBuilderOperation(
-        codeGenContext,
-        "scalar intrinsic recipe integer constant",
-        builder.getIntegerConstant(module, integerType, value, outValue));
-}
-
-// Executes a retained byte displacement without interpreting the logical record layout.
-SlangResult _emitNVVMLayoutByteAddress(
-    CodeGenContext* context,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    SlangNVVMValueHandle base,
-    uint64_t offset,
-    SlangNVVMTypeHandle pointee,
-    SlangNVVMValueHandle& result)
-{
-    SlangNVVMValueHandle byteOffset = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        _getNVVMRecipeIntegerConstant(context, builder, module, 64, int64_t(offset), byteOffset));
-    if (!pointee)
-    {
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            context,
-            "layout address byte type",
-            builder.getIntegerType(module, 8, pointee)));
-    }
-    return _requireBuilderOperation(
-        context,
-        "layout field byte address",
-        builder.emitByteOffsetPointer(module, base, byteOffset, pointee, result));
 }
 
 // Loads or stores the selected scalar payload lanes. Three-lane vectors never access a fourth
@@ -11402,7 +11533,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             {
                 auto numeric =
                     requirements.emissionPlan.entryNumericParameters.tryGetValue(parameter);
-                if (numeric && numeric->isVector)
+                if (numeric && numeric->isByValue())
                 {
                     SlangNVVMTypeHandle parameterType = nullptr;
                     SlangNVVMTypeHandle storageType = nullptr;
@@ -11463,7 +11594,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                     parameterIndex,
                     parameter)));
             valueMap[param] = parameter;
-            if (function == entryPoint && asNVVMSupportedResourceStructType(param->getDataType()))
+            if (function == entryPoint && asNVVMSupportedResourceStructType(param->getDataType()) &&
+                !requirements.emissionPlan.entryNumericParameters.containsKey(param))
             {
                 entryAggregatePointerMap[param] = parameter;
             }
@@ -11513,12 +11645,12 @@ SlangResult emitNVVMIRFromLinkedIR(
         {
             hasHalfParameter =
                 hasHalfParameter ||
-                (function != entryPoint && getNVVMHalfHelperABILaneCount(param->getDataType()));
+                (function != entryPoint && hasNVVMHalfHelperABITransport(param->getDataType()));
             hasEntryAggregateValueParameter =
                 hasEntryAggregateValueParameter ||
                 (function == entryPoint &&
                  asNVVMSupportedResourceStructType(param->getDataType()) &&
-                 !asNVVMSupportedScalarStructType(param->getDataType()));
+                 !requirements.emissionPlan.entryNumericParameters.containsKey(param));
         }
         if (hasHalfParameter || hasEntryAggregateValueParameter || hasEntryNumericParameters)
         {
@@ -11551,13 +11683,14 @@ SlangResult emitNVVMIRFromLinkedIR(
         {
             for (auto param : function->getParams())
             {
-                if (!getNVVMHalfHelperABILaneCount(param->getDataType()))
+                if (!hasNVVMHalfHelperABITransport(param->getDataType()))
                     continue;
                 SlangNVVMValueHandle loweredValue = nullptr;
                 SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                     codeGenContext,
                     builder,
                     moduleScope.module,
+                    typeContext,
                     param->getDataType(),
                     false,
                     valueMap.getValue(param),
@@ -11575,7 +11708,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             for (auto param : function->getParams())
             {
                 if (!asNVVMSupportedResourceStructType(param->getDataType()) ||
-                    asNVVMSupportedScalarStructType(param->getDataType()))
+                    requirements.emissionPlan.entryNumericParameters.containsKey(param))
                     continue;
 
                 SlangNVVMValueHandle loweredPointer = valueMap.getValue(param);
@@ -12601,13 +12734,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                                         genericArgument)));
                                 loweredArgument = genericArgument;
                             }
-                            if (getNVVMHalfHelperABILaneCount(callee->getParamType(argumentIndex)))
+                            if (hasNVVMHalfHelperABITransport(callee->getParamType(argumentIndex)))
                             {
                                 SlangNVVMValueHandle physicalArgument = nullptr;
                                 SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
+                                    typeContext,
                                     callee->getParamType(argumentIndex),
                                     true,
                                     loweredArgument,
@@ -12629,12 +12763,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 size_t(loweredArguments.getCount()),
                                 physicalValue)));
                         SlangNVVMValueHandle loweredValue = physicalValue;
-                        if (getNVVMHalfHelperABILaneCount(call->getDataType()))
+                        if (hasNVVMHalfHelperABITransport(call->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
+                                typeContext,
                                 call->getDataType(),
                                 false,
                                 physicalValue,
@@ -12956,6 +13091,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
+                                    typeContext,
                                     function,
                                     "named LLVM intrinsic return",
                                     value));
@@ -13191,18 +13327,11 @@ SlangResult emitNVVMIRFromLinkedIR(
                         NVVMStructFieldSelection resolvedField;
                         SLANG_RELEASE_ASSERT(_getNVVMStructFieldValue(fieldExtract, resolvedField));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        // CUDA kernel structs are pointer-backed `byval` parameters, but `IRParam`
-                        // also represents phi values in later blocks. Consider an interface value
-                        // selected by an `if`: existential lowering sends each tagged tuple to a
-                        // merge-block parameter, then extracts its tag. That tuple is an ordinary
-                        // first-class aggregate, not part of the launch ABI. Only a parameter owned
-                        // by the entry block received the pointer representation and `byval`
-                        // attributes above.
+                        // Only entries retained in the physical pointer map use direct field
+                        // addresses. Numeric entries have already been decoded to semantic values;
+                        // merge-block parameters likewise never use the launch-storage path.
                         const bool isPointerBackedEntryParameter =
-                            function == entryPoint && as<IRParam>(fieldExtract->getBase()) &&
-                            fieldExtract->getBase()->getParent() == function->getFirstBlock() &&
-                            asNVVMSupportedResourceStructType(
-                                fieldExtract->getBase()->getDataType());
+                            entryAggregatePointerMap.containsKey(fieldExtract->getBase());
                         if (isPointerBackedEntryParameter)
                         {
                             SlangNVVMValueHandle loweredBase =
@@ -13665,6 +13794,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             builder,
                             moduleScope.module,
+                            typeContext,
                             function,
                             _usesGenericNVVMFunctions(function) ? "generic value return"
                                                                 : "signed i32 return",

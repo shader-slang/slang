@@ -7,6 +7,12 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
+**Application feature work resumed on 2026-10-02:** the maintainer approved continuing the
+SlangPy-derived priorities. Fixed numeric aggregate entry ABI and byval entry-record forwarding
+are accepted together; continue with resource/helper transport and checked address/layout families,
+then normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
+Use affected application selections plus smoke between deliberately chosen full checkpoints.
+
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout
 against local Slang and RHI, verify explicit NVVM execution, run its complete CUDA-selected Python
 suite, and group failures into complete feature families. This work proceeds independently of the

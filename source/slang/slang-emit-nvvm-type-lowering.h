@@ -37,6 +37,10 @@ bool isNVVMFloat16Type(IRInst* type);
 /// Only helper parameters/results use this count to select integer bit transport.
 uint32_t getNVVMHalfHelperABILaneCount(IRInst* type);
 
+/// Returns whether a numeric helper value contains Half lanes requiring integer ABI transport.
+bool hasNVVMHalfHelperABITransport(IRInst* type);
+
+
 /// Returns whether `type` is canonical scalar BF16, distinct from every IEEE format.
 bool isNVVMBFloat16Type(IRInst* type);
 
@@ -401,7 +405,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field);
 /// Returns the canonical pointer produced by selected structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
-/// Records CUDA launch storage independently of the ordinary scalar/vector SSA representation.
+/// Records CUDA launch storage independently of the ordinary numeric SSA representation.
 struct NVVMEntryNumericLayout
 {
     IRType* type = nullptr;
@@ -414,6 +418,14 @@ struct NVVMEntryNumericLayout
     bool isVector = false;
     bool isBoolean = false;
     bool isHalf = false;
+    // Arrays retain one element plan and a stride; records retain one plan per semantic field.
+    List<NVVMEntryNumericLayout> children;
+    List<uint32_t> fieldOffsets;
+    uint32_t elementCount = 0;
+    uint32_t elementStride = 0;
+
+    bool isAggregate() const { return children.getCount() != 0; }
+    bool isByValue() const { return isVector || isAggregate(); }
 };
 
 /// Selects a finite numeric entry carrier using the same CUDA layout rules as reflection.
@@ -465,6 +477,7 @@ struct NVVMTypeInfo
     bool isFloat32 = false;
     bool isBool = false;
     bool isHelperValue = false;
+    bool isCopyableValue = false;
     bool isSubstandardRecord = false;
     bool isLocalSubstandardRecordArray = false;
     IRPtrTypeBase* localRecordArrayReference = nullptr;

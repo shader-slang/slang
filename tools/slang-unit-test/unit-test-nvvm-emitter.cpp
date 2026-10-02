@@ -8482,6 +8482,7 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
     const SlangNVVMValueTypeDesc signedI8Operands[] = {signedI8, signedI8};
     const SlangNVVMValueTypeDesc unsignedI8 = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 8, 1};
     const SlangNVVMValueTypeDesc storageBoolLoadOperands[] = {unsignedI8, unsignedI8};
+    const SlangNVVMValueTypeDesc halfDecodeOperands[] = {NVVMSemantics::kUnsignedI16};
     const SlangNVVMValueTypeDesc storageBoolStoreOperands[] = {NVVMSemantics::kBool};
 
     struct CapabilityCase
@@ -8491,6 +8492,21 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
         const char* diagnosticName;
     };
     const CapabilityCase cases[] = {
+        {
+            "struct Payload { half values[2]; }; RWStructuredBuffer<float> destination; "
+            "[numthreads(1,1,1)] void computeMain(uniform Payload payload[2]) { "
+            "destination[0] = float(payload[1].values[1]); }",
+            {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, NVVMSemantics::kFloat16, halfDecodeOperands, 1},
+            "canonical Half helper ABI decoding",
+        },
+        {
+            "struct Payload { bool flags[2]; half values[2]; }; "
+            "RWStructuredBuffer<uint> destination; "
+            "[numthreads(1,1,1)] void computeMain(uniform Payload payload[2]) { "
+            "destination[0] = uint(payload[1].flags[1]); }",
+            {SLANG_NVVM_VALUE_OP_NOT_EQUAL, NVVMSemantics::kBool, storageBoolLoadOperands, 2},
+            "numeric entry Boolean decode",
+        },
         {
             "struct Payload { bool flags[2]; float3 value; }; "
             "StructuredBuffer<Payload> source; RWStructuredBuffer<uint> destination; "

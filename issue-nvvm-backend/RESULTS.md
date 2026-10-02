@@ -1653,3 +1653,29 @@ For selected NVRTC comparisons, use the same build and exact test IDs in a fresh
 The five route checks cover helper/direct/custom sessions and missing/invalid selection. RHI
 internal direct NVRTC kernels are outside this SlangPy-session selection claim. Broad runs remain
 on demand; keep failure histories and use focused families between checkpoints.
+
+### Numeric aggregate entry and helper qualification
+
+The maintained `aggregate-entry-abi.cuda` sibling RHI fixture covers recursive numeric launch
+storage and byval helper forwarding, including mixed Half/non-Half records. Each selected test
+runs O0/O3 internally; use the same local build and library environment as the optional RHI workflow:
+
+```sh
+build/nvvm-rhi-cuda/rhi-build/RelWithDebInfo/slang-rhi-tests \
+  --select-devices=cuda --require-devices=cuda --cuda-compiler=nvvm \
+  --test-case=aggregate-entry-abi.cuda
+```
+
+Repeat with `--cuda-compiler=nvrtc` for comparison. Both routes pass 2,089 assertions; doctest's
+955 unselected registrations are not runtime skips. Static `nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides`
+checks compact float3 packing, nested arrays, matching/mismatched explicit strides and invalid extents.
+The existing numeric carrier and Half cache-order checks remain applicable. Fifteen focused units
+include denied nested Bool/Half conversions before module/program creation. All 16 smoke cells pass.
+
+The affected SlangPy invocation and exact node list are retained in
+`build/nvvm-entry-aggregate/slangpy-affected-1.json` and `slangpy-selection.txt`; the maintained
+[SlangPy manifest](slangpy-cuda-status.json) owns the mixed-age current outcomes. The 427-node
+selection resolves 30 original failures. Do not relabel unchanged full-run outcomes as fresh.
+The original mixed column-major matrix fixtures and both failed route logs remain under the same
+raw-evidence directory. They identify a shared entry reflection/physical-layout mismatch; current
+qualification uses explicit row-major matrices. No full campaign was rerun for this batch.

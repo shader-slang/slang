@@ -458,12 +458,44 @@ SLANG_UNIT_TEST(nvvmNumericEntryCarriersPreserveCudaPacking)
     for (auto type :
          {ir.getType(kIROp_BFloat16Type),
           ir.getType(kIROp_FloatE4M3Type),
-          ir.getType(kIROp_FloatE5M2Type),
-          static_cast<IRType*>(
-              ir.getArrayType(ir.getFloatType(), ir.getIntValue(ir.getIntType(), 3)))})
+          ir.getType(kIROp_FloatE5M2Type)})
     {
         NVVMEntryNumericLayout layout;
         SLANG_CHECK(!getNVVMEntryNumericLayout(&context.codeGen, type, layout));
         SLANG_CHECK(!isNVVMSupportedParameterType(type));
     }
+}
+
+
+SLANG_UNIT_TEST(nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    auto count = ir.getIntValue(ir.getIntType(), 2);
+    auto float3 = ir.getVectorType(ir.getFloatType(), 3);
+    auto compact = ir.getArrayType(float3, count);
+    NVVMEntryNumericLayout layout;
+    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, compact, layout));
+    SLANG_CHECK(layout.size == 24 && layout.alignment == 4 && layout.elementStride == 12);
+    SLANG_CHECK(layout.elementCount == 2 && layout.children.getCount() == 1);
+    SLANG_CHECK(layout.children[0].laneCount == 3);
+    auto padded = ir.getArrayType(float3, count, ir.getIntValue(ir.getIntType(), 16));
+    SLANG_CHECK(isNVVMSupportedCopyableValueType(padded));
+    SLANG_CHECK(!getNVVMEntryNumericLayout(&context.codeGen, padded, layout));
+    auto scalar = ir.getArrayType(ir.getFloatType(), count, ir.getIntValue(ir.getIntType(), 4));
+    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, scalar, layout));
+    SLANG_CHECK(layout.size == 8 && layout.elementStride == 4);
+    auto nested = ir.getArrayType(compact, count);
+    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, nested, layout));
+    SLANG_CHECK(layout.size == 48 && layout.elementStride == 24);
+    SLANG_CHECK(!getNVVMEntryNumericLayout(
+        &context.codeGen,
+        ir.getArrayType(ir.getFloatType(), ir.getIntValue(ir.getIntType(), 0)),
+        layout));
+    SLANG_CHECK(!getNVVMEntryNumericLayout(
+        &context.codeGen,
+        ir.getArrayType(ir.getDoubleType(), ir.getIntValue(ir.getIntType(), UINT32_MAX)),
+        layout));
 }

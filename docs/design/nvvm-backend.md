@@ -390,6 +390,14 @@ body. For example, double3 consumes 24 bytes rather than LLVM vector storage's 3
 consumes four half storage lanes while decoding only three semantic lanes. This representation
 has its own cache and does not alter helper, local or resource storage.
 
+Fixed numeric arrays and records extend this entry plan recursively. Arrays retain one child plan
+and their CUDA stride; records retain child plans and checked field offsets. Explicit array strides
+must match the selected CUDA layout. Aggregates use exactly sized byval byte carriers with CUDA
+alignment. Entry decoding reads only semantic lanes and constructs canonical SSA arrays/records
+before helper calls or field extraction. The existing copyable-value classifier owns numeric
+admission; resource-bearing entries keep their separate checked pointer representation. A physical
+entry address is never used as an ordinary aggregate value.
+
 Byte/structured buffer entry values retain pointer-plus-count storage, with bytes for byte buffers
 and elements for structured buffers. A checked equivalent-structured-view plan selects the element
 stride, reinterprets the pointer and divides the byte extent by that stride. A UInt32 view is not
@@ -403,9 +411,13 @@ format provenance or unsupported resource operations.
 Half helper parameters/results use physical i16 scalars or `<N x i16>` vectors for admitted widths
 2–4, while body values remain canonical Half. Callers encode arguments, callees decode parameters,
 returns encode results and callers decode them, using bit-preserving reinterpretation.
-`getNVVMHalfHelperABILaneCount` selects the same shapes at all four crossings. Preflight requires
-both exact conversion directions before provider mutation. This avoids a qualified libNVVM O3
-Half-vector call-transfer defect without changing arithmetic or storage admission.
+`getNVVMHalfHelperABILaneCount` selects leaf shapes; `hasNVVMHalfHelperABITransport` extends the
+same transport recursively to numeric arrays and records containing Half. Aggregate crossings
+extract and reconstruct values, converting only Half leaves and retaining non-Half children.
+The helper ABI cache remains separate from canonical Value and Storage representations. Preflight
+requires both exact conversion directions before provider mutation. This avoids qualified libNVVM
+O3 Half-vector and nested Half-record call-transfer defects without changing arithmetic or storage
+admission. Resource-bearing records are outside this numeric transport contract.
 
 Exported Half helpers retain the tested direct-NVVM PTX symbols and layout, including a half4-to-half3
 boundary. The independent PTX caller checks semantic lanes and ignores unspecified return padding.

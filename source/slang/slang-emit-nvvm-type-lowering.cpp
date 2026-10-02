@@ -578,6 +578,21 @@ bool isNVVMSupportedCopyableValueType(IRInst* type)
     return _isNVVMSupportedCopyableValueType(type, activeTypes);
 }
 
+bool hasNVVMHalfHelperABITransport(IRInst* type)
+{
+    if (getNVVMHalfHelperABILaneCount(type))
+        return true;
+    if (!isNVVMSupportedCopyableValueType(type))
+        return false;
+    if (auto array = as<IRArrayType>(type))
+        return hasNVVMHalfHelperABITransport(array->getElementType());
+    if (auto record = as<IRStructType>(type))
+        for (auto field : record->getFields())
+            if (hasNVVMHalfHelperABITransport(field->getFieldType()))
+                return true;
+    return false;
+}
+
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type)
 {
     auto structType = as<IRStructType>(type);
@@ -2163,8 +2178,55 @@ bool getNVVMEntryNumericLayout(
     NVVMEntryNumericLayout& outLayout)
 {
     outLayout = {};
-    if (!context || !isNVVMSupportedValueType(type))
+    if (!context || !isNVVMSupportedCopyableValueType(type))
         return false;
+    IRSizeAndAlignment aggregateLayout;
+    auto rules = IRTypeLayoutRules::getCUDA();
+    if (SLANG_FAILED(getSizeAndAlignment(context->getTargetReq(), rules, type, &aggregateLayout)) ||
+        aggregateLayout.size <= 0 || aggregateLayout.size > UINT32_MAX ||
+        aggregateLayout.alignment <= 0 || aggregateLayout.alignment > 16)
+        return false;
+    outLayout.type = type;
+    outLayout.size = uint32_t(aggregateLayout.size);
+    outLayout.alignment = uint32_t(aggregateLayout.alignment);
+    if (auto array = as<IRArrayType>(type))
+    {
+        NVVMEntryNumericLayout element;
+        if (!getNVVMEntryNumericLayout(context, array->getElementType(), element))
+            return false;
+        auto elementLayout =
+            rules->alignCompositeElement(IRSizeAndAlignment(element.size, int(element.alignment)));
+        const auto stride = elementLayout.getStride();
+        const auto count = cast<IRIntLit>(array->getElementCount())->getValue();
+        if (auto explicitStride = array->getArrayStride())
+        {
+            auto literal = as<IRIntLit>(explicitStride);
+            if (!literal || literal->getValue() != stride)
+                return false;
+        }
+        if (stride <= 0 || stride > UINT32_MAX ||
+            uint64_t(stride) * uint64_t(count - 1) + element.size != outLayout.size)
+            return false;
+        outLayout.elementCount = uint32_t(count);
+        outLayout.elementStride = uint32_t(stride);
+        outLayout.children.add(element);
+        return true;
+    }
+    if (auto record = as<IRStructType>(type))
+    {
+        for (auto field : record->getFields())
+        {
+            NVVMEntryNumericLayout child;
+            IRIntegerValue offset = 0;
+            if (!getNVVMEntryNumericLayout(context, field->getFieldType(), child) ||
+                SLANG_FAILED(getOffset(context->getTargetReq(), rules, field, &offset)) ||
+                offset < 0 || uint64_t(offset) + child.size > outLayout.size)
+                return false;
+            outLayout.children.add(child);
+            outLayout.fieldOffsets.add(uint32_t(offset));
+        }
+        return outLayout.isAggregate();
+    }
     auto vector = asNVVMSupportedValueVectorType(type);
     IRType* scalar = vector ? vector->getElementType() : type;
     IRSizeAndAlignment layout;
@@ -2675,9 +2737,8 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
         return isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
                localHelperPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue;
     case NVVMTypeUse::EntryPointParameter:
-        return isInteger || isFloatingPoint || isBool || valueVectorType || resourceStructType ||
-               deviceNumericPointer || deviceArrayPointer || isRawBuffer || isSampledTexture ||
-               isSurface || samplerValue ||
+        return isCopyableValue || resourceStructType || deviceNumericPointer ||
+               deviceArrayPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue ||
                (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
         return isHelperValue || resourceStructType || localResourceStructPointer ||
@@ -2773,12 +2834,12 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
     info.devicePhysicalStoragePointer =
         asNVVMSupportedDevicePhysicalStoragePointerType(type, &info.devicePhysicalStorageValueType);
     info.isHelperValue = isNVVMSupportedHelperValueType(type);
+    info.isCopyableValue = isNVVMSupportedCopyableValueType(type);
     info.isSubstandardRecord = asNVVMSupportedSubstandardRecordType(type) != nullptr;
     info.isLocalSubstandardRecordArray =
         asNVVMSupportedLocalSubstandardRecordArrayType(type) != nullptr;
     info.localRecordArrayReference = asNVVMSupportedLocalRecordArrayReferenceType(type);
-    info.isPointerBearingHelperValue =
-        info.isHelperValue && !isNVVMSupportedCopyableValueType(type);
+    info.isPointerBearingHelperValue = info.isHelperValue && !info.isCopyableValue;
     info.deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
     info.fixedCopyableArrayType = asNVVMSupportedCopyableArrayType(type);
     info.fixedHelperArrayType = asNVVMSupportedHelperArrayType(type);
@@ -2827,6 +2888,27 @@ SlangResult NVVMTypeLoweringContext::lowerEntryNumericType(
     SlangNVVMTypeHandle& outParameterType,
     SlangNVVMTypeHandle& outStorageType)
 {
+    if (layout.isAggregate())
+    {
+        // CUDA offsets need not match LLVM's value layout (for example float3 fields).
+        // An opaque byte carrier preserves the reflected size; the checked plan decodes fields.
+        SlangNVVMTypeHandle byteType = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric aggregate entry byte type",
+            m_builder.getIntegerType(m_module, 8, byteType)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric aggregate entry storage",
+            m_builder.getArrayType(m_module, byteType, layout.size, outStorageType)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric aggregate entry pointer",
+            m_builder.getPointerType(
+                m_module,
+                outStorageType,
+                SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+                outParameterType)));
+        m_entryParameterRepresentationMap[layout.type] = outParameterType;
+        return SLANG_OK;
+    }
     SlangNVVMTypeHandle scalarType = nullptr;
     if (layout.isBoolean || layout.isHalf)
     {
@@ -3094,10 +3176,51 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return SLANG_OK;
     }
 
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
+        hasNVVMHalfHelperABITransport(type))
+    {
+        // The same libNVVM Half call defect applies recursively to records and arrays.
+        // Retain canonical values inside the function; only its signature uses integer leaves.
+        if (auto mapped = m_helperABIRepresentationMap.tryGetValue(type))
+        {
+            outType = *mapped;
+            return SLANG_OK;
+        }
+        if (auto array = as<IRArrayType>(type))
+        {
+            SlangNVVMTypeHandle element = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                lowerType(array->getElementType(), NVVMTypeUse::HelperParameter, element));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "Half aggregate helper array type",
+                m_builder.getArrayType(
+                    m_module,
+                    element,
+                    uint32_t(cast<IRIntLit>(array->getElementCount())->getValue()),
+                    outType)));
+        }
+        else
+        {
+            List<SlangNVVMTypeHandle> fields;
+            for (auto field : cast<IRStructType>(type)->getFields())
+            {
+                SlangNVVMTypeHandle lowered = nullptr;
+                SLANG_RETURN_ON_FAIL(
+                    lowerType(field->getFieldType(), NVVMTypeUse::HelperParameter, lowered));
+                fields.add(lowered);
+            }
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "Half aggregate helper record type",
+                m_builder.getStructType(m_module, fields.getBuffer(), fields.getCount(), outType)));
+        }
+        m_helperABIRepresentationMap[type] = outType;
+        return SLANG_OK;
+    }
+
     // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
     // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.
     // Keep this physical ABI representation separate from the canonical value-type cache.
-    if (use == NVVMTypeUse::EntryPointParameter && isNVVMSupportedValueType(type))
+    if (use == NVVMTypeUse::EntryPointParameter && typeInfo.isCopyableValue)
     {
         NVVMEntryNumericLayout layout;
         if (!getNVVMEntryNumericLayout(m_codeGenContext, type, layout))

@@ -47,11 +47,28 @@ repair, all 13 final targeted controls pass. The original full run's six asset f
 the order-sensitive command-buffer cleanup assertion is retained separately from its isolated
 entry-parameter rejection. Do not infer full NVRTC acceptance from representative comparisons.
 
-Next complete families, in order: fixed numeric aggregate entry ABI (408 first diagnostics,
-including generated grid arrays); byval entry-record forwarding (12 value-call failures);
-resource helper wrappers/arrays and checked layout; normalized surface conversions (50 imageStore
-failures); intrinsic TensorView/DiffTensorView ABI and operations. Diagnostic clusters can hide
-later gaps, so these counts are not promised gains. Preserve type roles and address provenance.
+The first two priorities are now accepted: fixed numeric aggregate entry ABI and byval numeric
+record forwarding. One recursive CUDA layout plan decodes launch storage into canonical values;
+nested Half records also use the established integer helper transport at all four call boundaries.
+The complete numeric fixture passes at O0/O3 on NVVM and NVRTC (2,089 assertions per route).
+Fifteen focused units, four static checks and all 16 smoke cells pass. Builds use eight jobs.
+
+The affected SlangPy selection passes 37 and fails 390 of 427 nodes: **30 previous failures resolve**,
+including all 12 value-call failures. Remaining selected diagnostics are 353 entry-parameter
+rejections and 37 sequential-element-pointer rejections. These expose pointer/resource shapes
+outside numeric admission. The maintained mixed-age inventory is **1,084 pass / 506 fail / 807 skip /
+3 expected failures**; the full run above retains its original identity and counts. This was a focused
+rerun, not a fresh full application checkpoint. Exact transitions and evidence are in the manifest.
+
+Next complete families: resource helper wrappers/arrays and checked address/layout, normalized
+surface conversions (50 imageStore failures), then intrinsic TensorView/DiffTensorView ABI and
+operations. Reduce the remaining entry and pointer shapes before widening admission. Preserve type
+roles and address provenance.
+
+Open shared issue: column-major entry matrix reflection disagrees with CUDA's row-array physical
+representation. Both routes fail 11 lanes per optimization in the retained mixed-matrix fixture;
+explicit row-major non-square cases pass. Keep this separate from resource-buffer matrix layout.
+Raw focused evidence is under `build/nvvm-entry-aggregate/`.
 The legacy OptiX8 HitObject semantic decision remains parked independently of this backlog.
 
 ## Current full acceptance
@@ -107,7 +124,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Subsequent implementations have passed focused review; [focused evidence](focused-evidence.json)
-now contains 87 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 88 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:

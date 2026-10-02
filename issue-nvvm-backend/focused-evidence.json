@@ -90780,6 +90780,255 @@
         "interpretation": "8.0/8.1 incomingRayFlags returns0 after both immediateTraverse/Invoke and explicitconstruction/Invoke.9 preservesflags and skipsCH forflag8; ordinaryTrace controls preserveflags and suppressCH onall3. This is empiricalSDKversionbehavior, not proof of Vulkan/D3D standaloneInvoke suppression. Modern8.x flagvisibility requires a crossstageABI decision; no productionlegacyimplementation enabled.",
         "pending": "Choose modern semantics with a privatecontextABI preserving32payloadwords, or explicitly accept/document native8Invoke differences. Attribute budget and full topology reconstruction still require qualification."
       }
+    },
+    "nvvm-numeric-aggregate-entry": {
+      "status": "accepted-focused",
+      "scope": "Complete finite numeric fixed-array/record entry ABI and semantic byval forwarding; recursive Half integer helper transport. Resource/pointer-bearing and intrinsic TensorView families remain separate.",
+      "identity": {
+        "path": "build/nvvm-entry-aggregate/identity.json",
+        "sha256": "d498fda61b1689e3111063e978aa303f16ab9d1fc70d6ed70de020180be0ffbb"
+      },
+      "validation": {
+        "build-1": {
+          "path": "build/nvvm-entry-aggregate/build-1.json",
+          "sha256": "f62846a747dbc3ea30e49c7ec4981f9a6fe81b3225b9f088439c0ae5721df549",
+          "return_code": 1,
+          "elapsed_seconds": 29.95109224319458
+        },
+        "build-2": {
+          "path": "build/nvvm-entry-aggregate/build-2.json",
+          "sha256": "a37b704c662d67bb495fbdd0b0b7cd7efa914aa9479313951b3ebad4c8fd3f2f",
+          "return_code": 0,
+          "elapsed_seconds": 52.2179639339447
+        },
+        "build-3": {
+          "path": "build/nvvm-entry-aggregate/build-3.json",
+          "sha256": "9e8cce638abeaa77e2782370241fa22f107fd7510de6ee62bdccdb21b40f6356",
+          "return_code": 0,
+          "elapsed_seconds": 35.23004150390625
+        },
+        "build-final": {
+          "path": "build/nvvm-entry-aggregate/build-final.json",
+          "sha256": "1c364173130a84bf54723600b0581801be4e51fb93028ca93c3fdcd32be13f33",
+          "return_code": 0,
+          "elapsed_seconds": 32.606964349746704
+        },
+        "rhi-build-1": {
+          "path": "build/nvvm-entry-aggregate/rhi-build-1.json",
+          "sha256": "b85ca7f925a753d4ce75a817d325059d7c443e9f10d7d223f9a09474da661ee2",
+          "return_code": 0,
+          "elapsed_seconds": 3.5335159301757812
+        },
+        "rhi-build-2": {
+          "path": "build/nvvm-entry-aggregate/rhi-build-2.json",
+          "sha256": "0e6c224308b1d7fe744489b0ea96b1608c648087b216d1f310ed977a204323ea",
+          "return_code": 0,
+          "elapsed_seconds": 3.5658743381500244
+        },
+        "rhi-build-final": {
+          "path": "build/nvvm-entry-aggregate/rhi-build-final.json",
+          "sha256": "31c380605b29578eff6dd772974e30cc7154cf5cc463379e1027a5b12ca70727",
+          "return_code": 0,
+          "elapsed_seconds": 3.662942886352539
+        },
+        "rhi-nvrtc-1": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvrtc-1.json",
+          "sha256": "d9be495ebb65f273fde59aef1542b9ff9cde6da39b0857faa35739cf76d76599",
+          "return_code": 1,
+          "elapsed_seconds": 3.197354555130005
+        },
+        "rhi-nvrtc-2": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvrtc-2.json",
+          "sha256": "83984df45f9eaa47cdbc559e5eb496ada81898ee7425816ee278a29dc2f1cbab",
+          "return_code": 0,
+          "elapsed_seconds": 2.6949572563171387
+        },
+        "rhi-nvrtc-final": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvrtc-final.json",
+          "sha256": "15b6273acd3563fcf54975b2e49467e14fed27a430b1db5544d110788be3b552",
+          "return_code": 0,
+          "elapsed_seconds": 3.0991363525390625
+        },
+        "rhi-nvvm-1": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvvm-1.json",
+          "sha256": "485cdd1e7240282414e0771dbd2c8ac43cd662f2faababa04b2b9c4d8cd578a1",
+          "return_code": 1,
+          "elapsed_seconds": 7.376116037368774
+        },
+        "rhi-nvvm-2": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvvm-2.json",
+          "sha256": "17183227173ec0abdf05349bbc1daef2a007da294d657e0f055e5cedf3ff660d",
+          "return_code": 0,
+          "elapsed_seconds": 7.947938442230225
+        },
+        "rhi-nvvm-final": {
+          "path": "build/nvvm-entry-aggregate/rhi-nvvm-final.json",
+          "sha256": "b2871490b43adbd7c4be87d802b32cc07a7966846153f7ef378f1cf08899e36c",
+          "return_code": 0,
+          "elapsed_seconds": 4.984256982803345
+        },
+        "slangpy-affected-1": {
+          "path": "build/nvvm-entry-aggregate/slangpy-affected-1.json",
+          "sha256": "79180b67a7c1b59ed8d0d3de5c6980cc7992c2c19ac2e160da73e45a2e039fd8",
+          "return_code": 1,
+          "elapsed_seconds": 39.34583067893982
+        },
+        "slangpy-initial": {
+          "path": "build/nvvm-entry-aggregate/slangpy-initial.json",
+          "sha256": "e190096829221f6e297b815c7bf7276b462ef34ac0a18167b537fc8ec1e41944",
+          "return_code": 1,
+          "elapsed_seconds": 6.656737804412842
+        },
+        "smoke-gate": {
+          "path": "build/nvvm-entry-aggregate/smoke-gate.json",
+          "sha256": "5528dbc89947c73c6e579ab418a86fc325a629b5405982ff895842f508792034",
+          "return_code": 0,
+          "elapsed_seconds": 22.234993934631348
+        },
+        "static-build-1": {
+          "path": "build/nvvm-entry-aggregate/static-build-1.json",
+          "sha256": "143a9ee82e0647f0b7e8eebe63e65f890cc360f8de4034a59a6b1ace0278388b",
+          "return_code": 0,
+          "elapsed_seconds": 355.5911157131195
+        },
+        "static-nvvmHalfVectorBoundaryRolesIgnoreCacheOrder": {
+          "path": "build/nvvm-entry-aggregate/static-nvvmHalfVectorBoundaryRolesIgnoreCacheOrder.json",
+          "sha256": "deef19f77fcac17d57199d8f8661d4a799284aefe54c129ba72d3cb4b89164ef",
+          "return_code": 0,
+          "elapsed_seconds": 0.29327964782714844
+        },
+        "static-nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides": {
+          "path": "build/nvvm-entry-aggregate/static-nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides.json",
+          "sha256": "ba0ac2b7cafbc731b2f6a3a6a2806519bf3f7c3b70c058149c7ff2812cad7777",
+          "return_code": 0,
+          "elapsed_seconds": 7.060680627822876
+        },
+        "static-nvvmNumericEntryCarriersPreserveCudaPacking": {
+          "path": "build/nvvm-entry-aggregate/static-nvvmNumericEntryCarriersPreserveCudaPacking.json",
+          "sha256": "777a38659c4e615018823e254a109ae75ce7e22c27f5cc3286118498563eedab",
+          "return_code": 0,
+          "elapsed_seconds": 0.25882554054260254
+        },
+        "static-nvvmScalarHalfBoundaryRolesIgnoreCacheOrder": {
+          "path": "build/nvvm-entry-aggregate/static-nvvmScalarHalfBoundaryRolesIgnoreCacheOrder.json",
+          "sha256": "084ec17cd72352d2702457fefbec8870a8d25b01a50cafac8b5e71e6e4eea7b6",
+          "return_code": 0,
+          "elapsed_seconds": 0.262007474899292
+        },
+        "unit-build-1": {
+          "path": "build/nvvm-entry-aggregate/unit-build-1.json",
+          "sha256": "9924dd0ddeb48e2c8c7dc29c7268785588bc5f09d5d72aa5fd4a8dadea6ec4d0",
+          "return_code": 0,
+          "elapsed_seconds": 20.92032742500305
+        },
+        "units-1": {
+          "path": "build/nvvm-entry-aggregate/units-1.json",
+          "sha256": "c5d344d9674277f70dc6a716e200f3fe48a05d0049bf72d55a29fa9834032291",
+          "return_code": 0,
+          "elapsed_seconds": 10.330238342285156
+        }
+      },
+      "outcomes": {
+        "units": {
+          "passed": 15
+        },
+        "static": {
+          "passed": 4
+        },
+        "rhi_final": {
+          "nvvm": {
+            "passed": 1,
+            "assertions": 2089,
+            "optimization_levels": ["O0", "O3"],
+            "runtime_skips": 0,
+            "unselected_registrations": 955
+          },
+          "nvrtc": {
+            "passed": 1,
+            "assertions": 2089,
+            "optimization_levels": ["O0", "O3"],
+            "runtime_skips": 0,
+            "unselected_registrations": 955
+          }
+        },
+        "rhi_controls": {
+          "passed": 3,
+          "assertions": 3887,
+          "identity": "rhi-nvvm-2 before added mixed-record coverage; existing numeric/resource fixture semantics unchanged"
+        },
+        "slangpy": {
+          "selected": 427,
+          "passed": 37,
+          "failed": 390,
+          "resolved_previous_failures": 30,
+          "remaining_entry_failures": 353,
+          "remaining_sequential_pointer_failures": 37,
+          "manifest": "issue-nvvm-backend/slangpy-cuda-status.json"
+        },
+        "smoke": {
+          "passed": 16,
+          "regressions": 0,
+          "input_changes": 0,
+          "selection": {
+            "path": "build/nvvm-entry-aggregate/smoke/selection.json",
+            "sha256": "4779b63a4cb417517f34674d1f93941218bd124a5a47845e575344f54a4f27fd"
+          }
+        }
+      },
+      "contracts": [
+        "Shared numeric copyable analysis owns admission; checked recursive CUDA offsets/strides own entry decoding. Explicit strides must agree with CUDA packing; empty/oversized carriers reject.",
+        "Entry byte carriers materialize canonical SSA aggregates before helper calls and FieldExtract; nonnumeric resource entries retain checked physical pointers.",
+        "Numeric aggregate Half leaves use i16 helper transport at all four call boundaries. Canonical Value/Storage caches remain distinct; non-Half siblings unchanged. No new resource-bearing Half contract.",
+        "Nested Bool/Half unsupported operations reject before createModule/createProgram. Static stride tests separately prove pure planner rejection.",
+        "Twelve scalar families,vector2/3/4,nested arrays/records,mixedHalf/nonHalf,row-major nonsquare matrices,adjacent parameter/output guards qualified atO0/O3. No universal NVRTC oracle."
+      ],
+      "failure_history": [
+        {
+          "attempt": "build-1",
+          "status": "resolved",
+          "detail": "Moved byte-address helper required moving its existing integer constant helper declaration first; build-2 passes."
+        },
+        {
+          "attempt": "rhi-nvvm-1",
+          "status": "partially resolved",
+          "detail": "60 assertion failures:38 nestedHalf O3 lanes fixed by recursive existing integer helper transport;22 matrix lanes shared with NVRTC remain an open entry reflection/ABI defect."
+        },
+        {
+          "attempt": "rhi-nvrtc-1",
+          "status": "open-shared",
+          "detail": "22 matrix assertions:11 per optimization. Column-major float3x2 reflection uses2float3columns/alignment4 while CUDA Matrix uses3float2rows/alignment8. Retained original fixtures; no resource-buffer layout change.",
+          "inputs": [
+            {
+              "path": "build/nvvm-entry-aggregate/fixture-mixed-matrix.cpp",
+              "sha256": "ffd6e7accd81d03d214544fcdb8a1041d4cf9daf8f7b7721a636696df35ebd3a"
+            },
+            {
+              "path": "build/nvvm-entry-aggregate/fixture-mixed-matrix.slang",
+              "sha256": "3f77f752f1714599a4ab04c32c6505c640f58b70958c26bae30086049abcc051"
+            }
+          ]
+        },
+        {
+          "attempt": "slangpy-initial",
+          "status": "resolved-selected-family",
+          "detail": "34pass7fail3skip initial selection; remaining tensor entry rejections not fixed by numeric-only admission. Broader427selection provides authoritative focused outcomes."
+        },
+        {
+          "attempt": "static-gate-path",
+          "status": "setup-resolved",
+          "detail": "Initial runner invocation used a relative evidence prefix; gate rejected before any test. Corrected to required absolute path."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "No remaining correctness blockers. Explicit stride guard and mixed Half/non-Half runtime coverage address review gaps. Shared matrix issue and remaining application diagnostics retained."
+      },
+      "limits": [
+        "Focused qualification, not a new full corpus/RHI/SlangPy checkpoint.",
+        "BF16/FP8 entry types, unsupported pointers/resources, zero-size aggregates and column-major entry matrix ABI remain outside qualified scope.",
+        "Source and fixture formatting changed after final build/run only in whitespace; compiler source hashes and binary identities retained separately."
+      ],
+      "accepted_rhi_commit": "ed95db5f0522d1aad564e6171c1c526e79f42508"
     }
   }
 }
