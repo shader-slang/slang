@@ -133,7 +133,7 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
         sb << "ref";
         break;
     case ParamPassingMode::RefReadOnly:
-        sb << "const ref";
+        sb << "readonly ref";
         break;
     case ParamPassingMode::RefWriteOnly:
         sb << "writeonly ref";

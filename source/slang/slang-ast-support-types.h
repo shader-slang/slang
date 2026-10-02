@@ -1887,8 +1887,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a mutable memory location.
         ///
-        /// Indicated by using the `ref` modifier on a parameter
-        /// (without also using `const`).
+        /// Indicated by using the `ref` modifier on a parmater
+        /// (without also using the `readonly` or `writeonly` modifiers).
         ///
         /// Must be implemented by directly passing a reference to
         /// the memory location of the argument. It is an error if
@@ -1912,7 +1912,8 @@ FIDDLE() namespace Slang
         /// Pass a reference to a memory location that the callee may only read.
         ///
         /// Indicated by using the `ref` modifier on a parameter together
-        /// with `const`.
+        /// with the `readonly` modifier. The `const` keyword is accepted here
+        /// as a legacy alias for `readonly`.
         ///
         /// The same rules as `RefReadWrite` apply to the argument and to
         /// aliasing access paths; only the callee's access through the
@@ -1922,16 +1923,17 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a memory location that the callee may only write.
         ///
-        /// No modifier currently produces this mode; it completes the set of
-        /// access-restricted `ref` modes. There is no corresponding
-        /// `AccessQualifier`, so it has no parameter type representation.
+        /// Indicated by using the `ref` modifier on a parameter together
+        /// with the `writeonly` modifier. The checker does not derive this
+        /// mode yet, and there is no corresponding `AccessQualifier`, so it
+        /// has no parameter type representation.
         ///
         RefWriteOnly,
     };
 
     /// Is `mode` one of the `Ref*` modes, which always pass the address of
     /// the argument's memory location?
-    inline bool isRefParamPassingMode(ParamPassingMode mode)
+    inline bool isByReferenceParamPassingMode(ParamPassingMode mode)
     {
         switch (mode)
         {

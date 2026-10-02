@@ -1416,7 +1416,7 @@ void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
     if (getParamPassingMode() == ParamPassingMode::RefReadOnly)
-        out << toSlice("const ");
+        out << toSlice("readonly ");
     out << toSlice("ref ") << getValueType();
 }
 

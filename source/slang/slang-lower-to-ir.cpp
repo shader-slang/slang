@@ -3685,9 +3685,10 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
-        // A `const` on a by-value parameter only restricts the body, but on
-        // a `ref` parameter it restricts access to the caller's memory, so
-        // it is part of the mode.
+        // On a `ref` parameter, `const` is accepted as a legacy alias for
+        // `readonly`: it restricts the callee's access to the caller's
+        // memory, so unlike `const` on a by-value parameter it is part of
+        // the mode.
         return paramDecl->hasModifier<ConstModifier>() ? ParamPassingMode::RefReadOnly
                                                        : ParamPassingMode::RefReadWrite;
     }
