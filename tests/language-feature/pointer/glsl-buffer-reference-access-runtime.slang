@@ -30,16 +30,16 @@ void computeMain()
     *pair = p;
 
     // CHECK: type: int32_t
-    // CHECK-NEXT: 10
+    // CHECK-NEXT: {{^}}10{{$}}
     outputBuffer[0] = data[0];
-    // CHECK-NEXT: 20
+    // CHECK-NEXT: {{^}}20{{$}}
     outputBuffer[1] = data[1];
-    // CHECK-NEXT: 103
+    // CHECK-NEXT: {{^}}103{{$}}
     outputBuffer[2] = data[2];
-    // CHECK-NEXT: 3
+    // CHECK-NEXT: {{^}}3{{$}}
     outputBuffer[3] = old;
-    // CHECK-NEXT: 50
+    // CHECK-NEXT: {{^}}50{{$}}
     outputBuffer[4] = pair->a;
-    // CHECK-NEXT: 60
+    // CHECK-NEXT: {{^}}60{{$}}
     outputBuffer[5] = pair->b;
 }

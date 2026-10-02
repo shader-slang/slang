@@ -42,10 +42,10 @@ void computeMain()
     int seen = *q;
 
     // CHECK: type: int32_t
-    // CHECK-NEXT: 3
+    // CHECK-NEXT: {{^}}3{{$}}
     outputBuffer[0] = *oldTarget;
-    // CHECK-NEXT: 0
+    // CHECK-NEXT: {{^}}0{{$}}
     outputBuffer[1] = *newTarget;
-    // CHECK-NEXT: 0
+    // CHECK-NEXT: {{^}}0{{$}}
     outputBuffer[2] = seen;
 }
