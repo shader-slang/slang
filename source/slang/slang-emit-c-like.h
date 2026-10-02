@@ -347,7 +347,50 @@ public:
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
 
+    /// How an instruction is folded into the expressions of its users, as decided by its opcode,
+    /// type, and similar properties before the position of its uses is considered.
+    enum class FoldPolicy
+    {
+        /// The instruction is always emitted as a separate declaration or statement.
+        Never,
+        /// The instruction is folded into each of its users whatever their position, e.g.
+        /// because its result cannot be stored in a temporary on the target. Its text is
+        /// therefore emitted wherever its users are emitted, which `isSafeToFoldIntoUseSites`
+        /// follows when it checks the operands of the instruction.
+        Always,
+        /// The instruction is folded if it has a single use and `isSafeToFoldIntoUseSites`
+        /// holds, along with the other conditions checked by `shouldFoldInstIntoUseSites`.
+        WhenSafe,
+    };
+
+    /// Return the fold policy for `inst`. The result may depend on `inst`, its operands, and
+    /// the kinds of its users, but not on where those users are, and it must not change while
+    /// a function body is emitted, because `isSafeToFoldIntoUseSites` caches answers that
+    /// depend on it. An override handles the instructions it knows about and defers to the
+    /// base class for the rest.
+    virtual FoldPolicy getFoldPolicy(IRInst* inst);
+
+    /// Return true if `inst` is emitted as part of the expressions of its users rather than as a
+    /// declaration of its own. An override may only decline a fold that the base class allows,
+    /// because `isSafeToFoldIntoUseSites` relies on every folded `WhenSafe` instruction having
+    /// passed its check. An instruction that a subclass must always fold gets
+    /// `FoldPolicy::Always` from `getFoldPolicy` instead, so that the check follows it to its
+    /// uses. Declining to fold an `Always` instruction is allowed, and only makes the check more
+    /// conservative for its operands.
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
+
+    /// Return true if folding `inst` cannot change its value: at every point where the text of
+    /// `inst` is emitted when it is folded, its expression has the value it has at `inst`.
+    /// Those points are the users of
+    /// `inst`, or, for a user whose policy is `FoldPolicy::Always`, the points where that user's
+    /// text is emitted. Each point must be later in the block of `inst`, must not be an
+    /// unconditional branch, and must not have an instruction that might have side effects
+    /// between it and `inst`.
+    ///
+    /// For a `WhenSafe` instruction, this decides whether it can be folded. An `Always`
+    /// instruction is folded whatever the result, so for it `false` means only that its
+    /// operands must not be folded into it.
+    bool isSafeToFoldIntoUseSites(IRInst* inst);
 
     void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec)
     {
@@ -808,6 +851,15 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    // Results of `isSafeToFoldIntoUseSites` for the function body being emitted, or null when
+    // no answers are cached. `emitFunctionBody` installs the cache after the last change to
+    // the body's IR. Without the cache, an always-folded instruction with many uses makes
+    // emission quadratic, because each use re-emits its operands and each operand rescans
+    // every use.
+    Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
+
+    bool isSafeToFoldIntoUseSitesUncached(IRInst* inst);
 
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
