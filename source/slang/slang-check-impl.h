@@ -3040,8 +3040,18 @@ public:
         GenericDecl* right,
         DeclRef<Decl>* outSpecializedRightInner);
 
-    // Check if two functions have the same signature for the purposes
-    // of overload resolution.
+    /// Return whether `fst` and `snd` have the same signature, so that one redeclares the other.
+    ///
+    /// Parameter types are compared up to the matrix layout of a matrix, an array of matrices or
+    /// a pointer to them, an interim rule until mangled names encode the layout
+    /// (shader-slang/slang#13383). For two declarations whose parameters differ only in layout:
+    /// - two bodies are a redefinition (E30201);
+    /// - a prototype and a definition are one function when the difference is in a parameter
+    ///   passed by value, `inout`/`out`, `__ref` or `__constref`;
+    /// - they conflict (E30200, in `checkFuncRedeclaration`) when the difference is behind a
+    ///   pointer, because nothing converts the memory a pointer refers to.
+    /// Return types are not part of this comparison; `checkFuncRedeclaration` requires them to be
+    /// equal, so a return type that differs only in layout is E30202.
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
     Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
