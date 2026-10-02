@@ -40,6 +40,19 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     InstHashSet openInsts;
     Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
     List<EmitAction>* actions;
+
+    /// Pointer types whose definition waits for their pointee, keyed by that pointee. Each key is
+    /// open when it is added, and `ensureGlobalInst` defines the waiting pointers right after the
+    /// key's own definition, so the map is empty once the walk finishes.
+    Dictionary<IRInst*, List<IRInst*>> deferredPtrDefinitions;
+
+    /// Return true if `inst` is a pointer type whose pointee is still being defined, which puts
+    /// the pointer on a cycle through that pointee, as in `struct N { float v; N* next; }`.
+    bool isPtrToOpenInst(IRInst* inst)
+    {
+        auto ptrType = as<IRPtrType>(inst);
+        return ptrType && openInsts.contains(ptrType->getValueType());
+    }
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -5261,21 +5274,6 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
-    case kIROp_PtrType:
-        {
-            auto ptrType = static_cast<IRPtrType*>(inst);
-            auto valueType = ptrType->getValueType();
-
-            if (ctx->openInsts.contains(valueType))
-            {
-                requiredLevel = EmitAction::ForwardDeclaration;
-            }
-            else
-            {
-                requiredLevel = EmitAction::Definition;
-            }
-            break;
-        }
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
@@ -5375,6 +5373,23 @@ void CLikeSourceEmitter::ensureGlobalInst(
         break;
     }
 
+    // A pointee being defined only needs a pointer to it declared, so we break a cycle through
+    // a pointer by forward-declaring the pointer and defining it once the pointee is complete.
+    // Breaking it at the pointer rather than the struct matters for GLSL, which can
+    // forward-declare a `buffer_reference` block but not a struct. A cycle that closes on a
+    // struct instead is still reported below, so whether a recursive type compiles can depend on
+    // where the walk enters it: `struct W { float w; N n; }; struct N { float v; W* up; }`
+    // compiles when reached through `W*`, but not through `N*`.
+    if (requiredLevel == EmitAction::Level::Definition && ctx->isPtrToOpenInst(inst))
+    {
+        // A pointer that is itself open gets its definition when it closes. Deferring it as well
+        // would define it again from the pointee's definition while it is still open, which is
+        // the circularity error.
+        if (!ctx->openInsts.contains(inst))
+            ctx->deferredPtrDefinitions[cast<IRPtrType>(inst)->getValueType()].add(inst);
+        requiredLevel = EmitAction::Level::ForwardDeclaration;
+    }
+
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
     if (ctx->mapInstToLevel.tryGetValue(inst, existingLevel))
@@ -5418,6 +5433,19 @@ void CLikeSourceEmitter::ensureGlobalInst(
         break;
     }
     ctx->actions->add(action);
+
+    // Pointers deferred on `inst` are defined right after it, so each definition follows its
+    // pointee's. We take the list out of the map first because defining them may add entries.
+    if (requiredLevel == EmitAction::Level::Definition)
+    {
+        List<IRInst*> deferredPtrs;
+        if (ctx->deferredPtrDefinitions.tryGetValue(inst, deferredPtrs))
+        {
+            ctx->deferredPtrDefinitions.remove(inst);
+            for (auto ptrType : deferredPtrs)
+                ensureGlobalInst(ctx, ptrType, EmitAction::Level::Definition);
+        }
+    }
 }
 
 void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& ioActions)
@@ -5501,6 +5529,7 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
             continue;
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }
+    SLANG_ASSERT(ctx.deferredPtrDefinitions.getCount() == 0);
 }
 
 void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
@@ -5515,6 +5544,9 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");
         break;
+    case kIROp_PtrType:
+        emitPtrTypeForwardDeclarationImpl(cast<IRPtrType>(inst));
+        break;
     case kIROp_InterfaceType:
         {
             if (inst->findDecoration<IRComInterfaceDecoration>())
@@ -5528,6 +5560,26 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
     default:
         SLANG_UNREACHABLE("emit forward declaration");
     }
+}
+
+void CLikeSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
+{
+    // HLSL, Metal, CUDA and C++ spell a pointer in terms of its pointee, which only has to be
+    // declared. When the pointee leads to a struct through any arrays and pointers we
+    // forward-declare that struct, as in `struct A; struct B { A* a; }; struct A { B* b; };`. Any
+    // other pointee, such as the `int` of a `NativeRef<int*>`, needs no declaration.
+    IRInst* pointee = ptrType->getValueType();
+    for (;;)
+    {
+        if (auto arrayType = as<IRArrayTypeBase>(pointee))
+            pointee = arrayType->getElementType();
+        else if (auto innerPtrType = as<IRPtrType>(pointee))
+            pointee = innerPtrType->getValueType();
+        else
+            break;
+    }
+    if (auto structType = as<IRStructType>(pointee))
+        emitForwardDeclaration(structType);
 }
 
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)

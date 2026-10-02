@@ -2177,6 +2177,18 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     m_writer->emit("};\n");
 }
 
+void GLSLSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
+{
+    // GLSL cannot forward-declare a struct, but it can forward-declare the `buffer_reference`
+    // block that represents the pointer; `emitBufferPointerTypeDefinition` defines it later.
+    if (!isUserPointerType(ptrType))
+        return;
+    _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
+    m_writer->emit("layout(buffer_reference) buffer ");
+    m_writer->emit(getName(ptrType));
+    m_writer->emit(";\n");
+}
+
 // Is this type only used by SSBO declarations, if so then we don't need to
 // emit it and it'll be emitted inline there.
 static bool isSSBOInternalStructType(IRInst* inst)
