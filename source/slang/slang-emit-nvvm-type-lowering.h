@@ -337,9 +337,18 @@ struct NVVMBufferDataPointerType
 /// Resolves an exact selected raw-buffer data pointer.
 bool getNVVMSupportedBufferDataPointerType(IRInst* type, NVVMBufferDataPointerType& outType);
 
+/// Selects the logical conversion independently of the physical channel width and signedness.
+enum class NVVMSurfaceNormalization
+{
+    None,
+    UNorm,
+    SNorm,
+};
+
 /// Describes one exact read-write CUDA surface object selected by direct NVVM.
 struct NVVMSurfaceType
 {
+    NVVMSurfaceNormalization normalization = NVVMSurfaceNormalization::None;
     IRTextureTypeBase* textureType = nullptr;
     SlangNVVMTextureShape shape = 0;
     bool isArray = false;

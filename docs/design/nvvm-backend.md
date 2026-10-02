@@ -707,7 +707,9 @@ Several implementation exceptions carry independent contracts:
 
 Surface legalization runs before shared subscript expansion discards component masks. A shared
 validator reads the canonical resource type and optional format metadata from a collected field,
-first-block entry formal or exact descriptor-to-resource conversion. That checked owner selects
+first-block entry formal or exact descriptor-to-resource conversion. Typed field/fixed-array selectors
+retain their declared keys through entry value aggregates and synthesized global parameter groups.
+A selector rooted in an ordinary helper parameter or raw entry pointer supplies no format proof. That checked owner selects
 physical payload types, explicit conversion and byte-X coordinates; equal logical types can
 therefore access different formats. The provider emits typed
 operations and mechanical register transport, not format discovery or implicit storage conversion. Component
@@ -727,8 +729,14 @@ use matching-signedness 32-bit shader values across these non-array and array sh
 widens loads and clamps stores to the destination range before ordinary integer narrowing. Exact format enums distinguish integer encodings from normalized formats with
 similar channel metadata. LLVM's raw8-bit surface calls transport16-bit registers; the provider
 truncates loads and zero-extends store bits, leaving signed interpretation to the canonical IR casts.
-Arbitrary resource-helper provenance, additional packed/normalized formats and general aliases
-remain outside the qualified boundary.
+Exact8/16-bit UNORM/SNORM formats use Half/Float logical values and signed/unsigned physical channels.
+An explicit normalization policy accompanies format selection; width and signedness alone cannot
+identify the encoding. Loads divide in Float32 and clamp SNORM's minimum code to-1. Stores map NaN
+to0, clamp, scale in Float32 and round to nearest with ties away before narrowing. Truncation plus
+a residual comparison avoids the extra rounding from adding0.5. Half widens before quantization and
+narrows after decode. Partial stores convert only selected lanes, preserving untouched raw SNORM
+codes. sRGB transfer remains separately owned by the application/view; no gamma conversion is added.
+Arbitrary resource-helper provenance, packed formats and general aliases remain outside this boundary.
 
 An undecorated `RWTexture<int4>` requires matching native32 four-channel storage. An opaque CUDA
 handle does not make an RGBA8 allocation visible to the compiler, and shader reads using the same

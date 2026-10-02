@@ -1,7 +1,7 @@
-// A formatted resource's element type does not carry its physical storage format. The direct
-// legalization pass resolves `[format]` only when a tagged standard-library surface helper receives a
-// canonical load from the collected global field. Passing the resource through another helper
-// loses that provenance, so preflight must reject the shape instead of guessing from `float`.
+// A resource element type alone does not carry its physical storage format. Surface legalization
+// resolves typed accesses through entry/global binding selectors and declared field keys. Passing
+// the resource through an ordinary helper loses that provenance, so preflight rejects it rather
+// than guessing the physical format from `float`.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_7_0 -o nvvm-formatted-surface-provenance.ptx
 

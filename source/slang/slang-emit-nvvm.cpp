@@ -2957,12 +2957,21 @@ bool _resolveNVVMPhysicalSurfaceOperation(IRInst* inst, NVVMPlannedSurfaceOperat
     SlangNVVMValueTypeDesc physicalType = {};
     if (!surface || !coordinate ||
         !getNVVMSupportedSurfaceType(surface->getDataType(), surfaceType) ||
-        !_getNVVMSemanticType(isLoad ? inst->getDataType() : value->getDataType(), physicalType) ||
-        physicalType.kind != surfaceType.elementType.kind ||
+        !_getNVVMSemanticType(isLoad ? inst->getDataType() : value->getDataType(), physicalType))
+        return false;
+    // Normalized legalization has already selected and made the floating/integer conversion
+    // explicit. This boundary validates the physical operation, without rediscovering formats.
+    const bool normalizedStorage =
+        surfaceType.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+        (surfaceType.elementType.bitWidth == 16 || surfaceType.elementType.bitWidth == 32) &&
+        (physicalType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         physicalType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        (physicalType.bitWidth == 8 || physicalType.bitWidth == 16);
+    if ((physicalType.kind != surfaceType.elementType.kind && !normalizedStorage) ||
         physicalType.laneCount != surfaceType.elementType.laneCount ||
         (physicalType.laneCount != 1 && physicalType.laneCount != 2 &&
          physicalType.laneCount != 4) ||
-        (physicalType.bitWidth != surfaceType.elementType.bitWidth &&
+        (physicalType.bitWidth != surfaceType.elementType.bitWidth && !normalizedStorage &&
          !(physicalType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
            physicalType.bitWidth == 16 && surfaceType.elementType.bitWidth == 32) &&
          !((physicalType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||

@@ -54,11 +54,23 @@ Raw evidence: `build/nvvm-pointer-storage/`; exact histories and identities live
 focused, SlangPy and RHI manifests. Root source base is `f2a34ee90`, sibling RHI base `c7d26fe9`;
 the accepted feature record identifies the changed sources and binaries.
 
-**Next:** finish checked surface provenance and the complete 8/16-bit UNORM/SNORM family, then
-TensorView/DiffTensorView and remaining representation families. Surface failures include native
-texture wrappers as well as normalized formats, so they need distinct producer diagnoses. Working
-cadence resets here; use focused application selections and smoke. A full checkpoint follows the
-queued families. Legacy OptiX8 HitObject semantics remain parked independently.
+Normalized surfaces are now qualified for all12UNORM/SNORM formats (8/16-bit,1/2/4channels),
+Half/Float logical values, all five admitted geometries and whole/static/dynamic component writes.
+All60grouped NVVM cells pass; focused enhanced SNORM minimum-code checks preserve untouched bits.
+Three surface units, two wrapper PTX checks, the existing provenance rejection, four native surface
+controls and16smoke cells pass. Four NVRTC comparisons fail compilation at missing conversion helpers;
+no numerical equivalence is claimed. Raw evidence: `build/nvvm-normalized-surfaces/`.
+
+The484-node application selection passes388/fails96: all50normalized-format failures resolve and
+all338prior controls remain passing. Current mixed-age inventory is **1,435 pass /155 fail /807 skip /
+3 expected failures**. The original full checkpoint remains unchanged. The96remaining texture cases
+call ordinary helper methods whose resource parameters lack format provenance; direct entry/global
+wrapper selectors now work, but do not establish an arbitrary helper's physical format.
+
+**Next:** carry checked surface formats through helper specialization, then TensorView/DiffTensorView
+and remaining representation families. The working cadence is one implementation since the compact
+pointer checkpoint; use focused application selections and smoke. A full checkpoint follows the
+queued families. Legacy OptiX8HitObject semantics remain parked independently.
 
 ## SlangPy application checkpoint
 
@@ -297,7 +309,7 @@ Keep these open distinctions visible:
 - Original physical-storage-buffer and redundant-coherent-load fixtures contain races or unsupported
   scopes. Their compile evidence does not resolve runtime failures. Graphics tests, hardware atomics,
   generic `requirePrelude` text and non-square host packing remain distinct from missing primitives.
-- Unannotated packed bindings, normalized formats and three-channel transfers remain outside the
+- Unannotated mismatched bindings, packed formats and three-channel transfers remain outside the
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 

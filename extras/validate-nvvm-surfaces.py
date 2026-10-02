@@ -17,6 +17,8 @@ import ctypes as C
 import copy
 import hashlib
 import json
+import math
+from fractions import Fraction
 import os
 from pathlib import Path
 import re
@@ -28,7 +30,7 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
-            "half-layered", "half-volume", "integer-formats", "integer-spatial", "native-narrow"]
+            "half-layered", "half-volume", "integer-formats", "integer-spatial", "native-narrow", "normalized"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4),
@@ -200,6 +202,17 @@ def cases():
                 dict(SURFACE_DIM=shape, SURFACE_ARRAY=int(is_array), SURFACE_OPERATION=operation))
             if is_array or shape == 3:
                 rows[-1]["array_layers" if is_array else "volume_depth"] = 4
+    for shape, is_array, geometry in ((1, False, "1d"), (2, False, "2d"),
+                                      (1, True, "1d-array"), (2, True, "2d-array"),
+                                      (3, False, "3d")):
+        for operation, label in enumerate(("whole", "static-components", "dynamic-components")):
+            for half in (False, True):
+                add(f"normalized-{geometry}-{label}-{'half' if half else 'float'}",
+                    "normalized", "exercise", 259, 1 if shape == 1 else 5, 4, False, shape,
+                    dict(SURFACE_DIM=shape, SURFACE_ARRAY=int(is_array),
+                         SURFACE_OPERATION=operation, SURFACE_LOGICAL_HALF=int(half)))
+                if is_array or shape == 3:
+                    rows[-1]["array_layers" if is_array else "volume_depth"] = 4
     return rows
 
 
@@ -239,6 +252,18 @@ def resource_specs(row):
                                                 ("Unsigned16", "uint16", "uint32"))
                 for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
                 for prefix in ("surface", "observed")]
+    if row["fixture"] == "normalized":
+        result = []
+        logical = "float16" if row["defines"]["SURFACE_LOGICAL_HALF"] else "float32"
+        for family, storage, suffix in (("Signed8", "int8", "8_snorm"),
+                                         ("Unsigned8", "uint8", "8"),
+                                         ("Signed16", "int16", "16_snorm"),
+                                         ("Unsigned16", "uint16", "16")):
+            for name, lanes in (("R", 1), ("RG", 2), ("RGBA", 4)):
+                surface = spec("surface" + family + name, storage, lanes, logical)
+                surface["format"] = {1: "r", 2: "rg", 4: "rgba"}[lanes] + suffix
+                result += [surface, spec("observed" + family + name, "float32", lanes)]
+        return result
     scalar = row.get("scalar", "float32")
     return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
             spec("observed", scalar, row["lanes"], scalar)]
@@ -500,8 +525,97 @@ def integer_format_oracle(row):
     return dict(resources=resources)
 
 
+def float32(value):
+    return struct.unpack("<f", struct.pack("<f", value))[0]
+
+
+def normalized_inputs():
+    """Input bit patterns include both neighbors of several format-dependent thresholds."""
+    bits = [0, 0x80000000, 0x3F800000, 0xBF800000, 0x40000000, 0xC0000000,
+            0x7F800000, 0xFF800000, 0x7FC12345, 0xFFC12345, 1, 0x80000001,
+            0x3F000000, 0xBF000000, 0x3EAAAAAB, 0xBEAAAAAB]
+    for scale in (127, 255, 32767, 65535):
+        for integer in (0, scale // 2):
+            middle = struct.unpack("<I", struct.pack("<f", (integer + 0.5) / scale))[0]
+            bits += [middle - 1, middle, middle + 1]
+            bits += [x | 0x80000000 for x in (middle - 1, middle, middle + 1)]
+    require(len(bits) == 64, "Normalized input index contract changed")
+    return bits
+
+
+def encode_normalized(value, bits, signed):
+    """Quantize a Float32-scaled value with an exact rational nearest/ties-away oracle."""
+    if math.isnan(value):
+        return 0
+    maximum = (1 << (bits - int(signed))) - 1
+    scaled = float32(min(max(value, -1 if signed else 0), 1) * maximum)
+    exact = Fraction.from_float(abs(scaled))
+    quotient, remainder = divmod(exact.numerator, exact.denominator)
+    result = quotient + int(2 * remainder >= exact.denominator)
+    return (-result if scaled < 0 else result) & ((1 << bits) - 1)
+
+
+def normalized_oracle(row):
+    """Decode original raw channels independently; stores never depend on those observations."""
+    width, height = row["width"], row["height"]
+    depth = row.get("volume_depth", row.get("array_layers", 1))
+    spatial = "volume_depth" in row or "array_layers" in row
+    operation = row["defines"]["SURFACE_OPERATION"]
+    half = row["defines"]["SURFACE_LOGICAL_HALF"]
+    inputs = normalized_inputs()
+    resources = []
+    for resource, spec in enumerate(resource_specs(row)[::2]):
+        lanes, bits = spec["lanes"], FORMATS[spec["storage"]][1] * 8
+        signed = spec["storage"].startswith("int")
+        mask, midpoint = (1 << bits) - 1, 1 << (bits - 1)
+        maximum = (1 << (bits - int(signed))) - 1
+        pattern = [0, 1, midpoint - 1, midpoint, midpoint + 1, mask, mask - 1, 2]
+        initial, expected, observed, output = [], [], [], []
+        active = 0
+        for z in range(depth):
+            for y in range(height):
+                for x in range(width):
+                    live = (1 <= x <= 256 and (row["shape"] == 1 or 1 <= y <= 3) and
+                            (not spatial or 1 <= z <= 2))
+                    active += int(live)
+                    for lane in range(lanes):
+                        raw = (pattern[(x + y * 7 + resource * 3 + lane * 5) % 8]
+                               if x % 2 else (resource * 29 + z * 61 + y * 17 + x * 3 + lane * 7) & mask)
+                        # Every signed format explicitly includes its duplicate -1 encoding in
+                        # every lane, including lanes left untouched by partial stores.
+                        if signed and x == 1:
+                            raw = midpoint
+                        sentinel = 0x3F000000 | (resource << 16) | (z << 12) | (y << 9) | x
+                        decoded = raw - (1 << bits) if signed and raw >= midpoint else raw
+                        decoded = max(float32(decoded / maximum), -1 if signed else 0)
+                        if half:
+                            decoded = struct.unpack("<e", struct.pack("<e", decoded))[0]
+                        decoded_bits = struct.unpack("<I", struct.pack("<f", decoded))[0]
+                        initial.append(raw)
+                        observed.append(sentinel)
+                        output.append(decoded_bits if live else sentinel)
+                        selected = (operation == 0 or lanes == 1 or
+                                    (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
+                                    (operation == 2 and lane == (x - 1) % lanes))
+                        edge = (x - 1) // 4 if operation == 2 else x - 1
+                        value = struct.unpack("<f", struct.pack("<I",
+                            inputs[(edge + z * 5 + y * 7 + resource * 3 + lane * 5) % 64]))[0]
+                        if half:
+                            value = struct.unpack("<e", struct.pack("<e", value))[0]
+                        stored = encode_normalized(value, bits, signed)
+                        expected.append(stored if live and selected else raw)
+        for before, after, size in ((initial, expected, bits // 8), (observed, output, 4)):
+            resources.append(dict(initial=b"".join(v.to_bytes(size, "little") for v in before),
+                                  expected=b"".join(v.to_bytes(size, "little") for v in after),
+                                  nan_positions=set(), active_texels=active,
+                                  guard_texels=width * height * depth - active))
+    return dict(resources=resources)
+
+
 def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
+    if row["fixture"] == "normalized":
+        return normalized_oracle(row)
     if row["fixture"] == "layered":
         return layered_oracle(row)
     if row["fixture"] in ("integer-formats", "integer-spatial", "native-narrow"):
@@ -862,7 +976,7 @@ def self_test():
     # Each added resource has independent storage, including source-only arrays and guard texels.
     for row in (x for x in cases() if x["fixture"] in
                 ("integers", "mixed", "layered", "half-layered", "half-volume",
-                 "integer-formats", "integer-spatial", "native-narrow")):
+                 "integer-formats", "integer-spatial", "native-narrow", "normalized")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -900,7 +1014,8 @@ def self_test():
                 else:
                     raise ValueError("Invalid spatial depth/array role combination was ignored")
         for index in range(len(specs)):
-            for field, value in (("name", "wrongResource"), ("format", "rgba8")):
+            for field, value in (("name", "wrongResource"),
+                                 ("format", "rgba16" if specs[index]["format"] == "rgba8" else "rgba8")):
                 damaged = copy.deepcopy(reflection)
                 damaged["parameters"][index][field] = value
                 try:
@@ -917,6 +1032,34 @@ def self_test():
                 pass
             else:
                 raise ValueError("Surface array role substitution was ignored")
+            if row["fixture"] == "normalized":
+                scalar = specs[index]["scalar"]
+                for replacement in ("float32" if scalar == "float16" else "float16", "int32"):
+                    damaged = copy.deepcopy(reflection)
+                    result = damaged["parameters"][index]["type"]["resultType"]
+                    if specs[index]["lanes"] > 1:
+                        result["elementType"]["scalarType"] = replacement
+                    else:
+                        result["scalarType"] = replacement
+                    try:
+                        validate_bindings(damaged, row, ptx, 80)
+                    except ValueError:
+                        pass
+                    else:
+                        raise ValueError("Normalized logical type substitution was ignored")
+                if index % 2 == 0:
+                    original = specs[index]["format"]
+                    alternatives = (original.replace("_snorm", "i") if "_snorm" in original else original + "ui",
+                                    original.replace("_snorm", "") if "_snorm" in original else original + "_snorm")
+                    for replacement in alternatives:
+                        damaged = copy.deepcopy(reflection)
+                        damaged["parameters"][index]["format"] = replacement
+                        try:
+                            validate_bindings(damaged, row, ptx, 80)
+                        except ValueError:
+                            pass
+                        else:
+                            raise ValueError("Normalized encoding/signedness substitution was ignored")
             if row["fixture"] in ("integer-formats", "integer-spatial", "native-narrow"):
                 scalar = specs[index]["scalar"]
                 opposite = scalar[1:] if scalar.startswith("u") else "u" + scalar
@@ -937,6 +1080,47 @@ def self_test():
                         pass
                     else:
                         raise ValueError("Narrow format logical type substitution was ignored")
+    for bits in (8, 16):
+        for signed in (False, True):
+            maximum = (1 << (bits - int(signed))) - 1
+            require(encode_normalized(float("nan"), bits, signed) == 0, "NaN did not encode zero")
+            require(encode_normalized(float("inf"), bits, signed) == maximum, "Upper clamp failed")
+            require(encode_normalized(-float("inf"), bits, signed) ==
+                    ((-maximum) & ((1 << bits) - 1) if signed else 0), "Lower clamp failed")
+            require(encode_normalized(0.5, bits, signed) == (maximum + 1) // 2,
+                    "Ties-away conversion failed")
+    normalized_rows = [x for x in cases() if x["fixture"] == "normalized"]
+    require(len(normalized_rows) == 30, "Incomplete normalized geometry/operation/type family")
+    # Each input reaches every dynamic component, even though different lanes see shifted inputs.
+    for resource in range(12):
+        for lanes in (1, 2, 4):
+            for lane in range(lanes):
+                seen = {((x - 1) // 4 + resource * 3 + lane * 5) % 64
+                        for x in range(1, 257) if (x - 1) % lanes == lane}
+                require(len(seen) == 64, "Normalized dynamic lane misses an input boundary")
+    partial = next(x for x in normalized_rows if x["case"] == "normalized-1d-static-components-float")
+    buffers = oracle(partial)
+    for index, spec in enumerate(resource_specs(partial)):
+        if not spec["storage"].startswith("int") or spec["lanes"] == 1:
+            continue
+        size = FORMATS[spec["storage"]][1]
+        minimum = (1 << (size * 8 - 1)).to_bytes(size, "little")
+        data = buffers["resources"][index]
+        candidates = [position for position in range(len(data["initial"]) // size)
+                      if position % spec["lanes"] not in (1, 3) and
+                      data["initial"][position * size:(position + 1) * size] == minimum]
+        require(candidates, "Missing untouched SNORM minimum input")
+        for position in candidates:
+            require(data["expected"][position * size:(position + 1) * size] == minimum,
+                    "Untouched SNORM minimum was re-encoded")
+        damaged = bytearray(data["expected"])
+        damaged[candidates[0] * size] ^= 1
+        require(compare(partial, buffers, index, damaged)["mismatch_count"] == 1,
+                "SNORM equivalent-value bit corruption ignored")
+    # Verify source input constants independently of any generated output or compiler result.
+    source = (REPO / "tests/cuda/nvvm-surface-physical-normalized.slang").read_text()
+    encoded = [int(v, 16) for v in re.findall(r"return asfloat\(0x([0-9a-f]+)u\)", source)]
+    require(encoded == normalized_inputs(), "Shader/host normalized input selection differs")
     for value, bits, signed, expected in (
             (128, 8, True, 0x7F), (-129, 8, True, 0x80),
             (32768, 16, True, 0x7FFF), (-32769, 16, True, 0x8000),

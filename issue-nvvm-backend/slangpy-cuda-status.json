@@ -432,12 +432,36 @@
         "path": "build/nvvm-pointer-storage/identity.json",
         "sha256": "685d5bfa1a66c79559cc778e17a53c3cf028d38c673fe26afd993a0ef40f2228"
       }
+    },
+    "normalized-surfaces": {
+      "gate": {
+        "path": "build/nvvm-normalized-surfaces/slangpy2.json",
+        "sha256": "bf0e9265a161a588bb5fab947c464ac70610470be862d953878d37b93aa1c67e"
+      },
+      "log": {
+        "path": "build/nvvm-normalized-surfaces/slangpy2.log",
+        "sha256": "415a09c8b4fac5e2152940809dd73b49213bf53ee06194da663b5272fffdd4c8"
+      },
+      "junit": {
+        "path": "build/nvvm-normalized-surfaces/slangpy2.xml",
+        "sha256": "57cb05df981b14646835067fe3fe5440f96f2e3bc8a892ff164de65cb3734530"
+      },
+      "identity": {
+        "path": "build/nvvm-normalized-surfaces/identity-build4.json",
+        "sha256": "50dd81a07e6994fbaf9559d787bd48cf0cfbbde7a689ad202450db97d9849167"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 53.289711236953735,
+      "test_counts": {
+        "passed": 388,
+        "failed": 96
+      }
     }
   },
   "current_counts": {
     "skipped": 807,
-    "passed": 1385,
-    "failed": 205,
+    "passed": 1435,
+    "failed": 155,
     "xfailed": 3
   },
   "collection_skips": [
@@ -1911,7 +1935,57 @@
     "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_vecindex_inputcontainer_input_transform[data_type0-DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_vecindex_inputcontainer_input_transform[data_type1-DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_transforms.py::test_copy_data_vecindex_inputcontainer_input_transform[data_type0-DeviceType.cuda]",
-    "slangpy/tests/slangpy_tests/test_transforms.py::test_copy_data_vecindex_inputcontainer_input_transform[data_type1-DeviceType.cuda]"
+    "slangpy/tests/slangpy_tests/test_transforms.py::test_copy_data_vecindex_inputcontainer_input_transform[data_type1-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
+    "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]"
   ],
   "failures_by_first_diagnostic": {
     "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<cbuffer<SLANG_ParameterGroup_data>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'": [
@@ -1994,56 +2068,6 @@
       "slangpy/tests/slangpy_tests/test_type_resolution.py::test_type_resolution_texture[func_vector3_generic_Texture1D<Format.rgb32_sint>-DeviceType.cuda]"
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'": [
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
-      "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint8_t]",
       "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint16_t]",
       "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int8_t]",
@@ -6416,15 +6440,276 @@
         "sha256": "6779958e6f4a8df84a82c2d61699ce18392cf594b7755e4da46dada9457ccb42"
       },
       "detail": "Complete standard numeric CUDA pointer storage preserves local/device aliases, nested records/arrays, pointer values and caller-owned mutable references. Remaining selected first diagnostics:6atomicAdd,6uint field address,2updateElement,1nested cbuffer field. Full current inventory retains normalized surfaces/intrinsic TensorView and other previously recorded failures."
+    },
+    "normalized_surfaces": {
+      "transitions": [
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.automatic-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.linear-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-False-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.y-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.ya-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgb-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        }
+      ],
+      "resolved": 50,
+      "previous_passes_preserved": 338,
+      "selection": {
+        "path": "build/nvvm-normalized-surfaces/selection.txt",
+        "sha256": "eb810f9baf9bfa9da7bbb2bed3a1495512bcbe3b6c01eb1ef32039a893471ece"
+      },
+      "detail": "All50normalized texture-loader/sRGB/mipmap first failures resolve. Remaining96texture cases (58stores/38loads) execute in ordinary helper parameters, whose caller format provenance is not represented. Direct entry/global wrapper selectors qualify separately; helper format specialization is next."
     }
   },
   "next_complete_families": [
     {
       "priority": 4,
-      "family": "Normalized surface conversion",
-      "evidence": "108current first imageStore diagnostics and38imageLoad diagnostics, including newly exposed tensor-backed paths. Reconcile actual normalized/narrow-format provenance before implementation.",
-      "scope": "8/16-bit UNORM/SNORM, 1/2/4 channels, load/store component conversion and sRGB application semantics; inspect all related forms.",
-      "code": "source/slang/slang-emit-nvvm-type-lowering.cpp: getNVVMSupportedSurfaceFormat"
+      "family": "Surface helper format specialization",
+      "evidence": "Actual generated SlangPy IR has resource field extracts rooted in ordinary __slangpy method parameters.58imageStore/38imageLoad failures remain;50normalized cases resolved.",
+      "scope": "Preserve exact physical format contracts across helper input/output and aggregate transport; specialize by checked caller contract rather than infer native format from a helper resource type. Retain mixed-format callers and failure-before-mutation.",
+      "code": "source/slang/slang-ir-nvvm-surface-legalize.cpp and existing resource/function specialization producers"
     },
     {
       "priority": 5,
@@ -6440,7 +6725,7 @@
       "scope": "Reduce producer IR before expanding admission. Five unsupported RGB texture creation failures are shared application/RHI limitations, not evidence of NVVM lowering failure."
     }
   ],
-  "current_evidence": "Mixed-age: original full-nvvm-2 remains the 2400-node checkpoint. Compact pointer storage353 selection supersedes exactly tested nodes:338pass/15fail,75resolved and263prior passes preserved. Current1385pass/205fail/807skip/3xfail. No new full application run.",
+  "current_evidence": "Mixed-age: original full-nvvm-2 remains the2400-node checkpoint. Normalized surfaces484selection:388pass/96fail,50resolved and338prior passes preserved. Current1435pass/155fail/807skip/3xfail. No new full application run.",
   "completed_families": [
     {
       "priority": 1,
@@ -6481,6 +6766,12 @@
       "scope": "Standard numeric scalar/vector/matrix and nested record/array pointees; local/device aliases, padding, Bool truthiness, Packet**, mutable parameter roots and shared qualification. Callable storage and register-payload ordering repaired with existing GPU controls.",
       "status": "accepted-focused",
       "evidence": "features.nvvm-cuda-pointer-storage in focused-evidence.json"
+    },
+    {
+      "family": "8/16-bit UNORM/SNORM surfaces and aggregate binding selectors",
+      "scope": "All12formats,1/2/4channels,Half/Float,1D/2D/3D/1DArray/2DArray,whole/static/dynamic stores and loads. Declared entry/global value selectors; arbitrary helper/pointer provenance stays rejected.",
+      "status": "accepted-focused",
+      "evidence": "features.nvvm-normalized-surfaces in focused-evidence.json"
     }
   ]
 }

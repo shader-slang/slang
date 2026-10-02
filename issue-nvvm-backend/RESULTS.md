@@ -1737,3 +1737,19 @@ prior passing controls. Final commands and identities are retained alongside the
 attempts; manifests retain exact transitions. Smoke passes16. The due working corpus executes1716
 cells with1708passes/eight regressions, followed by successful exact repairs. Do not present that
 mixed evidence as a fresh all-green full run. No working tests were demoted.
+
+### Normalized surface qualification
+
+`validate-nvvm-surfaces.py --list` includes30normalized rows. Each compiles all12formats together;
+select these case names with `--modes nvvm-o0 nvvm-o3` for60cells. Geometry, store-mode and Half/Float
+logical selections are encoded in the row names. `--self-test` checks rational quantization anchors,
+all64input patterns reaching everydynamiclane, exact SNORM minimum preservation, raw guard corruption
+and normalized encoding/logical-type reflection substitutions. Reuse existing native surface cases
+as controls. Physical bytes and observed loads have independent host expectations, including NaN→0.
+
+Run prefix`slang-unit-test-tool/nvvmSurface` for physical selection/provider-capability/no-mutation
+checks, and`tests/cuda/nvvm-surface-wrapper-provenance` for O0/O3 real-provider binding selector PTX.
+The existing formatted-surface-provenance test retains arbitrary helper rejection. The484-node
+SlangPy selection under`build/nvvm-normalized-surfaces/selection.txt` passes388/fails96, resolving50
+normalized cases and preserving338controls. Mixed-age inventories retain the original full baseline;
+normalized cells are focused qualification, not silent adoption into that baseline.

@@ -71,7 +71,7 @@ The affected SlangPy selection supplies live 2D/3D texture evidence: 9 failures 
 37 prior passing controls preserved. Six static checks cover role/cache order, descriptor layout,
 readonly rejection before mutation and retained resource-format/storage restrictions.
 
-This does not admit arbitrary pointer-bearing entries, external helper ABI, normalized surface
+This does not itself admit arbitrary pointer-bearing entries, external helper ABI or surface
 formats or acceleration handles. Combined generic handle specializations still expose a duplicate
 symbol; per-shape success is not qualification of their coexistence. Shader cache reload subsequently exposed
 a shared RHI PTX-termination failure, now repaired by owning the exact byte span as terminated text.
@@ -857,7 +857,7 @@ shader values in 1D/2D/3D and 1DArray/2DArray surfaces. Loads sign- or zero-exte
 §3.2.3.13](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
 [Vulkan integer image reads](https://docs.vulkan.org/spec/latest/chapters/images.html#images-reads)
 agree on load interpretation; out-of-range Vulkan storage-image encoding equivalence has not been
-established. Normalized formats and mixed signedness remain excluded.
+established. Mixed integer signedness remains excluded; normalized floating conversions are qualified below.
 The static annotation owns physical interpretation; opaque handles do not infer runtime formats.
 
 Native signed/unsigned 8/16-bit logical values support these same shapes and widths 1/2/4.
@@ -914,8 +914,28 @@ That full baseline still owns its original 249 cells; the sixty-nine added array
 reviewed adoption at the next full checkpoint.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
-formatted store's observed truncation. NVRTC component writes (including dynamic indexing), user resource-helper format provenance, three-channel transfers and additional packed/normalized formats
+formatted store's observed truncation. NVRTC component writes (including dynamic indexing), user resource-helper format provenance, three-channel transfers and additional packed formats
 remain outside this qualification. The pass does not add layered helper writes or general aliases.
+
+The complete `r/rg/rgba`8/16-bit UNORM/SNORM family supports Half/Float logical values, whole
+loads/stores and static/dynamic component stores across1D/2D/3D and1DArray/2DArray surfaces.
+[The normalized fixture](../../tests/cuda/nvvm-surface-physical-normalized.slang) groups twelve formats
+per compile:30geometry/operation/type rows pass atNVVM O0/O3 (60cells). Independent raw initialization,
+Float32 observations, guarded bytes and64boundary inputs separate load and store correctness.
+Focused enhanced minimum-code cases also check that partial writes retain SNORM's raw minimum code.
+Stores map NaN to0, clamp, scale inFloat32 and round nearest/ties-away; Half inputs widen first.
+Loads divide inFloat32, clamp SNORM minimum to-1, then narrow for Half. This fits the
+[Direct3D normalized conversion contract, §§3.2.3.3–6](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm)
+and [Vulkan fixed-point conversions](https://github.khronos.org/Vulkan-Site/spec/latest/chapters/fundamentals.html#fundamentals-fixedconv),
+which does not mandate a tie direction. sRGB transfer is not repeated by storage conversion.
+Four selected NVRTC comparisons fail compilation at missing surface read-conversion helpers and
+component generation; they provide no numerical qualification. Exact failures remain in focused evidence.
+
+[Wrapper provenance](../../tests/cuda/nvvm-surface-wrapper-provenance.slang) qualifies declared fields
+and fixed arrays rooted in entry value bindings or collected globals. Ordinary resource helper
+parameters still lack caller format provenance and reject; the remaining96SlangPy texture failures
+reach that distinct boundary. All50normalized texture-loader failures resolve, including sRGB cases.
+This is focused application evidence, not an updated full surface/application checkpoint.
 
 The unannotated surface contract requires a matching physical channel width, count and scalar
 interpretation. A focused host-readback experiment binds the same `RWTexture1D<int4>` kernels to

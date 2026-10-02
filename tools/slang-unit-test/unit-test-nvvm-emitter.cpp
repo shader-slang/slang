@@ -9525,7 +9525,8 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalVectorsUseQualifiedStorage)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "typealias V = vector<BFloat16," << width << ">;" << R"SLANG(
+            source << "typealias V = vector<BFloat16," << width << ">;"
+                   << R"SLANG(
                 [noinline] V replace(inout V x, V y) { let old = x; x = y; return old; }
                 [noinline] void initialize(out V x, V y) { x = y; }
                 RWStructuredBuffer<uint> outputBuffer;
@@ -9600,7 +9601,8 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalRecordsUseQualifiedFields)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "typealias V = vector<BFloat16," << width << ">;" << R"SLANG(
+            source << "typealias V = vector<BFloat16," << width << ">;"
+                   << R"SLANG(
                 struct Record { uint16_t prefix; V value; uint16_t suffix; }
                 [noinline] void initialize(out Record x, V y)
                 { x.prefix = uint16_t(17); x.value = y; x.suffix = uint16_t(19); }
@@ -9672,7 +9674,8 @@ SLANG_UNIT_TEST(nvvmSlangSubstandardRecordsUseInternalValues)
         StringBuilder source;
         source << "typealias F = " << type
                << "; typealias Bits = " << (String(type) == "BFloat16" ? "uint16_t" : "uint8_t")
-               << ";" << R"SLANG(
+               << ";"
+               << R"SLANG(
             struct Payload { F value; }
             [noinline] Payload copy(Payload x) { return x; }
             RWStructuredBuffer<uint> outputBuffer;
@@ -9827,7 +9830,8 @@ SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsUseInternalValues)
         {
             StringBuilder source;
             source << "typealias F = " << format << "; typealias Bits = "
-                   << (String(format) == "BFloat16" ? "uint16_t" : "uint8_t") << ";" << R"SLANG(
+                   << (String(format) == "BFloat16" ? "uint16_t" : "uint8_t") << ";"
+                   << R"SLANG(
                 struct Payload { F value; }
                 struct Outer { Payload value; }
                 [noinline] Outer copy(Outer x) { return x; }
@@ -10205,7 +10209,8 @@ SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsRejectOtherRoles)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "struct Payload { vector<BFloat16," << width << "> value; }" << R"SLANG(
+            source << "struct Payload { vector<BFloat16," << width << "> value; }"
+                   << R"SLANG(
                 struct Outer { Payload inner; }
                 [noinline] void initialize(out Outer x, BFloat16 v) { x.inner.value = v; }
                 RWStructuredBuffer<uint> outputBuffer;
@@ -11860,7 +11865,8 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
         if (test.format)
             source << "[format(\"" << test.format << "\")] ";
         source << "RWTexture2D<" << test.type << "> image; RWStructuredBuffer<" << test.type
-               << "> output;" << R"SLANG(
+               << "> output;"
+               << R"SLANG(
             [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             {
                 let value = image.Load(int2(tid.xy));
@@ -12190,6 +12196,48 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
 
+// Rejected binding paths must fail before creating any provider module or program.
+SLANG_UNIT_TEST(nvvmSurfaceAggregateBindingsRejectUnprovenFormats)
+{
+    for (const char* source : {
+             R"SLANG(
+            struct Wrapper { [format("rgba8")] RWTexture2D<float3> image; }
+            RWStructuredBuffer<float3> output;
+            [numthreads(1,1,1)] void computeMain(uniform Wrapper value) {
+                output[0] = value.image.Load(int2(0));
+            }
+        )SLANG",
+             R"SLANG(
+            struct Wrapper { RWTexture2D<float4> image; }
+            RWStructuredBuffer<float4> output;
+            [numthreads(1,1,1)] void computeMain(uniform Wrapper* value) {
+                output[0] = value->image.Load(int2(0));
+            }
+        )SLANG",
+             R"SLANG(
+            struct Wrapper { RWTexture2D<float4> image; }
+            [noinline] float4 read(Wrapper value) { return value.image.Load(int2(0)); }
+            RWStructuredBuffer<float4> output;
+            [numthreads(1,1,1)] void computeMain(uniform Wrapper value) {
+                output[0] = read(value);
+            }
+        )SLANG"})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(session, source, code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(_getBlobText(diagnostics).contains("52017"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation)
 {
     for (const char* source : {kSurfaceFormatLegalizationSource, kSurfaceDynamicComponentSource})
@@ -12229,6 +12277,8 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
           RejectedFormat{"r8i", "2D", "int16_t", "int2(0)"},
           RejectedFormat{"r32ui", "2D", "uint16_t", "int2(0)"},
           RejectedFormat{"rgba8i", "2D", "vector<int8_t,3>", "int2(0)"},
+          RejectedFormat{"rgba8_snorm", "2D", "float3", "int2(0)"},
+          RejectedFormat{"r16_snorm", "2D", "uint", "int2(0)"},
           RejectedFormat{"r64ui", "2D", "uint64_t", "int2(0)"}})
     {
         _resetDirectNVVMFakes();
@@ -13076,7 +13126,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacyRoundAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldRound(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_round($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_round($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13120,7 +13171,8 @@ SLANG_UNIT_TEST(nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
             StringBuilder source;
             source << types[variant] << " selected(" << types[variant] << " x) { return "
-                   << operationName << "(x); } " << "[CUDAKernel] void computeMain("
+                   << operationName << "(x); } "
+                   << "[CUDAKernel] void computeMain("
                    << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                    << bodies[variant] << " }";
             ComPtr<slang::IBlob> code, diagnostics;
@@ -13390,7 +13442,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacySqrtAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldSqrt(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_sqrt($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_sqrt($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13430,7 +13483,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacyFracAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldFrac(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_frac($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_frac($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13613,7 +13667,8 @@ static void _checkNVVMPublicUnaryDeviceLibrary(
             const char* type = types[variant];
             StringBuilder source;
             source << "[noinline] " << type << " " << publicName << "Helper(" << type
-                   << " x) { return " << publicName << "(x); } " << "[CUDAKernel] void computeMain("
+                   << " x) { return " << publicName << "(x); } "
+                   << "[CUDAKernel] void computeMain("
                    << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
             for (Index i = 0; i < 4; ++i)
             {
@@ -13839,7 +13894,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldRsqrt(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_rsqrt($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_rsqrt($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13879,7 +13935,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExpAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldExp(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_exp($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_exp($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13919,7 +13976,8 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExp2AssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldExp2(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_exp2($0)\"; } " << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_exp2($0)\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13961,8 +14019,9 @@ static void _checkNVVMLegacyLogAssembly(const char* operation)
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
-        source << types[variant] << " oldLog(" << types[variant] << " x) { " << "__intrinsic_asm \""
-               << legacyAssembly << "\"; } " << "[CUDAKernel] void computeMain("
+        source << types[variant] << " oldLog(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"" << legacyAssembly << "\"; } "
+               << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;

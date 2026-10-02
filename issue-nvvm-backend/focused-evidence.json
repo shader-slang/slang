@@ -92621,6 +92621,266 @@
         "NVRTC numeric comparison stops at its local/column-major storage mismatch; no later cells implied.",
         "Normalized surfaces and TensorView remain queued; residual atomics/field/updateElement retain exact application failures."
       ]
+    },
+    "nvvm-normalized-surfaces": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-normalized-surfaces/identity.json",
+        "sha256": "3624950350c5fd06b87f0c434959e6f5130553ea1179e95d56b912e1f6c42829"
+      },
+      "scope": "Complete normalized surface physical conversion family and declared aggregate binding selectors; ordinary helper format provenance remains distinct and queued.",
+      "validation": {
+        "slangpy1": {
+          "path": "build/nvvm-normalized-surfaces/slangpy1.json",
+          "sha256": "642d20d3dec8a8076829192049420f0a28d4ae8c022c8e86b9a6709e0e6caf7f",
+          "return_code": 4,
+          "elapsed_seconds": 0.43244051933288574
+        },
+        "build4": {
+          "path": "build/nvvm-normalized-surfaces/build4.json",
+          "sha256": "0ca8b922087f65cd946f8458a4e6c852bc9654b29b4c65660c6907f3975330bd",
+          "return_code": 0,
+          "elapsed_seconds": 25.542446613311768
+        },
+        "wrapper-before": {
+          "path": "build/nvvm-normalized-surfaces/wrapper-before.json",
+          "sha256": "2f615b32fc3786f8c1f9827d6e1bc50255fc82eec9a7fb6df230c89e8e9931b5",
+          "return_code": 255,
+          "elapsed_seconds": 0.3281838893890381
+        },
+        "cpu1": {
+          "path": "build/nvvm-normalized-surfaces/cpu1.json",
+          "sha256": "c360efadb21b854a6eb82651a377258100fd424c9b05afeeffbc42f9968fe3bb",
+          "return_code": 0,
+          "elapsed_seconds": 30.893239974975586
+        },
+        "wrapper-source1": {
+          "path": "build/nvvm-normalized-surfaces/wrapper-source1.json",
+          "sha256": "01c6779f7d5453a730deb73b01c4a242a5f6b2fb96f59b9e1332c95935b4e0f9",
+          "return_code": 0,
+          "elapsed_seconds": 1.5325617790222168
+        },
+        "wrapper-unit1": {
+          "path": "build/nvvm-normalized-surfaces/wrapper-unit1.json",
+          "sha256": "d889e6007d0307a9dcecd4d2ff45aaa89c896875bc668ebd08fdae5d52e9da21",
+          "return_code": 1,
+          "elapsed_seconds": 1.73067045211792
+        },
+        "cpu2": {
+          "path": "build/nvvm-normalized-surfaces/cpu2.json",
+          "sha256": "6e386c64b41b0981f6f5a8e450f65b85014c3909113ba852639c2281c70aff2d",
+          "return_code": 1,
+          "elapsed_seconds": 26.245307207107544
+        },
+        "build2": {
+          "path": "build/nvvm-normalized-surfaces/build2.json",
+          "sha256": "cee01531b58581d7bd35c522b6fbfbe8d07584e2c05fd1bfc72becc0bcd5364e",
+          "return_code": 1,
+          "elapsed_seconds": 0.13930153846740723
+        },
+        "provenance-negative1": {
+          "path": "build/nvvm-normalized-surfaces/provenance-negative1.json",
+          "sha256": "168e5dddf4764d1a03a5bf80fee9df6d1272b157ba1c2d9b2ed7dde6a7ef7726",
+          "return_code": 0,
+          "elapsed_seconds": 1.4514007568359375
+        },
+        "application-ir1": {
+          "path": "build/nvvm-normalized-surfaces/application-ir1.json",
+          "sha256": "7de0d6a2102859d4f1702e8d6b8c1f09288c085dae051b82a98d48f77031f719",
+          "return_code": 255,
+          "elapsed_seconds": 1.7886450290679932
+        },
+        "build3": {
+          "path": "build/nvvm-normalized-surfaces/build3.json",
+          "sha256": "bab7fbf29e597df5b4a5c0b1e3cbb4d2cfaec52ee075bc77284c6654208e5e0b",
+          "return_code": 0,
+          "elapsed_seconds": 37.275973081588745
+        },
+        "build1": {
+          "path": "build/nvvm-normalized-surfaces/build1.json",
+          "sha256": "353a9c69eb8f185127d4a756fe4dd2689f28c903c4c1358a764600bdb9fc9ea9",
+          "return_code": 0,
+          "elapsed_seconds": 38.83810567855835
+        },
+        "slangpy2": {
+          "path": "build/nvvm-normalized-surfaces/slangpy2.json",
+          "sha256": "bf0e9265a161a588bb5fab947c464ac70610470be862d953878d37b93aa1c67e",
+          "return_code": 1,
+          "elapsed_seconds": 53.289711236953735
+        },
+        "wrapper-after1": {
+          "path": "build/nvvm-normalized-surfaces/wrapper-after1.json",
+          "sha256": "dff03419d5afd20c0e20c30390a2ccdcc2e0cf3a27151228a80cd61457e8a2eb",
+          "return_code": 0,
+          "elapsed_seconds": 0.3403022289276123
+        },
+        "cpu3": {
+          "path": "build/nvvm-normalized-surfaces/cpu3.json",
+          "sha256": "5715da3d8ac4499439cbc80adc9ab0d32bc58d055379b30764683c793f72332e",
+          "return_code": 0,
+          "elapsed_seconds": 30.799323797225952
+        },
+        "units2": {
+          "path": "build/nvvm-normalized-surfaces/units2.json",
+          "sha256": "c40d058fde62e08a2728da8c15041fc298a47f73a365932ac82a6fb363844c21",
+          "return_code": 0,
+          "elapsed_seconds": 7.22665548324585
+        },
+        "provenance-negative2": {
+          "path": "build/nvvm-normalized-surfaces/provenance-negative2.json",
+          "sha256": "8fcdde3355090d840a5f38d77161bc5d6c8236146b339f3d27f5cd27301b4de8",
+          "return_code": 0,
+          "elapsed_seconds": 1.4460272789001465
+        }
+      },
+      "surface_runs": {
+        "family1": {
+          "results": {
+            "path": "build/nvvm-normalized-surfaces/family1/results.json",
+            "sha256": "cc71ec00cc5d309e1dbd5a72eb3903603b2c916692faae58ebd1b13a6cbd80eb"
+          },
+          "provenance": {
+            "path": "build/nvvm-normalized-surfaces/family1/provenance.json",
+            "sha256": "787c3f2d681164c962f371fccf14a5f26936edc92c8ccc0549355577f31f4705"
+          },
+          "counts": {
+            "passed": 60
+          }
+        },
+        "minimum-controls": {
+          "results": {
+            "path": "build/nvvm-normalized-surfaces/minimum-controls/results.json",
+            "sha256": "907d23d3bfa1af8c1fcc052e1ec780200ad3a89fff2d4b60257edbf11688cf89"
+          },
+          "provenance": {
+            "path": "build/nvvm-normalized-surfaces/minimum-controls/provenance.json",
+            "sha256": "1d207ad2b7778e8b68066b2888297e5d5df55118783dfb7adcc4102cde896dfd"
+          },
+          "counts": {
+            "passed": 8
+          }
+        },
+        "controls1": {
+          "results": {
+            "path": "build/nvvm-normalized-surfaces/controls1/results.json",
+            "sha256": "2cbb554fc7f492db78538f64afe6c6ac4802a73abc06a5bb8cb34810d228d99c"
+          },
+          "provenance": {
+            "path": "build/nvvm-normalized-surfaces/controls1/provenance.json",
+            "sha256": "bb812bcefffd13ee0abc72478d0b035426df9fb1c1ed0e1691ceaa316a7bda17"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "comparison1": {
+          "results": {
+            "path": "build/nvvm-normalized-surfaces/comparison1/results.json",
+            "sha256": "c573931c5b107b26e4b99987892940eb8ff14c5f0069e4ae47ba3fa61342baa6"
+          },
+          "provenance": {
+            "path": "build/nvvm-normalized-surfaces/comparison1/provenance.json",
+            "sha256": "bb812bcefffd13ee0abc72478d0b035426df9fb1c1ed0e1691ceaa316a7bda17"
+          },
+          "counts": {
+            "compile-failed": 4
+          }
+        }
+      },
+      "outcomes": {
+        "surface_nvvm": {
+          "grouped_rows": 30,
+          "cells": 60,
+          "formats_per_cell": 12,
+          "enhanced_minimum_cells": 8,
+          "native_controls": 4
+        },
+        "surface_nvrtc": {
+          "selected": 4,
+          "compile_failed": 4,
+          "numerical_qualification": false
+        },
+        "units": {
+          "passed": 3
+        },
+        "wrapper_ptx": {
+          "passed": 2
+        },
+        "provenance_rejection": {
+          "passed": 1
+        },
+        "cpu_contracts": {
+          "passed": true,
+          "cases": 151
+        },
+        "slangpy": {
+          "selected": 484,
+          "passed": 388,
+          "failed": 96,
+          "resolved": 50,
+          "previous_passes_preserved": 338
+        },
+        "smoke": {
+          "passed": 16,
+          "selection": {
+            "path": "build/nvvm-normalized-surfaces/smoke1/selection.json",
+            "sha256": "a29be21f4f10cc4554eab58685ff6a367d381f7c2170cad5ce2ce925d21a2351"
+          }
+        }
+      },
+      "contracts": [
+        "Exact format owner selects None/UNorm/SNorm; physical width/kind alone do not infer normalization.",
+        "Half/Float logical values; Float32 clamp/scale, NaN0, nearest/ties-away via truncate/residual; SNORMminimum read clamps-1.",
+        "Partial stores convert only replacements and preserve untouched physical bits. No implicit sRGB gamma.",
+        "Canonical typed field/array selectors terminate at entry values or collected globals; arbitrary helper and raw-pointer roots reject.",
+        "Original full checkpoints and working inventory retain their identities; no automatic surface/corpus adoption."
+      ],
+      "failure_history": [
+        {
+          "attempts": ["probe1"],
+          "status": "resolved-fixture",
+          "detail": "Generated unsigned helper replacement left unScalar identifier; corrected fixture only."
+        },
+        {
+          "attempts": ["probe2"],
+          "status": "resolved",
+          "detail": "Physical preflight assumed logical/physical kind equality; selected normalized floating/integer shape now admitted without redoing format discovery."
+        },
+        {
+          "attempts": ["wrapper-unit1"],
+          "status": "resolved-test-scope",
+          "detail": "Fake struct simulation lacks nested resource storage. Positive selectors qualify with real-provider PTX/application evidence; fake retains no-mutation negative checks."
+        },
+        {
+          "attempts": ["slangpy1"],
+          "status": "resolved-harness",
+          "detail": "Mixed original/staged package selection failed import; all484paths corrected to staged package."
+        },
+        {
+          "attempts": ["cpu2"],
+          "status": "resolved-oracle-coverage",
+          "detail": "Explicit SNORMminimum missing in some unselected lanes; strengthened raw initialization and8focused cells pass. Original60cell input identity remains preserved."
+        },
+        {
+          "attempts": ["comparison1"],
+          "status": "open-comparison",
+          "detail": "All4NVRTC selections fail compilation at missing surf*read_convert and component generation; no runtime comparison."
+        },
+        {
+          "attempts": ["slangpy2", "application-ir1"],
+          "status": "open-next-family",
+          "detail": "96native texture accesses remain in ordinary helper parameters; caller format specialization remains unsupported, not guessed."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Final independent source/evidence audit approved: hashes, exact outcomes, prior histories and original/enhanced input identities reconcile."
+      },
+      "limits": [
+        "60family cells retain pre-enhancement host input identity;8focused cells qualify explicit minimum-code additions.",
+        "FourNVRTC compile failures do not establish numerical behavior.",
+        "No new full SlangPy/RHI/working run; RHI inventory unchanged."
+      ]
     }
   }
 }

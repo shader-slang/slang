@@ -1897,6 +1897,37 @@ bool getNVVMSupportedSurfaceFormat(
     if (outType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
         return false;
 
+    // Normalized formats expose floating values but store integer channels. Keep the conversion
+    // decision here, alongside exact format admission, rather than inferring it from channel bits.
+    switch (format)
+    {
+    case ImageFormat::r8:
+    case ImageFormat::rg8:
+    case ImageFormat::rgba8:
+    case ImageFormat::r16:
+    case ImageFormat::rg16:
+    case ImageFormat::rgba16:
+        outType.normalization = NVVMSurfaceNormalization::UNorm;
+        outPhysicalType.kind = SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
+        break;
+    case ImageFormat::r8_snorm:
+    case ImageFormat::rg8_snorm:
+    case ImageFormat::rgba8_snorm:
+    case ImageFormat::r16_snorm:
+    case ImageFormat::rg16_snorm:
+    case ImageFormat::rgba16_snorm:
+        outType.normalization = NVVMSurfaceNormalization::SNorm;
+        outPhysicalType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+        break;
+    default:
+        break;
+    }
+    if (outType.normalization != NVVMSurfaceNormalization::None)
+    {
+        outPhysicalType.bitWidth = formatInfo.sizeInBytes * 8 / formatInfo.channelCount;
+        return outType.elementType.bitWidth == 16 || outType.elementType.bitWidth == 32;
+    }
+
     if ((outType.elementType.bitWidth == 16 &&
          formatInfo.scalarType == SLANG_SCALAR_TYPE_FLOAT16) ||
         (outType.elementType.bitWidth == 32 && formatInfo.scalarType == SLANG_SCALAR_TYPE_FLOAT32))
