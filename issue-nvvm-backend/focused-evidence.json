@@ -91291,6 +91291,170 @@
         "Pointer-bearing entry aggregates, remaining local mixed-layout resource records, normalized formats and intrinsic TensorView remain separate families.",
         "Complete selected handle bit transport does not establish texture sampling, format provenance or external helper ABI semantics."
       ]
+    },
+    "nvvm-cached-ptx": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-cached-ptx/identity.json",
+        "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
+      },
+      "scope": "Sibling RHI owns terminated exact-span PTX for CUDA driver and OptiX consumers; generic cache/compiler artifacts unchanged.",
+      "validation": {
+        "build-diagnostics": {
+          "path": "build/nvvm-cached-ptx/build-diagnostics.json",
+          "sha256": "02f829c6107d178814f4a1a7ca9a72bd0554d700267557a58ddb7b196e7fac48",
+          "return_code": 0,
+          "elapsed_seconds": 5.285459756851196
+        },
+        "build-final": {
+          "path": "build/nvvm-cached-ptx/build-final.json",
+          "sha256": "08ace9eb1c8899d0696adbe0c7b4e6cc17db9740a180543acd2896c29ed44790",
+          "return_code": 0,
+          "elapsed_seconds": 5.342310905456543
+        },
+        "build-negative-final": {
+          "path": "build/nvvm-cached-ptx/build-negative-final.json",
+          "sha256": "fe881112b8fbb2c468d7977c3dfe84e5cf811354f6862d989ec24ef725dab597",
+          "return_code": 0,
+          "elapsed_seconds": 5.7970404624938965
+        },
+        "build-negative": {
+          "path": "build/nvvm-cached-ptx/build-negative.json",
+          "sha256": "515effdda2abc00743ea68c3e812bfbaf52fc28f6c36caa74c3aaf2824c9f4fb",
+          "return_code": 0,
+          "elapsed_seconds": 4.001114368438721
+        },
+        "build-rhi": {
+          "path": "build/nvvm-cached-ptx/build-rhi.json",
+          "sha256": "7e1eb02e5f79e206df09f0d91dee108131b59cbdd1aec3d34dcb984ad10a9beb",
+          "return_code": 0,
+          "elapsed_seconds": 5.242868185043335
+        },
+        "build-slangpy": {
+          "path": "build/nvvm-cached-ptx/build-slangpy.json",
+          "sha256": "1627b02f425740968f7398eddf160acdd1caf82e92d7e9e3cb12732631a5b9d4",
+          "return_code": 0,
+          "elapsed_seconds": 9.56095552444458
+        },
+        "inventory": {
+          "path": "build/nvvm-cached-ptx/inventory.json",
+          "sha256": "633c9804fe2a8c935f65ea7bcb7c3f96e5e8862bc5fc39a15eb75356a7acd1d1",
+          "return_code": 0,
+          "elapsed_seconds": 0.25768423080444336
+        },
+        "rhi-final-nvrtc": {
+          "path": "build/nvvm-cached-ptx/rhi-final-nvrtc.json",
+          "sha256": "a26425ee46d55ddf77b071946a1ca393ef3eac56e6dacd1b1cf8d515fd7ec9f7",
+          "return_code": 0,
+          "elapsed_seconds": 3.2322864532470703
+        },
+        "rhi-final-nvvm": {
+          "path": "build/nvvm-cached-ptx/rhi-final-nvvm.json",
+          "sha256": "b696cd027b36b463830ee574e1c0c371d42c798cd0e0de1ce0e845c68f652754",
+          "return_code": 0,
+          "elapsed_seconds": 2.543213367462158
+        },
+        "rhi-negative-final-nvrtc": {
+          "path": "build/nvvm-cached-ptx/rhi-negative-final-nvrtc.json",
+          "sha256": "f32cfc357e1661fa5ef34febf1c8f99a3737dd08b1beec9536c70e54a2d94fd5",
+          "return_code": 1,
+          "elapsed_seconds": 1.9442026615142822
+        },
+        "rhi-negative-final-nvvm": {
+          "path": "build/nvvm-cached-ptx/rhi-negative-final-nvvm.json",
+          "sha256": "f54300e7ae45bdc66fad06309369d132250bd4b8c04308ce0ad44544db540bca",
+          "return_code": 1,
+          "elapsed_seconds": 1.8891737461090088
+        },
+        "rhi-negative": {
+          "path": "build/nvvm-cached-ptx/rhi-negative.json",
+          "sha256": "9972b310446de32b706ebd188caec442b4afeee3d3020046696c36870f556034",
+          "return_code": 1,
+          "elapsed_seconds": 1.96449613571167
+        },
+        "rhi-nvrtc-diagnostics": {
+          "path": "build/nvvm-cached-ptx/rhi-nvrtc-diagnostics.json",
+          "sha256": "d3444f9f07a69302e664df021297a63fb159f0d9b4434963638c4cf974ed164e",
+          "return_code": 1,
+          "elapsed_seconds": 1.4710819721221924
+        },
+        "rhi-nvrtc": {
+          "path": "build/nvvm-cached-ptx/rhi-nvrtc.json",
+          "sha256": "a4c37878823ffdb1110cac8ec7dda37ae6acf546b71318bad200adb138c01317",
+          "return_code": 1,
+          "elapsed_seconds": 2.7180776596069336
+        },
+        "rhi-nvvm": {
+          "path": "build/nvvm-cached-ptx/rhi-nvvm.json",
+          "sha256": "c440fe0b069df5c95f0247bdebd18c17543b6bd5babe07de27e7d4e6127b2fca",
+          "return_code": 0,
+          "elapsed_seconds": 4.796633243560791
+        },
+        "slangpy-nvrtc": {
+          "path": "build/nvvm-cached-ptx/slangpy-nvrtc.json",
+          "sha256": "82a624a0d25f0d6ef69888baf18e78662677bb1094aad666d6a3d39fd552db0c",
+          "return_code": 0,
+          "elapsed_seconds": 4.714912414550781
+        },
+        "slangpy-nvvm": {
+          "path": "build/nvvm-cached-ptx/slangpy-nvvm.json",
+          "sha256": "7eb73843d8b1b97e6ecb7093aa126c849b3d11cf0598f2ae26b03350cb93a96e",
+          "return_code": 1,
+          "elapsed_seconds": 14.37871265411377
+        }
+      },
+      "outcomes": {
+        "rhi_nvvm": {
+          "passed": 3,
+          "assertions": 97
+        },
+        "rhi_nvrtc": {
+          "passed": 3,
+          "assertions": 97
+        },
+        "slangpy_nvvm": {
+          "passed": 47,
+          "failed": 15,
+          "selected": 62,
+          "resolved": 1,
+          "previous_passes_preserved": 46
+        },
+        "slangpy_nvrtc": {
+          "passed": 6,
+          "includes": "cache and5explicit route gates"
+        }
+      },
+      "failure_history": [
+        {
+          "attempts": ["rhi-negative-final-nvvm", "rhi-negative-final-nvrtc"],
+          "status": "resolved",
+          "detail": "Final invalid-suffix fixture with original owner: cold dispatch/cache assertions pass; hot pipeline load fails after15passing assertions. Restored owner passes on both routes."
+        },
+        {
+          "attempts": ["rhi-nvrtc", "rhi-nvrtc-diagnostics"],
+          "status": "separate-fixture-boundary",
+          "detail": "Existing source-string fixture uses main; CUDA renames it main_0 and RHI lookup fails on cold compile. Final dedicated PTX span fixture uses computeMain. Existing non-CUDA main tests remain unchanged; arbitrary renamed entry handling is not repaired here."
+        },
+        {
+          "attempt": "rhi-negative",
+          "status": "resolved",
+          "detail": "Initial source-string fixture fails cache hot reload on original NVVM RHI; superseded by both-route final fixture, original XML retained."
+        }
+      ],
+      "reuse": {
+        "compiler_smoke": "Reuses16resource-helper smoke cells: compiler/provider bytes unchanged; only sibling RHI module ownership/test fixtures change.",
+        "prior_numeric_fixture": "rhi-nvvm initial control passes aggregate-entry-abi with2089 assertions on current compiler; previous NVRTC numeric fixture evidence remains unchanged."
+      },
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Accepted: all89prior feature objects, prior SlangPy/RHI runs and281registration rows preserved; exact283/282RHI and2400SlangPy inventory reconciled. Forty references,17gate-log hashes, final source/binary hashes and protected inputs verified. Both-route revert drill and focused positives confirm boundary; no blocker."
+      },
+      "limits": [
+        "No full application/RHI/compiler refresh.",
+        "OptiX controls cover raygen and triangle modules, not persistent OptiX cache roundtrips.",
+        "Original full application baseline and historical feature evidence unchanged."
+      ],
+      "rhi_commit": "aec3e12ac581840ed0081690e2c9620b3a436a72"
     }
   }
 }

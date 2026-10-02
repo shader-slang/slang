@@ -1692,3 +1692,14 @@ Current commands, exact application selection, initial failures and final binary
 under `build/nvvm-resource-helpers/`; the maintained focused and SlangPy manifests own outcomes.
 The 62-node application selection passes 46, resolves 9 old failures and retains 16 failures.
 All 16 smoke cells pass. This is focused evidence, not a new full checkpoint.
+
+### Cached PTX boundary qualification
+
+The sibling RHI `shader-cache-ptx-span.cuda` fixture checks cold/hot dispatch outputs and cache
+counts with deliberately invalid bytes outside the reported cached blob length. Run it with
+`--cuda-compiler=nvvm` and `--cuda-compiler=nvrtc`; both must pass. Raygen/triangle controls qualify
+ordinary OptiX module creation through the same owner, not persistent OptiX cache roundtrips.
+The focused SlangPy62-node rerun is47pass/15fail, with the cache failure resolved; five explicit
+route gates are included. NVRTC cache plus those five gates pass6/6. Exact commands, negative
+revert drill, fixture main-name investigation and identities are under `build/nvvm-cached-ptx/`.
+Compiler/provider hashes are unchanged, so this RHI-only repair reuses resource-family smoke.

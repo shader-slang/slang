@@ -761,3 +761,11 @@ Future changes should retire a complete duplicated ownership path with a demonst
 bounded validation. Generic physical-storage transformation, broader texture metadata semantics,
 transitive convergence qualification and a production native-bitcode path remain separate work;
 they are not implied by adjacent passing tests or by this document.
+
+## PTX artifact consumer boundary
+
+PTX artifacts are length-delimited and exclude the vendor terminator. Generic caches preserve that
+exact span. RHI's CUDA shader module owns a string copied from pointer plus length, supplying a
+terminator for CUDA driver loading and OptiX text inspection while retaining the original size for
+OptiX compilation. Spare bytes in fresh compiler blobs are not part of the artifact contract.
+This boundary is shared by NVVM and NVRTC; neither compiler nor generic cache adds semantic bytes.

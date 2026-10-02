@@ -1151,6 +1151,66 @@
         "failed": 0
       },
       "scope": "Focused common version matrix; SDK9 also retains the existing lifecycle control. No full-suite rerun."
+    },
+    "numeric-entry-nvvm": {
+      "gate": {
+        "path": "build/nvvm-entry-aggregate/rhi-nvvm-final.json",
+        "sha256": "b2871490b43adbd7c4be87d802b32cc07a7966846153f7ef378f1cf08899e36c"
+      },
+      "log": {
+        "path": "build/nvvm-entry-aggregate/rhi-nvvm-final.log",
+        "sha256": "1e644338dd9db11dcc1bf54d98e4480624aa575a1a8d79124a4b1932bd1d8890"
+      },
+      "identity": {
+        "path": "build/nvvm-entry-aggregate/identity.json",
+        "sha256": "d498fda61b1689e3111063e978aa303f16ab9d1fc70d6ed70de020180be0ffbb"
+      },
+      "scope": "Focused exact registration; full baseline unchanged."
+    },
+    "numeric-entry-nvrtc": {
+      "gate": {
+        "path": "build/nvvm-entry-aggregate/rhi-nvrtc-final.json",
+        "sha256": "15b6273acd3563fcf54975b2e49467e14fed27a430b1db5544d110788be3b552"
+      },
+      "log": {
+        "path": "build/nvvm-entry-aggregate/rhi-nvrtc-final.log",
+        "sha256": "612a76d6498d06b3178f60fc81b7637d5934a7c9979c11fd39c658c0c8102d0a"
+      },
+      "identity": {
+        "path": "build/nvvm-entry-aggregate/identity.json",
+        "sha256": "d498fda61b1689e3111063e978aa303f16ab9d1fc70d6ed70de020180be0ffbb"
+      },
+      "scope": "Focused exact registration; full baseline unchanged."
+    },
+    "cached-ptx-nvvm": {
+      "gate": {
+        "path": "build/nvvm-cached-ptx/rhi-final-nvvm.json",
+        "sha256": "b696cd027b36b463830ee574e1c0c371d42c798cd0e0de1ce0e845c68f652754"
+      },
+      "log": {
+        "path": "build/nvvm-cached-ptx/rhi-final-nvvm.log",
+        "sha256": "27bdb88fed06c30d8d6d39eff971e2a60d8a6285e917b7bb371c7eda2e8d06f1"
+      },
+      "identity": {
+        "path": "build/nvvm-cached-ptx/identity.json",
+        "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
+      },
+      "scope": "Focused exact registration; full baseline unchanged."
+    },
+    "cached-ptx-nvrtc": {
+      "gate": {
+        "path": "build/nvvm-cached-ptx/rhi-final-nvrtc.json",
+        "sha256": "a26425ee46d55ddf77b071946a1ca393ef3eac56e6dacd1b1cf8d515fd7ec9f7"
+      },
+      "log": {
+        "path": "build/nvvm-cached-ptx/rhi-final-nvrtc.log",
+        "sha256": "89e852f6cf4c88349231fc64948015879790a00a6c55c1289c55aa161ab872be"
+      },
+      "identity": {
+        "path": "build/nvvm-cached-ptx/identity.json",
+        "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
+      },
+      "scope": "Focused exact registration; full baseline unchanged."
     }
   },
   "reconciliation": {
@@ -20579,20 +20639,73 @@
       ],
       "failure_history": [],
       "qualification": "Reject a session compiler version conflicting with the actual OptiX context; accept the same explicit version. Qualified on8.0/8.1/9.0."
+    },
+    {
+      "id": "aggregate-entry-abi.cuda#occurrence-1",
+      "name": "aggregate-entry-abi.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp",
+          "line": 569
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "numeric-entry-nvvm",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        },
+        {
+          "run": "numeric-entry-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "shader-cache-ptx-span.cuda#occurrence-1",
+      "name": "shader-cache-ptx-span.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-shader-cache.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "cached-ptx-nvvm",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        },
+        {
+          "run": "cached-ptx-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "current_known_outcomes": {
-    "registration_count": 281,
-    "unique_name_count": 280,
-    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite.",
+    "registration_count": 283,
+    "unique_name_count": 282,
+    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite. Numeric-entry and exact-span PTX cache fixtures add two passing registrations per route with their own focused identities; no full rerun.",
     "by_compiler": {
       "nvvm": {
-        "passed": 270,
+        "passed": 272,
         "failed": 1,
         "skipped": 10
       },
       "nvrtc": {
-        "passed": 266,
+        "passed": 268,
         "skipped": 10,
         "failed": 5
       }
@@ -20618,19 +20731,17 @@
   "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
   "current_inventory": {
     "gate": {
-      "path": "build/nvvm-optix-versions/rhi-inventory.json",
-      "sha256": "16992c02266f63354cb78b18a5b1b0520e42741b8981d4c698cafc12831edcbd",
-      "return_code": 0,
-      "elapsed_seconds": 0.24794936180114746
+      "path": "build/nvvm-cached-ptx/inventory.json",
+      "sha256": "633c9804fe2a8c935f65ea7bcb7c3f96e5e8862bc5fc39a15eb75356a7acd1d1"
     },
     "listing": {
-      "path": "build/nvvm-optix-versions/rhi-inventory.log",
-      "sha256": "693a9abeae96bfbf2d64ad33b34011726016226e68c81e4e918ea72d81e163d5"
+      "path": "build/nvvm-cached-ptx/inventory.log",
+      "sha256": "bdc8e9597467210a97d0f9f2837240df037ec3ce91ff0cab9aabce3c46ad0f11"
     },
-    "registration_count": 281,
-    "unique_name_count": 280,
+    "registration_count": 283,
+    "unique_name_count": 282,
     "manifest_multiset_matches": true,
-    "scope": "Adds the version conflict regression; original duplicate remains. Version8 results are separately qualified."
+    "scope": "Adds prior numeric-entry fixture and current exact-span PTX cache fixture; original duplicate retained. Mixed-age focused qualification."
   },
   "current_reconciliation": {
     "raw": {

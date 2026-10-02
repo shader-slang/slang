@@ -271,12 +271,59 @@
         "path": "build/nvvm-resource-helpers/identity.json",
         "sha256": "cd7fd7865bc271ca3094c33246f63d883c9257621cc4340e971c1d5b1ed4f08c"
       }
+    },
+    "cached-ptx-slangpy-nvvm": {
+      "gate": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvvm.json",
+        "sha256": "7eb73843d8b1b97e6ecb7093aa126c849b3d11cf0598f2ae26b03350cb93a96e"
+      },
+      "log": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvvm.log",
+        "sha256": "c4bc5ed9cb0166cac1fdf07cf6cdd9cb733c0eebfda58bb517f1d200748f68c3"
+      },
+      "junit": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvvm.xml",
+        "sha256": "62156c3a1a0b6bd9434911434ca70678e13acde781ad60b8930cd2b6acbaba0f"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 14.37871265411377,
+      "test_counts": {
+        "passed": 47,
+        "failed": 15
+      },
+      "identity": {
+        "path": "build/nvvm-cached-ptx/identity.json",
+        "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
+      }
+    },
+    "cached-ptx-slangpy-nvrtc": {
+      "gate": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvrtc.json",
+        "sha256": "82a624a0d25f0d6ef69888baf18e78662677bb1094aad666d6a3d39fd552db0c"
+      },
+      "log": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvrtc.log",
+        "sha256": "f347dac81ca03af1b5d749ab2b0093f0a9dd7513ed832e889bfbb4beaeff8065"
+      },
+      "junit": {
+        "path": "build/nvvm-cached-ptx/slangpy-nvrtc.xml",
+        "sha256": "b7cd48a5451036da4b0e56243262a0d4e131325e4a7049bacb7fc0fef68a2d7f"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 4.714912414550781,
+      "test_counts": {
+        "passed": 6
+      },
+      "identity": {
+        "path": "build/nvvm-cached-ptx/identity.json",
+        "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
+      }
     }
   },
   "current_counts": {
     "skipped": 807,
-    "passed": 1093,
-    "failed": 497,
+    "passed": 1094,
+    "failed": 496,
     "xfailed": 3
   },
   "collection_skips": [
@@ -1458,7 +1505,8 @@
     "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_broadcast[DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast[DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast_with_scalar[DeviceType.cuda]",
-    "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_thread_count_dispatch[DeviceType.cuda]"
+    "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_thread_count_dispatch[DeviceType.cuda]",
+    "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]"
   ],
   "failures_by_first_diagnostic": {
     "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<cbuffer<SLANG_ParameterGroup_data>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'": [
@@ -1994,9 +2042,6 @@
       "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
       "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
       "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]"
-    ],
-    "RuntimeError: m_device->rhi_device()->createComputePipeline(rhi_desc, (rhi::IComputePipeline**)m_rhi_pipeline.writeRef()) failed with error: -2147467259 (SLANG_FAIL)": [
-      "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]"
     ]
   },
   "skips_by_reason": {
@@ -3799,6 +3844,14 @@
         "sha256": "68365a7c413fd30bafef84a55a03703bc51545cfa7e85c6c3a47de03300afd53"
       },
       "detail": "62nodes:46pass16fail, including37existing pass sentinels. Remaining10entry,3sequential pointer,2local resource-layout and1cached-PTX pipeline failure. Cached shader test now executes first dispatch successfully, but second device reload reports CUDA_ERROR_INVALID_PTX; diagnostic transition retained, not a regression from a previously passing node."
+    },
+    "cached_ptx": {
+      "node": "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]",
+      "previous": "RuntimeError: m_device->rhi_device()->createComputePipeline(rhi_desc, (rhi::IComputePipeline**)m_rhi_pipeline.writeRef()) failed with error: -2147467259 (SLANG_FAIL)",
+      "current": "passed",
+      "cause": "RHI passed length-delimited PTX to terminated-text APIs; disk cache correctly drops compiler spare terminator.",
+      "repair": "CUDA module owns exact bytes in std::string; all CUDA/OptiX consumers share termination and preserve length.",
+      "runs": ["cached-ptx-slangpy-nvvm", "cached-ptx-slangpy-nvrtc"]
     }
   },
   "next_complete_families": [
@@ -3806,7 +3859,7 @@
       "priority": 3,
       "family": "Pointer-bearing entry aggregates and checked addressing",
       "evidence": "353original tensor-like entry failures plus10newly exposed cases; SlangPy CUDA StorageTraits selects T* with shape/stride/offset records. Sequential failures include37previous and3new cases; reduce const-array borrow roots and explicit thread-local call-shape fields.",
-      "scope": "Finite user-pointer-bearing entry records/arrays, explicit launch AS1 to helper AS0 conversion, preserved checked parent facts. Keep intrinsic TensorView separate and do not treat pointers as buffer descriptors. Remaining2local resource-layout cases and cached-PTX failure retain separate histories."
+      "scope": "Finite user-pointer-bearing entry records/arrays, explicit launch AS1 to helper AS0 conversion, preserved checked parent facts. Keep intrinsic TensorView separate and do not treat pointers as buffer descriptors. Remaining2local resource-layout cases retain separate histories; cached-PTX failure is resolved."
     },
     {
       "priority": 4,
@@ -3829,7 +3882,7 @@
       "scope": "Reduce producer IR before expanding admission. Five unsupported RGB texture creation failures are shared application/RHI limitations, not evidence of NVVM lowering failure."
     }
   ],
-  "current_evidence": "Mixed-age: full-nvvm-2 is the complete2400-node run; numeric-entry427 and resource-helper62 focused selections supersede exactly their tested nodes. Source/binary reuse is explicit in focused identities. No new full application run.",
+  "current_evidence": "Mixed-age: full-nvvm-2 is the original2400-node checkpoint. Numeric-entry427,resource-helper62 and cached-PTX62 selections supersede exactly tested nodes; five route gates are included in the62. Cached-PTX resolves1additional failure with46prior passes preserved. No new full run.",
   "completed_families": [
     {
       "priority": 1,
@@ -3852,6 +3905,12 @@
       "scope": "Existing buffer/texture/surface/sampler leaves, numeric/resource records and fixed resource arrays; value input/results, local out/inout/ref/readonly and planned child references. Separate from pointer-bearing entry records, special TensorView, resource format provenance and incompatible numeric/resource storage layouts.",
       "status": "accepted-focused",
       "evidence": "features.nvvm-resource-helper-transport in focused-evidence.json"
+    },
+    {
+      "family": "CUDA/OptiX PTX text ownership",
+      "resolved": 1,
+      "evidence": "cached-ptx-slangpy-nvvm",
+      "scope": "RHI exact-span adaptation for terminated consumers; shared NVVM/NVRTC cache repair. OptiX controls are fresh module tests, not cached-OptiX qualification."
     }
   ]
 }

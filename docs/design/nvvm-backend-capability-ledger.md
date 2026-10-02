@@ -44,8 +44,11 @@ readonly rejection before mutation and retained resource-format/storage restrict
 
 This does not admit arbitrary pointer-bearing entries, external helper ABI, normalized surface
 formats or acceleration handles. Combined generic handle specializations still expose a duplicate
-symbol; per-shape success is not qualification of their coexistence. Shader cache reload now reaches
-a separate RHI PTX-termination failure. Both histories remain in the maintained manifests.
+symbol; per-shape success is not qualification of their coexistence. Shader cache reload subsequently exposed
+a shared RHI PTX-termination failure, now repaired by owning the exact byte span as terminated text.
+The deterministic CUDA cache fixture and raygen/triangle controls pass on both routes; the SlangPy
+cache node also passes. OptiX controls do not qualify persistent OptiX cache roundtrips. Original
+failures and fixes remain in the maintained manifests.
 
 ## Explicit OptiX versions
 

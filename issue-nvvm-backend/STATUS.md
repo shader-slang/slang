@@ -12,11 +12,12 @@ accepted. The requested full validation checkpoint is accepted. Subsequent featu
 below; development has resumed with corpus tiers and an initial OptiX path.
 
 The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
-targeting and common raygen/trace/callable qualification are now accepted. **Awaiting the maintainer's
-legacy HitObject compatibility decision:** native8.x Invoke loses ray flags that9 retains;
+targeting and common raygen/trace/callable qualification are now accepted. Application-led feature
+development is active. **The legacy HitObject compatibility decision remains parked:** native8.x
+Invoke loses ray flags that9 retains;
 preserving modern visibility without reducing the32-word payload capacity needs a private
 cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
-economical focused validation when work resumes. No push, external messages or system changes.
+economical focused validation. No push, external messages or system changes.
 Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
@@ -69,12 +70,22 @@ Focused qualification passes 3 live buffer cells, 40 handle-transport cells (20 
 8 units, 6 static checks and all 16 smoke cells. Synthetic handle tests qualify bit transport;
 SlangPy supplies separate live 2D/3D sampling evidence. The affected application selection is
 **46 pass / 16 fail**, resolving **9 previous failures** and preserving all 37 prior passing controls.
-Current mixed-age inventory is **1,093 pass / 497 fail / 807 skip / 3 expected failures**.
+At resource-family acceptance, the mixed-age inventory was **1,093 pass / 497 fail / 807 skip /
+3 expected failures**.
 The full checkpoint above is unchanged. Evidence is under `build/nvvm-resource-helpers/`.
 
-Next: repair the newly exposed shared RHI cached-PTX termination boundary, then pointer-bearing
-entry records/arrays and checked addressing, normalized surface conversions (50 imageStore
-failures), and intrinsic TensorView/DiffTensorView. Remaining resource mixed-layout records need
+The shared RHI cached-PTX repair is also accepted (`aec3e12ac` in sibling RHI). CUDA modules now own terminated text copied from
+the exact artifact span; CUDA loading and OptiX inspection share that owner. The deterministic
+cache fixture fails on both old routes and passes on both repaired routes, with raygen/triangle
+controls (3 cases / 97 assertions per route). SlangPy now passes 47 of the same 62 selected nodes,
+resolving its cache failure and preserving all 46 prior passes; NVRTC cache plus five route checks
+also pass. Current mixed-age inventory is **1,094 pass / 496 fail / 807 skip / 3 expected failures**.
+Compiler smoke evidence is reused unchanged; no full rerun. Raw evidence: `build/nvvm-cached-ptx/`.
+The refreshed RHI inventory includes the prior numeric fixture and new cache fixture: 283 registrations
+(282 unique), mixed-age NVVM272/1/10 and NVRTC268/5/10. Full checkpoint identities remain unchanged.
+
+Next: pointer-bearing entry records/arrays and checked addressing, normalized surface conversions
+(50 imageStore failures), and intrinsic TensorView/DiffTensorView. Remaining resource mixed-layout records need
 reduction. The combined generic handle fixture also retains a duplicate-symbol failure; isolated
 shape qualification does not establish mixed-specialization coexistence. Do not widen type roles
 or discard address provenance to bypass these failures.
@@ -138,7 +149,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Subsequent implementations have passed focused review; [focused evidence](focused-evidence.json)
-now contains 89 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 90 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
