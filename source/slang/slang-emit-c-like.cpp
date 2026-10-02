@@ -5565,8 +5565,9 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
 void CLikeSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
 {
     // HLSL, Metal, CUDA and C++ spell a pointer in terms of its pointee, which only has to be
-    // declared, so we forward-declare the struct it leads to through any arrays and pointers, as
-    // in `struct A; struct B { A* a; }; struct A { B* b; };`.
+    // declared. When the pointee leads to a struct through any arrays and pointers we
+    // forward-declare that struct, as in `struct A; struct B { A* a; }; struct A { B* b; };`. Any
+    // other pointee, such as the `int` of a `NativeRef<int*>`, needs no declaration.
     IRInst* pointee = ptrType->getValueType();
     for (;;)
     {
@@ -5577,11 +5578,8 @@ void CLikeSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
         else
             break;
     }
-    // A pointer is only forward-declared when it is on a cycle through its pointee, and a type
-    // cycle can only close through a struct.
-    auto structType = as<IRStructType>(pointee);
-    SLANG_RELEASE_ASSERT(structType);
-    emitForwardDeclaration(structType);
+    if (auto structType = as<IRStructType>(pointee))
+        emitForwardDeclaration(structType);
 }
 
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)

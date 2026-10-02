@@ -509,9 +509,10 @@ public:
 
     void emitForwardDeclaration(IRInst* inst);
 
-    /// Emit whatever lets `ptrType` be named before its definition, which follows once its pointee
-    /// is defined. It is used when a pointer is on a cycle through its pointee, as in
-    /// `struct N { N* next; }`. The default forward-declares the struct the pointer leads to.
+    /// Emit whatever lets `ptrType` be named before its definition. It is used when a pointer is
+    /// on a cycle through its pointee, as in `struct N { N* next; }`, and when only its name is
+    /// needed, as for the `T*` of a `NativeRef<T*>`. The default forward-declares the struct the
+    /// pointer leads to, if any.
     virtual void emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType);
 
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
