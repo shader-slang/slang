@@ -18,7 +18,8 @@ struct IRModule;
 /// An array whose length is a small literal becomes a `makeArray` of converted elements. A longer
 /// array, or one whose length is not a literal (for example a specialization constant), is
 /// converted in a loop into a temporary, which keeps the code size independent of the length.
-/// A cast directly in module scope has no control flow for a loop, so it is always unrolled.
+/// A cast directly in module scope has no control flow for a loop, so a literal length is always
+/// unrolled there; a non-literal length there is unsupported.
 void lowerArrayBuiltinCasts(IRModule* module);
 
 } // namespace Slang

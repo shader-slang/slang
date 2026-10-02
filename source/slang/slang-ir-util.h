@@ -16,8 +16,9 @@ constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
 constexpr SlangInt kRTTIHandleSize = 8;
 
-/// The longest array whose element-wise copy or conversion we unroll; a longer array, or one
-/// whose length is not a literal, is handled in a loop so that code size does not grow with it.
+/// The longest array whose element-wise copy or conversion we unroll inside a function; a longer
+/// array, or one whose length is not a literal, is handled in a loop so that code size does not
+/// grow with it.
 constexpr IRIntegerValue kMaxUnrolledArrayElementCount = 16;
 
 /// Return whether a struct contains only void fields or recursively empty structs. Other types,
