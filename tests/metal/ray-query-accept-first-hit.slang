@@ -3,6 +3,8 @@
 // reconstructs it (shader-slang/slang#13408). The template form is checked at compile time
 // only; the runtime lanes run runtimeFlag.
 
+// FWD and REV compile the same entry point; separate prefixes keep each helper's
+// definition-to-call-site check independent of the order the preludes are emitted in.
 //TEST:SIMPLE(filecheck=FWD): -target metal -stage compute -entry runtimeFlag
 //TEST:SIMPLE(filecheck=REV): -target metal -stage compute -entry runtimeFlag
 //TEST:SIMPLE(filecheck=TEMPLATE): -target metal -stage compute -entry templateFlag
@@ -26,8 +28,9 @@
 // TEMPLATE-NEXT: params.accept_any_intersection(true);
 // TEMPLATE: _slang_ray_flags_to_intersection_params((4U))
 
-// The metallib lanes are the only check that Apple's compiler accepts the prelude helpers, so
-// they gate on slangc's result code as well as on the entry point being emitted.
+// SIMPLE lanes do not fail on a non-zero slangc exit code by themselves, so the metallib lanes
+// check "result code = 0" to catch a helper that Apple's compiler rejects, and the define to
+// confirm the kernel was emitted.
 // LIB: result code = 0
 // LIB: define {{.*}} @runtimeFlag
 // TLIB: result code = 0
