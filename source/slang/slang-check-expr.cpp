@@ -3900,10 +3900,12 @@ static bool _canLValueCoerce(Type* a, Type* b)
     SLANG_ASSERT(a != b);
     // `a` is the argument type and `b` the parameter type. `lowerLValueCast` never reinterprets an
     // array in place, so an array of matrices goes through a temporary in the parameter's layout.
-    // A single matrix of another layout never gets here: only `coerceArgToParam` builds an
-    // `ImplicitCastExpr` for a layout conversion, and only for arrays.
+    // A single matrix of another layout must not reach the matrix case below, which would let
+    // `lowerLValueCast` reinterpret it in place and ignore the layout; only `coerceArgToParam`
+    // builds an `ImplicitCastExpr` for a layout conversion, and only for arrays.
     if (isArrayMatrixLayoutConversion(b, a))
         return true;
+    SLANG_ASSERT(!as<MatrixExpressionType>(a) || !isMatrixLayoutConversion(b, a));
     if (a->astNodeType == b->astNodeType)
     {
         if (auto matA = as<MatrixExpressionType>(a))

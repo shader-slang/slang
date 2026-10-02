@@ -471,8 +471,10 @@ IRInst* emitLoopBlocks(
 void sortBlocksInFunc(IRGlobalValueWithCode* func);
 
 /// Move `inst` and every instruction after it in its block into a new block, and return the new
-/// block. The new block is appended at the end of the parent's block list, so callers that need
-/// dominance order call `sortBlocksInFunc` afterwards, and `builder` is left inserting into it.
+/// block. `inst` must be in a block of a function or other code value. The original block is left
+/// without a terminator, which the caller must emit. The new block is appended at the end of the
+/// parent's block list, so callers that need dominance order call `sortBlocksInFunc` afterwards,
+/// and `builder` is left inserting into it.
 IRBlock* splitBlockBefore(IRBuilder& builder, IRInst* inst);
 
 // Remove all linkage decorations from func.

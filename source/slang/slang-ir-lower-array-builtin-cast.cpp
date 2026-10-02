@@ -21,6 +21,63 @@ struct ArrayBuiltinCastLoweringContext
             collectCasts(child);
     }
 
+    /// Replace the uses of `cast` with a `makeArray` of each converted element.
+    void unrollCast(IRBuilder& builder, IRInst* cast, IRIntegerValue count)
+    {
+        auto toType = as<IRArrayType>(cast->getDataType());
+        List<IRInst*> elements;
+        for (IRIntegerValue i = 0; i < count; i++)
+        {
+            auto element = builder.emitCast(
+                toType->getElementType(),
+                builder.emitElementExtract(cast->getOperand(0), i));
+            if (isArrayBuiltinCast(element))
+                workList.add(element);
+            elements.add(element);
+        }
+        cast->replaceUsesWith(
+            builder.emitMakeArray(toType, elements.getCount(), elements.getBuffer()));
+        cast->removeAndDeallocate();
+    }
+
+    /// Replace the uses of `cast`, which is in `block`, with a temporary filled by a loop that
+    /// converts one element per iteration. `block` is split at `cast` so that the loop runs
+    /// between the instructions before the cast and those after it.
+    void convertCastInLoop(IRBuilder& builder, IRInst* cast, IRBlock* block)
+    {
+        auto toType = as<IRArrayType>(cast->getDataType());
+        auto code = as<IRGlobalValueWithCode>(block->getParent());
+
+        builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
+        auto resultVar = builder.emitVar(toType);
+
+        auto tailBlock = splitBlockBefore(builder, cast);
+        builder.setInsertInto(block);
+        IRBlock* loopBodyBlock = nullptr;
+        IRBlock* loopBreakBlock = nullptr;
+        auto index = emitLoopBlocks(
+            &builder,
+            builder.getIntValue(builder.getIntType(), 0),
+            builder.emitCast(builder.getIntType(), toType->getElementCount()),
+            loopBodyBlock,
+            loopBreakBlock);
+
+        builder.setInsertBefore(loopBodyBlock->getTerminator());
+        auto element = builder.emitCast(
+            toType->getElementType(),
+            builder.emitElementExtract(cast->getOperand(0), index));
+        if (isArrayBuiltinCast(element))
+            workList.add(element);
+        builder.emitStore(builder.emitElementAddress(resultVar, index), element);
+
+        builder.setInsertInto(loopBreakBlock);
+        builder.emitBranch(tailBlock);
+
+        builder.setInsertBefore(cast);
+        cast->replaceUsesWith(builder.emitLoad(resultVar));
+        cast->removeAndDeallocate();
+    }
+
     /// Replace the array cast `cast` with a conversion of each element, adding any nested array
     /// cast this creates to the work list. If the conversion is a loop, return the function or
     /// global variable whose blocks were split for it, which needs its blocks re-sorted;
@@ -28,7 +85,6 @@ struct ArrayBuiltinCastLoweringContext
     IRGlobalValueWithCode* lowerCast(IRInst* cast)
     {
         auto toType = as<IRArrayType>(cast->getDataType());
-        auto toElementType = toType->getElementType();
         auto value = cast->getOperand(0);
 
         // Specializing a call for a buffer-load argument leaves the caller's cast unused, and
@@ -52,65 +108,24 @@ struct ArrayBuiltinCastLoweringContext
         IRBuilderSourceLocRAII srcLocRAII(&builder, cast->sourceLoc);
         builder.setInsertBefore(cast);
 
-        IRGlobalValueWithCode* splitCode = nullptr;
-        IRInst* result = nullptr;
-        // A loop needs a control-flow graph, so a cast directly in module scope, such as one in
-        // a `static const` initializer, is unrolled whatever its length.
+        // A cast that is not in a block is directly in module scope, e.g. in a `static const`
+        // initializer, where there is no control flow for a loop.
         auto count = as<IRIntLit>(toType->getElementCount());
         auto block = as<IRBlock>(cast->getParent());
         if (count && (count->getValue() <= kMaxUnrolledArrayElementCount || !block))
         {
-            List<IRInst*> elements;
-            for (IRIntegerValue i = 0; i < count->getValue(); i++)
-            {
-                auto element =
-                    builder.emitCast(toElementType, builder.emitElementExtract(value, i));
-                if (isArrayBuiltinCast(element))
-                    workList.add(element);
-                elements.add(element);
-            }
-            result = builder.emitMakeArray(toType, elements.getCount(), elements.getBuffer());
-        }
-        else
-        {
-            // A module-scope array whose length is a specialization constant cannot be emitted
-            // even without a conversion, so we do not try to convert one.
-            if (!block)
-                SLANG_UNIMPLEMENTED_X("array layout conversion of a module-scope array whose "
-                                      "length is not a literal");
-            splitCode = as<IRGlobalValueWithCode>(block->getParent());
-
-            builder.setInsertBefore(splitCode->getFirstBlock()->getFirstOrdinaryInst());
-            auto resultVar = builder.emitVar(toType);
-
-            auto tailBlock = splitBlockBefore(builder, cast);
-            builder.setInsertInto(block);
-            IRBlock* loopBodyBlock = nullptr;
-            IRBlock* loopBreakBlock = nullptr;
-            auto index = emitLoopBlocks(
-                &builder,
-                builder.getIntValue(builder.getIntType(), 0),
-                builder.emitCast(builder.getIntType(), toType->getElementCount()),
-                loopBodyBlock,
-                loopBreakBlock);
-
-            builder.setInsertBefore(loopBodyBlock->getTerminator());
-            auto element =
-                builder.emitCast(toElementType, builder.emitElementExtract(value, index));
-            if (isArrayBuiltinCast(element))
-                workList.add(element);
-            builder.emitStore(builder.emitElementAddress(resultVar, index), element);
-
-            builder.setInsertInto(loopBreakBlock);
-            builder.emitBranch(tailBlock);
-
-            builder.setInsertBefore(cast);
-            result = builder.emitLoad(resultVar);
+            unrollCast(builder, cast, count->getValue());
+            return nullptr;
         }
 
-        cast->replaceUsesWith(result);
-        cast->removeAndDeallocate();
-        return splitCode;
+        // For example `static const float4x4 a[N] = b;` with a specialization-constant `N`. Such
+        // an array cannot be emitted even without a conversion, so we do not try to convert one.
+        if (!block)
+            SLANG_UNIMPLEMENTED_X(
+                "array layout conversion of a module-scope array whose length is not a literal");
+
+        convertCastInLoop(builder, cast, block);
+        return as<IRGlobalValueWithCode>(block->getParent());
     }
 
     void processModule()

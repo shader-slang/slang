@@ -10,7 +10,7 @@ struct IRModule;
 /// The front end produces such a cast when an array of matrices converts to an array whose
 /// matrices have another layout. `lowerLValueCast` produces one to copy an `inout`/`out` argument
 /// back after the call, and for `inout` a second one to copy it in. No backend can emit the cast
-/// directly. We run this pass after
+/// directly. In the main pipeline we run this pass after
 /// `specializeMatrixLayout`, which turns a cast between layouts that resolve to the same layout
 /// into an identity that simplification removes, and after the buffer-load specialization passes,
 /// which see through the cast to keep reading the original buffer.

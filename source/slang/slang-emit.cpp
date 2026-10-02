@@ -1816,6 +1816,8 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
+        // The buffer-load specializations that the main pipeline runs first do not run for the
+        // VM, and the bytecode emitter cannot handle an array cast.
         if (requiredLoweringPassSet.arrayBuiltinCast)
             SLANG_PASS(lowerArrayBuiltinCasts);
         SLANG_PASS(performForceInlining);
