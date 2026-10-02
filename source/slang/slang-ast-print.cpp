@@ -59,7 +59,7 @@ void ASTPrinter::addType(Type* type)
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             auto elementType = matrixType->getElementType();
-            if (as<BasicExpressionType>(elementType))
+            if (as<BasicExpressionType>(elementType) && !matrixType->hasNonDefaultLayout())
             {
                 matrixType->getElementType()->toText(m_builder);
                 if (as<ConstantIntVal>(matrixType->getRowCount()) &&

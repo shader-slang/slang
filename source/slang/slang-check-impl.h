@@ -170,6 +170,10 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
     }
     else if (auto matrixType = as<MatrixExpressionType>(typeIn))
     {
+        // The key has no room for the layout, and matrices that differ only in layout convert
+        // at different costs, so only a plain matrix gets a key.
+        if (matrixType->hasNonDefaultLayout())
+            return BasicTypeKey::invalid();
         if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
         {
             if (auto elemCount2 = as<ConstantIntVal>(matrixType->getColumnCount()))

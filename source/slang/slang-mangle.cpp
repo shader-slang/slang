@@ -221,6 +221,13 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "x");
         emitSimpleIntVal(context, matType->getColumnCount());
         emitType(context, matType->getElementType());
+        // A plain matrix keeps the `m<R>x<C><T>` spelling. Any other layout is a different type,
+        // so we append `L` and the layout value; no mangled production starts with `L`.
+        if (matType->hasNonDefaultLayout())
+        {
+            emitRaw(context, "L");
+            emitVal(context, matType->getLayout());
+        }
     }
     else if (auto namedType = dynamicCast<NamedExpressionType>(type))
     {
