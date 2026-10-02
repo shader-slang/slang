@@ -22,6 +22,17 @@ struct S
     float v[4];
 }
 
+struct W
+{
+    float x;
+    Inner n;
+}
+
+struct C2
+{
+    float v;
+}
+
 cbuffer C
 {
     float* pf;
@@ -29,6 +40,8 @@ cbuffer C
     S* ps;
     float4* pv;
     int* pi;
+    W* pw;
+    Ptr<C2[2]> arr;
 }
 
 RWStructuredBuffer<float*> ptrs;
@@ -81,4 +94,10 @@ void computeMain()
 
     // GLSL: (C_0.pf_0 + 2)._data = 9.0;
     *(pf + 2) = 9.0;
+
+    // GLSL: = C_0.pw_0._data.n_0.x_{{[0-9]+}};
+    outF[2] = pw->n.x;
+
+    // GLSL: = (C_0.arr_0 + 0)._data[1].v_{{[0-9]+}};
+    outF[3] = arr[0][1].v;
 }
