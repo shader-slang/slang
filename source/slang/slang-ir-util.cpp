@@ -385,6 +385,12 @@ bool isValueType(IRInst* dataType)
     }
 }
 
+bool isArrayBuiltinCast(IRInst* inst)
+{
+    return inst->getOp() == kIROp_BuiltinCast && as<IRArrayType>(inst->getDataType()) &&
+           as<IRArrayType>(inst->getOperand(0)->getDataType());
+}
+
 bool isScalarOrVectorType(IRInst* type)
 {
     switch (type->getOp())

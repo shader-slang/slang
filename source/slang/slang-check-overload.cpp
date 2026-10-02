@@ -915,6 +915,20 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
+            // An array of matrices passed to an `out`/`inout` parameter of another layout is
+            // converted into a temporary and back after the call. The argument check recognizes
+            // that conversion only in the implicit-cast form, so we build it here, where we know
+            // the conversion wraps this argument.
+            if (paramType.isLeftValue && arg.argExpr->type.isLeftValue)
+            {
+                if (auto castExpr = as<BuiltinCastExpr>(coercedExpr);
+                    castExpr && castExpr->base == arg.argExpr &&
+                    isArrayMatrixLayoutConversion(castExpr->type, arg.argExpr->type))
+                {
+                    coercedExpr = CreateImplicitCastExpr(castExpr->type, arg.argExpr);
+                }
+            }
+
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
                 !isInterfaceType(arg.type) && isInterfaceType(paramType.type))

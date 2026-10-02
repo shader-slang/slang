@@ -3898,7 +3898,9 @@ static bool _canLValueCoerce(Type* a, Type* b)
     // We can *assume* here that if they are coercable, that dimensions of vectors
     // and matrices match. We might want to assert to be sure...
     SLANG_ASSERT(a != b);
-    if (isMatrixLayoutConversion(b, a))
+    // `a` is the argument type and `b` the parameter type. `lowerLValueCast` never reinterprets an
+    // array in place, so an array of matrices goes through a temporary in the parameter's layout.
+    if (isArrayMatrixLayoutConversion(b, a))
         return true;
     if (a->astNodeType == b->astNodeType)
     {
@@ -4314,31 +4316,15 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
-                    // `out`, `inout`, and `ref` parameters currently require
-                    // an *exact* match on the type of the argument.
-                    //
-                    // TODO: relax this requirement by allowing an argument
-                    // for an `inout` parameter to be converted in both
-                    // directions.
+                    // `out`, `inout`, and `ref` parameters require an l-value of the
+                    // parameter's type. An `out` or `inout` argument may instead go through
+                    // one of the restricted implicit l-value conversions below; `ref`
+                    // cannot use that fallback.
                     //
                     if (argExpr)
                     {
                         if (!argExpr->type.isLeftValue)
                         {
-                            // We give a matrix-layout conversion the implicit-cast form, so that an
-                            // l-value argument is converted into a temporary and the result
-                            // converted back after the call, the same as an `int` argument to an
-                            // `inout uint` parameter.
-                            if (auto builtinCastExpr = as<BuiltinCastExpr>(argExpr);
-                                builtinCastExpr && isMatrixLayoutConversion(
-                                                       builtinCastExpr->type,
-                                                       builtinCastExpr->base->type))
-                            {
-                                argExpr = CreateImplicitCastExpr(
-                                    builtinCastExpr->type,
-                                    builtinCastExpr->base);
-                            }
-
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
                             // NOTE:
@@ -4378,7 +4364,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // ```
                                 // That strictly speaking it's not allowed, but we are going to
                                 // allow it for now for situations were the types are uint/int
-                                // and vector/matrix varieties of those types
+                                // and vector/matrix varieties of those types, and for arrays of
+                                // matrices that differ only in layout
                                 //
                                 // Then in lowering we are going to insert code to do something
                                 // like
@@ -4462,7 +4449,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     {
                                         // We restict what types can use this mechanism -
                                         // currently int/uint and same sized matrix/vectors of
-                                        // those types.
+                                        // those types, and arrays of matrices that differ only
+                                        // in layout.
                                         getSink()->diagnose(
                                             Diagnostics::ImplicitCastUsedAsLvalueType{
                                                 .from = implicitCastExpr->arguments[0]->type.type,
@@ -9609,10 +9597,7 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     }
     else
     {
-        // TODO: more complete error message here
-        getSink()->diagnose(Diagnostics::Unexpected{
-            .message = "unknown type modifier in semantic checking",
-            .location = modifier->loc});
+        getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
         return nullptr;
     }
 }

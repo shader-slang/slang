@@ -1486,7 +1486,8 @@ IRFunc* splitApplyAndPropFuncs(
     // FieldAddress -> GetElementPtr and FieldExtract -> GetTupleElement.
     //
     auto convertStructToNamedTuple = [&](IRStructType* structType,
-                                         UnownedStringSlice nameSuffix) -> IRInst*
+                                         UnownedStringSlice nameSuffix,
+                                         bool isParameterContext = false) -> IRInst*
     {
         List<IRType*> fieldTypes;
         Dictionary<IRInst*, UInt> keyToIndex;
@@ -1498,6 +1499,8 @@ IRFunc* splitApplyAndPropFuncs(
 
         auto tupleNameType = builder.getTupleNameType(builder.getStringValue(nameSuffix));
         builder.addDecoration(tupleNameType, kIROp_OptimizableTypeDecoration);
+        if (isParameterContext)
+            builder.addDecoration(tupleNameType, kIROp_AutodiffParameterContextTypeDecoration);
         fieldTypes.add((IRType*)tupleNameType);
 
         auto tupleType = builder.getTupleType(fieldTypes);
@@ -1566,7 +1569,8 @@ IRFunc* splitApplyAndPropFuncs(
     String paramTypeName = String("s_paramCtx_") + intermediateTypeName;
     paramsContextType = convertStructToNamedTuple(
         cast<IRStructType>(paramsContextType),
-        paramTypeName.getUnownedSlice());
+        paramTypeName.getUnownedSlice(),
+        true);
 
     fullContextType =
         convertStructToNamedTuple(cast<IRStructType>(fullContextType), intermediateTypeName);

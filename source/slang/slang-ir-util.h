@@ -286,6 +286,10 @@ bool isValueType(IRInst* type);
 
 bool isScalarOrVectorType(IRInst* type);
 
+// Return whether `inst` is a `BuiltinCast` from one sized array type to another. Such a cast
+// converts each element; see `lowerArrayBuiltinCasts`.
+bool isArrayBuiltinCast(IRInst* inst);
+
 bool isSimpleDataType(IRType* type);
 
 bool isSimpleHLSLDataType(IRInst* inst);

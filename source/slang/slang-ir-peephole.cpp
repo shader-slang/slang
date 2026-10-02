@@ -956,6 +956,21 @@ struct PeepholeContext : InstPassBase
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
+            else if (isArrayBuiltinCast(inst->getOperand(0)))
+            {
+                // An array cast converts each element on its own, so reading one element of the
+                // result only needs that element converted, not a copy of the whole array.
+                auto cast = inst->getOperand(0);
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto element = builder.emitElementExtract(
+                    cast->getOperand(0),
+                    as<IRGetElement>(inst)->getIndex());
+                inst->replaceUsesWith(builder.emitCast(inst->getFullType(), element));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
             else
             {
                 changed |= tryFoldElementExtractFromUpdateInst(inst);
@@ -1504,34 +1519,10 @@ struct PeepholeContext : InstPassBase
                             }
                         }
                     }
+                    // array -> vector
                     else if (auto fromArr = as<IRArrayTypeBase>(fromType))
                     {
-                        auto toArr = as<IRArrayType>(toType);
-                        if (toArr && as<IRArrayType>(fromArr))
-                        {
-                            auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
-                            auto toCountLit = as<IRIntLit>(toArr->getElementCount());
-                            if (fromCountLit && toCountLit &&
-                                fromCountLit->getValue() == toCountLit->getValue())
-                            {
-                                List<IRInst*> elems;
-                                auto count = (UInt)toCountLit->getValue();
-                                elems.setCount((Index)count);
-                                for (UInt i = 0; i < count; ++i)
-                                {
-                                    elems[(Index)i] = builder.emitCast(
-                                        toArr->getElementType(),
-                                        builder.emitElementExtract(val, i));
-                                }
-                                auto newInst =
-                                    builder.emitMakeArray(toType, count, elems.getBuffer());
-                                inst->replaceUsesWith(newInst);
-                                maybeRemoveOldInst(inst);
-                                changed = true;
-                            }
-                        }
-                        // array -> vector
-                        else if (auto toVec = as<IRVectorType>(toType))
+                        if (auto toVec = as<IRVectorType>(toType))
                         {
                             if (isTypeEqual(fromArr->getElementType(), toVec->getElementType()))
                             {
