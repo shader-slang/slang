@@ -1,9 +1,11 @@
-// Copying a whole struct out of a buffer must not leave a `CopyLogical` for the emitter when the
-// struct is stored differently from its logical form (shader-slang/slang#13379).
+// Copying a whole struct out of a buffer must compile when the buffer stores the struct
+// differently from its logical form, and must not leave a `CopyLogical` for an emitter other than
+// direct SPIR-V (shader-slang/slang#13379).
 //
-// The `LOAD_*` cases copy the struct into a local variable. The `STORE_*` cases write a struct read
+// The `LOAD_*` cases copy the struct into a local variable. The other cases write a struct read
 // from a `cbuffer` or `ParameterBlock` to a structured buffer whose element is lowered under a
-// different layout.
+// different layout. Metal, CUDA and C++ store `row_major` matrices in their logical form, so their
+// cases use an unqualified matrix (`PLAIN_MATRIX`), which those targets do have to lower.
 
 //TEST:SIMPLE(filecheck=LOAD): -target glsl -entry main -stage compute -DLOAD_CBUFFER
 //TEST:SIMPLE(filecheck=LOAD): -target glsl -entry main -stage compute -DLOAD_CBUFFER -matrix-layout-column-major
@@ -16,28 +18,28 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage compute -DLOAD_CBUFFER
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage compute -emit-spirv-via-glsl -DLOAD_CBUFFER
 
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -DSTORE
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute -DSTORE
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DSTORE
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage compute -emit-spirv-via-glsl -DSTORE
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage compute -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -stage compute
 
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DSTORE -DPLAIN_MATRIX
-//TEST:SIMPLE(filecheck=METAL): -target metal -entry main -stage compute -DSTORE -DPLAIN_MATRIX
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry main -stage compute -DSTORE -DPLAIN_MATRIX
-//TEST:SIMPLE(filecheck=CPP): -target cpp -entry main -stage compute -DSTORE -DPLAIN_MATRIX
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DPLAIN_MATRIX
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry main -stage compute -DPLAIN_MATRIX
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry main -stage compute -DPLAIN_MATRIX
+//TEST:SIMPLE(filecheck=CPP): -target cpp -entry main -stage compute -DPLAIN_MATRIX
 
-//TEST:SIMPLE(filecheck=WGSL_SCALAR): -target wgsl -entry main -stage compute -DSTORE -DSCALAR
-//TEST:SIMPLE(filecheck=WGSL_ARRAY): -target wgsl -entry main -stage compute -DSTORE -DVECTOR_AND_ARRAY
+//TEST:SIMPLE(filecheck=WGSL_SCALAR): -target wgsl -entry main -stage compute -DSCALAR
+//TEST:SIMPLE(filecheck=WGSL_ARRAY): -target wgsl -entry main -stage compute -DVECTOR_AND_ARRAY
 
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -DSTORE -DSTORE_DIRECT
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute -DSTORE -DSTORE_DIRECT
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DSTORE -DSTORE_DIRECT
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -DSTORE_DIRECT
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute -DSTORE_DIRECT
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DSTORE_DIRECT
 
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -DSTORE -DFROM_PARAMETER_BLOCK
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute -DSTORE -DFROM_PARAMETER_BLOCK
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DSTORE -DFROM_PARAMETER_BLOCK
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage compute -DFROM_PARAMETER_BLOCK
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage compute -DFROM_PARAMETER_BLOCK
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DFROM_PARAMETER_BLOCK
 
-// HLSL keeps `Append` through buffer element lowering and is not covered here.
 //TEST:SIMPLE(filecheck=APPEND): -target glsl -entry main -stage compute -DSTORE_APPEND
 //TEST:SIMPLE(filecheck=APPEND): -target wgsl -entry main -stage compute -DSTORE_APPEND
 //TEST:SIMPLE(filecheck=APPEND): -target metal -entry main -stage compute -DSTORE_APPEND -DPLAIN_MATRIX

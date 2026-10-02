@@ -268,6 +268,11 @@ struct TypeLoweringConfig
     IRTypeLayoutRuleName layoutRuleName;
     bool lowerToPhysicalType = true;
 
+    /// Return the config for the layout-free twin of the storage types lowered under `config`.
+    /// The twin is lowered identically except that it gets no explicit offsets or strides, which
+    /// lets SPIR-V declare a local variable of it. Since `lowerToPhysicalType` controls only
+    /// strides, the `PhysicalType` decoration and name hints, a storage type and its twin
+    /// logically match, so `CopyLogical` can copy between them.
     static TypeLoweringConfig getLogicalTypeLoweringConfig(TypeLoweringConfig config)
     {
         TypeLoweringConfig result = config;
@@ -330,8 +335,9 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     }
 
     /// Returns true if the target allows declaring a local var in Function address space with a
-    /// StorageType that may have explicit layout. This is currently true for all targets except
-    /// SPIRV.
+    /// StorageType that may have explicit layout. This is false only when emitting SPIR-V directly.
+    /// When it is false, a buffer value loaded into a local is held in the storage type's
+    /// layout-free twin (see `TypeLoweringConfig::getLogicalTypeLoweringConfig`).
     virtual bool canUseStorageTypeInLocalVar() { return true; }
 
     /// Discovery filter: returns true if the given buffer element type
@@ -1408,8 +1414,8 @@ struct LoweredElementTypeContext
                                         // clone of the storage type such that it doesn't have SPIRV
                                         // "explicit layout" decorations, but is otherwise the same
                                         // as the lowered storage type. We will declare a temporary
-                                        // variable of this "logical storage" type to hold the
-                                        // loaded value in Function address space.
+                                        // variable of this layout-free twin to hold the loaded
+                                        // value in Function address space.
                                         newLoweringConfig =
                                             TypeLoweringConfig::getLogicalTypeLoweringConfig(
                                                 config);
@@ -1927,14 +1933,14 @@ struct LoweredElementTypeContext
     /// `destConfig`; `packToDest` converts a logical value into that storage type.
     ///
     /// When `val` is a deferred load `CastStorageToLogicalDeref(srcAddr)`, we copy from `srcAddr`
-    /// directly if it points to the same storage type, or to the layout-free twin of that type
-    /// that SPIR-V uses for local variables (lowered under `getLogicalTypeLoweringConfig`). We
-    /// only create `CopyLogical` for such a twin pair: only the SPIR-V backend handles the
-    /// instruction, and only the twin is guaranteed to have the same shape as `dest`. Consider
-    /// `cbuffer C { S s; } RWStructuredBuffer<S> b;` with `b[0] = s;`: the two buffer elements
-    /// are lowered under different configs, and their storage types can differ in shape (for
-    /// example WGSL pads `std140` array elements to 16 bytes, and SPIR-V wraps a matrix in a
-    /// struct behind a user pointer), so we unpack the logical value and pack it into `dest`.
+    /// directly if it points to the same storage type, or to that type's layout-free twin. Twins
+    /// are the only pair of storage types we copy with `CopyLogical`: they are created only when
+    /// the policy forbids storage-typed locals, which happens only when emitting SPIR-V directly,
+    /// and they always logically match. Consider `cbuffer C { S s; } RWStructuredBuffer<S> b;`
+    /// with `b[0] = s;`: the two buffer elements are lowered under different configs, and their
+    /// storage types can differ in shape (WGSL pads `std140` array elements to 16 bytes, SPIR-V
+    /// wraps a matrix in a struct behind a user pointer, and the C layout stores `bool` in one
+    /// byte), so we go through the logical value instead.
     void storeLogicalValue(
         IRBuilder& builder,
         IRInst* dest,
@@ -1955,10 +1961,14 @@ struct LoweredElementTypeContext
             auto srcConfig = getTypeLoweringConfigFromInst(deferredLoad->getLayoutConfig());
             if (srcConfig == TypeLoweringConfig::getLogicalTypeLoweringConfig(destConfig))
             {
+                SLANG_ASSERT(!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar());
                 builder.emitCopyLogical(dest, srcAddr, nullptr);
                 return;
             }
         }
+        // A deferred load from a differently lowered storage type stays in `val` here; it is
+        // unpacked when `materializeStorageToLogicalCasts` processes the remaining
+        // `CastStorageToLogicalDeref` insts, after every `CastStorageToLogical`.
         packToDest.applyDestinationDriven(builder, dest, val);
     }
 
@@ -2869,7 +2879,9 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     virtual bool canUseStorageTypeInLocalVar() override
     {
         // SPIRV (Vulkan) does not allow using an explicitly laid out type to declare a local
-        // variable. GLSL has no such restriction.
+        // variable. GLSL has no such restriction, including on the way to SPIR-V: the emitted GLSL
+        // struct carries no layout of its own, and the GLSL compiler takes the layout from the
+        // buffer block that holds it.
         return !target->shouldEmitSPIRVDirectly();
     }
 
