@@ -35,7 +35,7 @@ struct IntMatrices
 //TEST_INPUT:ubuffer(data=[1 4 2 5 3 6 7 10 8 11 9 12], stride=48):name intBuffer
 RWStructuredBuffer<IntMatrices> intBuffer;
 
-//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
 RWStructuredBuffer<float> output;
 
 // Return how many elements of `m` differ from the logical values `first + 8*k + 4*r + c`.
@@ -98,6 +98,19 @@ float countMismatchesLong(float2x2 m[20])
     return mismatches;
 }
 
+// A conversion directly in module scope has no control flow for a loop, so it is unrolled even
+// though the array has more than 16 elements.
+// clang-format off
+static const row_major float2x2 moduleScopeLong[20] = {
+    float2x2(0, 1, 2, 3), float2x2(1, 2, 3, 4), float2x2(2, 3, 4, 5), float2x2(3, 4, 5, 6),
+    float2x2(4, 5, 6, 7), float2x2(5, 6, 7, 8), float2x2(6, 7, 8, 9), float2x2(7, 8, 9, 10),
+    float2x2(8, 9, 10, 11), float2x2(9, 10, 11, 12), float2x2(10, 11, 12, 13),
+    float2x2(11, 12, 13, 14), float2x2(12, 13, 14, 15), float2x2(13, 14, 15, 16),
+    float2x2(14, 15, 16, 17), float2x2(15, 16, 17, 18), float2x2(16, 17, 18, 19),
+    float2x2(17, 18, 19, 20), float2x2(18, 19, 20, 21), float2x2(19, 20, 21, 22) };
+// clang-format on
+static const float2x2 moduleScopeLongConverted[20] = moduleScopeLong;
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -150,6 +163,8 @@ void computeMain()
     for (int k = 0; k < 20; k++)
         longArray[k] = float2x2(k, k + 1, k + 2, k + 3);
     output[16] = countMismatchesLong(longArray);
+
+    output[17] = countMismatchesLong(moduleScopeLongConverted);
 }
 
 // CHECK: type: float
@@ -169,4 +184,5 @@ void computeMain()
 // CHECK-NEXT: 109.0
 // CHECK-NEXT: 8.0
 // CHECK-NEXT: 10.0
+// CHECK-NEXT: 0.0
 // CHECK-NEXT: 0.0

@@ -2365,7 +2365,10 @@ bool SemanticsVisitor::_coerce(
     }
 
     // An array-typed cast lowers to an array `BuiltinCast`, which `lowerArrayBuiltinCasts` expands
-    // element by element once matrix layouts are resolved.
+    // element by element once matrix layouts are resolved. A `BuiltinCastExpr` is not an l-value,
+    // so `coerceArgToParam` rebuilds the cast of an array variable passed to `out`/`inout` as an
+    // `ImplicitCastExpr`, the only form the l-value argument check accepts; a single matrix keeps
+    // this form and is rejected there.
     if (isMatrixLayoutConversion(toType, fromType))
     {
         if (outCost)

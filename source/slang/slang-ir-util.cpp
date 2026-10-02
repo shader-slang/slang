@@ -1586,6 +1586,19 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func)
         block->insertAtEnd(func);
 }
 
+IRBlock* splitBlockBefore(IRBuilder& builder, IRInst* inst)
+{
+    builder.setInsertBefore(inst);
+    auto tailBlock = builder.emitBlock();
+    for (auto cur = inst; cur;)
+    {
+        auto next = cur->getNextInst();
+        cur->insertAtEnd(tailBlock);
+        cur = next;
+    }
+    return tailBlock;
+}
+
 void removeLinkageDecorations(IRInst* inst)
 {
     if (!inst)
