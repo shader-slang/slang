@@ -124,9 +124,14 @@ static bool isAliasable(IRInst* inst)
     return false;
 }
 
-// The `upper` field contains the struct that the type is
-// is contained in. It is used to check for empty structs.
-static bool canIgnoreType(IRType* type, IRType* upper)
+// Returns true if a value of `type` holds nothing that can be uninitialized, such as void, an
+// interface, or a struct whose fields are all ignorable. A pointer is treated as its pointee, which
+// is what matters for a global of pointer type.
+//
+// `enclosingStructs` holds the structs whose fields are being checked further up the walk. A
+// pointer back to one of them is not ignorable, which keeps a walk through `struct A { B* b; }`
+// and `struct B { A* a; }` finite.
+static bool canIgnoreTypeImpl(IRType* type, HashSet<IRType*>& enclosingStructs)
 {
     // In case specialization returns a function instead
     if (!type)
@@ -138,13 +143,17 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     // For structs, ignore if its empty
     if (auto str = as<IRStructType>(type))
     {
+        if (!enclosingStructs.add(type))
+            return false;
+
         int count = 0;
         for (auto field : str->getFields())
         {
             IRType* ftype = field->getFieldType();
-            count += !canIgnoreType(ftype, type);
+            count += !canIgnoreTypeImpl(ftype, enclosingStructs);
         }
 
+        enclosingStructs.remove(type);
         return (count == 0);
     }
 
@@ -159,12 +168,10 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     // For pointers, check the value type (primarily for globals)
     if (auto ptr = as<IRPtrType>(type))
     {
-        // Avoid the recursive step if its a
-        // recursive structure like a linked list
         IRType* ptype = ptr->getValueType();
         if (auto resolvedType = as<IRType>(getResolvedInstForDecorations(ptype)))
             ptype = resolvedType;
-        return (ptype != upper) && canIgnoreType(ptype, upper);
+        return canIgnoreTypeImpl(ptype, enclosingStructs);
     }
 
     // In the case of specializations, check returned type
@@ -172,10 +179,16 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     {
         IRInst* inner = getResolvedInstForDecorations(spec);
         IRType* innerType = (IRType*)(inner);
-        return canIgnoreType(innerType, upper);
+        return canIgnoreTypeImpl(innerType, enclosingStructs);
     }
 
     return false;
+}
+
+static bool canIgnoreType(IRType* type)
+{
+    HashSet<IRType*> enclosingStructs;
+    return canIgnoreTypeImpl(type, enclosingStructs);
 }
 
 // If `argUse` is an *argument* operand of an unconditional branch or loop (i.e. a phi
@@ -1283,7 +1296,7 @@ static List<IRStructField*> checkFieldsFromExit(
     auto fields = type->getFields();
     for (auto field : fields)
     {
-        if (canIgnoreType(field->getFieldType(), nullptr))
+        if (canIgnoreType(field->getFieldType()))
             continue;
 
         if (!usedKeys.contains(field->getKey()))
@@ -1432,7 +1445,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
                 continue;
 
             IRType* type = inst->getFullType();
-            if (canIgnoreType(type, nullptr))
+            if (canIgnoreType(type))
                 continue;
 
             // Collect both may-init and must-init violations from a single shared
@@ -1475,7 +1488,7 @@ static bool isHostProvidedGlobal(IRGlobalVar* variable)
 static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
 {
     IRType* type = variable->getFullType();
-    if (canIgnoreType(type, nullptr))
+    if (canIgnoreType(type))
         return;
 
     // Check for semantic decorations
