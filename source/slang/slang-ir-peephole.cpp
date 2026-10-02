@@ -1540,9 +1540,11 @@ struct PeepholeContext : InstPassBase
                 auto fromType = as<IRVectorType>(inst->getOperand(0)->getDataType());
                 if (!fromType)
                     break;
-                auto resultType = as<IRVectorType>(inst->getDataType());
-                if (!resultType)
+                auto resultVectorType = as<IRVectorType>(inst->getDataType());
+                if (!resultVectorType)
                 {
+                    // A scalar result (e.g. a WGSL std140 `float` array element read from its
+                    // `vec4` slot) lowers to `cast(swizzle(v, 0))`, never to another reshape.
                     IRBuilder builder(inst);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
@@ -1556,14 +1558,14 @@ struct PeepholeContext : InstPassBase
                 auto fromCount = as<IRIntLit>(fromType->getElementCount());
                 if (!fromCount)
                     break;
-                auto toCount = as<IRIntLit>(resultType->getElementCount());
+                auto toCount = as<IRIntLit>(resultVectorType->getElementCount());
                 if (!toCount)
                     break;
                 IRBuilder builder(inst);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                 builder.setInsertBefore(inst);
-                auto newInst = builder.emitVectorReshape(resultType, inst->getOperand(0));
+                auto newInst = builder.emitVectorReshape(resultVectorType, inst->getOperand(0));
                 if (newInst != inst)
                 {
                     inst->replaceUsesWith(newInst);
