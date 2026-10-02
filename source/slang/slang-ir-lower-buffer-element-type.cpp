@@ -1923,18 +1923,43 @@ struct LoweredElementTypeContext
         }
     }
 
-    void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
+    /// Store the logical value `val` into `dest`, which points to the storage type lowered under
+    /// `destConfig`; `packToDest` converts a logical value into that storage type.
+    ///
+    /// When `val` is a deferred load `CastStorageToLogicalDeref(srcAddr)`, we copy from `srcAddr`
+    /// directly if it points to the same storage type, or to the layout-free twin of that type
+    /// that SPIR-V uses for local variables (lowered under `getLogicalTypeLoweringConfig`). We
+    /// only create `CopyLogical` for such a twin pair: only the SPIR-V backend handles the
+    /// instruction, and only the twin is guaranteed to have the same shape as `dest`. Consider
+    /// `cbuffer C { S s; } RWStructuredBuffer<S> b;` with `b[0] = s;`: the two buffer elements
+    /// are lowered under different configs, and their storage types can differ in shape (for
+    /// example WGSL pads `std140` array elements to 16 bytes, and SPIR-V wraps a matrix in a
+    /// struct behind a user pointer), so we unpack the logical value and pack it into `dest`.
+    void storeLogicalValue(
+        IRBuilder& builder,
+        IRInst* dest,
+        IRInst* val,
+        ConversionMethod packToDest,
+        TypeLoweringConfig destConfig)
     {
-        auto destValType = tryGetPointedToType(&builder, dest->getDataType());
-        auto srcValType = tryGetPointedToType(&builder, src->getDataType());
-        if (isTypeEqual(destValType, srcValType))
+        if (auto deferredLoad = as<IRCastStorageToLogicalDeref>(val))
         {
-            builder.emitStore(dest, builder.emitLoad(src));
+            auto srcAddr = deferredLoad->getVal();
+            auto destValType = tryGetPointedToType(&builder, dest->getDataType());
+            auto srcValType = tryGetPointedToType(&builder, srcAddr->getDataType());
+            if (isTypeEqual(destValType, srcValType))
+            {
+                builder.emitStore(dest, builder.emitLoad(srcAddr));
+                return;
+            }
+            auto srcConfig = getTypeLoweringConfigFromInst(deferredLoad->getLayoutConfig());
+            if (srcConfig == TypeLoweringConfig::getLogicalTypeLoweringConfig(destConfig))
+            {
+                builder.emitCopyLogical(dest, srcAddr, nullptr);
+                return;
+            }
         }
-        else
-        {
-            builder.emitCopyLogical(dest, src, nullptr);
-        }
+        packToDest.applyDestinationDriven(builder, dest, val);
     }
 
     void materializeStorageToLogicalCastsImpl(IRCastStorageToLogicalBase* castInst)
@@ -2105,21 +2130,12 @@ struct LoweredElementTypeContext
                                     addr,
                                     alignedAttr->getAlignment());
                             }
-                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
-                            {
-                                auto valAddr = originalVal->getOperand(0);
-
-                                // In case `originalVal->getOperand(0)` is a tmp var of logical
-                                // storage type (created for SPIRV conformance), we need to use a
-                                // logical copy instead of a plain store to convert it to the actual
-                                // storage type.
-                                copyLogical(builder, addr, valAddr);
-                            }
-                            else
-                            {
-                                loweredElementTypeInfo.convertOriginalToLowered
-                                    .applyDestinationDriven(builder, addr, originalVal);
-                            }
+                            storeLogicalValue(
+                                builder,
+                                addr,
+                                originalVal,
+                                loweredElementTypeInfo.convertOriginalToLowered,
+                                config);
                             user->removeAndDeallocate();
                         }
                         return;
@@ -2853,8 +2869,8 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     virtual bool canUseStorageTypeInLocalVar() override
     {
         // SPIRV (Vulkan) does not allow using an explicitly laid out type to declare a local
-        // variable.
-        return false;
+        // variable. GLSL has no such restriction.
+        return !target->shouldEmitSPIRVDirectly();
     }
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
