@@ -1,5 +1,5 @@
-// The `-target wgsl` row pins the reference std140 layout and runs everywhere. The Tint rows, which
-// fail without the fix, run on CI where `slang-tint` is available and are ignored where it is absent.
+// The `-target wgsl` row pins the reference std140 layout and runs everywhere. The Tint rows check
+// the SPIR-V Tint produces, where `slang-tint` is available, and are ignored elsewhere.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv -entry main -stage compute

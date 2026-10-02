@@ -125,9 +125,9 @@ protected:
     FakeTint m_tint;
 };
 
-// The repro from #13391, widened to every buffer kind whose layout rule the fix changed: a
-// constant buffer and a `ParameterBlock` (std140), and structured buffers of a struct and of a
-// matrix (std430). Under `Natural`, each of them lowers to different WGSL.
+// One buffer of each kind that WGSL lays out differently from `Natural`: a constant buffer and a
+// `ParameterBlock` (std140), and structured buffers of a struct and of a matrix (std430). The
+// constant buffer is the repro from #13391.
 const char* kShaderSource = R"SLANG(
     struct S { float f; float3 v; float g[2]; }
     cbuffer C { float a[2]; float b; }
