@@ -1415,9 +1415,22 @@ void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
-    if (getParamPassingMode() == ParamPassingMode::RefReadOnly)
-        out << toSlice("readonly ");
-    out << toSlice("ref ") << getValueType();
+    switch (getParamPassingMode())
+    {
+    case ParamPassingMode::RefReadWrite:
+        out << toSlice("ref ");
+        break;
+    case ParamPassingMode::RefReadOnly:
+        out << toSlice("readonly ref ");
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        out << toSlice("writeonly ref ");
+        break;
+    default:
+        SLANG_UNEXPECTED("ref parameter type with a non-reference passing mode");
+        break;
+    }
+    out << getValueType();
 }
 
 ParamPassingMode RefParamType::getParamPassingMode()
