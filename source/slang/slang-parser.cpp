@@ -7459,6 +7459,7 @@ Stmt* Parser::parseIfLetStatement()
 
     auto varDecl = astBuilder->create<LetDecl>();
     varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->loc = identifierToken.loc;
     varDecl->initExpr = memberExpr;
     varDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(positiveScopeDecl, varDecl);
@@ -7475,18 +7476,24 @@ Stmt* Parser::parseIfLetStatement()
 
     if (ifStatement->positiveStatement)
     {
-        auto seqPositiveStmt = as<SeqStmt>(ifStatement->positiveStatement);
-        if (!seqPositiveStmt)
-        {
-            seqPositiveStmt = astBuilder->create<SeqStmt>();
-        }
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
+        varDeclrStatement->loc = varDecl->loc;
         varDeclrStatement->decl = varDecl;
 
-        seqPositiveStmt->stmts.add(varDeclrStatement);
-        seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
-        ifStatement->positiveStatement = seqPositiveStmt;
+        SeqStmt* scopedBody = astBuilder->create<SeqStmt>();
+        scopedBody->loc = identifierToken.loc;
+        scopedBody->stmts.add(varDeclrStatement);
+        scopedBody->stmts.add(ifStatement->positiveStatement);
+
+        // Preserve the parser scope that contains the unwrapped user binding as
+        // an ordinary scoped statement. Later lowering can then attach debug
+        // variables for the binding to this lexical scope instead of the
+        // enclosing function/block.
+        BlockStmt* positiveScopeStmt = astBuilder->create<BlockStmt>();
+        positiveScopeStmt->loc = identifierToken.loc;
+        positiveScopeStmt->scopeDecl = positiveScopeDecl;
+        positiveScopeStmt->body = scopedBody;
+        ifStatement->positiveStatement = positiveScopeStmt;
     }
 
     newBody->stmts.add(ifStatement);
