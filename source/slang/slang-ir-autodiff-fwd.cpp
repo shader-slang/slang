@@ -2071,6 +2071,15 @@ struct ForwardDiffTranslationContext
         // pair must preserve its result type: looking up a pair type for the
         // attributed operand would fail because no_diff has no such annotation.
         auto primalPairType = findOrTranslatePrimalInst(builder, origInst->getFullType());
+        // The full type can be rate-qualified; check the underlying value-pair type.
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(unwrapAttributedType(primalPairType)));
+
+        // The differential operand already has type T.Differential, without the
+        // primal operand's no_diff modifier. IDifferentiable requires that type
+        // to be differentiable, and maybeAddTypeAnnotationsForHigherOrderDiff
+        // registers its pair annotation. Looking up that annotation gives the
+        // concrete DiffPair<T.Differential> needed here, even when the whole
+        // pair's associated Differential type is still a deferred lookupWitness.
         auto diffPairType = getOrCreateDiffPairType(builder, diffPrimalVal->getDataType());
         if (origInst->getOp() == kIROp_MakeDifferentialPair)
         {

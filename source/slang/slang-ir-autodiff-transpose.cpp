@@ -1691,9 +1691,13 @@ struct DiffTransposePass
         IRMakeDifferentialPair* fwdMakePair,
         IRInst* revValue)
     {
-        // This opcode constructs a value pair. Its reverse gradient may still have
-        // an associated type expressed as lookupWitness, so do not rediscover the
-        // pair flavor by requiring its type to be a concrete pair opcode here.
+        // MakeDifferentialPair constructs a value pair, but revValue's associated
+        // type may still be an unresolved lookupWitness. The generic
+        // emitDifferentialPairGetPrimal/GetDifferential helpers dispatch on
+        // IRDifferentialPairType versus IRDifferentialPtrPairType; an unresolved
+        // type reaches their unreachable assertion and returns null in release.
+        // The explicit value-pair getters emit the intrinsics with the supplied
+        // result types, using the pair flavor established by MakeDifferentialPair.
         TranspositionResult result;
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
