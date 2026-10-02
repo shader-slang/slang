@@ -26,11 +26,13 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <random>
 #include <slang-com-ptr.h>
 #include <slang.h>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 using Slang::ComPtr;
@@ -640,42 +642,47 @@ CoverageSummary summarize(
     const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
-    // Iterate entries ([0, getEntryCount())), not counters: several
-    // entries can share one counterIndex once line coverage coalesces
-    // markers, so a counter-indexed loop both under-visits (stops at
-    // getCounterCount() < getEntryCount()) and misattributes hits (entry
-    // i's counter is not generally counter i). Look each entry's counter
-    // up by its own counterIndex instead.
-    const uint32_t n = coverage->getEntryCount();
-    for (uint32_t i = 0; i < n; ++i)
+    std::map<std::pair<std::string, uint32_t>, bool> lines;
+    std::map<std::pair<std::string, std::string>, bool> functions;
+    std::map<std::tuple<std::string, uint32_t, uint32_t>, bool> branches;
+    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
-        const bool covered = entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
-                             entry.counterIndex < (uint32_t)hits.size() &&
-                             hits[entry.counterIndex] > 0;
-        switch (entry.kind)
+        if (!entry.file || !*entry.file || !entry.line ||
+            entry.counterIndex == slang::kInvalidCoverageCounterIndex)
+            continue;
+        if (entry.counterIndex >= hits.size())
+            fail("coverage entry counter index is out of range");
+        const bool covered = hits[entry.counterIndex] != 0;
+        auto lineKey = std::make_pair(std::string(entry.file), entry.line);
+        // The LCOV exporter also exposes the source locations of function
+        // entries and decisions as lines, even in function/branch-only mode.
+        lines[lineKey] = lines[lineKey] || covered;
+        if (entry.kind == slang::CoverageEntryKind::Function)
         {
-        case slang::CoverageEntryKind::Line:
-            ++s.lineTotal;
-            if (covered)
-                ++s.lineCovered;
-            break;
-        case slang::CoverageEntryKind::Function:
-            ++s.functionTotal;
-            if (covered)
-                ++s.functionCovered;
-            break;
-        case slang::CoverageEntryKind::Branch:
-            ++s.branchTotal;
-            if (covered)
-                ++s.branchCovered;
-            break;
-        default:
-            break;
+            auto key = std::make_pair(
+                std::string(entry.file),
+                std::string(entry.functionName ? entry.functionName : ""));
+            functions[key] = functions[key] || covered;
+        }
+        else if (entry.kind == slang::CoverageEntryKind::Branch)
+        {
+            auto key =
+                std::make_tuple(std::string(entry.file), entry.branchSiteID, entry.branchArmID);
+            branches[key] = branches[key] || covered;
         }
     }
+    s.lineTotal = uint32_t(lines.size());
+    s.functionTotal = uint32_t(functions.size());
+    s.branchTotal = uint32_t(branches.size());
+    for (const auto& line : lines)
+        s.lineCovered += line.second;
+    for (const auto& function : functions)
+        s.functionCovered += function.second;
+    for (const auto& branch : branches)
+        s.branchCovered += branch.second;
     return s;
 }
 

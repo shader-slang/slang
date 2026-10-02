@@ -3,8 +3,10 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-ssa.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -1314,17 +1316,21 @@ struct CoverageInstrumenter
     // Lower a single coverage marker op, recording its source-entry
     // metadata against `slot` and then removing the marker op.
     //
-    // `emitRuntimeProbe` selects whether this marker also emits the
-    // counter update. Coalesced line markers share one slot and one
-    // probe, so only the last marker of a group emits it while the
-    // others contribute metadata alone — that is what removes probe
-    // sequences from the emitted shader. Every marker still produces
-    // its own entry, so per-line reporting is unchanged.
-    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe)
+    // `emitRuntimeProbe` selects the runtime update independently of metadata.
+    // Coalesced single-block lines share a probe but retain separate entries;
+    // repeated markers of one source line retain only its canonical entry.
+    // `shouldRecord` guards a multi-block count-mode probe with region state.
+    void lowerMarkerOp(
+        IRInst* markerOp,
+        UInt slot,
+        bool emitRuntimeProbe,
+        bool recordEntry = true,
+        IRInst* shouldRecord = nullptr)
     {
         CoverageTracingEntry entry;
         populateEntryForMarker(markerOp, slot, entry);
-        outMetadata.m_coverageEntries.add(entry);
+        if (recordEntry)
+            outMetadata.m_coverageEntries.add(entry);
 
         if (!emitRuntimeProbe)
         {
@@ -1335,6 +1341,30 @@ struct CoverageInstrumenter
 
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
+
+        // A repeated visit within the same source-line region must not issue
+        // an atomic operation, even an addition of zero: that still contends
+        // on the shared counter. Keep the probe conditional and let ordinary
+        // SSA simplification remove guards whose value is statically known.
+        IRBlock* afterProbe = nullptr;
+        if (shouldRecord)
+        {
+            auto block = as<IRBlock>(markerOp->getParent());
+            SLANG_RELEASE_ASSERT(block);
+            afterProbe = builder.createBlock();
+            afterProbe->insertAfter(block);
+            for (auto inst = markerOp; inst;)
+            {
+                auto next = inst->getNextInst();
+                inst->insertAtEnd(afterProbe);
+                inst = next;
+            }
+            auto probeBlock = builder.createBlock();
+            probeBlock->insertBefore(afterProbe);
+            builder.setInsertInto(block);
+            builder.emitIf(shouldRecord, probeBlock, afterProbe);
+            builder.setInsertInto(probeBlock);
+        }
 
         // Bindless form: select this shader's buffer out of the descriptor
         // array first, then index within it. The array index is uniform by
@@ -1401,6 +1431,9 @@ struct CoverageInstrumenter
             builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
         }
 
+        if (afterProbe)
+            builder.emitBranch(afterProbe);
+
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
         // this removal — the op would otherwise be silently dropped here.
@@ -1410,11 +1443,240 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& markerOps)
     {
+        // A source line can span several blocks: `if (p) return a; else return b;`
+        // must count one visit, not the condition plus the selected return. Treat
+        // its marked blocks as a region. Count entry into that region, and count
+        // another visit when a loop cycles entirely inside it. Blocks without a
+        // line marker are transparent; they are compiler control-flow plumbing.
+        struct LineRegion
+        {
+            IRFunc* func = nullptr;
+            String file;
+            uint32_t line = 0;
+            UInt slot = 0;
+            IRInst* visited = nullptr;
+            HashSet<IRBlock*> blocks;
+        };
+        List<LineRegion> regions;
+        Dictionary<IRFunc*, Dictionary<String, Dictionary<uint32_t, Index>>> regionIndices;
+        Dictionary<IRInst*, Index> markerRegion;
+        Dictionary<IRFunc*, HashSet<IRBlock*>> blocksWithLines;
+        HashSet<IRFunc*> functions;
         List<UInt> slots;
         List<bool> emitsProbe;
-        UInt coalescedCounterCount = 0;
-        assignCoverageCounterSlots(markerOps, slots, emitsProbe, coalescedCounterCount);
-        const auto counterCount = (Index)coalescedCounterCount;
+        List<bool> recordsEntry;
+        List<IRInst*> probeConditions;
+        slots.setCount(markerOps.getCount());
+        emitsProbe.setCount(markerOps.getCount());
+        recordsEntry.setCount(markerOps.getCount());
+        probeConditions.setCount(markerOps.getCount());
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            auto marker = markerOps[i];
+            emitsProbe[i] = recordsEntry[i] = true;
+            probeConditions[i] = nullptr;
+            if (marker->getOp() != kIROp_IncrementCoverageCounter)
+                continue;
+            auto func = getParentFunc(marker);
+            auto block = as<IRBlock>(marker->getParent());
+            SLANG_RELEASE_ASSERT(func && block);
+            String file;
+            uint32_t line = 0, column = 0;
+            resolveHumaneLoc(sourceManager, marker, file, line, column);
+            auto& fileRegions = regionIndices.getOrAddValue(
+                func,
+                Dictionary<String, Dictionary<uint32_t, Index>>());
+            auto& lineRegions = fileRegions.getOrAddValue(file, Dictionary<uint32_t, Index>());
+            Index regionIndex;
+            recordsEntry[i] = !lineRegions.tryGetValue(line, regionIndex);
+            if (recordsEntry[i])
+            {
+                regionIndex = regions.getCount();
+                lineRegions.add(line, regionIndex);
+                LineRegion region;
+                region.func = func;
+                region.file = file;
+                region.line = line;
+                regions.add(region);
+            }
+            auto& region = regions[regionIndex];
+            emitsProbe[i] = !region.blocks.contains(block);
+            region.blocks.add(block);
+            markerRegion.add(marker, regionIndex);
+            blocksWithLines.getOrAddValue(func, HashSet<IRBlock*>()).add(block);
+            functions.add(func);
+        }
+
+        // Preserve coalescing for lines confined to one block. Different source
+        // lines that execute together may still share a slot; a line spanning
+        // multiple blocks needs its own region counter instead.
+        List<UInt> coalescedSlots;
+        List<bool> coalescedProbes;
+        UInt coalescedCount = 0;
+        assignCoverageCounterSlots(markerOps, coalescedSlots, coalescedProbes, coalescedCount);
+        Dictionary<UInt, UInt> singleBlockSlots;
+        HashSet<UInt> emittedSingleBlockSlots;
+        UInt nextSlot = 0;
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            Index regionIndex;
+            if (!markerRegion.tryGetValue(markerOps[i], regionIndex))
+            {
+                slots[i] = nextSlot++;
+                continue;
+            }
+            auto& region = regions[regionIndex];
+            if (recordsEntry[i])
+            {
+                UInt sharedSlot;
+                if (region.blocks.getCount() == 1 &&
+                    singleBlockSlots.tryGetValue(coalescedSlots[i], sharedSlot))
+                    region.slot = sharedSlot;
+                else
+                {
+                    region.slot = nextSlot++;
+                    if (region.blocks.getCount() == 1)
+                        singleBlockSlots.add(coalescedSlots[i], region.slot);
+                }
+            }
+            slots[i] = region.slot;
+            if (region.blocks.getCount() == 1)
+                emitsProbe[i] = emittedSingleBlockSlots.add(region.slot);
+        }
+
+        if (booleanMode)
+        {
+            // Hit flags never reset. If another block in this source-line
+            // region dominates this probe, reaching it already guarantees the
+            // flag is set. In `if (p) return a; else return b;` on one line,
+            // only the condition's store is needed, not either return's store.
+            Dictionary<IRFunc*, RefPtr<IRDominatorTree>> dominators;
+            for (Index i = 0; i < markerOps.getCount(); ++i)
+            {
+                Index regionIndex;
+                if (!emitsProbe[i] || !markerRegion.tryGetValue(markerOps[i], regionIndex))
+                    continue;
+                auto& region = regions[regionIndex];
+                if (region.blocks.getCount() == 1)
+                    continue;
+                auto& dom = dominators.getOrAddValue(region.func, RefPtr<IRDominatorTree>());
+                if (!dom)
+                    dom = computeDominatorTree(region.func);
+                auto block = as<IRBlock>(markerOps[i]->getParent());
+                for (auto parent = dom->getImmediateDominator(block); parent;
+                     parent = dom->getImmediateDominator(parent))
+                {
+                    if (region.blocks.contains(parent))
+                    {
+                        emitsProbe[i] = false;
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            IRBuilder builder(module);
+            auto zero = builder.getIntValue(counterElementType, 0);
+            auto one = builder.getIntValue(counterElementType, 1);
+            Dictionary<IRBlock*, IRInst*> blockStarts;
+            for (auto func : functions)
+                for (auto block : func->getBlocks())
+                    blockStarts.add(block, block->getFirstOrdinaryInst());
+            for (auto& region : regions)
+            {
+                if (region.blocks.getCount() == 1)
+                    continue;
+                builder.setInsertBefore(region.func->getFirstBlock()->getFirstOrdinaryInst());
+                region.visited = builder.emitVar(counterElementType);
+                builder.emitStore(region.visited, zero);
+                for (auto block : region.func->getBlocks())
+                {
+                    if (blocksWithLines[region.func].contains(block) &&
+                        !region.blocks.contains(block))
+                    {
+                        builder.setInsertBefore(blockStarts[block]);
+                        builder.emitStore(region.visited, zero);
+                    }
+                }
+            }
+
+            // A loop contained in one source line never leaves that line's
+            // region. Split its back edge to start a new visit. A loop spanning
+            // other lines already resets the state on leaving the region.
+            for (auto func : functions)
+            {
+                auto dom = computeDominatorTree(func);
+                List<IREdge> backEdges;
+                for (auto block : func->getBlocks())
+                    for (auto it = block->getSuccessors().begin();
+                         it != block->getSuccessors().end();
+                         ++it)
+                        if (dom->dominates(*it, block))
+                            backEdges.add(it.getEdge());
+                for (auto edge : backEdges)
+                {
+                    auto head = edge.getSuccessor();
+                    auto tail = edge.getPredecessor();
+                    List<IRInst*> resetVars;
+                    for (auto& region : regions)
+                    {
+                        if (region.func != func || !region.visited)
+                            continue;
+                        HashSet<IRBlock*> reached;
+                        List<IRBlock*> pending;
+                        pending.add(head);
+                        bool reachesTail = false;
+                        for (Index p = 0; p < pending.getCount(); ++p)
+                        {
+                            auto block = pending[p];
+                            if (reached.contains(block) || (blocksWithLines[func].contains(block) &&
+                                                            !region.blocks.contains(block)))
+                                continue;
+                            reached.add(block);
+                            if (block == tail)
+                            {
+                                reachesTail = true;
+                                break;
+                            }
+                            for (auto successor : block->getSuccessors())
+                                pending.add(successor);
+                        }
+                        if (reachesTail)
+                            resetVars.add(region.visited);
+                    }
+                    if (resetVars.getCount() == 0)
+                        continue;
+                    auto edgeBlock = builder.createBlock();
+                    edgeBlock->insertBefore(head);
+                    builder.setInsertInto(edgeBlock);
+                    List<IRInst*> args;
+                    for (auto param : head->getParams())
+                        args.add(builder.emitParam(param->getDataType()));
+                    for (auto var : resetVars)
+                        builder.emitStore(var, zero);
+                    builder.emitBranch(head, args.getCount(), args.getBuffer());
+                    edge.getUse()->set(edgeBlock);
+                }
+            }
+
+            for (Index i = 0; i < markerOps.getCount(); ++i)
+            {
+                if (!emitsProbe[i])
+                    continue;
+                Index regionIndex;
+                if (!markerRegion.tryGetValue(markerOps[i], regionIndex))
+                    continue;
+                auto& region = regions[regionIndex];
+                if (!region.visited)
+                    continue;
+                builder.setInsertBefore(markerOps[i]);
+                auto visited = builder.emitLoad(region.visited);
+                probeConditions[i] = builder.emitEql(visited, zero);
+                builder.emitStore(region.visited, one);
+            }
+        }
+        const auto counterCount = (Index)nextSlot;
         // This concerns the counter *index* type, which is independent of
         // the per-slot storage width recorded just below: the public
         // metadata stores counter indices as uint32_t because the
@@ -1450,13 +1712,21 @@ struct CoverageInstrumenter
             SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
         }
         outMetadata.m_coverageEntries.reserve(markerOps.getCount());
-        // Every marker produces one source entry, but line markers that
-        // provably execute together share a counter slot, so entry count
-        // and counter count now genuinely differ. The public metadata API
+        // Each canonical line produces one source entry. Different lines that
+        // provably execute together can share a counter slot, so entry count
+        // and counter count can differ. The public metadata API
         // has always kept the two separate; hosts size the readback buffer
         // from the counter count and attribute results per entry.
         for (Index i = 0; i < markerOps.getCount(); ++i)
-            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i]);
+            lowerMarkerOp(
+                markerOps[i],
+                slots[i],
+                emitsProbe[i],
+                recordsEntry[i],
+                probeConditions[i]);
+        if (!booleanMode)
+            for (auto func : functions)
+                constructSSA(module, func);
     }
 };
 

@@ -835,7 +835,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         // the latter still emits a synthetic DefaultArm so the metadata
         // can distinguish "no label selected" from "switch not reached".
         SLANG_CHECK(branchDefaultCount >= 2);
-        SLANG_CHECK(!seenLine);
+        // Branch decisions carry line events for strict LCOV consistency.
+        SLANG_CHECK(seenLine);
 
         ComPtr<ISlangBlob> manifest;
         SLANG_CHECK(

@@ -22,9 +22,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: struct GlobalParams
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// One function-entry marker and two branch-arm markers lower to native
-// CUDA atomicAdd operations.
+// One function entry, one decision line, and two branch arms lower
+// to native CUDA atomicAdd operations.
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(0\)}}
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(1\)}}
 //CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(2\)}}
-//CHECK-NOT: atomicAdd{{.*_slang_coverage.*int\(3\)}}
+//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(3\)}}
+//CHECK-NOT: atomicAdd{{.*_slang_coverage.*int\(4\)}}

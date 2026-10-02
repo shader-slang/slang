@@ -135,8 +135,10 @@ counters are inserted, with examples, see
      source `switch` case/default dispatch arms, including the
      implicit no-match default path when no `default` label exists,
      and for the true/false arms of the expression-level branches:
-     the condition of a scalar `?:` and the left operand of a
-     short-circuiting `&&` / `||`.
+     the condition of a scalar `?:` and each evaluated scalar operand
+     of a short-circuiting `&&` / `||`. Conditions composed of these
+     operators do not add another site for their merged result.
+     Evaluated expressions also carry line events for LCOV consistency.
    - Marker ops are opaque void IR instructions. They do not reference
      a buffer at this point; the IR coverage pass rewrites them later.
    - The marker source position rides on the standard per-instruction
@@ -190,15 +192,16 @@ counters are inserted, with examples, see
      uniforms (CPU, CUDA). Graphics targets don't pack and the
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
-   - **Assigns a counter slot to each coverage marker op** (per-inst
-     UID, consecutive index in traversal order). Multiple line markers
-     on the same source line get distinct slots and are aggregated by
-     the LCOV exporter. Function and branch markers produce their own
-     `CoverageEntryInfo::kind` values and use the same counter buffer.
-   - **Rewrites each op** as `AtomicAdd(__slang_coverage[slot], 1,
-Relaxed)` in the default counting mode, or as a plain non-atomic
-     store of `1` under `-trace-coverage-boolean` (hit/not-hit; see
-     `CoverageCounterMode` in the roadmap section).
+   - **Assigns canonical line counters** per function/file/line. Multiple
+     markers on one line count entry into their source-mapped CFG region,
+     including another visit on a loop cycle wholly within that region.
+     Lines confined to one block retain coalescing when they execute together.
+     Function and branch markers retain dedicated counters.
+   - **Rewrites markers** as atomic counter updates in count mode, or
+     stores of `1` in boolean mode. Count-mode line regions use temporary
+     visited state, then SSA construction removes that storage. Metadata
+     records each canonical line once; consumers deduplicate slot aliases
+     per line and OR boolean hits.
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its

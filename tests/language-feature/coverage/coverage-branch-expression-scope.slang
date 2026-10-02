@@ -31,9 +31,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = value;
 }
 
-// Five sites with two arms each: the `if` and its `&&` condition, the
-// scalar `?:` on the next line, and on the line after that both the `||`
-// and the `?:` that consumes it.
+// Five evaluated predicate sites with two arms each: both operands of
+// the if condition, the scalar ternary condition, and both operands of
+// the logical ternary condition. Three canonical source-line counters
+// make thirteen slots in total. Vector and global expressions add none.
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}
@@ -44,4 +45,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(7\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(8\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(9\)}}
-//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(10\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(10\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(11\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(12\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(13\)}}

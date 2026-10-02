@@ -4118,6 +4118,60 @@ static void emitBranchCoverageMarker(
         IRIntegerValue(uint32_t(branchArmKind)));
 }
 
+// Record evaluation of an expression at its own source location. Expression arms
+// are not statements: without this marker, a multiline conditional can have branch
+// coverage on a line for which no line coverage exists.
+static void emitExpressionLineCoverage(IRGenContext* context, Expr* expr)
+{
+    if ((context->traceCoverage || context->traceBranchCoverage) && expr->loc.isValid() &&
+        getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+    {
+        IRBuilderSourceLocRAII loc(context->irBuilder, expr->loc);
+        context->irBuilder->emitIncrementCoverageCounter();
+    }
+}
+
+// Count the decisions that are actually evaluated. For `a && b`, lowering the
+// logical expression records `a` and, only on its true path, `b`. Its consumer must
+// not record the merged result as another decision: that would count a skipped
+// `b` as an evaluated false branch. Parentheses preserve that same decision tree.
+static IRInst* lowerCoverageCondition(IRGenContext* context, Expr* expr)
+{
+    if (auto paren = as<ParenExpr>(expr))
+        return lowerCoverageCondition(context, paren->base);
+
+    if (context->traceBranchCoverage)
+    {
+        if (auto builtin = as<BuiltinOperatorExpr>(expr))
+            if (builtin->op == BuiltinOperationKind::Not)
+            {
+                auto operand = lowerCoverageCondition(context, builtin->arguments[0]);
+                return context->irBuilder->emitNot(operand->getDataType(), operand);
+            }
+    }
+
+    emitExpressionLineCoverage(context, expr);
+    auto value = getSimpleVal(context, lowerRValueExpr(context, expr));
+    if (!context->traceBranchCoverage || as<LogicOperatorShortCircuitExpr>(expr) ||
+        !getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+        return value;
+
+    auto builder = context->irBuilder;
+    auto trueBlock = builder->createBlock();
+    auto falseBlock = builder->createBlock();
+    auto mergeBlock = builder->createBlock();
+    auto site = allocateCoverageBranchSiteID(context);
+    builder->emitIfElse(value, trueBlock, falseBlock, mergeBlock);
+    builder->insertBlock(trueBlock);
+    emitBranchCoverageMarker(context, expr->loc, site, 1, slang::CoverageBranchArmKind::TrueArm);
+    builder->emitBranch(mergeBlock);
+    builder->insertBlock(falseBlock);
+    emitBranchCoverageMarker(context, expr->loc, site, 2, slang::CoverageBranchArmKind::FalseArm);
+    builder->emitBranch(mergeBlock);
+    builder->insertBlock(mergeBlock);
+    return value;
+}
+
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
 // that folds in any contributions from both the declaration itself *and*
@@ -7153,19 +7207,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    // Allocate a branch-coverage site for an expression that lowers to a two-way branch, or
-    // return 0 when the branch gets no site. Expressions are not always lowered into a function
-    // body: in `static bool g = a && b;` the short-circuit branch is built inside the global's
-    // initializer, and the coverage IR pass can only attribute a marker that sits in a function.
-    uint32_t allocateExprBranchCoverageSiteID()
-    {
-        if (!context->traceBranchCoverage)
-            return 0;
-        if (!getParentFunc(context->irBuilder->getInsertLoc().getInst()))
-            return 0;
-        return allocateCoverageBranchSiteID(context);
-    }
-
     LoweredValInfo visitSelectExpr(SelectExpr* expr)
     {
         // A vector typed `select` expr will turn into a normal `select` op.
@@ -7181,33 +7222,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
 
         // A scalar typed `select` expr will turn into an if-else to implement short circuiting
-        // semantics. Under branch coverage, the two arms carry true/false markers for the
-        // condition, exactly as the arms of an `if` statement do.
+        // semantics. Condition lowering records each evaluated scalar decision.
         auto builder = context->irBuilder;
         auto thenBlock = builder->createBlock();
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
-        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
-        uint32_t coverageBranchSiteID = allocateExprBranchCoverageSiteID();
+        auto irCond = lowerCoverageCondition(context, expr->arguments[0]);
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
-        emitBranchCoverageMarker(
-            context,
-            expr->loc,
-            coverageBranchSiteID,
-            1,
-            slang::CoverageBranchArmKind::TrueArm);
+        emitExpressionLineCoverage(context, expr->arguments[1]);
         auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
         builder->emitBranch(afterBlock, 1, &trueVal);
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
-        emitBranchCoverageMarker(
-            context,
-            expr->loc,
-            coverageBranchSiteID,
-            2,
-            slang::CoverageBranchArmKind::FalseArm);
+        emitExpressionLineCoverage(context, expr->arguments[2]);
         auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
         builder->emitBranch(afterBlock, 1, &falseVal);
         builder->insertBlock(afterBlock);
@@ -7223,32 +7252,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto thenBlock = builder->createBlock();
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
-        auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
-        uint32_t coverageBranchSiteID = allocateExprBranchCoverageSiteID();
+        auto irCond = lowerCoverageCondition(context, expr->arguments[0]);
 
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
 
         // ifElse(<first param>, %true-block, %false-block, %after-block)
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
-        // Under branch coverage, the true/false markers record the value of the first operand,
-        // which is the decision the operator makes: for `&&` the true arm evaluates the second
-        // operand and the false arm short-circuits, and for `||` it is the other way around.
-
         // true-block: nonconditionalBranch(%after-block, <second param> : Bool)
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
-        emitBranchCoverageMarker(
-            context,
-            expr->loc,
-            coverageBranchSiteID,
-            1,
-            slang::CoverageBranchArmKind::TrueArm);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
-                           ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
-                           : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
+                           ? lowerCoverageCondition(context, expr->arguments[1])
+                           : builder->getBoolValue(true);
 
         builder->emitBranch(afterBlock, 1, &trueVal);
 
@@ -7257,15 +7275,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
-        emitBranchCoverageMarker(
-            context,
-            expr->loc,
-            coverageBranchSiteID,
-            2,
-            slang::CoverageBranchArmKind::FalseArm);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
-                            ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
-                            : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+                            ? builder->getBoolValue(false)
+                            : lowerCoverageCondition(context, expr->arguments[1]);
 
         builder->emitBranch(afterBlock, 1, &falseVal);
 
@@ -8423,13 +8435,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+        auto irCond = lowerCoverageCondition(context, condExpr);
 
         maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
-        uint32_t coverageBranchSiteID =
-            context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
         if (elseStmt)
         {
@@ -8441,54 +8451,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
-            emitBranchCoverageMarker(
-                context,
-                condExpr->loc,
-                coverageBranchSiteID,
-                1,
-                slang::CoverageBranchArmKind::TrueArm);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
             insertBlock(elseBlock);
-            emitBranchCoverageMarker(
-                context,
-                condExpr->loc,
-                coverageBranchSiteID,
-                2,
-                slang::CoverageBranchArmKind::FalseArm);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
-
-            insertBlock(afterBlock);
-        }
-        else if (context->traceBranchCoverage)
-        {
-            auto thenBlock = createBlock();
-            auto elseBlock = createBlock();
-            auto afterBlock = createBlock();
-
-            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
-
-            insertBlock(thenBlock);
-
-            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
-            emitBranchCoverageMarker(
-                context,
-                condExpr->loc,
-                coverageBranchSiteID,
-                1,
-                slang::CoverageBranchArmKind::TrueArm);
-            lowerStmt(context, thenStmt);
-            popScopeBlock(prevScopeEndBlock, true);
-            emitBranchIfNeeded(afterBlock);
-
-            insertBlock(elseBlock);
-            emitBranchCoverageMarker(
-                context,
-                condExpr->loc,
-                coverageBranchSiteID,
-                2,
-                slang::CoverageBranchArmKind::FalseArm);
 
             insertBlock(afterBlock);
         }
@@ -8583,47 +8550,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        uint32_t coverageBranchSiteID = 0;
-        SourceLoc coverageBranchLoc;
         if (const auto condExpr = stmt->predicateExpression)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition =
-                getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
+            auto irCondition = lowerCoverageCondition(context, stmt->predicateExpression);
 
-            coverageBranchLoc = condExpr->loc;
-            coverageBranchSiteID =
-                context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
             // Now we want to `break` if the loop condition is false.
-            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
-            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
-
-            if (context->traceBranchCoverage)
-            {
-                insertBlock(conditionFalseLabel);
-                emitBranchCoverageMarker(
-                    context,
-                    coverageBranchLoc,
-                    coverageBranchSiteID,
-                    2,
-                    slang::CoverageBranchArmKind::FalseArm);
-                emitBranchIfNeeded(breakLabel);
-            }
+            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        if (coverageBranchSiteID != 0)
-        {
-            emitBranchCoverageMarker(
-                context,
-                coverageBranchLoc,
-                coverageBranchSiteID,
-                1,
-                slang::CoverageBranchArmKind::TrueArm);
-        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8674,6 +8613,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (auto incrExpr = stmt->sideEffectExpression)
         {
             maybeEmitDebugLine(context, this, stmt, incrExpr->loc);
+            emitExpressionLineCoverage(context, incrExpr);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -8720,46 +8660,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        uint32_t coverageBranchSiteID = 0;
-        SourceLoc coverageBranchLoc;
         if (auto condExpr = stmt->predicate)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+            auto irCondition = lowerCoverageCondition(context, condExpr);
 
-            coverageBranchLoc = condExpr->loc;
-            coverageBranchSiteID =
-                context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
             // Now we want to `break` if the loop condition is false.
-            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
-            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
-
-            if (context->traceBranchCoverage)
-            {
-                insertBlock(conditionFalseLabel);
-                emitBranchCoverageMarker(
-                    context,
-                    coverageBranchLoc,
-                    coverageBranchSiteID,
-                    2,
-                    slang::CoverageBranchArmKind::FalseArm);
-                emitBranchIfNeeded(breakLabel);
-            }
+            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        if (coverageBranchSiteID != 0)
-        {
-            emitBranchCoverageMarker(
-                context,
-                coverageBranchLoc,
-                coverageBranchSiteID,
-                1,
-                slang::CoverageBranchArmKind::TrueArm);
-        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8818,7 +8731,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
 
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+            auto irCondition = lowerCoverageCondition(context, condExpr);
 
             // One thing to be careful here is that lowering irCondition
             // may create additional blocks due to short circuiting, so
@@ -8843,40 +8756,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
-            if (context->traceBranchCoverage)
-            {
-                auto coverageBranchSiteID = allocateCoverageBranchSiteID(context);
-                auto loopExitBlock = builder->createBlock();
-                // `invCondition` is the loop-exit test. Its true arm is the
-                // original condition's false branch, so it receives the
-                // FalseArm marker and exits the loop.
-                builder->emitIfElse(invCondition, loopExitBlock, mergeBlock, mergeBlock);
+            builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
 
-                insertBlock(loopExitBlock);
-                emitBranchCoverageMarker(
-                    context,
-                    condExpr->loc,
-                    coverageBranchSiteID,
-                    2,
-                    slang::CoverageBranchArmKind::FalseArm);
-                emitBranchIfNeeded(breakLabel);
-
-                insertBlock(mergeBlock);
-                emitBranchCoverageMarker(
-                    context,
-                    condExpr->loc,
-                    coverageBranchSiteID,
-                    1,
-                    slang::CoverageBranchArmKind::TrueArm);
-                builder->emitBranch(loopHead);
-            }
-            else
-            {
-                builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
-
-                insertBlock(mergeBlock);
-                builder->emitBranch(loopHead);
-            }
+            insertBlock(mergeBlock);
+            builder->emitBranch(loopHead);
         }
 
         // Finally we insert the label that a `break` will jump to
@@ -9268,7 +9151,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // selected arms.
         uint32_t coverageBranchSiteID = 0;
         uint32_t nextCoverageBranchArmID = 1;
-        SourceLoc coverageBranchFallbackLoc;
+        SourceLoc coverageBranchLoc;
     };
 
     // We need a label to use for a `case` or `default` statement,
@@ -9306,7 +9189,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     IRBlock* createSwitchCoverageDispatchBlock(
         SwitchStmtInfo* info,
         IRBlock* bodyLabel,
-        SourceLoc armLoc,
         slang::CoverageBranchArmKind armKind)
     {
         if (info->coverageBranchSiteID == 0)
@@ -9319,10 +9201,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info->initialBlock->getParent()->addBlock(dispatchLabel);
         builder->setInsertInto(dispatchLabel);
 
-        SourceLoc markerLoc = armLoc.isValid() ? armLoc : info->coverageBranchFallbackLoc;
         emitBranchCoverageMarker(
             context,
-            markerLoc,
+            info->coverageBranchLoc,
             info->coverageBranchSiteID,
             info->nextCoverageBranchArmID++,
             armKind);
@@ -9452,7 +9333,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto dispatchLabel = createSwitchCoverageDispatchBlock(
                 info,
                 bodyLabel,
-                caseStmt->loc,
                 slang::CoverageBranchArmKind::CaseArm);
 
             // Add this `case` to the list for the enclosing `switch`.
@@ -9465,7 +9345,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto dispatchLabel = createSwitchCoverageDispatchBlock(
                 info,
                 bodyLabel,
-                defaultStmt->loc,
                 slang::CoverageBranchArmKind::DefaultArm);
 
             // We expect to only find a single `default` stmt.
@@ -9715,6 +9594,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         //
 
         // First emit code to compute the condition:
+        emitExpressionLineCoverage(context, stmt->condition);
         auto conditionVal = getSimpleVal(context, lowerRValueExpr(context, stmt->condition));
 
         // Check for any cases or default.
@@ -9751,7 +9631,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info.defaultLabel = nullptr;
         info.coverageBranchSiteID =
             context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
-        info.coverageBranchFallbackLoc = stmt->condition->loc;
+        info.coverageBranchLoc = stmt->condition->loc;
 
         lowerSwitchCases(stmt->body, &info);
 
@@ -9788,7 +9668,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             defaultLabel = createSwitchCoverageDispatchBlock(
                 &info,
                 breakLabel,
-                stmt->condition->loc,
                 slang::CoverageBranchArmKind::DefaultArm);
         }
 

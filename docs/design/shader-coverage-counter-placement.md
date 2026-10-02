@@ -23,153 +23,88 @@ the two rewrite forms; everything in this document applies to both.
 Slot numbers are not part of the placement contract; the metadata maps
 each source coverage entry to the slot chosen for that compile.
 
-Markers and counters are not one-to-one. Line markers that provably
-execute together are coalesced onto a single counter and a single
-runtime probe — see [Counter coalescing](#counter-coalescing) below.
-Every marker still produces its own source coverage entry, so this
-changes how many probes the shader carries, not what gets reported.
-
-Modes are independent. Enabling more than one mode adds the markers
-from each enabled mode into the same counter buffer.
+Markers and counters are not one-to-one. Coverage metadata is authoritative:
+read every entry through its `counterIndex`, and deduplicate aliases for each
+source identity. Slots are local to one compiled artifact.
 
 ## Line Coverage: `-trace-coverage`
 
-Line coverage inserts a counter before each executable statement that
-has a valid source location. Purely structural statement wrappers,
-such as blocks, statement sequences, and empty statements, are skipped.
-
-This is statement coverage, not basic-block coverage. Multiple
-statements on the same source line can get multiple counters, and the
-LCOV conversion step aggregates those counters back to the source
-line.
-
-Conceptually, this source:
+Line coverage reports visits to a source line, rather than adding the number
+of statements on that line. For example, four calls to either function below
+report four executions of its body line:
 
 ```slang
-void someFunction(uint N)
-{
-    uint i = 0;
-    while (i < N)
-    {
-        x = y + z;
-        a = b + c;
-        d = e + f;
-        i++;
-    }
-}
+int sequential(int x) { int y = x; y += 2; return y; }
+int conditional(int x) { if (x > 0) return 1; else return 2; }
 ```
 
-is instrumented like this under line coverage:
+Lowering emits markers before executable statements and at evaluated scalar
+conditions and conditional-expression arms. The coverage pass groups markers
+by function, source file, and line. Blocks containing that line form a region;
+compiler-generated blocks without line markers are transparent. Entering the
+region counts one visit. A back edge that cycles entirely within the region
+starts another visit, so a one-line loop counts repeated condition evaluations.
+A temporary visited flag prevents counting both the condition and selected
+return of a one-line `if` twice. Count-mode probes are guarded by this state,
+so a repeated visit does not issue an atomic addition of zero. SSA construction
+removes the temporary storage, and ordinary simplification removes constant guards.
+Boolean mode only records whether any part of the line executed and needs no
+visited state. A probe dominated by another probe of the same line is omitted,
+since the first probe already guarantees that the hit flag is set.
 
-```slang
-void someFunction(uint N)
-{
-    coverageAtomic("line: uint i = 0");
-    uint i = 0;
+Each function/file/line has one canonical metadata entry. Distinct source
+functions on the same line contribute separate counts. Lines confined to a
+single block can still share a runtime slot when the existing fallthrough
+analysis proves they execute together. Calls that may abandon the invocation
+split these coalescing groups. Consumers must not sum repeated aliases of
+one slot on the same line; boolean values combine with logical OR.
 
-    coverageAtomic("line: while");
-    while (i < N)
-    {
-        coverageAtomic("line: x = y + z");
-        x = y + z;
+As before, the fallthrough analysis cannot recognize target-level termination
+hidden inside a normally returning intrinsic's `GenericAsm`. Ray-tracing hit
+terminators are an example of this existing limitation.
 
-        coverageAtomic("line: a = b + c");
-        a = b + c;
+## gcov and LCOV compatibility
 
-        coverageAtomic("line: d = e + f");
-        d = e + f;
+The semantic contract is evaluated scalar decisions, source-line visits, and
+function entries. It does not promise GCC's block numbering, branch order,
+optimization-dependent source mapping, or exception edges. GCC 15 can attribute
+shared ternary control-flow blocks to both arm lines, even at `-O0`; Slang
+instead records the actual evaluation of each arm.
 
-        coverageAtomic("line: i++");
-        i++;
-    }
-}
+Branch coverage includes line events for its evaluated expressions, so LCOV
+has a `DA` record at each decision location. Function-only exports include the
+function declaration lines. `BRDA` uses `-` when no outcome of a decision ran,
+and `0` for an untaken arm of an evaluated decision. Both consumers must use
+the same line/function/branch identities so totals agree. `genhtml` should run
+without `--ignore-errors`.
+
+Older manifests can contain only function or branch records at a location.
+The converter supplies their known execution evidence as line records. For
+multiple legacy decisions on one line, the largest site count is only a lower
+bound: exact line counts require recompilation with canonical line events.
+The converter cannot reconstruct short-circuit operand counts from old merged
+result counters.
+
+The executable reference gate is:
+
+```sh
+python3 tools/shader-coverage/test_gcov_semantics.py \
+    --slangc build/Debug/bin/slangc --gcc g++-15 --gcov gcov-15 \
+    --output-dir /tmp/slang-gcov-parity
 ```
 
-The marker on the `while` statement counts execution reaching the loop
-statement. It does not count each loop-condition evaluation. Per-arm
-loop condition counts come from branch coverage.
+It runs identical input data through GNU GCC/gcov and Slang's C++ target,
+compares outputs and the promised coverage semantics, and imports every result
+with strict `genhtml`. It covers count/boolean recording, both counter widths,
+and each coverage mode independently. GCC and gcov must be matching versions;
+Apple's `/usr/bin/gcov` is an LLVM compatibility implementation.
 
-### Counter coalescing
-
-Emitted shader size scales with the number of probe sequences, not with
-counter width: every probe expands to index arithmetic, an address
-computation, and an atomic. Line coverage therefore coalesces markers
-that provably execute together onto one counter and one probe.
-
-The rule is simple because the IR is already in basic-block form when
-the coverage pass runs: markers in the same basic block, with nothing
-between them that can abandon the invocation, all execute exactly the
-same number of times. A basic block has one entry and one exit, so
-reaching any instruction in it means reaching all of them.
-
-The `someFunction` example above therefore emits two counters for its
-six markers — one for the entry block, one for the loop body:
-
-```slang
-void someFunction(uint N)
-{
-    // `uint i = 0` and `while` are in the same block: one probe covers
-    // both, and it sits at the last of the two.
-    uint i = 0;
-    coverageAtomic("region: i = 0, while");
-    while (i < N)
-    {
-        // The four body statements are one straight-line region.
-        buf[0] = buf[1] + buf[2];
-        buf[3] = buf[4] + buf[5];
-        buf[6] = buf[7] + buf[8];
-        i++;
-        coverageAtomic("region: loop body");
-    }
-}
-```
-
-Because the block boundary *is* the region boundary, every structural
-split falls out for free: `if` / `else` arms, `switch` cases, loop
-bodies versus loop exits, early `return` / `break` / `continue`, and
-short-circuit operands all begin new blocks during lowering, so none of
-them can be coalesced across.
-
-The probe sits at the **last** marker of a region rather than the
-first. Reaching it proves every earlier marker in the region also
-executed; placing it first would over-report when a region is entered
-but abandoned partway.
-
-Two cases break the "same block means same count" property, and both
-split the region:
-
-- An instruction that can abandon the invocation — `discard`, an abort,
-  or a call to a function that transitively contains one, or that never
-  returns at all. The analysis is a memoized depth-first walk of the
-  call graph, not an iterated fixpoint: a re-entered function is
-  reported as possibly not returning, which breaks cycles conservatively
-  without letting an optimistic answer escape into another function's
-  cached result.
-- A call whose target cannot be resolved statically, such as an
-  interface method dispatched through a witness table. Coverage runs
-  before specialization, so these are common; the pass assumes the
-  worst and splits, since an extra probe costs emitted code while a
-  missed split would cost correctness.
-
-Function and branch markers always take a dedicated counter. They are
-already one probe per function or per arm, and their counts carry
-per-site meaning that sharing would destroy.
-
-Reported results are unaffected. Every source entry survives with its
-own file/line attribution, and hosts accumulate per entry, so several
-entries reading one slot produce exactly the LCOV records that
-dedicated slots did. What changes is `counterCount`, which drops
-markedly below the entry count — roughly half on the bundled demos.
-
-Known gap: any core-module intrinsic that abandons the invocation lowers
-to a `GenericAsm` terminator like every other intrinsic, and the exit
-analysis treats `GenericAsm` as a normal exit — so the gap is general to
-any present or future abandoning intrinsic modeled that way, not
-specific to a fixed list. The ray-tracing hit terminators `IgnoreHit`
-and `AcceptHitAndEndSearch` are the concrete examples today: they end
-the invocation at the target level, but Slang's IR models them as
-ordinary `void` functions that return normally, so the analysis cannot
-currently see them.
+The normal `coverageCpuRuntimeLineRegions` and
+`coverageCpuRuntimeExpressionBranches` unit tests also exercise these semantics
+without requiring GCC, gcov, or genhtml. They cover both counter widths and modes,
+one-line loops, nested loops, early exits, skipped operands, and nested expressions.
+`coverage-line-region-probes.slang` checks for redundant zero-valued atomics and
+compiles the region control flow to SPIR-V.
 
 ## Function Coverage: `-trace-function-coverage`
 
@@ -370,7 +305,8 @@ counter increments once on exit.
 
 For `switch`, counters are inserted on dispatch arms, not in the case
 body after fallthrough. This preserves the meaning "which switch label
-was selected by dispatch?"
+was selected by dispatch?" All outcomes are attributed to the switch
+condition location, including its implicit no-match default.
 
 For example:
 
@@ -434,7 +370,8 @@ from "the switch was not reached."
 
 A `?:` with a scalar condition evaluates only the operand its condition
 selects, so it lowers to the same two-way branch as an `if` with an
-`else`. Slang emits one counter per arm, attributed to the `?` token:
+`else`. Slang records its evaluated condition, attributed to the condition
+expression, and line events for the selected value expression:
 
 ```slang
 uint v = (t > 1u) ? a : b;
@@ -463,55 +400,23 @@ branch and gets no counters.
 ### Short-Circuit `&&` and `||`
 
 `&&` and `||` evaluate their right operand only when the left operand
-does not already decide the result. That decision is the branch, so
-Slang emits a true-arm and a false-arm counter for the value of the left
-operand, attributed to the operator token:
+does not already decide the result. Each evaluated scalar operand has a true
+and false outcome, attributed to that operand's source expression.
 
 ```slang
-bool r = p && q;
+if (a && b)
 ```
 
-Conceptually:
+This records `a`, then records `b` only when `a` is true. If `a` is false,
+both counters for `b` remain zero; LCOV renders those arms as unevaluated.
+There is no additional site for the merged result of `a && b`. Parentheses
+and logical negation preserve the operand decision tree.
 
-```slang
-bool r;
-if (p)
-{
-    coverageAtomic("branch: && left operand true"); // q is evaluated
-    r = q;
-}
-else
-{
-    coverageAtomic("branch: && left operand false"); // short-circuited
-    r = false;
-}
-```
-
-For `||` the arms are the same, true and false of the left operand,
-but their roles swap: the true arm short-circuits to `true` and the
-false arm evaluates the right operand.
-
-Each operator is its own site. `a && b || c` parses as `(a && b) || c`
-and gets two sites: the `&&` site records `a`, and the `||` site
-records the value of `a && b`. The last right operand of a chain is not
-a branch; it becomes the value of the whole expression. When the
-expression is the condition of an `if` or a loop, that statement's own
-site records the final outcome, so every operand's outcome is
-recoverable:
-
-```slang
-if (a && b) // `&&` site: a true/false; `if` site: (a && b) true/false
-```
-
-Here `b` was true as often as the `if` true arm ran, and false as often
-as the `&&` true arm ran minus that. When the expression is used as a
-value instead, as in `bool r = a && b;`, the outcome of `b` is not
-recorded; branch coverage does not add control flow just to observe it.
-
-The `if` in that example attributes its own site to its condition
-expression, which is located at the `&&` token, so the two sites share
-a line and column. Reports tell sites apart by their branch-site ID, not
-by position.
+Likewise, `(a && b) || c` has decisions for `a`, `b`, and `c`, with skipped
+operands remaining unevaluated. The same source-oriented rule applies when
+the expression produces a value, such as `bool r = a && b;`. GCC can eliminate
+some branches in value contexts; exact backend branch counts are outside the
+compatibility contract.
 
 Under `-disable-short-circuit`, `&&` and `||` evaluate both operands
 without branching and get no counters. `?:` is unaffected by that
@@ -607,7 +512,7 @@ Line coverage already shares one counter across the source entries of
 a straight-line region (see [Counter coalescing](#counter-coalescing)),
 but each entry still names a concrete counter and reports a real
 count. Future source-region coverage may move further toward a
-clang-style model where entries describe source *ranges* and some
+clang-style model where entries describe source _ranges_ and some
 reported counts are derived arithmetically from other counters rather
 than read directly. That would extend coverage metadata — most likely
 by using `kInvalidCoverageCounterIndex` for derived entries — but it

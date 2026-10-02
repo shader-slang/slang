@@ -55,6 +55,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //   - continue if true/false
 //   - break if true/false
 //   - return if true/false
+//   - four canonical decision-line counters
 //CPP: RWStructuredBuffer{{.*}}_slang_coverage
 //CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
 //CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
@@ -64,7 +65,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(5\)}}
 //CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(6\)}}
 //CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(7\)}}
-//CPP-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(8\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(8\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(9\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(10\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(11\)}}
+//CPP-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(12\)}}
 
 //HLSL: _slang_coverage
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(0\)}}
@@ -75,4 +80,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(5\)}}
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(6\)}}
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(7\)}}
-//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(8\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(8\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(9\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(10\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(11\)}}
+//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(12\)}}

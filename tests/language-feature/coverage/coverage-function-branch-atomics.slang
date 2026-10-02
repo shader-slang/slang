@@ -62,11 +62,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // Shared synthesized coverage buffer should appear even though
-// `-trace-coverage` line probes are not enabled.
+// `-trace-coverage` is not enabled. Branch decisions carry line events.
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Function + branch coverage for this shader emits exactly sixteen
-// counters: two function-entry markers, two for-loop condition arms,
+// Function + branch coverage emits 23 counters: seven canonical decision
+// lines, two function-entry markers, two for-loop condition arms,
 // two if/else arms, two if-without-else arms, two while-loop condition
 // arms, two do-while condition arms, two switch case arms, one explicit
 // switch default arm, and one implicit switch no-match/default arm.
@@ -86,7 +86,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(13\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(14\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(15\)}}
-//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(16\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(16\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(17\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(18\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(19\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(20\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(21\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(22\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(23\)}}
 
 // The three coverage modes must be accepted together and share one
 // synthesized coverage buffer. The exact combined slot map is covered

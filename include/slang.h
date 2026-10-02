@@ -1253,7 +1253,7 @@ typedef uint32_t SlangSizeT;
 
         // Add new options HERE, immediately before CountOf.
 
-        TraceCoverage = 145, // bool: insert per-statement line coverage counters
+        TraceCoverage = 145, // bool: record source-line execution coverage
         TraceCoverageBinding =
             146, // intValue0: register index; intValue1: register space - explicit
                  //   binding for the synthesized __slang_coverage buffer. Consumed
@@ -4943,9 +4943,10 @@ inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
 /// may add fields such as column/span information, function identity,
 /// branch-arm identity, or coverage-mode-specific metadata at the end
 /// without changing the COM interface. Entries are source-location
-/// based: the current producers emit one source entry per marker op.
-/// If multiple line entries resolve to the same `(file, line)`, LCOV
-/// export aggregates them at report-generation time.
+/// based: line coverage emits one canonical entry per function/file/line.
+/// Different lines may share a counter when they execute together. Exporters
+/// deduplicate counter aliases per source line, sum distinct count-mode slots,
+/// and combine boolean-mode hits with logical OR.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);

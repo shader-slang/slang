@@ -46,7 +46,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // coverage even when line coverage is disabled.
 //CHECK: __slang_coverage
 
-// One function-entry marker and ten branch-arm markers lower through
+// One function entry, five decision lines, and ten branch arms lower through
 // the same storage-buffer atomic path used by line coverage.
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_0
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_1
@@ -59,6 +59,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_8
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_9
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_10
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_11
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_12
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_13
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_14
+//CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_15
 //CHECK-DAG: OpLoopMerge
 //CHECK-DAG: OpSelectionMerge
 //CHECK-DAG: OpSelectionMerge
@@ -73,4 +78,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd
-//CHECK-NOT: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_11
+//CHECK-NOT: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_16
