@@ -7301,6 +7301,44 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
     }
 }
 
+/// Parameters synthesized from a requirement get their modifiers from the
+/// requirement's effective mode rather than from a copy of its modifiers,
+/// because several spellings (`const __ref`, a legacy alias, an inferred mode)
+/// produce the same mode, and only the mode has to match.
+static void addModifiersForParamPassingMode(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        addModifier(paramDecl, astBuilder->create<OutModifier>());
+        break;
+    case ParamPassingMode::BorrowInOut:
+        addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        break;
+    case ParamPassingMode::BorrowIn:
+        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        break;
+    case ParamPassingMode::RefReadWrite:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        break;
+    case ParamPassingMode::RefReadOnly:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        addModifier(paramDecl, astBuilder->create<ConstModifier>());
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        SLANG_UNEXPECTED("no parameter modifier spells a write-only reference");
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        break;
+    }
+}
+
 void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
     DeclRef<CallableDecl> requirement,
     CallableDecl* synthesized,
@@ -7338,27 +7376,16 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         //
         synthesized->addMember(synParamDecl);
 
-        // Add modifiers
-        paramType.isLeftValue = true;
-        for (auto modifier : paramDeclRef.getDecl()->modifiers)
+        // The synthesized parameter must have the same effective passing mode
+        // as the requirement's, whatever modifier spelling produced it there.
+        auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
+        addModifiersForParamPassingMode(m_astBuilder, synParamDecl, paramMode);
+        paramType.isLeftValue = paramMode != ParamPassingMode::BorrowIn;
+        if (paramDeclRef.getDecl()->hasModifier<NoDiffModifier>())
         {
-            if (as<NoDiffModifier>(modifier))
-            {
-                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-                addModifier(synParamDecl, noDiffModifier);
-            }
-            else if (
-                as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
-            {
-                auto clonedModifier =
-                    (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
-                clonedModifier->keywordName = modifier->keywordName;
-                addModifier(synParamDecl, clonedModifier);
-                if (as<BorrowModifier>(modifier))
-                    paramType.isLeftValue = false;
-            }
+            auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
+            noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+            addModifier(synParamDecl, noDiffModifier);
         }
 
         // Create an expression that references the parameter for use in arguments.
@@ -15194,23 +15221,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        switch (paramDir)
-        {
-        case ParamPassingMode::BorrowInOut:
-            addModifier(param, m_astBuilder->create<InOutModifier>());
-            break;
-        case ParamPassingMode::Out:
-            addModifier(param, m_astBuilder->create<OutModifier>());
-            break;
-        case ParamPassingMode::Ref:
-            addModifier(param, m_astBuilder->create<RefModifier>());
-            break;
-        case ParamPassingMode::BorrowIn:
-            addModifier(param, m_astBuilder->create<BorrowModifier>());
-            break;
-        default:
-            break;
-        }
+        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
 }
@@ -17073,7 +17084,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isByReferenceParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17103,7 +17114,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isByReferenceParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }

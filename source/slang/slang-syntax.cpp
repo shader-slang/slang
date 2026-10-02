@@ -966,7 +966,7 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     else if (as<RefParamType>(paramTypeWithDirection))
     {
         auto refParamType = as<RefParamType>(paramTypeWithDirection);
-        return {refParamType->getValueType(), ParamPassingMode::Ref};
+        return {refParamType->getValueType(), refParamType->getParamPassingMode()};
     }
     else if (as<BorrowInParamType>(paramTypeWithDirection))
     {
