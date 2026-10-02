@@ -22,6 +22,7 @@ enum class BufferElementTypeLoweringPolicyKind
     MetalPointerLowering,
     WGSL,
     LLVM,
+    NVVM,
     Metal
 };
 

@@ -3063,11 +3063,19 @@ SLANG_UNIT_TEST(nvvmResourceReferencesPreserveDerivedReadOnlyAccess)
         StoreRoot,
         StoreChild,
         MutableCall,
-        ReadOnlyCall
+        ReadOnlyCall,
+        PointerRoot,
+        PointerChild
     };
     for (bool pointerLeaf : {false, true})
         for (auto testCase :
-             {Case::Read, Case::StoreRoot, Case::StoreChild, Case::MutableCall, Case::ReadOnlyCall})
+             {Case::Read,
+              Case::StoreRoot,
+              Case::StoreChild,
+              Case::MutableCall,
+              Case::ReadOnlyCall,
+              Case::PointerRoot,
+              Case::PointerChild})
         {
             _resetDirectNVVMFakes();
             NVVMStaticTestContext context(unitTestContext);
@@ -3126,6 +3134,18 @@ SLANG_UNIT_TEST(nvvmResourceReferencesPreserveDerivedReadOnlyAccess)
             {
                 IRInst* arguments[] = {element};
                 builder.emitCallInst(builder.getVoidType(), callee, 1, arguments);
+            }
+            if (testCase == Case::PointerRoot || testCase == Case::PointerChild)
+            {
+                IRInst* source = testCase == Case::PointerRoot ? value : element;
+                auto pointee = cast<IRPtrTypeBase>(source->getDataType())->getValueType();
+                auto pointer = builder.getPtrType(
+                    kIROp_PtrType,
+                    pointee,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::UserPointer,
+                    builder.getDefaultBufferLayoutType());
+                builder.emitIntrinsicInst(pointer, kIROp_PtrCast, 1, &source);
             }
             builder.emitReturn();
             builder.setInsertInto(module);
@@ -3226,5 +3246,170 @@ SLANG_UNIT_TEST(irAddressPropagationPreservesDerivedPointerProperties)
             SLANG_CHECK(type->getAccessQualifier() == AccessQualifier::Read);
             SLANG_CHECK(type->getDataLayout()->getOp() == kIROp_ScalarBufferLayoutType);
         }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmPointerQualificationKeepsExactPointeeAndLayout)
+{
+    enum class Case
+    {
+        Local,
+        Child,
+        Shared,
+        SharedChild,
+        LocalToShared,
+        SharedToLocal,
+        WrongPointee,
+        ExplicitLayout,
+        MissingOperand
+    };
+    for (auto testCase :
+         {Case::Local,
+          Case::Child,
+          Case::Shared,
+          Case::SharedChild,
+          Case::LocalToShared,
+          Case::SharedToLocal,
+          Case::WrongPointee,
+          Case::ExplicitLayout,
+          Case::MissingOperand})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto record = builder.createStructType();
+        auto field =
+            builder.createStructField(record, builder.createStructKey(), builder.getIntType());
+        const bool sharedSource = testCase == Case::Shared || testCase == Case::SharedChild ||
+                                  testCase == Case::SharedToLocal;
+        IRInst* shared = nullptr;
+        if (sharedSource)
+        {
+            shared = builder.createGlobalVar(record);
+            shared->setFullType(
+                builder.getRateQualifiedType(builder.getGroupSharedRate(), shared->getFullType()));
+        }
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* source = sharedSource ? shared : builder.emitVar(record);
+        IRType* pointee = record;
+        if (testCase == Case::Child || testCase == Case::SharedChild)
+        {
+            source = builder.emitFieldAddress(source, field->getKey());
+            pointee = builder.getIntType();
+            if (sharedSource)
+                source->setFullType(builder.getPtrType(
+                    pointee,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::GroupShared,
+                    builder.getType(kIROp_ScalarBufferLayoutType)));
+        }
+        if (testCase == Case::WrongPointee)
+            pointee = builder.getFloatType();
+        auto pointer = builder.getPtrType(
+            kIROp_PtrType,
+            pointee,
+            AccessQualifier::ReadWrite,
+            testCase == Case::Shared || testCase == Case::SharedChild ||
+                    testCase == Case::LocalToShared
+                ? AddressSpace::GroupShared
+                : AddressSpace::UserPointer,
+            testCase == Case::ExplicitLayout ? builder.getType(kIROp_Std430BufferLayoutType)
+                                             : builder.getDefaultBufferLayoutType());
+        auto conversion = builder.emitIntrinsicInst(
+            pointer,
+            kIROp_PtrCast,
+            testCase == Case::MissingOperand ? 0 : 1,
+            &source);
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool valid = testCase == Case::Local || testCase == Case::Child ||
+                           testCase == Case::Shared || testCase == Case::SharedChild;
+        if (valid != SLANG_SUCCEEDED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+        if (valid)
+        {
+            auto selected =
+                requirements.emissionPlan.pointerQualificationValues.tryGetValue(conversion);
+            SLANG_CHECK(selected && *selected == source);
+            auto space = requirements.emissionPlan.scopedPointerSpaces.tryGetValue(conversion);
+            SLANG_CHECK(sharedSource ? space && *space == SLANG_NVVM_ADDRESS_SPACE_SHARED : !space);
+        }
+        else
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(
+                    toSlice("pointer qualification")) >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmPointerQualificationPreservesMutableParameterRoots)
+{
+    for (auto op : {kIROp_OutParamType, kIROp_BorrowInOutParamType, kIROp_RefParamType})
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto reference = op == kIROp_RefParamType
+                             ? builder.getRefParamType(builder.getIntType(), AddressSpace::Generic)
+                             : builder.getPtrType(op, builder.getIntType());
+        auto pointer = builder.getPtrType(
+            kIROp_PtrType,
+            builder.getIntType(),
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            builder.getDefaultBufferLayoutType());
+        auto helper = builder.createFunc();
+        IRType* types[] = {reference};
+        helper->setFullType(builder.getFuncType(1, types, builder.getVoidType()));
+        builder.setInsertInto(helper);
+        builder.emitBlock();
+        IRInst* source = builder.emitParam(reference);
+        auto conversion = builder.emitIntrinsicInst(pointer, kIROp_PtrCast, 1, &source);
+        builder.emitReturn();
+        builder.setInsertInto(module);
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* local = builder.emitVar(builder.getIntType());
+        builder.emitCallInst(builder.getVoidType(), helper, 1, &local);
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(SLANG_SUCCEEDED(result));
+        auto selected =
+            requirements.emissionPlan.pointerQualificationValues.tryGetValue(conversion);
+        SLANG_CHECK(selected && *selected == source);
     }
 }

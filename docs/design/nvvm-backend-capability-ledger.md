@@ -40,12 +40,25 @@ decoder. The sibling `pointer-aggregate-entry-abi` fixture exercises nested arra
 pointer-to-array, pointer-to-pointer, value/out/inout/readonly forwarding, Half3/Bool/float3 launch
 fields, cbuffer loads and guarded writes at O0/O3 on both routes (155 assertions per route).
 
-Ordinary typed offsets require matching CUDA/LLVM pointee layout. Compact raw memory remains a
-separate missing representation family; float3/half3 and related nested layouts are not admitted by
-this change. [Static context addressing](../../tests/cuda/nvvm-static-context-array-addressing.slang)
+Ordinary typed offsets retain the CUDA/LLVM layout proof. Shared storage legalization now makes
+standard numeric scalar/vector/matrix, nested record/array and pointer-to-pointer storage match
+CUDA packing, including float3 stride12, Half3 padding and Bool byte truthiness. Local and device
+aliases use the same recipe without pointer-call copies. The sibling `compact-pointer-storage`
+fixture covers 204 shape/optimization cells with independent byte guards; `compact-pointer-record`
+covers nested arrays, records and Packet** aliases at O0/O3. Exact pointer qualification retains
+readonly and explicit-layout rejection. BF16/FP8 and explicit layouts retain their existing owners.
+OptiX callable payloads use the same selected storage on both sides; register payloads retain
+logical matrix order. [Static context addressing](../../tests/cuda/nvvm-static-context-array-addressing.slang)
 qualifies deep field/index chains and per-thread isolation on three routes. Static tests cover
 layout/cache ownership, denied launch roles and readonly forwarding; existing SPIR-V address-space
 specialization controls remain passing.
+
+The NVRTC comparison passes the nested record fixture. Its tag increment uses ordinary access;
+only the NVVM branch qualifies coherent access through a bare scalar entry pointer. Its numeric fixture reads Bool byte0x80
+as -128 when converted to float, whereas NVVM preserves nonzero truthiness and returns1. NVRTC
+then rejects a column-major Bool3x3 local pointer passed to its lowered helper; subsequent numeric
+cells and O3 are unrun. These exact differences remain in the RHI manifest; CUDA output does not
+replace the independent byte and logical-value oracle.
 
 ## Local resource helper transport
 

@@ -27,6 +27,39 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
 
+## Current application feature work
+
+Compact CUDA pointer storage is qualified: standard numeric scalar/vector/matrix and nested
+record/array pointers share canonical local/device storage, preserving aliases, Half3 padding and
+Bool byte truthiness. Exact pointer qualification preserves access and physical address spaces;
+bare copyable entry pointers retain AS1 for coherent memory. OptiX callable storage and logical
+register-payload ordering retain their existing contracts.
+
+The 353-node SlangPy selection passes **338 / fails 15**, resolving **75** previous failures and
+preserving **263** prior passes. Current mixed-age inventory is **1,385 pass / 205 fail / 807 skip /
+3 expected failures**. The original full checkpoint below is unchanged. Remaining selected failures:
+six atomicAdd, six uint field addresses, two updateElement and one nested cbuffer field address.
+
+Qualification includes 204 numeric GPU cells at O0/O3, three existing OptiX controls (18,931
+assertions), nested record/entry controls (437 assertions), 34 NVVM static tests, one address test,
+six provider units, ten coherent positive/negative cells and all 16 smoke cells. The due 1,716-cell
+working run passed 1,708 and found eight regressions; all eight exact configurations pass after
+producer repairs. This is a full run plus focused repairs, not a fresh all-green full run.
+
+RHI has 286 registrations (285 unique), with mixed-age NVVM **275/1/10** and NVRTC **270/6/10**.
+NVRTC passes the record comparison (283 assertions; ordinary tag access, not coherent semantics).
+Its numeric comparison retains five Bool0x80-to-float differences and a column-major Bool3x3 helper
+ABI compile failure; later numeric cases and O3 were unrun. Independent NVVM byte oracles remain.
+Raw evidence: `build/nvvm-pointer-storage/`; exact histories and identities live in the current
+focused, SlangPy and RHI manifests. Root source base is `f2a34ee90`, sibling RHI base `c7d26fe9`;
+the accepted feature record identifies the changed sources and binaries.
+
+**Next:** finish checked surface provenance and the complete 8/16-bit UNORM/SNORM family, then
+TensorView/DiffTensorView and remaining representation families. Surface failures include native
+texture wrappers as well as normalized formats, so they need distinct producer diagnoses. Working
+cadence resets here; use focused application selections and smoke. A full checkpoint follows the
+queued families. Legacy OptiX8 HitObject semantics remain parked independently.
+
 ## SlangPy application checkpoint
 
 The requested on-demand CUDA-selected SlangPy checkpoint is complete: **1,054 passed,
@@ -98,16 +131,9 @@ address controls pass, and all 16 smoke cells pass. One stale Callable transform
 corrected to the already-supported production contract. Raw evidence: `build/nvvm-pointer-entry/`.
 RHI now has 284 registrations (283 unique), with mixed-age NVVM 273/1/10 and NVRTC 269/5/10.
 
-Next: finish the **compact raw pointer storage family**. Seventy-three selected cases reach the
-CUDA/LLVM layout boundary (notably float3 stride 12 versus 16 and half3 padding); seven further pointer
-offset shapes, three local helper-layout cases and seven retained field-address failures need
-canonical producer/storage handling. Reuse existing storage legalization and preserve local/global
-aliasing; do not pack temporary pointees around helper calls. This is a remaining family, not an
-accepted compact-memory feature. Working-corpus cadence is due by the next implementation batch.
-Then address normalized/narrow surfaces (108 imageStore and 38 imageLoad first diagnostics), intrinsic
-TensorView/DiffTensorView, and remaining representation/specialization failures. Combined generic
-handle specializations retain their duplicate-symbol failure. All exact failures and transitions
-remain in the manifests; no automatic demotion or full-suite freshness claim.
+The subsequent compact-pointer qualification is recorded in the current section above. Combined
+generic handle specializations retain their duplicate-symbol failure; exact failures and transitions
+remain in the manifests. No automatic demotion or full-suite freshness claim is made.
 
 Open shared issue: column-major entry matrix reflection disagrees with CUDA's row-array physical
 representation. Both routes fail 11 lanes per optimization in the retained mixed-matrix fixture;
@@ -563,10 +589,10 @@ version differences, not a claim about Vulkan/D3D standaloneInvoke suppression. 
 beside an older snapshot would answer saved-object queries but would not repair RayFlags inside
 invoked shaders. Retracing is not valid because it repeats traversal side effects.
 
-**Next action: settle the pending8.x HitObject contract, then implement the complete chosen
+**Parked legacy action: settle the pending8.x HitObject contract before implementing that
 family.** The recommended next step preserves modern flag visibility and all32 payload words by
 investigating a private cross-stage context ABI. The alternative explicitly accepts and documents
 native 8 Invoke differences. Attribute-budget ownership and full topology reconstruction also require
-qualification; there is no hidden downgrade. This is the current human decision boundary.
+qualification; there is no hidden downgrade. This decision boundary applies only to the parked legacy family.
 Immutable global aggregate initialization and exploratory ranking remain queued and unstarted.
 Custom RHI devices/sessions and internal NVRTC kernels retain their documented compiler ownership.

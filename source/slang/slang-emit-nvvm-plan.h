@@ -479,6 +479,7 @@ struct NVVMEmissionPlan
     Dictionary<IRInst*, NVVMPlannedEquivalentStructuredBuffer> equivalentStructuredBuffers;
     Dictionary<IRInst*, NVVMPlannedLayoutPointerOffset> layoutPointerOffsets;
     Dictionary<IRInst*, IRInst*> pointerToIntegerValues;
+    Dictionary<IRInst*, IRInst*> pointerQualificationValues;
     List<NVVMPlannedLocalStorage> localStorage;
     List<NVVMPlannedLoad> loads;
     List<NVVMPlannedStore> stores;
@@ -502,8 +503,8 @@ struct NVVMEmissionPlan
     List<NVVMPlannedEphemeralValue> ephemeralValues;
     List<NVVMPlannedSurfaceOperation> surfaceOperations;
     List<NVVMPlannedAtomicOperation> atomicOperations;
-    // GetOffsetPtr has no field/element record. Retain its checked physical space at planning.
-    Dictionary<IRInst*, SlangNVVMAddressSpace> scopedOffsetSpaces;
+    // Offset and qualification instructions retain their source's checked physical space.
+    Dictionary<IRInst*, SlangNVVMAddressSpace> scopedPointerSpaces;
 };
 
 struct NVVMAtomicOperationRequirement

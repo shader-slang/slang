@@ -2756,9 +2756,9 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
     case NVVMTypeUse::EntryPointParameter:
         return isCopyableValue ||
                (isHelperValue && (structType || as<IRArrayType>(canonicalType))) ||
-               resourceStructType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
-               isSampledTexture || isSurface || samplerValue ||
-               (parameterGroup && hasParameterGroupValueRepresentation);
+               resourceStructType || deviceNumericPointer || deviceArrayPointer ||
+               deviceHelperPointer || isRawBuffer || isSampledTexture || isSurface ||
+               samplerValue || (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
         return isHelperValue || resourceStructType || fixedResourceArrayType ||
                localResourceValuePointer || localCopyablePointer || localHelperPointer ||
@@ -3128,7 +3128,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     if (use == NVVMTypeUse::Value && physicalArrayStructType)
         return lowerType(type, NVVMTypeUse::StructuredBufferStorage, outType);
 
-    if (use == NVVMTypeUse::EntryPointParameter && deviceCopyablePointer)
+    if (use == NVVMTypeUse::EntryPointParameter && (deviceCopyablePointer || deviceHelperPointer))
     {
         if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
         {
@@ -3137,7 +3137,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         }
         SLANG_RETURN_ON_FAIL(_lowerPointerType(
             type,
-            deviceCopyablePointerValueType,
+            deviceCopyablePointer ? deviceCopyablePointerValueType : deviceHelperPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
             outType,
             NVVMTypeUse::Value,

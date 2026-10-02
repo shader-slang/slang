@@ -669,6 +669,50 @@ SLANG_UNIT_TEST(nvvmPointerEntryLayoutsKeepLaunchAndHelperRolesSeparate)
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             expectedGeneric)));
         SLANG_CHECK(launchPointer == expectedGlobal && helperPointer == expectedGeneric);
+        auto recordPointer = ir.getPtrType(
+            kIROp_PtrType,
+            record,
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            ir.getDefaultBufferLayoutType());
+        auto indirectPointer = ir.getPtrType(
+            kIROp_PtrType,
+            recordPointer,
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            ir.getDefaultBufferLayoutType());
+        SlangNVVMTypeHandle indirectEntry = nullptr, indirectHelper = nullptr;
+        if (!entryFirst)
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                lowering.lowerType(indirectPointer, NVVMTypeUse::HelperParameter, indirectHelper)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            lowering.lowerType(indirectPointer, NVVMTypeUse::EntryPointParameter, indirectEntry)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            lowering.lowerType(indirectPointer, NVVMTypeUse::HelperParameter, indirectHelper)));
+        SlangNVVMTypeHandle byteType = nullptr, expectedRecord = nullptr,
+                            expectedRecordPointer = nullptr, expectedIndirectEntry = nullptr,
+                            expectedIndirectHelper = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getIntegerType(scope.module, 8, byteType)));
+        SlangNVVMTypeHandle recordFields[] = {byteType, expectedGeneric};
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider.getStructType(scope.module, recordFields, 2, expectedRecord)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+            scope.module,
+            expectedRecord,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            expectedRecordPointer)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+            scope.module,
+            expectedRecordPointer,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            expectedIndirectEntry)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+            scope.module,
+            expectedRecordPointer,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            expectedIndirectHelper)));
+        SLANG_CHECK(indirectEntry == expectedIndirectEntry);
+        SLANG_CHECK(indirectHelper == expectedIndirectHelper);
         SlangNVVMTypeHandle ordinaryHalfRecord = nullptr, physicalHalfRecord = nullptr;
         if (!entryFirst)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(

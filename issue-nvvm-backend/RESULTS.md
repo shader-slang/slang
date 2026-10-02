@@ -1717,5 +1717,23 @@ Run `tests/cuda/nvvm-static-context-array-addressing.slang` plus the existing
 The exact 452-node application selection under `build/nvvm-pointer-entry/selection-final.txt`
 passes 263/fails 189, resolving 216 old failures and preserving 47 prior passes. All 16 smoke cells pass.
 The maintained manifests preserve original full counts, every diagnostic transition and unsuccessful
-reductions. The compact raw-pointer layout failures remain queued, and the 17-minute working corpus
-was not rerun for each intermediate fix. It is due by the next implementation batch.
+reductions. That predecessor did not rerun the working corpus. The compact-pointer qualification below
+records the subsequent full working run and exact repairs.
+
+### Compact CUDA pointer storage qualification
+
+Select sibling RHI `compact-pointer-storage.cuda,compact-pointer-record.cuda` using the established
+explicit compiler selector. The numeric fixture runs 204 scalar/vector/matrix/major-order cells at
+O0/O3 with independent bytes, untouched guards, Half3 padding and Bool0x80 truthiness. The record
+fixture covers nested arrays and Packet** aliases, including mutable parameter roots. Its NVVM
+branch additionally checks coherent access through a bare scalar entry pointer; NVRTC uses ordinary
+access and does not qualify that coherent contract. Preserve the recorded NVRTC Bool and column-major
+helper differences, including unrun later cases.
+
+The existing static `nvvm` filter passes 34 tests; `irAddressPropagation` adds one. Run prefix
+`tests/cuda/nvvm-coherent-pointer-memory` for ten positive/negative cases. The 353-node application
+selection in `build/nvvm-pointer-storage/selection-final2.txt` passes338/fails15 and preserves all263
+prior passing controls. Final commands and identities are retained alongside the original failed
+attempts; manifests retain exact transitions. Smoke passes16. The due working corpus executes1716
+cells with1708passes/eight regressions, followed by successful exact repairs. Do not present that
+mixed evidence as a fresh all-green full run. No working tests were demoted.

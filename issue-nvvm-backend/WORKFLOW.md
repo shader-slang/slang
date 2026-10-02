@@ -13,9 +13,9 @@ are accepted together, as are local resource/helper transport and the shared RHI
 consumer repair. Continue with pointer-bearing entry aggregates and checked address/layout families,
 normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
 Pointer-bearing launch/helper transport and static-context address propagation are now qualified.
-Continue with the exposed compact raw pointer storage family before normalized surfaces and intrinsic
-TensorView; preserve local/global aliasing through canonical storage legalization. Working corpus is
-due by the next implementation batch. Use affected application selections plus smoke between
+Compact raw pointer storage is now qualified with canonical local/device aliasing. Continue with
+checked surface provenance and the complete normalized surface family, then intrinsic TensorView.
+The 1,716-cell working checkpoint plus eight exact repairs resets the working cadence. Use affected application selections plus smoke between
 deliberately chosen full checkpoints.
 
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout

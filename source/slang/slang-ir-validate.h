@@ -98,8 +98,12 @@ bool validateStructuredBufferResourceTypes(
 // plain value, and emits an error if it is. Vars whose stored type is a pointer,
 // pointer-like resource (e.g. ConstantBuffer), structured buffer, or
 // byte-address buffer are exempt because those always refer to device memory.
-// Always replaces each AssumeAddress(x) with x so backend passes never see the
-// opcode.
-void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink);
+// Replaces AssumeAddress with its operand, or with a PtrCast when preservePointerTypes
+// is requested and the declared pointer type differs. No AssumeAddress opcode remains.
+void validateAndRemoveAssumeAddress(
+    IRModule* module,
+    bool validate,
+    DiagnosticSink* sink,
+    bool preservePointerTypes = false);
 
 } // namespace Slang

@@ -1122,7 +1122,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.assumeAddress)
     {
         bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
-        SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
+        SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink, emitNVVMDirectly);
     }
 
     // If the user specified the flag that they want us to dump
@@ -2162,6 +2162,21 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    // Pack OptiX values while their semantic matrix types still describe logical rows.
+    // Storage legalization may replace local/reference matrices with column-major carriers;
+    // those carriers must not determine the independent ray-payload ABI.
+    if (emitNVVMDirectly)
+    {
+        // These passes can introduce or repair entry-point parameters, so they must precede
+        // CUDA entry-point legalization even when it runs before matrix storage lowering.
+        if (requiredLoweringPassSet.globalVaryingVar)
+            SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+        if (requiredLoweringPassSet.resolveVaryingInputRef)
+            SLANG_PASS(resolveVaryingInputRef);
+        SLANG_PASS(fixEntryPointCallsites);
+        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink(), true);
+    }
+
     if (isCPUTargetViaLLVM(targetRequest) || emitNVVMDirectly)
     {
         // The LLVM targets are special in that we always lower all matrices
@@ -2454,13 +2469,16 @@ Result linkAndOptimizeIR(
     // previously hidden behind generic/interface dispatch. Translate all global
     // varying inputs/outputs now, after specialization, but before target
     // entry-point legalization.
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+    if (!emitNVVMDirectly)
+    {
+        if (requiredLoweringPassSet.globalVaryingVar)
+            SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
+        if (requiredLoweringPassSet.resolveVaryingInputRef)
+            SLANG_PASS(resolveVaryingInputRef);
 
-    SLANG_PASS(fixEntryPointCallsites);
+        SLANG_PASS(fixEntryPointCallsites);
+    }
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2469,10 +2487,6 @@ Result linkAndOptimizeIR(
     // as late as possible, so that it doesn't affect how other
     // optimization passes need to work.
     //
-    if (emitNVVMDirectly)
-    {
-        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink(), true);
-    }
     switch (target)
     {
     case CodeGenTarget::GLSL:
@@ -2753,7 +2767,13 @@ Result linkAndOptimizeIR(
     }
 
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
-    if (isWGPUTarget(targetRequest))
+    // System-value entry parameters and the explicit CUDA context are now canonical.
+    // Compact storage lowering can rewrite local objects without changing the semantic types
+    // that entry-point legalization consumes (for example SV_DispatchThreadID's uint3).
+    if (emitNVVMDirectly)
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::NVVM;
+    else if (isWGPUTarget(targetRequest))
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::WGSL;
     else if (isKhronosTarget(targetRequest))

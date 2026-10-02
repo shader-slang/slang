@@ -142,15 +142,17 @@ launches. The shared immutable-location policy owns that distinction.
 `CallShader` selects an effectful typed value-in/value-out operation. Its checked plan admits a
 UInt32 shader-table index and recursive copyable numeric payloads in raygen, closest-hit, miss and
 callable closures. The optional callable interface (ID11, ABI46 unchanged) privately obtains the
-SDK direct-callable address, stores the value in local `Value(T)` storage, invokes `void(T*)`, and
-loads the updated value. Neither the callable address nor a payload pointer becomes a general
+SDK direct-callable address, stores the selected payload value, invokes `void(T*)`, and loads
+its updated value. Shared storage legalization packs/unpacks the intrinsic's value boundary with
+the same CUDA recipe as the callable reference parameter, before matrix lowering and again when
+selecting compact vector storage. Neither the callable address nor a payload pointer becomes a general
 executable value. Ordinary helper calls remain direct and module-owned.
 
 Callable definitions use `__direct_callable__` external device symbols, with canonical
 `BorrowInOutParam<T>` or `OutParam<T>` lowered through the existing helper-parameter role. They
 are selected entries for closure validation but are not kernels and receive no compute byval
-attributes. Caller and callee share the private NVVM value representation; this is not a promise
-of mixed NVRTC/NVVM callable layout compatibility. Pointer/resource payloads remain excluded.
+attributes. Caller and callee share the selected private storage representation; mixed
+NVRTC/NVVM callable layout compatibility remains unqualified. Pointer/resource payloads remain excluded.
 Existing empty-type legalization removes empty formals and rebuilds an empty-result call as an
 effectful void operation retaining its index, so both sides use `void()` and shader effects survive.
 
@@ -402,12 +404,24 @@ from leaking into ordinary SSA. Resource-bearing entries retain their separate r
 A physical entry address is never used as an ordinary aggregate value.
 
 Ordinary raw pointer offsets require a compatible CUDA/LLVM pointee layout before typed GEP
-emission. Finite numeric records, arrays and pointer leaves can use that identity representation.
-Compact mismatches such as float3 stride12 versus LLVM16 remain rejected; broadening arithmetic
-alone would be incorrect. Global-context replacement propagates the new address space through
-existing child addresses and phi edges while preserving each child's opcode, access and layout.
-Checked local field/element references reuse their root proof for helper forwarding, including
-readonly-to-readonly calls; an explicit pointer spelling alone grants no local provenance.
+emission. Shared storage legalization selects a canonical CUDA recipe for default UserPointer
+pointees and addressable Generic locals, including numeric vectors, matrices, records and arrays.
+Native LLVM chunks express CUDA size/alignment: float3 uses three scalars; Half3 uses two half2
+chunks and preserves its padding. Logical loads/stores convert semantic lanes, while pointer calls
+retain the original object and aliases. Explicit storage layouts and BF16/FP8 keep their own owners.
+Matrix orientation is selected before matrix value legalization; compact vector storage runs after
+CUDA system values. OptiX register payload packing and its entry-point prerequisites run before
+matrix storage lowering so physical column order cannot change the payload ABI.
+
+Removing AssumeAddress preserves a canonical PtrCast when the declared UserPointer type differs
+from the local address. Storage conversion commutes through exact-pointee qualification casts;
+preflight checks access and provenance, records the source and emits its generic pointer identity.
+This keeps pointer arrays/records correctly typed without granting global memory or writable access.
+New bare helper-pointee launch pointers use entry AS1 to executable AS0 conversion; existing
+copyable-pointee entry pointers retain AS1, including their scoped global-memory operations. Global-context
+replacement propagates address space through child addresses and phi edges while preserving opcode,
+access and layout. Checked child references reuse their root proof, including readonly forwarding;
+an explicit pointer spelling alone grants no local provenance.
 
 Byte/structured buffer entry values retain pointer-plus-count storage, with bytes for byte buffers
 and elements for structured buffers. A checked equivalent-structured-view plan selects the element

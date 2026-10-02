@@ -91871,6 +91871,756 @@
         "Remaining raw compact-memory family must preserve local/global aliases; it is not marked complete."
       ],
       "rhi_commit": "c7d26fe9477ecd297ea348835e69f9b792c2e8d2"
+    },
+    "nvvm-cuda-pointer-storage": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-pointer-storage/identity.json",
+        "sha256": "685d5bfa1a66c79559cc778e17a53c3cf028d38c673fe26afd993a0ef40f2228"
+      },
+      "scope": "Canonical compact CUDA pointer storage, exact qualification, complete numeric alias/padding family; existing OptiX payload/callable contracts preserved.",
+      "validation": {
+        "bool3-ir1": {
+          "path": "build/nvvm-pointer-storage/bool3-ir1.json",
+          "sha256": "1ea650ddf12998df6eef19dbdb31c50de4e8cb01165a4765ce718c5fd2492fa9",
+          "return_code": 255,
+          "elapsed_seconds": 0.29171109199523926
+        },
+        "buffer-regression-ir": {
+          "path": "build/nvvm-pointer-storage/buffer-regression-ir.json",
+          "sha256": "8e9bb49e7720411babc6ba0b7c7c255320111e413a5f987cfef20382779f3b0e",
+          "return_code": 255,
+          "elapsed_seconds": 0.375960111618042
+        },
+        "build1": {
+          "path": "build/nvvm-pointer-storage/build1.json",
+          "sha256": "4adc25daa13d920ee75c5256e3cbf8d299b3324091eaa4626f2bf7b037144762",
+          "return_code": 0,
+          "elapsed_seconds": 38.36947226524353
+        },
+        "build10": {
+          "path": "build/nvvm-pointer-storage/build10.json",
+          "sha256": "75f649459bb5eda6c81323297f1228dcc703bc7489d4f8dcdf74ed908be14161",
+          "return_code": 0,
+          "elapsed_seconds": 31.903781175613403
+        },
+        "build11": {
+          "path": "build/nvvm-pointer-storage/build11.json",
+          "sha256": "26b263ace4848c172750495bbd2a5575354d3480a33a21b50070645fd15273d3",
+          "return_code": 0,
+          "elapsed_seconds": 31.850353002548218
+        },
+        "build12": {
+          "path": "build/nvvm-pointer-storage/build12.json",
+          "sha256": "c772975b96c5931aee86a509ac69486333961113969dee76056bc0f9a0d89928",
+          "return_code": 0,
+          "elapsed_seconds": 32.08653450012207
+        },
+        "build13": {
+          "path": "build/nvvm-pointer-storage/build13.json",
+          "sha256": "7059a73da8fd5f19a596755a84101c63a62cebbaf58ac90dbee63aa9cff8577f",
+          "return_code": 0,
+          "elapsed_seconds": 24.841480016708374
+        },
+        "build14": {
+          "path": "build/nvvm-pointer-storage/build14.json",
+          "sha256": "df0d5380b56e796060992df3f6056d2f5d60fb70aa1c4585745f01962c33b3ce",
+          "return_code": 0,
+          "elapsed_seconds": 32.489014625549316
+        },
+        "build15": {
+          "path": "build/nvvm-pointer-storage/build15.json",
+          "sha256": "179455aade3b265a3203c3bbebb53c931fb0dfb7c0b3bc54583f3bbe2ac62e96",
+          "return_code": 0,
+          "elapsed_seconds": 23.686691284179688
+        },
+        "build16": {
+          "path": "build/nvvm-pointer-storage/build16.json",
+          "sha256": "ac744399d13b888c6122c6840f63fa46b4eb159ca9fa0334a10181500793e81c",
+          "return_code": 0,
+          "elapsed_seconds": 28.172258138656616
+        },
+        "build17": {
+          "path": "build/nvvm-pointer-storage/build17.json",
+          "sha256": "d4dc9527ec7a11cff1612d300e47da6853b9650427934202bc5cff4014f228e1",
+          "return_code": 1,
+          "elapsed_seconds": 14.378470659255981
+        },
+        "build18": {
+          "path": "build/nvvm-pointer-storage/build18.json",
+          "sha256": "0af8188326de07f5eac3e150128ec50541cd98c90c7e27237d560ffef82b888a",
+          "return_code": 0,
+          "elapsed_seconds": 61.335795640945435
+        },
+        "build19": {
+          "path": "build/nvvm-pointer-storage/build19.json",
+          "sha256": "d768883d86ecd90e47a91e2fce58199067e0c4446408e16ac9a5fc4badc9c16c",
+          "return_code": 0,
+          "elapsed_seconds": 32.34445905685425
+        },
+        "build2": {
+          "path": "build/nvvm-pointer-storage/build2.json",
+          "sha256": "9b00a0a6d4a4cda967d97107cdc40324313e2e1de4b53b3c8ffb9f2d778f04da",
+          "return_code": 1,
+          "elapsed_seconds": 4.84674859046936
+        },
+        "build20": {
+          "path": "build/nvvm-pointer-storage/build20.json",
+          "sha256": "b28c5f85eb4ad45c54ab4e8d7f0427f4261da6cfc7511d3be8e6518c784dba00",
+          "return_code": 0,
+          "elapsed_seconds": 31.789153337478638
+        },
+        "build21": {
+          "path": "build/nvvm-pointer-storage/build21.json",
+          "sha256": "ee8cfe45ada11d323f32cd01ce1352f4acef23a3a049aed048b624828f21c282",
+          "return_code": 0,
+          "elapsed_seconds": 61.02877688407898
+        },
+        "build22": {
+          "path": "build/nvvm-pointer-storage/build22.json",
+          "sha256": "1dec6ced3ea4bd95056545d0deb2c8d613eaec862f63c9591fdd565d1ede13de",
+          "return_code": 0,
+          "elapsed_seconds": 31.631810188293457
+        },
+        "build23": {
+          "path": "build/nvvm-pointer-storage/build23.json",
+          "sha256": "862ad3488ba33812bfda4561194db8eb9f9367d62e9436dcf21ba24a82605bb1",
+          "return_code": 0,
+          "elapsed_seconds": 31.55253529548645
+        },
+        "build24": {
+          "path": "build/nvvm-pointer-storage/build24.json",
+          "sha256": "d1b2f1409ad87036bfaded6720b04be5288bf9fca20da7c277664e90b2fc5f9b",
+          "return_code": 0,
+          "elapsed_seconds": 32.10729789733887
+        },
+        "build25": {
+          "path": "build/nvvm-pointer-storage/build25.json",
+          "sha256": "8ece5a597f5487627e217e43dfee517a360cb6baf0dd1c24caa8db75b01acbfb",
+          "return_code": 0,
+          "elapsed_seconds": 31.52715563774109
+        },
+        "build26": {
+          "path": "build/nvvm-pointer-storage/build26.json",
+          "sha256": "42af524b7ccab4be6060035d179a173a50b2c9c2565edf55633b23c756b241f3",
+          "return_code": 0,
+          "elapsed_seconds": 31.77513861656189
+        },
+        "build3": {
+          "path": "build/nvvm-pointer-storage/build3.json",
+          "sha256": "fd00f0dffe7abdba08e300c3ef75b9513c0a0b27755187683c70d0a0253216b1",
+          "return_code": 0,
+          "elapsed_seconds": 25.61148190498352
+        },
+        "build4": {
+          "path": "build/nvvm-pointer-storage/build4.json",
+          "sha256": "3d12b3f0bf74996134170cf3f00e6f7493803b291da39bbde59d2fbbd75aca3a",
+          "return_code": 0,
+          "elapsed_seconds": 25.095988273620605
+        },
+        "build5": {
+          "path": "build/nvvm-pointer-storage/build5.json",
+          "sha256": "f03601107c0ede061dcdebf6a1b215148a406da9baaeaf985beb93d40a3f86af",
+          "return_code": 0,
+          "elapsed_seconds": 35.30108332633972
+        },
+        "build6": {
+          "path": "build/nvvm-pointer-storage/build6.json",
+          "sha256": "216d1b4756e10680d3467e62794945b69f2cb396fd89b2cdff48ab4210337837",
+          "return_code": 0,
+          "elapsed_seconds": 32.73560357093811
+        },
+        "build7": {
+          "path": "build/nvvm-pointer-storage/build7.json",
+          "sha256": "2cd915f684e366feefc4671b63366767e418adbffc8c5c41733aaeb228471345",
+          "return_code": 0,
+          "elapsed_seconds": 31.82971692085266
+        },
+        "build8": {
+          "path": "build/nvvm-pointer-storage/build8.json",
+          "sha256": "831b18d0ff5b9fb25ac559a230301335ae1de20889d22de702fb103a70cd0cb3",
+          "return_code": 0,
+          "elapsed_seconds": 27.973511934280396
+        },
+        "build9": {
+          "path": "build/nvvm-pointer-storage/build9.json",
+          "sha256": "cbb7e6042bca616abe19c1a1a20131106a72bc924768592aa41afd6ae8fb4580",
+          "return_code": 0,
+          "elapsed_seconds": 31.884973287582397
+        },
+        "coherent-entry1": {
+          "path": "build/nvvm-pointer-storage/coherent-entry1.json",
+          "sha256": "5e8e59b9c672c4407f8b15c2dfcdb8a22dea9d1afe05b31751a9055bfb1cce59",
+          "return_code": 255,
+          "elapsed_seconds": 0.2880394458770752
+        },
+        "coherent-final": {
+          "path": "build/nvvm-pointer-storage/coherent-final.json",
+          "sha256": "45a3970091278267e3d4ba2a4d30afbb032b58f2b23f049091864b7aa8553e94",
+          "return_code": 1,
+          "elapsed_seconds": 2.127857208251953
+        },
+        "coherent-final2": {
+          "path": "build/nvvm-pointer-storage/coherent-final2.json",
+          "sha256": "0c2a0988ba1730382052628ebf4796fe7642b7720156f63a3cf458c37e394d64",
+          "return_code": 0,
+          "elapsed_seconds": 3.056856155395508
+        },
+        "coherent-probe1": {
+          "path": "build/nvvm-pointer-storage/coherent-probe1.json",
+          "sha256": "afb62c9f824a97921c6ec8f745df2a731fbba8e241f1f9943cb9e110aeadabbf",
+          "return_code": 255,
+          "elapsed_seconds": 0.35479235649108887
+        },
+        "column-singleton-debug": {
+          "path": "build/nvvm-pointer-storage/column-singleton-debug.json",
+          "sha256": "5e9616fd9d331a0357b999be28ca1cc23397f210fd05031f1257a08ddda9f228",
+          "return_code": 0,
+          "elapsed_seconds": 2.944352626800537
+        },
+        "context-ir1": {
+          "path": "build/nvvm-pointer-storage/context-ir1.json",
+          "sha256": "64f65bddcfcc0edfe74d123f3e1bdbefa1b56897ae33615725592c0318e453dc",
+          "return_code": 0,
+          "elapsed_seconds": 1.8983633518218994
+        },
+        "discovery-repair-final-gate": {
+          "path": "build/nvvm-pointer-storage/discovery-repair-final-gate.json",
+          "sha256": "98f85b19aa9bdb68cdd3d35298d9152bf06912e61b40a20ee6eb664375817c2f",
+          "return_code": 0,
+          "elapsed_seconds": 4.3439366817474365
+        },
+        "discovery-repair-gate": {
+          "path": "build/nvvm-pointer-storage/discovery-repair-gate.json",
+          "sha256": "e8d2e7c136a4c252a49ba68818d24e05f6615e58ad4ef3aec7f67003aab6fba4",
+          "return_code": 0,
+          "elapsed_seconds": 4.4452104568481445
+        },
+        "frozen-repair-final-gate": {
+          "path": "build/nvvm-pointer-storage/frozen-repair-final-gate.json",
+          "sha256": "f272869b841b3c3b707c3632a3a7383f908e12e55134a194fca02e0b59219552",
+          "return_code": 0,
+          "elapsed_seconds": 6.7414562702178955
+        },
+        "frozen-repair-gate": {
+          "path": "build/nvvm-pointer-storage/frozen-repair-gate.json",
+          "sha256": "dde4bed05e81dd5f0876aaa82049138414c3c9cf6f62cb1ef48c2dda25a01a5c",
+          "return_code": 0,
+          "elapsed_seconds": 6.75761342048645
+        },
+        "generated-ir1": {
+          "path": "build/nvvm-pointer-storage/generated-ir1.json",
+          "sha256": "7cc9f496eb77e1d7e7c991c5d08193d0f341174a1d05ec5abfea90b0d1bbe7b0",
+          "return_code": 255,
+          "elapsed_seconds": 1.8890516757965088
+        },
+        "inventory": {
+          "path": "build/nvvm-pointer-storage/inventory.json",
+          "sha256": "5f74c2d157a5421697b57c3c0dcf0a3ab8633ef9e25ca2ba14d64ef1055263a5",
+          "return_code": 0,
+          "elapsed_seconds": 0.24393248558044434
+        },
+        "matrix-family-run1": {
+          "path": "build/nvvm-pointer-storage/matrix-family-run1.json",
+          "sha256": "b288d8a09a2d58349e9927f69ad5f55311cc9d1a33d41e91bb8212ea6e59185b",
+          "return_code": 1,
+          "elapsed_seconds": 5.2603864669799805
+        },
+        "matrix-family-run2": {
+          "path": "build/nvvm-pointer-storage/matrix-family-run2.json",
+          "sha256": "729c45972915976761adf08e2c724496ea42bb3d3c11c4e65a8293bb7deaff68",
+          "return_code": 0,
+          "elapsed_seconds": 5.255354404449463
+        },
+        "matrix-ir1": {
+          "path": "build/nvvm-pointer-storage/matrix-ir1.json",
+          "sha256": "a17eaa67361ea7c9cd80d5673ac9418d1bc7c0a91665a1dcc82eabeab01d37f7",
+          "return_code": 255,
+          "elapsed_seconds": 0.3058757781982422
+        },
+        "matrix-regression-ir": {
+          "path": "build/nvvm-pointer-storage/matrix-regression-ir.json",
+          "sha256": "d294b2f29eb9e133c740afcdc1df7f2bbd9a78fa09f9963cb9d657a6620309c7",
+          "return_code": 255,
+          "elapsed_seconds": 0.3848152160644531
+        },
+        "mutable-root1": {
+          "path": "build/nvvm-pointer-storage/mutable-root1.json",
+          "sha256": "3586fe808ca87f084b934586913095571b54f1b1ffa1bfb08eef3243f9d6710f",
+          "return_code": 255,
+          "elapsed_seconds": 0.2813582420349121
+        },
+        "probe-runtime1": {
+          "path": "build/nvvm-pointer-storage/probe-runtime1.json",
+          "sha256": "1850e8cd484f269760da1f81a485639745f2d477e96386323c658f30022833c0",
+          "return_code": 0,
+          "elapsed_seconds": 0.35201048851013184
+        },
+        "probe1": {
+          "path": "build/nvvm-pointer-storage/probe1.json",
+          "sha256": "aeac2824da8fa78186571f7cd8ee0a4c8e29029a615d5b067cd10ddc0931138a",
+          "return_code": 255,
+          "elapsed_seconds": 0.2841653823852539
+        },
+        "probe2": {
+          "path": "build/nvvm-pointer-storage/probe2.json",
+          "sha256": "9125e8ec8ea310cfc46f5f999d4642845439c21576144730c0b8a65008974aa5",
+          "return_code": 255,
+          "elapsed_seconds": 0.2896595001220703
+        },
+        "probe3": {
+          "path": "build/nvvm-pointer-storage/probe3.json",
+          "sha256": "fc1c0e8cf9441e66e6349a34bcd6dd9c3342c6b9b8333c569cf5ff81bad3c073",
+          "return_code": 255,
+          "elapsed_seconds": 0.29872798919677734
+        },
+        "probe4": {
+          "path": "build/nvvm-pointer-storage/probe4.json",
+          "sha256": "82ea8ed2d55d3bc60209591069194ab16cc8bf9b8c173f294108b9e5bf36c1d8",
+          "return_code": 0,
+          "elapsed_seconds": 0.30146145820617676
+        },
+        "record-probe1": {
+          "path": "build/nvvm-pointer-storage/record-probe1.json",
+          "sha256": "59e350e261c5124e201442e47a0b5b7d5b53f4e6d92df6f2f92c758c4d3d7527",
+          "return_code": 255,
+          "elapsed_seconds": 0.37175703048706055
+        },
+        "record-probe2": {
+          "path": "build/nvvm-pointer-storage/record-probe2.json",
+          "sha256": "a3a837d6ecc654bbb69f0e46277018f468b109212e6d64f58d66df5aa58bc5f6",
+          "return_code": 255,
+          "elapsed_seconds": 0.3093442916870117
+        },
+        "record-probe3": {
+          "path": "build/nvvm-pointer-storage/record-probe3.json",
+          "sha256": "421af46cbfd5fed206aba67008dc235a2a3048b28d60014216b8e97805f540bc",
+          "return_code": 255,
+          "elapsed_seconds": 0.3024883270263672
+        },
+        "record-probe4": {
+          "path": "build/nvvm-pointer-storage/record-probe4.json",
+          "sha256": "88e5a12010e2b247398bb81e1f92ba0e9adc2439d4a25c107ec87dcd72eb1290",
+          "return_code": 255,
+          "elapsed_seconds": 0.3070049285888672
+        },
+        "rhi-build1": {
+          "path": "build/nvvm-pointer-storage/rhi-build1.json",
+          "sha256": "ddd4b83574c24ce3fab51c83acbf73afbcaa17c3efeaa6027d8657c73770c4c8",
+          "return_code": 0,
+          "elapsed_seconds": 4.944499969482422
+        },
+        "rhi-build2": {
+          "path": "build/nvvm-pointer-storage/rhi-build2.json",
+          "sha256": "b8a72b58d491989066e70c7ab327d11c0723d62aa6951e15e2b3bb72d40eb988",
+          "return_code": 0,
+          "elapsed_seconds": 5.214711427688599
+        },
+        "rhi-build3": {
+          "path": "build/nvvm-pointer-storage/rhi-build3.json",
+          "sha256": "1637d13fa8bd765d6629d018f8a7541256ccf6fb47fe04b9501bebdabf98ead4",
+          "return_code": 0,
+          "elapsed_seconds": 5.303069353103638
+        },
+        "rhi-controls3": {
+          "path": "build/nvvm-pointer-storage/rhi-controls3.json",
+          "sha256": "ef3c4ee9ddafc5aaf47ad11af1383a138714f7b460dbc0e5b214b71b2a7da774",
+          "return_code": 1,
+          "elapsed_seconds": 5.529763698577881
+        },
+        "rhi-controls4": {
+          "path": "build/nvvm-pointer-storage/rhi-controls4.json",
+          "sha256": "aee13943dd401e7e952f408b731eb910e9df27802c27647566b4b74d37f5ce4e",
+          "return_code": 0,
+          "elapsed_seconds": 115.4768385887146
+        },
+        "rhi-nvrtc-1": {
+          "path": "build/nvvm-pointer-storage/rhi-nvrtc-1.json",
+          "sha256": "efd1820256bb3d8e8353b486012a33e9bf08267fdde4a6146c4cc7e030a256bf",
+          "return_code": 1,
+          "elapsed_seconds": 1.4642629623413086
+        },
+        "rhi-nvrtc-final": {
+          "path": "build/nvvm-pointer-storage/rhi-nvrtc-final.json",
+          "sha256": "c7a44445c53f5135871cb2c773a2efb980d3675b95cf282ae456887fdcdcf865",
+          "return_code": 1,
+          "elapsed_seconds": 5.749263286590576
+        },
+        "rhi-nvvm-1": {
+          "path": "build/nvvm-pointer-storage/rhi-nvvm-1.json",
+          "sha256": "f36341451b102d913e3c6d3f66be163006f3ce1c9d8fc84d2e35b7eb498ef13f",
+          "return_code": 0,
+          "elapsed_seconds": 73.45285034179688
+        },
+        "rhi-nvvm-2": {
+          "path": "build/nvvm-pointer-storage/rhi-nvvm-2.json",
+          "sha256": "59a0de3930fd5ac549c9b6fcc6b5a71c01b2e46bd7f52a64f8950033c2abd6af",
+          "return_code": 1,
+          "elapsed_seconds": 41.04410743713379
+        },
+        "rhi-nvvm-final": {
+          "path": "build/nvvm-pointer-storage/rhi-nvvm-final.json",
+          "sha256": "909843807bd8d1404cd17e3625dda2cd9a0e066d187a3c0a40e1e638aa321041",
+          "return_code": 0,
+          "elapsed_seconds": 114.53446936607361
+        },
+        "rhi-record-final": {
+          "path": "build/nvvm-pointer-storage/rhi-record-final.json",
+          "sha256": "35a3d53f811722c2d9ba316fbc8166f2ba28dd65e2bf7b331356036b1b460cb6",
+          "return_code": 0,
+          "elapsed_seconds": 3.317312717437744
+        },
+        "rhi-record-final2": {
+          "path": "build/nvvm-pointer-storage/rhi-record-final2.json",
+          "sha256": "583c6947629c8ccd1b3ae69262e8563688d42439b216a9b71c7357a0f30f7fe0",
+          "return_code": 0,
+          "elapsed_seconds": 3.6051647663116455
+        },
+        "rhi-record-nvrtc-final": {
+          "path": "build/nvvm-pointer-storage/rhi-record-nvrtc-final.json",
+          "sha256": "c1edf6153077fdb305619e65d8cdb15c538486e0bd23ece47d5b49834df8b587",
+          "return_code": 0,
+          "elapsed_seconds": 2.3598792552948
+        },
+        "rhi-record-nvrtc-final2": {
+          "path": "build/nvvm-pointer-storage/rhi-record-nvrtc-final2.json",
+          "sha256": "95ea3be96c82d7f56ba2c5c48bff9039ccc3ef9f02ad78ce4f382c8a70e65c7c",
+          "return_code": 0,
+          "elapsed_seconds": 2.537424087524414
+        },
+        "rhi-record5": {
+          "path": "build/nvvm-pointer-storage/rhi-record5.json",
+          "sha256": "2f49717eec2ee51ff3f578e1e415d8724b14c1db95ac5047de8ee6b22eafdf60",
+          "return_code": 0,
+          "elapsed_seconds": 3.345243215560913
+        },
+        "slangpy-final": {
+          "path": "build/nvvm-pointer-storage/slangpy-final.json",
+          "sha256": "0c60f82dadc68ae687e83c0231c8db7ce514ba0e39e1c21de0215cef0fb46d38",
+          "return_code": 5,
+          "elapsed_seconds": 0.7208719253540039
+        },
+        "slangpy-final2": {
+          "path": "build/nvvm-pointer-storage/slangpy-final2.json",
+          "sha256": "8a77db0bc6778ead2c86d2dae672a9fb5c758043f9485ffabfb4d3dc9775b60d",
+          "return_code": 1,
+          "elapsed_seconds": 48.40727162361145
+        },
+        "slangpy-final3": {
+          "path": "build/nvvm-pointer-storage/slangpy-final3.json",
+          "sha256": "fd53b10f046c00b3c7e95ef4f15f8953cf78b9058ea03dad8b627fec64f8615f",
+          "return_code": 1,
+          "elapsed_seconds": 48.6725869178772
+        },
+        "slangpy-ir": {
+          "path": "build/nvvm-pointer-storage/slangpy-ir.json",
+          "sha256": "f0ef7d43c5e80d8d89d8f19b4de3cdc5348c7f9ca6c3074050e6ab27dfd2c6c9",
+          "return_code": 1,
+          "elapsed_seconds": 3.083009719848633
+        },
+        "slangpy-prototype": {
+          "path": "build/nvvm-pointer-storage/slangpy-prototype.json",
+          "sha256": "538c14ef62dba2b9c98a926e770adb29d4a5899f29f4165d144cc4bf1018da0d",
+          "return_code": 1,
+          "elapsed_seconds": 9.317068815231323
+        },
+        "slangpy-prototype2": {
+          "path": "build/nvvm-pointer-storage/slangpy-prototype2.json",
+          "sha256": "961d8f7b491a8f9c5dc2b172cb0b19f897c7cf34e1a852ffc280235bfb4573cf",
+          "return_code": 1,
+          "elapsed_seconds": 9.53313136100769
+        },
+        "slangpy-prototype3": {
+          "path": "build/nvvm-pointer-storage/slangpy-prototype3.json",
+          "sha256": "a4d02199c57d5f8544cc7f7a6b9a829c9d8d5908aed86ac6747d306dac19221a",
+          "return_code": 1,
+          "elapsed_seconds": 9.218429327011108
+        },
+        "slangpy-prototype4": {
+          "path": "build/nvvm-pointer-storage/slangpy-prototype4.json",
+          "sha256": "d51bc42696e25bcde1b19168af6abfd03a559ffdbf219c25092877d67e65bb01",
+          "return_code": 1,
+          "elapsed_seconds": 11.545031309127808
+        },
+        "slangpy-prototype5": {
+          "path": "build/nvvm-pointer-storage/slangpy-prototype5.json",
+          "sha256": "b967a86786733abdab0d63918343ede2a35f498e35ed5ad6674b9beef09112ab",
+          "return_code": 1,
+          "elapsed_seconds": 12.349128007888794
+        },
+        "static-address1": {
+          "path": "build/nvvm-pointer-storage/static-address1.json",
+          "sha256": "1d7bcc1a3d296d31f97cb345b812ea4581452a0101a8ca1517ac5e93c5588a65",
+          "return_code": 0,
+          "elapsed_seconds": 0.2556579113006592
+        },
+        "static-build1": {
+          "path": "build/nvvm-pointer-storage/static-build1.json",
+          "sha256": "9ee56108e1029c348ddb10861dd8ce544b271e84984360f374b050e48cb90464",
+          "return_code": 0,
+          "elapsed_seconds": 74.7067699432373
+        },
+        "static-build2": {
+          "path": "build/nvvm-pointer-storage/static-build2.json",
+          "sha256": "3a41698f9bd79b513dd47d0012a791ccc270a7cfb973c38579b774090a570f5b",
+          "return_code": 0,
+          "elapsed_seconds": 31.465964794158936
+        },
+        "static-build3": {
+          "path": "build/nvvm-pointer-storage/static-build3.json",
+          "sha256": "d457ab77f40d99665a2930b79fa34a5d1f1d27228f2e84a7270db15a8e42f79b",
+          "return_code": 0,
+          "elapsed_seconds": 16.40939164161682
+        },
+        "static-build4": {
+          "path": "build/nvvm-pointer-storage/static-build4.json",
+          "sha256": "7ff4f5fe15826d6ddfa5678207b8c13c208f55598a0962ffc6c363e65ea61b49",
+          "return_code": 0,
+          "elapsed_seconds": 16.345908641815186
+        },
+        "static-build5": {
+          "path": "build/nvvm-pointer-storage/static-build5.json",
+          "sha256": "9b4c5b90dc78b69443aea7b15ceb1ecc23e959f83aed60d19eee570fcbf7fc3f",
+          "return_code": 0,
+          "elapsed_seconds": 31.803200006484985
+        },
+        "static-build6": {
+          "path": "build/nvvm-pointer-storage/static-build6.json",
+          "sha256": "768bbb72197e16e2e36a601ea5e7cf7dcea891d23bea01d6b5f155bf6cf5b9b8",
+          "return_code": 0,
+          "elapsed_seconds": 31.41462254524231
+        },
+        "static-nvvm-final": {
+          "path": "build/nvvm-pointer-storage/static-nvvm-final.json",
+          "sha256": "bb3b0c38259bced1674170d6aac307f843fdf342ba16c9d76493659176349160",
+          "return_code": 1,
+          "elapsed_seconds": 7.365503311157227
+        },
+        "static-nvvm-final2": {
+          "path": "build/nvvm-pointer-storage/static-nvvm-final2.json",
+          "sha256": "3c97e87a17af5deb94998f5e74fd23ae45c92ffde525080d1f2c6b2b43ed8ad5",
+          "return_code": 0,
+          "elapsed_seconds": 7.2921507358551025
+        },
+        "static-nvvm-final3": {
+          "path": "build/nvvm-pointer-storage/static-nvvm-final3.json",
+          "sha256": "845630ec1540808561ba8e9f338f987a1931f2abbc88ade0f2d7554631a853c9",
+          "return_code": 0,
+          "elapsed_seconds": 8.182926654815674
+        },
+        "static-nvvm1": {
+          "path": "build/nvvm-pointer-storage/static-nvvm1.json",
+          "sha256": "a04674be9430e9e6638c2b113e48293dc509b67e583a606986996951964fa08a",
+          "return_code": 0,
+          "elapsed_seconds": 7.2123425006866455
+        },
+        "tensor-ir1": {
+          "path": "build/nvvm-pointer-storage/tensor-ir1.json",
+          "sha256": "2d10e7f1656f6a508496f86de47416eb99e0ba31eb908e717620950ec4c34b04",
+          "return_code": 255,
+          "elapsed_seconds": 1.846252202987671
+        },
+        "tensor-ir2": {
+          "path": "build/nvvm-pointer-storage/tensor-ir2.json",
+          "sha256": "117abacb9589cb228afe92f3a7df28f6d550de7dce8be783bec3b99106b0ee61",
+          "return_code": 255,
+          "elapsed_seconds": 1.8411850929260254
+        },
+        "tensor-ir3": {
+          "path": "build/nvvm-pointer-storage/tensor-ir3.json",
+          "sha256": "172b9e7a41976820c933875e0f3b57ecfb7a1900136c52e15a93b844e006fbb7",
+          "return_code": 0,
+          "elapsed_seconds": 1.9333624839782715
+        },
+        "unit-1": {
+          "path": "build/nvvm-pointer-storage/unit-1.json",
+          "sha256": "1e2b01e84be243290b811ddba1eed940eb99b408e5089b49e7f3363adc04f826",
+          "return_code": 0,
+          "elapsed_seconds": 1.6606149673461914
+        },
+        "unit-2": {
+          "path": "build/nvvm-pointer-storage/unit-2.json",
+          "sha256": "8e026b99d3652e7b0557a4cc0f10963725ba72333c90a9a997361546aeab608e",
+          "return_code": 0,
+          "elapsed_seconds": 1.6017322540283203
+        },
+        "unit-3": {
+          "path": "build/nvvm-pointer-storage/unit-3.json",
+          "sha256": "3d01238b64572ba1bec7c9047b1081d4f3d60b7e9ec05143649816bd0db88a92",
+          "return_code": 0,
+          "elapsed_seconds": 1.617297887802124
+        },
+        "unit-4": {
+          "path": "build/nvvm-pointer-storage/unit-4.json",
+          "sha256": "da87d0e41a8a0f03e1110c2d18a88e1eed458308f7409a381b7c229fb5d60938",
+          "return_code": 0,
+          "elapsed_seconds": 5.567718744277954
+        },
+        "unit-5": {
+          "path": "build/nvvm-pointer-storage/unit-5.json",
+          "sha256": "55d247f35ce4efc8f59bbb9f1bbdc14c8d715f2fc4ca54caa8533a5451e25cf0",
+          "return_code": 0,
+          "elapsed_seconds": 1.6368794441223145
+        },
+        "unit-6": {
+          "path": "build/nvvm-pointer-storage/unit-6.json",
+          "sha256": "7e10b1c857a3a81b62e4a33b0908e289e23ef97afbb3ca766d8e34d4ca43b878",
+          "return_code": 0,
+          "elapsed_seconds": 1.6132762432098389
+        },
+        "vector-family-run1": {
+          "path": "build/nvvm-pointer-storage/vector-family-run1.json",
+          "sha256": "65aa4178d8c83abde3ac38924bd3267844d0970842939c771b963dc345651b07",
+          "return_code": 1,
+          "elapsed_seconds": 14.671772956848145
+        },
+        "vector-family-run2": {
+          "path": "build/nvvm-pointer-storage/vector-family-run2.json",
+          "sha256": "d778aa44c24bac795ec77c4d8ec835fb0b43e880ae564c3cdd88908d128b1875",
+          "return_code": 1,
+          "elapsed_seconds": 14.396720170974731
+        },
+        "vector-family-run3": {
+          "path": "build/nvvm-pointer-storage/vector-family-run3.json",
+          "sha256": "21b8ece898bec4dfb974bed268495c45b498ab2ef00f9f1086fb1f3429c2df11",
+          "return_code": 1,
+          "elapsed_seconds": 14.527141332626343
+        },
+        "vector-family-run4": {
+          "path": "build/nvvm-pointer-storage/vector-family-run4.json",
+          "sha256": "ab9080307ebedac30187b3165ac383a9335d02cdcbf08d71e291693ea60fadd7",
+          "return_code": 0,
+          "elapsed_seconds": 14.373685836791992
+        },
+        "vector-family-run5": {
+          "path": "build/nvvm-pointer-storage/vector-family-run5.json",
+          "sha256": "c1e590c22e519170898b75f622dca9f474f0908511861ea85ef37cab23878707",
+          "return_code": 0,
+          "elapsed_seconds": 15.102440357208252
+        }
+      },
+      "outcomes": {
+        "rhi_nvvm": {
+          "numeric_cells": 204,
+          "numeric_and_optix_assertions": 18931,
+          "record_and_entry_assertions": 437
+        },
+        "rhi_nvrtc": {
+          "record": "passed",
+          "numeric": "failed; Bool and column-major helper differences; later cases unrun"
+        },
+        "static_nvvm": {
+          "passed": 34
+        },
+        "static_address": {
+          "passed": 1
+        },
+        "fake_units": {
+          "passed": 6
+        },
+        "slangpy": {
+          "selected": 353,
+          "passed": 338,
+          "failed": 15,
+          "resolved": 75,
+          "previous_passes_preserved": 263
+        },
+        "working": {
+          "selected": 1716,
+          "passed_at_checkpoint": 1708,
+          "regressions_at_checkpoint": 8,
+          "repaired_exact_cells": 8,
+          "selection": {
+            "path": "build/nvvm-pointer-storage/working/selection.json",
+            "sha256": "7d41c9da822e444507aa61ab1c1af9acf6d77f4015f9ffc099d2ad34932bc6f3"
+          },
+          "repairs": [
+            {
+              "path": "build/nvvm-pointer-storage/frozen-repair-final/results.json",
+              "sha256": "4a81ad626ad87e214a5aec5b39f20124df7cd373d26ff85ca35f34c907f07835"
+            },
+            {
+              "path": "build/nvvm-pointer-storage/discovery-repair-final/results.json",
+              "sha256": "f03010600923ec79820acdcf0a0243a826ae39f4f720a5576d4bdad71b09b7b3"
+            }
+          ],
+          "scope": "Full run plus focused repairs; not a fresh all-green full run."
+        },
+        "smoke": {
+          "passed": 16,
+          "regressions": 0,
+          "selection": {
+            "path": "build/nvvm-pointer-storage/smoke-final2/selection.json",
+            "sha256": "8f08e996118629f18069f5246d30241004a954f11ccac816ab6ef882dc152d67"
+          }
+        }
+      },
+      "contracts": [
+        "Existing CUDA and LLVM layout owners select/prove native chunks; no duplicated width table.",
+        "Default local and UserPointer pointees share recipe and aliases; conversions occur at loads/stores and existing value-based callable boundary.",
+        "OptiX register payload packing precedes physical matrix layout; callable operand/result share entry storage recipe in both phases.",
+        "PtrCast qualification preserves exact pointee, checked root, readonly access and physical address space; no reinterpretation or arbitrary AS conversion.",
+        "Entry/helper/storage caches and BF16/FP8/explicit-layout owners remain distinct."
+      ],
+      "failure_history": [
+        {
+          "attempts": ["working"],
+          "status": "resolved-by-focused-repairs",
+          "detail": "1716-cell build11 working run:1708pass/8regressions,zerochangedinputs. Formal signature mismatch, raw buffer CUDA layout admission and BF16 storage-policy overlap repaired; all8exact cells pass on build13 and build21. Original full outcomes preserved."
+        },
+        {
+          "attempts": ["rhi-nvvm-2", "rhi-controls3"],
+          "status": "resolved",
+          "detail": "Column singleton row store assertion, OptiX logical payload ordering, callable caller/callee compact layout mismatch and bare Packet** entry cache owner repaired; existing controls pass."
+        },
+        {
+          "attempts": ["record-probe3", "record-probe4"],
+          "status": "resolved",
+          "detail": "AssumeAddress erasure discarded aggregate element types. Canonical PtrCast preserved and commuted through storage. Provider bits/pointer operation rejected pointer identity; emission now reuses proven value without provider widening."
+        },
+        {
+          "attempts": [
+            "smoke-final",
+            "coherent-probe1",
+            "coherent-final",
+            "mutable-root1",
+            "coherent-entry1"
+          ],
+          "status": "resolved",
+          "detail": "Shared-memory qualification, its scoped-space record and mutable parameter roots were missing. Existing root/access/space proof now admits them. Bare copyable entry pointers retain AS1 rather than taking the new helper-pointee decoder. Cross-space/readonly casts remain rejected."
+        },
+        {
+          "attempts": ["static-nvvm-final"],
+          "status": "resolved-test-only",
+          "detail": "Synthetic RefParam used noncanonical one-operand spelling; corrected to canonical getRefParamType builder."
+        },
+        {
+          "attempts": ["slangpy-final"],
+          "status": "resolved-harness",
+          "detail": "Mixed absolute/relative selection paths collected zero; final2/final3 execute353 exactnodes."
+        },
+        {
+          "attempts": ["rhi-nvrtc-1"],
+          "status": "resolved-harness",
+          "detail": "Generic ROWS/COLS test macros collided with CUDA prelude; renamed COMPACT_TEST_*."
+        },
+        {
+          "attempts": ["rhi-nvrtc-final"],
+          "status": "open-comparison",
+          "detail": "Record fixture passes; numeric O0 yields five Bool0x80\u2192float results -128 instead of1, then column-major Bool3x3 local/helper pointer compile fails. Later numeric/O3 cells unrun. NVVM independent byte oracle unchanged."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Final independent source and evidence review approved; hashes, exact transitions, prior histories and comparison limits reconcile. Stale STATUS next-work paragraph removed."
+      },
+      "limits": [
+        "Mixed-age focused evidence; full application and RHI checkpoints remain original.",
+        "Working full run followed by exact repairs and focused controls, not a repeated full run.",
+        "Record comparison: NVVM coherent load/store versus NVRTC ordinary increment; NVRTC does not qualify coherent semantics.",
+        "NVRTC numeric comparison stops at its local/column-major storage mismatch; no later cells implied.",
+        "Normalized surfaces and TensorView remain queued; residual atomics/field/updateElement retain exact application failures."
+      ]
     }
   }
 }

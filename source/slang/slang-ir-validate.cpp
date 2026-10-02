@@ -834,7 +834,11 @@ static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)
         collectAssumeAddressInsts(child, out);
 }
 
-void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink)
+void validateAndRemoveAssumeAddress(
+    IRModule* module,
+    bool validate,
+    DiagnosticSink* sink,
+    bool preservePointerTypes)
 {
     List<IRInst*> assumeAddrs;
     collectAssumeAddressInsts(module->getModuleInst(), assumeAddrs);
@@ -889,7 +893,18 @@ void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticS
 
     for (auto inst : assumeAddrs)
     {
-        inst->replaceUsesWith(inst->getOperand(0));
+        IRInst* replacement = inst->getOperand(0);
+        if (preservePointerTypes && !isTypeEqual(inst->getDataType(), replacement->getDataType()))
+        {
+            // __getAddress(local) promises a UserPointer value even when local's address
+            // has a Generic or parameter-reference type. Preserve this conversion so an
+            // array or record containing the pointer keeps its declared element type.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            replacement =
+                builder.emitIntrinsicInst(inst->getDataType(), kIROp_PtrCast, 1, &replacement);
+        }
+        inst->replaceUsesWith(replacement);
         inst->removeAndDeallocate();
     }
 }

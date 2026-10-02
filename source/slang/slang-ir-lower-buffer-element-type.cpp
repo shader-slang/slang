@@ -524,6 +524,29 @@ struct LoweredElementTypeContext
             getBufferElementTypeLoweringPolicy(options.loweringPolicyKind, target, options);
     }
 
+    // Local objects whose addresses can become default CUDA user pointers must use the same
+    // canonical storage recipe. Explicit pointer layouts remain separate contracts.
+    TypeLoweringConfig getStorageConfig(IRType* type)
+    {
+        auto config = getTypeLoweringConfigForBuffer(target, type);
+        auto pointer = as<IRPtrTypeBase>(type);
+        if (target->shouldEmitNVVMDirectly() &&
+            (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM ||
+             options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::LLVM) &&
+            pointer && pointer->getAddressSpace() == AddressSpace::Generic &&
+            (!pointer->getDataLayout() ||
+             pointer->getDataLayout()->getOp() == kIROp_DefaultBufferLayoutType))
+        {
+            config.addressSpace = AddressSpace::UserPointer;
+            config.layoutRuleName = IRTypeLayoutRuleName::CUDA;
+        }
+        // CUDA storage is expressed using ordinary canonical types. It does not need
+        // explicit-layout decorations (which belong to parameter/resource storage roles).
+        if (target->shouldEmitNVVMDirectly() && config.layoutRuleName == IRTypeLayoutRuleName::CUDA)
+            config.lowerToPhysicalType = false;
+        return config;
+    }
+
     IRFunc* createArrayUnpackFunc(
         IRArrayType* arrayType,
         IRStructType* structType,
@@ -794,7 +817,8 @@ struct LoweredElementTypeContext
                 auto loweredFieldTypeInfo = getLoweredTypeInfo(field->getFieldType(), config);
                 fieldLoweredTypeInfo.add(loweredFieldTypeInfo);
                 if (loweredFieldTypeInfo.convertLoweredToOriginal ||
-                    config.layoutRuleName != IRTypeLayoutRuleName::Natural)
+                    (config.layoutRuleName != IRTypeLayoutRuleName::Natural &&
+                     config.layoutRuleName != IRTypeLayoutRuleName::CUDA))
                     isTrivial = false;
             }
 
@@ -966,7 +990,16 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(newElementType);
         if (auto ptrType = as<IRPtrTypeBase>(originalPtrLikeType))
         {
-            return builder.getPtrType(newElementType, ptrType);
+            // Preserve the canonical direction/access/layout spelling. In particular,
+            // OutParam<T> must not acquire redundant Generic/ReadWrite operands merely
+            // because its pointee representation changed.
+            ShortList<IRInst*> operands;
+            for (UInt i = 0; i < ptrType->getOperandCount(); ++i)
+                operands.add(i ? ptrType->getOperand(i) : newElementType);
+            return builder.getType(
+                ptrType->getOp(),
+                (UInt)operands.getCount(),
+                operands.getArrayView().getBuffer());
         }
 
         if (as<IRPointerLikeType>(originalPtrLikeType) ||
@@ -1192,6 +1225,48 @@ struct LoweredElementTypeContext
         return config;
     }
 
+    // Find a semantic vector lane in its checked chunked storage representation.
+    // For example, half3 uses half2[2]: lane 2 is chunk 1, lane 0, leaving padding untouched.
+    IRInst* emitVectorStorageElementAddress(
+        IRBuilder& builder,
+        IRInst* storageBase,
+        IRInst* index,
+        IRStructKey* key,
+        IRArrayType* arrayType)
+    {
+        auto arrayAddress = builder.emitFieldAddress(storageBase, key);
+        auto chunkVector = as<IRVectorType>(arrayType->getElementType());
+        IRInst* chunkIndex = index;
+        IRInst* laneIndex = nullptr;
+        if (chunkVector)
+        {
+            auto width = builder.getIntValue(
+                index->getDataType(),
+                getIntVal(chunkVector->getElementCount()));
+            chunkIndex = builder.emitDiv(index->getDataType(), index, width);
+            IRInst* remainderArgs[] = {index, width};
+            laneIndex =
+                builder.emitIntrinsicInst(index->getDataType(), kIROp_IRem, 2, remainderArgs);
+        }
+        auto laneAddress = builder.emitElementAddress(arrayAddress, chunkIndex);
+        if (laneIndex)
+            laneAddress = builder.emitElementAddress(laneAddress, laneIndex);
+        return laneAddress;
+    }
+
+    // A qualification cast changes pointer metadata while preserving the selected object
+    // representation. Only this shape can commute with storage conversion without a copy.
+    bool isStorageQualificationCast(IRInst* inst)
+    {
+        if (!target->shouldEmitNVVMDirectly() || inst->getOp() != kIROp_PtrCast ||
+            inst->getOperandCount() != 1)
+            return false;
+        auto source = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+        auto result = as<IRPtrTypeBase>(inst->getDataType());
+        return source && result && isTypeEqual(source->getValueType(), result->getValueType()) &&
+               getStorageConfig(source) == getStorageConfig(result);
+    }
+
     void deferStorageToLogicalCasts(
         IRModule* module,
         List<IRCastStorageToLogicalBase*> castInstWorkList)
@@ -1218,6 +1293,31 @@ struct LoweredElementTypeContext
                         auto user = use->getUser();
                         switch (user->getOp())
                         {
+                        case kIROp_PtrCast:
+                            {
+                                // A pointer qualification conversion preserves the object,
+                                // so move it through the same selected pointee storage recipe.
+                                if (!isStorageQualificationCast(user))
+                                    break;
+                                auto resultType = cast<IRPtrTypeBase>(user->getDataType());
+                                builder.setInsertBefore(user);
+                                auto storageType = getLoweredPtrLikeType(
+                                    resultType,
+                                    cast<IRPtrTypeBase>(ptrVal->getDataType())->getValueType());
+                                auto storageCast = builder.emitIntrinsicInst(
+                                    storageType,
+                                    kIROp_PtrCast,
+                                    1,
+                                    &ptrVal);
+                                auto logicalCast = builder.emitCastStorageToLogical(
+                                    resultType,
+                                    storageCast,
+                                    castInst->getLayoutConfig());
+                                user->replaceUsesWith(logicalCast);
+                                user->removeAndDeallocate();
+                                castInstWorkList.add(cast<IRCastStorageToLogicalBase>(logicalCast));
+                                break;
+                            }
                         case kIROp_FieldAddress:
                             if (!isUseBaseAddrOperand(use, user))
                                 break;
@@ -1271,6 +1371,32 @@ struct LoweredElementTypeContext
                                                     ptrType),
                                                 ptrVal,
                                                 arrayLowerInfo.loweredInnerStructKey);
+                                        }
+                                    }
+                                    if (as<IRVectorType>(originalBaseValueType))
+                                    {
+                                        auto vectorInfo =
+                                            getLoweredTypeInfo(originalBaseValueType, config);
+                                        if (auto arrayType =
+                                                as<IRArrayType>(vectorInfo.loweredInnerArrayType))
+                                        {
+                                            builder.setInsertBefore(user);
+                                            auto laneAddress = emitVectorStorageElementAddress(
+                                                builder,
+                                                storageBaseAddr,
+                                                user->getOperand(1),
+                                                vectorInfo.loweredInnerStructKey,
+                                                arrayType);
+                                            auto castOfLane = builder.emitCastStorageToLogical(
+                                                logicalType,
+                                                laneAddress,
+                                                castInst->getLayoutConfig());
+                                            user->replaceUsesWith(castOfLane);
+                                            user->removeAndDeallocate();
+                                            if (auto castStorage =
+                                                    as<IRCastStorageToLogical>(castOfLane))
+                                                castInstWorkList.add(castStorage);
+                                            break;
                                         }
                                     }
                                     if (as<IRMatrixType>(originalBaseValueType))
@@ -1580,7 +1706,9 @@ struct LoweredElementTypeContext
                     }
                     else
                     {
-                        paramTypes.add(arg->getDataType());
+                        // Only storage casts change a formal. An unchanged argument can
+                        // still be a local Ptr<T> passed to OutParam<T> or a UserPointer<T>.
+                        paramTypes.add(oldParamTypes[i]);
                         newArgs.add(arg);
                     }
                 }
@@ -1720,6 +1848,8 @@ struct LoweredElementTypeContext
             for (auto use : uses)
                 builder.replaceOperand(use, castedParam);
         }
+        for (UInt i = 0; i < (UInt)params.getCount(); ++i)
+            SLANG_ASSERT(params[i]->getDataType() == specializedFuncType->getParamType(i));
         clonedFunc->setFullType(specializedFuncType);
         // Keep track of the specialized functions. This is used to remove
         // clashing linkage decorations if we need to retain the original too.
@@ -1736,6 +1866,40 @@ struct LoweredElementTypeContext
             }
         }
         return clonedFunc;
+    }
+
+    // Give the value-based callable intrinsic the same storage ABI as its reference-based
+    // entry point. For example, CallShader(index, payload) must pack payload.float3 using
+    // the same compact CUDA carrier that the callee receives through inout Payload.
+    // Run before matrix legalization too, while the recipe still knows matrix orientation.
+    void lowerCallablePayloads(IRInst* parent)
+    {
+        for (auto inst : parent->getModifiableChildren())
+        {
+            lowerCallablePayloads(inst);
+            if (inst->getOp() != kIROp_OptixCallShader ||
+                inst->getDataType()->getOp() == kIROp_VoidType)
+                continue;
+            IRBuilder builder(inst);
+            auto logicalType = inst->getDataType();
+            auto config = getStorageConfig(builder.getPtrType(logicalType));
+            auto info = getLoweredTypeInfo(logicalType, config);
+            if (info.loweredType == logicalType)
+                continue;
+            builder.setInsertBefore(inst);
+            auto storage = builder.emitVar(info.loweredType);
+            info.convertOriginalToLowered.applyDestinationDriven(
+                builder,
+                storage,
+                inst->getOperand(1));
+            IRInst* operands[] = {inst->getOperand(0), builder.emitLoad(storage)};
+            auto call =
+                builder.emitIntrinsicInst(info.loweredType, kIROp_OptixCallShader, 2, operands);
+            builder.emitStore(storage, call);
+            auto result = info.convertLoweredToOriginal.apply(builder, logicalType, storage);
+            inst->replaceUsesWith(result);
+            inst->removeAndDeallocate();
+        }
     }
 
     void processModule(IRModule* module, DiagnosticSink* sink)
@@ -1788,6 +1952,14 @@ struct LoweredElementTypeContext
             {
                 switch (ptrType->getAddressSpace())
                 {
+                case AddressSpace::Generic:
+                    if (target->shouldEmitNVVMDirectly() &&
+                        (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM ||
+                         options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::LLVM) &&
+                        (!ptrType->getDataLayout() ||
+                         ptrType->getDataLayout()->getOp() == kIROp_DefaultBufferLayoutType))
+                        elementType = ptrType->getValueType();
+                    break;
                 case AddressSpace::UserPointer:
                 case AddressSpace::Input:
                 case AddressSpace::Output:
@@ -1835,6 +2007,12 @@ struct LoweredElementTypeContext
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
 
+        // CallShader and the callable entry must cross each storage phase together.
+        if (target->shouldEmitNVVMDirectly() &&
+            (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::LLVM ||
+             options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM))
+            lowerCallablePayloads(module->getModuleInst());
+
         List<IRCastStorageToLogicalBase*> castInstWorkList;
 
         for (auto& bufferTypeInfo : bufferTypeInsts)
@@ -1849,11 +2027,10 @@ struct LoweredElementTypeContext
             // shouldSkipPhysicalTypes() to false — see the policy's
             // override for which predecessors it re-processes.
             //
+            auto config = getStorageConfig(bufferType);
             if (elementType->findDecoration<IRPhysicalTypeDecoration>() &&
                 leafTypeLoweringPolicy->shouldSkipPhysicalTypes())
                 continue;
-
-            auto config = getTypeLoweringConfigForBuffer(target, bufferType);
             auto loweredBufferElementTypeInfo = getLoweredTypeInfo(elementType, config);
 
             // If the lowered type is the same as original type, no change is required.
@@ -1888,13 +2065,13 @@ struct LoweredElementTypeContext
                     // derived from some other base address. We will let
                     // the later part of the pass to systematically propagate
                     // the cast through them.
-                    if (isAddressInst(user))
+                    if (isAddressInst(user) || isStorageQualificationCast(user))
                         return;
                     auto ptrVal = use->getUser();
                     setInsertAfterOrdinaryInst(&builder, ptrVal);
                     builder.replaceOperand(use, loweredBufferType);
                     auto logicalBufferType = getLoweredPtrLikeType(bufferType, elementType);
-                    auto loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+                    auto loweringConfig = getStorageConfig(bufferType);
                     auto castStorageToLogical = builder.emitCastStorageToLogical(
                         logicalBufferType,
                         ptrVal,
@@ -1931,6 +2108,11 @@ struct LoweredElementTypeContext
             bufferTypeInst.bufferType->replaceUsesWith(bufferTypeInst.loweredBufferType);
             bufferTypeInst.bufferType->removeAndDeallocate();
         }
+
+        // Generated pack/unpack helpers contain new field and element addresses. Resolve
+        // their layout operands too; the pre-pass only saw addresses that already existed.
+        if (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM)
+            fixBufferAccessPointerTypes(module->getModuleInst());
 
         // Remove linkage decorations from specialized functions if they don't
         // cleanly replace the original.
@@ -1998,7 +2180,9 @@ struct LoweredElementTypeContext
         auto originalElementType = oldPtrType->getOperand(0);
         auto config = getTypeLoweringConfigFromInst(castInst->getLayoutConfig());
 
-        LoweredElementTypeInfo loweredElementTypeInfo = {};
+        // Resolve the ordinary leaf first, so conversion lookup also works for a scalar
+        // first encountered as a component (for example bool3's byte-backed bool lane).
+        auto loweredElementTypeInfo = getLoweredTypeInfo((IRType*)originalElementType, config);
         if (auto getElementPtr = as<IRGetElementPtr>(ptrVal))
         {
             if (auto arrayType = as<IRArrayTypeBase>(tryGetPointedToOrBufferElementType(
@@ -2011,7 +2195,7 @@ struct LoweredElementTypeContext
                 // the base array.
                 // We should setup loweredElementTypeInfo so the remaining logic can handle
                 // this case and insert proper packing/unpacking logic around it.
-                if (arrayType->getElementType() != originalElementType &&
+                if (arrayType->getElementType() != loweredElementTypeInfo.loweredType &&
                     isScalarOrVectorType(originalElementType))
                 {
                     loweredElementTypeInfo.loweredType = arrayType->getElementType();
@@ -2024,14 +2208,6 @@ struct LoweredElementTypeContext
                         loweredElementTypeInfo.originalType);
                 }
             }
-        }
-
-        // For general cases we simply check if the element type needs lowering.
-        // If so we will insert packing/unpacking logic if necessary.
-        //
-        if (!loweredElementTypeInfo.loweredType)
-        {
-            loweredElementTypeInfo = getLoweredTypeInfo((IRType*)originalElementType, config);
         }
 
         if (loweredElementTypeInfo.loweredType == loweredElementTypeInfo.originalType)
@@ -2367,9 +2543,14 @@ struct LoweredElementTypeContext
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, i);
                                 auto elementAddr =
                                     builder.emitElementAddress(vectorAddr, majorGEP->getIndex());
-                                builder.emitStore(
-                                    elementAddr,
-                                    builder.emitElementExtract(storeInst->getVal(), i));
+                                // Singleton-vector legalization can already have made a
+                                // matrix<T,R,1> row scalar. Its one value is the whole row.
+                                auto value = storeInst->getVal();
+                                if (as<IRVectorType>(value->getDataType()))
+                                    value = builder.emitElementExtract(value, i);
+                                else
+                                    SLANG_ASSERT(colCount == 1 && i == 0);
+                                builder.emitStore(elementAddr, value);
                             }
                             user->removeAndDeallocate();
                         }
@@ -2452,6 +2633,9 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (auto pointerType = as<IRPtrTypeBase>(bufferType))
         {
             auto layout = pointerType->getDataLayout();
+            if (pointerType->getAddressSpace() == AddressSpace::UserPointer &&
+                (!layout || layout->getOp() == kIROp_DefaultBufferLayoutType))
+                return IRTypeLayoutRuleName::CUDA;
             if (pointerType->getAddressSpace() == AddressSpace::UserPointer && layout &&
                 (layout->getOp() == kIROp_ScalarBufferLayoutType ||
                  layout->getOp() == kIROp_CBufferLayoutType ||
@@ -3348,6 +3532,156 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+// CUDA pointer storage must retain its external byte layout even when LLVM's native
+// vector representation has different padding or alignment. Logical values stay vectors;
+// the existing storage pass specializes pointer calls and converts only at loads/stores.
+struct NVVMBufferElementTypeLoweringPolicy : LLVMBufferElementTypeLoweringPolicy
+{
+    using LLVMBufferElementTypeLoweringPolicy::LLVMBufferElementTypeLoweringPolicy;
+
+    bool needsElementLowering(IRType* type) override
+    {
+        return as<IRVectorType>(type) ||
+               LLVMBufferElementTypeLoweringPolicy::needsElementLowering(type);
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        if (config.addressSpace != AddressSpace::UserPointer ||
+            config.layoutRuleName != IRTypeLayoutRuleName::CUDA)
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+
+        if (as<IRBoolType>(type))
+        {
+            IRBuilder builder(type);
+            LoweredElementTypeInfo info = {};
+            info.originalType = type;
+            info.loweredType = builder.getUInt8Type();
+            info.convertOriginalToLowered = kIROp_IntCast;
+            info.convertLoweredToOriginal = kIROp_IntCast;
+            return info;
+        }
+        auto vectorType = as<IRVectorType>(type);
+        if (!vectorType)
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+        // BF16 and FP8 have separate NVVM storage contracts; LLVM's ordinary vector
+        // layout is not their physical representation. This policy owns standard numeric lanes.
+        auto elementType = vectorType->getElementType();
+        if (!isScalarIntegerType(elementType) && !as<IRBoolType>(elementType) &&
+            !as<IRHalfType>(elementType) && !as<IRFloatType>(elementType) &&
+            !as<IRDoubleType>(elementType))
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+        auto count = as<IRIntLit>(vectorType->getElementCount());
+        if (!count || count->getValue() < 2 || count->getValue() > 4)
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+
+        IRSizeAndAlignment storageLayout, valueLayout;
+        if (SLANG_FAILED(getSizeAndAlignment(
+                target->getTargetReq(),
+                config.getLayoutRule(),
+                type,
+                &storageLayout)) ||
+            SLANG_FAILED(getSizeAndAlignment(
+                target->getTargetReq(),
+                IRTypeLayoutRules::getLLVM(),
+                type,
+                &valueLayout)))
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+        const bool isBool = as<IRBoolType>(vectorType->getElementType()) != nullptr;
+        if (!isBool && storageLayout.getStride() == valueLayout.getStride() &&
+            storageLayout.alignment == valueLayout.alignment)
+            return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+
+        IRBuilder builder(type);
+        builder.setInsertAfter(type);
+        IRType* scalarType = isBool ? builder.getUInt8Type() : vectorType->getElementType();
+        IRSizeAndAlignment scalarLayout;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            target->getTargetReq(),
+            IRTypeLayoutRules::getLLVM(),
+            scalarType,
+            &scalarLayout)));
+        // Choose chunks by the layout owner's alignment, not by a second CUDA type table.
+        // float3 becomes float[3], while half3 becomes half2[2], including its tail padding.
+        auto chunkLanes = storageLayout.alignment / scalarLayout.alignment;
+        auto chunkCount = storageLayout.getStride() / (scalarLayout.size * chunkLanes);
+        IRType* chunkType =
+            chunkLanes == 1 ? scalarType : builder.getVectorType(scalarType, chunkLanes);
+        auto arrayType = builder.getArrayType(chunkType, builder.getIntValue(chunkCount));
+        IRSizeAndAlignment arrayLayout;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            target->getTargetReq(),
+            IRTypeLayoutRules::getLLVM(),
+            arrayType,
+            &arrayLayout)));
+        SLANG_RELEASE_ASSERT(
+            arrayLayout.getStride() == storageLayout.getStride() &&
+            arrayLayout.alignment == storageLayout.alignment);
+        auto storageType = builder.createStructType();
+        maybeAddPhysicalTypeDecoration(builder, storageType, config);
+        builder.addNameHintDecoration(storageType, UnownedStringSlice("_CUDAVectorStorage"));
+        auto key = builder.createStructKey();
+        builder.createStructField(storageType, key, arrayType);
+        LoweredElementTypeInfo info = {};
+        info.originalType = type;
+        info.loweredType = storageType;
+        info.loweredInnerArrayType = arrayType;
+        info.loweredInnerStructKey = key;
+        for (int packing = 0; packing != 2; ++packing)
+        {
+            builder.setInsertAfter(storageType);
+            auto func = builder.createFunc();
+            auto refType = builder.getRefParamType(storageType, AddressSpace::Generic);
+            IRType* params[] = {refType, type};
+            func->setFullType(builder.getFuncType(
+                packing ? 2 : 1,
+                params,
+                packing ? builder.getVoidType() : type));
+            builder.addForceInlineDecoration(func);
+            builder.setInsertInto(func);
+            builder.emitBlock();
+            auto address = builder.emitParam(refType);
+            auto value = packing ? builder.emitParam(type) : nullptr;
+            auto arrayAddress = builder.emitFieldAddress(address, key);
+            List<IRInst*> lanes;
+            for (IRIntegerValue i = 0; i < count->getValue(); ++i)
+            {
+                auto laneAddress =
+                    builder.emitElementAddress(arrayAddress, builder.getIntValue(i / chunkLanes));
+                if (chunkLanes != 1)
+                    laneAddress = builder.emitElementAddress(
+                        laneAddress,
+                        builder.getIntValue(i % chunkLanes));
+                if (packing)
+                {
+                    auto lane = builder.emitElementExtract(value, builder.getIntValue(i));
+                    if (isBool)
+                        lane = builder.emitCast(scalarType, lane);
+                    builder.emitStore(laneAddress, lane);
+                }
+                else
+                {
+                    auto lane = builder.emitLoad(laneAddress);
+                    if (isBool)
+                        lane = builder.emitCast(vectorType->getElementType(), lane);
+                    lanes.add(lane);
+                }
+            }
+            if (packing)
+            {
+                builder.emitReturn();
+                info.convertOriginalToLowered = func;
+            }
+            else
+            {
+                builder.emitReturn(builder.emitMakeVector(vectorType, lanes));
+                info.convertLoweredToOriginal = func;
+            }
+        }
+        return info;
+    }
+};
+
 // Metal rejects pointer-to-pointer in buffer pointee types. This policy
 // lowers pointer fields to UIntPtr (emits as `ulong` — a pointer-sized
 // integer that communicates the value holds an address, unlike UInt64
@@ -3507,6 +3841,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::LLVM:
         return new LLVMBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::NVVM:
+        return new NVVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }
