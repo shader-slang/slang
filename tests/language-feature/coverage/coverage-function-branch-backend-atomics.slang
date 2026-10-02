@@ -25,20 +25,24 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = accum;
 }
 
+// One function, one decision line, and two outcomes: four counters.
 //HLSL: _slang_coverage
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(0\)}}
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(1\)}}
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(2\)}}
-//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(3\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(3\)}}
+//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(4\)}}
 
 //GLSL: _slang_coverage
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(0\)}}
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(1\)}}
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(2\)}}
-//GLSL-NOT: atomicAdd{{.*_slang_coverage.*uint\(3\)}}
+//GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(3\)}}
+//GLSL-NOT: atomicAdd{{.*_slang_coverage.*uint\(4\)}}
 
 //METAL: _slang_coverage
 //METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(0\)}}
 //METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(1\)}}
 //METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(2\)}}
-//METAL-NOT: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(3\)}}
+//METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(3\)}}
+//METAL-NOT: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(4\)}}

@@ -51,7 +51,7 @@ public float3 sampleWithBoundary(
         sy = clamp(sy, 0, height - 1);
         break;
     case BoundaryMode::Black:
-        if (sx < 0 || sx >= width || sy < 0 || sy >= height)
+        if (!(sx >= 0 && sx < width && sy >= 0 && sy < height))
             return float3(0.0, 0.0, 0.0);
         break;
     default:

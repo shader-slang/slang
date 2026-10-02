@@ -377,8 +377,8 @@ static void runCoverageCpuRuntimeTest(slang::IGlobalSession* globalSession, int 
     }
 }
 
-// Expression-level branch sites. Each operator is attributed to its own
-// token, so the two sites on the `chained` line are told apart by column.
+// Expression-level branch sites are attributed to evaluated operands.
+// The three sites on the `chained` line are told apart by column.
 // The right operands of the `&&` and `||` sites on their own lines are
 // calls, so function coverage independently counts how often each right
 // operand was evaluated.
@@ -446,6 +446,7 @@ static void checkExpressionBranchSite(
     uint32_t otherArmEntries = 0;
     uint64_t trueCount = 0;
     uint64_t falseCount = 0;
+    bool booleanMode = false;
     auto coverage = dispatch.coverage;
     for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
     {
@@ -456,6 +457,7 @@ static void checkExpressionBranchSite(
         if (entry.line != line || entry.startColumn != column)
             continue;
 
+        booleanMode = entry.counterMode == slang::CoverageCounterMode::Boolean;
         // Both arms belong to one site.
         if (siteID == 0)
             siteID = entry.branchSiteID;
@@ -480,6 +482,11 @@ static void checkExpressionBranchSite(
     SLANG_CHECK(trueArmEntries == 1);
     SLANG_CHECK(falseArmEntries == 1);
     SLANG_CHECK(otherArmEntries == 0);
+    if (booleanMode)
+    {
+        expectedTrueCount = expectedTrueCount != 0;
+        expectedFalseCount = expectedFalseCount != 0;
+    }
     SLANG_CHECK(trueCount == expectedTrueCount);
     SLANG_CHECK(falseCount == expectedFalseCount);
 }
@@ -508,19 +515,23 @@ static uint64_t getFunctionEntryCount(const CoverageCpuDispatch& dispatch, const
 
 // Execute the expression-branch shader under branch and function coverage
 // and validate each site's arm counts against the four threads `t = 0..3`.
-static void runCoverageCpuExpressionBranchTest(slang::IGlobalSession* globalSession)
+static void runCoverageCpuExpressionBranchTest(
+    slang::IGlobalSession* globalSession,
+    int counterByteWidth,
+    bool booleanMode)
 {
-    const slang::CompilerOptionName coverageModes[] = {
-        slang::CompilerOptionName::TraceFunctionCoverage,
-        slang::CompilerOptionName::TraceBranchCoverage,
-    };
+    List<slang::CompilerOptionName> coverageModes;
+    coverageModes.add(slang::CompilerOptionName::TraceFunctionCoverage);
+    coverageModes.add(slang::CompilerOptionName::TraceBranchCoverage);
+    if (booleanMode)
+        coverageModes.add(slang::CompilerOptionName::TraceCoverageBoolean);
     CoverageCpuDispatch dispatch;
     dispatchCoverageShader(
         globalSession,
         "coverageCpuExpressionBranches",
         kExpressionBranchShaderSource,
-        makeConstArrayView(coverageModes),
-        8,
+        coverageModes.getArrayView(),
+        counterByteWidth,
         dispatch);
 
     // The instrumented kernel must still compute correct results.
@@ -529,23 +540,23 @@ static void runCoverageCpuExpressionBranchTest(slang::IGlobalSession* globalSess
         SLANG_CHECK(dispatch.outputValues[t] == expectedOutput[t]);
 
     // `?:` records its condition: true only for t == 3.
-    checkExpressionBranchSite(dispatch, "? 10u", 1, 3);
+    checkExpressionBranchSite(dispatch, "== 3u) ?", 1, 3);
 
     // `&&` records its first operand. The true arm evaluates `andRhs`
     // (t = 1, 2, 3) and the false arm short-circuits (t = 0).
-    checkExpressionBranchSite(dispatch, "&& andRhs", 3, 1);
-    SLANG_CHECK(getFunctionEntryCount(dispatch, "andRhs") == 3);
+    checkExpressionBranchSite(dispatch, "!= 0u) &&", 3, 1);
+    SLANG_CHECK(getFunctionEntryCount(dispatch, "andRhs") == (booleanMode ? 1 : 3));
 
     // `||` records its first operand. The true arm short-circuits (t = 1)
     // and the false arm evaluates `orRhs` (t = 0, 2, 3).
-    checkExpressionBranchSite(dispatch, "|| orRhs", 1, 3);
-    SLANG_CHECK(getFunctionEntryCount(dispatch, "orRhs") == 3);
+    checkExpressionBranchSite(dispatch, "== 1u) ||", 1, 3);
+    SLANG_CHECK(getFunctionEntryCount(dispatch, "orRhs") == (booleanMode ? 1 : 3));
 
-    // In `(t >= 1u) && (t == 3u) || (t == 0u)` the `&&` site records
-    // `t >= 1u`, and the `||` site records the value of the whole `&&`,
-    // which is true only for t == 3.
-    checkExpressionBranchSite(dispatch, "&& (t == 3u)", 3, 1);
-    checkExpressionBranchSite(dispatch, "|| (t == 0u)", 1, 3);
+    // Each evaluated operand has its own decision. No extra decision is
+    // attributed to the merged result of the inner `&&` expression.
+    checkExpressionBranchSite(dispatch, ">= 1u)", 3, 1);
+    checkExpressionBranchSite(dispatch, "== 3u) ||", 1, 2);
+    checkExpressionBranchSite(dispatch, "== 0u);", 1, 2);
 }
 
 // Create a private global session whose host-callable transition uses a real
@@ -608,5 +619,111 @@ SLANG_UNIT_TEST(coverageCpuRuntimeExpressionBranches)
         SLANG_IGNORE_TEST;
     }
 
-    runCoverageCpuExpressionBranchTest(globalSession);
+    for (int width : {4, 8})
+        for (bool booleanMode : {false, true})
+            runCoverageCpuExpressionBranchTest(globalSession, width, booleanMode);
+}
+
+
+// These cases exercise region entry, loop re-entry, and early exits. They
+// deliberately put several independently executed statements on one line.
+SLANG_UNIT_TEST(coverageCpuRuntimeLineRegions)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    if (!createCppHostCallableGlobalSession(globalSession))
+    {
+        SLANG_IGNORE_TEST;
+    }
+    const char* source = R"(
+RWStructuredBuffer<uint> outputBuffer;
+uint choose(uint t) { if (t == 0) return 5; return 7; } // early
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    uint t = tid.x;
+    uint value = 0; if ((t & 1) != 0) value += 1; else value += 2; // sameLine
+    for (uint i = 0; i < t; ++i) { if (i == 1) continue; value += i; } // oneLineLoop
+    for (uint i = 0; i < 2; ++i) // outer
+    {
+        for (uint j = 0; j < 3; ++j) // inner
+        {
+            if (j == 1) break; // breakTest
+            value += 10; // innerBody
+        }
+    }
+    bool skipped = t > 100 && t < 200; // skipped
+    value += t == 0 ? (t < 2 ? 3 : 4) : ((t == 1 || t == 3) ? 5 : 6); // nested
+    outputBuffer[t] = value + choose(t) + uint(skipped);
+}
+)";
+    struct ExpectedLine
+    {
+        const char* tag;
+        uint64_t count;
+    };
+    const ExpectedLine expectedLines[] = {
+        {"// early", 4},
+        {"// sameLine", 4},
+        {"// oneLineLoop", 10},
+        {"// outer", 12},
+        {"// inner", 16},
+        {"// breakTest", 16},
+        {"// innerBody", 8},
+        {"// skipped", 4},
+        {"// nested", 4},
+    };
+    for (int width : {4, 8})
+    {
+        for (bool booleanMode : {false, true})
+        {
+            List<slang::CompilerOptionName> modes;
+            modes.add(slang::CompilerOptionName::TraceCoverage);
+            modes.add(slang::CompilerOptionName::TraceBranchCoverage);
+            modes.add(slang::CompilerOptionName::TraceFunctionCoverage);
+            if (booleanMode)
+                modes.add(slang::CompilerOptionName::TraceCoverageBoolean);
+            CoverageCpuDispatch dispatch;
+            dispatchCoverageShader(
+                globalSession,
+                "coverageCpuLineRegions",
+                source,
+                modes.getArrayView(),
+                width,
+                dispatch);
+            const uint32_t expectedOutput[] = {30, 33, 35, 35};
+            for (uint32_t t = 0; t < kThreadCount; ++t)
+                SLANG_CHECK(dispatch.outputValues[t] == expectedOutput[t]);
+            for (auto expected : expectedLines)
+            {
+                auto line = findLineContaining(source, expected.tag);
+                uint32_t entries = 0;
+                for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
+                {
+                    slang::CoverageEntryInfo entry;
+                    SLANG_CHECK_ABORT(dispatch.coverage->getEntryInfo(i, &entry) == SLANG_OK);
+                    if (entry.kind != slang::CoverageEntryKind::Line || entry.line != line)
+                        continue;
+                    ++entries;
+                    SLANG_CHECK(dispatch.getCount(entry) == (booleanMode ? 1 : expected.count));
+                }
+                SLANG_CHECK(entries == 1);
+            }
+            uint32_t rhsLine, rhsColumn;
+            findSourcePosition(source, "< 200", rhsLine, rhsColumn);
+            uint32_t rhsEntries = 0;
+            for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
+            {
+                slang::CoverageEntryInfo entry;
+                SLANG_CHECK_ABORT(dispatch.coverage->getEntryInfo(i, &entry) == SLANG_OK);
+                if (entry.kind == slang::CoverageEntryKind::Branch && entry.line == rhsLine &&
+                    entry.startColumn == rhsColumn)
+                {
+                    ++rhsEntries;
+                    SLANG_CHECK(dispatch.getCount(entry) == 0);
+                }
+            }
+            SLANG_CHECK(rhsEntries == 2);
+        }
+    }
 }

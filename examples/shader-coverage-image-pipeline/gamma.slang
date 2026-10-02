@@ -11,9 +11,8 @@ public enum GammaMode
 
 float srgbEncodeChannel(float x)
 {
-    if (x <= 0.0031308)
-        return 12.92 * x;
-    return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+    // Single-line conditional expression for comparison with the multiline one below.
+    return x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
 }
 
 float3 srgbEncode(float3 rgb)
@@ -26,9 +25,9 @@ float3 srgbEncode(float3 rgb)
 
 float rec709EncodeChannel(float x)
 {
-    if (x < 0.018)
-        return 4.5 * x;
-    return 1.099 * pow(x, 0.45) - 0.099;
+    return x < 0.018
+        ? 4.5 * x
+        : 1.099 * pow(x, 0.45) - 0.099;
 }
 
 float3 rec709Encode(float3 rgb)
