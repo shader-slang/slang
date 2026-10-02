@@ -5385,8 +5385,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-                    if (shouldUseQuadDerivativeGroup(entryPoint))
+                    switch (inferDerivativeGroupMode(entryPoint))
                     {
+                    case DerivativeGroupMode::Quad:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5398,9 +5399,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupQuadsKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsKHR);
-                    }
-                    else
-                    {
+                        break;
+                    case DerivativeGroupMode::Linear:
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
                             inst->sourceLoc,
@@ -5412,6 +5412,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             getIRInstSpvID(entryPoint),
                             SpvExecutionModeDerivativeGroupLinearKHR);
                         requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearKHR);
+                        break;
+                    default:
+                        SLANG_UNEXPECTED("unexpected derivative-group mode");
                     }
                 }
 
