@@ -484,7 +484,7 @@ public:
     void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitVar(IRVar* varDecl);
-    void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec);
+    virtual void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec);
 
     void emitGlobalVar(IRGlobalVar* varDecl);
     void emitGlobalParam(IRGlobalParam* varDecl);
@@ -567,6 +567,14 @@ protected:
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
     virtual bool doesTargetSupportPtrTypes() { return false; }
+    /// Return true if a value of pointer type `ptrType` can be held in a temporary on a target
+    /// where `doesTargetSupportPtrTypes()` is false. Such a value is otherwise always folded into
+    /// its use sites.
+    virtual bool canHoldPtrTypeInTemporary(IRType* ptrType)
+    {
+        SLANG_UNUSED(ptrType);
+        return false;
+    }
     virtual bool isResourceTypeBindless(IRType* type)
     {
         SLANG_UNUSED(type);
