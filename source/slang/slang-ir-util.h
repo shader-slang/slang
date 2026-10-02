@@ -95,7 +95,7 @@ struct ParameterDirectionInfo
     // For Ref and BorrowInOut
     AddressSpace addressSpace;
 
-    // For Ref: whether the callee may write through the reference.
+    // For Ref: the callee's access through the reference.
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
 
     ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)

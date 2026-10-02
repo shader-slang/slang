@@ -24,6 +24,8 @@ interface IReadWrite
 //CHECK: ^ see interface requirement declaration of 'g'
 }
 
+// Matching is exact, so a method that only reads does not satisfy a read-write
+// requirement either.
 struct ReadsThroughConstRef : IReadWrite
 {
     void g(const __ref uint a[8]) {}
