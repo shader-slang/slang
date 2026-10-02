@@ -5023,9 +5023,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case hlsl:
             __intrinsic_asm ".Load";
 		case cuda:
-            // The 'tex*fetch_int<T>' prelude templates below have no half implementation
-            // (specialized only for float/uint/int), so a half texel produces broken CUDA.
-            // Reject it here; the shape catch-all below does not.
+            // The 'tex*fetch_int<T>' prelude templates below are specialized only for 1-, 2- and
+            // 4-wide float/uint/int texels, so a half texel would fail later as an undefined
+            // template in NVRTC. We reject it here with a message that points users to a float
+            // texture; the shape catch-all below does not check texel types.
             static_assert(!__isHalf<T>(),
                 "'Load' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
             if (isArray != 0)

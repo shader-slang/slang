@@ -1,8 +1,9 @@
 // Read-only `Texture1D.Load` on CUDA must return the stored texels (#12630).
 //
-// The textures use `content=gradient`, so each texel holds a distinct value: for RGBA8Unorm texel x
-// of a size-4 texture is (x/3, 0, 0, 1); for RGBA32Uint/Sint it is (x == 3 ? 1 : 0, 0, 0, 1). A
-// fetch that returns zero, or reads the wrong texel, fails the CHECK lines.
+// With `content=gradient`, texel x of a size-4 RGBA8Unorm texture is (x/3, 0, 0, 1), so every float
+// texel is distinct and a fetch that returns zero or the wrong texel fails the CHECK lines. The
+// RGBA32Uint gradient is (x == 3 ? 1 : 0, 0, 0, 1), so the uint loads only tell texel 0 from texel 3.
+// The `-cpu` run does not use the CUDA prelude; it confirms the expected values match the upload.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
@@ -28,7 +29,7 @@ void store4(int base, float4 v)
     outputBuffer[base + 3] = v.w;
 }
 
-// Each 1D load reads row 0 of the texture's 2D view.
+// Each 1D load is a 2D texel fetch at row 0.
 //PTX: tex.level.2d.v4.f32.s32
 //PTX: tex.level.2d.v4.u32.s32
 

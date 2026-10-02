@@ -1,10 +1,8 @@
-// Read-only `Texture1D.Load` on CUDA must return the stored texels (#12630).
+// Read-only `Texture1D.Load` of a signed-integer texel on CUDA must return the stored texels (#12630).
 //
-// The textures use `content=gradient`, so each texel holds a distinct value: for RGBA8Unorm texel x
-// of a size-4 texture is (x/3, 0, 0, 1); for RGBA32Uint/Sint it is (x == 3 ? 1 : 0, 0, 0, 1). A
-// fetch that returns zero, or reads the wrong texel, fails the CHECK lines.
-// This file covers the signed-integer texel type; the CPU backend cannot unpack RGBA32Sint, so it runs
-// on CUDA only. `texture1d-load.slang` covers float and uint texels.
+// With `content=gradient`, texel x of a size-4 RGBA32Sint texture is (x == 3 ? 1 : 0, 0, 0, 1), so
+// the two loads tell texel 0 from texel 3 and catch a fetch that returns zero. The CPU backend cannot
+// unpack RGBA32Sint, so this runs on CUDA only; `texture1d-load.slang` covers float and uint texels.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute

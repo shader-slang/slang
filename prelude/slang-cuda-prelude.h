@@ -6210,10 +6210,14 @@ struct TensorView
 // Implementations for texture fetch/load functions using tex PTX intrinsics
 // These are used for read-only texture access with integer coordinates.
 
-// We fetch row 0 of a 2D view because CUDA's own `tex1DLod` on a 1D `CUtexObject` bound to a CUDA
-// array compiles to a 2D fetch, while an integer-coordinate `tex.level.1d` compiles to the
-// linear-memory fetch used by `tex1Dfetch`, which does not read CUDA arrays. A 1D texture object
-// over linear memory is not supported here.
+// Return texel `x` of mip level `mip` of a 1D texture object backed by a CUDA array or mipmapped
+// array, which is the only kind slang-rhi creates. Despite the name, this is not CUDA's
+// `tex1Dfetch`: we address the 1D object with the integer-coordinate 2D fetch at row 0, because in
+// SASS from nvcc 12.6 (sm_52 through sm_90) CUDA's own `tex1DLod` on such an object lowers to a 2D
+// texture fetch, while an integer-coordinate `tex.level.1d` lowers to the 1D fetch that
+// `tex1Dfetch` uses for linear memory and reads zeros from a CUDA array.
+// `tests/cuda/texture1d-load.slang` guards this. For a 1D texture object created over linear
+// memory the result is undefined, with no diagnostic.
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip);
 
@@ -6225,7 +6229,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
         [[maybe_unused]] T stub;                                                               \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"              \
             : c(result), c(stub), c(stub), c(stub)                                             \
-            : "l"(texObj), "r"(x), "r"(0), "r"(mip));                                          \
+            : "l"(texObj), "r"(x), "r"(0) /* y: row 0 */, "r"(mip));                           \
         return result;                                                                         \
     }                                                                                          \
     template<>                                                                                 \
@@ -6235,7 +6239,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
         [[maybe_unused]] T stub;                                                               \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"              \
             : c(result_x), c(result_y), c(stub), c(stub)                                       \
-            : "l"(texObj), "r"(x), "r"(0), "r"(mip));                                          \
+            : "l"(texObj), "r"(x), "r"(0) /* y: row 0 */, "r"(mip));                           \
         return make_##T##2(result_x, result_y);                                                \
     }                                                                                          \
     template<>                                                                                 \
@@ -6244,7 +6248,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
         T result_x, result_y, result_z, result_w;                                              \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"              \
             : c(result_x), c(result_y), c(result_z), c(result_w)                               \
-            : "l"(texObj), "r"(x), "r"(0), "r"(mip));                                          \
+            : "l"(texObj), "r"(x), "r"(0) /* y: row 0 */, "r"(mip));                           \
         return make_##T##4(result_x, result_y, result_z, result_w);                            \
     }
 
