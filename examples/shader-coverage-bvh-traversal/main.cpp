@@ -9,11 +9,12 @@
 // to keep each GPU submission short and avoid OS watchdog resets
 // (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
-// All GPU-runtime calls go through `vk_compute_demo.h`. See its
-// file-level comment for the swap procedure when slang-rhi PR #739
+// GPU-runtime calls go through the shared shader-coverage-common/vk_compute_demo.h
+// helper. See its file-level comment for the swap procedure when slang-rhi PR #739
 // lands.
 
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/coverage-counters.h"
+#include "shader-coverage-common/vk_compute_demo.h"
 
 #include <algorithm>
 #include <array>
@@ -33,6 +34,7 @@
 #include <vector>
 
 using Slang::ComPtr;
+using coverageDemo::decodeCoverageCounters;
 
 namespace
 {
@@ -993,15 +995,7 @@ int main(int argc, char** argv)
             // a consistent layout (matches image-pipeline's readback convention).
             std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
             ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-            std::vector<uint64_t> hits(counterCount, 0);
-            for (uint32_t i = 0; i < counterCount; ++i)
-            {
-                uint64_t value = 0;
-                const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-                for (uint32_t b = 0; b < counterByteWidth; ++b)
-                    value |= (uint64_t)slot[b] << (b * 8); // little-endian reassembly
-                hits[i] = value;
-            }
+            auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
 
             auto summary = summarize(shader.coverageMetadata, hits);
             printSummary(mode.c_str(), summary);
