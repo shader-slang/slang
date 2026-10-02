@@ -2199,6 +2199,12 @@ local insts = {
 				},
 			},
 			{
+				SpecializePerConformance = {
+					-- Request whole-helper specialization over a bounded conformance set.
+					struct_name = "SpecializePerConformanceDecoration",
+				},
+			},
+			{
 				AllowPreTranslationInlining = {
 					-- This decoration indicates the callee should be inlined after translation passes,
 					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 

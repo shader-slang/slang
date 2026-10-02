@@ -15024,6 +15024,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
                 isInline = true;
             }
+            else if (as<SpecializePerConformanceAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_SpecializePerConformanceDecoration);
+            }
             else if (auto intrinsicOp = as<IntrinsicOpModifier>(modifier))
             {
                 auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);

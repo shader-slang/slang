@@ -3749,6 +3749,139 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+// Build concrete helper calls before lowering their bodies to dynamic operations.
+// Consider this example:
+//
+//     [__specializePerConformance]
+//     void visit<G : IGeometry>(G geometry, inout Handler handler, inout State state)
+//     {
+//         Candidate candidate;
+//         if (G.intersect(handler.getContext(state), candidate))
+//             handler.accept(candidate, state);
+//     }
+//
+// Typeflow normally specializes `visit` once for the whole set of geometry types.
+// Here we instead specialize its original generic with each concrete type and witness,
+// then use the existing dispatcher to select the entire visit. Context reads and acceptance
+// consequently stay in the same concrete body without moving either operation across a call.
+// Return a dispatcher with `dispatchType`, or null when the optimization does not apply.
+// Unsupported shapes retain normal set specialization: the attribute is an optimization hint.
+// Failed attempts can leave unused concrete specializations for normal dead-code elimination.
+static IRFunc* trySpecializeHelperPerConformance(
+    IRSpecialize* specializeInst,
+    IRFuncType* dispatchType,
+    SpecializationContext* context,
+    UInt specializationDepth)
+{
+    auto generic = cast<IRGeneric>(specializeInst->getBase());
+    auto originalFunc = cast<IRFunc>(findGenericReturnVal(generic));
+    if (!originalFunc->findDecoration<IRSpecializePerConformanceDecoration>())
+        return nullptr;
+
+    // Limit the prototype to one dynamic type and one witness set. In particular, do not
+    // form a Cartesian product of independent sets or guess correlations between them.
+    IRWitnessTableSet* witnessSet = nullptr;
+    IRUntaggedUnionType* unionType = nullptr;
+    UInt witnessArgIndex = 0;
+    UInt typeArgIndex = 0;
+    for (UInt i = 0; i < specializeInst->getArgCount(); ++i)
+    {
+        auto arg = specializeInst->getArg(i);
+        if (auto set = as<IRWitnessTableSet>(arg))
+        {
+            if (witnessSet)
+                return nullptr;
+            witnessSet = set;
+            witnessArgIndex = i;
+        }
+        else if (auto type = as<IRUntaggedUnionType>(arg))
+        {
+            if (unionType)
+                return nullptr;
+            unionType = type;
+            typeArgIndex = i;
+        }
+        else if (as<IRSetBase>(arg))
+            return nullptr;
+    }
+    static const UInt kMaxConformers = 8;
+    if (!witnessSet || !unionType || witnessSet->isUnbounded() || witnessSet->isEmpty() ||
+        witnessSet->getCount() > kMaxConformers)
+        return nullptr;
+
+    // Bound directly duplicated IR as well as the number of copies. This is a compile-time
+    // budget, not a prediction of native code size after downstream inlining.
+    static const UInt kMaxDuplicatedInsts = 1024;
+    UInt instCount = 0;
+    for (auto block : originalFunc->getBlocks())
+        for (auto inst = block->getFirstChild(); inst; inst = inst->getNextInst())
+            if (++instCount > kMaxDuplicatedInsts / witnessSet->getCount())
+                return nullptr;
+
+    // Witnesses are the source of truth for their concrete types. Compare canonical sets,
+    // never pair the type and witness collections by their element positions.
+    IRBuilder builder(specializeInst->getModule());
+    builder.setInsertInto(specializeInst->getModule());
+    HashSet<IRInst*> concreteTypes;
+    for (UInt i = 0; i < witnessSet->getCount(); ++i)
+    {
+        auto witness = as<IRWitnessTable>(witnessSet->getElement(i));
+        if (!witness)
+            return nullptr;
+        concreteTypes.add(witness->getConcreteType());
+    }
+    if (builder.getSet(kIROp_TypeSet, concreteTypes) != unionType->getSet())
+        return nullptr;
+
+    // Keep the initial experiment to void helpers with by-value dynamic payloads and
+    // concrete state references. Marshalling two references to a dynamic payload through
+    // independent temporary values could change aliasing; that needs a separate design.
+    if (dispatchType->getResultType()->getOp() != kIROp_VoidType)
+        return nullptr;
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>> mapping;
+    for (UInt i = 0; i < witnessSet->getCount(); ++i)
+    {
+        auto witness = cast<IRWitnessTable>(witnessSet->getElement(i));
+        List<IRInst*> args;
+        for (UInt j = 0; j < specializeInst->getArgCount(); ++j)
+            args.add(specializeInst->getArg(j));
+        args[typeArgIndex] = witness->getConcreteType();
+        args[witnessArgIndex] = witness;
+        auto concreteSpec = cast<IRSpecialize>(
+            builder.emitSpecializeInst(specializeInst->getFullType(), generic, args));
+        if (context)
+            context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                concreteSpec,
+                specializationDepth);
+        auto concreteFunc =
+            context ? specializeGeneric(context, concreteSpec) : specializeGeneric(concreteSpec);
+        if (!concreteFunc)
+            return nullptr;
+        auto concreteFuncType = cast<IRFuncType>(concreteFunc->getDataType());
+        // The leading parameter selects the witness. Concrete specialization can also
+        // expand parameter packs; retain the ordinary path if that changes the arity.
+        if (dispatchType->getParamCount() != concreteFuncType->getParamCount() + 1)
+            return nullptr;
+        for (UInt j = 0; j < concreteFuncType->getParamCount(); ++j)
+        {
+            auto paramType = dispatchType->getParamType(j + 1);
+            auto concreteParamType = concreteFuncType->getParamType(j);
+            if (paramType != concreteParamType &&
+                !(paramType == unionType && concreteParamType == witness->getConcreteType()))
+                return nullptr;
+        }
+        auto tag = builder.emitGetTagOfElementInSet(
+            builder.getSetTagType(witnessSet),
+            witness,
+            witnessSet);
+        mapping.add(tag, {concreteFunc, concreteFuncType});
+    }
+    auto dispatcher = createDispatchFunc(dispatchType, mapping);
+    builder.addNameHintDecoration(dispatcher, UnownedStringSlice("perConformance"));
+    builder.addForceInlineDecoration(dispatcher);
+    return dispatcher;
+}
+
 // Evaluate a `Specialize` inst where the arguments are sets of types (or witness tables)
 // rather than concrete singleton types and the generic returns a function.
 //
@@ -3884,6 +4017,29 @@ IRInst* specializeGenericWithSetArgs(
             auto returnedFunc = cast<IRFunc>(inst);
             auto funcFirstBlock = returnedFunc->getFirstBlock();
 
+            builder.setInsertInto(builder.getModule());
+            auto loweredFuncType =
+                as<IRFuncType>(cloneInst(&staticCloningEnv, &builder, returnedFunc->getFullType()));
+            List<IRType*> funcTypeParams;
+            for (auto extraParamType : extraParamTypes)
+                funcTypeParams.add(extraParamType);
+            for (auto paramType : loweredFuncType->getParamTypes())
+                funcTypeParams.add(paramType);
+            auto dispatchType =
+                builder.getFuncType(funcTypeParams, loweredFuncType->getResultType());
+
+            // Decide the dispatch boundary before cloning a shared body. The concrete path
+            // uses the same tag-parameter ABI, so callers need no special handling.
+            if (auto dispatcher = trySpecializeHelperPerConformance(
+                    specializeInst,
+                    dispatchType,
+                    context,
+                    specializationDepth))
+            {
+                loweredFunc->removeAndDeallocate();
+                return dispatcher;
+            }
+
             builder.setInsertBefore(loweredFunc->getFirstBlock());
             for (auto decoration : returnedFunc->getDecorations())
             {
@@ -3905,10 +4061,7 @@ IRInst* specializeGenericWithSetArgs(
                 cloneEnv.mapOldValToNew[block] = cloneInstAndOperands(&cloneEnv, &builder, block);
             }
 
-            builder.setInsertInto(builder.getModule());
-            auto loweredFuncType =
-                as<IRFuncType>(cloneInst(&staticCloningEnv, &builder, returnedFunc->getFullType()));
-            loweredFunc->setFullType((IRType*)loweredFuncType);
+            loweredFunc->setFullType(dispatchType);
 
             builder.setInsertInto(loweredFunc->getFirstBlock());
             builder.emitBranch(as<IRBlock>(cloneEnv.mapOldValToNew[funcFirstBlock]));
@@ -3956,18 +4109,6 @@ IRInst* specializeGenericWithSetArgs(
                         specializationDepth);
                 }
             }
-
-            // Add extra indices to the func-type parameters
-            List<IRType*> funcTypeParams;
-            for (Index i = 0; i < extraParamTypes.getCount(); i++)
-                funcTypeParams.add(extraParamTypes[i]);
-
-            for (auto paramType : loweredFuncType->getParamTypes())
-                funcTypeParams.add(paramType);
-
-            // Set the new function type with the extra indices
-            loweredFunc->setFullType(
-                builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
         }
         else if (as<IRDebugFunction>(inst))
         {
