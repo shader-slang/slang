@@ -3215,7 +3215,9 @@ bool SemanticsVisitor::canCoerce(
 
     // If this type pair isn't covered by the global cache, use
     // the cache that is local to the module.
-    if (getShared()->m_typeConversionCostCache.tryGetValue(ConversionCostKey(toType, fromType), cost))
+    if (getShared()->m_typeConversionCostCache.tryGetValue(
+            ConversionCostKey(toType, fromType),
+            cost))
     {
         if (outCost)
             *outCost = cost;
