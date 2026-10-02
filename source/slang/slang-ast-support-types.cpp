@@ -104,21 +104,6 @@ AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
     }
 }
 
-ParamPassingMode getRefParamPassingModeForAccess(AccessQualifier accessQualifier)
-{
-    switch (accessQualifier)
-    {
-    case AccessQualifier::ReadWrite:
-        return ParamPassingMode::RefReadWrite;
-    case AccessQualifier::Read:
-    case AccessQualifier::Immutable:
-        return ParamPassingMode::RefReadOnly;
-    default:
-        SLANG_UNEXPECTED("unhandled access qualifier");
-        UNREACHABLE_RETURN(ParamPassingMode::RefReadWrite);
-    }
-}
-
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
     switch (direction)

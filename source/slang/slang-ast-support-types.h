@@ -1913,7 +1913,8 @@ FIDDLE() namespace Slang
         ///
         /// Indicated by using the `ref` modifier on a parameter together
         /// with the `readonly` modifier. The `const` keyword is accepted here
-        /// as a legacy alias for `readonly`.
+        /// as a legacy alias for `readonly`. The checker does not accept
+        /// `readonly` on a `ref` parameter yet.
         ///
         /// The same rules as `RefReadWrite` apply to the argument and to
         /// aliasing access paths; only the callee's access through the
@@ -1953,13 +1954,6 @@ FIDDLE() namespace Slang
     /// represents write-only access.
     ///
     AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
-
-    /// Get the `Ref*` mode for a reference whose access is `accessQualifier`.
-    ///
-    /// This is the inverse of `getRefParamPassingModeAccess`; `Immutable`
-    /// also maps to `RefReadOnly`, since it forbids writes through the reference.
-    ///
-    ParamPassingMode getRefParamPassingModeForAccess(AccessQualifier accessQualifier);
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
