@@ -39,7 +39,8 @@ struct K
     int counter;
 }
 
-// A call whose `T*` result is unused still has to run (shader-slang/slang#13414).
+// A call whose `T*` result is unused still has to run, as does a `bab.Store` of a `T*`
+// (shader-slang/slang#13414).
 [noinline]
 int* bump(int* p)
 {
@@ -63,6 +64,7 @@ cbuffer C
 RWStructuredBuffer<float*> ptrs;
 RWStructuredBuffer<float> outF;
 RWStructuredBuffer<int> outI;
+RWByteAddressBuffer bab;
 
 // VIA_GLSL: OpEntryPoint
 // SPV: OpEntryPoint
@@ -127,6 +129,23 @@ void computeMain()
     // GLSL: atomicAdd(C_0.pa_0._data, int(-1))
     outI[6] = pa->decrement();
 
+    // GLSL: atomicAnd((C_0.pi_0 + 2)._data, 1)
+    InterlockedAnd(pi[2], 1, old);
+    // GLSL: atomicXor((C_0.pi_0 + 2)._data, 1)
+    InterlockedXor(pi[2], 1, old);
+    // GLSL: atomicMin((C_0.pi_0 + 2)._data, 1)
+    InterlockedMin(pi[2], 1, old);
+    outI[7] = old;
+    // GLSL: atomicAdd(C_0.pa_0._data, int(1))
+    outI[8] = pa->increment();
+    // GLSL: atomicAdd(C_0.pa_0._data, -(4))
+    outI[9] = pa->sub(4);
+
+    // GLSL: = C_0.pa_0._data;
+    outI[10] = pa->load();
+    // GLSL: C_0.pa_0._data = 4;
+    pa->store(4);
+
     // GLSL: (C_0.pf_0 + 2)._data = 9.0;
     *(pf + 2) = 9.0;
 
@@ -138,4 +157,7 @@ void computeMain()
 
     // GLSL: = bump_0(C_0.pi_0);
     bump(pi);
+
+    // GLSL: = bab_0._data[{{.*}}] = C_0.pi_0;
+    bab.Store(8, pi);
 }
