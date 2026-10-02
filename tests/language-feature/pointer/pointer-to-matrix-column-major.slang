@@ -8,7 +8,7 @@
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0], stride=4):name=mats
 RWStructuredBuffer<float2x3> mats;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct S
@@ -91,4 +91,13 @@ void computeMain()
     // ROW-NEXT: 60.0
     writePointer(&mats[0]);
     outputBuffer[7] = mats[0][1][2];
+
+    // A pointer made from a raw address reads its matrix row-major on these targets, whatever the
+    // layout of the memory behind it. Column-major storage holds this matrix as [1 4 2 5 3 6], so
+    // the pointer's [0][1] is 4 there, while the buffer's own [0][1] is 2.
+    // COL-NEXT: 4.0
+    // ROW-NEXT: 2.0
+    mats[0] = float2x3(1, 2, 3, 4, 5, 6);
+    let address = (uint64_t)&mats[0];
+    outputBuffer[8] = (*(float2x3*)address)[0][1];
 }
