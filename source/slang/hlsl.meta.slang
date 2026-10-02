@@ -21880,6 +21880,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         uint instanceInclusionMask,
         RAY_FLAG rayFlags)
     {
+        // Metal's intersection_params has no equivalent for RAY_FLAG_SKIP_CLOSEST_HIT_SHADER (0x08),
+        // which has no effect on an inline ray query, or for RAY_FLAG_FORCE_OMM_2_STATE (0x400), so
+        // we leave those bits unmapped here and in _slang_intersection_params_to_ray_flags.
         __requirePrelude(R"(
             raytracing::intersection_params _slang_ray_flags_to_intersection_params(uint flags){
                 raytracing::intersection_params params;
@@ -22883,6 +22886,8 @@ $}
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
         case metal:
+            // The getters used here are declared in Apple's <metal_raytracing> header but not listed
+            // in the MSL specification; the boolean one is spelled should_accept_any_intersection().
             __requirePrelude(R"(
                 uint _slang_intersection_params_to_ray_flags(raytracing::intersection_params params) {
                     uint flags = 0;

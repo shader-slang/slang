@@ -1,13 +1,15 @@
 // Tests that RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH reaches Metal's intersection_params,
 // both as a TraceRayInline argument and as a RayQuery template flag, and that RayFlags()
-// reconstructs it (shader-slang/slang#13408).
+// reconstructs it (shader-slang/slang#13408). The template form is checked at compile time
+// only; the runtime lanes run runtimeFlag.
 
 //TEST:SIMPLE(filecheck=FWD): -target metal -stage compute -entry runtimeFlag
 //TEST:SIMPLE(filecheck=REV): -target metal -stage compute -entry runtimeFlag
 //TEST:SIMPLE(filecheck=TEMPLATE): -target metal -stage compute -entry templateFlag
 //TEST:SIMPLE(filecheck=LIB): -target metallib -stage compute -entry runtimeFlag
-//TEST:SIMPLE(filecheck=LIB-TEMPLATE): -target metallib -stage compute -entry templateFlag
+//TEST:SIMPLE(filecheck=TLIB): -target metallib -stage compute -entry templateFlag
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry runtimeFlag -output-using-type -render-feature ray-query
+// The Vulkan lane reads RayFlags() natively, as a reference for the values the Metal lane expects.
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry runtimeFlag -output-using-type -render-feature ray-query
 
 // FWD: _slang_ray_flags_to_intersection_params(uint flags)
@@ -18,14 +20,18 @@
 // REV: _slang_intersection_params_to_ray_flags(raytracing::intersection_params params)
 // REV: if (params.should_accept_any_intersection())
 // REV-NEXT: flags |= 0x04; /* RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH */
-// REV: _slang_intersection_params_to_ray_flags((&
+// REV: _slang_intersection_params_to_ray_flags({{.*}}get_intersection_params())
 
 // TEMPLATE: if (flags & 0x04) /* RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH */
 // TEMPLATE-NEXT: params.accept_any_intersection(true);
 // TEMPLATE: _slang_ray_flags_to_intersection_params((4U))
 
-// LIB: runtimeFlag
-// LIB-TEMPLATE: templateFlag
+// The metallib lanes are the only check that Apple's compiler accepts the prelude helpers, so
+// they gate on slangc's result code as well as on the entry point being emitted.
+// LIB: result code = 0
+// LIB: define {{.*}} @runtimeFlag
+// TLIB: result code = 0
+// TLIB: define {{.*}} @templateFlag
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
@@ -55,6 +61,8 @@ void runtimeFlag()
     result[1] = q.RayFlags();
 }
 
+// With a single triangle, a first-hit and a closest-hit search commit the same hit, so result[0]
+// only shows the flag does not suppress the hit; result[1] checks that RayFlags() reports it.
 // BUF: 1
 // BUF-NEXT: 4
 
