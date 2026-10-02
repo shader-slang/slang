@@ -12,21 +12,20 @@
 using namespace Slang;
 
 // The `wgsl-spirv` and `wgsl-spirv-asm` targets are WGSL emission followed by Tint, so the WGSL
-// they hand to Tint must be exactly the `-target wgsl` output. Identical text is what guarantees
-// that every buffer gets the layout WGSL reflection reports for all three targets (see issue
-// #13391). Separately, `wgsl-spirv` must reach Tint like `wgsl-spirv-asm` does, rather than fail
-// with an "unhandled code generation target" internal error (see issue #8323).
+// they hand to Tint must be exactly the `-target wgsl` output, including its std140/std430 buffer
+// layouts (see issue #13391). Separately, `wgsl-spirv` must reach Tint like `wgsl-spirv-asm` does,
+// rather than fail with an "unhandled code generation target" internal error (see issue #8323).
 //
-// `slang-tint` is only fetched for Windows x64, so a `.slang` test cannot see the WGSL that Tint
-// receives anywhere else. These tests install a fake loader through `setSharedLibraryLoader`, so a
+// A `.slang` test can only check the SPIR-V that Tint produces, and only where `slang-tint` is
+// available (Windows x64). These tests install a fake loader through `setSharedLibraryLoader`, so a
 // fake `slang-tint` records the WGSL it is given on every platform.
 
 namespace
 {
 
-// Written by `fakeTintCompile`. Each test resets them before the compile it inspects. A successful
-// result is cached per target on a linked program, so only the first request for a target reaches
-// Tint, and each test therefore requests each target at most once.
+// Written by `fakeTintCompile` and reset before each compile whose Tint call a test inspects. A
+// successful result is cached per target on a linked program, so only the first request for a
+// target reaches Tint, and each test therefore requests each target at most once.
 String gTintInputWgsl;
 bool gFakeTintWasCalled = false;
 
@@ -80,10 +79,11 @@ protected:
     }
 };
 
+// Whether a `slang-tint` request loads the fake library or fails as if Tint were not installed.
 enum class FakeTint
 {
     Available,
-    Missing,
+    Unavailable,
 };
 
 // Answers every `slang-tint` request, either with the fake library or with "not found", so a real
@@ -105,7 +105,7 @@ public:
         if (UnownedStringSlice(path).indexOf(UnownedStringSlice("slang-tint")) < 0)
             return DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(path, outLibrary);
 
-        if (m_tint == FakeTint::Missing)
+        if (m_tint == FakeTint::Unavailable)
             return SLANG_E_NOT_FOUND;
 
         ComPtr<ISlangSharedLibrary> library(new FakeTintLibrary());
@@ -258,7 +258,7 @@ SLANG_UNIT_TEST(wgslSpirvTintInputMatchesWgslTarget)
     EntryPointCodeOutcome wgsl = getEntryPointCode(program, kWgslTargetIndex);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(wgsl.result));
     // The reference itself must use std140/std430, or two equally wrong layouts would compare
-    // equal. The lowered type names carry the layout rule they were built for.
+    // equal. The std140 array spelling and the lowered type names show which rule was applied.
     SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("array<vec4<f32>, i32(2)>")) >= 0);
     SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("S_std140")) >= 0);
     SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("S_std430")) >= 0);
@@ -290,7 +290,7 @@ SLANG_UNIT_TEST(wgslSpirvTargetReturnsTintOutput)
 SLANG_UNIT_TEST(wgslSpirvTargetWithoutTintReportsDiagnostic)
 {
     LinkedProgram linked;
-    linkProgram(linked, FakeTint::Missing);
+    linkProgram(linked, FakeTint::Unavailable);
     slang::IComponentType* program = linked.program;
 
     EntryPointCodeOutcome spirv = getEntryPointCode(program, kWgslSpirvTargetIndex);
