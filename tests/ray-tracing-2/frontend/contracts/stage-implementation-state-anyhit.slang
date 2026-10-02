@@ -1,6 +1,5 @@
-// An open section discovers its hit groups from conformances rather than a closed source list. Its
-// stages are nevertheless compiler-created in exactly the same way and cannot carry instance
-// storage.
+// An any-hit stage selected through an explicit hit-group list is compiler-created and cannot
+// carry instance storage, just like a stage selected directly with `-entry StructName`.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
 
 import slang.raytracing;
@@ -34,11 +33,9 @@ struct StatefulAnyHit : rt::IAnyHitShader
     void invoke(rt::AnyHitInput<Context> input) {}
 }
 
-interface IOpenHitGroup : rt::IHitGroup
-{
-}
+interface IHitGroupContract : rt::IHitGroup {}
 
-struct OpenHitGroup : IOpenHitGroup
+struct HitGroup : IHitGroupContract
 {
     typealias Context = HitContext;
     typealias ClosestHit = rt::NoClosestHit<Context>;
@@ -49,7 +46,7 @@ struct OpenHitGroup : IOpenHitGroup
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::OpenHitGroups<IOpenHitGroup>;
+    typealias HitGroups = rt::HitGroupList<HitGroup>;
     typealias MissShaders = rt::NoMissShaders;
     typealias CallableShaders = rt::NoCallableShaders;
 }

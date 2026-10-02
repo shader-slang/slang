@@ -4677,13 +4677,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-open-tag-not-entry-interface",
-    38083,
-    "invalid structural ray-tracing open-section tag",
-    span { loc = "location", message = "open ~section tag '~tag:Type' must be an interface inheriting '~entryInterface:String'" }
-)
-
-err(
     "unlowered-structural-ray-tracing-entry-point",
     38084,
     "structural ray-tracing entry point was not lowered",

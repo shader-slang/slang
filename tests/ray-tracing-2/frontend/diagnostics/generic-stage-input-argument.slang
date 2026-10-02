@@ -104,11 +104,15 @@ typealias InvalidMetadataArgument = Phantom<rt::ITraceProgramSchema>;
 typealias LegalTracer = rt::RayTracer<TestSchema>;
 typealias LegalDescriptor = rt::TraceProgramDescriptor<TestSchema>;
 
-// Open-section tags and listed stages are themselves generic arguments, but the resulting type is
-// compiler-recognized structural metadata rather than an ordinary user container.
-interface IOpenMissTag : rt::IMissShader {}
+// Listed stage implementations are generic arguments, but the resulting type is compiler-recognized
+// structural metadata rather than an ordinary user container.
+struct Miss : rt::IMissShader
+{
+    typealias Context = HitContext;
+    void invoke(rt::MissInput<Context> input) {}
+}
 
-typealias LegalOpenSection = rt::OpenMissShaders<IOpenMissTag>;
+typealias LegalMissList = rt::MissShaderList<Miss>;
 
 void useType<T>() {}
 void useTypes<each T>() {}

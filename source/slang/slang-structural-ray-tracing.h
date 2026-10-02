@@ -58,18 +58,6 @@ enum class StructuralRayTracingMetadataKind
     Count,
 };
 
-/// Identifies one independently openable entry section of a trace program schema.
-///
-/// The values describe semantic entry roles rather than the physical order of associated types or
-/// generic arguments.
-enum class StructuralRayTracingSectionKind
-{
-    HitGroups,
-    MissShaders,
-    CallableShaders,
-    Count,
-};
-
 /// Gives each associated-type requirement in the structural API a stable semantic role.
 ///
 /// The registry resolves these roles to trusted declarations once. Consumers can then project a
@@ -209,17 +197,7 @@ struct StructuralRayTracingEntryPack
     TypePackSubtypeWitness* witnesses = nullptr;
 };
 
-/// Describes the source-local part of one open schema section.
-///
-/// `tagType` is the interface used for link-time discovery; `listedEntries` are the explicitly
-/// named entries that participate even before linked conformances are collected.
-struct StructuralRayTracingOpenSectionInfo
-{
-    Type* tagType = nullptr;
-    StructuralRayTracingEntryPack listedEntries;
-};
-
-/// Decodes the entry and witness packs from a trusted closed or open section-list specialization.
+/// Decodes the entry and witness packs from a trusted section-list specialization.
 StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
@@ -266,16 +244,6 @@ public:
 
     /// Returns the trusted metadata interface for `kind`, or null for an invalid kind.
     InterfaceDecl* getMetadataInterface(StructuralRayTracingMetadataKind kind) const;
-
-    /// Decodes `sectionType` when it is the trusted open form for `expectedKind`.
-    ///
-    /// On success, `outInfo` receives the tag argument and explicitly listed entry pack. On
-    /// failure it is cleared, so callers never observe information from an earlier query.
-    bool tryGetOpenSectionInfo(
-        ASTBuilder* astBuilder,
-        Type* sectionType,
-        StructuralRayTracingSectionKind expectedKind,
-        StructuralRayTracingOpenSectionInfo& outInfo) const;
 
     /// Returns whether `functionDecl` is a trusted accessor for a stage input's payload property.
     bool isPayloadStageInputAccessor(FunctionDeclBase* functionDecl) const;
@@ -375,9 +343,6 @@ private:
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
-    AggTypeDecl* m_openSectionTypes[int(StructuralRayTracingSectionKind::Count)] = {};
-    GenericTypeParamDecl* m_openSectionTagParameters[int(StructuralRayTracingSectionKind::Count)] =
-        {};
     AssocTypeDecl*
         m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
     GenericTypeConstraintDecl* m_associatedTypeConstraintRequirements[int(

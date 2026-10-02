@@ -1,7 +1,7 @@
 // Structural stages use compiler-created value receivers. Classes, built-in types, and generic
 // parameters do not provide the required concrete value representation, so reject them when their
-// conformances are checked. An interface inheriting the stage contract remains legal because open
-// sections use that pattern as a tag rather than as an executable stage.
+// conformances are checked. An interface inheriting the stage contract remains legal because it
+// refines the requirements for implementations without itself defining an executable stage.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
@@ -25,7 +25,7 @@ struct HitContext : rt::IHitContext
     typealias Record = void;
 }
 
-interface IClosestHitTag : rt::IClosestHitShader
+interface IClosestHitContract : rt::IClosestHitShader
 {
 }
 
