@@ -2199,6 +2199,12 @@ local insts = {
 				},
 			},
 			{
+				SpecializePerConformance = {
+					-- Request whole-helper specialization over a bounded conformance set.
+					struct_name = "SpecializePerConformanceDecoration",
+				},
+			},
+			{
 				AllowPreTranslationInlining = {
 					-- This decoration indicates the callee should be inlined after translation passes,
 					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 
@@ -2340,6 +2346,13 @@ local insts = {
 					-- marking the interface type that the generic parameter conforms to.
 					-- A generic parameter can have more than one `IRTypeConstraintDecoration`s
 					operands = { { "constraintType" } },
+				},
+			},
+			{
+				ConstrainedTypeDecoration = {
+					-- On a generic witness parameter, records the type parameter whose
+					-- conformance this witness supplies. Multiple constraints may share it.
+					operands = { { "constrainedType" } },
 				},
 			},
 			{ BuiltinDecoration = {} },

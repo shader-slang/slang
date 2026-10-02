@@ -5979,6 +5979,13 @@ err(
     span { loc = "location", message = "the hit attribute passed to 'ReportHit' requires ~registerCount:int 32-bit attribute registers, but OptiX supports at most 8 (32 bytes)." }
 )
 
+warning(
+    "specialize-per-conformance-not-applied",
+    55219,
+    "whole-helper specialization was not applied",
+    span { loc = "location", message = "[__specializePerConformance] was not applied: ~reason:String. Ordinary specialization is used instead." }
+)
+
 err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,

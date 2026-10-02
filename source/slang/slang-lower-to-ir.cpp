@@ -13242,6 +13242,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
+                // Keep the checked constraint's subtype on its witness parameter.
+                // For `T : IA & IB`, both witnesses constrain T; matching interface
+                // names or sets of possible witnesses later cannot prove that relation.
+                subBuilder->addDecoration(
+                    param,
+                    kIROp_ConstrainedTypeDecoration,
+                    typeParamDeclVal->val);
             }
 
             return param;
@@ -13462,6 +13469,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irWitnessTableParam =
             subBuilder->emitParam(subBuilder->getWitnessTableType(irInterfaceType));
         subBuilder->addTypeConstraintDecoration(irThisTypeParam, irInterfaceType);
+        subBuilder->addDecoration(
+            irWitnessTableParam,
+            kIROp_ConstrainedTypeDecoration,
+            irThisTypeParam);
 
         // Now we need to wire up the IR parameters
         // we created to be used as the `ThisType` in
@@ -15023,6 +15034,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
                 isInline = true;
+            }
+            else if (as<SpecializePerConformanceAttribute>(modifier))
+            {
+                if (isForceInlineEarly(decl))
+                {
+                    Diagnostics::SpecializePerConformanceNotApplied diag = {};
+                    diag.location = modifier->loc;
+                    diag.reason = "early forced inlining removes the helper boundary";
+                    getSink()->diagnose(diag);
+                }
+                else
+                    getBuilder()->addDecoration(irFunc, kIROp_SpecializePerConformanceDecoration);
             }
             else if (auto intrinsicOp = as<IntrinsicOpModifier>(modifier))
             {

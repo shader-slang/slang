@@ -878,5 +878,7 @@ return {
 	["Attr.TypeAlignment"] = 901,
 	["reportOptiXIntersection"] = 902,
 	["Decoration.postDepthCoverage"] = 903,
-	["Decoration.AutodiffParameterContextTypeDecoration"] = 905
+	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
+	["Decoration.SpecializePerConformance"] = 906,
+	["Decoration.ConstrainedTypeDecoration"] = 907
 }

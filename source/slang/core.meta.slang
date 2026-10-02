@@ -4818,6 +4818,13 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForceInline] : ForceInlineAttribute;
 
 /// @internal
+/// Request whole-function specialization over a small, closed conformance set.
+/// Unsupported dynamic specializations issue warning 55219 and use the ordinary path.
+/// Promote that warning to an error when specialization is required.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__specializePerConformance] : SpecializePerConformanceAttribute;
+
+/// @internal
 /// Specify the overload rank of a function for overload resolution.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [OverloadRank] : OverloadRankAttribute;
