@@ -42,12 +42,18 @@ AppendStructuredBuffer<S> a;
 // LOCAL: _S{{[0-9]+}}.m_0.data_{{[0-9]+}} =
 // LOCAL: a_0.Append(_S{{[0-9]+}});
 
-// A `cbuffer` element is lowered to a different storage type than the append buffer element.
+// A `cbuffer` element is lowered to a different storage type than the append buffer element, so
+// the matrix is unpacked from the former and packed into a temporary of the latter.
+// CBUFFER: AppendStructuredBuffer<[[T:[A-Za-z_0-9]+]] > a_0
 // CBUFFER: = float2x2(C_0.s_0.m_0.data_{{[0-9]+}}
+// CBUFFER: [[T]] _S{{[0-9]+}};
 // CBUFFER: _S{{[0-9]+}}.m_0.data_{{[0-9]+}} =
 // CBUFFER: a_0.Append(_S{{[0-9]+}});
 
-// A structured or consume buffer element has the same storage type, so it is appended directly.
+// A structured or consume buffer element has the same storage type, so the value is copied with no
+// unpacking or packing.
+// BUFFER: void main()
+// BUFFER-NOT: float2x2(
 // BUFFER: a_0.Append(
 
 // NESTED: _S{{[0-9]+}}.i_0.data_{{[0-9]+}}[int(0)].m_0.data_{{[0-9]+}} =

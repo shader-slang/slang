@@ -1000,8 +1000,8 @@ struct LoweredElementTypeContext
         else if (auto sbStore = as<IRRWStructuredBufferStore>(storeInst))
             return sbStore->getVal();
         else if (auto sbAppend = as<IRStructuredBufferAppend>(storeInst))
-            return sbAppend->getOperand(1);
-        return nullptr;
+            return sbAppend->getElement();
+        SLANG_UNEXPECTED("unhandled store inst");
     }
 
     struct MatrixAddrWorkItem
@@ -2104,7 +2104,11 @@ struct LoweredElementTypeContext
                         auto originalVal = getStoreVal(user);
                         if (auto sbAppend = as<IRStructuredBufferAppend>(user))
                         {
-                            builder.setInsertBefore(sbAppend);
+                            // `Append` takes its element by value, so we pack it into a local of
+                            // the storage type, which is legal because `Append` reaches this pass
+                            // only on HLSL; every other target lowers it beforehand. We keep the
+                            // `Append` and redirect its buffer operand ourselves, since this case
+                            // returns before the generic redirect below.
                             auto addr = builder.emitVar(loweredElementTypeInfo.loweredType);
                             storeLogicalValue(
                                 builder,
