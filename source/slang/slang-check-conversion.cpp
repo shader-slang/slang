@@ -1724,6 +1724,34 @@ bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl
     return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
 }
 
+bool isMatrixLayoutConversion(Type* toType, Type* fromType)
+{
+    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    {
+        auto toMatrixType = as<MatrixExpressionType>(toType);
+        return toMatrixType &&
+               fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
+               fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
+               fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount());
+    }
+    if (auto fromArrayType = as<ArrayExpressionType>(fromType))
+    {
+        auto toArrayType = as<ArrayExpressionType>(toType);
+        if (!toArrayType || fromArrayType->isUnsized() ||
+            !fromArrayType->getElementCount()->equals(toArrayType->getElementCount()))
+            return false;
+        return isMatrixLayoutConversion(
+            toArrayType->getElementType(),
+            fromArrayType->getElementType());
+    }
+    return false;
+}
+
+bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType)
+{
+    return as<ArrayExpressionType>(toType) && isMatrixLayoutConversion(toType, fromType);
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1916,6 +1944,30 @@ bool SemanticsVisitor::_coerce(
                         *outToExpr = fromExpr;
                     if (outCost)
                         *outCost = kConversionCost_SizedArrayToUnsizedArray;
+                    return true;
+                }
+
+                // We convert only the element layout and keep the argument's length, because the
+                // rule above passes a sized array to an unsized parameter unchanged. Adding the two
+                // costs keeps an overload that takes the sized array preferred.
+                if (toArrayType->isUnsized() && !fromArrayType->isUnsized() &&
+                    isMatrixLayoutConversion(
+                        toArrayType->getElementType(),
+                        fromArrayType->getElementType()))
+                {
+                    if (outToExpr)
+                    {
+                        auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                        castExpr->type = m_astBuilder->getArrayType(
+                            toArrayType->getElementType(),
+                            fromArrayType->getElementCount());
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->base = fromExpr;
+                        *outToExpr = castExpr;
+                    }
+                    if (outCost)
+                        *outCost =
+                            kConversionCost_MatrixLayout + kConversionCost_SizedArrayToUnsizedArray;
                     return true;
                 }
             }
@@ -2312,30 +2364,26 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // matrix types with different layouts are convertible
-    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    // An array-typed cast lowers to an array `BuiltinCast`, which `lowerArrayBuiltinCasts` expands
+    // element by element once matrix layouts are resolved. A `BuiltinCastExpr` is not an l-value,
+    // so `coerceArgToParam` rebuilds the cast of an array variable passed to `out`/`inout` as an
+    // `ImplicitCastExpr`, the only form the l-value argument check accepts; a single matrix keeps
+    // this form and is rejected there.
+    if (isMatrixLayoutConversion(toType, fromType))
     {
-        if (auto toMatrixType = as<MatrixExpressionType>(toType))
+        if (outCost)
         {
-            if (fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
-                fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
-                fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount()))
-            {
-                if (outCost)
-                {
-                    *outCost = kConversionCost_MatrixLayout;
-                }
-                if (outToExpr)
-                {
-                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
-                    castExpr->type = toType;
-                    castExpr->loc = fromExpr->loc;
-                    castExpr->base = fromExpr;
-                    *outToExpr = castExpr;
-                }
-                return true;
-            }
+            *outCost = kConversionCost_MatrixLayout;
         }
+        if (outToExpr)
+        {
+            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+            castExpr->type = toType;
+            castExpr->loc = fromExpr->loc;
+            castExpr->base = fromExpr;
+            *outToExpr = castExpr;
+        }
+        return true;
     }
 
     // We allow a value of a `struct` type to be coerced to a function

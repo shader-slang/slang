@@ -956,6 +956,21 @@ struct PeepholeContext : InstPassBase
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
+            else if (isArrayBuiltinCast(inst->getOperand(0)))
+            {
+                // An array cast converts each element on its own, so reading one element of the
+                // result only needs that element converted, not a copy of the whole array.
+                auto cast = inst->getOperand(0);
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto element = builder.emitElementExtract(
+                    cast->getOperand(0),
+                    as<IRGetElement>(inst)->getIndex());
+                inst->replaceUsesWith(builder.emitCast(inst->getFullType(), element));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
             else
             {
                 changed |= tryFoldElementExtractFromUpdateInst(inst);

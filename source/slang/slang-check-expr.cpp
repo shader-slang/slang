@@ -3898,6 +3898,14 @@ static bool _canLValueCoerce(Type* a, Type* b)
     // We can *assume* here that if they are coercable, that dimensions of vectors
     // and matrices match. We might want to assert to be sure...
     SLANG_ASSERT(a != b);
+    // `a` is the argument type and `b` the parameter type. `lowerLValueCast` never reinterprets an
+    // array in place, so an array of matrices goes through a temporary in the parameter's layout.
+    // A single matrix of another layout must not reach the matrix case below, which would let
+    // `lowerLValueCast` reinterpret it in place and ignore the layout; only `coerceArgToParam`
+    // builds an `ImplicitCastExpr` for a layout conversion, and only for arrays.
+    if (isArrayMatrixLayoutConversion(b, a))
+        return true;
+    SLANG_ASSERT(!as<MatrixExpressionType>(a) || !isMatrixLayoutConversion(b, a));
     if (a->astNodeType == b->astNodeType)
     {
         if (auto matA = as<MatrixExpressionType>(a))
@@ -4312,12 +4320,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
-                    // `out`, `inout`, and `ref` parameters currently require
-                    // an *exact* match on the type of the argument.
-                    //
-                    // TODO: relax this requirement by allowing an argument
-                    // for an `inout` parameter to be converted in both
-                    // directions.
+                    // `out`, `inout`, and `ref` parameters require an l-value of the
+                    // parameter's type. An `out` or `inout` argument may instead go through
+                    // one of the restricted implicit l-value conversions below; `ref`
+                    // cannot use that fallback.
                     //
                     if (argExpr)
                     {
@@ -4362,7 +4368,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // ```
                                 // That strictly speaking it's not allowed, but we are going to
                                 // allow it for now for situations were the types are uint/int
-                                // and vector/matrix varieties of those types
+                                // and vector/matrix varieties of those types, and for arrays of
+                                // matrices that differ only in layout
                                 //
                                 // Then in lowering we are going to insert code to do something
                                 // like
@@ -4446,7 +4453,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     {
                                         // We restict what types can use this mechanism -
                                         // currently int/uint and same sized matrix/vectors of
-                                        // those types.
+                                        // those types, and arrays of matrices that differ only
+                                        // in layout.
                                         getSink()->diagnose(
                                             Diagnostics::ImplicitCastUsedAsLvalueType{
                                                 .from = implicitCastExpr->arguments[0]->type.type,

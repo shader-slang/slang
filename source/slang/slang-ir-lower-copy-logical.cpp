@@ -57,14 +57,7 @@ struct LowerCopyLogicalContext
         builder.setInsertBefore(insertLoc.getInst());
         if (insertLoc.getMode() == IRInsertLoc::Mode::Before)
         {
-            auto newBlock = builder.emitBlock();
-            for (auto inst = insertLoc.getInst(); inst;)
-            {
-                auto nextInst = inst->getNextInst();
-                inst->insertAtEnd(newBlock);
-                inst = nextInst;
-            }
-            return newBlock;
+            return splitBlockBefore(builder, insertLoc.getInst());
         }
         if (insertLoc.getMode() == IRInsertLoc::Mode::AtEnd)
         {
@@ -112,7 +105,7 @@ struct LowerCopyLogicalContext
             {
                 elementCountIntLit = getIntVal(elementCount);
             }
-            if (elementCountIntLit <= 16)
+            if (elementCountIntLit <= kMaxUnrolledArrayElementCount)
             {
                 // If array is small, just unroll the copy for each element.
                 for (IRIntegerValue i = 0; i < elementCountIntLit; i++)
