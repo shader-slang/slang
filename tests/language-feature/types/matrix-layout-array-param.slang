@@ -81,7 +81,6 @@ void rowMajorArray2D(uniform row_major float2x3 values[2][2], uniform float trai
     outputBuffer[0] = values[1][1][0][0] + trailingValue;
 }
 
-// The postfix spelling, with the brackets on the type rather than the name.
 // COL: "name": "rowMajorPostfixArray"
 // COL: "name": "values"
 // COL: "offset": 0, "size": 60, "elementStride": 32
@@ -94,7 +93,6 @@ void rowMajorPostfixArray(uniform row_major float2x3[2] values, uniform float tr
     outputBuffer[0] = values[0][0][0] + trailingValue;
 }
 
-// A traditional-style parameter inside a modern `func` parameter list.
 // COL: "name": "rowMajorArrayInModernFunc"
 // COL: "name": "values"
 // COL: "offset": 0, "size": 60, "elementStride": 32
