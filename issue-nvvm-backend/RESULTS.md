@@ -98,9 +98,9 @@ python3 issue-nvvm-backend/run-complex-corpus.py \
   --output build/nvvm-application-reproducers/replay-1
 ```
 
-This selects nine entry points at NVRTC O3 / NVVM O0 / NVVM O3: 27 cells, including the three
-Falcor scalar/vector-select entries. The prior 18-cell Torch replay was not refreshed when those
-nine Falcor cells were added. Every successful
+This selects ten entry points at NVRTC O3 / NVVM O0 / NVVM O3: 30 cells, including three
+Falcor scalar/vector-select entries and one64-bit wave-sum entry. The prior18-cell Torch replay
+and nine-cell select replay retain their original identities; the later wave replay is separate. Every successful
 compile must also pass `ptxas`. Exit 1 preserves the current failures and is not an accepted backend
 pass; exit 0 requires all cells to succeed. Inspect `results.json` and per-cell logs, including
 attempt errors. The existing runner labels process timeouts `infrastructure-failed` with an explicit
@@ -1870,6 +1870,12 @@ select repair, NVRTC still passes (12.81 s); NVVM advances to `WaveActiveSum(uin
 dispatch. All three route controls per backend pass. Revisions, refreshed loaded hashes and both
 failure stages are maintained in [falcor2-status.json](falcor2-status.json).
 
+After the64-bit arithmetic repair, NVRTC passes (15.25 s). NVVM completes the scene fixture and
+fails in `ReferencePathTracerNode._render` at command encoder finish with E52017 for
+`optixTraceRay` (1 failure,10.05 s). This is progress beyond scene setup, not a successful render.
+All six routing controls pass. Current raw logs, JUnit and loaded-library identity reports are
+under `build/nvvm-falcor-wave64/`; earlier comparisons remain in manifest history.
+
 Downstream-library provenance matters here: although `CUDA_PATH` selects toolkit12.9, the
 application process maps NVRTC12.8.93 from its existing `.venv` (`nvidia-cuda-nvrtc-cu12`).
 The standalone NVRTC probe additionally maps system NVRTC12.9.86; its import order differs from
@@ -1912,7 +1918,7 @@ python3 issue-nvvm-backend/run-complex-corpus.py \
 Current result: **nine passes**, exit0, zero unrun cells. Four original rejections are resolved,
 five prior passes preserved. The prior failing replay remains in manifest history. Application
 NVRTC uses12.8.93; CLI replay uses the explicitly selected toolkit NVRTC12.9.86. The separate
-application still stops at the newly exposed 64-bit wave-sum restriction.
+application subsequently exposed the64-bit wave-sum restriction, now repaired below.
 
 The bounded fix was validated with the focused tests below, all570 NVVM units and smoke16. Use the
 same explicit toolkit/provider environment and serialize GPU runs:
@@ -1927,3 +1933,25 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-re
 
 These produce6 focused and9 authored regression passes. Raw accepted build/check/replay/application
 logs are in `build/nvvm-falcor-select-fix/`; no full working or application suite refresh is implied.
+
+### Standalone Falcor 64-bit wave arithmetic
+
+`tests/cuda/applications/falcor-wave64-sum.slang` preserves `WaveActiveSum(uint64_t3)` on buffer
+values. It reproduces the original E41400 before the core type-gate repair and now passes all
+three compile/assembly modes. Filter the application corpus as in the selection example above,
+using workload name `falcor-wave64-sum`, then replay with the existing runner. Accepted focused
+replay is `build/nvvm-falcor-wave64/replay/results.json` (3 passes, exit0).
+
+With the same compiler/provider/toolkit environment, run the arithmetic GPU fixture:
+
+```sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/nvvm-int64-wave-arithmetic.slang
+```
+
+It dispatches four 32-lane groups to test full/sparse/partial/singleton masks through one shared
+body. NVRTC O3 and NVVM O0/O3 pass. An earlier driver duplicated each mask's fold and exceeded the
+O3 test-server timeout; the final driver retains all cases without that duplicate inlining.
+Raw failed and successful attempts remain under `build/nvvm-falcor-wave64/`. Neighboring
+`nvvm-fp64-masked-wave`, `nvvm-fp64-wave-aggregate`, `nvvm-wave-shuffle-widths` and `nvvm-core-waves`
+pass 12 GPU checks; the portable fixture has three authored compile checks. Units retain 569 passes from the full run plus 1 repaired admission test pass; smoke 16 passes. These checks do not admit new working-tier configurations or claim OptiX trace support.

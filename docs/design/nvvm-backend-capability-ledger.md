@@ -42,10 +42,21 @@ producer and provider LLVM `CreateSelect` emission are unchanged. See the
 [Falcor-derived compile regressions](../../tests/cuda/applications/falcor-scalar-vector-select.slang).
 All nine standalone compile/assembly cells pass, resolving four original rejections.
 
-Falcor now advances to a separate `WaveActiveSum(uint64_t3)` rejection during emissive-triangle
-setup; no completed NVVM path-tracing run is claimed. The
-[application manifest](../../issue-nvvm-backend/falcor2-status.json) retains both failure stages and
-exact qualification scope. Aggregate/matrix selection and additional wave support are not added.
+The subsequent Falcor `WaveActiveSum(uint64_t3)` restriction is also repaired. Scene setup now
+completes; the render call exposes an `optixTraceRay` lowering rejection. No successful NVVM render
+is claimed. The [application manifest](../../issue-nvvm-backend/falcor2-status.json) retains exact
+outcomes and all three failure stages. Aggregate/matrix selection is not added.
+
+## 64-bit integer wave arithmetic
+
+The core `__nvvmWaveFold` arithmetic type gate admits signed/unsigned64 in addition to its existing
+int/uint/float/double family. Existing typed sum/product, mask enumeration and exact two-word
+shuffle transport implement reduction and inclusive/exclusive prefix semantics without provider or
+ABI changes. [GPU coverage](../../tests/cuda/nvvm-int64-wave-arithmetic.slang) spans scalar,
+vector2/3/4 and matrix2x2, full/sparse/partial/singleton masks, implicit active/prefix routes,
+wide values, low-word carries and unsigned sum wrap at NVRTC O3 and NVVM O0/O3. Bitwise and narrow
+arithmetic admission are unchanged. The [Falcor reproducer](../../tests/cuda/applications/falcor-wave64-sum.slang)
+has three passing compile/assembly modes; the actual application now completes scene setup.
 
 ## TensorView, references and canonical numeric storage
 
@@ -796,6 +807,7 @@ These details must accompany any widening of a role predicate.
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lane reads, ballots, votes, rotation and prefixes | Named primitives and core payload, reduction/prefix, quad and rotation composition           | Exact type widths and mask participation govern legality. [Shuffle widths](../../tests/cuda/nvvm-wave-shuffle-widths.slang), [rotation](../../tests/cuda/nvvm-wave-rotation.slang)                                                           |
 | Hardware active mask                              | Side-effecting convergent snapshot; implicit aggregate helpers compose the required ballot   | Distinct from logical active-mask synthesis; source branch membership need not imply reconvergence. [Hardware mask](../../tests/cuda/nvvm-hardware-active-mask.slang), [aggregate mask](../../tests/cuda/nvvm-implicit-aggregate-mask.slang) |
+| Signed/unsigned64 sum/product | Core typed reduction and inclusive/exclusive prefix folds; GPU | Scalar/vector/matrix, full/sparse/partial/singleton masks. [Arithmetic](../../tests/cuda/nvvm-int64-wave-arithmetic.slang) |
 | Masked integer MIN/MAX                            | Narrow and 64-bit signed/unsigned identities in core prefix/reduction folds                  | Identity bits are width-specific; no invalid shift by 64. [Narrow](../../tests/cuda/nvvm-narrow-masked-minmax.slang), [64-bit](../../tests/cuda/nvvm-i64-masked-minmax.slang)                                                                |
 | Masked Float/Double MIN/MAX                       | Source-ordered reduction and prefix rules, signed-zero/NaN/singleton behavior; GPU           | Ordinary min/max calls are not interchangeable with ordered wave selection. [Float](../../tests/cuda/nvvm-fp32-minmax-order.slang), [Double prefix](../../tests/cuda/nvvm-fp64-prefix-minmax-order.slang)                                    |
 | Masked Half MIN/MAX                               | Separately qualified raw-half transport and ordered selection; finite exclusive seeds ±65504 | Infinity/NaN/signed-zero behavior follows exact seed and source order. Matrix prefixes remain separate. [Half](../../tests/cuda/nvvm-fp16-masked-minmax.slang)                                                                               |

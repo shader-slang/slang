@@ -1,5 +1,18 @@
 # NVVM current status
 
+**64-bit integer wave arithmetic repaired (2026-10-03):** the core arithmetic fold now admits
+`int64_t` and `uint64_t`, reusing existing typed sum/product and exact two-word shuffle transport.
+GPU tests pass on NVRTC O3 and NVVM O0/O3 for scalar, vector2/3/4 and matrix2x2 reductions and
+inclusive/exclusive prefixes, including sparse/partial/singleton masks. Focused coverage passes
+**18/18**, standalone compile/assembly **3/3**, NVVM units **570/570** and smoke **16/16**.
+
+**Falcor2 now completes scene setup.** NVRTC renders successfully (**1 pass, 15.25 s**). NVVM
+reaches `ReferencePathTracerNode._render` and fails at command encoder finish with E52017 for
+`optixTraceRay` (**1 failure, 10.05 s**, no fixture error). No successful NVVM render is claimed.
+The exact trace shape remains to be reduced; this is not a claim that all OptiX tracing is
+unsupported. Six backend-routing controls pass. This bounded wave arithmetic fix is complete;
+OptiX repair, unrelated Torch work and the general development loop remain stopped.
+
 **Scalar-condition vector select repaired (2026-10-03):** the shared NVVM admission rule now
 accepts scalar Boolean predicates for existing numeric/Boolean vectors, reusing the current lane
 compatibility helper and LLVM emission. All **nine standalone compile/assembly cells pass**
@@ -7,14 +20,10 @@ compatibility helper and LLVM emission. All **nine standalone compile/assembly c
 and smoke **16/16** pass. GPU coverage spans both predicate values, widths2-4, Boolean, signed/unsigned
 integer8/16/32/64 and float16/32/64 at NVVM O0/O3 and NVRTC O3. No ABI/module bump or new lowering path.
 
-**Falcor2 follow-up:** NVRTC still renders successfully (**1 pass, 12.81 s**). NVVM gets past the
-original select rejection but reports **1 fixture error, 8.17 s** at
-`WaveActiveSum(uint64_t3)` in `emissive_geometry_kernels.slang:271` (`E41400`: unsupported NVVM
-partition operation scalar type). Path tracing is still not reached. All three routing controls
-per backend pass with refreshed compiler/provider identities. The initial select failure and
-comparison are retained in [application status](falcor2-status.json); the standalone history lives
-in [the corpus manifest](application-corpus.manifest.json). This bounded select fix is complete;
-64-bit wave reduction, unrelated Torch failures and the general feature loop remain stopped.
+**Falcor2 follow-up after select repair:** the original select rejection exposed a separate
+`WaveActiveSum(uint64_t3)` type restriction. That later restriction is now repaired as described
+above. Original comparison outcomes and failure transitions remain in
+[application status](falcor2-status.json) and [the corpus manifest](application-corpus.manifest.json).
 
 **Two easy Torch families repaired and stopped (2026-10-03):** CUDAKernel direct calls now use
 ordinary helper clones, and explicit parameter-group pointer loads retain their global-memory
@@ -105,11 +114,40 @@ and NVRTC O3. All nine have authored compile regressions. The separate
 with independent expected outputs and both predicate values. Independent review approved the
 single shared-rule change and coverage. No new runtime working-tier configuration is admitted here.
 
-Falcor's original select issue is resolved, but subsequent `accumulate_triangle_emission` compilation
-rejects a 64-bit vector wave sum. That separate operation remains unimplemented. Exact current
+Falcor's original select issue is resolved. The subsequently exposed 64-bit vector wave sum is also
+resolved by the bounded core arithmetic change below. Exact current
 identities, preserved failure histories and checks are in [the corpus manifest](application-corpus.manifest.json)
 and [application status](falcor2-status.json). Raw final evidence is under
 `build/nvvm-falcor-select-fix/`; original captures remain under `build/nvvm-falcor2-reduction/`.
+
+## Falcor2 64-bit integer wave arithmetic
+
+The [portable shader](../tests/cuda/applications/falcor-wave64-sum.slang) captures buffer-loaded
+`uint64_t3` fixed-point emission, `WaveActiveSum`, and a first-lane store. Before the fix it
+reproduced the same E41400 assertion as `accumulate_triangle_emission` at line 271. The source is
+valid: `WaveActiveSum` reaches `WaveMaskSum`, then `WaveMultiSum` maps vector components into
+`__nvvmWaveFold`. That core helper admitted int/uint/float/double arithmetic but omitted 64-bit
+integers. Its existing sum/product identities, arithmetic and `WaveMaskReadLaneAt` two-word
+transport already support them. Extending that gate needs no provider, IR, ABI or algorithm change.
+Bitwise and narrow arithmetic admission remain unchanged.
+
+The [runtime fixture](../tests/cuda/nvvm-int64-wave-arithmetic.slang) checks signed/unsigned 64-bit
+scalar/vector/matrix sum/product and both prefix conventions against independent formulas.
+Wide values, negative signed values, carry and unsigned sum wrap expose truncation. Four groups
+exercise full, sparse, partial and singleton partitions through one shared body. NVRTC O3 and
+NVVM O0/O3 all pass. The initial driver repeated the fold at constant call sites and hit the O3
+test-server timeout; that failed attempt remains in raw evidence. Refactoring only the test driver
+preserved coverage and avoided duplicate inlining; no general compiler-performance fix is claimed.
+
+Twelve neighboring wave GPU checks and three authored compile checks pass, giving 18 focused
+passes with the final three-mode arithmetic test. Fresh portable replay compiles and assembles
+all three cells. The unit run passed 569/570; the old int64-sum rejection expectation was updated
+to positive,
+with uint64 product positive and int16/Half/uint64-bitwise negatives. That changed unit then
+passes 1/1, leaving 570 accepted unit outcomes. Smoke 16 passes; no working-tier admission is made.
+Falcor's scene setup completes and the next failure occurs at the render call's `optixTraceRay`
+lowering. Raw evidence is `build/nvvm-falcor-wave64/`; the maintained manifests retain current
+loaded identities, exact application outcomes, and the original select and wave failure histories.
 
 ## Current validation and maintenance
 

@@ -1,5 +1,11 @@
 # NVVM development workflow
 
+**Bounded 64-bit wave arithmetic fix complete (2026-10-03):** the maintainer authorized repairing
+the newly exposed Falcor wave-sum restriction. Core signed/unsigned64 sum/product reductions and
+prefixes are now qualified; scene setup completes. NVVM reaches the path tracer render call and
+rejects `optixTraceRay`. This supersedes the earlier wave stop only for this arithmetic family.
+OptiX trace-shape repair, wave performance work, unrelated fixes and the general loop remain stopped.
+
 **Bounded scalar-select fix complete (2026-10-03):** the maintainer authorized fixing the
 reduced Falcor issue. Scalar-predicate selection for the existing numeric/Boolean vector family
 is now accepted and runtime-tested. The original application rejection is gone; the next scene-update

@@ -369,7 +369,7 @@
         "build/nvvm-falcor2-reduction/gdb-entry.log",
         "build/nvvm-falcor2-reduction/gdb-standalone.log"
       ],
-      "scope": "Compile/assemble reproducer now has authored regressions. Separate numeric/Boolean family GPU fixture qualifies scalar selection; full Falcor path tracing remains blocked on uint64 wave sum.",
+      "scope": "Compile/assemble reproducer has authored regressions. Separate numeric/Boolean family GPU fixture qualifies scalar selection. Current application blocker is recorded in falcor2-status.json.",
       "observations": {
         "constantCondition": {
           "nvrtc-o3": {
@@ -516,6 +516,121 @@
         "module_abi_unchanged": true,
         "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
       }
+    },
+    {
+      "name": "falcor-wave64-sum",
+      "source": "tests/cuda/applications/falcor-wave64-sum.slang",
+      "source_sha256": "0abe4921ef65c539587177a4213dbd45758bfbe10b9ffa9803d3ce4aeea7aaf2",
+      "entry_points": [
+        "computeMain"
+      ],
+      "stage": "compute",
+      "application": {
+        "name": "Falcor2",
+        "revision": "4ab8df487e479c78dfc30f064ad05ab33a609ba4",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "origin_sources": [
+        "slang/falcor2/render/kernels/emissive_geometry_kernels.slang:271"
+      ],
+      "preserved_shape": "WaveActiveSum(uint64_t3) over buffer-loaded fixed-point emission, followed by a first-lane store.",
+      "desired_semantics": "Each result component is the exact unsigned64 sum of the corresponding emission components from all active lanes.",
+      "initial_application_observation": "E41400: Unsupported NVVM partition operation scalar type during accumulate_triangle_emission compilation.",
+      "scope": "Compile/assembly reproducer; separate signed/unsigned64 arithmetic family fixture supplies GPU correctness evidence.",
+      "observations": {
+        "computeMain": {
+          "nvrtc-o3": {
+            "status": "passed"
+          },
+          "nvvm-o0": {
+            "status": "passed"
+          },
+          "nvvm-o3": {
+            "status": "passed"
+          }
+        }
+      },
+      "observation_history": [
+        {
+          "date": "2026-10-03",
+          "source_sha256": "feead58f6dd1962c5828697604b9e1f234aecbc55ad687cd0635bd686f90fafa",
+          "observations": {
+            "computeMain": {
+              "nvvm-o3": {
+                "status": "compile-failed",
+                "diagnostics": [
+                  "E41400: Unsupported NVVM partition operation scalar type."
+                ]
+              }
+            }
+          },
+          "raw_evidence": "build/nvvm-falcor-wave64/before.log",
+          "notes": "Initial standalone capture before adding regression directives. Runtime family baseline separately passes NVRTC O3 and rejects NVVM O0/O3."
+        }
+      ],
+      "input_shape_audit": {
+        "canonical": true,
+        "producer": "WaveActiveSum uint64_t3 -> WaveMaskSum -> WaveMultiSum vector component mapping.",
+        "consumer": "__nvvmWaveFold<uint64_t,__NVVMWaveSum<uint64_t>,Reduction> in source/slang/hlsl.meta.slang.",
+        "restriction": "Arithmetic gate lacked signed/unsigned64 despite existing exact shuffle transport and typed arithmetic.",
+        "ownership": "Extend only arithmetic fold admission; existing identities, component mapping, mask iteration and WaveMaskReadLaneAt two-word transport remain unchanged."
+      },
+      "fix": {
+        "date": "2026-10-03",
+        "source_state": {
+          "base_revision": "d1ef11f1b9429c862a9da719fc1828cb3780e114",
+          "implementation_source_sha256": {
+            "source/slang/hlsl.meta.slang": "9949c741a6853f1953bf24830c4945907361749148707bdbe66fa7ce78c08253"
+          }
+        },
+        "implementation": "Admit int64_t/uint64_t in the existing __nvvmWaveFold arithmetic gate. Typed sum/product identities and arithmetic, component mapping, mask iteration and two-word shuffle transport remain unchanged.",
+        "checks": {
+          "runtime_arithmetic": {
+            "passed": 3,
+            "failed": 0
+          },
+          "neighboring_wave_gpu": {
+            "passed": 12,
+            "failed": 0
+          },
+          "authored_standalone_compile": {
+            "passed": 3,
+            "failed": 0
+          },
+          "standalone_compile_and_assemble": {
+            "passed": 3,
+            "failed": 0
+          },
+          "nvvm_units": {
+            "passed": 570,
+            "failed": 0,
+            "validation": "Full run passes569/570; old int64-sum rejection expectation is updated to positive, and the changed unit passes1/1. Other569 units and runtime/compiler artifacts are unchanged.",
+            "original_failure": "nvvmSlangMaskedWaveScalarAdmissionStaysBounded"
+          },
+          "smoke": {
+            "passed": 16,
+            "failed": 0
+          },
+          "application_route_controls": {
+            "nvrtc_passed": 3,
+            "nvvm_passed": 3
+          }
+        },
+        "runtime_fixture": "tests/cuda/nvvm-int64-wave-arithmetic.slang",
+        "runtime_fixture_sha256": "88e95a1614edc0213eac1189b1958df6a210c8017c7ad9632d6fd3ba1a11fbb8",
+        "runtime_scope": "Signed/unsigned64 scalar, vector2/3/4 and matrix2x2 sum/product reductions and inclusive/exclusive prefixes; full/sparse/partial/singleton masks, implicit active/prefix wrappers, high words/carries and unsigned sum wrap. NVRTC O3 and NVVM O0/O3.",
+        "raw_evidence": "build/nvvm-falcor-wave64/",
+        "module_abi_unchanged": true,
+        "development_observations": [
+          "Original standalone NVVM O3 rejects E41400; initial runtime layout passes NVRTC O3 and rejects NVVM O0/O3 before the fix.",
+          "First fixed runtime layout passes NVRTC/O0 but O3 hits test-server request timeout. Four runtime-selected groups remove duplicate fold inlining without reducing coverage; final layout passes all three modes. Initial failure retained in focused.log."
+        ],
+        "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+      }
     }
   ],
   "current_replay": {
@@ -642,5 +757,38 @@
       "compiler_library_sha256": "9a5322d57f22ca9aae527f766c43e3f35e37734bc2d39d17e218e7bfa3a58f92",
       "review": "Independent fixture/IR/root-cause/replay review complete; no blocking findings."
     }
-  ]
+  ],
+  "falcor2_wave64_replay": {
+    "date": "2026-10-03",
+    "scope": "Only falcor-wave64-sum: three compile/assembly cells; previous Torch and select replays retain their original identities.",
+    "source_state": {
+      "base_revision": "d1ef11f1b9429c862a9da719fc1828cb3780e114",
+      "implementation_source_sha256": {
+        "source/slang/hlsl.meta.slang": "9949c741a6853f1953bf24830c4945907361749148707bdbe66fa7ce78c08253"
+      }
+    },
+    "raw_evidence": "build/nvvm-falcor-wave64/replay/results.json",
+    "counts": {
+      "passed": 3,
+      "failed": 0,
+      "unrun": 0
+    },
+    "runner_exit_code": 0,
+    "runner_status": "passed",
+    "gpu_execution": false,
+    "cuda_version": "12.9",
+    "samples": 1,
+    "warmup": 0,
+    "timeout_seconds": 60,
+    "artifact_sha256": {
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d10ac2c45cc2c027ada1eb3a5f13514f8d9db7d281a2ab39a0341fe41a33d442",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "compiler_library_sha256": "86520437e81f8299d8088038b808b9de36c3838c79d03a901eb19c531fcd9ab2",
+    "core_module_sha256": "0599e5766c75ec26d5a8769536173fbe2ce2846cb4f8b6869e1b986bf56c253c",
+    "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+  }
 }

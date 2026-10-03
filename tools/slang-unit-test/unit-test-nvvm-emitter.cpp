@@ -14852,18 +14852,25 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveLegacyTextRejectsBeforeOutput)
 
 SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarAdmissionStaysBounded)
 {
-    const char* expressions[] = {
-        "WaveMultiSum(int64_t(outp[0]),mask)",
-        "WaveMultiProduct(half(outp[0]),mask)",
-        "WaveMultiBitAnd(uint64_t(outp[0]),mask)",
+    struct Case
+    {
+        const char* expression;
+        bool accepted;
     };
-    for (const char* expression : expressions)
+    const Case cases[] = {
+        {"WaveMultiSum(int64_t(outp[0]),mask)", true},
+        {"WaveMultiProduct(uint64_t(outp[0]),mask)", true},
+        {"WaveMultiSum(int16_t(outp[0]),mask)", false},
+        {"WaveMultiProduct(half(outp[0]),mask)", false},
+        {"WaveMultiBitAnd(uint64_t(outp[0]),mask)", false},
+    };
+    for (const auto& test : cases)
     {
         StringBuilder source;
         source << "[CUDAKernel] void computeMain(uniform "
                   "Ptr<int,Access::ReadWrite,AddressSpace::Device> outp) { uint4 "
                   "mask=uint4(15,0,0,0); outp[1]=int("
-               << expression << "); }";
+               << test.expression << "); }";
         _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;
         SLANG_CHECK_ABORT(
@@ -14871,13 +14878,24 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarAdmissionStaysBounded)
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
         ComPtr<slang::IBlob> code, diagnostics;
-        SLANG_CHECK(SLANG_FAILED(
-            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
-        SLANG_CHECK(!code);
-        SLANG_CHECK(
-            _getBlobText(diagnostics).contains("Unsupported NVVM partition operation scalar type"));
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        SlangResult result =
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+        if (test.accepted)
+        {
+            SLANG_CHECK(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(code);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+        }
+        else
+        {
+            SLANG_CHECK(SLANG_FAILED(result));
+            SLANG_CHECK(!code);
+            SLANG_CHECK(_getBlobText(diagnostics)
+                            .contains("Unsupported NVVM partition operation scalar type"));
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
     }
 }
 

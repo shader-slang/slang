@@ -19831,7 +19831,8 @@ T __nvvmWaveFold(T value, uint mask)
     static_assert(Op.isMinMax
         ? (__isInt<T>() || T is half || T is float || T is double)
         : Op.isBitwise ? (T is int || T is uint)
-        : (T is int || T is uint || T is float || T is double),
+        : (T is int || T is uint || T is int64_t || T is uint64_t ||
+            T is float || T is double),
         "Unsupported NVVM partition operation scalar type.");
     static const bool sourceOrder = Op.isMinMax &&
         (mode == __NVVMWaveMode.Reduction || T is half || T is double) && !__isInt<T>();

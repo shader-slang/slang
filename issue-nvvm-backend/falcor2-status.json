@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0"
+    "slang": "d1ef11f1b9429c862a9da719fc1828cb3780e114"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
   "configuration": {
@@ -63,21 +63,21 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 12.81,
+      "pytest_seconds": 15.25,
       "phase": "render and assertions completed"
     },
     "nvvm": {
       "passed": 0,
-      "failed": 0,
-      "errors": 1,
+      "failed": 1,
+      "errors": 0,
       "skipped": 0,
       "exit_code": 1,
-      "pytest_seconds": 8.17,
-      "phase": "helmet_scene fixture, first scene.update(), during accumulate_triangle_emission compilation; original select rejection no longer occurs",
-      "diagnostic": "E41400: Unsupported NVVM partition operation scalar type.",
-      "operation": "WaveActiveSum(uint64_t3)",
-      "call_site": "slang/falcor2/render/kernels/emissive_geometry_kernels.slang:271",
-      "rhi_operation": "createComputePipeline"
+      "pytest_seconds": 10.05,
+      "phase": "Scene setup completed; ReferencePathTracerNode._render reaches command encoder finish and rejects optixTraceRay before successful rendering.",
+      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'optixTraceRay'",
+      "operation": "optixTraceRay",
+      "call_site": "tests/python/pathtracer/test_pathtracer.py:416 -> falcor2/rendernodes/reference_pathtracer_node.py:723",
+      "rhi_operation": "command_encoder.finish"
     }
   },
   "failure_history": [
@@ -111,22 +111,40 @@
       "diagnostic": "E41400: Unsupported NVVM partition operation scalar type.",
       "source": "slang/falcor2/render/kernels/emissive_geometry_kernels.slang:271",
       "notes": "Newly exposed after scalar-select repair, before path tracing. No wave implementation change attempted; parked wave work not resumed."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "resolved",
+      "family": "64-bit integer wave reduction",
+      "operation": "WaveActiveSum(uint64_t3)",
+      "reduced_reproducer": "tests/cuda/applications/falcor-wave64-sum.slang",
+      "notes": "Core arithmetic gate now admits int64_t/uint64_t. Standalone compile/assembly and full focused arithmetic runtime family pass; Falcor scene setup completes."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "unresolved",
+      "family": "OptiX trace shape during path tracer rendering",
+      "operation": "optixTraceRay",
+      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'optixTraceRay'",
+      "notes": "Newly exposed at ReferencePathTracerNode._render after scene setup. Exact IR shape not reduced; this does not imply all OptiX tracing is unsupported. No OptiX fix attempted."
     }
   ],
   "loaded_artifact_sha256": {
     "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d10ac2c45cc2c027ada1eb3a5f13514f8d9db7d281a2ab39a0341fe41a33d442",
     "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
     "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
-    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "0d096c26f158cdec79a3eb2e7bfd1e1dc79cf20e3919afd6e5ad9cf2761b0241",
+    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "86520437e81f8299d8088038b808b9de36c3838c79d03a901eb19c531fcd9ab2",
     "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
-    "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+    "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
+    "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6"
   },
-  "raw_evidence": "build/nvvm-falcor-select-fix/",
+  "raw_evidence": "build/nvvm-falcor-wave64/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
-    "NVVM still stops in scene setup before path tracing; later application failures remain unknown.",
+    "NVVM completes scene setup but fails while preparing the path tracer render at optixTraceRay; no successful NVVM render is claimed.",
     "No image-equivalence comparison, full-suite refresh or automatic corpus-tier admission.",
-    "Standalone corpus replay is compile/assembly evidence. Separate numeric/Boolean family fixture supplies GPU correctness coverage for scalar predicates."
+    "Standalone corpus replay is compile/assembly evidence; the separate arithmetic family fixture supplies GPU correctness coverage.",
+    "The initial large runtime driver exposed an O3 test-server timeout. Final coverage uses four groups and a shared body; no general compiler-performance fix is claimed."
   ],
   "downstream_libraries": {
     "application_nvrtc": {
@@ -145,12 +163,17 @@
       "path": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
       "sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
       "notes": "Initial and follow-up probes dispatch with the selected toolkit. End-of-application library maps are snapshots, not a history of all libraries loaded during the process."
+    },
+    "application_optix": {
+      "path": "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05",
+      "sha256": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+      "notes": "Mapped during current NVVM application follow-up. End-of-process maps remain snapshots, not load histories."
     }
   },
   "review": "Independent implementation, fixture and final evidence review complete; no remaining findings.",
   "reduction": {
     "date": "2026-10-03",
-    "status": "Scalar select issue resolved; application now exposes a separate uint64 wave-sum rejection.",
+    "status": "Scalar select resolved; subsequent uint64 wave-sum issue is now also resolved. Current failure is optixTraceRay during rendering.",
     "source": "tests/cuda/applications/falcor-scalar-vector-select.slang",
     "source_sha256": "bc42cb21da8dfe5e4a9fc8875c507c65c3b22dfd87abf2edded7d493f0763ff3",
     "corpus_manifest": "issue-nvvm-backend/application-corpus.manifest.json",
@@ -253,12 +276,55 @@
       },
       "raw_evidence": "build/nvvm-falcor2/",
       "notes": "Initial comparison before the select fix; diagnostic reduction did not change these outcomes."
+    },
+    {
+      "date": "2026-10-03",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 12.81,
+          "phase": "render and assertions completed"
+        },
+        "nvvm": {
+          "passed": 0,
+          "failed": 0,
+          "errors": 1,
+          "skipped": 0,
+          "exit_code": 1,
+          "pytest_seconds": 8.17,
+          "phase": "helmet_scene fixture, first scene.update(), during accumulate_triangle_emission compilation; original select rejection no longer occurs",
+          "diagnostic": "E41400: Unsupported NVVM partition operation scalar type.",
+          "operation": "WaveActiveSum(uint64_t3)",
+          "call_site": "slang/falcor2/render/kernels/emissive_geometry_kernels.slang:271",
+          "rhi_operation": "createComputePipeline"
+        }
+      },
+      "loaded_artifact_sha256": {
+        "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d10ac2c45cc2c027ada1eb3a5f13514f8d9db7d281a2ab39a0341fe41a33d442",
+        "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+        "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+        "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "0d096c26f158cdec79a3eb2e7bfd1e1dc79cf20e3919afd6e5ad9cf2761b0241",
+        "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+        "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+      },
+      "compiler_source_state": {
+        "base_revision": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0",
+        "implementation_source_sha256": {
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "14ebb70850efdb199429a1070cf7c6ed3d3383f8fb21c9795897f0b24939d2a2"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-select-fix/",
+      "notes": "After scalar-select repair, before64-bit arithmetic fold support."
     }
   ],
   "compiler_source_state": {
-    "base_revision": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0",
+    "base_revision": "d1ef11f1b9429c862a9da719fc1828cb3780e114",
     "implementation_source_sha256": {
-      "source/compiler-core/slang-nvvm-semantic-catalog.h": "14ebb70850efdb199429a1070cf7c6ed3d3383f8fb21c9795897f0b24939d2a2"
+      "source/slang/hlsl.meta.slang": "9949c741a6853f1953bf24830c4945907361749148707bdbe66fa7ce78c08253"
     }
   },
   "select_fix": {
@@ -308,5 +374,60 @@
     "module_abi_unchanged": true,
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
   },
-  "current_failure": "64-bit integer WaveActiveSum in emissive-triangle setup; path tracer dispatch remains unqualified."
+  "current_failure": "optixTraceRay lowering rejection during ReferencePathTracerNode._render; scene setup now succeeds, rendering remains unqualified.",
+  "wave64_fix": {
+    "date": "2026-10-03",
+    "source_state": {
+      "base_revision": "d1ef11f1b9429c862a9da719fc1828cb3780e114",
+      "implementation_source_sha256": {
+        "source/slang/hlsl.meta.slang": "9949c741a6853f1953bf24830c4945907361749148707bdbe66fa7ce78c08253"
+      }
+    },
+    "implementation": "Admit int64_t/uint64_t in the existing __nvvmWaveFold arithmetic gate. Typed sum/product identities and arithmetic, component mapping, mask iteration and two-word shuffle transport remain unchanged.",
+    "checks": {
+      "runtime_arithmetic": {
+        "passed": 3,
+        "failed": 0
+      },
+      "neighboring_wave_gpu": {
+        "passed": 12,
+        "failed": 0
+      },
+      "authored_standalone_compile": {
+        "passed": 3,
+        "failed": 0
+      },
+      "standalone_compile_and_assemble": {
+        "passed": 3,
+        "failed": 0
+      },
+      "nvvm_units": {
+        "passed": 570,
+        "failed": 0,
+        "validation": "Full run passes569/570; old int64-sum rejection expectation is updated to positive, and the changed unit passes1/1. Other569 units and runtime/compiler artifacts are unchanged.",
+        "original_failure": "nvvmSlangMaskedWaveScalarAdmissionStaysBounded"
+      },
+      "smoke": {
+        "passed": 16,
+        "failed": 0
+      },
+      "application_route_controls": {
+        "nvrtc_passed": 3,
+        "nvvm_passed": 3
+      }
+    },
+    "runtime_fixture": "tests/cuda/nvvm-int64-wave-arithmetic.slang",
+    "runtime_fixture_sha256": "88e95a1614edc0213eac1189b1958df6a210c8017c7ad9632d6fd3ba1a11fbb8",
+    "runtime_scope": "Signed/unsigned64 scalar, vector2/3/4 and matrix2x2 sum/product reductions and inclusive/exclusive prefixes; full/sparse/partial/singleton masks, implicit active/prefix wrappers, high words/carries and unsigned sum wrap. NVRTC O3 and NVVM O0/O3.",
+    "raw_evidence": "build/nvvm-falcor-wave64/",
+    "module_abi_unchanged": true,
+    "development_observations": [
+      "Original standalone NVVM O3 rejects E41400; initial runtime layout passes NVRTC O3 and rejects NVVM O0/O3 before the fix.",
+      "First fixed runtime layout passes NVRTC/O0 but O3 hits test-server request timeout. Four runtime-selected groups remove duplicate fold inlining without reducing coverage; final layout passes all three modes. Initial failure retained in focused.log."
+    ],
+    "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+  },
+  "built_core_module_sha256": {
+    "build/RelWithDebInfo/lib/slang-core-module.bin": "0599e5766c75ec26d5a8769536173fbe2ce2846cb4f8b6869e1b986bf56c253c"
+  }
 }
