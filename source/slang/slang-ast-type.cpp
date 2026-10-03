@@ -927,8 +927,29 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                 }
             case ParamPassingMode::Ref:
                 {
-                    // Ref parameters not allowed in backward diff.
-                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    // A type that transitively contains a non-copyable field (e.g.
+                    // `Atomic<T>`) is promoted from `BorrowInOut` to `Ref` by
+                    // `adjustParamPassingModeBasedOnParamType` (slang-lower-to-ir.cpp) so
+                    // the parameter is always passed by reference to its original storage,
+                    // never copied. Such a type can still conform to `IDifferentiable`
+                    // (only a directly `[__NonCopyableType]`-marked type is barred from
+                    // interface conformance; see NonCopyableTypeCannotConformToInterface
+                    // in slang-check-decl.cpp), so `diffWitness` may still be present here.
+                    // Mirror the `BorrowInOut` case above, but wrap with
+                    // `getRefParamType` instead of `getBorrowInOutParamType` so the
+                    // synthesized backward-diff signature preserves the same
+                    // never-copy-the-original guarantee for both the paired and
+                    // non-differentiable cases.
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(astBuilder->getRefParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(astBuilder->getRefParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
+                    }
                     break;
                 }
             default:
