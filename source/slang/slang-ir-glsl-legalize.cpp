@@ -1179,38 +1179,62 @@ IRInst* getOrCreateBuiltinParamForHullShader(
 
 IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
     IRBuilder& irBuilder,
     IRType* type)
 {
+    // TODO: there is a more general issue with nested arrayed structs in (#13330)
+    // take this case into account when fixing it as well
     if (auto structType = as<IRStructType>(type))
     {
+        // Field offsets below are relative to this struct; the walker
+        // (createGLSLGlobalVaryingsImpl) adds them to the enclosing binding.
+        const Index structBase =
+            context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+        UInt reservedCount = 0;
         IRStructTypeLayout::Builder builder(&irBuilder);
         for (auto field : structType->getFields())
         {
             auto fieldType = field->getFieldType();
-            IRTypeLayout* fieldTypeLayout =
-                createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
+            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(
+                context, codeGenContext, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
-            if (decoration)
+            if (decoration && decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
             {
-                if (decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
-                    fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
+                fieldVarLayoutBuilder.setSystemValueSemantic(decoration->getSemanticName(), 0);
             }
             else
             {
+                // A field with a user semantic (non-sv_) or no semantic is an ordinary varying
+                // output: give it a real location instead of leaving it at the default (location 0),
+                // which would collide with per-control-point outputs (see #12726).
                 auto varLayoutForKind =
                     fieldVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
 
                 UInt space = 0;
                 varLayoutForKind->space = space;
 
-                auto unusedBinding =
-                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = (UInt)unusedBinding;
-                context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
+                IRTypeSizeAttr *sizeAttr =
+                    fieldTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput);
+                UInt varyingCount =
+                    sizeAttr ? sizeAttr->getFiniteSize() : 1;
+
+                varLayoutForKind->offset = reservedCount;
+                for (UInt i = 0; i < varyingCount; ++i)
+                {
+                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
+                        (Index)(structBase + reservedCount + i));
+                }
+                reservedCount += varyingCount;
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
+        }
+        if (reservedCount != 0)
+        {
+            builder.addResourceUsage(
+                LayoutResourceKind::VaryingOutput,
+                LayoutSize::fromRaw(reservedCount));
         }
         auto typeLayout = builder.build();
         return typeLayout;
@@ -1218,10 +1242,32 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
         auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(
-            context,
-            irBuilder,
-            arrayType->getElementType());
+            context, codeGenContext, irBuilder, arrayType->getElementType());
         IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
+        if (auto sizeAttr =
+                elementTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+        {
+            builder.addResourceUsage(
+                LayoutResourceKind::VaryingOutput,
+                sizeAttr->getSize() * getIntVal(arrayType->getElementCount()));
+        }
+        return builder.build();
+    }
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        // A matrix patch output must reserve the same location count the
+        // domain-side varying input layout gives it (the storage-major axis,
+        // see `getSimpleVaryingParameterTypeLayout`).
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto columnCount = getIntVal(matrixType->getColumnCount());
+        auto matrixLayoutMode =
+            codeGenContext->getTargetProgram()->getOptionSet().getMatrixLayoutMode();
+        auto locationCount =
+            matrixLayoutMode == kMatrixLayoutMode_ColumnMajor ? columnCount : rowCount;
+        IRTypeLayout::Builder builder(&irBuilder);
+        builder.addResourceUsage(
+            LayoutResourceKind::VaryingOutput,
+            LayoutSize::fromRaw(locationCount));
         return builder.build();
     }
     else
@@ -1239,7 +1285,7 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     IRFunc* func,
     IRVarLayout* resultLayout);
 
-void invokePathConstantFuncInHullShader(
+void invokePatchConstantFuncInHullShader(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     ScalarizedVal outputPatchVal)
@@ -1362,15 +1408,28 @@ void invokePathConstantFuncInHullShader(
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
 
     auto constantOutputType = constantFunc->getResultType();
-    IRTypeLayout* constantOutputLayout =
-        createPatchConstantFuncResultTypeLayout(context, builder, constantOutputType);
+    // Struct field offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
+    auto constantOutputBase =
+        context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(
+        context,
+        codeGenContext,
+        builder,
+        constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
+    if (constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+    {
+        auto resultVarInfo =
+            resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+        resultVarInfo->offset = (UInt)constantOutputBase;
+        resultVarInfo->space = 0;
+    }
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
-    legalizeEntryPointReturnValueForGLSL(
+    auto patchConstantFuncOutputVal = legalizeEntryPointReturnValueForGLSL(
         context,
         codeGenContext,
         builder,
@@ -1378,6 +1437,18 @@ void invokePathConstantFuncInHullShader(
         resultVarLayoutBuilder.build());
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
+
+    for (auto leafAddr : patchConstantFuncOutputVal.leafAddresses())
+    {
+        if (auto leafLayout = findVarLayout(leafAddr))
+        {
+            // system values (SV_TessFactor/SV_InsideTessFactor) are skipped as the emitter
+            // already adds Patch to them
+            if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+                continue;
+        }
+        builder.addGLSLPatchDecoration(leafAddr);
+    }
 
     fixUpFuncType(constantFunc);
 }
@@ -4365,6 +4436,28 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
         tryReplaceUsesOfStageInput(context, globalValue, pp);
+
+        // Domain shader patch constant inputs: a varying input that isn't
+        // InputPatch/OutputPatch (handled by legalizePatchParam above).
+        // Patch constants are always passed by const reference
+        // (translateEntryPointInParamToBorrow). System values are skipped
+        // here: the emitter already adds Patch to the SV_TessFactor/
+        // SV_InsideTessFactor globals (gl_TessLevel*), and other system
+        // values such as gl_TessCoord must not get it.
+        if (stage == Stage::Domain)
+        {
+            SLANG_ASSERT(!as<IRHLSLPatchType>(valueType));
+            for (auto addr : globalValue.leafAddresses())
+            {
+                if (auto leafLayout = findVarLayout(addr))
+                {
+                    if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+                        continue;
+                }
+                builder->addGLSLPatchDecoration(addr);
+            }
+        }
+
         for (auto dec : pp->getDecorations())
         {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
@@ -4438,7 +4531,6 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 
         // we have a simple struct which represents all materialized GlobalParams, this
@@ -4929,7 +5021,7 @@ void legalizeEntryPointForGLSL(
     // at the end of the entrypoint now.
     if (stage == Stage::Hull)
     {
-        invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
+        invokePatchConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
     // Special handling for ray tracing shaders
