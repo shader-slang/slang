@@ -2372,11 +2372,11 @@ local insts = {
 			},
 			{ noRefInline = { struct_name = "NoRefInlineDecoration" } },
 			{
-				DerivativeGroupQuad = {
-					struct_name = "DerivativeGroupQuadDecoration",
+				DerivativeGroupDecoration = {
+					{ DerivativeGroupQuad = { struct_name = "DerivativeGroupQuadDecoration" } },
+					{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 				},
 			},
-			{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 			{
 				MaximallyReconverges = {
 					struct_name = "MaximallyReconvergesDecoration",
