@@ -3791,8 +3791,23 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
+    auto errorCountBeforeAssign = getSink()->getErrorCount();
+
     if (expr->right->type.isWriteOnly)
         getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
+
+    // A memory qualifier on the source decl is a decl-level modifier, invisible to the type-only
+    // coercion below. Capture the checked (pre-coercion) source and the destination decl now; the
+    // drop is diagnosed after coercion, only if the assignment is otherwise valid.
+    Expr* checkedSrcExpr = expr->right;
+    Decl* dstDecl = nullptr;
+    {
+        auto leftExpr = expr->left;
+        while (auto paren = as<ParenExpr>(leftExpr))
+            leftExpr = paren->base;
+        if (auto leftVar = as<VarExpr>(leftExpr))
+            dstDecl = leftVar->declRef.getDecl();
+    }
 
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
@@ -3835,6 +3850,12 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    // Only diagnose the dropped qualifier when the assignment is otherwise valid (assignable
+    // l-value, coercion succeeded), so a type mismatch or a non-l-value target is not also charged
+    // a spurious qualifier-drop error.
+    if (dstDecl && getSink()->getErrorCount() == errorCountBeforeAssign)
+        diagnoseMemoryQualifierDropOnLocalCopy(dstDecl, checkedSrcExpr);
+
     expr->type = type;
     return expr;
 }
@@ -3917,47 +3938,88 @@ static bool _canLValueCoerce(Type* a, Type* b)
 }
 
 
-void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn)
+// Diagnose binding a source whose decl carries a memory qualifier (`coherent`, `readonly`,
+// `writeonly`, or `volatile`) into a destination decl that lacks it. The qualifier is a decl-level
+// modifier, not part of the type, so type-only coercion cannot observe it. `restrict` is
+// intentionally droppable (matches GLSL).
+void SemanticsVisitor::diagnoseMemoryQualifierDrop(Decl* dstDecl, Expr* srcIn)
 {
-    auto arg = as<VarExpr>(argIn);
-    if (!paramIn || !arg)
+    auto srcExpr = as<VarExpr>(srcIn);
+    if (!dstDecl || !srcExpr)
         return;
 
-    auto argDeclRef = arg->declRef;
-    if (!argDeclRef)
+    auto srcDeclRef = srcExpr->declRef;
+    if (!srcDeclRef)
         return;
-    auto argDecl = argDeclRef.getDecl();
-    auto argMemMods = argDecl->findModifier<MemoryQualifierSetModifier>();
-    if (!argMemMods)
+    auto srcDecl = srcDeclRef.getDecl();
+    auto srcMemMods = srcDecl->findModifier<MemoryQualifierSetModifier>();
+    if (!srcMemMods)
         return;
-    uint32_t argQualifiers = argMemMods->getMemoryQualifierBit();
+    uint32_t srcQualifiers = srcMemMods->getMemoryQualifierBit();
 
-    uint32_t paramQualifiers = 0;
-    auto paramMemMods = paramIn->findModifier<MemoryQualifierSetModifier>();
-    if (paramMemMods)
-        paramQualifiers = paramMemMods->getMemoryQualifierBit();
+    uint32_t dstQualifiers = 0;
+    if (auto dstMemMods = dstDecl->findModifier<MemoryQualifierSetModifier>())
+        dstQualifiers = dstMemMods->getMemoryQualifierBit();
 
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "coherent",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "readonly",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "writeonly",
-            .arg = arg});
-    if (argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
-        !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
+            .arg = srcExpr});
+    if (srcQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
+        !(dstQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
             .qualifier = "volatile",
-            .arg = arg});
-    // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
+            .arg = srcExpr});
+    // Dropping a `restrict` qualifier is allowed (consistent with GLSL memory qualifiers).
+}
+
+// True if `type` is a resource handle whose memory-coherence qualifier a plain copy would silently
+// drop: read/write buffers and textures/images, GLSL shader-storage buffers, and `DynamicResource`.
+// A raytracing acceleration structure derives from `UntypedBufferResourceType` but is a read-only
+// opaque handle, not coherent read/write memory, so it is excluded.
+static bool isMemoryQualifiableResourceHandle(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<RaytracingAccelerationStructureType>(type))
+        return false;
+    return as<ResourceType>(type) || as<UntypedBufferResourceType>(type) ||
+           as<HLSLStructuredBufferTypeBase>(type) || as<GLSLShaderStorageBufferType>(type) ||
+           as<DynamicResourceType>(type);
+}
+
+// The copy-to-a-local counterpart of `diagnoseMemoryQualifierDrop`. It fires only for a genuine
+// same-kind handle copy that forcibly drops the qualifier, guarded three ways: the source and the
+// destination are both memory-qualifiable resource handles (a qualified scalar read is a completed
+// load, not a coherent location; a non-handle or error-typed destination means the copy is already
+// ill-formed), and the destination is a local variable (`isLocalVar`), which -- unlike a global or
+// a struct field -- cannot carry the qualifier. Callers invoke this only once the copy is otherwise
+// valid (see checkVarDeclCommon / checkAssignWithCheckedOperands), so a type-mismatched or
+// non-l-value target is not charged a spurious diagnostic.
+void SemanticsVisitor::diagnoseMemoryQualifierDropOnLocalCopy(Decl* dstDecl, Expr* srcIn)
+{
+    while (auto paren = as<ParenExpr>(srcIn))
+        srcIn = paren->base;
+    auto srcExpr = as<VarExpr>(srcIn);
+    if (!srcExpr)
+        return;
+    if (!isMemoryQualifiableResourceHandle(srcExpr->type.type))
+        return;
+    auto dstVar = as<VarDeclBase>(dstDecl);
+    if (!dstVar || !isLocalVar(dstDecl) || !isMemoryQualifiableResourceHandle(dstVar->getType()))
+        return;
+    diagnoseMemoryQualifierDrop(dstDecl, srcExpr);
 }
 
 DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
@@ -4308,7 +4370,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     if (funcDeclBase && funcDeclBase->getParameters().getCount() > pp)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
-                compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+                diagnoseMemoryQualifierDrop(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
