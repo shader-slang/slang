@@ -1,6 +1,7 @@
 // slang-ir-clone.cpp
 #include "slang-ir-clone.h"
 
+#include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -118,33 +119,98 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     return newInst;
 }
 
-static void getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* specInst)
+// Encodes canonical specialization arguments without using their diagnostic display names.
+// Consider `identity<int*>(p)` and `identity<float*>(q)`: pointer types have no linkage and
+// their display hints can be empty. Their pointee, access, address space and layout operands
+// must all participate in the symbol. Lengths and node boundaries also distinguish (1, 23)
+// from (12, 3). Nominal types retain their existing linkage rather than encoding their fields.
+static bool appendSpecializationArgument(StringBuilder& out, IRInst* arg, HashSet<IRInst*>& active)
 {
-    DigestBuilder<SHA1> digestBuilder;
-    for (UInt i = 0; i < specInst->getArgCount(); ++i)
+    if (!arg)
     {
-        auto arg = specInst->getArg(i);
-        if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
-        {
-            digestBuilder.append(typeLinkage->getMangledName());
-        }
-        else
-        {
-            StringBuilder typeNameHint;
-            getTypeNameHint(typeNameHint, arg);
-            digestBuilder.append(typeNameHint.getUnownedSlice());
-        }
+        out << "null;";
+        return true;
     }
+    if (auto linkage = arg->findDecoration<IRLinkageDecoration>())
+    {
+        auto name = linkage->getMangledName();
+        out << "name" << name.getLength() << ":" << name;
+        return true;
+    }
+    // Unlinked nominal values and unresolved generic parameters have local identity.
+    // They cannot contribute a stable external symbol, nor can process-address literals.
+    const bool literal =
+        as<IRIntLit>(arg) || as<IRBoolLit>(arg) || as<IRFloatLit>(arg) || as<IRStringLit>(arg);
+    if ((!literal && !getIROpInfo(arg->getOp()).isHoistable()) || as<IRPtrLit>(arg) ||
+        arg->getFirstChild() || active.contains(arg))
+        return false;
+    active.add(arg);
+    SLANG_DEFER(active.remove(arg));
+    out << "op" << getOpcodeStableName(arg->getOp()) << "(";
+    if (!appendSpecializationArgument(out, arg->getFullType(), active))
+        return false;
+    if (auto value = as<IRIntLit>(arg))
+        out << ":" << value->getValue();
+    else if (auto value = as<IRBoolLit>(arg))
+        out << (value->getValue() ? "true" : "false");
+    else if (auto value = as<IRFloatLit>(arg))
+    {
+        const auto number = value->getValue();
+        UInt64 bits = 0;
+        static_assert(sizeof(number) == sizeof(bits));
+        memcpy(&bits, &number, sizeof(bits));
+        out << ":" << bits;
+    }
+    else if (auto value = as<IRStringLit>(arg))
+    {
+        const auto text = value->getStringSlice();
+        out << text.getLength() << ":" << text;
+    }
+    else
+    {
+        out << arg->getOperandCount() << ":";
+        for (UInt i = 0; i < arg->getOperandCount(); ++i)
+            if (!appendSpecializationArgument(out, arg->getOperand(i), active))
+                return false;
+    }
+    out << ")";
+    return true;
+}
 
+static bool getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* specInst)
+{
+    StringBuilder arguments;
+    HashSet<IRInst*> active;
+    for (UInt i = 0; i < specInst->getArgCount(); ++i)
+        if (!appendSpecializationArgument(arguments, specInst->getArg(i), active))
+            return false;
+    DigestBuilder<SHA1> digestBuilder;
+    digestBuilder.append(arguments.getUnownedSlice());
     strBuilder.append(digestBuilder.finalize().toString());
+    return true;
 }
 
 // Copy the linkage decoration of oldInst (if present) and specialize it for target.
-static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
+static void specializeLinkageDecoration(
+    IRCloneEnv* env,
+    IRInst* target,
+    IRSpecialize* oldInst,
+    IRBuilder* builder)
 {
     auto gen = as<IRGeneric>(oldInst->getBase());
     if (gen)
     {
+        // A generic can return an existing parameter or global. Only a newly cloned body
+        // result (or cloned deferred specialization) owns linkage that we may replace.
+        auto returnValue = getGenericReturnVal(gen);
+        const bool ownsBodyResult =
+            returnValue && returnValue != target &&
+            returnValue->getParent() == gen->getFirstBlock() && !as<IRParam>(returnValue) &&
+            !getIROpInfo(returnValue->getOp()).isHoistable() && lookUp(env, returnValue) == target;
+        const bool ownsDeferredSpecialization =
+            as<IRSpecialize>(target) && target != oldInst && lookUp(env, oldInst) == target;
+        if (!ownsBodyResult && !ownsDeferredSpecialization)
+            return;
         auto genLinkage = gen->findDecoration<IRLinkageDecoration>();
         if (genLinkage)
         {
@@ -158,7 +224,14 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
                 specializationProvider = targetAsSpec;
             }
             StringBuilder specLinkName;
-            getSpecializedLinkageName(specLinkName, specializationProvider);
+            if (!getSpecializedLinkageName(specLinkName, specializationProvider))
+            {
+                // The local definition retains IR identity and liveness decorations. A deferred
+                // specialization retains its generic/arguments and can gain linkage once resolved.
+                while (auto linkage = target->findDecoration<IRLinkageDecoration>())
+                    linkage->removeAndDeallocate();
+                return;
+            }
             sb.append(specLinkName);
 
             if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())
@@ -312,7 +385,7 @@ static void _cloneInstDecorationsAndChildren(
 
     if (auto oldAsSpec = as<IRSpecialize>(oldInst))
     {
-        specializeLinkageDecoration(newInst, oldAsSpec, builder);
+        specializeLinkageDecoration(env, newInst, oldAsSpec, builder);
     }
 }
 

@@ -9,11 +9,11 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; development is stopped at the requested discussion point.
+below; the remaining SlangPy failures are resolved and development is stopped.
 
 The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
 targeting and common raygen/trace/callable qualification are now accepted. Application-led feature
-development is stopped at the maintainer-requested discussion point. **The legacy HitObject compatibility decision remains parked:** native8.x
+development is stopped after resolving the remaining SlangPy failures. **The legacy HitObject compatibility decision remains parked:** native8.x
 Invoke loses ray flags that9 retains;
 preserving modern visibility without reducing the32-word payload capacity needs a private
 cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
@@ -27,7 +27,46 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
 
-## Current application feature work — stopped for discussion
+## Current application acceptance — SlangPy failures resolved
+
+The full CUDA-selected SlangPy checkpoint is **1,591 passes, zero failures, 807 skips and
+3 expected failures** across **2,401 nodes**, plus 14 module-level skips. All **29 previous failures
+resolve**, all **1,561 previous passes remain passing**, and no node was removed or demoted.
+One new RGB32Uint metadata test accounts for the extra node. Exact node comparisons, intermediate
+failures and executable identities remain in [SlangPy status](slangpy-cuda-status.json).
+
+The accepted families cover pointer/helper qualification and generic symbol identity; fixed resource
+arrays and nested acceleration-handle/parameter-group values; complete standard numeric CUDA uniform
+storage; unused type-only declarations; and immutable AD field/array/vector/matrix updates. Dynamic
+array reads use checked local snapshots to avoid the captured CUDA12.9 libNVVM optimizer stall.
+The five RGB failures were metadata-only fixture allocations: tests now use the production texture
+type factory without allocating unsupported physical RGB CUDA textures. Live texture tests still run.
+
+Permanent runtime controls pass at NVVM O0/O3, with NVRTC/CPU controls as appropriate. The high-bit
+array-index fixture reaches LLVM as `i8` and zero-extends before addressing lane 200. The full NVVM
+unit checkpoint passed **564/568**; all four test-only failures pass in an exact repaired selection.
+These repaired stale compact-uniform rejection/fake-type assumptions, an old select-chain assertion,
+and inherited surface recorder count typos. No production workaround was added for these failures.
+The working corpus measured **1,714 passes and 2 preflight failures**; both exact SM80 failures
+now pass after repairing readonly uniform forwarding and the producer's shared physical-type cache.
+The runner also recorded a source-edit warning: the repair was edited during testing, but no rebuild
+occurred until the full run completed. This is full observed output plus focused repairs, not a fresh
+all-green working run. The final **16/16 smoke** and **5/5 readonly/layout controls** pass. Eight new
+runtime configurations join the working inventory from focused evidence, bringing it to 1,724.
+
+An additional exploratory source using an explicit free `__constref` call with a pointer-bearing
+constant buffer crashes in shared typeflow. It also crashes with the preserved upstream compiler;
+the equivalent readonly method produces the intended NVVM rejection and is covered before mutation.
+This inherited issue is separate from the now-passing SlangPy suite and remains recorded for future work.
+
+SlangPy's full pre-commit checks pass. Current raw evidence is `build/nvvm-application-values/`;
+[focused evidence](focused-evidence.json) records the final smoke/working checkpoints and reviews.
+
+**Stopped as requested:** all remaining SlangPy failures are resolved. Do not resume the general
+feature loop without a new instruction. The legacy OptiX8 HitObject decision remains parked.
+Torch, other SlangPy platforms and physical RGB CUDA textures are outside this qualification.
+
+## Prior TensorView and structured-storage checkpoint
 
 The TensorView/structured-storage slice is complete. TensorView and DiffTensorView use a typed,
 host-compatible descriptor and ordinary core composition for queries, indexing, load/store,
@@ -76,18 +115,8 @@ analysis is claimed. Direct immutable global aggregate constref forwarding remai
 shared StructuredBuffer lowering can retain stale reads through a writable alias; qualified mutable
 alias observations use two RWStructuredBuffer views. The failed exploratory alias attempt is retained.
 
-**Stop here for discussion.** No next feature family has started. The 29 remaining SlangPy failures
-suggest these queued groups (first diagnostics, not completed root-cause analyses):
-
-- 10 pointer/reference/helper-layout and generated-symbol identity cases;
-- 7 nested resource/parameter-group cases;
-- 3 differentiable aggregate update cases;
-- 4 link-time type/struct cases;
-- 5 RHI RGB32 texture-creation cases, before shader compilation.
-
-The legacy OptiX 8 HitObject semantic decision remains parked independently. Resume only after the
-maintainer's next instruction; retain eight-job builds, complete-family batching and economical
-focused validation between deliberate checkpoints.
+The later application acceptance above resolves this checkpoint's remaining 29 failures. Its exact
+first diagnostics and original outcomes remain preserved; the OptiX8 HitObject decision stays separate.
 
 ## SlangPy application checkpoint
 
@@ -160,9 +189,9 @@ address controls pass, and all 16 smoke cells pass. One stale Callable transform
 corrected to the already-supported production contract. Raw evidence: `build/nvvm-pointer-entry/`.
 RHI now has 284 registrations (283 unique), with mixed-age NVVM 273/1/10 and NVRTC 269/5/10.
 
-The subsequent compact-pointer qualification is recorded in the current section above. Combined
-generic handle specializations retain their duplicate-symbol failure; exact failures and transitions
-remain in the manifests. No automatic demotion or full-suite freshness claim is made.
+The subsequent compact-pointer qualification is recorded in the current section above. The original combined
+generic handle specialization duplicate-symbol failure remains recorded; the new canonical pointer
+specialization regression passes, while that older combined fixture has not been rerun. No automatic demotion or full-suite freshness claim is made.
 
 Open shared issue: column-major entry matrix reflection disagrees with CUDA's row-array physical
 representation. Both routes fail 11 lanes per optimization in the retained mixed-matrix fixture;

@@ -2093,17 +2093,40 @@ static SlangResult SLANG_NVVM_CALL _emitSequentialElementExtract(
             llvmSequentialValue,
             uint32_t(constantIndex->getZExtValue()));
     }
-    else if (!constantIndex && (arrayType || elementType->isIntegerTy(1)))
+    else if (!constantIndex && arrayType)
     {
-        // LLVM has no dynamic `extractvalue`, and CUDA 12.9's libNVVM mishandles dynamic extracts
-        // from `<N x i1>`. Both fixed sequences are bounded in this ABI, so use constant extracts
-        // and typed selects. An out-of-range index retains LLVM's undefined result.
+        // LLVM has no dynamic extractvalue. Keep one snapshot at the read and index it in
+        // local storage. Expanding a loop-carried array into a select chain can make libNVVM's
+        // optimizer explode when reverse differentiation also updates that array in the loop.
+        // This private snapshot's lifetime is exactly the read. Its address never escapes.
+        // Keep its allocation at that point: hoisting it to entry reintroduces the optimizer
+        // pathology. Qualified NVVM O0/O3 output assigns these temporaries to a fixed local frame.
+        if (!arrayType->isSized())
+            return SLANG_E_INVALID_ARG;
+        const auto& layout = state->module->getDataLayout();
+        const auto alignment = layout.getABITypeAlign(arrayType);
+        auto size = state->builder.getInt64(layout.getTypeAllocSize(arrayType).getFixedValue());
+        auto storage = state->builder.CreateAlloca(arrayType, nullptr, "slangArraySnapshot");
+        storage->setAlignment(alignment);
+        state->builder.CreateLifetimeStart(storage, size);
+        _emitStorePreservingNestedStructLayout(state, llvmSequentialValue, storage, alignment);
+        // GEP sign-extends narrow indices. Preserve the old lane-selection bit patterns:
+        // an i8 index with bits 200 selects element 200, not element -56.
+        auto addressIndex =
+            state->builder.CreateZExtOrTrunc(llvmElementIndex, state->builder.getInt64Ty());
+        llvm::Value* indices[] = {state->builder.getInt32(0), addressIndex};
+        auto element = state->builder.CreateGEP(arrayType, storage, indices);
+        result = state->builder.CreateLoad(elementType, element);
+        state->builder.CreateLifetimeEnd(storage, size);
+    }
+    else if (!constantIndex && elementType->isIntegerTy(1))
+    {
+        // CUDA 12.9's libNVVM mishandles dynamic extracts from <N x i1>. Keep this bounded
+        // vector adaptation; an out-of-range index retains LLVM's undefined result.
         result = llvm::UndefValue::get(elementType);
         for (uint32_t lane = 0; lane < elementCount; ++lane)
         {
-            llvm::Value* laneValue =
-                arrayType ? state->builder.CreateExtractValue(llvmSequentialValue, lane)
-                          : state->builder.CreateExtractElement(llvmSequentialValue, lane);
+            llvm::Value* laneValue = state->builder.CreateExtractElement(llvmSequentialValue, lane);
             llvm::Value* laneIndex = llvm::ConstantInt::get(llvmElementIndex->getType(), lane);
             llvm::Value* isLane = state->builder.CreateICmpEQ(llvmElementIndex, laneIndex);
             result = state->builder.CreateSelect(isLane, laneValue, result);
@@ -2809,6 +2832,7 @@ static SlangResult _writeLegacyNVVMAssembly(
     size_t semanticAtomicCount = 0;
     size_t semanticFloatNegateCount = 0;
     size_t semanticIntegerScanDeclarationCount = 0;
+    size_t semanticLifetimeDeclarationCount = 0;
     size_t semanticByValueParameterCount = 0;
     llvm::SmallVector<llvm::AttributeSet, 2> semanticLegacyIntrinsicAttributeSets;
     for (llvm::Function& function : *state->module)
@@ -3007,6 +3031,29 @@ static SlangResult _writeLegacyNVVMAssembly(
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
         else if (
+            intrinsicID == llvm::Intrinsic::lifetime_start ||
+            intrinsicID == llvm::Intrinsic::lifetime_end)
+        {
+            const auto attributes = function.getAttributes();
+            const auto functionAttributes = attributes.getFnAttrs();
+            if (!function.isDeclaration() || !function.getReturnType()->isVoidTy() ||
+                function.arg_size() != 2 || !function.getArg(0)->getType()->isIntegerTy(64) ||
+                function.getArg(1)->getType() != llvm::Type::getInt8PtrTy(state->context) ||
+                attributes.getParamAttrs(0).getNumAttributes() != 1 ||
+                !function.hasParamAttribute(0, llvm::Attribute::ImmArg) ||
+                attributes.getParamAttrs(1).getNumAttributes() != 1 ||
+                !function.hasParamAttribute(1, llvm::Attribute::NoCapture) ||
+                functionAttributes.getNumAttributes() != 5 ||
+                !function.hasFnAttribute(llvm::Attribute::ArgMemOnly) ||
+                !function.hasFnAttribute(llvm::Attribute::NoFree) ||
+                !function.hasFnAttribute(llvm::Attribute::NoSync) ||
+                !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
+                !function.hasFnAttribute(llvm::Attribute::WillReturn))
+                return SLANG_E_NOT_AVAILABLE;
+            _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
+            ++semanticLifetimeDeclarationCount;
+        }
+        else if (
             intrinsicID == llvm::Intrinsic::nvvm_txq_width ||
             intrinsicID == llvm::Intrinsic::nvvm_txq_height ||
             intrinsicID == llvm::Intrinsic::nvvm_txq_depth)
@@ -3154,11 +3201,17 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef legacySpecialRegisterAttributes(" = { nounwind readnone }");
     const llvm::StringRef integerScanParameterMarker("i1 immarg");
     const llvm::StringRef legacyIntegerScanParameter("i1");
+    const llvm::StringRef llvm14LifetimeAttributeMarker(
+        " = { argmemonly nofree nosync nounwind willreturn }");
+    const llvm::StringRef legacyLifetimeAttributes(" = { argmemonly nounwind }");
+    const llvm::StringRef lifetimeParameterMarker("i64 immarg");
+    const llvm::StringRef legacyLifetimeParameter("i64");
     llvm::StringRef remaining(llvm14Assembly.data(), llvm14Assembly.size());
     size_t rewrittenAtomicCount = 0;
     size_t rewrittenFloatNegateCount = 0;
     size_t rewrittenLegacyIntrinsicAttributeSetCount = 0;
     size_t rewrittenIntegerScanDeclarationCount = 0;
+    size_t rewrittenLifetimeDeclarationCount = 0;
     size_t rewrittenByValueParameterCount = 0;
     while (!remaining.empty())
     {
@@ -3262,6 +3315,33 @@ static SlangResult _writeLegacyNVVMAssembly(
             ++rewrittenLegacyIntrinsicAttributeSetCount;
         }
         else if (
+            trimmedLine.startswith("attributes #") && line.endswith(llvm14LifetimeAttributeMarker))
+        {
+            const auto prefix = line.drop_back(llvm14LifetimeAttributeMarker.size());
+            outSerializedData.append(prefix.begin(), prefix.end());
+            outSerializedData.append(
+                legacyLifetimeAttributes.begin(),
+                legacyLifetimeAttributes.end());
+            ++rewrittenLegacyIntrinsicAttributeSetCount;
+        }
+        else if (
+            trimmedLine.startswith("declare void @llvm.lifetime.start.p0i8(") ||
+            trimmedLine.startswith("declare void @llvm.lifetime.end.p0i8("))
+        {
+            const size_t markerIndex = line.find(lifetimeParameterMarker);
+            if (markerIndex == llvm::StringRef::npos ||
+                line.find(lifetimeParameterMarker, markerIndex + 1) != llvm::StringRef::npos)
+                return SLANG_E_NOT_AVAILABLE;
+            const auto prefix = line.take_front(markerIndex);
+            const auto suffix = line.drop_front(markerIndex + lifetimeParameterMarker.size());
+            outSerializedData.append(prefix.begin(), prefix.end());
+            outSerializedData.append(
+                legacyLifetimeParameter.begin(),
+                legacyLifetimeParameter.end());
+            outSerializedData.append(suffix.begin(), suffix.end());
+            ++rewrittenLifetimeDeclarationCount;
+        }
+        else if (
             trimmedLine.startswith("declare i") &&
             (trimmedLine.contains(" @llvm.ctlz.i") || trimmedLine.contains(" @llvm.cttz.i")))
         {
@@ -3334,6 +3414,7 @@ static SlangResult _writeLegacyNVVMAssembly(
                    rewrittenLegacyIntrinsicAttributeSetCount ==
                        semanticLegacyIntrinsicAttributeSets.size() &&
                    rewrittenIntegerScanDeclarationCount == semanticIntegerScanDeclarationCount &&
+                   rewrittenLifetimeDeclarationCount == semanticLifetimeDeclarationCount &&
                    rewrittenByValueParameterCount == semanticByValueParameterCount
                ? SLANG_OK
                : SLANG_E_NOT_AVAILABLE;

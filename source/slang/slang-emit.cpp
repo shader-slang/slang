@@ -2775,6 +2775,11 @@ Result linkAndOptimizeIR(
             SLANG_PASS(rcpWOfPositionInput);
     }
 
+    // NVVM keeps SSA block parameters, but aggregate updates still need the ordinary
+    // temporary-storage recipe. Introduce those temporaries before selecting physical layouts.
+    if (emitNVVMDirectly)
+        SLANG_PASS(lowerUpdateElements);
+
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
     // System-value entry parameters and the explicit CUDA context are now canonical.
     // Compact storage lowering can rewrite local objects without changing the semantic types

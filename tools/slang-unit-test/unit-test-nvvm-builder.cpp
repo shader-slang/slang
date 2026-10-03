@@ -8585,8 +8585,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
     SLANG_CHECK(diagnostics.getLength() == 0);
     const String assembly = _getBlobText(assemblyBlob);
     SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("insertvalue")) == 4);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("extractvalue")) == 3);
-    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("select")) == 2);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(_countOccurrences(assembly.getUnownedSlice(), toSlice("select")) == 0);
+    SLANG_CHECK(assembly.indexOf("slangArraySnapshot = alloca [2 x <2 x float>]") >= 0);
     SLANG_CHECK(assembly.indexOf("poison") < 0);
 
     expectRejectedConstruction(module.module, arrayType, rows, SLANG_COUNT_OF(rows));
@@ -8607,8 +8608,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsGenericAggregateValues)
         diagnostics)));
     const String compatible = _getBlobText(compatibleBlob);
     SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("insertvalue")) == 4);
-    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("extractvalue")) == 3);
-    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("select")) == 2);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("extractvalue")) == 1);
+    SLANG_CHECK(_countOccurrences(compatible.getUnownedSlice(), toSlice("select")) == 0);
+    SLANG_CHECK(compatible.indexOf("slangArraySnapshot = alloca [2 x <2 x float>]") >= 0);
     SLANG_CHECK(compatible.indexOf("poison") < 0);
 }
 

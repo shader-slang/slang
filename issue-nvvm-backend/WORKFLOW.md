@@ -7,16 +7,12 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-**Stopped for discussion (2026-10-02):** the active TensorView/structured-storage slice and its
-validation repairs are complete. STATUS and current manifests own the accepted results. Do not start
-another family until the maintainer resumes work. This supersedes the earlier automatic-loop authority.
-
-The 1,716-cell working checkpoint passed 1,713; all three crashes were repaired by rebuilding stale
-standard modules and rerunning the exact configurations. No input changed. All 16 smoke cells pass.
-The full CUDA-selected SlangPy checkpoint has 1,561 passes, 29 failures, 807 skips and 3 expected
-failures, resolving 30 failures and preserving all 1,531 prior passes. Queued families remain unstarted.
-Use affected application selections plus smoke between deliberately chosen full checkpoints after
-resumption. The legacy HitObject semantic decision remains parked independently.
+**Stopped after completion (2026-10-03):** all 29 remaining SlangPy failures resolve. The fresh
+CUDA-selected checkpoint passes 1,591 with zero failures,807 skips and3 expected failures across2,401 nodes,
+plus14 module skips. All 1,561 previous passes are preserved; one RGB metadata test is new. No failure was
+demoted or test removed. Current exact evidence and smoke/working outcomes are in STATUS and the
+maintained manifests. The maintainer requested a stop after resolution; do not resume unrelated
+feature work. The legacy OptiX8 HitObject semantic decision remains parked independently.
 
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout
 against local Slang and RHI, verify explicit NVVM execution, run its complete CUDA-selected Python

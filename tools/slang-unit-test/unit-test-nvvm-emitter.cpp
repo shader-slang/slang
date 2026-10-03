@@ -3,6 +3,25 @@
 #include "unit-test-nvvm-source-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
+// Uses LLVM's real aggregate types while retaining the deterministic fake libNVVM compiler.
+// Consider `struct Payload { FloatE4M3 value; }; struct Outer { Payload inner; };`.
+// The scalar fake provider has only one struct handle and one field list, so it cannot represent
+// distinct parent and child types. Forward
+// only the existing builder-library request to the platform loader instead of inventing another
+// recursive type model in the fixture. The real provider verifies and serializes the module;
+// separate GPU tests qualify libNVVM optimization and execution.
+class RealBuilderFakeNVVMLoader : public FakeDirectNVVMLoader
+{
+public:
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    loadSharedLibrary(const char* path, ISlangSharedLibrary** outLibrary) SLANG_OVERRIDE
+    {
+        if (path && UnownedStringSlice(path).indexOf(toSlice("slang-llvm-nvvm")) >= 0)
+            return DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(path, outLibrary);
+        return FakeDirectNVVMLoader::loadSharedLibrary(path, outLibrary);
+    }
+};
+
 SLANG_UNIT_TEST(nvvmSlangOptixPrimitivesRejectComputeBeforeEmission)
 {
     for (const char* name : {"_optix_get_launch_index_x", "_optix_get_sbt_data_ptr_64"})
@@ -2336,94 +2355,88 @@ SLANG_UNIT_TEST(nvvmSlangLoadedParameterGroupValueUsesExactImmutablePointer)
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
 
+// A pointer field is global in constant-buffer storage and generic in an ordinary helper value.
+// Borrowing the whole record cannot silently reinterpret one representation as the other.
+SLANG_UNIT_TEST(nvvmSlangParameterGroupBorrowRejectsPointerRepresentationMismatch)
+{
     _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMUnsupportedLoadedCompactParameterGroupValueSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK(code == nullptr);
-        const String diagnosticText = _getBlobText(diagnostics);
-        SLANG_CHECK(diagnosticText.indexOf("E52017") >= 0);
-        SLANG_CHECK(diagnosticText.indexOf("loaded parameter-group value representation") >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    const char* source = R"SLANG(
+        struct Params
+        {
+            float* pointer;
+            float value;
+            [noinline] float read() { return value; }
+        }
+        ConstantBuffer<Params> params;
+        RWStructuredBuffer<float> output;
+        [numthreads(1,1,1)] void computeMain() { output[0] = params.read(); }
+    )SLANG";
+    ComPtr<slang::IBlob> code, diagnostics;
+    const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(code == nullptr);
+    SLANG_CHECK(_getBlobText(diagnostics).contains("loaded parameter-group value representation"));
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
 }
 
 SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation)
 {
-    _resetDirectNVVMFakes();
+    NVVMIRBuilder realBuilder;
+    _requireRealNVVMBuilder(unitTestContext, realBuilder);
+    for (const char* source :
+         {kDirectNVVMLoadedCompactParameterGroupValueSource,
+          kDirectNVVMCompactParameterGroupVectorSource})
     {
-        ComPtr<slang::IGlobalSession> globalSession;
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
         SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        const SlangResult compileResult = _compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMCompactParameterGroupVectorSource,
-            code,
-            diagnostics);
-        if (SLANG_FAILED(compileResult))
+            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
+        // Uniform records use CUDA physical storage, including compact float3 fields.
+        // A whole record reaches its helper by address; a vector value is reconstructed.
+        const String& assembly = gFakeNVVM.addedModule;
+        const bool wholeRecord = source == kDirectNVVMLoadedCompactParameterGroupValueSource;
+        SLANG_CHECK(assembly.contains(
+            wholeRecord ? "{ { [3 x float] } } addrspace(1)*"
+                        : "{ { [3 x float] }, { [3 x float] } } addrspace(1)*"));
+        List<UnownedStringSlice> lines;
+        StringUtil::split(assembly.getUnownedSlice(), '\n', lines);
+        Index physicalLoadCount = 0;
+        bool sawHelperSignature = false;
+        for (auto line : lines)
         {
-            const String diagnosticText = _getBlobText(diagnostics);
-            if (diagnosticText.getLength())
-                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
-        }
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.getArrayTypeCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.arrayElementType == _getFakeNVVMBuilderFloatType());
-        SLANG_CHECK(gFakeNVVMBuilder.scalarStructFieldTypes.getCount() == 2);
-        for (auto fieldType : gFakeNVVMBuilder.scalarStructFieldTypes)
-            SLANG_CHECK(fieldType == _getFakeNVVMBuilderArrayType());
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 1);
-        bool sawCompactVectorLoad = false;
-        for (Index i = 0; i < gFakeNVVMBuilder.loadResultTypeKinds.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.loadResultTypeKinds[i] ==
-                FakeNVVMBuilderScalarTypeKind::NumericArray)
+            const auto physicalLoad =
+                wholeRecord ? " = load { { [3 x float] } }," : " = load float, float addrspace(1)*";
+            if (line.indexOf(UnownedStringSlice(physicalLoad)) >= 0)
             {
-                sawCompactVectorLoad = true;
-                SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[i] == 4);
-                SLANG_CHECK(gFakeNVVMBuilder.loadFlags[i] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+                ++physicalLoadCount;
+                SLANG_CHECK(line.indexOf(toSlice(", align 4, !invariant.load")) >= 0);
             }
+            if (line.startsWith(toSlice("define internal float")))
+                sawHelperSignature |=
+                    line.indexOf(UnownedStringSlice(
+                        wholeRecord ? "({ { [3 x float] } }*" : "(<3 x float>")) >= 0;
         }
-        SLANG_CHECK(sawCompactVectorLoad);
-        bool sawValueVectorParameter = false;
-        for (auto parameterType : gFakeNVVMBuilder.functionParameterTypeKinds)
-        {
-            sawValueVectorParameter |=
-                parameterType == FakeNVVMBuilderParameterTypeKind::ValueVector;
-        }
-        SLANG_CHECK(sawValueVectorParameter);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount >= 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+        SLANG_CHECK(physicalLoadCount == (wholeRecord ? 1 : 4));
+        SLANG_CHECK(sawHelperSignature);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
@@ -9450,25 +9463,6 @@ SLANG_UNIT_TEST(nvvmSlangSubstandardRecordsUseInternalValues)
     }
 }
 
-// Uses LLVM's real aggregate types while retaining the deterministic fake libNVVM compiler.
-// Consider `struct Payload { FloatE4M3 value; }; struct Outer { Payload inner; };`.
-// The scalar fake provider has only one struct handle and one field list, so it cannot represent
-// distinct parent and child types. Forward
-// only the existing builder-library request to the platform loader instead of inventing another
-// recursive type model in the fixture. The real provider verifies and serializes the module;
-// separate GPU tests qualify libNVVM optimization and execution.
-class RealBuilderFakeNVVMLoader : public FakeDirectNVVMLoader
-{
-public:
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    loadSharedLibrary(const char* path, ISlangSharedLibrary** outLibrary) SLANG_OVERRIDE
-    {
-        if (path && UnownedStringSlice(path).indexOf(toSlice("slang-llvm-nvvm")) >= 0)
-            return DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(path, outLibrary);
-        return FakeDirectNVVMLoader::loadSharedLibrary(path, outLibrary);
-    }
-};
-
 // Exact aggregate identities require the real builder; the recording fake has one array handle.
 SLANG_UNIT_TEST(nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract)
 {
@@ -11285,7 +11279,8 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
         SLANG_CHECK(
             assembly.indexOf("getelementptr inbounds { i8, { i16, <2 x i16>, i16 }, i32 }") >= 0);
         SLANG_CHECK(assembly.indexOf("getelementptr <2 x i16>") >= 0);
-        SLANG_CHECK(assembly.indexOf("extractvalue [2 x { i16, <2 x i16>, i16 }]") >= 0);
+        SLANG_CHECK(assembly.contains("slangArraySnapshot"));
+        SLANG_CHECK(assembly.contains("load { i16, <2 x i16>, i16 }"));
         SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
@@ -11899,7 +11894,7 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
                 _getBlobText(diagnostics).getBuffer());
         }
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
-        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == 2);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
         for (Index i = 0; i < 2; ++i)
         {
             const auto& access = gFakeNVVMBuilder.surfaceOperations[i];
@@ -11966,7 +11961,7 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
                 TestMessageType::Info,
                 _getBlobText(diagnostics).getBuffer());
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
-        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == 2);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
         for (Index i = 0; i < 2; ++i)
         {
             const auto& operation = gFakeNVVMBuilder.surfaceOperations[i];
@@ -12127,7 +12122,7 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
         }
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK(code != nullptr);
-        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == 2);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
         Index loadIndex = -1, storeIndex = -1;
         const uint32_t width = isHalf ? 16 : 32;
         const uint32_t lanes = isHalf ? 4 : 2;

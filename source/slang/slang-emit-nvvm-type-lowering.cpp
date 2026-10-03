@@ -415,9 +415,8 @@ static bool _isNVVMSupportedAggregateStorageType(
 {
     if (allowLayoutPointerFields && asNVVMSupportedLayoutTransportPointerType(type))
         return true;
-    if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) || isNVVMFloat16Type(type) ||
-        isNVVMFloat32Type(type) || asNVVMSupported32BitNumericVectorType(type) ||
-        asNVVMSupportedCompactParameterGroupVectorType(type))
+    if (isNVVMSupportedNumericValueType(type) || isNVVMBoolType(type) ||
+        isNVVMAccelerationStructureType(type))
     {
         return true;
     }
@@ -641,7 +640,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(IRInst* type, IRTyp
         pointerType->getOperandCount() != 4 ||
         pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
-        dataLayout->getOp() != kIROp_DefaultBufferLayoutType ||
+        (dataLayout->getOp() != kIROp_DefaultBufferLayoutType &&
+         dataLayout->getOp() != kIROp_CUDABufferLayoutType) ||
         !isNVVMSupportedCopyableValueType(valueType))
     {
         return nullptr;
@@ -672,13 +672,16 @@ static IRPtrTypeBase* _asNVVMSupportedDeviceHelperValuePointerType(
         pointerType->getOperandCount() != 4 ||
         pointerType->getAccessQualifier() != AccessQualifier::ReadWrite ||
         pointerType->getAddressSpace() != AddressSpace::UserPointer || !dataLayout ||
-        dataLayout->getOp() != kIROp_DefaultBufferLayoutType || activeTypes.contains(type))
+        (dataLayout->getOp() != kIROp_DefaultBufferLayoutType &&
+         dataLayout->getOp() != kIROp_CUDABufferLayoutType) ||
+        activeTypes.contains(type))
     {
         return nullptr;
     }
 
     activeTypes.add(type);
-    const bool isSupported = _isNVVMSupportedHelperValueType(valueType, activeTypes);
+    const bool isSupported = asNVVMSupportedAtomicType(valueType) ||
+                             _isNVVMSupportedHelperValueType(valueType, activeTypes);
     activeTypes.remove(type);
     if (!isSupported)
         return nullptr;
@@ -1233,7 +1236,8 @@ IRPtrTypeBase* asNVVMSupportedLocalResourceValuePointerType(IRInst* type, IRType
     NVVMRawBufferType rawBuffer;
     NVVMReadOnlyTextureType texture;
     NVVMSurfaceType surface;
-    const bool isResourceValue = asNVVMSupportedResourceStructType(valueType) ||
+    const bool isResourceValue = isNVVMAccelerationStructureType(valueType) ||
+                                 asNVVMSupportedResourceStructType(valueType) ||
                                  asNVVMSupportedResourceArrayType(valueType) ||
                                  getNVVMSupportedRawBufferType(valueType, rawBuffer) ||
                                  getNVVMSupportedReadOnlyTextureType(valueType, texture) ||
@@ -1510,7 +1514,10 @@ static uint32_t _getNVVMResourceValueAlignment(IRInst* type, HashSet<IRInst*>& a
         return getNVVMCopyableValueAlignment(atomicValueType);
     if (isNVVMBoolType(type))
         return 1;
-    if (asNVVMSupportedDevicePhysicalStoragePointerType(type))
+    if (isNVVMAccelerationStructureType(type))
+        return 8;
+    if (asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
+        asNVVMSupportedDeviceHelperValuePointerType(type))
         return 8;
 
     IRType* parameterGroupElementType = nullptr;
@@ -1596,11 +1603,6 @@ IRStructType* asNVVMSupportedResourceStructType(IRInst* type)
 
 uint32_t getNVVMResourceValueAlignment(IRInst* type)
 {
-    // A launch-bound acceleration handle is one opaque UInt64 value. Keep this leaf outside the
-    // recursive resource algebra: admitting it there would also open buffer elements, resource
-    // arrays and mutable record references, which have separate storage contracts.
-    if (isNVVMAccelerationStructureType(type))
-        return 8;
     HashSet<IRInst*> activeTypes;
     return _getNVVMResourceValueAlignment(type, activeTypes);
 }
@@ -1619,12 +1621,18 @@ IRArrayType* asNVVMSupportedResourceArrayType(IRInst* type, uint32_t* outElement
     return arrayType;
 }
 
+bool isNVVMSupportedResourceAggregateType(IRInst* type)
+{
+    return asNVVMSupportedResourceStructType(type) || asNVVMSupportedResourceArrayType(type);
+}
+
 static bool _isNVVMSupportedResourceElementType(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
     // Resource lowering preserves the exact specialized element type in the raw view and every
     // typed element pointer. Reuse the value algebra that generic type/memory emission already
     // supports instead of maintaining the older integer/Float32 subset here.
     return isNVVMSupportedStructuredBufferStorageType(type) ||
+           asNVVMSupportedDeviceHelperValuePointerType(type) ||
            isNVVMSupportedNumericValueType(type) || asNVVMSupportedAtomicType(type) ||
            asNVVMSupportedPhysicalArrayStructType(type) ||
            (as<IRStructType>(type) && _getNVVMResourceValueAlignment(type, activeTypes));
@@ -2175,8 +2183,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     NVVMReadOnlyTextureType sampledTextureType;
     SlangNVVMValueTypeDesc physicalType = {};
     IRType* type = field ? field->getFieldType() : nullptr;
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupported32BitNumericVectorType(type) || isNVVMAccelerationStructureType(type) ||
+    return isNVVMSupportedNumericValueType(type) || isNVVMAccelerationStructureType(type) ||
            asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
@@ -2730,11 +2737,11 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 
     // Consider `RaytracingAccelerationStructure scene; TraceRay(scene, ...);`. Shared uniform
     // collection stores the handle in the synthesized launch record, then loads and forwards it
-    // through an ordinary helper parameter. This does not establish a returned-handle ABI or
-    // permission to dereference, construct from integers, or store handles in resource aggregates.
+    // through an ordinary helper parameter or nested resource record. Storage preserves the
+    // opaque UInt64 handle; it does not grant dereference or integer-construction semantics.
     if (isAccelerationStructure)
         return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperParameter ||
-               use == NVVMTypeUse::Storage;
+               use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
 
     // Internal value parameters preserve the same array snapshot as ordinary SSA values. Reference
     // and result roles remain separate contracts, even after a value/storage lookup fills a cache.
@@ -2789,9 +2796,10 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
     case NVVMTypeUse::EntryPointParameter:
         return isCopyableValue ||
                (isHelperValue && (structType || as<IRArrayType>(canonicalType))) ||
-               resourceStructType || deviceNumericPointer || deviceArrayPointer ||
-               deviceHelperPointer || isRawBuffer || isSampledTexture || isSurface ||
-               samplerValue || (parameterGroup && hasParameterGroupValueRepresentation);
+               resourceStructType || fixedResourceArrayType || deviceNumericPointer ||
+               deviceArrayPointer || deviceHelperPointer || isRawBuffer || isSampledTexture ||
+               isSurface || samplerValue ||
+               (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
         return isHelperValue || resourceStructType || fixedResourceArrayType ||
                localResourceValuePointer || localCopyablePointer || localHelperPointer ||
@@ -2828,8 +2836,7 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
             }
             return hasField;
         }
-        return isInteger || isFloat32 || isFloat16 || numeric32VectorType ||
-               compactParameterGroupVectorType || aggregateStorageArrayType ||
+        return isNVVMSupportedNumericValueType(canonicalType) || aggregateStorageArrayType ||
                deviceCopyablePointer || devicePhysicalStoragePointer || isRawBuffer ||
                parameterGroup || isSurface || isSampledTexture || samplerStorage ||
                unsizedSamplerArrayStorage || atomicType || descriptorHandle ||
@@ -3219,7 +3226,9 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             deviceHelperPointerValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType,
-            deviceCopyablePointer ? NVVMTypeUse::Value : NVVMTypeUse::HelperValue);
+            (deviceCopyablePointer || asNVVMSupportedAtomicType(deviceHelperPointerValueType))
+                ? NVVMTypeUse::Value
+                : NVVMTypeUse::HelperValue);
     }
 
     // Consider `half3 rearrange(half4 value) { return value.zwx; }`. The caller and callee retain
@@ -3306,7 +3315,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
         return lowerCUDAValueType(layout, outType, storageType);
     }
 
-    if (use == NVVMTypeUse::EntryPointParameter && resourceStructType)
+    if (use == NVVMTypeUse::EntryPointParameter && (resourceStructType || fixedResourceArrayType))
     {
         if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
         {
@@ -3424,8 +3433,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
 
     if (use == NVVMTypeUse::ParameterGroupStorage &&
-        (isInteger || isFloat32 || isFloat16 ||
-         (typeInfo.numeric32VectorType && !compactParameterGroupVectorType) ||
+        ((isNVVMSupportedNumericValueType(type) && !compactParameterGroupVectorType) ||
          typeInfo.scalarStructType || physicalArrayStructType))
     {
         return lowerType(type, NVVMTypeUse::Value, outType);

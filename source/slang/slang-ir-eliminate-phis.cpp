@@ -59,6 +59,49 @@
 namespace Slang
 {
 
+// Writes an aggregate update into its selected temporary. Register allocation may prove that
+// the temporary already contains the old value; independent value updates must copy it first.
+static void emitUpdateElementStores(
+    IRBuilder& builder,
+    IRUpdateElement* update,
+    IRInst* temporary,
+    bool copyOldValue)
+{
+    if (copyOldValue)
+        builder.emitStore(temporary, update->getOldValue());
+    auto element = builder.emitElementAddress(temporary, update->getAccessChain().getArrayView());
+    builder.emitStore(element, update->getElementValue());
+}
+
+void lowerUpdateElements(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto global : module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(global);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst;)
+            {
+                auto next = inst->getNextInst();
+                if (auto update = as<IRUpdateElement>(inst))
+                {
+                    builder.setInsertBefore(update);
+                    auto temporary = builder.emitVar(update->getDataType());
+                    emitUpdateElementStores(builder, update, temporary, true);
+                    // Capture the value here. Later uses, including loop edges, observe this
+                    // snapshot rather than a load moved across another execution of the update.
+                    update->replaceUsesWith(builder.emitLoad(temporary));
+                    update->removeAndDeallocate();
+                }
+                inst = next;
+            }
+        }
+    }
+}
+
 struct PhiEliminationContext
 {
     // We are going to make some effort to re-use intermediate structures across
@@ -171,15 +214,7 @@ struct PhiEliminationContext
                         oldReg);
                     // If the original value is not assigned to the same register as this inst,
                     // we need to insert a copy.
-                    if (reg != oldReg)
-                    {
-                        builder.emitStore(registerVar, updateInst->getOldValue());
-                    }
-                    // Perform update on the register var.
-                    auto elementAddr = builder.emitElementAddress(
-                        registerVar,
-                        updateInst->getAccessChain().getArrayView());
-                    builder.emitStore(elementAddr, updateInst->getElementValue());
+                    emitUpdateElementStores(builder, updateInst, registerVar, reg != oldReg);
                 }
                 break;
             default:

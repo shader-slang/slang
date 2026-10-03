@@ -27,6 +27,10 @@ void eliminatePhis(LivenessMode livenessMode, IRModule* module, PhiEliminationOp
 // Overload that takes IRModule* first for use with SLANG_PASS macro
 void eliminatePhis(IRModule* module, LivenessMode livenessMode, PhiEliminationOptions options);
 
+/// Lower immutable aggregate updates to local storage without changing SSA block parameters.
+/// Run before physical storage legalization so new temporaries receive the target's layout.
+void lowerUpdateElements(IRModule* module);
+
 void eliminatePhisInFunc(
     LivenessMode livenessMode,
     IRModule* module,

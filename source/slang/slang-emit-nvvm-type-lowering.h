@@ -134,6 +134,9 @@ IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 /// Returns a nonempty struct recursively composed of selected values and CUDA resource values.
 IRStructType* asNVVMSupportedResourceStructType(IRInst* type);
 
+/// Returns whether a resource record or fixed resource array has a by-value CUDA entry ABI.
+bool isNVVMSupportedResourceAggregateType(IRInst* type);
+
 /// Returns an exact nonempty fixed array in the recursive copyable-value algebra.
 IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElementCount = nullptr);
 

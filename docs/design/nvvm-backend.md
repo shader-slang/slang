@@ -419,6 +419,31 @@ Matrix orientation is selected before matrix value legalization; compact vector 
 CUDA system values. OptiX register payload packing and its entry-point prerequisites run before
 matrix storage lowering so physical column order cannot change the payload ABI.
 
+Default uniform parameter groups use the same CUDA numeric storage policy and finite value cache
+as local and structured-buffer objects. Readonly group borrows require identical pointees and
+proven storage/value layout identity; pointer-bearing representation mismatches remain rejected. Replacing a collected
+uniform struct preserves its synthesized-parameter-group marker; address plans retain that storage
+role through mutable local copies and nested fields. Packed byte-vector chunks are storage leaves,
+not a new ByteAddressBuffer element contract. Fixed resource arrays cross compute entry parameters
+through the existing checked aggregate/byval representation. Acceleration handles remain opaque
+64-bit leaves in resource records and parameter groups.
+
+Immutable aggregate updates from AD lower to a private temporary, an exact field/index chain, and
+an immediate value snapshot before physical storage legalization. SSA block parameters remain
+intact. Dynamic LLVM array extraction uses a nonescaping local snapshot at the read, with lifetime
+markers; narrow indices zero-extend before pointer arithmetic. Constant array extracts and dynamic
+Boolean-vector extracts retain their existing forms. The qualified CUDA12.9 path assigns these
+fixed-size read temporaries to a fixed local frame at O0/O3. Entry-hoisted snapshots and select-chain
+reads exposed a vendor optimizer stall in reverse AD; both failed attempts remain in the evidence.
+This is an LLVM-dialect adaptation, not a bounds check or a generic LLVM stack-allocation guarantee.
+
+Generic specialization names encode canonical linked leaves and framed structural IR arguments,
+including type and literal payload. Diagnostic display hints are not symbol identity. Unlinked
+nominal values, unresolved parameters and child-bearing witnesses retain private IR identity; only
+clone-owned linkage can be replaced or removed. Specialization returning an existing operand must
+preserve that operand's linkage. Unused exported zero-state type declarations do not impose an
+executable ABI; used types still pass their role-specific admission checks.
+
 TensorView lowering replaces the magic type after AD/tuple lowering with one ordinary descriptor:
 a 64-bit address, five 32-bit byte strides, five 32-bit sizes and a 32-bit rank, followed by explicit
 padding to the host ABI's 56 bytes/alignment 8. Four typed queries become exact field/element

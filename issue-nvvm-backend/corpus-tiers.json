@@ -334,6 +334,142 @@
         "tests/cuda/nvvm-static-context-array-addressing.slang"
       ],
       "rationale": "Same source and independent eight-word oracle; mutable nested static arrays retain per-thread address provenance on all authored modes."
+    },
+    {
+      "id": "cuda/nvvm-aggregate-value-updates.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-aggregate-value-updates.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-aggregate-value-updates.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-aggregate-value-updates.slang#cuda-2",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-aggregate-value-updates.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-aggregate-value-updates.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-dynamic-array-snapshots.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-specialized-pointer-identity.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-specialized-pointer-identity.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-specialized-pointer-identity.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-application-values",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-specialized-pointer-identity.slang"
+      ],
+      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
     }
   ],
   "smoke": [

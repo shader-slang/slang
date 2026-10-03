@@ -93759,6 +93759,607 @@
         "reviewer": "/root/remaining_rhi_analysis",
         "result": "Source/test/docs approved; exact final evidence reviewed before commit."
       }
+    },
+    "nvvm-application-values": {
+      "status": "accepted-focused",
+      "completion": "Stopped after resolving all remaining SlangPy failures",
+      "identity": {
+        "source_base": "9989cfa4772f428bc108c40fc46200f107673f0b",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "09275839569c9ce61779143da25e65d4108ce88df286a66cee50e33ef6432b02",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "4aac52ab3624cdcededa5bf4203c6664ba28e6b2c1bb3b40f25e2b8d4f6decc3",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "1f129ac0146b1fe1ae7fe41aef3aba348ff7293a27719132814051ca3dc0ee36",
+          "source/slang/slang-emit-nvvm.cpp": "aa6ce83022e2db96926cc210ed46f7cfe81adb6410ce162a9ade52ee5991e485",
+          "source/slang/slang-emit.cpp": "809eb77f53b391da589ae18e7194514d4af38a52cbb8d2a5e92f846f8f3cb06c",
+          "source/slang/slang-ir-clone.cpp": "981ab7e20fbb6b62ee077d04b315ed8d9d642331adc158c788297435d4ae7e72",
+          "source/slang/slang-ir-eliminate-phis.cpp": "c894ba6b7f75025aadb0e42d77c5a3f366e0cec775425841b1a709d8f20865bd",
+          "source/slang/slang-ir-eliminate-phis.h": "ecd163de17f412df64ebe30abda200b312af1711c194afa3943ae9994c831196",
+          "source/slang/slang-ir-lower-buffer-element-type.cpp": "9ee51f72606b2d43786c281bcd90be8df7becadc35b69f6c988c7f8980e24141",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "ced6841dddfd3f7e67cd359018031c1a941c157d6c46a4e85f6b203e7d96a82a",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "514706e034f9ee480d04d79089d559636daa92a33dce93f289d0f12c2572672e",
+          "tools/slang-unit-test/unit-test-nvvm-source-fixtures.h": "4355e1fddf52f5bfb1125709c6073ad37170e9c2d4ddf770cc84db5d2949961c",
+          "tests/cuda/nvvm-aggregate-value-updates.slang": "d36000586f75dd20f64440619ef609d7b85ef674db485aef488bcdab1e24a770",
+          "tests/cuda/nvvm-dynamic-array-snapshots.slang": "ca842e2361e3d70d4596061e2deffb12175eaf043ae5bddb7de79f117d5627b3",
+          "tests/cuda/nvvm-specialized-pointer-identity.slang": "c9090da208e9d815f555820aafc3b4ed47ce75fc2b4000b63a031b997aa7e3f8",
+          "tests/cuda/nvvm-specialized-pointer-module.slang": "2e9008e73184e3d7e48e084d59d9f45644a42d7951215e5a6da7551abf792235",
+          "../slangpy/slangpy/tests/slangpy_tests/test_type_resolution.py": "28beac26ac8628b98bcbb511499595554e19936f0e15724c3457a8512aeaa75f"
+        },
+        "binaries_sha256": {
+          "build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "bd3bac76469523a6f515a43161cbba1ecb2f41d051d101f7cbd02dd820ce7474",
+          "build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "689f9518b8ebdb36558e51e70179695f7f282ef5722e4deed513843a4eba1e4d",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "61fb10c4be402d69fd778c64d0b83a22c068dac304d25db15f979f36de591486",
+          "build/nvvm-slangpy/native/RelWithDebInfo/libsgl.so": "2d6013b064991b97cd630165919ef5f5274810b883eddb4d418e73ce78f3d3cb",
+          "build/nvvm-slangpy/python/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "a92b4c1bb352bc7c1d9267338cb665ff96939bd469c9e3bb868994778fa5fe21",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "1263f34ff1364709aeb941ebd71c34681312f52422158ef5dcc2b5b994d968be",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "0f14d3a88f64f6c9c3eeb4f2bb8eb407f9ab7ebe8d7b687755d0832c511ea765",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "2b221dffaaefde8ab09ab6d6d7ae3b18aba6b0dc470d7f9f4de6b8ddeb4774db",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "ce04dc87035ce5202a9973e8fb7d30587fa9fb7488a5ba317f034fca3e050133",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "fc6f14d82a6569953a91c700c2ea840117c59465e9767fa16bbdf462caec7e1d",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "4c5591e831a905cf03576afbc20c3f2f54b6363703288624330d4f4c7e143f5e"
+        },
+        "preserved_original_package": {
+          "/home/skallweit/codex/agent-sandbox/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "0d76f636401dec6047957b4873bad2ef2c43350e324b13680a8f42aa96915ad9",
+          "/home/skallweit/codex/agent-sandbox/slangpy/slangpy/.build_dir": "e10972ce731afd4625ddbb99b0dbadb881b635e4f0150b2a7a77993dca3a93fd"
+        },
+        "protected_shader_sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e",
+        "scope": "Compiler/provider and matching standard modules build17; unit library build18. Final readonly group qualification and canonical Uniform CUDA cache included. Fresh final smoke/application runs use this identity; working checkpoint retains build13 plus exact build17 repairs."
+      },
+      "identity_record": {
+        "path": "build/nvvm-application-values/identity-accepted.json",
+        "sha256": "3a0b3c0aec97ef48b48db7781ed3e78988125c8b311d835b89f2b86fc4894882"
+      },
+      "architecture": "docs/design/nvvm-backend.md",
+      "contracts": [
+        "Canonical generic specialization identity with clone-owned linkage; independent nominal/local identities retained.",
+        "Default/CUDA pointer qualification with identical pointee/layout proof; fixed resource arrays and opaque acceleration handles compose through explicit value/storage/entry roles.",
+        "Uniform CUDA physical storage preserves synthesized parameter-group marker and packed numeric leaves; ByteAddress admission unchanged.",
+        "Canonical immutable AD UpdateElement lowers before physical storage with immediate snapshots, preserving SSA phis.",
+        "Dynamic array extraction uses read-local snapshots/lifetimes and zero-extended indices; fixed-frame CUDA12.9 O0/O3 qualification is observed behavior.",
+        "RGB metadata fixture uses production type factory/TextureMarshall without physical allocation or execution claim."
+      ],
+      "validation": {
+        "slangpy_full": {
+          "path": "build/nvvm-application-values/slangpy-full2.json",
+          "sha256": "15645641224326680a218df719cc780f2e0fe504688a74a6ea3cd87d4702e7fb",
+          "return_code": 0,
+          "elapsed_seconds": 117.49661827087402
+        },
+        "slangpy_counts": {
+          "passed": 1591,
+          "failed": 0,
+          "skipped": 807,
+          "xfailed": 3,
+          "test_nodes": 2401,
+          "module_skips": 14
+        },
+        "exact_comparison": {
+          "previous_passes_preserved": 1561,
+          "previous_failures_resolved": 29,
+          "new_rgb_uint_metadata_pass": 1,
+          "removed_nodes": 0,
+          "regressions": 0,
+          "changed_skip_or_xfail_outcomes": 0
+        },
+        "source_controls": {
+          "gate": {
+            "path": "build/nvvm-application-values/source-controls2.json",
+            "sha256": "0aa9d89c8bab453a48fe3dc59643ee168e204592db80bfa744537f5c1052f99b",
+            "return_code": 0,
+            "elapsed_seconds": 8.881874084472656
+          },
+          "passed": 16,
+          "ignored": 1,
+          "outcomes": {
+            "tests/cuda/nvvm-aggregate-value-updates.slang (cuda)": "passed",
+            "tests/cuda/nvvm-aggregate-value-updates.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-aggregate-value-updates.slang.2 (cpu)": "passed",
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang (cuda)": "passed",
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-specialized-pointer-identity.slang (cuda)": "passed",
+            "tests/cuda/nvvm-specialized-pointer-identity.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-specialized-pointer-identity.slang.2 (cuda)": "passed",
+            "tests/language-feature/interfaces/local-generic-conformance-13092.slang (cpu)": "passed",
+            "tests/language-feature/interfaces/local-generic-conformance-13092.slang.1 syn (cuda)": "passed",
+            "tests/language-feature/lambda/lambda-in-generic-func.slang": "passed",
+            "tests/language-feature/tuple/tuple-autodiff.slang.1 (vk)": "passed",
+            "tests/language-feature/tuple/tuple-autodiff.slang.2 (cpu)": "passed",
+            "tests/language-feature/tuple/tuple-autodiff.slang.3 syn (llvm)": "passed",
+            "tests/language-feature/tuple/tuple-autodiff.slang.4 syn (cuda)": "passed"
+          },
+          "scope": "Build11/compiler and build12/provider, before whitespace-only formatting rebuild13. Final compiler additionally repairs readonly uniform forwarding/cache identity; that change has its own focused gates."
+        },
+        "nvvm_units": {
+          "full": {
+            "path": "build/nvvm-application-values/units1.json",
+            "sha256": "2f8227ac445da011b2236b208819ff090cb5a7cd6fd9988ebfee663f5f7ca8d1",
+            "return_code": 1,
+            "elapsed_seconds": 220.7671902179718
+          },
+          "passed": 564,
+          "failed": 4,
+          "exact_repairs": {
+            "path": "build/nvvm-application-values/unit-repairs2.json",
+            "sha256": "fd5a42fdfaff26f40f4491e05856af1d0284b7c5e5546b8b1e879067f113ecc8",
+            "return_code": 0,
+            "elapsed_seconds": 5.139786243438721
+          },
+          "repaired": 4,
+          "scope": "Full568unitrun plus exact4test-only repairs, not a fresh all-green full unit run."
+        },
+        "smoke": {
+          "gate": {
+            "path": "build/nvvm-application-values/smoke-gate2.json",
+            "sha256": "e6e379f93f0ff3015c7b099ce7809e2e81904399ffc881dafc55df16499084aa",
+            "return_code": 0,
+            "elapsed_seconds": 22.045814275741577
+          },
+          "selection": {
+            "path": "build/nvvm-application-values/smoke2/selection.json",
+            "sha256": "907a84c8524e2348f0eca019f46a287e7e14f02ba3c7c6f92a89cc83946f9316"
+          },
+          "passed": 16
+        },
+        "working": {
+          "gate": {
+            "path": "build/nvvm-application-values/working-gate1.json",
+            "sha256": "b703a65b6fbb2e55f4b22a8275bbae734954c40dfe53b673f44132a9f98e73b2",
+            "return_code": 1,
+            "elapsed_seconds": 1082.774235010147
+          },
+          "selection": {
+            "path": "build/nvvm-application-values/working1/selection.json",
+            "sha256": "b14d155c9b82ad3a50bb29dd0f8df5721b7827fa1a29c18662698d0886e2c699"
+          },
+          "selected_count": 1716,
+          "passed": 1714,
+          "failed": 2,
+          "original_regressions": [
+            {
+              "id": "optimization/arrray-storage-lowering.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'call argument type: cbuffer<Params_default_logical_default_logical> -> BorrowInParam<Params_default_logical_default_logical, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>'",
+                "canonical_shape": "call argument type"
+              }
+            },
+            {
+              "id": "optimization/arrray-storage-lowering.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'call argument type: cbuffer<Params_default_logical_default_logical> -> BorrowInParam<Params_default_logical_default_logical, addressSpace=2147483647, access=1, operands=4, layout=DefaultLayout>'",
+                "canonical_shape": "call argument type"
+              }
+            }
+          ],
+          "input_changes": [],
+          "source_identity_warning": "inputs changed during execution: ['/home/skallweit/codex/agent-sandbox/slang/source/slang/slang-emit-nvvm.cpp']",
+          "exact_repairs": {
+            "gate": {
+              "path": "build/nvvm-application-values/working-repair3.json",
+              "sha256": "e2aeef7402c3aff4b8ceae7b6e45d801051fa79c46a9083f1f0cac00a20ba36e",
+              "return_code": 0,
+              "elapsed_seconds": 3.5606048107147217
+            },
+            "results": {
+              "path": "build/nvvm-application-values/working-repair3/results.json",
+              "sha256": "6bfc6a0e93f2989bcbce4715c0a2c2cd4e5e4e1bf03830adf46616e6c90f7e67"
+            },
+            "outcomes": [
+              {
+                "id": "optimization/arrray-storage-lowering.slang#discovery-1",
+                "source": "optimization/arrray-storage-lowering.slang",
+                "source_line": 2,
+                "source_test_ordinal": 1,
+                "cuda_ordinal": 1,
+                "mode": "nvvm-o0",
+                "capability": "cuda_sm_8_0",
+                "reference_derived_from_direct": false,
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "elapsed_ms": 1673,
+                "diagnostic": "",
+                "canonical_shape": "",
+                "log": "build/nvvm-application-values/working-repair3/logs/nvvm-o0/4f1255decd5e6cab8088e4212a8475dee0d7ea46.log"
+              },
+              {
+                "id": "optimization/arrray-storage-lowering.slang#discovery-1",
+                "source": "optimization/arrray-storage-lowering.slang",
+                "source_line": 2,
+                "source_test_ordinal": 1,
+                "cuda_ordinal": 1,
+                "mode": "nvvm-o3",
+                "capability": "cuda_sm_8_0",
+                "reference_derived_from_direct": false,
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "elapsed_ms": 1615,
+                "diagnostic": "",
+                "canonical_shape": "",
+                "log": "build/nvvm-application-values/working-repair3/logs/nvvm-o3/c58feb975149093c99c09b725e85192bd8d902ec.log"
+              }
+            ]
+          },
+          "scope": "Full observed build13 outcomes plus exact two SM80 repairs on build17; not a fresh all-green full checkpoint. Source-only repair was edited while the full run executed; no binary rebuild until it completed. Original failed status and warning are retained."
+        },
+        "slangpy_precommit": {
+          "log": {
+            "path": "build/nvvm-application-values/slangpy-precommit1.log",
+            "sha256": "6a3cd73f1b2e9218264b1a8fda2c8f5d2d5e3d877a89bb571dea8896100b9d2e"
+          },
+          "result": "all hooks passed"
+        },
+        "narrow_index": {
+          "gate": {
+            "path": "build/nvvm-application-values/array-index-probe.json",
+            "sha256": "60cdfdcebe9533e4a78a298b9db9419984e1dcfbdcd7d065ad0d061708771c03",
+            "return_code": 0,
+            "elapsed_seconds": 0.3204162120819092
+          },
+          "llvm": {
+            "path": "build/nvvm-application-values/array-index1.llvm-ir-asm",
+            "sha256": "768544ed935c5f9bb8a3aec9d9d4b52a87183906ef5bcb1fd57f69e3911db091"
+          },
+          "contract": "readLane takesi8; zexti8toi64 before GEP; runtimeindex200passes."
+        },
+        "readonly_controls": {
+          "gate": {
+            "path": "build/nvvm-application-values/readonly-controls2.json",
+            "sha256": "15e904861e024fd879b4c19383ab95fec16b862fb86c506d122580521dfb9d91",
+            "return_code": 0,
+            "elapsed_seconds": 2.8493402004241943
+          },
+          "passed": 5,
+          "scope": "Includes pointer-bearing method borrow rejection before provider creation, readonly nested-store and layout-pointer controls."
+        }
+      },
+      "failure_history": {
+        "attempts": {
+          "ad-build6": {
+            "path": "build/nvvm-application-values/ad-build6.json",
+            "sha256": "1308b225fb2368f31b033b996706be2a21ce97d722f41c701204da3800d63c59",
+            "return_code": 124,
+            "elapsed_seconds": 25.301912784576416
+          },
+          "ad-capture": {
+            "path": "build/nvvm-application-values/ad-capture.json",
+            "sha256": "97637ff7d69ff7530753e014557d04d11f1ad304b8696c8f15857a4bd213c644",
+            "return_code": 124,
+            "elapsed_seconds": 20.36382031440735
+          },
+          "ad-live": {
+            "path": "build/nvvm-application-values/ad-live.json",
+            "sha256": "5fc9f28e25744d57261bf5b06e352ccd2ced5e6295a353abcc738f93a6e04956",
+            "return_code": 1,
+            "elapsed_seconds": 0.9965646266937256
+          },
+          "ad-live2": {
+            "path": "build/nvvm-application-values/ad-live2.json",
+            "sha256": "8f00190a491e683ce4065352f68e3118f4cdcdd4e1ee113f7120fdd79e875737",
+            "return_code": 124,
+            "elapsed_seconds": 25.320404052734375
+          },
+          "ad-new-capture": {
+            "path": "build/nvvm-application-values/ad-new-capture.json",
+            "sha256": "2d68eb7e4b1193eb02040d67a81af4a16cdc40e72fc779801e838418a75ecd6f",
+            "return_code": 124,
+            "elapsed_seconds": 20.389005184173584
+          },
+          "ad-stall": {
+            "path": "build/nvvm-application-values/ad-stall.json",
+            "sha256": "b759c182a44179f3f8880979f37baa0aefe7052d02f5997a569f64ef102187cd",
+            "return_code": 124,
+            "elapsed_seconds": 21.420583724975586
+          },
+          "build14": {
+            "path": "build/nvvm-application-values/build14.json",
+            "sha256": "874fb93e50328bf2655df5a18299fd50f05c2ed406a27a6a89163cae389dca3b",
+            "return_code": 1,
+            "elapsed_seconds": 3.4359018802642822
+          },
+          "build8": {
+            "path": "build/nvvm-application-values/build8.json",
+            "sha256": "f3b45c32c476970b6070bd621baef0de1d0b4912b7b91b645f660f6e81a5e4b8",
+            "return_code": 1,
+            "elapsed_seconds": 0.13434815406799316
+          },
+          "build9": {
+            "path": "build/nvvm-application-values/build9.json",
+            "sha256": "198aaa9d810d47952db53e051716a24dcca3274caef193d74355c141fc543637",
+            "return_code": 1,
+            "elapsed_seconds": 15.73011302947998
+          },
+          "cursor-before": {
+            "path": "build/nvvm-application-values/cursor-before.json",
+            "sha256": "e62f323c51b71bb141dde8853f375bab78cc39b65f169c42b506f0398876ac4b",
+            "return_code": 255,
+            "elapsed_seconds": 0.4076731204986572
+          },
+          "cursor-lifetime": {
+            "path": "build/nvvm-application-values/cursor-lifetime.json",
+            "sha256": "f5f2c092b426b94341b57b5264a44f76374d71dabd4c4bcb21ae11f05d247a7d",
+            "return_code": 255,
+            "elapsed_seconds": 0.4102792739868164
+          },
+          "cursor-probe2": {
+            "path": "build/nvvm-application-values/cursor-probe2.json",
+            "sha256": "6938122c13e43c068f2c4a5a9ca271881ddaa8dc5443f6213ad76cb2f4c6750e",
+            "return_code": 255,
+            "elapsed_seconds": 0.4088001251220703
+          },
+          "empty-before": {
+            "path": "build/nvvm-application-values/empty-before.json",
+            "sha256": "9c7798bdb783a7d40fbba0c0b31c11b379ebf2bbd2c4c6fadf0a3d84f3cb9d3b",
+            "return_code": 255,
+            "elapsed_seconds": 0.3126358985900879
+          },
+          "ir-all-value-update": {
+            "path": "build/nvvm-application-values/ir-all-value-update.json",
+            "sha256": "dc14fd6738bf6fdb6e04bdc57514be38bd83ce063f4af4d9e99082e4250481d4",
+            "return_code": 124,
+            "elapsed_seconds": 10.005107402801514
+          },
+          "ir-defined-fallback": {
+            "path": "build/nvvm-application-values/ir-defined-fallback.json",
+            "sha256": "2c42e67bb8bb88b1e4f2bac473a93af4a648a730ead41652051e4b6f6508f553",
+            "return_code": 124,
+            "elapsed_seconds": 10.004682540893555
+          },
+          "ir-lifetimes": {
+            "path": "build/nvvm-application-values/ir-lifetimes.json",
+            "sha256": "d297ceabcf0335f64d008a312d685efd7fd1bc4d6f51f3bfd5a046836b67472d",
+            "return_code": 124,
+            "elapsed_seconds": 10.005433082580566
+          },
+          "ir-no-forward": {
+            "path": "build/nvvm-application-values/ir-no-forward.json",
+            "sha256": "b265bf17ee0120f6e5f16f5a65f3087334c6501ed66798b0d7ff4053053f0875",
+            "return_code": 124,
+            "elapsed_seconds": 8.005358695983887
+          },
+          "ir-o3": {
+            "path": "build/nvvm-application-values/ir-o3.json",
+            "sha256": "389fbc0ed90507722833113f3defa555417c9f18df40b67e27a96a1e11bf7fc7",
+            "return_code": 124,
+            "elapsed_seconds": 10.005712985992432
+          },
+          "ir-value-update": {
+            "path": "build/nvvm-application-values/ir-value-update.json",
+            "sha256": "37b5bb48eb82a792b8babef7ae1b64c73d73a55b166ed007d0816f0f5244a190",
+            "return_code": 124,
+            "elapsed_seconds": 12.005203247070312
+          },
+          "nested-before": {
+            "path": "build/nvvm-application-values/nested-before.json",
+            "sha256": "f230a4da4ba58deeeef2d7105f15facfaa85230a8731ed9f0d4265d1c3ed9096",
+            "return_code": 255,
+            "elapsed_seconds": 0.3159468173980713
+          },
+          "pointer-before": {
+            "path": "build/nvvm-application-values/pointer-before.json",
+            "sha256": "20b6477558689a737d6988e521f1adac3aa2c8d47d05ad6b8a22fa64ec741d0d",
+            "return_code": 255,
+            "elapsed_seconds": 0.29603099822998047
+          },
+          "readonly-controls1": {
+            "path": "build/nvvm-application-values/readonly-controls1.json",
+            "sha256": "ad26832763085350b10d3bc0a6dd3a48f5f4478866bd69448a01cd0828138c07",
+            "return_code": 1,
+            "elapsed_seconds": 3.730323314666748
+          },
+          "readonly-ir": {
+            "path": "build/nvvm-application-values/readonly-ir.json",
+            "sha256": "23dde2ba0c9f2f8755750bb96d3eb807dbf8601839a57555fabbbb3440390c25",
+            "return_code": 255,
+            "elapsed_seconds": 0.29201221466064453
+          },
+          "readonly-pointer-baseline": {
+            "path": "build/nvvm-application-values/readonly-pointer-baseline.json",
+            "sha256": "efdfc01f134c35906701e15e5c050a4bd8cf328c6f905cef5c32841665173142",
+            "return_code": -11,
+            "elapsed_seconds": 0.3607335090637207
+          },
+          "readonly-pointer-field": {
+            "path": "build/nvvm-application-values/readonly-pointer-field.json",
+            "sha256": "f938f58cc5ed0348e444837687c0935367262b76650692d00cabf1d502bb04c7",
+            "return_code": -11,
+            "elapsed_seconds": 0.26232147216796875
+          },
+          "readonly-pointer-method": {
+            "path": "build/nvvm-application-values/readonly-pointer-method.json",
+            "sha256": "f72e0d03f1777b156251763dd591b0e3b3f7635518e35e09a7e859ceb741d157",
+            "return_code": 255,
+            "elapsed_seconds": 0.27257800102233887
+          },
+          "readonly-pointer-nvrtc": {
+            "path": "build/nvvm-application-values/readonly-pointer-nvrtc.json",
+            "sha256": "5ee53767d7475e850a70ff44f51d265917039fea423b51a4856112896587e598",
+            "return_code": -11,
+            "elapsed_seconds": 0.2732059955596924
+          },
+          "readonly-pointer-probe": {
+            "path": "build/nvvm-application-values/readonly-pointer-probe.json",
+            "sha256": "e365a8b8b108467050c75e7be82faa9cc2834a07249f9c6a2180d5414334a3c2",
+            "return_code": -11,
+            "elapsed_seconds": 0.2714266777038574
+          },
+          "selected1": {
+            "path": "build/nvvm-application-values/selected1.json",
+            "sha256": "f30dff45db2329b485f0b122672ba49c07cb252b70d763e29328a294377c188a",
+            "return_code": 1,
+            "elapsed_seconds": 8.828844547271729
+          },
+          "selected2": {
+            "path": "build/nvvm-application-values/selected2.json",
+            "sha256": "a5ac8982fa240bc014015129c969ca0fbdc63f4801d8407afd7f340b5afa1e65",
+            "return_code": 1,
+            "elapsed_seconds": 8.67305064201355
+          },
+          "selected3": {
+            "path": "build/nvvm-application-values/selected3.json",
+            "sha256": "e19716cb11f42077be2527ff3d23c4227a8c8fefcc1560e4baa4f21f0651060b",
+            "return_code": 1,
+            "elapsed_seconds": 8.878359317779541
+          },
+          "selected4": {
+            "path": "build/nvvm-application-values/selected4.json",
+            "sha256": "236ea1ca0a1aa4ee44b2d49e6575c436250022a08c0ff94347e20ff9218bc397",
+            "return_code": 1,
+            "elapsed_seconds": 9.033976554870605
+          },
+          "selected5": {
+            "path": "build/nvvm-application-values/selected5.json",
+            "sha256": "533d1f3f50fd1e29615f3042ec0401d5aec5ec6606727c1b7658d92d8e2efd7b",
+            "return_code": 2,
+            "elapsed_seconds": 102.63902187347412
+          },
+          "selected6": {
+            "path": "build/nvvm-application-values/selected6.json",
+            "sha256": "7b74b6cb4f18c31de7ca22e791198b08732dbfe312d7eaa97c26df373d5ef82f",
+            "return_code": 1,
+            "elapsed_seconds": 4.206954479217529
+          },
+          "selected7": {
+            "path": "build/nvvm-application-values/selected7.json",
+            "sha256": "ae905033c31a6c08a4106c20da3920bc2e9e6dc5814b19d5b8ecdec1db9adeab",
+            "return_code": 1,
+            "elapsed_seconds": 5.0568742752075195
+          },
+          "selected8": {
+            "path": "build/nvvm-application-values/selected8.json",
+            "sha256": "0f2b9bc19c35fcbbc8a49e7265cdef5f8a82f2345b4ff63b8aac4d7b061c2456",
+            "return_code": 2,
+            "elapsed_seconds": 90.50921082496643
+          },
+          "selected9": {
+            "path": "build/nvvm-application-values/selected9.json",
+            "sha256": "08d11ada1037ade1b4fa1dd113b97f46038e7c736b34f9a38d32dddd24e61d38",
+            "return_code": 1,
+            "elapsed_seconds": 8.010900020599365
+          },
+          "source-controls1": {
+            "path": "build/nvvm-application-values/source-controls1.json",
+            "sha256": "0d96b36351a3342d87c5864656a89052e284c28fd27a583ae95e5412b24adc5e",
+            "return_code": 1,
+            "elapsed_seconds": 8.363282680511475
+          },
+          "symbol-before": {
+            "path": "build/nvvm-application-values/symbol-before.json",
+            "sha256": "944373dc14f6da21d4167c5b6084173cfa08086003366da40729c6642a70808a",
+            "return_code": 255,
+            "elapsed_seconds": 1.9646062850952148
+          },
+          "unit-repairs1": {
+            "path": "build/nvvm-application-values/unit-repairs1.json",
+            "sha256": "ebd686b603f4a7155332941bb5cbf5af1f51e58943cbed64b8c3d5c269952a22",
+            "return_code": 1,
+            "elapsed_seconds": 4.917836427688599
+          },
+          "units1": {
+            "path": "build/nvvm-application-values/units1.json",
+            "sha256": "2f8227ac445da011b2236b208819ff090cb5a7cd6fd9988ebfee663f5f7ca8d1",
+            "return_code": 1,
+            "elapsed_seconds": 220.7671902179718
+          },
+          "working-gate1": {
+            "path": "build/nvvm-application-values/working-gate1.json",
+            "sha256": "b703a65b6fbb2e55f4b22a8275bbae734954c40dfe53b673f44132a9f98e73b2",
+            "return_code": 1,
+            "elapsed_seconds": 1082.774235010147
+          },
+          "working-repair1": {
+            "path": "build/nvvm-application-values/working-repair1.json",
+            "sha256": "8a51827889d892b6f050429818f2526315326242a6c120daf767d9d526a611fb",
+            "return_code": 1,
+            "elapsed_seconds": 2.6036839485168457
+          }
+        },
+        "explanations": [
+          "selected1-10 preserve cumulative root-cause progression; all29originalcases pass inselected10. selected5/8 interrupted vendor optimization stalls retain partial XML.",
+          "Captured AD LLVM:opt3select-chain/entry-hoisted snapshots time out; opt0/noinline and point-of-read snapshots compile. No noinline/volatile/optimization-disable workaround retained.",
+          "LLVM14 lifetime immarg/attributes caused17selected9parsefailures; exact dialect adaptation resolves them.",
+          "Initial new snapshot regression rejected a narrow array write; uint32 write isolates the new uint8 value-read contract, confirmed by LLVM and runtime.",
+          "Full units564/568; promote compactuniform oldnegative to realprovider positive, replace fake nestedtype assumptions, update dynamicread assertion, fix inherited surface recorder count typos. Firstrepairrun exposed overbroadfloat3assertion for physicalwhole-recordhelper and second surfacetypos; exactload/signature assertions and bothsurfacecounts nowpass.",
+          "build14 unit compilation failed using compile-time toSlice on runtimeconstchar*; corrected to existing UnownedStringSlice. Earlierbuild8wrongtarget/build9macroerror retained.",
+          "Identity filename before-build13 was captured after build completion; its explicit scope disclaims prebuild identity. Finalfreshfull uses separately captured exactidentity.",
+          "Working full1716:1714passed and readonly uniform method failed at O0/O3. Existing helper-reference admission now proves readonly producer/pointee/storage/layout identity and uses AS1-to-AS0 adaptation. That exposed duplicate nested nominal types: extend the existing finite CUDA storage cache to Uniform at the producer. Four source controls and exact2SM80cells nowpass.",
+          "The corpus runner also detected slang-emit-nvvm.cpp source-only edits during execution. All executions retained build13 binaries; build16 started only after the run completed. Preserve the runner error and original failures; acceptance uses observed full outcomes plus exactrepairs, not a relabeled fresh green checkpoint.",
+          "A new explicit free __constref pointer-bearing cbuffer probe crashes in shared typeflow before NVVM; current CUDA source and the preserved upstream2026.18.3 compiler also crash. The canonical readonly method form reaches the intended NVVM storage rejection and is the permanent no-mutation control. The inherited explicit-call crash remains separately recorded, outside the passing SlangPy inventory."
+        ]
+      },
+      "limits": [
+        "No physical CUDA RGB textures, Torch, all-platform SlangPy or general bounds/lifetime analysis claim.",
+        "Legacy OptiX8 HitObject decision remains parked; no arbitrary MakeHit change.",
+        "Original combined generic handle fixture has not been rerun; only imported pointer/wrapper naming cases qualified.",
+        "No fullRHI/native/surface/material campaign. Working corpus keeps original1716cells;8new authored runtime cells admitted from focused evidence after this checkpoint."
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Final code/test diff approved; exactcompactloads/helperABI,narrowindexLLVM and no-mutation contracts checked."
+      },
+      "inherited_exploratory_failure": {
+        "status": "unresolved; outside SlangPy suite",
+        "source": {
+          "path": "build/nvvm-application-values/readonly-pointer.slang",
+          "sha256": "5d3d01d5b6d1a8004314a454d5fde99484779fb59206ee38475414a1d5ec1b78"
+        },
+        "current_nvvm": {
+          "path": "build/nvvm-application-values/readonly-pointer-probe.json",
+          "sha256": "e365a8b8b108467050c75e7be82faa9cc2834a07249f9c6a2180d5414334a3c2",
+          "return_code": -11,
+          "elapsed_seconds": 0.2714266777038574
+        },
+        "current_cuda": {
+          "path": "build/nvvm-application-values/readonly-pointer-nvrtc.json",
+          "sha256": "5ee53767d7475e850a70ff44f51d265917039fea423b51a4856112896587e598",
+          "return_code": -11,
+          "elapsed_seconds": 0.2732059955596924
+        },
+        "upstream_cuda": {
+          "path": "build/nvvm-application-values/readonly-pointer-baseline.json",
+          "sha256": "efdfc01f134c35906701e15e5c050a4bd8cf328c6f905cef5c32841665173142",
+          "return_code": -11,
+          "elapsed_seconds": 0.3607335090637207
+        },
+        "backtrace": {
+          "path": "build/nvvm-application-values/readonly-pointer-backtrace.log",
+          "sha256": "911c7d2c1983483062b658a870c279a06a342e03f34c7c50bb7d7ca99c3a3c36"
+        },
+        "upstream_compiler_sha256": {
+          "../slangpy/build/linux-gcc/_deps/slang-src/bin/slangc": "6b42ed03eaef9f5e84433de3ee40edec28da1b680a71a94f813881e38c732a4f",
+          "../slangpy/build/linux-gcc/_deps/slang-src/lib/libslang-compiler.so.0.2026.18.3": "2f54ca7dc50a072ee4bb6b0bbcf80c283725cb7b1cbaf45dfe50d17e878a307d"
+        },
+        "root": "TypeFlowSpecializationContext::analyzeCall assumes pointer-wrapped argInfo for BorrowIn; explicit read(__constref Params) called with ConstantBuffer<Params> reaches non-pointer argInfo. No guard/workaround added."
+      }
     }
   }
 }

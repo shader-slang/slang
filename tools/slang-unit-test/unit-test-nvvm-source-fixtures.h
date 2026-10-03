@@ -978,7 +978,7 @@ void computeMain()
 }
 )";
 
-static const char kDirectNVVMUnsupportedLoadedCompactParameterGroupValueSource[] = R"(
+static const char kDirectNVVMLoadedCompactParameterGroupValueSource[] = R"(
 struct Params
 {
     float3 value;

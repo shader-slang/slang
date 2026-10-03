@@ -835,6 +835,10 @@ struct LoweredElementTypeContext
             }
             auto loweredType = builder.createStructType();
             maybeAddPhysicalTypeDecoration(builder, loweredType, config);
+            // The replacement still represents the collected entry-point uniforms. Preserve
+            // this identity so downstream ABI selection recognizes their parameter group.
+            if (structType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+                builder.addSynthesizedParameterGroupDecoration(loweredType);
 
             StringBuilder nameSB;
             getTypeNameHint(nameSB, type);
@@ -962,17 +966,18 @@ struct LoweredElementTypeContext
 
     LoweredTypeMap& getTypeLoweringMap(TypeLoweringConfig config, IRType* type)
     {
-        // Consider a bool3x3 loaded from a buffer into a local and passed by reference.
-        // Both objects use the same finite CUDA value layout. Creating separate nominal
-        // array wrappers gives their otherwise identical fields different keys when helper
-        // specialization crosses that boundary. Share the value recipe, while preserving
-        // the actual address space and access on pointers and storage casts.
+        // Consider a bool3x3 loaded from a uniform or structured buffer into a local and
+        // passed by reference. These objects use the same finite CUDA value layout. Creating
+        // separate nominal array wrappers gives their otherwise identical fields different keys
+        // when helper specialization crosses that boundary. Share the value recipe, while
+        // preserving the actual address space and access on pointers and storage casts.
         if (target->shouldEmitNVVMDirectly() &&
             (options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::LLVM ||
              options.loweringPolicyKind == BufferElementTypeLoweringPolicyKind::NVVM) &&
             config.layoutRuleName == IRTypeLayoutRuleName::CUDA && !config.lowerToPhysicalType &&
             (config.addressSpace == AddressSpace::UserPointer ||
-             config.addressSpace == AddressSpace::StorageBuffer) &&
+             config.addressSpace == AddressSpace::StorageBuffer ||
+             config.addressSpace == AddressSpace::Uniform) &&
             !hasUnsizedStorage(type))
             config.addressSpace = AddressSpace::Generic;
         RefPtr<LoweredTypeMap> map;
@@ -2659,6 +2664,12 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     // the CUDA source backend retain their existing contracts.
     if (target->shouldEmitNVVMDirectly())
     {
+        if (auto group = as<IRUniformParameterGroupType>(bufferType))
+        {
+            auto layout = group->getDataLayout();
+            if (!layout || layout->getOp() == kIROp_DefaultBufferLayoutType)
+                return IRTypeLayoutRuleName::CUDA;
+        }
         if (auto buffer = as<IRHLSLStructuredBufferTypeBase>(bufferType))
         {
             auto layout = buffer->getDataLayout();
@@ -3583,7 +3594,8 @@ struct NVVMBufferElementTypeLoweringPolicy : LLVMBufferElementTypeLoweringPolicy
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
         if ((config.addressSpace != AddressSpace::UserPointer &&
-             config.addressSpace != AddressSpace::StorageBuffer) ||
+             config.addressSpace != AddressSpace::StorageBuffer &&
+             config.addressSpace != AddressSpace::Uniform) ||
             config.layoutRuleName != IRTypeLayoutRuleName::CUDA)
             return LLVMBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
 

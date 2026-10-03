@@ -96,12 +96,38 @@ The affected SlangPy selection supplies live 2D/3D texture evidence: 9 failures 
 readonly rejection before mutation and retained resource-format/storage restrictions.
 
 This does not itself admit arbitrary pointer-bearing entries, external helper ABI or surface
-formats or acceleration handles. Combined generic handle specializations still expose a duplicate
-symbol; per-shape success is not qualification of their coexistence. Shader cache reload subsequently exposed
+formats or acceleration handles. Later application qualification below adds opaque acceleration
+handle composition. The original combined generic handle failure remains recorded; per-shape success
+is not qualification of their coexistence. Shader cache reload subsequently exposed
 a shared RHI PTX-termination failure, now repaired by owning the exact byte span as terminated text.
 The deterministic CUDA cache fixture and raygen/triangle controls pass on both routes; the SlangPy
 cache node also passes. OptiX controls do not qualify persistent OptiX cache roundtrips. Original
 failures and fixes remain in the maintained manifests.
+
+## Application value and AD update qualification
+
+The full CUDA-selected SlangPy inventory passes 1,591 with zero failures,807 skips and3 expected failures
+across2,401 nodes plus14 module skips. All 29 previous failures resolve; all 1,561 prior passes remain passing.
+The extra node completes RGB Float/Sint/Uint metadata coverage, using the real texture-type factory
+without allocating CUDA RGB textures. This does not establish physical three-channel texture support.
+
+Default/CUDA pointer layout qualification preserves identical pointees and checked CUDA/LLVM layout;
+atomic pointers and nested helper records retain established access and provenance restrictions.
+Fixed resource arrays use the checked entry aggregate path. Opaque acceleration handles now compose
+inside records/arrays and parameter-group storage, without integer construction or a returned-handle
+ABI. Default uniform storage uses canonical CUDA numeric packing and preserves its collected-record
+marker through physical lowering. Finite uniform/local/structured values share the same producer
+cache; readonly uniform borrows require identical pointee/storage representations and layout proof.
+Pointer-bearing record borrows retain their rejection. BF16/FP8 and ByteAddress storage keep separate admission.
+
+[Imported generic pointers](../../tests/cuda/nvvm-specialized-pointer-identity.slang) qualify distinct
+canonical specialization identities at NVVM O0/O3 and NVRTC O3. The earlier combined generic handle
+failure remains historical evidence; that separate combined fixture has not been rerun.
+[Aggregate updates](../../tests/cuda/nvvm-aggregate-value-updates.slang) qualify reverse AD through
+field/vector/array/matrix chains while retaining the original value. [Array snapshots](../../tests/cuda/nvvm-dynamic-array-snapshots.slang)
+qualify high-bit uint8 dynamic reads, repeated mutation and padded nested-record values at O0/O3.
+Captured LLVM confirms i8-to-i64 zero extension; captured CUDA12.9 PTX qualifies a fixed local frame.
+The vendor optimizer stall and rejected entry-hoisting/select-chain attempts remain recorded.
 
 ## Explicit OptiX versions
 
