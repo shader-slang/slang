@@ -2390,52 +2390,85 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
 {
     NVVMIRBuilder realBuilder;
     _requireRealNVVMBuilder(unitTestContext, realBuilder);
-    for (const char* source :
-         {kDirectNVVMLoadedCompactParameterGroupValueSource,
-          kDirectNVVMCompactParameterGroupVectorSource})
+    for (const char* layout : {"DefaultDataLayout", "ScalarDataLayout", "CDataLayout"})
     {
-        _resetDirectNVVMFakes();
-        ComPtr<slang::IGlobalSession> session;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
-        session->setSharedLibraryLoader(loader);
-        ComPtr<slang::IBlob> code, diagnostics;
-        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
-        if (SLANG_FAILED(result))
-            getTestReporter()->message(
-                TestMessageType::Info,
-                _getBlobText(diagnostics).getBuffer());
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
-        // Uniform records use CUDA physical storage, including compact float3 fields.
-        // Unpacking reconstructs logical record/vector values before their helper calls.
-        const String& assembly = gFakeNVVM.addedModule;
-        const bool wholeRecord = source == kDirectNVVMLoadedCompactParameterGroupValueSource;
-        SLANG_CHECK(assembly.contains(
-            wholeRecord ? "{ { [3 x float] } } addrspace(1)*"
-                        : "{ { [3 x float] }, { [3 x float] } } addrspace(1)*"));
-        List<UnownedStringSlice> lines;
-        StringUtil::split(assembly.getUnownedSlice(), '\n', lines);
-        Index physicalLoadCount = 0;
-        bool sawHelperSignature = false;
-        for (auto line : lines)
+        for (const char* source :
+             {kDirectNVVMLoadedCompactParameterGroupValueSource,
+              kDirectNVVMCompactParameterGroupVectorSource})
         {
-            const auto physicalLoad = " = load float, float addrspace(1)*";
-            if (line.indexOf(UnownedStringSlice(physicalLoad)) >= 0)
+            if (source == kDirectNVVMCompactParameterGroupVectorSource &&
+                UnownedStringSlice(layout) != toSlice("DefaultDataLayout"))
+                continue;
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code, diagnostics;
+            String groupType = String("ConstantBuffer<Params, ") + layout + ">";
+            String explicitSource = StringUtil::replaceAll(
+                UnownedStringSlice(source),
+                toSlice("ConstantBuffer<Params>"),
+                groupType.getUnownedSlice());
+            const auto result =
+                _compileSlangWithDirectNVVM(session, explicitSource.getBuffer(), code, diagnostics);
+            if (SLANG_FAILED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
+            // Uniform records use CUDA physical storage, including compact float3 fields.
+            // Unpacking reconstructs logical record/vector values before their helper calls.
+            const String& assembly = gFakeNVVM.addedModule;
+            const bool wholeRecord = source == kDirectNVVMLoadedCompactParameterGroupValueSource;
+            SLANG_CHECK(assembly.contains(
+                wholeRecord ? "{ { [3 x float] } } addrspace(1)*"
+                            : "{ { [3 x float] }, { [3 x float] } } addrspace(1)*"));
+            List<UnownedStringSlice> lines;
+            StringUtil::split(assembly.getUnownedSlice(), '\n', lines);
+            Index physicalLoadCount = 0;
+            bool sawHelperSignature = false;
+            for (auto line : lines)
             {
-                ++physicalLoadCount;
-                SLANG_CHECK(line.indexOf(toSlice(", align 4, !invariant.load")) >= 0);
+                const auto physicalLoad = " = load float, float addrspace(1)*";
+                if (line.indexOf(UnownedStringSlice(physicalLoad)) >= 0)
+                {
+                    ++physicalLoadCount;
+                    SLANG_CHECK(line.indexOf(toSlice(", align 4, !invariant.load")) >= 0);
+                }
+                if (line.startsWith(toSlice("define internal float")))
+                    sawHelperSignature |=
+                        line.indexOf(UnownedStringSlice(
+                            wholeRecord ? "({ <3 x float> }" : "(<3 x float>")) >= 0;
             }
-            if (line.startsWith(toSlice("define internal float")))
-                sawHelperSignature |= line.indexOf(UnownedStringSlice(
-                                          wholeRecord ? "({ <3 x float> }" : "(<3 x float>")) >= 0;
+            SLANG_CHECK(physicalLoadCount == (wholeRecord ? 3 : 4));
+            SLANG_CHECK(sawHelperSignature);
+            SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         }
-        SLANG_CHECK(physicalLoadCount == (wholeRecord ? 3 : 4));
-        SLANG_CHECK(sawHelperSignature);
-        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+// Normalizing uniform-group storage does not admit a previously unsupported layout operand.
+SLANG_UNIT_TEST(nvvmSlangCompactStd430GroupRejectsBeforeEmission)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    String source = StringUtil::replaceAll(
+        UnownedStringSlice(kDirectNVVMLoadedCompactParameterGroupValueSource),
+        toSlice("ConstantBuffer<Params>"),
+        toSlice("ConstantBuffer<Params, Std430DataLayout>"));
+    ComPtr<slang::IBlob> code, diagnostics;
+    const auto result = _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+    SLANG_CHECK(SLANG_FAILED(result) && code == nullptr);
+    SLANG_CHECK(_getBlobText(diagnostics).contains("struct field address result"));
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
 }
 
 SLANG_UNIT_TEST(nvvmSlangFloat64ValueFamilyUsesGenericTypedOperations)

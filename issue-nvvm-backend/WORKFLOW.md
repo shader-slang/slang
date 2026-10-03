@@ -1,11 +1,18 @@
 # NVVM development workflow
 
+**Compact-vector consolidation complete and stopped (2026-10-03):** explicit and default
+uniform groups now share the existing CUDA storage lowering. Both duplicate compact-vector load
+conversions are removed. Host layout, Half role separation, snapshot semantics and material
+performance are preserved. Full working **1,735/1,735** retains all 1,726 prior passes; units
+**570/570** and smoke **16/16** pass. Material PTX is byte-identical to the accepted fast code;
+no fresh timing is claimed. This bounded request is complete; no general loop or wave work resumes.
+
 **Bounded material investigation completed and stopped (2026-10-03):** the small shared-storage
 producer fix restores material performance using existing unpack helpers, without new provider
 machinery or ABI changes. Focused, static, AD, RHI and full working validation are accepted; exact
 before/after timing and preserved failed experiments are recorded in STATUS and focused evidence.
-Storage/ABI consolidation is the recommended next bounded cleanup, not an authorization to start it.
-Wave work, unrelated features and the legacy OptiX8 HitObject decision remain parked.
+The later compact-group consolidation is completed above; further storage/ABI audits need a new
+bounded request. Wave work, unrelated features and the legacy OptiX8 HitObject decision remain parked.
 
 Start with [STATUS](STATUS.md), the [architecture](../docs/design/nvvm-backend.md), and the
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md). Use [RESULTS](RESULTS.md) for

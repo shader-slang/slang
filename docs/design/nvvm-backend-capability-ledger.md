@@ -689,6 +689,19 @@ representation. Current shared lowering treats StructuredBuffer reads as immutab
 observations use two RWStructuredBuffer views. The exploratory RO/RW alias attempt and its stale
 reads remain a recorded semantic limitation, not an accepted mutable-read contract.
 
+Uniform groups now use that same shared CUDA numeric lowering even with explicit Scalar/CData
+layout operands, matching CUDA reflection. Both former compact-vector load conversion kinds and
+their emitter reconstruction are removed. Existing compact type/stride proofs and Half storage
+cache roles remain; unnormalized compact loads on checked immutable group paths reject before
+provider mutation, as does Std430. This also admits previously rejected explicit Bool3, Int16x3,
+UInt64x3 and Double3 groups through the existing policy. The
+[explicit-group byte fixture](../../tests/cuda/nvvm-explicit-group-compact-storage.slang) checks a
+144-byte mixed record at default/Scalar/CData O0/O3, including integer/Half lanes, Half3 NaN padding,
+noncanonical Boolean true, wider scalar alignment and adjacent sentinels. The
+[compact float3 fixture](../../tests/cuda/nvvm-compact-vector-storage.slang) also covers nested
+records and dynamic array reads with explicit Scalar/CData layouts. Explicit pointer/resource
+layout contracts are unchanged.
+
 Half-vector helper parameters/results use physical integer lane transport while body arithmetic and
 storage retain their selected Half representations. [Parameter transport](../../tests/cuda/nvvm-half-vector-helper-parameters.slang)
 and [result transport](../../tests/cuda/nvvm-half-vector-helper-results.slang) separately cover all

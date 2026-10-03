@@ -162,14 +162,12 @@ struct NVVMPlannedAtomicOperation
 
 /// Records the physical conversion selected for one already-admitted memory operation.
 /// Read-only access is independent of representation: a borrowed float3 keeps its native vector,
-/// while a parameter-group float3 uses compact component storage.
+/// while shared IR lowering owns compact parameter-group vector conversion.
 enum class NVVMStorageConversionKind
 {
     Identity,
     StructuredBuffer,
     BFloat16Vector,
-    CompactVector,
-    CompactHalfVector,
 };
 
 struct NVVMPlannedStorageConversion

@@ -1,5 +1,12 @@
 # NVVM current status
 
+**Compact-vector consolidation complete and stopped (2026-10-03):** explicit and default
+uniform groups now share the existing CUDA storage lowering. Both duplicate compact-vector load
+conversions are removed. Host layout, Half role separation, snapshot semantics and material
+performance are preserved. Full working **1,735/1,735** retains all 1,726 prior passes; units
+**570/570** and smoke **16/16** pass. Material PTX is byte-identical to the accepted fast code;
+no fresh timing is claimed. This bounded request is complete; no general loop or wave work resumes.
+
 **Material regression repaired; bounded work complete (2026-10-03):** shared storage lowering
 now unpacks ordinary NVVM aggregate snapshots at their original read, using its existing helpers.
 The small producer-side fix adds no provider machinery or ABI change and fits later storage/ABI
@@ -40,6 +47,16 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 Plans and reports remain uncommitted.
 
 ## Current validation and maintenance
+
+The compact-group cleanup adds nine exact working admissions: three existing compact-float3 modes
+and six mixed-record default/Scalar/CData modes. All 1,726 earlier working outcomes and 569 earlier
+units remain passing, with no changed campaign inputs. New focused controls pass 15/15, existing
+snapshot/storage/borrowed controls 45/45, selected RHI 4/4 with 55,633 assertions, and the AD guard.
+The static contracts pass after correcting one inherited Half2 rejection assertion: numeric Storage
+was already admitted by earlier application work. Runtime compiler/provider/source pins remained
+unchanged through the full campaign; the later static-only correction has its own test/binary pins.
+The full RHI and SlangPy suites were not rerun. Exact outcomes and failed development attempts are in
+[focused evidence](focused-evidence.json), under `build/nvvm-compact-conversion-cleanup/`.
 
 The fresh initial checkpoint passes **1,724/1,724 working configurations** and **569/569 NVVM units**
 with unchanged inputs. The full RHI run then exposed two regressions: provider-created dynamic array
@@ -106,12 +123,11 @@ missing integer-prefix tree fast paths and extra floating-fold mask/control work
 spills. These are correctness workloads with shader checks and host enqueue gaps, not application
 throughput. The full historical 580-case static analysis was not rerun.
 
-Recommended next bounded work: investigate removing the duplicate compact parameter-group vector
-conversion family (`CompactVector` / `CompactHalfVector`) through existing shared storage lowering.
-First prove remaining source-path reachability and the intended direct-IR boundary; direct-IR tests
-still deliberately admit the older representation, so deletion is not yet proved safe. Preserve
-host-byte layout checks and the original-read snapshot contract. This is one bounded C1 cleanup,
-independent of the material repair. Wave fast paths remain a separate performance opportunity.
+The compact parameter-group conversion cleanup is complete. A useful next bounded audit is
+checked array storage provenance: an inherited raw direct-IR conventional-array shape can lose its
+storage role during element selection. It did not select the deleted decoder, and no source-level
+regression is demonstrated. Prove its producer/admission contract before changing representations.
+Wave fast paths remain a separate performance opportunity. Neither recommendation resumes work.
 Current material evidence and a readable before/after report are under
 `build/nvvm-material-promotion/presentation/report.md`; the preceding full compile/dispatch report
 remains `build/nvvm-results/2026-10-03-current1/presentation/report.md`. The

@@ -1,6 +1,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0 -Xslang -DGROUP_LAYOUT=ScalarDataLayout
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3 -Xslang -DGROUP_LAYOUT=ScalarDataLayout
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0 -Xslang -DGROUP_LAYOUT=CDataLayout
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3 -Xslang -DGROUP_LAYOUT=CDataLayout
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 9.0 4.0 5.0 6.0 11.0 7.0 8.0 9.0 10.0 11.0 12.0]):name=settings
 //TEST_INPUT:ubuffer(data=[1], stride=4):name=inputs
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputs
@@ -22,7 +26,11 @@ struct Settings
     Payload nested;
     float3 values[2];
 };
-ConstantBuffer<Settings> settings;
+// CUDA reflection owns the same compact bytes even with an explicit group layout operand.
+#ifndef GROUP_LAYOUT
+#define GROUP_LAYOUT DefaultDataLayout
+#endif
+ConstantBuffer<Settings, GROUP_LAYOUT> settings;
 StructuredBuffer<uint> inputs;
 RWStructuredBuffer<uint> outputs;
 uint encode(float3 value)

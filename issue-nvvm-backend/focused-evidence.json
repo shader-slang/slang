@@ -94986,12 +94986,9 @@
         }
       ],
       "next_cleanup": {
-        "family": "Compact parameter-group vector conversions: CompactVector and CompactHalfVector",
-        "gate": "Trace remaining source reachability and intended direct-IR boundary before deleting the complete duplicate family; direct-IR tests still admit it. No cleanup implementation authorized by this recommendation.",
-        "review": {
-          "path": "build/nvvm-material-promotion/next-cleanup-review.md",
-          "sha256": "74792c6e969c1746294fffd5cdf91d769d6a7da1bab63f7e7b81089722c0108b"
-        }
+        "status": "completed",
+        "feature": "nvvm-compact-group-consolidation",
+        "contract": "Shared CUDA group lowering owns compact conversion; original-read snapshots and attributed memory operations are preserved."
       },
       "review": {
         "producer": {
@@ -95010,6 +95007,270 @@
       "final_review": {
         "path": "build/nvvm-material-promotion/final-review.md",
         "sha256": "0928544a74539d43fe500e0a9c4e3bd5f57bbf42804f9e038c7cb715fe0e0052"
+      }
+    },
+    "nvvm-compact-group-consolidation": {
+      "status": "accepted-focused",
+      "scope": "Accepted compact uniform-group consolidation, focused source/host-byte contracts and reconciled full working/unit/smoke checkpoint. Full RHI and full SlangPy keep their previous identities.",
+      "raw_evidence": "build/nvvm-compact-conversion-cleanup",
+      "identity": {
+        "base_revision": "5410161d6",
+        "source_sha256": {
+          "tests/cuda/nvvm-compact-vector-storage.slang": "62b01a297732a94e08f4bafa7b1d480f47659ed124fda7d57939ce8322045a08",
+          "tests/cuda/nvvm-explicit-group-compact-storage.slang": "3e9c3858901613c1cb6a208d1b134d2c12916ff2cfa074e88525c927f27057fb"
+        },
+        "compiler_sha256": "650c203c49f892902e2f5d75c7b86ca7eebf047f587c06a3369304ccc58d53e0",
+        "provider_sha256": "e2749db3cf6f78c36025eb21488b6fb984b911fccdc0e8134b228f4c826492ec"
+      },
+      "validation": {
+        "focused": {
+          "passed": 15,
+          "failed": 0,
+          "outcomes": {
+            "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.3 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.4 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.5 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.6 (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang.3 (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang.4 (cuda)": "passed",
+            "tests/cuda/nvvm-explicit-group-compact-storage.slang.5 (cuda)": "passed",
+            "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCompactStd430GroupRejectsBeforeEmission.internal": "passed"
+          }
+        },
+        "reconciliation": {
+          "path": "build/nvvm-compact-conversion-cleanup/reconciliation.json",
+          "sha256": "a938bdf1d47877bcce97cc904b477a36e362c675f6b0de6e46d0fae13b3e4cd3"
+        },
+        "working": {
+          "path": "build/nvvm-compact-conversion-cleanup/working1/selection.json",
+          "sha256": "00124a9efc042f061435cd76e8d77e4b3b464aaae9c5839389612ccd2ab8bfa1"
+        },
+        "units": {
+          "path": "build/nvvm-compact-conversion-cleanup/units2.json",
+          "sha256": "9534ff3c8aefac03128c192a177da5ab26e81229624ae2c5bc32ac4f2384508b"
+        },
+        "smoke": {
+          "path": "build/nvvm-compact-conversion-cleanup/smoke1/selection.json",
+          "sha256": "7163fdf7557a613cc675435a1a69db12987a1f8a45be62f17f06981205849ffb"
+        },
+        "rhi": {
+          "path": "build/nvvm-compact-conversion-cleanup/rhi-focused1.json",
+          "sha256": "1748c61e2382dee2c02abec3401723163cd69627972beaec4e3369749fcd2bf0"
+        },
+        "ad": {
+          "path": "build/nvvm-compact-conversion-cleanup/ad-guard1.json",
+          "sha256": "d53123d122345ffae5a28238ba129601037931744814c3e4531dc0653e67fda5"
+        },
+        "focused_existing": {
+          "path": "build/nvvm-compact-conversion-cleanup/focused1.json",
+          "sha256": "0e3c6e48efd9244d4e09302ef8e11d4a2a06c63761a17c5d0bbf345e510b43af"
+        },
+        "static_gates": [
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final2-compact.json",
+            "sha256": "06a83a2506d9515174abb3de445f10db8b1b3872be47bc1a5d94573cdd43f8a4"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-half-cache-corrected.json",
+            "sha256": "be5ebe1876a64578f5e4d586782e9f3b187600518b1fa7f7849cff498a650175"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-half-scalar-corrected.json",
+            "sha256": "ff7af820e3db46494ed6d0c276f4d9970b776d516afd138fa1465413996c6e2e"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmConventionalGlobalLayoutProofsKeepRepresentationRoles.json",
+            "sha256": "db62042b8e05244d95d59ac4e4f39a5f6c931ede2f71ea01e2253526595c9c1a"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder.json",
+            "sha256": "b4b6bfbedfcaeccbbbbf4e21fe4904fc579c2aaf29585ea40518696322cc5fba"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmParameterGroupLayoutPointerStorageKeepsRolesSeparate.json",
+            "sha256": "b321c880829f94fcd0b70fd70aabbd0388ab43af8f1a556250564c2f9b17275b"
+          },
+          {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmStorageLoadsPreserveSnapshotAndAttributes.json",
+            "sha256": "3b923f661f9ac8cd0ffd578634915acb63257ae1046b8355c9be18354af2bbf4"
+          }
+        ],
+        "runtime_identity_before": {
+          "path": "build/nvvm-compact-conversion-cleanup/identity-before2.json",
+          "sha256": "1613651ed3d7828f3a022dd4c3d07058fcab755df84f9964255e3379995190cb"
+        },
+        "runtime_identity_after": {
+          "path": "build/nvvm-compact-conversion-cleanup/identity-after2.json",
+          "sha256": "1613651ed3d7828f3a022dd4c3d07058fcab755df84f9964255e3379995190cb"
+        },
+        "final_identity": {
+          "path": "build/nvvm-compact-conversion-cleanup/final-identity.json",
+          "sha256": "4f99ecd0a7df0febd0e7d30b248f0338455c421e7722253c07e81f33fef19ebe"
+        }
+      },
+      "contracts": {
+        "normalized": "All NVVM uniform groups select the CUDA reflection owner; explicit group layout operand remains for admission.",
+        "removed": ["CompactVector", "CompactHalfVector"],
+        "preserved": [
+          "Half storage/cache roles",
+          "compact size/alignment/stride proofs",
+          "explicit pointer/resource contracts",
+          "Std430 rejection before provider mutation",
+          "original-read snapshots and attributed memory operations"
+        ]
+      },
+      "source_probe_comparison": {
+        "cases": 50,
+        "prior_passes_preserved": 40,
+        "prior_Std430_rejections_preserved": 10,
+        "instrumented_explicit_decoder_hits": 20,
+        "baseline": {
+          "path": "build/nvvm-compact-conversion-cleanup/baseline2/results.json",
+          "sha256": "479050b2754af8d883aebe259f3cbd79e05a193585f4e74b41b3e587c30a5aae"
+        },
+        "instrumented": {
+          "path": "build/nvvm-compact-conversion-cleanup/instrumented/results.json",
+          "sha256": "987d03456c85d36feae5869439d0af256aa64577cb98b7094542bdf7d51e08db"
+        },
+        "candidate": {
+          "path": "build/nvvm-compact-conversion-cleanup/candidate/results.json",
+          "sha256": "8e5536c888d227cca71eac805f944fa6b8e8ed350751f9ea33436e73a68fd5ec"
+        }
+      },
+      "broader_probe_comparison": {
+        "cases": 24,
+        "prior_default_passes_preserved": 8,
+        "newly_admitted_explicit_cells": 16,
+        "types": ["bool3", "int16x3", "uint64x3", "double3"],
+        "runtime": "All four are covered by six default/Scalar/CData O0/O3 mixed-record byte checks.",
+        "baseline": {
+          "path": "build/nvvm-compact-conversion-cleanup/broad-baseline/results.json",
+          "sha256": "b5b3cfd4a4924b98653260e467bd7507a5ab41689463bcb626b46f5fadba473c"
+        },
+        "candidate": {
+          "path": "build/nvvm-compact-conversion-cleanup/broad-candidate/results.json",
+          "sha256": "119685dad75f2adfb9fed49beeb3dbfeb2673b666bc6e28b92959b2f13a263f0"
+        }
+      },
+      "failing_before": {
+        "source_unit": "nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation",
+        "diagnostic": "loaded parameter-group value representation",
+        "compiler_sha256": "19842c65c73dffdf124fd336567eb2ff8a3569a22db40cd9167df16abdfea4e9",
+        "log": "build/nvvm-compact-conversion-cleanup/source-unit-baseline.log",
+        "log_sha256": "b708afd4bf990e3ee18db0ca8f19705aa9fa55dcc4243f4fdadab649066aa06a"
+      },
+      "material": {
+        "ptx_byte_identical": true,
+        "entries": [
+          {
+            "entry": "eval_buffer",
+            "ptx_sha256": "27c2a016ab32c64be2485b92c2b51a64b83e26ff9f86d2c106cd0f94f7dbbd5b",
+            "registers": 51,
+            "frame_bytes": 0,
+            "spill_store_bytes": 0,
+            "spill_load_bytes": 0,
+            "static_local_stores": 0
+          },
+          {
+            "entry": "sample_buffer",
+            "ptx_sha256": "e93014a653abece8f4909b7b067b9d3d7eac01518f8895ab458a1ab37fa6db82",
+            "registers": 62,
+            "frame_bytes": 0,
+            "spill_store_bytes": 0,
+            "spill_load_bytes": 0,
+            "static_local_stores": 8
+          }
+        ],
+        "runtime_measurements_reused_from": "nvvm-material-promotion",
+        "fresh_timing": false,
+        "reused_large_count_medians_ms": {
+          "records": 1048577,
+          "eval": 0.313344002,
+          "sample": 0.3911360055
+        },
+        "code_generation": {
+          "path": "build/nvvm-compact-conversion-cleanup/material1/results.json",
+          "sha256": "bcea871a93d82486d75e205015310c1fb02c695623b8c42d2120c7461602dee7"
+        }
+      },
+      "review": {
+        "path": "build/nvvm-compact-conversion-cleanup/independent-audit.md",
+        "sha256": "5fac92a5f425b2a490893faec5f36b939239c5f8a98bddfebbd74e9cb0d6e6ea"
+      },
+      "versions": {
+        "semantic_module": 43,
+        "provider_abi": 46,
+        "container": 2
+      },
+      "development_history": [
+        {
+          "kind": "invalid-probe-harness",
+          "gate": {
+            "path": "build/nvvm-compact-conversion-cleanup/baseline-probes.json",
+            "sha256": "16c104359bcb1706bc379448ef10ebf833e59d99a5aa0e9ca21ae25f3923c5c1"
+          },
+          "outcome": "Initial source omitted stage and used incorrectly capitalized noinline. Corrected baseline2 before conclusions."
+        },
+        {
+          "kind": "wrong-direct-IR-array-shapes",
+          "gates": [
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static1.json",
+              "sha256": "ce594464f3ebcd08dacb3f1755bf8ec2bf410f2447ae24ca71f19bcb16743213"
+            },
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static2.json",
+              "sha256": "42ffaab68bc3d923b41d758d7a3c3acbbd67d388c459fcd94210383e28c1026e"
+            },
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static-nvvmConventionalGlobalVectorsUseCheckedStorage.json",
+              "sha256": "c09ced516f6cfec1f9a9f771833e52ba727734ca53c7c4f85b532e095719497e"
+            },
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmConventionalGlobalVectorsUseCheckedStorage.json",
+              "sha256": "8c97d291a3f4debd48fed3db5407dd787064a4a6d88552acf125e1282c55c389"
+            }
+          ],
+          "outcome": "Wrong access/array-root spellings did not reach the old decoder. Final nested group record with explicit8/12 stride reaches exact checked group path and rejects before mutation."
+        },
+        {
+          "kind": "stale-Half2-rejection-assertion",
+          "before": {
+            "path": "build/nvvm-compact-conversion-cleanup/static-final-nvvmHalfVectorBoundaryRolesIgnoreCacheOrder.json",
+            "sha256": "c95c73d2bbdd805123d4d26fc1033459fcae6951e4217c8fd81469d66c699f6b"
+          },
+          "after": {
+            "path": "build/nvvm-compact-conversion-cleanup/static-half-cache-corrected.json",
+            "sha256": "be5ebe1876a64578f5e4d586782e9f3b187600518b1fa7f7849cff498a650175"
+          },
+          "outcome": "20 old rejection/null assertions fail. Admission broadened in3f1250d61a after the September27 test. Test now checks native Half2 Storage and unchanged compact Half3/4 and integer helper transport; no production type-lowering change."
+        },
+        {
+          "kind": "test-build-API-errors",
+          "gates": [
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static-build2.json",
+              "sha256": "5074acd38ca931a312d1e957fef6a677dd39cd0643248d1bcf74c9b77ae1e9dd"
+            },
+            {
+              "path": "build/nvvm-compact-conversion-cleanup/static-build4.json",
+              "sha256": "879ba4329cb93079c9c053f8f6db54e619aa8fa50a378ec71acbc8f86047e985"
+            }
+          ],
+          "outcome": "Corrected test array-count IR literal and existing Read enum spelling; no production workaround."
+        }
+      ],
+      "remaining_direct_IR_audit": {
+        "status": "unqualified-inherited-concern",
+        "shape": "Raw conventional-global numeric array without explicit stride can lose conventional storage provenance in element selection while Storage lowering keeps compact leaves.",
+        "scope": "This direct-IR shape never selected the old decoder. No source-level regression demonstrated; normalized source paths are qualified. Separate bounded producer/provenance audit recommended, not a new fallback in this cleanup."
       }
     }
   }

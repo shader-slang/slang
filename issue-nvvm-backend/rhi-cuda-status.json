@@ -1603,6 +1603,77 @@
       },
       "interrupted": null,
       "hidden_failures": []
+    },
+    "compact-group-consolidation-rhi-focused1": {
+      "identity": {
+        "path": "build/nvvm-compact-conversion-cleanup/final-identity.json",
+        "sha256": "4f99ecd0a7df0febd0e7d30b248f0338455c421e7722253c07e81f33fef19ebe"
+      },
+      "gate": {
+        "path": "build/nvvm-compact-conversion-cleanup/rhi-focused1.json",
+        "sha256": "1748c61e2382dee2c02abec3401723163cd69627972beaec4e3369749fcd2bf0"
+      },
+      "scope": "Focused4cases only; prior full291-registration checkpoint retains its recorded identity.",
+      "rows": [
+        {
+          "id": "aggregate-entry-abi.cuda#occurrence-1",
+          "name": "aggregate-entry-abi.cuda",
+          "occurrence": 1,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "2.75s",
+          "assertion_records": []
+        },
+        {
+          "id": "compact-pointer-storage.cuda#occurrence-1",
+          "name": "compact-pointer-storage.cuda",
+          "occurrence": 1,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "110.42s",
+          "assertion_records": []
+        },
+        {
+          "id": "structured-numeric-child-storage.cuda#occurrence-1",
+          "name": "structured-numeric-child-storage.cuda",
+          "occurrence": 1,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "113.55s",
+          "assertion_records": []
+        },
+        {
+          "id": "tensor-view-numeric-storage.cuda#occurrence-1",
+          "name": "tensor-view-numeric-storage.cuda",
+          "occurrence": 1,
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "117.03s",
+          "assertion_records": []
+        }
+      ],
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 55633,
+        "passed": 55633,
+        "failed": 0
+      },
+      "doctest_cases": {
+        "selected": 4,
+        "passed_including_runtime_skips": 4,
+        "failed": 0,
+        "filtered_out": 961
+      },
+      "interrupted": null,
+      "hidden_failures": []
     }
   },
   "reconciliation": {
@@ -28822,6 +28893,15 @@
           "terminal_line": 3,
           "detail": "2.77s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "compact-group-consolidation-rhi-focused1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "2.75s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -28999,6 +29079,15 @@
           "terminal_line": 4,
           "detail": "113.16s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "compact-group-consolidation-rhi-focused1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "110.42s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -29173,6 +29262,15 @@
           "terminal_line": 6,
           "detail": "118.80s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "compact-group-consolidation-rhi-focused1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "117.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -29282,6 +29380,15 @@
           "reported_status": "passed",
           "terminal_line": 5,
           "detail": "115.34s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "compact-group-consolidation-rhi-focused1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "113.55s",
           "failed_assertion_records": 0
         }
       ]
@@ -29441,10 +29548,10 @@
     "sha256": "8dabdb5b44113ec206ce3ae5b86a985fc241533331c57514cb058d0b909114d2"
   },
   "latest_focused_qualification": {
-    "run": "material-promotion-rhi-focused1",
+    "run": "compact-group-consolidation-rhi-focused1",
     "identity": {
-      "path": "build/nvvm-material-promotion/candidate-identity.json",
-      "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
+      "path": "build/nvvm-compact-conversion-cleanup/final-identity.json",
+      "sha256": "4f99ecd0a7df0febd0e7d30b248f0338455c421e7722253c07e81f33fef19ebe"
     },
     "counts": {
       "passed": 4,

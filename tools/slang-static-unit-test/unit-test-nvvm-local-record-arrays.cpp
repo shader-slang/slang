@@ -1595,23 +1595,31 @@ SLANG_UNIT_TEST(nvvmLayoutPointerReinterpretPreservesProducerChecks)
         }
 }
 
-// Collected globals use compact three-lane storage without making their fields writable.
+// Shared storage lowering must eliminate raw compact vector loads before preflight. Other
+// collected vectors retain native storage, immutable access and trusted-root requirements.
 SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
 {
     enum class Case
     {
         Load,
+        ArrayLoad,
         Store,
         ForgedRoot
     };
-    for (auto elementOp : {kIROp_IntType, kIROp_UIntType, kIROp_FloatType})
+    for (auto elementOp : {kIROp_IntType, kIROp_UIntType, kIROp_FloatType, kIROp_HalfType})
     {
         for (uint32_t width : {2u, 3u, 4u})
         {
-            for (auto testCase : {Case::Load, Case::Store, Case::ForgedRoot})
+            if (elementOp == kIROp_HalfType && width == 2)
+                continue;
+            const bool compact = width == 3 || elementOp == kIROp_HalfType;
+            for (auto testCase : {Case::Load, Case::ArrayLoad, Case::Store, Case::ForgedRoot})
             {
                 // One representative vector is enough to check the shared permission/root gates.
-                if (testCase != Case::Load && (elementOp != kIROp_UIntType || width != 3))
+                if (testCase == Case::ArrayLoad && !compact)
+                    continue;
+                if ((testCase == Case::Store || testCase == Case::ForgedRoot) &&
+                    (elementOp != kIROp_UIntType || width != 4))
                     continue;
                 _resetDirectNVVMFakes();
                 NVVMStaticTestContext context(unitTestContext);
@@ -1626,7 +1634,23 @@ SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
                     builder.createStructKey(),
                     builder.getUIntType());
                 auto vector = builder.getVectorType(builder.getType(elementOp), width);
-                auto field = builder.createStructField(globals, builder.createStructKey(), vector);
+                IRType* fieldType = vector;
+                IRStructField* arrayField = nullptr;
+                if (testCase == Case::ArrayLoad)
+                {
+                    auto array = builder.getArrayType(
+                        vector,
+                        builder.getIntValue(builder.getIntType(), 2),
+                        builder.getIntValue(
+                            builder.getIntType(),
+                            elementOp == kIROp_HalfType ? 8 : 12));
+                    auto record = builder.createStructType();
+                    arrayField =
+                        builder.createStructField(record, builder.createStructKey(), array);
+                    fieldType = builder.getType(kIROp_ConstantBufferType, record);
+                }
+                auto field =
+                    builder.createStructField(globals, builder.createStructKey(), fieldType);
                 builder.createStructField(
                     globals,
                     builder.createStructKey(),
@@ -1644,10 +1668,35 @@ SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
                 builder.emitBlock();
                 auto pointer = builder.getPtrType(
                     vector,
-                    AccessQualifier::ReadWrite,
+                    testCase == Case::ArrayLoad ? AccessQualifier::Read
+                                                : AccessQualifier::ReadWrite,
                     AddressSpace::Generic,
                     builder.getType(kIROp_ScalarBufferLayoutType));
-                auto address = builder.emitFieldAddress(pointer, global, field->getKey());
+                IRInst* address = builder.emitFieldAddress(
+                    testCase == Case::ArrayLoad ? builder.getPtrType(
+                                                      fieldType,
+                                                      AccessQualifier::Read,
+                                                      AddressSpace::Generic,
+                                                      builder.getType(kIROp_ScalarBufferLayoutType))
+                                                : pointer,
+                    global,
+                    field->getKey());
+                if (testCase == Case::ArrayLoad)
+                {
+                    auto group = builder.emitLoad(fieldType, address);
+                    auto arrayAddress = builder.emitFieldAddress(
+                        builder.getPtrType(
+                            arrayField->getFieldType(),
+                            AccessQualifier::Read,
+                            AddressSpace::Generic,
+                            builder.getType(kIROp_ScalarBufferLayoutType)),
+                        group,
+                        arrayField->getKey());
+                    address = builder.emitElementAddress(
+                        pointer,
+                        arrayAddress,
+                        builder.getIntValue(builder.getIntType(), 0));
+                }
                 auto loaded = builder.emitLoad(vector, address);
                 if (testCase == Case::Store)
                     builder.emitStore(address, loaded);
@@ -1660,15 +1709,18 @@ SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
                 const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
                 const auto expected = testCase == Case::Store
                                           ? toSlice("immutable struct field access: consumer=store")
-                                          : toSlice("global_param");
-                if ((testCase == Case::Load && SLANG_FAILED(result)) ||
-                    (testCase != Case::Load && diagnostic.indexOf(expected) < 0))
+                                      : testCase == Case::ForgedRoot
+                                          ? toSlice("global_param")
+                                          : toSlice("unlowered compact group load");
+                const bool accepted = testCase == Case::Load && !compact;
+                if ((accepted && SLANG_FAILED(result)) ||
+                    (!accepted && diagnostic.indexOf(expected) < 0))
                 {
                     getTestReporter()->message(
                         TestMessageType::Info,
                         context.sink.outputBuffer.getBuffer());
                 }
-                if (testCase == Case::Load)
+                if (accepted)
                 {
                     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
                     const auto selected =
@@ -1683,16 +1735,8 @@ SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
                     const auto& load = requirements.emissionPlan.loads[0];
                     SLANG_CHECK(load.source == loaded && load.pointer == address);
                     SLANG_CHECK(load.flags == SLANG_NVVM_LOAD_FLAG_INVARIANT);
-                    SLANG_CHECK(load.alignment == (width == 3 ? 4 : width * 4));
-                    SLANG_CHECK(
-                        load.conversion.kind == (width == 3
-                                                     ? NVVMStorageConversionKind::CompactVector
-                                                     : NVVMStorageConversionKind::Identity));
-                    if (width == 3)
-                    {
-                        SLANG_CHECK(load.conversion.type == vector);
-                        SLANG_CHECK(load.conversion.laneCount == 3);
-                    }
+                    SLANG_CHECK(load.alignment == width * 4);
+                    SLANG_CHECK(load.conversion.kind == NVVMStorageConversionKind::Identity);
                 }
                 else
                 {

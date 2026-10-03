@@ -504,6 +504,159 @@
         "tests/cuda/nvvm-bitfield-boundaries.slang"
       ],
       "rationale": "Exact authored runtime mode; explicit signedness and independent zero/full/top-bit/interior expectations across scalar/vector integer widths, with sentinel."
+    },
+    {
+      "id": "cuda/nvvm-compact-vector-storage.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-compact-vector-storage.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-compact-vector-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-compact-vector-storage.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-compact-vector-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-compact-vector-storage.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-compact-vector-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-2",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-3",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-4",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang.3 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-5",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang.4 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
+    },
+    {
+      "id": "cuda/nvvm-explicit-group-compact-storage.slang#cuda-6",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-compact-group-consolidation",
+      "outcome_path": [
+        "validation",
+        "focused",
+        "outcomes",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang.5 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-explicit-group-compact-storage.slang"
+      ],
+      "rationale": "Exact authored mode and host-byte oracle; default or explicit GROUP_LAYOUT is retained by the selected directive. No unexecuted comparison backend is admitted."
     }
   ],
   "smoke": [

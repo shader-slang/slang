@@ -419,8 +419,14 @@ Matrix orientation is selected before matrix value legalization; compact vector 
 CUDA system values. OptiX register payload packing and its entry-point prerequisites run before
 matrix storage lowering so physical column order cannot change the payload ABI.
 
-Default uniform parameter groups use the same CUDA numeric storage policy and finite value cache
-as local and structured-buffer objects. Readonly group borrows require identical pointees and
+Uniform parameter groups use the same CUDA numeric storage policy and finite value cache
+as local and structured-buffer objects. CUDA reflection selects CUDA layout even for explicit
+Scalar/CData ConstantBuffer layout operands; shared lowering uses that same owner. The original
+layout operand remains available to admission, including the existing Std430 rejection. Compact
+Int/UInt/Float32 width3 and Half3/4 values are reconstructed by shared IR pack/unpack helpers;
+NVVM has no separate compact-group load decoder. A leftover raw compact load on its checked
+immutable group path is rejected before provider mutation. Compact physical type, stride and
+Half role-cache proofs remain independent contracts. Readonly group borrows require identical pointees and
 proven storage/value layout identity; pointer-bearing representation mismatches remain rejected. Replacing a collected
 uniform struct preserves its synthesized-parameter-group marker; address plans retain that storage
 role through mutable local copies and nested fields. Packed byte-vector chunks are storage leaves,
@@ -540,9 +546,9 @@ buffer recipes require their separate immutable-location contract.
 Collected conventional globals admit direct Int32/UInt32/Float32 vectors of widths2–4. Their
 layout-qualified field pointers come from shared buffer-layout fixing and retain the exact field
 key and immutable root. Global field classification owns admission; executable selection excludes
-comparison samplers and unsized sampler arrays that have storage-only contracts. Checked loads
-reuse the parameter-group compact-vector conversion for width3: twelve bytes of scalar-array
-storage become a three-lane SSA vector. Widths2/4 retain their native representation. This does not
+comparison samplers and unsized sampler arrays that have storage-only contracts. Shared storage
+lowering expresses width3 conversion as ordinary IR: twelve bytes of scalar-array storage become
+a three-lane SSA vector before NVVM planning. Widths2/4 retain their native representation. This does not
 authorize stores through uniforms or broaden ordinary device-pointer and resource-storage roles.
 Recursive pointer-bearing records and arrays retain this checked conventional root, canonical
 field keys and external-layout proof through child selection. Storage admission does not grant

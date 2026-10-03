@@ -6164,7 +6164,7 @@ struct NVVMMemoryAddress
     IRInst* root = nullptr;
     IRType* structuredStorageType = nullptr;
     IRVectorType* localBFloat16Vector = nullptr;
-    IRVectorType* compactVector = nullptr;
+    bool hasUnloweredCompactVector = false;
     bool isConventionalGlobal = false;
     bool isParameterGroupStorage = false;
 };
@@ -6201,8 +6201,8 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
     if (hasCompactStorage)
     {
         auto pointerType = cast<IRPtrTypeBase>(pointer->getDataType());
-        address.compactVector =
-            asNVVMSupportedCompactParameterGroupVectorType(pointerType->getValueType());
+        address.hasUnloweredCompactVector =
+            asNVVMSupportedCompactParameterGroupVectorType(pointerType->getValueType()) != nullptr;
     }
     address.structuredStorageType =
         _getNVVMStructuredBufferStoragePointerValueType(plan.addresses, pointer);
@@ -6520,10 +6520,12 @@ SlangResult _planNVVMLoad(
     const uint32_t physicalAlignment =
         _getNVVMPhysicalAggregateStorageAlignment(codeGenContext, load->getDataType());
     const uint32_t valueAlignment = _getNVVMExecutableValueAlignment(load->getDataType());
-    auto compactVector = address.compactVector;
-    outLoad.alignment = compactVector
-                            ? getNVVMNumericValueAlignment(compactVector->getElementType())
-                            : physicalAlignment;
+    // Shared buffer-element lowering must express compact group loads as ordinary IR over
+    // physical fields. Reject a raw float3/half3/half4 load here: its storage array cannot be
+    // used as a native vector value, even when both roles have already been cached.
+    if (address.hasUnloweredCompactVector)
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("unlowered compact group load"));
+    outLoad.alignment = physicalAlignment;
     if (localBFloat16Vector)
     {
         outLoad.alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
@@ -6540,16 +6542,6 @@ SlangResult _planNVVMLoad(
         outLoad.conversion.type = storageType;
         outLoad.conversion.structuredRecipe =
             _planNVVMStructuredBufferStorageConversion(requirements, storageType, true);
-    }
-    if (compactVector)
-    {
-        uint32_t count = 0;
-        SLANG_RELEASE_ASSERT(asNVVMSupportedNumericVectorType(compactVector, &count));
-        outLoad.conversion.kind = isNVVMFloat16Type(compactVector->getElementType())
-                                      ? NVVMStorageConversionKind::CompactHalfVector
-                                      : NVVMStorageConversionKind::CompactVector;
-        outLoad.conversion.type = compactVector;
-        outLoad.conversion.laneCount = count;
     }
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
@@ -10036,66 +10028,9 @@ SlangResult _emitNVVMPlannedStorageConversion(
             storageToValue,
             input,
             outValue);
-    case NVVMStorageConversionKind::CompactVector:
-    case NVVMStorageConversionKind::CompactHalfVector:
-        break;
     default:
         SLANG_UNEXPECTED("unknown planned storage conversion");
     }
-    SLANG_RELEASE_ASSERT(storageToValue);
-    const uint32_t elementCount = conversion.laneCount;
-    SlangNVVMValueHandle loweredElements[4] = {};
-    if (conversion.kind == NVVMStorageConversionKind::CompactHalfVector)
-    {
-        for (uint32_t chunkIndex = 0; chunkIndex < 2; ++chunkIndex)
-        {
-            SlangNVVMValueHandle chunk = nullptr;
-            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                codeGenContext,
-                "compact parameter-group half-vector chunk extraction",
-                builder.emitAggregateElementExtract(module, input, chunkIndex, chunk)));
-            for (uint32_t laneIndex = 0; laneIndex < 2; ++laneIndex)
-            {
-                const uint32_t elementIndex = chunkIndex * 2 + laneIndex;
-                if (elementIndex >= elementCount)
-                    break;
-                SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
-                    codeGenContext,
-                    builder,
-                    module,
-                    chunk,
-                    laneIndex,
-                    loweredElements[elementIndex]));
-            }
-        }
-    }
-    else
-    {
-        SLANG_RELEASE_ASSERT(elementCount == 3);
-        for (uint32_t elementIndex = 0; elementIndex < elementCount; ++elementIndex)
-        {
-            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                codeGenContext,
-                "compact parameter-group vector element extraction",
-                builder.emitAggregateElementExtract(
-                    module,
-                    input,
-                    elementIndex,
-                    loweredElements[elementIndex])));
-        }
-    }
-    SlangNVVMTypeHandle loweredVectorType = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        typeContext.lowerType(conversion.type, conversion.resultUse, loweredVectorType));
-    return _requireBuilderOperation(
-        codeGenContext,
-        "compact parameter-group vector reconstruction",
-        builder.emitVectorConstruct(
-            module,
-            loweredVectorType,
-            loweredElements,
-            elementCount,
-            outValue));
 }
 
 SlangResult _emitNVVMValueRecipeStep(

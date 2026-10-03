@@ -2678,16 +2678,16 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     }
     auto targetReq = target->getTargetReq();
     // Default CUDA pointers and structured resources share the host CUDA byte layout. In
-    // particular Bool is one byte and Half3 has an eight-byte stride. Explicit layouts and
-    // the CUDA source backend retain their existing contracts.
+    // particular Bool is one byte and Half3 has an eight-byte stride. The CUDA source backend
+    // retains its existing lowering policy.
     if (target->shouldEmitNVVMDirectly())
     {
-        if (auto group = as<IRUniformParameterGroupType>(bufferType))
-        {
-            auto layout = group->getDataLayout();
-            if (!layout || layout->getOp() == kIROp_DefaultBufferLayoutType)
-                return IRTypeLayoutRuleName::CUDA;
-        }
+        // CUDA reflection uses CUDALayoutRulesFamilyImpl for every uniform group, including
+        // ConstantBuffer<Params, ScalarDataLayout>. Match that owner here so a float3 field
+        // becomes compact storage before NVVM planning, regardless of the group layout operand.
+        // Explicit pointer and structured-buffer layouts below have separate contracts.
+        if (as<IRUniformParameterGroupType>(bufferType))
+            return IRTypeLayoutRuleName::CUDA;
         if (auto buffer = as<IRHLSLStructuredBufferTypeBase>(bufferType))
         {
             auto layout = buffer->getDataLayout();

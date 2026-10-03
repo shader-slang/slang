@@ -51,7 +51,7 @@ void checkHalfBoundaryCacheOrders(UnitTestContext* testContext, uint32_t laneCou
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                 provider.getVectorType(scope.module, integer, laneCount, boundary)));
         }
-        SlangNVVMTypeHandle storage = nativeHalf;
+        SlangNVVMTypeHandle storage = value;
         if (laneCount >= 3)
         {
             SlangNVVMTypeHandle chunk = nullptr;
@@ -67,13 +67,6 @@ void checkHalfBoundaryCacheOrders(UnitTestContext* testContext, uint32_t laneCou
             const auto role = roles[(first + request) % SLANG_COUNT_OF(roles)];
             SlangNVVMTypeHandle actual = boundary;
             const auto result = lowering.lowerType(canonical, role, actual);
-            if (role == NVVMTypeUse::Storage && laneCount == 2)
-            {
-                // Bare half2 Storage is not currently admitted. Preserve that separate policy.
-                SLANG_CHECK(SLANG_FAILED(result));
-                SLANG_CHECK(actual == nullptr);
-                continue;
-            }
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
             const auto expected =
                 role == NVVMTypeUse::Storage ? storage
