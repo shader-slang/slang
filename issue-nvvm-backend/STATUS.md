@@ -1,8 +1,9 @@
 # NVVM current status
 
-**Current authorized work (2026-10-03):** fresh working/unit/RHI validation, bounded bitfield
-simplification, then compilation and GPU performance refresh. The correctness checkpoint and bitfield cleanup are complete; the performance report is being finalized;
-the prior application acceptance below remains unchanged. Legacy OptiX8 HitObjects remain parked.
+**Requested work complete (2026-10-03):** fresh validation, ordinary-IR bitfield cleanup and
+compilation/GPU performance refresh are accepted. Development is stopped after these three items.
+The main next priority is the confirmed material-code regression; wave fast paths follow.
+Legacy OptiX8 HitObjects remain parked.
 
 The CUDA-text route migration is **complete with focused local acceptance**. NVVM no longer
 infers operations from CUDA assembly-body strings or active semantic tags. The final field-offset
@@ -53,6 +54,35 @@ preserves the exact 280 pass / 1 intentional unsupported MakeHit / 10 skip outco
 
 Current evidence is under `build/nvvm-current-checkpoint/` and `build/nvvm-bitfield-legalization/`;
 [focal records](focused-evidence.json) retain the initial failures, controls and final reconciliation.
+
+## Current performance and next priorities
+
+On the current L4 / driver 595.71.05 / eight-CPU host, NVVM O3 compilation is **1.95× faster on the
+406-case frozen cohort and 1.82× on the 98-case discovery cohort** by geometric mean of per-case
+median NVRTC/NVVM ratios. All 1,512 variants compile/assemble and all 9,072 measured samples plus
+3,024 warmups preserve qualified PTX. Historical host and dependency changes prevent attributing
+this larger relative advantage to an NVVM compiler speedup.
+
+Material execution exposes a **confirmed generated-code regression**. At 1,048,577 records,
+current NVVM O3 eval/sample take **2.734/2.373 ms**, close to NVRTC's **2.817/2.487 ms**. Historical
+NVVM O3 cubins requalified on the current helper, inputs, GPU and driver take **0.312/0.390 ms**:
+current code takes **8.75×/6.08× longer**. Local frames grow from zero to 592/624 bytes, with 94 extra
+static local stores and 3 loads and no PTXAS spills. Compact material-context scalar promotion after
+helper inlining is the leading investigation; an individual pass cause is not yet isolated. The
+Boolean snapshot repair is not exercised by this material. Preserve pointer ABI and AD stall controls.
+
+The full original-input dispatch refresh preserves all 3,402 prior measured cells and adds 22:
+**3,424 measured / 56 excluded**, 30,816 samples, 567 complete cases. The copyable-context fixture now
+passes all six cells after explicit initialization. Of nine ratio-eligible cases, eight wave/min/max
+fixtures take **2.07–3.03× NVRTC O3 intervals**; FP8 is near parity. Fresh 27-cell code analysis shows
+missing integer-prefix tree fast paths and extra floating-fold mask/control work, with zero offline
+spills. These are correctness workloads with shader checks and host enqueue gaps, not application
+throughput. The full historical 580-case static analysis was not rerun.
+
+Recommended next bounded work: first isolate and recover material-context scalar promotion; then
+optimize wave eligible-mask paths while preserving floating ordering semantics. Current measurements,
+exact transitions and histories are in [focused evidence](focused-evidence.json); readable results,
+plots and raw evidence are under `build/nvvm-results/2026-10-03-current1/presentation/report.md`.
 
 ## Current application acceptance — SlangPy failures resolved
 

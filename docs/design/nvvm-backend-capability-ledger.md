@@ -1024,14 +1024,14 @@ is claimed by this investigation.
 
 ## Language composition and application evidence
 
-| Region                                                                            | Evidence currently available                                                                                                             | Limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dynamic dispatch                                                                  | Permanent simple and nested AnyValue records with live runtime selection/mutation                                                        | Concrete record roles and payload capacity remain bounded. [Original substandard case](../../tests/compute/dynamic-dispatch-substandard-float.slang), [nested regression](../../tests/cuda/nvvm-nested-substandard-dynamic.slang)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Errors and generic throwing calls                                                 | Runtime-dependent scalar/aggregate propagation, catches, generic-specialized witness path; permanent three-mode GPU tests                | Generic specialization is not an existential throwing-witness ABI. [Runtime errors](../../tests/cuda/nvvm-runtime-errors.slang), [throwing witness](../../tests/cuda/nvvm-runtime-throwing-witness.slang)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Inheritance and initialization                                                    | Focused unchanged-source three-mode qualification of struct inheritance, derived initializer lists, 16-bit defaults and scoped constants | Some expressions/calls/arrays can fold; no IR survival, arbitrary inheritance depth or nonintegral Half claim. [Inheritance](../../tests/language-feature/inheritance/struct-inheritance.slang), [derived initialization](../../tests/language-feature/inheritance/derived-struct-init-list.slang), [16-bit defaults](../../tests/language-feature/initializer-lists/default-init-16bit-types.slang), [constants](../../tests/language-feature/constants/static-const-in-struct.slang)                                                                                                                                                                                                                                                                                                                                       |
-| Accessors, generics, variadics, constrained extensions, lambdas, tuples and defer | Focused unchanged-source experiments plus main-corpus selection                                                                          | Passing isolated examples does not establish all feature intersections. Selected membership and semantic coverage are different measurements.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Material shaders                                                                  | Both registered entries × three modes compile/assemble and execute with two live synthetic textures and independent scalar oracles       | 65 active records/entry/mode and 63 untouched guards. Eval checks 260 components; sample checks 455 floats/65 flags, selected-layer throughput, coherent arithmetic candidates and exact rejection zeros. Fixed synthetic inputs only; no original assets, live LUTs or sampling-distribution claim. Device-event evidence has its own scoped row below. [Runtime validator](../../extras/validate-nvvm-material-runtime.py). [Material manifest](../../issue-nvvm-backend/complex-corpus.manifest.json)                                                                                                                                                                                                                                                                                                                     |
-| Synthetic material device events                                                  | Both entries × two counts × three modes × two reversed rounds; 216 measured launches and 72 warmups pass complete output checks          | At N1,048,577, fresh NVRTC O3/NVVM O3 time ratios are 8.93–8.97 eval and 6.26–6.30 sample across the two rounds on the qualified L4 (pooled medians: 8.95×/6.29×). Tiny hot textures, periodic inputs and inter-launch correctness transfers only; no application performance or causal claim. Small NVVM O3 cells fail the 0.1 ms throughput gate. An earlier eval-only diagnostic, not rerun in this refresh, removes 65 proven never-read PTX stores: reassembly eliminates its stack and reduces NVRTC time about 8.15× with exact outputs. This is not a production pass or a sampling result. [Runner](../../extras/measure-nvvm-material-runtime.py), [CPU contracts](../../issue-nvvm-backend/test-nvvm-material-measurement.py), [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement). |
+| Region                                                                            | Evidence currently available                                                                                                             | Limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dynamic dispatch                                                                  | Permanent simple and nested AnyValue records with live runtime selection/mutation                                                        | Concrete record roles and payload capacity remain bounded. [Original substandard case](../../tests/compute/dynamic-dispatch-substandard-float.slang), [nested regression](../../tests/cuda/nvvm-nested-substandard-dynamic.slang)                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Errors and generic throwing calls                                                 | Runtime-dependent scalar/aggregate propagation, catches, generic-specialized witness path; permanent three-mode GPU tests                | Generic specialization is not an existential throwing-witness ABI. [Runtime errors](../../tests/cuda/nvvm-runtime-errors.slang), [throwing witness](../../tests/cuda/nvvm-runtime-throwing-witness.slang)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Inheritance and initialization                                                    | Focused unchanged-source three-mode qualification of struct inheritance, derived initializer lists, 16-bit defaults and scoped constants | Some expressions/calls/arrays can fold; no IR survival, arbitrary inheritance depth or nonintegral Half claim. [Inheritance](../../tests/language-feature/inheritance/struct-inheritance.slang), [derived initialization](../../tests/language-feature/inheritance/derived-struct-init-list.slang), [16-bit defaults](../../tests/language-feature/initializer-lists/default-init-16bit-types.slang), [constants](../../tests/language-feature/constants/static-const-in-struct.slang)                                                                                                                                                                |
+| Accessors, generics, variadics, constrained extensions, lambdas, tuples and defer | Focused unchanged-source experiments plus main-corpus selection                                                                          | Passing isolated examples does not establish all feature intersections. Selected membership and semantic coverage are different measurements.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Material shaders                                                                  | Both registered entries × three modes compile/assemble and execute with two live synthetic textures and independent scalar oracles       | 65 active records/entry/mode and 63 untouched guards. Eval checks 260 components; sample checks 455 floats/65 flags, selected-layer throughput, coherent arithmetic candidates and exact rejection zeros. Fixed synthetic inputs only; no original assets, live LUTs or sampling-distribution claim. Device-event evidence has its own scoped row below. [Runtime validator](../../extras/validate-nvvm-material-runtime.py). [Material manifest](../../issue-nvvm-backend/complex-corpus.manifest.json)                                                                                                                                              |
+| Synthetic material device events                                                  | Both entries × two counts × three modes × two reversed rounds; 216 measured launches and 72 warmups pass complete output checks          | At 1,048,577 records, current NVVM O3 eval/sample take 2.734/2.373 ms versus NVRTC 2.817/2.487 ms. Historical NVVM cubins requalified on the current machine take 0.312/0.390 ms, confirming current code takes 8.75×/6.08× longer. Tiny hot textures and periodic inputs only; no application-performance or individual-pass attribution. Current cells pass the 0.1 ms gate; small historical-cubin controls do not. The earlier eval-only local-store diagnostic remains historical and was not rerun. [Runner](../../extras/measure-nvvm-material-runtime.py), [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement). |
 
 The material validator also qualifies a separately named `linear-filtering` input profile in six
 GPU cells. Four dyadic UV locations exercise horizontal, vertical and bilinear blends and a footprint
@@ -1089,76 +1089,71 @@ parameter-group loads retain their independent representation, alignment and inv
 These checks preserve existing support boundaries. Parent proofs and raw-view access are retained
 directly; pointer spelling alone cannot grant a child writable resource access.
 
-## Current compilation observations
+## Current compilation and execution observations
 
-The current results refresh uses the accepted optimized compiler on an AMD EPYC 7R13 host with
-four visible logical CPUs; one compiler process runs at a time. The standalone release cohort has
-504 cases/500 sources and 76 explicit exclusions. All 1,512 variants compile and assemble; all
-9,072 measured compilations and 3,024 warmups preserve the qualified PTX.
+The October 3 refresh uses the optimized compiler on an AMD EPYC 7R13 host with eight visible logical
+CPUs, one compiler process at a time, CUDA 12.9.2 and an L4 with driver 595.71.05. All 1,512 standalone
+variants compile and assemble; 9,072 measured fresh-process compilations and 3,024 warmups preserve
+qualified PTX. The cohort retains 504 cases/500 sources and 76 explicit exclusions.
 
 | Cohort    | Cases | NVRTC O3 / NVVM O3 | NVRTC O3 / NVVM O0 |
 | --------- | ----: | -----------------: | -----------------: |
-| Frozen    |   406 |              1.47× |              1.51× |
-| Discovery |    98 |              1.41× |              1.49× |
+| Frozen    |   406 |              1.95× |              1.99× |
+| Discovery |    98 |              1.82× |              1.92× |
 
-These are geometric means of per-case median fresh-process time ratios, using six samples per cell
-and warm caches. NVVM O3 has lower observed medians in 400/406 frozen and 94/98 discovery cases;
-NVVM O0 does so in all selected cases. Equal `-g0` policy avoids asymmetric renderer debug options.
-Original runtime contracts remain authoritative; timed release PTX is compile/assembly-qualified,
-not separately GPU-qualified. No general application compilation or statistical-significance claim
-follows. See [protocol](../../issue-nvvm-backend/RESULTS.md#standalone-corpus-compilation) and the
-`compilation-performance` feature in [current evidence](../../issue-nvvm-backend/focused-evidence.json).
+These are geometric means of per-case median compilation-time ratios, six samples per cell with
+warm caches and equal `-g0`. NVVM O3 has lower medians in 400/406 frozen and 93/98 discovery cases;
+NVVM O0 in 404/406 and 94/98. Timed CLI PTX is compile/assembly-qualified, not separately GPU-qualified.
+Historical NVVM compilation times are roughly unchanged on matched primary sources while NVRTC
+is slower; CPU count, physical GPU, driver and dependencies changed. The relative advantage does not
+establish a longitudinal NVVM compiler speedup. Material compilation uses 18 samples/cell: eval medians
+are 1.478/1.570/1.441 seconds and sample 1.504/1.697/1.498 seconds for NVRTC O3/NVVM O3/NVVM O0.
+Assembly is measured separately. Broad-corpus gains do not transfer uniformly to larger entries.
 
-Material compilation uses 18 samples per cell. Eval medians are 1.381/1.376/1.292 seconds and
-sample medians 1.401/1.473/1.336 seconds for NVRTC O3/NVVM O3/NVVM O0. Thus the broad-corpus gains
-do not transfer uniformly to these larger entries. Assembly and inclusive Slang phases remain
-separate measurements. The 12-shader quality subset supplies fresh static resources for 36 cells;
-its single compile observations and code sizes are not GPU-performance evidence.
+The synthetic material protocol independently qualifies 18 cells, then validates full outputs and 63
+sentinel records on 216 measured launches and 72 warmups. At 1,048,577 records, NVVM O3 eval/sample take
+2.734/2.373 ms versus NVRTC 2.817/2.487 ms. Historical NVVM O3 cubins requalified with the current helper,
+inputs, oracle, GPU and driver take 0.312/0.390 ms: current code takes 8.75/6.08 times longer. This
+establishes a generated-code regression, not a specific pass cause. NVRTC PTX/cubins are byte-identical
+to historical controls. NVVM local frames grow 0 → 592/624 bytes with 94 extra static local stores and 3
+loads; PTXAS reports zero spills. Compact material-context scalar promotion after helper inlining is
+the leading investigation. Boolean snapshots are not exercised; two numeric matrix snapshots remain.
+These periodic 65-record/hot 2×2-texture workloads are not renderer frames or arbitrary-material evidence.
 
-Original-input GPU dispatch measurements now attempt all 452 frozen and 128 discovery cases in
-NVRTC O3, NVVM O3 and NVVM O0 with explicit `-g0`: two reversed rounds, three warmups and nine
-samples per mode/round, reset resources before every launch, and original comparison oracles.
-Complete three-mode comparisons cover 449 frozen and 117 discovery cases; 30,618 accepted samples
-span 3,402 measured mode-round cells. The 78 exclusions retain 72 instances of the existing 36 gaps
-and six new repeatability failures in the copyable-context fixture. The latter returns typed uint32
-failure sentinels, not aggregate padding; both backends leave its bare static aggregate uninitialized.
-The ordinary full checkpoint still has all 1,740 original outcomes unchanged. A later focused
-fixture correction supplies `state = {};` and passes three launches in each mode; it does not
-retroactively accept these excluded timing samples.
+Original-input dispatch attempts all 452 frozen and 128 discovery cases in three modes and two reversed
+rounds, with three warmups/nine samples per mode/round and reset resources before each launch.
+It accepts 3,424 mode-round cells and 30,816 samples; 56 cells remain excluded. All 3,402 prior measured
+cells remain measured, 22 previously excluded cells now measure, and no measured cell regresses to
+excluded. The initialized copyable-context fixture passes all six cells; its original repeatability
+failure remains recorded. No general bare-static zero initialization guarantee is inferred.
 
-Of 566 complete cases, 557 are below the prespecified 0.1 ms ratio cutoff in at least one mode.
-Eight of the nine longer cases exercise wave/min/max and show 1.76–2.42× higher NVVM O3 intervals
-than NVRTC O3; FP8 scalar transport is near parity at 1.03×. These are original correctness workloads,
-including shader-side checks. CUDA events include RHI parameter upload and host enqueue gaps;
-reset, readback, compilation and encoding are outside. Clocks are not locked. Short observations
-are retained without ratios; the cutoff is policy, not calibrated resolution. No aggregate shader
-throughput or application-performance claim follows. See the
-[runner](../../extras/measure-nvvm-corpus-runtime.py),
-[CPU contracts](../../issue-nvvm-backend/test-nvvm-corpus-runtime.py),
-[harness contracts](../../extras/test-cuda-dispatch-profile.py),
-[protocol](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-dispatch-timing) and
-`corpus-dispatch-performance` in [current evidence](../../issue-nvvm-backend/focused-evidence.json).
+Of 567 complete three-mode cases, 558 fall below the 0.1 ms median ratio policy cutoff. Eight of the
+nine longer cases exercise wave/min/max and take 2.07–3.03 times NVRTC O3 intervals; FP8 scalar
+transport is near parity at 1.04 times. Thirteen cases remain incomplete. These are correctness
+fixtures including shader-side checks. CUDA events include RHI parameter upload and host enqueue
+gaps; compilation, resource reset and readback are excluded. Clocks are not locked. Short intervals
+remain without ratios, and no aggregate shader-throughput claim follows.
 
-Fresh original-input code capture covers all 580 cases and three modes: 1,704 qualified cells,
-36 retained gaps, and 567 complete O3/O3 comparisons. Offline SM89 assembly finds 194 cases
-with identical bytes in every named executable section, 0 additional normalized-PTX matches,
-46 similar static profiles, 327 different profiles, and 13 incomplete comparisons.
-Similarity is a triage heuristic, not performance proof. NVVM uses fewer/equal/more hardware
-registers in 103/402/62 paired cases.
-The narrow masked min/max slowdown coexists with smaller PTX and fewer offline registers:
-eligible-mask fast paths and aggregate traversal differ. Floating min/max already uses trees,
-but retains mode selection within loops and repeated component traversal. Interface-return dispatch
-shows a separate tag/control-flow simplification opportunity (33→94 PTX, 40→104 SASS instructions);
-its short fixture does not support a runtime regression claim. Static metrics use fresh captures
-and offline ptxas, not historical timed PTX or recorded driver-JIT machine code. No new timings,
-compiler changes or broader feature qualification are implied.
+Fresh code capture/analysis covers all 27 variants of those nine longer cases. Offline CUDA 12.9 SM89
+assembly reports zero spills for all 27 entries. O3 stack sizes match across backends: 112 bytes for
+narrow min/max and zero for the other eight. Integer prefix folds miss eligible-mask tree fast paths;
+floating folds retain trees but carry sparse/tree selection and first-set-bit work inside their loop.
+Vector/matrix folds repeat scalar traversal. Static instruction/register counts alone do not explain
+runtime; NVVM is often smaller. Preserve NaN, signed-zero, tie/second-operand and masked-lane semantics
+when optimizing. Offline SASS is not recorded driver-JIT code.
 
-See the [capture tool](../../extras/capture-nvvm-corpus-code.py),
-[analyzer](../../extras/analyze-nvvm-corpus-code.py),
-[protocol](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-code-quality) and
-`corpus-code-quality` in [current evidence](../../issue-nvvm-backend/focused-evidence.json).
-The current presentation includes every case, resource/instruction tables and six source/PTX/SASS
-case studies. Existing semantic qualifications and failure histories remain unchanged.
+The September 28 full 580-case code-quality analysis remains historical: 1,704 qualified captures,
+36 gaps, 567 complete O3 pairs, 194 identical executable-section binaries, 46 similar profiles and 327
+different profiles. It was not rerun on the current compiler. The older 12-source static subset and
+material local-store diagnostic also retain their original identities; neither is fresh timing evidence.
+
+See [measurement protocols](../../issue-nvvm-backend/RESULTS.md), the maintained
+[capture tool](../../extras/capture-nvvm-corpus-code.py) and
+[analyzer](../../extras/analyze-nvvm-corpus-code.py). The `compilation-performance`,
+`corpus-dispatch-performance` and `tiled-brass-synthetic-device-events` records in
+[current evidence](../../issue-nvvm-backend/focused-evidence.json) pin current measurements,
+independent reviews, exact transitions and preserved failure histories. Material scalar promotion is
+the first recommended investigation, followed by wave fast paths; neither starts further development.
 
 ## Known gaps and evidence boundaries
 
