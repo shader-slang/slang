@@ -31,6 +31,22 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## Scalar predicates selecting vectors
+
+The shared semantic catalog admits scalar Boolean predicates or matching-width Boolean vector
+predicates for existing selected value types. Exact alternatives/results remain required. Numeric
+and Boolean vectors of widths2-4 now have GPU coverage for both scalar predicate values at NVVM
+O0/O3 and NVRTC O3; invalid mask widths and non-Boolean predicates remain rejected. The compiler
+producer and provider LLVM `CreateSelect` emission are unchanged. See the
+[runtime fixture](../../tests/cuda/nvvm-scalar-vector-select.slang) and
+[Falcor-derived compile regressions](../../tests/cuda/applications/falcor-scalar-vector-select.slang).
+All nine standalone compile/assembly cells pass, resolving four original rejections.
+
+Falcor now advances to a separate `WaveActiveSum(uint64_t3)` rejection during emissive-triangle
+setup; no completed NVVM path-tracing run is claimed. The
+[application manifest](../../issue-nvvm-backend/falcor2-status.json) retains both failure stages and
+exact qualification scope. Aggregate/matrix selection and additional wave support are not added.
+
 ## TensorView, references and canonical numeric storage
 
 TensorView/DiffTensorView use a typed 56-byte descriptor with the existing host offsets and alignment.

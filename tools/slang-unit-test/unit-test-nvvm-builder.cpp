@@ -6242,7 +6242,33 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         scalarConditionVectorSelectOperands,
         SLANG_COUNT_OF(scalarConditionVectorSelectOperands),
     };
-    SLANG_CHECK(!builder.supportsValueOperation(scalarConditionVectorSelect));
+    SLANG_CHECK(builder.supportsValueOperation(scalarConditionVectorSelect));
+
+    const SlangNVVMValueTypeDesc mismatchedSelectMaskOperands[] = {
+        bool3,
+        signedI32x2,
+        signedI32x2,
+    };
+    const SlangNVVMValueOperationDesc mismatchedSelectMask = {
+        SLANG_NVVM_VALUE_OP_SELECT,
+        signedI32x2,
+        mismatchedSelectMaskOperands,
+        SLANG_COUNT_OF(mismatchedSelectMaskOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(mismatchedSelectMask));
+
+    const SlangNVVMValueTypeDesc numericSelectMaskOperands[] = {
+        NVVMSemantics::kSignedI32,
+        signedI32x2,
+        signedI32x2,
+    };
+    const SlangNVVMValueOperationDesc numericSelectMask = {
+        SLANG_NVVM_VALUE_OP_SELECT,
+        signedI32x2,
+        numericSelectMaskOperands,
+        SLANG_COUNT_OF(numericSelectMaskOperands),
+    };
+    SLANG_CHECK(!builder.supportsValueOperation(numericSelectMask));
 
     const SlangNVVMValueTypeDesc unsignedI32x2 = {
         SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,

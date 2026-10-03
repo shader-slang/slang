@@ -98,7 +98,9 @@ python3 issue-nvvm-backend/run-complex-corpus.py \
   --output build/nvvm-application-reproducers/replay-1
 ```
 
-This selects all six entry points at NVRTC O3 / NVVM O0 / NVVM O3: 18 cells. Every successful
+This selects nine entry points at NVRTC O3 / NVVM O0 / NVVM O3: 27 cells, including the three
+Falcor scalar/vector-select entries. The prior 18-cell Torch replay was not refreshed when those
+nine Falcor cells were added. Every successful
 compile must also pass `ptxas`. Exit 1 preserves the current failures and is not an accepted backend
 pass; exit 0 requires all cells to succeed. Inspect `results.json` and per-cell logs, including
 attempt errors. The existing runner labels process timeouts `infrastructure-failed` with an explicit
@@ -118,7 +120,9 @@ The kernel-call and packed-tensor sources now also contain authored compile regr
 their bounded repair. Run those with `slang-test tests/cuda/applications/torch-cuda-kernel-call`
 and `slang-test tests/cuda/applications/torch-packed-tensor`; the separate
 `tests/cuda/cuda-kernel-direct-call.slang` checks non-inlined GPU calls and the preserved CUDA launch
-entry. The polynomial and softplus sources remain opt-in unresolved cases without default directives.
+entry. The polynomial and softplus sources remain opt-in unresolved cases. The Falcor scalar/vector-select
+source now has nine authored compile regressions; `tests/cuda/nvvm-scalar-vector-select.slang`
+adds three-mode numeric/Boolean family GPU coverage.
 
 `helperControl` in the CUDAKernel source and `scalarControl` in the softplus source test reduced
 alternatives. They are compilation controls, not runtime qualifications. Update source hashes after
@@ -1807,3 +1811,119 @@ The existing formatted-surface-provenance test retains arbitrary helper rejectio
 SlangPy selection under`build/nvvm-normalized-surfaces/selection.txt` passes388/fails96, resolving50
 normalized cases and preserving338controls. Mixed-age inventories retain the original full baseline;
 normalized cells are focused qualification, not silent adoption into that baseline.
+
+## Falcor2 path tracer comparison
+
+Use the existing sibling `../falcor2` checkout and its `.venv`; do not reinstall the application.
+Its local `external/slangpy` branch `nvvm-falcor2` merges local SlangPy `4bfa86b2` into the
+application's `837b5838`, retaining the `decompose_trs` API required by Falcor's native transforms.
+The resulting local merge is `81819b92c4b0aff9d1862e6a67c0539baf553606`; it is not an upstream pin.
+The RHI checkout is `be78baad4f84d3df91a9d96b684d12ba6c80f399`.
+
+From the Falcor2 root, with no other build running:
+
+```sh
+cmake --preset linux-gcc \
+  -DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR="$PWD/../slang" \
+  -DSGL_LOCAL_SLANG_BUILD_DIR=build/RelWithDebInfo \
+  -DSGL_LOCAL_RHI=ON -DSGL_LOCAL_RHI_DIR="$PWD/../slang-rhi" \
+  -DSGL_ENABLE_NVVM_TESTING=ON
+cmake --build --preset linux-gcc-release -j 8
+
+export CUDA_PATH=/usr/local/cuda-12.9
+export CUDA_HOME="$CUDA_PATH"
+export LIBNVVM_HOME="$CUDA_PATH"
+export SLANG_NVVM_BUILDER_PATH="$PWD/../slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so"
+export SLANG_PATH="$PWD/../slang/build/RelWithDebInfo/bin"
+export LD_LIBRARY_PATH="$PWD/../slang/build/RelWithDebInfo/lib:$PWD/../slang/build/RelWithDebInfo/bin:$CUDA_PATH/nvvm/lib64:$CUDA_PATH/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PYTHONDONTWRITEBYTECODE=1
+export SLANGPY_DEVICE=cuda
+mkdir -p ../slang/build/nvvm-falcor2
+for compiler in nvrtc nvvm; do
+  SLANGPY_TEST_CUDA_COMPILER="$compiler" timeout --signal=TERM --kill-after=10s 300s \
+    .venv/bin/python -m pytest -q \
+    'tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]' \
+    --junitxml="../slang/build/nvvm-falcor2/$compiler.xml" \
+    > "../slang/build/nvvm-falcor2/$compiler.log" 2>&1
+  result=$?
+  printf '%s exit=%s\n' "$compiler" "$result"
+done
+```
+
+Do not prepend the separate SlangPy qualification package to `PYTHONPATH`: Falcor and SlangPy
+must load the extensions built together by the Falcor build. Check both module locations and
+loaded shared libraries after real dispatch. The existing
+`external/slangpy/slangpy/tests/device/test_cuda_compiler_route.py` probe returns 29 for NVRTC and
+71 for NVVM and should pass for direct, helper and custom sessions before accepting results.
+The first local comparison additionally records `/proc/self/maps` and hashes through a temporary
+pytest evidence plugin under `build/nvvm-falcor2/`; no test assertions are altered.
+
+This is one 64x64 DamagedHelmet render through `ReferencePathTracerNode`, with nonzero and no-NaN
+assertions. It is not an image-reference comparison or a complete application qualification.
+Leave persistent module/shader caches off and run processes serially. A fixture/setup error,
+compile rejection, timeout or skip must be reported separately from a rendered test pass.
+
+The initial comparison passed on NVRTC (1 passed, 20.84 s) and rejected scalar-Bool/float3
+selection on NVVM during the first `scene.update()` (1 fixture error, 7.59 s). After the bounded
+select repair, NVRTC still passes (12.81 s); NVVM advances to `WaveActiveSum(uint64_t3)` in
+`emissive_geometry_kernels.slang:271` and reports E41400 (1 fixture error, 8.17 s), before path tracer
+dispatch. All three route controls per backend pass. Revisions, refreshed loaded hashes and both
+failure stages are maintained in [falcor2-status.json](falcor2-status.json).
+
+Downstream-library provenance matters here: although `CUDA_PATH` selects toolkit12.9, the
+application process maps NVRTC12.8.93 from its existing `.venv` (`nvidia-cuda-nvrtc-cu12`).
+The standalone NVRTC probe additionally maps system NVRTC12.9.86; its import order differs from
+the application, so it is route evidence rather than an identical downstream-library control.
+The initial NVVM probe maps toolkit12.9's `libnvvm.so.4.0.0`; the initial select rejection
+occurred before provider compilation. End-of-process maps do not capture every earlier load/unload. The manifest records these paths and hashes separately.
+
+### Standalone Falcor selection reproducer
+
+The original failure reduces to `select(false, -n, n)` for `float3 n`. From the Slang root,
+with the compiler/provider/toolkit environment above:
+
+```sh
+mkdir -p build/nvvm-falcor2-reduction
+build/RelWithDebInfo/bin/slangc tests/cuda/applications/falcor-scalar-vector-select.slang \
+  -entry constantCondition -stage compute -target ptx -capability cuda_sm_8_0 \
+  -emit-cuda-via-nvvm -O3 -o build/nvvm-falcor2-reduction/constant.ptx
+```
+
+Before the repair this reproduced E52017 without Falcor, scene assets or a GPU launch. Both
+`constantCondition` and `dynamicCondition` now pass at O0/O3, preserving `vectorConditionControl`
+passes. All three entries also compile and assemble with NVRTC O3. Successful PTX assembly is required for corpus passes and is not a GPU
+correctness claim. For only this workload, create a focused manifest using the existing schema:
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+manifest = json.loads(Path("issue-nvvm-backend/application-corpus.manifest.json").read_text())
+manifest["workloads"] = [w for w in manifest["workloads"] if w["name"] == "falcor-scalar-vector-select"]
+Path("build/nvvm-falcor2-reduction/manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+PY
+python3 issue-nvvm-backend/run-complex-corpus.py \
+  --slangc build/RelWithDebInfo/bin/slangc --build-label RelWithDebInfo \
+  --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
+  --manifest build/nvvm-falcor2-reduction/manifest.json \
+  --output build/nvvm-falcor2-reduction/replay --samples 1 --warmup 0 --timeout 60
+```
+
+Current result: **nine passes**, exit0, zero unrun cells. Four original rejections are resolved,
+five prior passes preserved. The prior failing replay remains in manifest history. Application
+NVRTC uses12.8.93; CLI replay uses the explicitly selected toolkit NVRTC12.9.86. The separate
+application still stops at the newly exposed 64-bit wave-sum restriction.
+
+The bounded fix was validated with the focused tests below, all570 NVVM units and smoke16. Use the
+same explicit toolkit/provider environment and serialize GPU runs:
+
+```sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/nvvm-scalar-vector-select.slang tests/cuda/nvvm-typed-select.slang \
+  slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies.internal
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/applications/falcor-scalar-vector-select.slang
+```
+
+These produce6 focused and9 authored regression passes. Raw accepted build/check/replay/application
+logs are in `build/nvvm-falcor-select-fix/`; no full working or application suite refresh is implied.

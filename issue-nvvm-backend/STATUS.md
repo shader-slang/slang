@@ -1,5 +1,21 @@
 # NVVM current status
 
+**Scalar-condition vector select repaired (2026-10-03):** the shared NVVM admission rule now
+accepts scalar Boolean predicates for existing numeric/Boolean vectors, reusing the current lane
+compatibility helper and LLVM emission. All **nine standalone compile/assembly cells pass**
+(four rejections resolved, five controls preserved), focused checks **6/6**, NVVM units **570/570**
+and smoke **16/16** pass. GPU coverage spans both predicate values, widths2-4, Boolean, signed/unsigned
+integer8/16/32/64 and float16/32/64 at NVVM O0/O3 and NVRTC O3. No ABI/module bump or new lowering path.
+
+**Falcor2 follow-up:** NVRTC still renders successfully (**1 pass, 12.81 s**). NVVM gets past the
+original select rejection but reports **1 fixture error, 8.17 s** at
+`WaveActiveSum(uint64_t3)` in `emissive_geometry_kernels.slang:271` (`E41400`: unsupported NVVM
+partition operation scalar type). Path tracing is still not reached. All three routing controls
+per backend pass with refreshed compiler/provider identities. The initial select failure and
+comparison are retained in [application status](falcor2-status.json); the standalone history lives
+in [the corpus manifest](application-corpus.manifest.json). This bounded select fix is complete;
+64-bit wave reduction, unrelated Torch failures and the general feature loop remain stopped.
+
 **Two easy Torch families repaired and stopped (2026-10-03):** CUDAKernel direct calls now use
 ordinary helper clones, and explicit parameter-group pointer loads retain their global-memory
 provenance for existing helper conversion. All **five mapped failures now pass**, with **49 prior
@@ -61,6 +77,39 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-integration/full-after-cleanup-1/`; Half evidence remains under
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
+
+## Falcor2 scalar-condition vector selection
+
+The standalone [shader](../tests/cuda/applications/falcor-scalar-vector-select.slang) preserves the
+original failure from `compute_triangle_max_emission`, called by `EmissiveGeometrySystem::update`.
+Its surface-interaction helper reaches this code in Falcor's `triangle_geometry.slang`:
+
+```slang
+let is_front_face_cw = false;
+let N = normalize(cross(v1.position - v0.position, v2.position - v0.position));
+let normal_os = select(is_front_face_cw, -N, N);
+```
+
+Both original debugger captures showed `select(false, float3, float3) -> float3`. This is canonical
+IR from `core.meta.slang`'s `select<T>(bool, T, T)`. The shared semantic catalog previously required
+predicate/result lane equality, rejecting one Bool lane versus three Float lanes before provider
+emission. It now uses `hasComponentWiseLanes`: either one predicate lane or the result width.
+Boolean predicate kind, admitted result types and exact alternatives remain checked. Existing
+LLVM `CreateSelect` emission is unchanged. The previous scalar-Bool/int2 negative unit is now
+positive; mismatched-width Boolean masks, numeric masks and mismatched alternatives remain rejected.
+
+The initial replay had five passes and four E52017 rejections. The fresh replay passes all nine
+cells, including constant and dynamic scalar predicates and the vector-mask control at NVVM O0/O3
+and NVRTC O3. All nine have authored compile regressions. The separate
+[runtime fixture](../tests/cuda/nvvm-scalar-vector-select.slang) executes the admitted vector families
+with independent expected outputs and both predicate values. Independent review approved the
+single shared-rule change and coverage. No new runtime working-tier configuration is admitted here.
+
+Falcor's original select issue is resolved, but subsequent `accumulate_triangle_emission` compilation
+rejects a 64-bit vector wave sum. That separate operation remains unimplemented. Exact current
+identities, preserved failure histories and checks are in [the corpus manifest](application-corpus.manifest.json)
+and [application status](falcor2-status.json). Raw final evidence is under
+`build/nvvm-falcor-select-fix/`; original captures remain under `build/nvvm-falcor2-reduction/`.
 
 ## Current validation and maintenance
 

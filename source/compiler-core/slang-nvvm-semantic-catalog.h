@@ -546,7 +546,7 @@ inline bool resolveValueOperationFamily(
                                    isSelectedFloatValue(desc.resultType);
     if (desc.operation == SLANG_NVVM_VALUE_OP_SELECT && desc.operandCount == 3 &&
         hasSelectedResult && isSelectedBoolValue(desc.operandTypes[0]) &&
-        desc.operandTypes[0].laneCount == desc.resultType.laneCount &&
+        hasComponentWiseLanes(desc.resultType, desc.operandTypes[0]) &&
         areSameType(desc.resultType, desc.operandTypes[1]) &&
         areSameType(desc.resultType, desc.operandTypes[2]))
     {

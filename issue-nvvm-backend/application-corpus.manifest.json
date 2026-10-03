@@ -2,7 +2,7 @@
   "schema": 1,
   "scope": "compile-and-assemble-only",
   "architecture": 80,
-  "purpose": "Portable application-derived reproducers with current compile/assembly observations and original application mappings. Resolved cases also carry authored compile regressions; remaining failures stay exploratory. This manifest does not admit runtime working configurations.",
+  "purpose": "Portable application-derived reproducers with current compile/assembly observations and original application mappings. Resolved cases also carry authored compile regressions; remaining failures stay exploratory. This manifest does not admit runtime working configurations. Workloads with their own application object override the top-level SlangPy provenance; Falcor2 coverage is a separate focused comparison.",
   "application": {
     "name": "SlangPy",
     "repository": "https://github.com/shader-slang/slangpy",
@@ -338,6 +338,184 @@
         }
       },
       "initial_application_observation": "backward timeout after 60 seconds"
+    },
+    {
+      "name": "falcor-scalar-vector-select",
+      "source": "tests/cuda/applications/falcor-scalar-vector-select.slang",
+      "source_sha256": "bc42cb21da8dfe5e4a9fc8875c507c65c3b22dfd87abf2edded7d493f0763ff3",
+      "entry_points": [
+        "constantCondition",
+        "dynamicCondition",
+        "vectorConditionControl"
+      ],
+      "stage": "compute",
+      "application": {
+        "name": "Falcor2",
+        "revision": "4ab8df487e479c78dfc30f064ad05ab33a609ba4",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "origin_sources": [
+        "slang/falcor2/render/geometry/triangle_geometry.slang:453-455",
+        "slang/falcor2/render/kernels/emissive_geometry_kernels.slang:compute_triangle_max_emission"
+      ],
+      "preserved_shape": "select(Bool, float3, float3) -> float3. The original condition is constant false. A dynamic scalar condition tests the same whole-vector choice; an explicitly splatted bool3 condition is the per-lane control.",
+      "desired_semantics": "Scalar condition chooses an entire vector: false returns n, true returns -n. Constant entry always returns n. Dynamic and vector-control entries return n at index zero, -n otherwise.",
+      "initial_application_observation": "E52017: unsupported select during first scene.update(), inside compute_triangle_max_emission -> make_emission_surface_interaction -> Scene.make_triangle_surface_interaction",
+      "reduction_evidence": [
+        "build/nvvm-falcor2-reduction/gdb-entry.log",
+        "build/nvvm-falcor2-reduction/gdb-standalone.log"
+      ],
+      "scope": "Compile/assemble reproducer now has authored regressions. Separate numeric/Boolean family GPU fixture qualifies scalar selection; full Falcor path tracing remains blocked on uint64 wave sum.",
+      "observations": {
+        "constantCondition": {
+          "nvrtc-o3": {
+            "status": "passed"
+          },
+          "nvvm-o0": {
+            "status": "passed"
+          },
+          "nvvm-o3": {
+            "status": "passed"
+          }
+        },
+        "dynamicCondition": {
+          "nvrtc-o3": {
+            "status": "passed"
+          },
+          "nvvm-o0": {
+            "status": "passed"
+          },
+          "nvvm-o3": {
+            "status": "passed"
+          }
+        },
+        "vectorConditionControl": {
+          "nvrtc-o3": {
+            "status": "passed"
+          },
+          "nvvm-o0": {
+            "status": "passed"
+          },
+          "nvvm-o3": {
+            "status": "passed"
+          }
+        }
+      },
+      "input_shape_audit": {
+        "producer": "core.meta.slang select<T>(bool,T,T), with T=float3, lowers directly through emitIntrinsicInst in slang-lower-to-ir.cpp.",
+        "canonical": true,
+        "consumer": "_validateNVVMFunction -> _resolveNVVMValueOperation -> NVVMSemantics::resolveValueOperationFamily",
+        "restriction": "Resolved: scalar Boolean or matching-width Boolean predicates are admitted; exact alternative/result types remain required.",
+        "ownership": "Shared NVVM semantic admission reuses hasComponentWiseLanes; canonical source IR and existing LLVM CreateSelect emission are unchanged.",
+        "existing_negative_test": "nvvmIRBuilderBuildsNumericTypeFamilies now accepts Bool/int2 and rejects mismatched-width Boolean and numeric predicates; mismatched alternatives remain rejected.",
+        "reduction_match": "Both application and standalone O3 GDB captures show select(false, Vec(Float,3), Vec(Float,3)) at the same preflight rejection."
+      },
+      "observation_history": [
+        {
+          "date": "2026-10-03",
+          "source_sha256": "bc521cb121ce4b1f4e0b1536cc84490e54d9accecdd303bc8330031280a82f6d",
+          "observations": {
+            "constantCondition": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'select'"
+                ]
+              },
+              "nvvm-o3": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'select'"
+                ]
+              }
+            },
+            "dynamicCondition": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'select'"
+                ]
+              },
+              "nvvm-o3": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'select'"
+                ]
+              }
+            },
+            "vectorConditionControl": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "passed"
+              },
+              "nvvm-o3": {
+                "status": "passed"
+              }
+            }
+          },
+          "raw_evidence": "build/nvvm-falcor2-reduction/replay/results.json",
+          "status": "before scalar-predicate support"
+        }
+      ],
+      "fix": {
+        "date": "2026-10-03",
+        "source_state": {
+          "base_revision": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0",
+          "implementation_source_sha256": {
+            "source/compiler-core/slang-nvvm-semantic-catalog.h": "14ebb70850efdb199429a1070cf7c6ed3d3383f8fb21c9795897f0b24939d2a2"
+          }
+        },
+        "implementation": "Reuse hasComponentWiseLanes in the shared select semantic rule; allow scalar Bool or matching-width Boolean vector predicates without widening result/alternative types.",
+        "checks": {
+          "focused": {
+            "passed": 6,
+            "failed": 0,
+            "scope": "Three new numeric/Boolean GPU modes, two existing typed-select controls, one provider-family unit"
+          },
+          "authored_standalone_compile": {
+            "passed": 9,
+            "failed": 0
+          },
+          "standalone_compile_and_assemble": {
+            "passed": 9,
+            "failed": 0,
+            "transitions": {
+              "rejected_to_passed": 4,
+              "preserved_passes": 5
+            }
+          },
+          "nvvm_units": {
+            "passed": 570,
+            "failed": 0
+          },
+          "smoke": {
+            "passed": 16,
+            "failed": 0
+          },
+          "application_route_controls": {
+            "nvrtc_passed": 3,
+            "nvvm_passed": 3
+          }
+        },
+        "runtime_fixture": "tests/cuda/nvvm-scalar-vector-select.slang",
+        "runtime_fixture_sha256": "870603a279f7e047cc6d62330217a175245b1d7c9511469fcdb4ba09f4d2e7cf",
+        "runtime_scope": "Boolean, signed/unsigned integer8/16/32/64 and float16/32/64 vectors of widths2/3/4; both scalar predicate values, independent expected outputs, NVVM O0/O3 and NVRTC O3.",
+        "raw_evidence": "build/nvvm-falcor-select-fix/",
+        "module_abi_unchanged": true,
+        "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+      }
     }
   ],
   "current_replay": {
@@ -370,7 +548,8 @@
     },
     "compiler_library_sha256": "9a5322d57f22ca9aae527f766c43e3f35e37734bc2d39d17e218e7bfa3a58f92",
     "compiler_version": "2026.18.3-423-g3f1250d61",
-    "identity_note": "Built with the bounded implementation diff on base_revision. Source hashes identify the implementation; artifact hashes identify loaded bytes. The configured compiler version retains its older revision string."
+    "identity_note": "Built with the bounded implementation diff on base_revision. Source hashes identify the implementation; artifact hashes identify loaded bytes. The configured compiler version retains its older revision string.",
+    "scope": "Prior four Torch workloads only (18 cells); excludes the subsequently added Falcor2 workload. See falcor2_replay for its focused results."
   },
   "application_followup": {
     "date": "2026-10-03",
@@ -397,5 +576,71 @@
       "same_compiler_provider_as_smoke": true
     },
     "native_bridge": "Verified API available, native library loaded, fallback disabled. Existing application bridge bytes unchanged."
-  }
+  },
+  "falcor2_replay": {
+    "date": "2026-10-03",
+    "scope": "Only falcor-scalar-vector-select: all nine compile/assembly cells. Prior Torch outcomes not refreshed.",
+    "source_state": {
+      "base_revision": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0",
+      "implementation_source_sha256": {
+        "source/compiler-core/slang-nvvm-semantic-catalog.h": "14ebb70850efdb199429a1070cf7c6ed3d3383f8fb21c9795897f0b24939d2a2"
+      }
+    },
+    "raw_evidence": "build/nvvm-falcor-select-fix/replay/results.json",
+    "counts": {
+      "passed": 9,
+      "preflight_rejected": 0,
+      "unrun": 0
+    },
+    "transitions": {
+      "rejected_to_passed": 4,
+      "preserved_passes": 5
+    },
+    "runner_exit_code": 0,
+    "runner_status": "passed",
+    "gpu_execution": false,
+    "cuda_version": "12.9",
+    "samples": 1,
+    "warmup": 0,
+    "timeout_seconds": 60,
+    "artifact_sha256": {
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d10ac2c45cc2c027ada1eb3a5f13514f8d9db7d281a2ab39a0341fe41a33d442",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "compiler_library_sha256": "0d096c26f158cdec79a3eb2e7bfd1e1dc79cf20e3919afd6e5ad9cf2761b0241",
+    "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+  },
+  "falcor2_replay_history": [
+    {
+      "date": "2026-10-03",
+      "scope": "Only falcor-scalar-vector-select: three entries, nine compile/assembly cells. Prior Torch outcomes not refreshed.",
+      "source_revision": "aac2622c3e71723cd31e152b61a4ad1c7a4193d0",
+      "raw_evidence": "build/nvvm-falcor2-reduction/replay/results.json",
+      "counts": {
+        "passed": 5,
+        "preflight_rejected": 4,
+        "unrun": 0
+      },
+      "runner_exit_code": 1,
+      "runner_status": "incomplete",
+      "status_note": "All nine cells attempted; incomplete means known exploratory compilation failures, not missing runs.",
+      "gpu_execution": false,
+      "cuda_version": "12.9",
+      "samples": 1,
+      "warmup": 0,
+      "timeout_seconds": 60,
+      "artifact_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "e2749db3cf6f78c36025eb21488b6fb984b911fccdc0e8134b228f4c826492ec",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "compiler_library_sha256": "9a5322d57f22ca9aae527f766c43e3f35e37734bc2d39d17e218e7bfa3a58f92",
+      "review": "Independent fixture/IR/root-cause/replay review complete; no blocking findings."
+    }
+  ]
 }

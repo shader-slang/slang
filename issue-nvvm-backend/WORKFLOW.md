@@ -1,5 +1,24 @@
 # NVVM development workflow
 
+**Bounded scalar-select fix complete (2026-10-03):** the maintainer authorized fixing the
+reduced Falcor issue. Scalar-predicate selection for the existing numeric/Boolean vector family
+is now accepted and runtime-tested. The original application rejection is gone; the next scene-update
+kernel rejects `WaveActiveSum(uint64_t3)`. This supersedes the earlier no-fix scope only for scalar
+select. Further wave implementation, unrelated fixes and the general loop remain stopped.
+
+**Bounded Falcor2 reduction completed (2026-10-03):** the maintainer requested diagnosis and a
+standalone shader if useful. The scalar-Bool/float3 selection is captured faithfully in the existing
+application corpus, with constant/dynamic failures and a passing vector-condition control. No
+compiler fixes were requested or made; general development stays stopped.
+
+**Bounded Falcor2 qualification completed (2026-10-03):** the maintainer redirected work from
+Torch fixes to running one existing Falcor2 path tracer test with local dependencies on both
+compiler routes. The existing environment and Release build were reused; local SlangPy changes
+were merged while preserving the application's required upstream TRS API. NVRTC passes; NVVM
+stops during scene update with an unsupported `select` shape, before path tracing. Exact results
+are in [the application manifest](falcor2-status.json). No compiler repair or general development
+loop is started by this comparison.
+
 **Bounded easy Torch fixes (2026-10-03):** the maintainer authorized repairing the easy cases after
 corpus creation. This slice covers CUDAKernel direct-call roles and packed-tensor pointer provenance.
 The five mapped application nodes now pass; local/neighboring checks and review establish the bounded
