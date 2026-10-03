@@ -1,5 +1,12 @@
 # NVVM development workflow
 
+**Bounded material investigation completed and stopped (2026-10-03):** the small shared-storage
+producer fix restores material performance using existing unpack helpers, without new provider
+machinery or ABI changes. Focused, static, AD, RHI and full working validation are accepted; exact
+before/after timing and preserved failed experiments are recorded in STATUS and focused evidence.
+Storage/ABI consolidation is the recommended next bounded cleanup, not an authorization to start it.
+Wave work, unrelated features and the legacy OptiX8 HitObject decision remain parked.
+
 Start with [STATUS](STATUS.md), the [architecture](../docs/design/nvvm-backend.md), and the
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md). Use [RESULTS](RESULTS.md) for
 commands and [AGENTS](../AGENTS.md) for compiler methodology. [HISTORY](HISTORY.md) explains archive
@@ -9,7 +16,8 @@ recovery; current design must be understandable without reading completed slice 
 
 **Bounded work completed and stopped (2026-10-03):** fresh working/unit/RHI checkpoint,
 ordinary-IR bitfield simplification and compilation/GPU performance refresh are accepted. The
-reproduced material regression and wave/min/max weaknesses are investigated and recorded in STATUS.
+material regression is resolved by the later bounded request above; wave/min/max weaknesses remain
+recorded in STATUS.
 No further implementation is started by these recommendations. Unrelated feature work and the legacy
 OptiX8 HitObject decision remain parked; the three-item authorization is complete.
 

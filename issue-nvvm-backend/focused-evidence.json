@@ -2043,24 +2043,12 @@
         "input_profile": "texel-centers",
         "contract": "tiled-brass-eval-synthetic-textures-v1",
         "provenance": {
-          "revision": "5b239a2fe590f3ec83f49cd46cdc35d61af79970",
-          "patch": {
-            "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/source-diff.log",
-            "sha256": "0b0a646b917a511b506a1c1dc726ace67a097758b178b21a8d88b1953eece0ab"
-          },
-          "compiler_version": "2026.18.3-423-g3f1250d61",
-          "provider_abi": 46,
-          "module_version": 43,
-          "container_version": 2,
-          "provenance": {
-            "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/provenance.json",
-            "sha256": "0995e0bb29adc7ea6bccfda5c7852dc213544d2bbcbef5f431bc1f17741ed6c6"
-          },
-          "meaning": "Measured after Boolean snapshot repair, with the bitfield patch subsequently committed as 07d851d1f. Configured version string predates these edits; hashes and patch identify measured binaries."
+          "path": "build/nvvm-material-promotion/candidate-identity.json",
+          "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
         },
         "results": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-eval_buffer-execution/results.json",
-          "sha256": "dd2108cef884d2e8975e91372d659f624d3751d4f8a31fc6c8be3d3b648eca22"
+          "path": "build/nvvm-material-promotion/material-eval_buffer-execution/results.json",
+          "sha256": "2c3f6ff82d7070dcad8805db0830ac83ade48457c7a74899cc9b253c73d10a5c"
         },
         "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
         "absolute_tolerance": 1e-5,
@@ -2105,8 +2093,8 @@
               "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
               "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
             },
-            "ptx_sha256": "a6bab32295bd6f4aab5e4c15c8ba8745f28327f6d5c844ceb667562f74aa8c02",
-            "cubin_sha256": "e5ba63d807139222d56dcb07777ad33d46e7d9b8a1354af4c3f61d6578a4ecd5",
+            "ptx_sha256": "4c6f617a56b1c8c2165533010bdbaa821240dea03e26304e8b3364e95309a618",
+            "cubin_sha256": "dc811a75744f0fbeafde35b644b6bb76e6511d1aaedaa5dbe43bb714657c2ec0",
             "runtime": {
               "launches": 1,
               "active_records": 65,
@@ -2136,8 +2124,8 @@
               "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
               "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
             },
-            "ptx_sha256": "9eb9ba1512c0a05e1731a1eacc3bfd898839798d46fa062220f109de689b516d",
-            "cubin_sha256": "df18a25c12b3cb95bc57a768b74e38defd20e361f41f2f48fabff271a94157f3",
+            "ptx_sha256": "27c2a016ab32c64be2485b92c2b51a64b83e26ff9f86d2c106cd0f94f7dbbd5b",
+            "cubin_sha256": "7e82893bf5ee03d55eafc558428d0c89714446588cf2a89c0609598ed3e5cc22",
             "runtime": {
               "launches": 1,
               "active_records": 65,
@@ -2160,7 +2148,7 @@
             }
           }
         ],
-        "scope": "Fresh three-mode 65-record texel-center correctness with independent oracle. Historical linear filtering qualification was not rerun."
+        "scope": "Fresh current three-mode65-record texel-center correctness after material snapshot fix. Historical linear filtering qualification was not rerun."
       },
       "linear_filtering_qualification": {
         "status": "accepted",
@@ -2932,24 +2920,12 @@
         "input_profile": "texel-centers",
         "contract": "tiled-brass-sample-synthetic-textures-v1",
         "provenance": {
-          "revision": "5b239a2fe590f3ec83f49cd46cdc35d61af79970",
-          "patch": {
-            "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/source-diff.log",
-            "sha256": "0b0a646b917a511b506a1c1dc726ace67a097758b178b21a8d88b1953eece0ab"
-          },
-          "compiler_version": "2026.18.3-423-g3f1250d61",
-          "provider_abi": 46,
-          "module_version": 43,
-          "container_version": 2,
-          "provenance": {
-            "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/provenance.json",
-            "sha256": "0995e0bb29adc7ea6bccfda5c7852dc213544d2bbcbef5f431bc1f17741ed6c6"
-          },
-          "meaning": "Measured after Boolean snapshot repair, with the bitfield patch subsequently committed as 07d851d1f. Configured version string predates these edits; hashes and patch identify measured binaries."
+          "path": "build/nvvm-material-promotion/candidate-identity.json",
+          "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
         },
         "results": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-sample_buffer-execution/results.json",
-          "sha256": "06d89f084aa2b5ef40a8893a25d12b1b18bb6aa78cdb65088c86dcebd0254ed6"
+          "path": "build/nvvm-material-promotion/material-sample_buffer-execution/results.json",
+          "sha256": "952c1556f21dbc97d8b92a04ce83d59c475b3d0d74b9981026f12e3062ba333b"
         },
         "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
         "absolute_tolerance": 1e-5,
@@ -2994,8 +2970,8 @@
               "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
               "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
             },
-            "ptx_sha256": "ed1a440e27e3491ec205ae6496a6f10a39477f638058ffb6d3d9e07c8eaa08ce",
-            "cubin_sha256": "b0698403eafd2aa2a5b438f1c51f378a5a64f43c84d7091380c4c72161806409",
+            "ptx_sha256": "3c5dd0516c8d287118fc6a71d4d223101988bdae2c0e49f39ab3e30c70364155",
+            "cubin_sha256": "d80388f4f5d1fd5fbd636a033b8f2bfe4fdc8bb600f7a41df3f15f579f774491",
             "runtime": {
               "launches": 1,
               "active_records": 65,
@@ -3025,8 +3001,8 @@
               "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
               "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
             },
-            "ptx_sha256": "c5d2cc5717b36d6bfc202ff295a5f44ee8b387b9e0ddcfc031afa0823b3d8256",
-            "cubin_sha256": "c516017029b771803f54a460b642d541c1810168c7eb5b884f01b7edcf60c35a",
+            "ptx_sha256": "e93014a653abece8f4909b7b067b9d3d7eac01518f8895ab458a1ab37fa6db82",
+            "cubin_sha256": "c6e3e2708fd8cafe3a5584e4de57ee9294744e23f452066a590bfa2a9f65769f",
             "runtime": {
               "launches": 1,
               "active_records": 65,
@@ -3049,7 +3025,7 @@
             }
           }
         ],
-        "scope": "Fresh three-mode 65-record texel-center correctness with independent oracle. Historical linear filtering qualification was not rerun."
+        "scope": "Fresh current three-mode65-record texel-center correctness after material snapshot fix. Historical linear filtering qualification was not rerun."
       },
       "linear_filtering_qualification": {
         "status": "accepted",
@@ -3265,14 +3241,14 @@
       "meaning": "Synthetic device-event comparison of unchanged qualified periodic inputs; independent correctness precedes every accepted timing contract.",
       "baseline": {
         "checkpoint": {
-          "path": "build/nvvm-bitfield-legalization/reconciliation.json",
-          "sha256": "aaac05203c7e30662dabc5cf452dcaaf5a8f7af3b906cae8b0a911388a94a24b"
+          "path": "build/nvvm-material-promotion/reconciliation.json",
+          "sha256": "1c56d3e3e8c05fccfe1965f6c08b42a0f0e2c382849a8f708a0eb41c0582a967"
         },
-        "scope": "Fresh focused/full working and RHI checkpoint; historical main baseline is not rerun."
+        "scope": "Current full working/unit/smoke and focused4RHI/static/AD; prior full RHI/SlangPy retains its identity."
       },
       "identity": {
-        "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/provenance.json",
-        "sha256": "0995e0bb29adc7ea6bccfda5c7852dc213544d2bbcbef5f431bc1f17741ed6c6"
+        "path": "build/nvvm-material-promotion/candidate-identity.json",
+        "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
       },
       "sources": {
         "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c",
@@ -3283,20 +3259,20 @@
         "issue-nvvm-backend/complex-corpus.manifest.json": "b6867b9576c5c81171c36412001f14ab89e29bbb7f800ffb1f3bca45c5f6b724"
       },
       "compiler_identity": {
-        "revision": "5b239a2fe590f3ec83f49cd46cdc35d61af79970",
-        "patch": {
-          "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/source-diff.log",
-          "sha256": "0b0a646b917a511b506a1c1dc726ace67a097758b178b21a8d88b1953eece0ab"
-        },
-        "compiler_version": "2026.18.3-423-g3f1250d61",
-        "provider_abi": 46,
+        "revision": "6e179ff0bcf9c51164a253b22b4f5df47184aa90",
+        "version": "2026.18.3-423-g3f1250d61",
         "module_version": 43,
+        "provider_abi": 46,
         "container_version": 2,
-        "provenance": {
-          "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/provenance.json",
-          "sha256": "0995e0bb29adc7ea6bccfda5c7852dc213544d2bbcbef5f431bc1f17741ed6c6"
+        "sha256": {
+          "source/slang/slang-ir-lower-buffer-element-type.cpp": "1d32b85b601bf830bccbfc089a1077e2f575601b17e1866ec5d22efd11987bbd",
+          "tools/slang-static-unit-test/unit-test-nvvm-storage-loads.cpp": "a709eeaefbad7b36283c89679b098bfb0fdac4446a50ae0c283542f56db2d45a",
+          "build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "19842c65c73dffdf124fd336567eb2ff8a3569a22db40cd9167df16abdfea4e9",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "e2749db3cf6f78c36025eb21488b6fb984b911fccdc0e8134b228f4c826492ec",
+          "build/nvvm-material-promotion/source-diff.patch": "f53c5b800fb9f23d07f07b64245bf5d01043c8fd322d807bd463a7d04d2c86bd"
         },
-        "meaning": "Measured after Boolean snapshot repair, with the bitfield patch subsequently committed as 07d851d1f. Configured version string predates these edits; hashes and patch identify measured binaries."
+        "meaning": "Final candidate on 6e179ff0b plus the recorded single compiler-file patch and new static regression; docs updated separately. Baseline and candidate library identities retained in their own directories. The configured version string predates these edits; source patch and binary hashes, rather than that string, identify this measured build."
       },
       "protocol": {
         "counts": [65537, 1048577],
@@ -3324,7 +3300,7 @@
       "qualification": {
         "default_regression_cells": 6,
         "small_and_large_cells": 18,
-        "scope": "Independent oracle before timing, periodic output and63 guard records checked; full output reset/byte comparison on every timed launch.",
+        "scope": "Current independent oracle before timing, periodic output and63guards checked; full output reset/byte comparison on every timed launch. Unchanged CPU protocol contracts retain their prior identity.",
         "cpu_contracts": {
           "material-runtime": {
             "path": "build/nvvm-results/2026-10-03-current1/material-runtime-contracts.json",
@@ -3367,7 +3343,7 @@
           "count": 65,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "e5ba63d807139222d56dcb07777ad33d46e7d9b8a1354af4c3f61d6578a4ecd5",
+          "cubin_sha256": "dc811a75744f0fbeafde35b644b6bb76e6511d1aaedaa5dbe43bb714657c2ec0",
           "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "f51f35a9b425c13a20a4b597745bd42e9ef83d416fbe16da5e3a2e65ca9526d2",
@@ -3382,7 +3358,7 @@
           "count": 65,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "df18a25c12b3cb95bc57a768b74e38defd20e361f41f2f48fabff271a94157f3",
+          "cubin_sha256": "7e82893bf5ee03d55eafc558428d0c89714446588cf2a89c0609598ed3e5cc22",
           "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
@@ -3412,7 +3388,7 @@
           "count": 65,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "b0698403eafd2aa2a5b438f1c51f378a5a64f43c84d7091380c4c72161806409",
+          "cubin_sha256": "d80388f4f5d1fd5fbd636a033b8f2bfe4fdc8bb600f7a41df3f15f579f774491",
           "input_sha256": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
           "reference_sha256": "59b02ed2c75a0578257e63b40dbb640a2f01f10e77583f7ac7d52a481bd8f1f4",
@@ -3427,10 +3403,10 @@
           "count": 65,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "c516017029b771803f54a460b642d541c1810168c7eb5b884f01b7edcf60c35a",
+          "cubin_sha256": "c6e3e2708fd8cafe3a5584e4de57ee9294744e23f452066a590bfa2a9f65769f",
           "input_sha256": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
-          "reference_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
+          "reference_sha256": "bf8201590c3fea8c93a49551c4f2733260ce829e34daf64f49ade02ee26bd605",
           "all_active_bytes_periodic": true,
           "guards_unchanged": true,
           "compared_bytes": 4096,
@@ -3457,7 +3433,7 @@
           "count": 65537,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "e5ba63d807139222d56dcb07777ad33d46e7d9b8a1354af4c3f61d6578a4ecd5",
+          "cubin_sha256": "dc811a75744f0fbeafde35b644b6bb76e6511d1aaedaa5dbe43bb714657c2ec0",
           "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "1f7817058cf15140b655d47923b769ca50f6e859668859d631efee4e33243b1c",
@@ -3472,7 +3448,7 @@
           "count": 65537,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "df18a25c12b3cb95bc57a768b74e38defd20e361f41f2f48fabff271a94157f3",
+          "cubin_sha256": "7e82893bf5ee03d55eafc558428d0c89714446588cf2a89c0609598ed3e5cc22",
           "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
@@ -3502,7 +3478,7 @@
           "count": 1048577,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "e5ba63d807139222d56dcb07777ad33d46e7d9b8a1354af4c3f61d6578a4ecd5",
+          "cubin_sha256": "dc811a75744f0fbeafde35b644b6bb76e6511d1aaedaa5dbe43bb714657c2ec0",
           "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "d6acc16a0fa47060b5aeedc261468bfde72626c525546006de3af980a878eeb7",
@@ -3517,7 +3493,7 @@
           "count": 1048577,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "df18a25c12b3cb95bc57a768b74e38defd20e361f41f2f48fabff271a94157f3",
+          "cubin_sha256": "7e82893bf5ee03d55eafc558428d0c89714446588cf2a89c0609598ed3e5cc22",
           "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
           "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
           "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
@@ -3547,7 +3523,7 @@
           "count": 65537,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "b0698403eafd2aa2a5b438f1c51f378a5a64f43c84d7091380c4c72161806409",
+          "cubin_sha256": "d80388f4f5d1fd5fbd636a033b8f2bfe4fdc8bb600f7a41df3f15f579f774491",
           "input_sha256": "0bedebf1c6cf9221398a07239583692d8585ea12863cfb43e25377d9a4aa69ec",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
           "reference_sha256": "1d1d50460d7e7e1298ea77f668d7d77976bc7b50402762ac0e0d5b1fc6898e96",
@@ -3562,10 +3538,10 @@
           "count": 65537,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "c516017029b771803f54a460b642d541c1810168c7eb5b884f01b7edcf60c35a",
+          "cubin_sha256": "c6e3e2708fd8cafe3a5584e4de57ee9294744e23f452066a590bfa2a9f65769f",
           "input_sha256": "0bedebf1c6cf9221398a07239583692d8585ea12863cfb43e25377d9a4aa69ec",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
-          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "reference_sha256": "ae28018669b840646a432720d1dc4d42c0de5ad2494cf114f8aa638ef4973d6f",
           "all_active_bytes_periodic": true,
           "guards_unchanged": true,
           "compared_bytes": 2099200,
@@ -3592,7 +3568,7 @@
           "count": 1048577,
           "mode": "nvvm-o0",
           "status": "passed",
-          "cubin_sha256": "b0698403eafd2aa2a5b438f1c51f378a5a64f43c84d7091380c4c72161806409",
+          "cubin_sha256": "d80388f4f5d1fd5fbd636a033b8f2bfe4fdc8bb600f7a41df3f15f579f774491",
           "input_sha256": "8ffa8e4c017e53705c5115fe6ef8014c713ab94e50c2fa0630ea31d9ee73f903",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
           "reference_sha256": "137f98166596faf5bd3cdf946ab559e6e57d11fe9492e87d0656ee7537d42f62",
@@ -3607,10 +3583,10 @@
           "count": 1048577,
           "mode": "nvvm-o3",
           "status": "passed",
-          "cubin_sha256": "c516017029b771803f54a460b642d541c1810168c7eb5b884f01b7edcf60c35a",
+          "cubin_sha256": "c6e3e2708fd8cafe3a5584e4de57ee9294744e23f452066a590bfa2a9f65769f",
           "input_sha256": "8ffa8e4c017e53705c5115fe6ef8014c713ab94e50c2fa0630ea31d9ee73f903",
           "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
-          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "reference_sha256": "2f5711f54365d2049e1159637668f2db08ae7508846eeecfc062784d81a2a0e1",
           "all_active_bytes_periodic": true,
           "guards_unchanged": true,
           "compared_bytes": 33556480,
@@ -3629,15 +3605,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.157695994,
+              "median": 0.157631993,
               "q1": 0.156672001,
-              "q3": 0.158720002,
-              "iqr": 0.0020480009999999937,
-              "minimum": 0.154624,
-              "maximum": 0.159743994
+              "q3": 0.158751994,
+              "iqr": 0.002079993000000002,
+              "minimum": 0.155647993,
+              "maximum": 0.161663994
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 415590772.71170247
+            "records_per_second": 415759508.92151695
           }
         },
         {
@@ -3651,15 +3627,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.07622397,
-              "q1": 1.071136,
-              "q3": 1.07827199,
-              "iqr": 0.00713598999999987,
-              "minimum": 1.067904,
-              "maximum": 1.08137596
+              "median": 1.08851194,
+              "q1": 1.08748806,
+              "q3": 1.08851194,
+              "iqr": 0.001023879999999977,
+              "minimum": 1.08032,
+              "maximum": 1.09568
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 60895317.17083015
+            "records_per_second": 60207883.43396582
           }
         },
         {
@@ -3673,15 +3649,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.148479998,
-              "q1": 0.147456005,
-              "q3": 0.149504006,
-              "iqr": 0.0020480009999999937,
-              "minimum": 0.144383997,
-              "maximum": 0.150527999
+              "median": 0.027648,
+              "q1": 0.0266239997,
+              "q3": 0.027648,
+              "iqr": 0.0010240002999999977,
+              "minimum": 0.0266239997,
+              "maximum": 0.0284800008
             },
-            "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 441386051.2040147
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
           }
         },
         {
@@ -3695,15 +3671,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.81929588,
-              "q1": 2.81497598,
-              "q3": 2.82214403,
-              "iqr": 0.007168050000000203,
-              "minimum": 2.79756808,
-              "maximum": 2.82521605
+              "median": 2.81599998,
+              "q1": 2.81494403,
+              "q3": 2.818048,
+              "iqr": 0.003103970000000178,
+              "minimum": 2.7996161,
+              "maximum": 2.82624006
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 371928681.71041346
+            "records_per_second": 372363994.12190336
           }
         },
         {
@@ -3717,15 +3693,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 17.5952644,
-              "q1": 17.5236797,
-              "q3": 17.6558075,
-              "iqr": 0.1321278000000028,
-              "minimum": 17.0014725,
-              "maximum": 17.6834564
+              "median": 16.6696968,
+              "q1": 16.658432,
+              "q3": 16.6881275,
+              "iqr": 0.029695499999998987,
+              "minimum": 16.6410236,
+              "maximum": 16.7004166
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 59594273.55919698
+            "records_per_second": 62903183.697978236
           }
         },
         {
@@ -3739,15 +3715,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.73510408,
-              "q1": 2.73305607,
-              "q3": 2.7422719,
-              "iqr": 0.009215830000000036,
-              "minimum": 2.73203206,
-              "maximum": 2.75046396
+              "median": 0.312319994,
+              "q1": 0.312319994,
+              "q3": 0.313344002,
+              "iqr": 0.0010240080000000207,
+              "minimum": 0.312319994,
+              "maximum": 0.313439995
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 383377366.7581966
+            "records_per_second": 3357380315.5234437
           }
         },
         {
@@ -3761,15 +3737,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.137216002,
-              "q1": 0.136191994,
-              "q3": 0.137280002,
-              "iqr": 0.0010880080000000014,
-              "minimum": 0.135168001,
-              "maximum": 0.139264002
+              "median": 0.138111994,
+              "q1": 0.138047993,
+              "q3": 0.138239995,
+              "iqr": 0.00019200199999999668,
+              "minimum": 0.136191994,
+              "maximum": 0.141312003
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 477619221.1167907
+            "records_per_second": 474520699.48392755
           }
         },
         {
@@ -3783,15 +3759,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.22777605,
-              "q1": 1.22246397,
-              "q3": 1.23084795,
-              "iqr": 0.008383980000000069,
-              "minimum": 1.21958399,
-              "maximum": 1.23494399
+              "median": 1.14979196,
+              "q1": 1.14662397,
+              "q3": 1.15103996,
+              "iqr": 0.004415990000000036,
+              "minimum": 1.14169598,
+              "maximum": 1.15404797
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 53378627.152728714
+            "records_per_second": 56999007.02036567
           }
         },
         {
@@ -3801,19 +3777,19 @@
           "mode": "nvvm-o3",
           "round": 0,
           "status": "passed",
-          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "reference_sha256": "ae28018669b840646a432720d1dc4d42c0de5ad2494cf114f8aa638ef4973d6f",
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.129984006,
-              "q1": 0.129951999,
-              "q3": 0.131072,
-              "iqr": 0.0011200009999999816,
-              "minimum": 0.127967998,
-              "maximum": 0.132960007
+              "median": 0.035840001,
+              "q1": 0.035840001,
+              "q3": 0.035840001,
+              "iqr": 0.0,
+              "minimum": 0.0348160006,
+              "maximum": 0.0368320011
             },
-            "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 504192800.45885026
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
           }
         },
         {
@@ -3827,15 +3803,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.48707199,
-              "q1": 2.48320007,
-              "q3": 2.48934388,
-              "iqr": 0.00614380999999975,
-              "minimum": 2.47910404,
-              "maximum": 2.51203203
+              "median": 2.48934388,
+              "q1": 2.48422408,
+              "q3": 2.49958396,
+              "iqr": 0.01535987999999966,
+              "minimum": 2.47296,
+              "maximum": 2.50262403
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 421611036.6793202
+            "records_per_second": 421226255.00820726
           }
         },
         {
@@ -3849,15 +3825,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 18.6152954,
-              "q1": 18.4260483,
-              "q3": 19.1231995,
-              "iqr": 0.6971511999999969,
-              "minimum": 18.2087688,
-              "maximum": 19.6944637
+              "median": 16.0030727,
+              "q1": 15.9107838,
+              "q3": 16.8130569,
+              "iqr": 0.9022730999999986,
+              "minimum": 15.8943682,
+              "maximum": 17.6004791
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 56328786.488126315
+            "records_per_second": 65523479.12535572
           }
         },
         {
@@ -3867,19 +3843,19 @@
           "mode": "nvvm-o3",
           "round": 0,
           "status": "passed",
-          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "reference_sha256": "2f5711f54365d2049e1159637668f2db08ae7508846eeecfc062784d81a2a0e1",
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.37590408,
-              "q1": 2.36953592,
-              "q3": 2.38489604,
-              "iqr": 0.015360119999999977,
-              "minimum": 2.33983994,
-              "maximum": 2.39513612
+              "median": 0.391104013,
+              "q1": 0.389120013,
+              "q3": 0.392192006,
+              "iqr": 0.003071992999999995,
+              "minimum": 0.388096005,
+              "maximum": 0.396288007
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 441338103.17797
+            "records_per_second": 2681069396.2375684
           }
         },
         {
@@ -3889,19 +3865,19 @@
           "mode": "nvvm-o3",
           "round": 1,
           "status": "passed",
-          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "reference_sha256": "2f5711f54365d2049e1159637668f2db08ae7508846eeecfc062784d81a2a0e1",
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.36835194,
-              "q1": 2.35724807,
-              "q3": 2.38592005,
-              "iqr": 0.028671980000000374,
-              "minimum": 2.35008001,
-              "maximum": 2.39808011
+              "median": 0.391167998,
+              "q1": 0.390143991,
+              "q3": 0.392192006,
+              "iqr": 0.0020480149999999586,
+              "minimum": 0.390143991,
+              "maximum": 0.397311985
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 442745430.8163338
+            "records_per_second": 2680630842.403422
           }
         },
         {
@@ -3915,15 +3891,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 19.0218239,
-              "q1": 18.2087688,
-              "q3": 19.2460804,
-              "iqr": 1.037311599999999,
-              "minimum": 18.1319675,
-              "maximum": 19.7027836
+              "median": 15.9610882,
+              "q1": 15.8533764,
+              "q3": 16.1249275,
+              "iqr": 0.27155109999999816,
+              "minimum": 15.8308802,
+              "maximum": 17.3310394
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 55124945.19518709
+            "records_per_second": 65695833.94696108
           }
         },
         {
@@ -3937,15 +3913,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.48812795,
-              "q1": 2.47900796,
-              "q3": 2.49855995,
-              "iqr": 0.019551990000000075,
-              "minimum": 2.46572804,
-              "maximum": 2.50060797
+              "median": 2.4862721,
+              "q1": 2.48012805,
+              "q3": 2.49753594,
+              "iqr": 0.017407890000000315,
+              "minimum": 2.47193599,
+              "maximum": 2.50163198
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 421432105.2098627
+            "records_per_second": 421746678.491063
           }
         },
         {
@@ -3955,19 +3931,19 @@
           "mode": "nvvm-o3",
           "round": 1,
           "status": "passed",
-          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "reference_sha256": "ae28018669b840646a432720d1dc4d42c0de5ad2494cf114f8aa638ef4973d6f",
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.128992006,
-              "q1": 0.128000006,
-              "q3": 0.129023999,
-              "iqr": 0.0010239930000000008,
-              "minimum": 0.126975998,
-              "maximum": 0.130976006
+              "median": 0.0348160006,
+              "q1": 0.0348160006,
+              "q3": 0.0367360003,
+              "iqr": 0.001919999700000001,
+              "minimum": 0.0337920003,
+              "maximum": 0.0377280004
             },
-            "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 508070244.29095244
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
           }
         },
         {
@@ -3981,15 +3957,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.23193598,
-              "q1": 1.22777605,
-              "q3": 1.23494399,
-              "iqr": 0.007167940000000206,
-              "minimum": 1.22265601,
-              "maximum": 1.24006402
+              "median": 1.15097594,
+              "q1": 1.14892805,
+              "q3": 1.151968,
+              "iqr": 0.0030399500000000135,
+              "minimum": 1.13459206,
+              "maximum": 1.15302396
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 53198381.29900224
+            "records_per_second": 56940373.57548934
           }
         },
         {
@@ -4003,15 +3979,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.138239995,
-              "q1": 0.137216002,
-              "q3": 0.140095994,
-              "iqr": 0.002879991999999998,
-              "minimum": 0.136191994,
+              "median": 0.139264002,
+              "q1": 0.137152001,
+              "q3": 0.139264002,
+              "iqr": 0.0021120010000000022,
+              "minimum": 0.132095993,
               "maximum": 0.141312003
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 474081325.017409
+            "records_per_second": 470595409.1424143
           }
         },
         {
@@ -4025,15 +4001,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.7331841,
-              "q1": 2.73203206,
-              "q3": 2.73535991,
-              "iqr": 0.003327850000000243,
-              "minimum": 2.7256639,
-              "maximum": 2.75148797
+              "median": 0.314271986,
+              "q1": 0.313344002,
+              "q3": 0.314399987,
+              "iqr": 0.0010559849999999815,
+              "minimum": 0.311295986,
+              "maximum": 0.315391988
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 383646677.88020575
+            "records_per_second": 3336527106.173568
           }
         },
         {
@@ -4047,15 +4023,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 16.7311363,
-              "q1": 16.4106236,
-              "q3": 16.9625607,
-              "iqr": 0.5519371,
-              "minimum": 16.063488,
-              "maximum": 17.0997753
+              "median": 16.708416,
+              "q1": 16.6983681,
+              "q3": 16.7577591,
+              "iqr": 0.059391000000001526,
+              "minimum": 16.6594238,
+              "maximum": 16.8017921
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 62672192.80258927
+            "records_per_second": 62757415.18525754
           }
         },
         {
@@ -4070,11 +4046,11 @@
           "summary": {
             "device_ms": {
               "median": 2.81395197,
-              "q1": 2.81395197,
-              "q3": 2.82102394,
-              "iqr": 0.0070719699999997054,
-              "minimum": 2.80668807,
-              "maximum": 2.83238411
+              "q1": 2.81292796,
+              "q3": 2.82112002,
+              "iqr": 0.008192059999999834,
+              "minimum": 2.80780792,
+              "maximum": 2.8313601
             },
             "all_intervals_at_least_0_1ms": true,
             "records_per_second": 372635002.7218126
@@ -4091,15 +4067,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.149504006,
-              "q1": 0.148479998,
-              "q3": 0.151327997,
-              "iqr": 0.00284799899999999,
-              "minimum": 0.147456005,
-              "maximum": 0.175999999
+              "median": 0.027648,
+              "q1": 0.0266239997,
+              "q3": 0.0286720004,
+              "iqr": 0.0020480007,
+              "minimum": 0.0266239997,
+              "maximum": 0.0286720004
             },
-            "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 438362835.57512164
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
           }
         },
         {
@@ -4113,15 +4089,15 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.07417595,
-              "q1": 1.06496,
-              "q3": 1.07929599,
-              "iqr": 0.014335990000000187,
-              "minimum": 1.06086397,
-              "maximum": 1.08236802
+              "median": 1.08339202,
+              "q1": 1.08044803,
+              "q3": 1.08544004,
+              "iqr": 0.004992010000000047,
+              "minimum": 1.07724798,
+              "maximum": 1.09667206
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 61011419.96336819
+            "records_per_second": 60492415.29395795
           }
         },
         {
@@ -4135,100 +4111,100 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.157695994,
-              "q1": 0.157536,
-              "q3": 0.160671994,
-              "iqr": 0.003135994000000003,
-              "minimum": 0.155423999,
+              "median": 0.159712002,
+              "q1": 0.158720002,
+              "q3": 0.160704002,
+              "iqr": 0.0019840000000000135,
+              "minimum": 0.155647993,
               "maximum": 0.161791995
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 415590772.71170247
+            "records_per_second": 410344865.6288211
           }
         }
       ],
       "optimized_large_count_comparison": [
         {
+          "arm": "after",
           "entry": "eval_buffer",
           "count": 1048577,
           "mode": "nvrtc-o3",
-          "device_ms_n": 18,
-          "device_ms_median": 2.81651199,
-          "device_ms_q1": 2.81395197,
-          "device_ms_q3": 2.82214403,
-          "device_ms_minimum": 2.79756808,
-          "device_ms_maximum": 2.83238411,
-          "throughput_records_per_second": 372296302.5625181
+          "median_ms": 2.8149600049999997,
+          "q1_ms": 2.8131839625,
+          "q3_ms": 2.8195600525,
+          "minimum_ms": 2.7996161,
+          "maximum_ms": 2.8313601,
+          "samples": 18
         },
         {
+          "arm": "after",
           "entry": "eval_buffer",
           "count": 1048577,
           "mode": "nvvm-o3",
-          "device_ms_n": 18,
-          "device_ms_median": 2.733983995,
-          "device_ms_q1": 2.7322480675,
-          "device_ms_q3": 2.7409119575,
-          "device_ms_minimum": 2.7256639,
-          "device_ms_maximum": 2.75148797,
-          "throughput_records_per_second": 383534432.50497156
+          "median_ms": 0.313344002,
+          "q1_ms": 0.312319994,
+          "q3_ms": 0.31406398825,
+          "minimum_ms": 0.311295986,
+          "maximum_ms": 0.315391988,
+          "samples": 18
         },
         {
+          "arm": "after",
           "entry": "sample_buffer",
           "count": 1048577,
           "mode": "nvrtc-o3",
-          "device_ms_n": 18,
-          "device_ms_median": 2.4871840450000002,
-          "device_ms_q1": 2.48243207,
-          "device_ms_q3": 2.4985039825,
-          "device_ms_minimum": 2.46572804,
-          "device_ms_maximum": 2.51203203,
-          "throughput_records_per_second": 421592041.8547072
+          "median_ms": 2.48780799,
+          "q1_ms": 2.480640055,
+          "q3_ms": 2.4983039475,
+          "minimum_ms": 2.47193599,
+          "maximum_ms": 2.50262403,
+          "samples": 18
         },
         {
+          "arm": "after",
           "entry": "sample_buffer",
           "count": 1048577,
           "mode": "nvvm-o3",
-          "device_ms_n": 18,
-          "device_ms_median": 2.37311995,
-          "device_ms_q1": 2.3595520875,
-          "device_ms_q3": 2.3856640475,
-          "device_ms_minimum": 2.33983994,
-          "device_ms_maximum": 2.39808011,
-          "throughput_records_per_second": 441855878.3764807
+          "median_ms": 0.3911360055,
+          "q1_ms": 0.390143991,
+          "q3_ms": 0.392192006,
+          "minimum_ms": 0.388096005,
+          "maximum_ms": 0.397311985,
+          "samples": 18
         }
       ],
       "provenance": {
         "protocol": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-device-protocol/results.json",
-          "sha256": "2a30149046bc17f0c7a0319ace40ad0b0907dcdf2c1ef12142c8259d61420ee0"
+          "path": "build/nvvm-material-promotion/material-device-protocol/results.json",
+          "sha256": "8f103fdd97de6d16a3055138a4cdd37d2d98454845aa264f36203cc543964632"
         },
         "qualification": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-device-qualified/results.json",
-          "sha256": "05d92721b9f5e8fd84f814538e66ff6b365be3d8a1cceb2c401301ef9b4c70fc"
+          "path": "build/nvvm-material-promotion/material-device-qualified/results.json",
+          "sha256": "1be1d645455c08912aba7d94f37bbb675b91a17023437d042c17a90f4b04a9d2"
         },
         "measurement": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-device-measured/results.json",
-          "sha256": "c6c597e7f823356a505581cfd413a6ba28e4d4d400b889b8fa5dd7274c87f09f"
+          "path": "build/nvvm-material-promotion/material-device-measured/results.json",
+          "sha256": "9d1788f329a94929c370009b0779154d27e272dc1899b983a63af5da3bc371fc"
         },
         "summary": {
-          "path": "build/nvvm-results/2026-10-03-current1/presentation/material-summary.json",
-          "sha256": "51bc1122025675235487b20d9bbf897ac3f39216d428bde9f197e4f4542aae8e"
+          "path": "build/nvvm-material-promotion/presentation/material-summary.json",
+          "sha256": "51d45882c39ace3da799776319a2086a5d7085955ad1fac33bcc9e30aae7c0f5"
         },
         "freeze": {
-          "path": "build/nvvm-results/2026-10-03-current1/compile-provenance/provenance.json",
-          "sha256": "0995e0bb29adc7ea6bccfda5c7852dc213544d2bbcbef5f431bc1f17741ed6c6"
+          "path": "build/nvvm-material-promotion/candidate-identity.json",
+          "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
         },
         "default_eval": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-eval_buffer-execution/results.json",
-          "sha256": "dd2108cef884d2e8975e91372d659f624d3751d4f8a31fc6c8be3d3b648eca22"
+          "path": "build/nvvm-material-promotion/material-eval_buffer-execution/results.json",
+          "sha256": "2c3f6ff82d7070dcad8805db0830ac83ade48457c7a74899cc9b253c73d10a5c"
         },
         "default_sample": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-sample_buffer-execution/results.json",
-          "sha256": "06d89f084aa2b5ef40a8893a25d12b1b18bb6aa78cdb65088c86dcebd0254ed6"
+          "path": "build/nvvm-material-promotion/material-sample_buffer-execution/results.json",
+          "sha256": "952c1556f21dbc97d8b92a04ce83d59c475b3d0d74b9981026f12e3062ba333b"
         },
         "abi_review": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-abi-review.md",
-          "sha256": "7957a487b7fdfc65a26b9a42bd462f3bb49a460448b7e81959391c6e7de29f20"
+          "path": "build/nvvm-material-promotion/material-abi-review.md",
+          "sha256": "e51b63c715a5d94cf1c3ff0918377f086e87f50cb710948f8eb163958e959354"
         }
       },
       "research_gate": {
@@ -4265,14 +4241,14 @@
         "Sample throughput estimator and records/second execution throughput are different quantities; sample workload includes known early rejections.",
         "Correctness reset/readback/comparison occurs between persistent-allocation launches; this is not continuously queued rendering throughput.",
         "CUDA event interval may include host submission gaps; host submission, synchronization wall time, compilation and allocation are separate.",
-        "All nine intervals must be at least 0.1 ms for a throughput summary. Current material cells pass this gate; small-count historical-cubin controls fail it and retain observations without ratios.",
+        "All measured intervals must be at least0.1ms for a throughput ratio. Current small-count NVVM O3 cells fail this gate and retain observations without ratios; large-count comparisons pass. Historical small-cubin controls also retain their original suppression.",
         "Clocks were observed, not fixed; retain noisy samples and order effects. Before/after process snapshots cannot exclude transient contention.",
-        "Static stack/register observations do not establish the cause of the measured difference. No NVRTC O0 comparison was performed.",
+        "Static counts alone do not establish runtime cause; pinned aggregate-load controls isolate the producer effect and same-host qualified execution confirms recovery. No NVRTC O0 comparison was performed.",
         "Every launch is source-reviewed to compare its full output against the independently qualified reference; identical per-launch buffers are not stored redundantly."
       ],
       "review": {
-        "path": "build/nvvm-results/2026-10-03-current1/performance-review.md",
-        "sha256": "640d2fd36465c101b231864be78d35a69ec44bc5e1ade77fa84115e77adcc890"
+        "path": "build/nvvm-material-promotion/independent-results-review.md",
+        "sha256": "47e55b4cad2825df5bf8602ddc9361ddf0c1b55a9a8b5789f14d62d3ad629e4b"
       },
       "measurement_totals": {
         "cells": 24,
@@ -5527,27 +5503,55 @@
       },
       "date": "2026-10-03",
       "current_regression": {
-        "status": "confirmed-on-current-host",
+        "status": "resolved",
         "comparison": {
-          "path": "build/nvvm-results/2026-10-03-current1/presentation/material-control-summary.json",
-          "sha256": "a35f40641149d9cd94cec46f2d2e729da0cb2b279a81dbd59d2f387b3594dfe9"
+          "path": "build/nvvm-material-promotion/presentation/material-summary.json",
+          "sha256": "51d45882c39ace3da799776319a2086a5d7085955ad1fac33bcc9e30aae7c0f5"
+        },
+        "before_protocol": {
+          "path": "build/nvvm-material-promotion/material-before-fix-protocol/results.json",
+          "sha256": "4fa676d325c4097544f046c4c403569bf6fb0f5029034f28c55562191b8669ff"
+        },
+        "before_qualification": {
+          "path": "build/nvvm-material-promotion/material-before-fix-qualified/results.json",
+          "sha256": "5b8c343297d3a3f1c71e1e90a02981c6d88810039151d6c08a4cb1662508336c"
+        },
+        "before_measurement": {
+          "path": "build/nvvm-material-promotion/material-before-fix-measured/results.json",
+          "sha256": "1c7dc04b356e0c4799f72844bd82318a4bba5d7582e8b8ba6c7317fea3d06190"
         },
         "codegen": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-codegen-review.json",
-          "sha256": "1de9d9040c03008372d186fb0a338c8af99351872a632661585d600e53a326de"
+          "path": "build/nvvm-material-promotion/candidate/results.json",
+          "sha256": "3694c3182d2b0e3579325c8504161b6ae5669f3d7efed928ef81b7315783df9e"
         },
-        "trace": {
-          "path": "build/nvvm-results/2026-10-03-current1/material-codegen-review.md",
-          "sha256": "53c10aad6cc4e988f01885b7ce395ce074c562931568c6b81c1d6266f7571d25"
-        },
-        "meaning": "Historical NVVM O3 cubins requalified and timed with current helper, inputs, oracle, GPU and driver. Current eval/sample take8.75/6.08 times longer at1048577records. Current NVRTC PTX/cubins are byte-identical to historical controls. Generated-code regression is established, individual pass cause is not.",
-        "static_observation": "NVVM O3 local frames grow0 to592/624bytes, with94 extra static local stores and3 extra loads; zero ptxas spills. Compact material context fails scalar promotion. Boolean snapshot repair is not exercised; two numeric matrix snapshots remain.",
-        "next_work": "Isolate compact material-context scalar promotion after helper inlining, preserving pointer ABI, immutable snapshots and the AD optimizer-stall regression controls."
+        "meaning": "Same-host requalified pre-fix/current cubins: eval2.74124789\u21920.313344002ms; sample2.38080001\u21920.3911360055ms at1048577records,8.748365606/6.08688532times faster. Historical confirmed regression preserved above. Ordinary whole-storage snapshot copy was the promotion barrier.",
+        "static_observation": "Entry frames592/624\u21920B, zero spills,51/62registers; eval0localstores and sample8library stores. Matrix/inlining controls did not resolve the regression.",
+        "next_work": "Consolidate one storage/ABI conversion family while preserving original-read snapshots and attributed memory operations; separate wave work remains parked."
       },
       "final_review": {
-        "path": "build/nvvm-results/2026-10-03-current1/final-evidence-review.md",
-        "sha256": "53074d814ad8f6a7dc745bd2930e98bb3706bb6b945ce980f7de2df208eb4818"
-      }
+        "path": "build/nvvm-material-promotion/independent-results-review.md",
+        "sha256": "47e55b4cad2825df5bf8602ddc9361ddf0c1b55a9a8b5789f14d62d3ad629e4b"
+      },
+      "regression_history": [
+        {
+          "status": "confirmed-on-current-host",
+          "comparison": {
+            "path": "build/nvvm-results/2026-10-03-current1/presentation/material-control-summary.json",
+            "sha256": "a35f40641149d9cd94cec46f2d2e729da0cb2b279a81dbd59d2f387b3594dfe9"
+          },
+          "codegen": {
+            "path": "build/nvvm-results/2026-10-03-current1/material-codegen-review.json",
+            "sha256": "1de9d9040c03008372d186fb0a338c8af99351872a632661585d600e53a326de"
+          },
+          "trace": {
+            "path": "build/nvvm-results/2026-10-03-current1/material-codegen-review.md",
+            "sha256": "53c10aad6cc4e988f01885b7ce395ce074c562931568c6b81c1d6266f7571d25"
+          },
+          "meaning": "Historical NVVM O3 cubins requalified and timed with current helper, inputs, oracle, GPU and driver. Current eval/sample take8.75/6.08 times longer at1048577records. Current NVRTC PTX/cubins are byte-identical to historical controls. Generated-code regression is established, individual pass cause is not.",
+          "static_observation": "NVVM O3 local frames grow0 to592/624bytes, with94 extra static local stores and3 extra loads; zero ptxas spills. Compact material context fails scalar promotion. Boolean snapshot repair is not exercised; two numeric matrix snapshots remain.",
+          "next_work": "Isolate compact material-context scalar promotion after helper inlining, preserving pointer ABI, immutable snapshots and the AD optimizer-stall regression controls."
+        }
+      ]
     },
     "column-major-compact-uniform": {
       "status": "accepted-focused-gpu",
@@ -8477,7 +8481,8 @@
       "final_review": {
         "path": "build/nvvm-results/2026-10-03-current1/final-evidence-review.md",
         "sha256": "53074d814ad8f6a7dc745bd2930e98bb3706bb6b945ce980f7de2df208eb4818"
-      }
+      },
+      "scope_after_material_fix": "This full campaign predates the material snapshot fix and was not rerun for it. Current focused material/runtime and paired compile controls are recorded under nvvm-material-promotion."
     },
     "corpus-dispatch-performance": {
       "status": "accepted-with-explicit-exclusions",
@@ -9340,7 +9345,8 @@
       "final_review": {
         "path": "build/nvvm-results/2026-10-03-current1/final-evidence-review.md",
         "sha256": "53074d814ad8f6a7dc745bd2930e98bb3706bb6b945ce980f7de2df208eb4818"
-      }
+      },
+      "scope_after_material_fix": "This full campaign predates the material snapshot fix and was not rerun for it. Current focused material/runtime and paired compile controls are recorded under nvvm-material-promotion."
     },
     "corpus-code-quality": {
       "status": "accepted-static-code-quality",
@@ -94818,6 +94824,192 @@
         "limits": [
           "Valid offset+count<=width only. No new out-of-range promise, type admission, ABI/module version, or performance claim."
         ]
+      }
+    },
+    "nvvm-material-promotion": {
+      "status": "accepted",
+      "date": "2026-10-03",
+      "identity": {
+        "path": "build/nvvm-material-promotion/candidate-identity.json",
+        "sha256": "77558d4331bec76391eedb9df6df078c090b93b931cc3f425cffcad37b25e29b"
+      },
+      "contract": "Ordinary unattributed NVVM aggregate loads unpack through existing shared conversion helpers at the original read. Attributed and resource loads retain their physical memory operation. No new representation, provider machinery or ABI.",
+      "root_cause": "Whole compact Graph storage copy in direct_prepare_bsdf prevents libNVVM scalar promotion. One LLVM aggregate load is sufficient; shared conversion avoids creating the copy.",
+      "cleanup_compatibility": "Reuses shared unpack conversion; storage/ABI consolidation should preserve read-point snapshot semantics and attribute boundaries. No duplicate traversal or new physical representation.",
+      "validation": {
+        "reconciliation": {
+          "path": "build/nvvm-material-promotion/reconciliation.json",
+          "sha256": "1c56d3e3e8c05fccfe1965f6c08b42a0f0e2c382849a8f708a0eb41c0582a967"
+        },
+        "working": {
+          "path": "build/nvvm-material-promotion/working1/selection.json",
+          "sha256": "40dda04f14264d73e449ac2b2e238017e1bb951cc383272110c4a5300b501b76"
+        },
+        "units": {
+          "path": "build/nvvm-material-promotion/units2.json",
+          "sha256": "6e27a373c9fff0dcc9de01338199730c19115e2be33c3f97d8f5abec56e278c2"
+        },
+        "smoke": {
+          "path": "build/nvvm-material-promotion/smoke1/selection.json",
+          "sha256": "4a9848296adae395ebf935ada35cb557b7f630df0bba14e4d5ec15a903de1644"
+        },
+        "static": {
+          "path": "build/nvvm-material-promotion/static-candidate1.json",
+          "sha256": "f07f59df3b3d5c6e1dceb345a4a8ff671ecfd6de11d10b232ed3533d24762967"
+        },
+        "focused": {
+          "path": "build/nvvm-material-promotion/focused1.json",
+          "sha256": "f178e727db071ba18d30bbce8c00c50fde0096060bce4afc2a0ca7c8ee45a266"
+        },
+        "rhi": {
+          "path": "build/nvvm-material-promotion/rhi-focused1.json",
+          "sha256": "93c816976aa9884a0135a56f17e0bd9995dc60553d06d940000e976de9176678"
+        },
+        "ad": {
+          "path": "build/nvvm-material-promotion/ad-guard1.json",
+          "sha256": "26f047852579c46dd1e79ed0420a0d0582b6efb08424b91b04a1feec93b14557"
+        },
+        "frozen_before": {
+          "path": "build/nvvm-material-promotion/identity-before2.json",
+          "sha256": "5b21b05273491265c96022dc39a17da4252a3be5fc5878b1726e668d878b313a"
+        },
+        "frozen_after": {
+          "path": "build/nvvm-material-promotion/identity-after2.json",
+          "sha256": "5b21b05273491265c96022dc39a17da4252a3be5fc5878b1726e668d878b313a"
+        }
+      },
+      "performance": {
+        "material": {
+          "path": "build/nvvm-material-promotion/presentation/material-summary.json",
+          "sha256": "51d45882c39ace3da799776319a2086a5d7085955ad1fac33bcc9e30aae7c0f5"
+        },
+        "compile_control": {
+          "path": "build/nvvm-material-promotion/compile-control/summary.json",
+          "sha256": "32c78bbd01b58288bed29d934865ca48337e942d020668215b70ff7cc6947ce5"
+        },
+        "compile_samples": {
+          "path": "build/nvvm-material-promotion/compile-control/results.json",
+          "sha256": "d97d5d1e6c46ad691f9dc7968dd4a3509b330d5ab1b0cb7bf68534f1a9a94def"
+        },
+        "baseline_library": {
+          "path": "build/nvvm-material-promotion/baseline-library/identity.json",
+          "sha256": "f348908537140d841da1b50ee1f975e9e8701ef1e82c430e96cef559fc6ae134"
+        },
+        "candidate_library": {
+          "path": "build/nvvm-material-promotion/candidate-library/identity.json",
+          "sha256": "a65cf3d019cad228eab28220073ac558b5b7526b43af0443831fb7a3b65d8795"
+        },
+        "matched_rhi_before": {
+          "path": "build/nvvm-material-promotion/rhi-compact-baseline-control1.json",
+          "sha256": "fa8a21beffca5b78180ea72138793776bcf233a0f12f67b55a5b26272a3d4a45"
+        },
+        "matched_rhi_after": {
+          "path": "build/nvvm-material-promotion/rhi-compact-candidate-control1.json",
+          "sha256": "1cd7529f66b5c07756d74c00b674fde88a813e477ca85f455dba6c3ad01eb8f4"
+        },
+        "scope": "Focused same-host material recovery and bounded compilation controls; preceding504-case compile/580-case dispatch campaigns were not rerun."
+      },
+      "causal_controls": {
+        "replay": {
+          "path": "build/nvvm-material-promotion/baseline.json",
+          "sha256": "da56d62ba9cfa0942bbf838603596afc9070ed2bcd2c8026b554be873670ea82"
+        },
+        "reduced_load": {
+          "path": "build/nvvm-material-promotion/minimal-loads.json",
+          "sha256": "ab6f9e66e6959c9bb3dd8ae44053cb69f871f0157491052d3b091a87c7b4e189"
+        },
+        "matrix_select": {
+          "path": "build/nvvm-material-promotion/matrix-select.json",
+          "sha256": "e82871b91dce5b81ade255f5240ae45fa30605068c673f5f08c9648ad6687855"
+        },
+        "inlining": {
+          "path": "build/nvvm-material-promotion/inline-controls.json",
+          "sha256": "6a63be3bbd0c61cfd2803af46c7ad3b636fa02df438c3387c89647663857c902"
+        },
+        "candidate_codegen": {
+          "path": "build/nvvm-material-promotion/candidate/results.json",
+          "sha256": "3694c3182d2b0e3579325c8504161b6ae5669f3d7efed928ef81b7315783df9e"
+        }
+      },
+      "failure_history": [
+        {
+          "kind": "obsolete-unit-shape-expectations",
+          "result": {
+            "path": "build/nvvm-material-promotion/units1.json",
+            "sha256": "88b6e2c65cf6a990e68ecbdc231235f4174165104a3230d951fc8186b789dc2b"
+          },
+          "outcome": "Initial567/569; two assertions required whole aggregate copies removed by the fix. Updated to enforce compact scalar-load alignment/invariance, logical helper value and five aligned Half field stores. Compiler source unchanged."
+        },
+        {
+          "kind": "revert-drill",
+          "result": {
+            "path": "build/nvvm-material-promotion/static-baseline1.json",
+            "sha256": "eac646f2aebe6464fd42ab9abe81dc3a7f08cc7f37db882114c7d0816d4acb4e"
+          },
+          "outcome": "Baseline fails exactly no-whole-physical-load and direct-source-unpack checks; candidate passes all four qualified/ordinary shapes."
+        },
+        {
+          "kind": "discarded-late-pass",
+          "result": {
+            "path": "build/nvvm-material-promotion/late-defer-prototype/eval_buffer.log",
+            "sha256": "b161d274e0963adb880e2ed2387de765997e2fa2ea7f149c06907da49a906c9c"
+          },
+          "outcome": "Full late deferBufferLoad introduces raw RWStructuredBuffer numeric pointers after their lowering boundary; reverted."
+        },
+        {
+          "kind": "discarded-late-ordinary-pass",
+          "result": {
+            "path": "build/nvvm-material-promotion/late-ordinary-prototype/results.json",
+            "sha256": "d9f24ebafac9d5e36c59ac9e10ac314f149308edd73d90a79fd3fa92b85c2f09"
+          },
+          "outcome": "Temporary ordinary-only mode avoids diagnostic but retains592/624-byte frames; mode/API/callsite reverted."
+        },
+        {
+          "kind": "inherited-reduced-fixture-rejection",
+          "before": {
+            "path": "build/nvvm-material-promotion/compile-control/context-repro-baseline-1.log",
+            "sha256": "71f3c8da4bdf53d45eede27e863ba3c91cebf53bdfbea660def5b6ef4412d2ec"
+          },
+          "after": {
+            "path": "build/nvvm-material-promotion/compile-control/context-repro-candidate-1.log",
+            "sha256": "71f3c8da4bdf53d45eede27e863ba3c91cebf53bdfbea660def5b6ef4412d2ec"
+          },
+          "outcome": "Exact sequential-element-pointer diagnostic on both compiler builds; not newly admitted support."
+        },
+        {
+          "kind": "unmatched-rhi-duration",
+          "result": {
+            "path": "build/nvvm-material-promotion/rhi-focused1.json",
+            "sha256": "93c816976aa9884a0135a56f17e0bd9995dc60553d06d940000e976de9176678"
+          },
+          "outcome": "Initially113s vs historical82s compact test prompted matched control. Before113.77s/after116.55s with17713assertions each; historical gap not candidate-specific."
+        }
+      ],
+      "next_cleanup": {
+        "family": "Compact parameter-group vector conversions: CompactVector and CompactHalfVector",
+        "gate": "Trace remaining source reachability and intended direct-IR boundary before deleting the complete duplicate family; direct-IR tests still admit it. No cleanup implementation authorized by this recommendation.",
+        "review": {
+          "path": "build/nvvm-material-promotion/next-cleanup-review.md",
+          "sha256": "74792c6e969c1746294fffd5cdf91d769d6a7da1bab63f7e7b81089722c0108b"
+        }
+      },
+      "review": {
+        "producer": {
+          "path": "build/nvvm-material-promotion/independent-producer-review.md",
+          "sha256": "61b50eef7e643c56e2edebc4398d59c7330f34a698c56ec552f54f85b8e87919"
+        },
+        "abi": {
+          "path": "build/nvvm-material-promotion/material-abi-review.md",
+          "sha256": "e51b63c715a5d94cf1c3ff0918377f086e87f50cb710948f8eb163958e959354"
+        },
+        "results": {
+          "path": "build/nvvm-material-promotion/independent-results-review.md",
+          "sha256": "47e55b4cad2825df5bf8602ddc9361ddf0c1b55a9a8b5789f14d62d3ad629e4b"
+        }
+      },
+      "final_review": {
+        "path": "build/nvvm-material-promotion/final-review.md",
+        "sha256": "0928544a74539d43fe500e0a9c4e3bd5f57bbf42804f9e038c7cb715fe0e0052"
       }
     }
   }

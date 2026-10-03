@@ -437,6 +437,15 @@ fixed-size read temporaries to a fixed local frame at O0/O3. Entry-hoisted snaps
 reads exposed a vendor optimizer stall in reverse AD; both failed attempts remain in the evidence.
 This is an LLVM-dialect adaptation, not a bounds check or a generic LLVM stack-allocation guarantee.
 
+Shared CUDA storage legalization also preserves the read point of logical aggregate snapshots.
+For ordinary, unattributed NVVM loads through a storage-to-logical cast, the existing recursive unpack
+helpers produce the logical value at the original load. They avoid first copying the entire physical
+storage object into another temporary: compact vector fields contain arrays, and that copy can prevent
+libNVVM from promoting otherwise private material contexts. The source may be a helper parameter;
+its snapshot still cannot observe later mutations. Attributed loads and resource operations retain
+their original physical memory operation before deferred unpacking, preserving scope and alignment.
+This choice belongs to shared storage conversion and introduces no provider representation or ABI.
+
 The provider owns the snapshot's private storage representation. Boolean vector leaves become
 arrays of byte lanes before the snapshot is stored, and only the selected element is reconstructed
 to its original value type. This prevents libNVVM from packing a Boolean vector store while loading

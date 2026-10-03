@@ -2408,7 +2408,7 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
                 _getBlobText(diagnostics).getBuffer());
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
         // Uniform records use CUDA physical storage, including compact float3 fields.
-        // A whole record reaches its helper by address; a vector value is reconstructed.
+        // Unpacking reconstructs logical record/vector values before their helper calls.
         const String& assembly = gFakeNVVM.addedModule;
         const bool wholeRecord = source == kDirectNVVMLoadedCompactParameterGroupValueSource;
         SLANG_CHECK(assembly.contains(
@@ -2420,19 +2420,17 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
         bool sawHelperSignature = false;
         for (auto line : lines)
         {
-            const auto physicalLoad =
-                wholeRecord ? " = load { { [3 x float] } }," : " = load float, float addrspace(1)*";
+            const auto physicalLoad = " = load float, float addrspace(1)*";
             if (line.indexOf(UnownedStringSlice(physicalLoad)) >= 0)
             {
                 ++physicalLoadCount;
                 SLANG_CHECK(line.indexOf(toSlice(", align 4, !invariant.load")) >= 0);
             }
             if (line.startsWith(toSlice("define internal float")))
-                sawHelperSignature |=
-                    line.indexOf(UnownedStringSlice(
-                        wholeRecord ? "({ { [3 x float] } }*" : "(<3 x float>")) >= 0;
+                sawHelperSignature |= line.indexOf(UnownedStringSlice(
+                                          wholeRecord ? "({ <3 x float> }" : "(<3 x float>")) >= 0;
         }
-        SLANG_CHECK(physicalLoadCount == (wholeRecord ? 1 : 4));
+        SLANG_CHECK(physicalLoadCount == (wholeRecord ? 3 : 4));
         SLANG_CHECK(sawHelperSignature);
         SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
@@ -9618,7 +9616,21 @@ SLANG_UNIT_TEST(nvvmSlangStructuredHalfPaddingAndMatrixLaneWrites)
         {
             SLANG_CHECK(assembly.contains("alloca { half, { [2 x <2 x half>] } }, align 4"));
             SLANG_CHECK(assembly.contains("getelementptr inbounds { half, { [2 x <2 x half>] } }"));
-            SLANG_CHECK(assembly.contains("store { [2 x <2 x half>] }"));
+            // The leading half and four payload lanes keep their CUDA addresses even when
+            // shared storage conversion removes the intermediate whole-payload copy.
+            List<UnownedStringSlice> lines;
+            StringUtil::split(assembly.getUnownedSlice(), '\n', lines);
+            Index globalHalfStoreCount = 0;
+            for (auto line : lines)
+            {
+                if (line.indexOf(toSlice("store half ")) >= 0 &&
+                    line.indexOf(toSlice("half addrspace(1)*")) >= 0)
+                {
+                    ++globalHalfStoreCount;
+                    SLANG_CHECK(line.endsWith(toSlice(", align 2")));
+                }
+            }
+            SLANG_CHECK(globalHalfStoreCount == 5);
         }
         else
             SLANG_CHECK(assembly.contains("getelementptr <4 x float>"));

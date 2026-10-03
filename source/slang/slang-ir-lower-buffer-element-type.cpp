@@ -1541,6 +1541,24 @@ struct LoweredElementTypeContext
                                 // a simple type.
                                 if (!isCompositeType(user->getDataType()))
                                     break;
+
+                                // Materialize ordinary NVVM value loads at their original read
+                                // point using the existing recursive unpack helpers. Consider:
+                                //
+                                //     Context snapshot = context;
+                                //     context.weights[index] = update(snapshot);
+                                //
+                                // Compact CUDA storage can contain arrays for logical float3
+                                // fields. Copying that entire storage object to another temporary
+                                // before unpacking can prevent libNVVM from promoting either
+                                // object. Eager unpacking produces the same logical snapshot
+                                // without that whole-storage copy; later writes to context cannot
+                                // change it. Attributed loads and resource operations keep their
+                                // original memory operation below, including scope and alignment.
+                                if (target->shouldEmitNVVMDirectly() && as<IRLoad>(user) &&
+                                    user->getAllAttrs().getCount() == 0)
+                                    break;
+
                                 IRInst* tempVar = nullptr;
                                 if (as<IRLoad>(user))
                                 {
