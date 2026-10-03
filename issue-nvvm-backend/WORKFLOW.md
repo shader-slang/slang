@@ -1,5 +1,10 @@
 # NVVM development workflow
 
+**Bounded application-reproducer work (2026-10-03):** the maintainer requested portable shaders
+for the four newly exposed Torch failure families and a reusable application capture workflow.
+This authorizes fixtures, provenance, replay and documentation; compiler fixes and the general
+implementation loop remain stopped. The earlier green SlangPy checkpoint excluded Torch.
+
 **Compact-vector consolidation complete and stopped (2026-10-03):** explicit and default
 uniform groups now share the existing CUDA storage lowering. Both duplicate compact-vector load
 conversions are removed. Host layout, Half role separation, snapshot semantics and material
@@ -115,6 +120,53 @@ creation and raygen buffer output, launch index/dimensions, launch parameters/SB
 bindings across launches. Then qualify triangle hit/miss with payload transport, followed by a
 representative material. Keep stage/ABI ownership explicit and use typed OptiX operations or genuine
 primitive calls; do not restore CUDA-text recognition. Advanced OptiX features follow actual demand.
+
+## Application-derived reproducers
+
+Application testing supplies realistic feature combinations. Keep a portable shader reproducer
+for each distinct failing shape so local compiler work does not require the application runtime.
+Application provenance is independent of smoke/working/exploratory qualification. The initial
+[Torch corpus](application-corpus.manifest.json) is exploratory compile/assembly coverage; it is
+not a new working baseline or a negative suite that treats missing support as correct behavior.
+
+1. **Capture the application failure.** Record the exact test IDs, application revision, explicit
+   backend and optimization choices, loaded compiler/provider identities, dependency/bridge setup,
+   input shape, diagnostics or bounded timeout, and a selected comparison run. Preserve the generated
+   shader and source dependencies under ignored `build/`. If only runtime output fails, retain the
+   input/binding/output oracle as well; compilation alone cannot reproduce that issue.
+2. **Make a portable source reproducer.** Start from the failing generated wrapper. Inline or vendor
+   only the required licensed source helpers, preserving origin paths and revision. Remove host
+   package and absolute-path dependencies. Reduce incrementally against the original diagnostic or
+   failure behavior. Record essential shapes such as overload selection, AD context, descriptor layout
+   and decorated calls. Keep failed reductions locally; a different error is not faithful reduction.
+   Add a passing control when it tests a concrete hypothesis. A shared diagnostic groups candidates;
+   it does not prove a shared root cause. Distinguish a matching timeout from a proven identical stall.
+3. **Admit the input and observations.** Store reusable shaders under `tests/cuda/applications/` and
+   register source hashes, entry points, exact application mappings, preserved shape, desired semantics
+   and current per-mode outcomes in `application-corpus.manifest.json`. Keep known failures opt-in,
+   without default-suite `//TEST` directives or expected-rejection assertions. Reuse
+   `run-complex-corpus.py` for fresh NVRTC O3 and NVVM O0/O3 compilation and assembly with a process
+   timeout. Missing tools, compile failures, assembly failures, timeouts and unrun cells stay distinct
+   in the assessment. Raw logs and captures stay under ignored `build/`; commands are in
+   [RESULTS](RESULTS.md#application-reproducer-corpus).
+4. **Debug locally, then validate the application.** Once separately authorized, fix the responsible
+   producer or lowering contract using the local input. Require passing local modes and controls,
+   relevant runtime oracles, and a rerun of every mapped application variant with verified routing.
+   A representative rank-1 or helper-call source does not establish rank-3 or differentiated coverage.
+   Update observations and unresolved/resolved history in place; do not erase the original failure.
+5. **Promote exact tested configurations.** After runtime correctness is established, add the proper
+   authored regression directives or existing focused runtime contract and propose admission through
+   the existing tier inventory. Reference the same source and its application provenance rather than
+   copying it into a second corpus. Compilation and PTX assembly alone never admit a runtime pass.
+   Neither replay nor changed observations automatically promote, demote or close an application issue.
+
+The application manifest owns selection/provenance and compact local observations for this input
+class; the existing runner consumes it directly. Application suite manifests retain full suite
+outcomes. Replace current observations after a reviewed replay, preserving failure transitions;
+Git retains superseded versions. Source fixtures remain as regression inputs after repair. This
+avoids retaining generated dumps, completed narratives or a parallel execution/reporting framework.
+For a runtime-only issue, use an existing suitable runtime runner and record its contract explicitly
+before claiming a faithful reproducer; do not force it into this compile-only manifest.
 
 ## Optional application validation with slang-rhi
 

@@ -1,5 +1,12 @@
 # NVVM current status
 
+**Application reproducer corpus added (2026-10-03):** four portable Torch-derived shaders now
+isolate all four newly exposed NVVM diagnostic/timeout families, with two passing controls.
+The existing runner covers 18 compile/assembly cells. Compiler fixes and the general loop remain
+stopped. See [current Torch findings](#torch-findings-and-local-application-reproducers), the
+[manifest](application-corpus.manifest.json), [workflow](WORKFLOW.md#application-derived-reproducers)
+and [replay command](RESULTS.md#application-reproducer-corpus).
+
 **Compact-vector consolidation complete and stopped (2026-10-03):** explicit and default
 uniform groups now share the existing CUDA storage lowering. Both duplicate compact-vector load
 conversions are removed. Host layout, Half role separation, snapshot semantics and material
@@ -28,11 +35,11 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; the remaining SlangPy failures are resolved and development is stopped.
+below; the earlier non-Torch SlangPy failures are resolved and development is stopped.
 
 The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
 targeting and common raygen/trace/callable qualification are now accepted. Application-led feature
-development is stopped after resolving the remaining SlangPy failures. **The legacy HitObject compatibility decision remains parked:** native8.x
+development remains stopped; the new Torch failures below are not repaired. **The legacy HitObject compatibility decision remains parked:** native8.x
 Invoke loses ray flags that9 retains;
 preserving modern visibility without reducing the32-word payload capacity needs a private
 cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
@@ -133,7 +140,43 @@ Current material evidence and a readable before/after report are under
 remains `build/nvvm-results/2026-10-03-current1/presentation/report.md`. The
 [focused evidence](focused-evidence.json) records exact transitions and scopes.
 
-## Current application acceptance — SlangPy failures resolved
+## Torch findings and local application reproducers
+
+With PyTorch 2.8.0+cu128 and the native `slangpy-torch` 0.7.0 bridge installed, the same 688-node
+Torch-related selection gives **626 pass / 11 compilation failures / 1 timeout / 50 authored skips**.
+All 514 earlier passes remain passing. Of 113 bridge-blocked nodes, 110 now pass and three expose
+native variants of the existing polynomial layout failure; two previously skipped bridge contracts
+also pass. The previous eight compile failures and softplus timeout persist. All **12 exact problem
+nodes pass with NVRTC**, with five route controls passing for each selected backend. No compiler fix
+was made and no formerly passing node regressed. This is not a new full SlangPy checkpoint.
+
+The [application manifest](application-corpus.manifest.json) maps all 12 nodes to four standalone
+source reductions, preserving the failure shape and desired semantics. Local SM80/CUDA12.9 replay
+uses the same compiler/provider bytes as the application run, without SlangPy/Torch dependencies:
+
+| Local entry / mapped application nodes | NVRTC O3 | NVVM O0 | NVVM O3 |
+| --- | --- | --- | --- |
+| CUDAKernel helper call / 3 | Pass | E52017 `call` | E52017 `call` |
+| Packed tensor / 2 | Pass | E52018 `value store` | E52018 `value store` |
+| Polynomial out backward / 6 | Pass | E52017 `local helper-value layout` | Same |
+| Softplus tensor backward / 1 | Pass | Pass | 60-second timeout |
+| Ordinary helper control | Pass | Pass | Pass |
+| Scalar softplus backward control | Pass | Pass | Pass |
+
+All passes include PTX assembly, **not GPU execution**: 11 pass, six diagnostic failures and one
+timeout across 18 cells. Softplus now has a standalone O3 compilation timeout; its native stalled
+phase and identity with the application stall remain unproven. The packed reduction must retain the
+slicing overload selected with `SliceD == D`; replacing it with a descriptor copy changes the error.
+These are diagnostic families, not established root causes. Each reduction represents a family,
+not every rank, bridge mode or differentiation variant in its application mapping.
+
+Raw application evidence is `build/nvvm-torch-native-status/`; local captures, failed reductions,
+loaded identity and replay evidence are under `build/nvvm-application-reproducers/`. The manifest
+owns compact observations and provenance. These cases remain opt-in exploratory inputs. A local
+repair must pass its controls, appropriate runtime checks and all original mapped application nodes
+before acceptance; no working/smoke admission or broad-suite refresh is claimed.
+
+## Prior application acceptance — non-Torch SlangPy failures resolved
 
 The full CUDA-selected SlangPy checkpoint is **1,591 passes, zero failures, 807 skips and
 3 expected failures** across **2,401 nodes**, plus 14 module-level skips. All **29 previous failures
@@ -168,9 +211,10 @@ This inherited issue is separate from the now-passing SlangPy suite and remains 
 SlangPy's full pre-commit checks pass. Current raw evidence is `build/nvvm-application-values/`;
 [focused evidence](focused-evidence.json) records the final smoke/working checkpoints and reviews.
 
-**Stopped as requested:** all remaining SlangPy failures are resolved. Do not resume the general
+**Stopped as requested:** all failures in that non-Torch checkpoint are resolved. Do not resume the general
 feature loop without a new instruction. The legacy OptiX8 HitObject decision remains parked.
-Torch, other SlangPy platforms and physical RGB CUDA textures are outside this qualification.
+Torch was outside that checkpoint; its later focused results are recorded above. Other SlangPy
+platforms and physical RGB CUDA textures remain outside this qualification.
 
 ## Prior TensorView and structured-storage checkpoint
 
@@ -216,7 +260,7 @@ CUDA wraps the product to `0x1c`, while NVVM produces the intended 64-bit `0x100
 NVRTC registrations remain unrun. Existing MakeHit and comparison failures retain their histories in
 [RHI status](rhi-cuda-status.json).
 
-Limits remain explicit: Torch MakeTensorView is unavailable/unqualified; no new lifetime or bounds
+At that checkpoint, Torch MakeTensorView was unavailable/unqualified; no new lifetime or bounds
 analysis is claimed. Direct immutable global aggregate constref forwarding remains rejected. Current
 shared StructuredBuffer lowering can retain stale reads through a writable alias; qualified mutable
 alias observations use two RWStructuredBuffer views. The failed exploratory alias attempt is retained.

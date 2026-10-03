@@ -77,6 +77,51 @@ but require review; a working failure remains a regression. Preserve these histo
 the compact metadata. The selector's CPU contracts are `test-nvvm-corpus-tiers.py` together with the
 existing census, discovery and results contracts.
 
+## Application reproducer corpus
+
+The [manifest](application-corpus.manifest.json) maps portable shaders in
+`tests/cuda/applications/` back to exact application tests and records their preserved failure
+shapes. Follow [the capture/reduction workflow](WORKFLOW.md#application-derived-reproducers).
+The initial four Torch families use only core Slang; replay needs the local compiler/provider and
+CUDA toolkit, with no SlangPy checkout, Python packages or GPU launch. These are compile/assembly
+checks; original application tests remain the final acceptance gate.
+
+Use the environment from [Evidence and outputs](#evidence-and-outputs), then a fresh output path:
+
+```bash
+python3 issue-nvvm-backend/run-complex-corpus.py \
+  --slangc build/RelWithDebInfo/bin/slangc --build-label RelWithDebInfo \
+  --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so \
+  --cuda-root "$CUDA_PATH" \
+  --manifest issue-nvvm-backend/application-corpus.manifest.json \
+  --samples 1 --warmup 0 --timeout 60 \
+  --output build/nvvm-application-reproducers/replay-1
+```
+
+This selects all six entry points at NVRTC O3 / NVVM O0 / NVVM O3: 18 cells. Every successful
+compile must also pass `ptxas`. Exit 1 preserves the current failures and is not an accepted backend
+pass; exit 0 requires all cells to succeed. Inspect `results.json` and per-cell logs, including
+attempt errors. The existing runner labels process timeouts `infrastructure-failed` with an explicit
+`timed out` attempt error; record these as timeouts rather than inferring missing infrastructure.
+No failed or timed-out attempt is a successful compile-time sample. The corpus has no GPU oracle yet.
+
+For a single debugger invocation, select an entry and route explicitly (bound known stalls):
+
+```bash
+timeout --kill-after=5s 60s build/RelWithDebInfo/bin/slangc \
+  tests/cuda/applications/torch-softplus-backward.slang \
+  -entry computeMain -stage compute -target ptx -capability cuda_sm_8_0 \
+  -O3 -emit-cuda-via-nvvm -o build/softplus-backward.ptx
+```
+
+`helperControl` in the CUDAKernel source and `scalarControl` in the softplus source test reduced
+alternatives. They are compilation controls, not runtime qualifications. Update source hashes after
+intentional fixture edits and recheck fidelity; the runner refuses stale source pins. Capture the
+loaded compiler library identity as well as the executable/provider hashes in the replay evidence.
+A source reduction passing locally does not resolve its mapped application cases: rerun those exact
+nodes, both authored bridge modes/ranks where mapped, and relevant neighboring controls before
+updating application acceptance. Do not refresh broad suite claims from this local corpus.
+
 ### Explicit OptiX versions
 
 Use `-optix-version 80000`, `80100`, or `90000` (API `CompilerOptionName::OptixVersion`)
