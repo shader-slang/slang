@@ -165,8 +165,126 @@ a bespoke switch:
 
 Two further families, **`SLANG_USE_SYSTEM_*`** and **`SLANG_OVERRIDE_*_PATH`**,
 appear per-dependency in the reference table above (which lists the dependencies
-that expose them and their defaults). Their usage is tracked separately in
-#12189.
+that expose them and their defaults). Their usage is covered in the next
+section.
+
+## Using system-provided dependencies
+
+Most of the submodule-backed dependencies above can instead be taken from a copy
+you supply, through one of two option families: `SLANG_USE_SYSTEM_*` builds
+against a package you have installed; `SLANG_OVERRIDE_*_PATH` builds from a
+source checkout you point at. Both default **OFF**; the option lines are in the
+top-level [`CMakeLists.txt`](../CMakeLists.txt) and the wiring is in
+[`external/CMakeLists.txt`](CMakeLists.txt) and
+[`tools/CMakeLists.txt`](../tools/CMakeLists.txt), which stay the authoritative
+source of truth.
+
+> These options are marked _advanced_, so they are hidden in the default
+> `ccmake` / `cmake-gui` view (toggle "advanced" to see them). They are also
+> declared with CMake's `option()`, i.e. a boolean type, but the
+> `SLANG_OVERRIDE_*_PATH` ones take a path string — pass a path and the `OFF`
+> default simply means "not set".
+
+### `SLANG_USE_SYSTEM_*` — use an installed package
+
+Setting one `ON` makes the build call `find_package` for that dependency instead
+of adding the bundled submodule. Defined for `MINIZ`, `LZ4`, `VULKAN_HEADERS`,
+`SPIRV_HEADERS`, `UNORDERED_DENSE`, `SPIRV_TOOLS`, and `GLSLANG`. Point CMake at
+the install the usual way — `-D<Pkg>_ROOT=…`, `-D<Pkg>_DIR=…`, or
+`-DCMAKE_PREFIX_PATH=…`. **The `find_package` name is case-sensitive and does not
+track the option suffix** (e.g. `VulkanHeaders`, `SPIRV-Headers`), so use the
+name from the table.
+
+```bash
+# Build glslang and SPIRV-Tools from system installs instead of the submodules.
+cmake --preset default \
+  -DSLANG_USE_SYSTEM_SPIRV_TOOLS=ON \
+  -DSLANG_USE_SYSTEM_GLSLANG=ON \
+  -DCMAKE_PREFIX_PATH="/opt/spirv-tools;/opt/glslang"
+```
+
+| Option (all default OFF)           | `find_package` name | Notes                                                                                    |
+| ---------------------------------- | ------------------- | ---------------------------------------------------------------------------------------- |
+| `SLANG_USE_SYSTEM_MINIZ`           | `miniz`             | Aliases `miniz::miniz` → the expected `miniz` target.                                    |
+| `SLANG_USE_SYSTEM_LZ4`             | `lz4`               | Aliases `LZ4::lz4` → the expected `lz4_static` target.                                   |
+| `SLANG_USE_SYSTEM_VULKAN_HEADERS`  | `VulkanHeaders`     | Provides the `Vulkan::Headers` target; also reused by `slang-rhi`'s own request.         |
+| `SLANG_USE_SYSTEM_SPIRV_HEADERS`   | `SPIRV-Headers`     | Uses `SPIRV-Headers::SPIRV-Headers`. Wins over `SLANG_OVERRIDE_SPIRV_HEADERS_PATH`.      |
+| `SLANG_USE_SYSTEM_UNORDERED_DENSE` | `unordered_dense`   | Config-mode only, and the only one not `REQUIRED` — see the failure note below.          |
+| `SLANG_USE_SYSTEM_SPIRV_TOOLS`     | `SPIRV-Tools`       | Used on the glslang path (`SLANG_ENABLE_SLANG_GLSLANG=ON`).                              |
+| `SLANG_USE_SYSTEM_GLSLANG`         | `glslang`           | Aliases `glslang::glslang` → the expected `glslang` target; needs SPIRV-Tools available. |
+
+`unordered_dense` is looked up in config mode specifically; the other six use the
+basic `find_package` signature, which tries module mode first and falls back to
+config mode. In practice the tree ships no `Find*.cmake` for any of them, so all
+seven are satisfied by a package's installed `…Config.cmake`. Point `-D<Pkg>_DIR=`
+at the directory containing that config file; `-D<Pkg>_ROOT=`/`CMAKE_PREFIX_PATH`
+point at the install prefix.
+
+> **Slang requests no version.** None of these `find_package` calls pass a
+> version constraint, so Slang accepts whatever the package config reports (the
+> config itself may still perform its own checks). This matters most for
+> `glslang`, `SPIRV-Tools`, and `SPIRV-Headers`, which Slang pins to specific
+> commits — a mismatched system copy can configure and then fail or misbehave
+> later. Prefer the bundled submodule unless your copy matches the pinned
+> revision.
+
+> **How a missing package fails.** Six of the seven use `find_package(… REQUIRED)`,
+> so a failed lookup stops configuration immediately with a clear message.
+> `UNORDERED_DENSE` is the exception: it is looked up `CONFIG QUIET`, so a failed
+> lookup is _silent_ and the bundled copy is still skipped — the failure only
+> surfaces later, as a CMake generation error about the unresolved target
+> `unordered_dense::unordered_dense`. If you enable it, make sure the package is
+> actually discoverable.
+
+### `SLANG_OVERRIDE_*_PATH` — build from a source checkout
+
+Setting one to a path builds that dependency from your own tree instead of the
+submodule. Defined for `LZ4`, `MINIZ`, `UNORDERED_DENSE`, `VULKAN_HEADERS`,
+`SPIRV_HEADERS`, `SPIRV_TOOLS`, `GLSLANG`, `GLM`, `IMGUI`, `SLANG_RHI`,
+`TINYOBJLOADER`, `LUA`, `MIMALLOC`, `CMARK`, and `FAST_FLOAT`.
+
+An override assumes the matching `SLANG_USE_SYSTEM_*` is OFF; when a dependency
+exposes both knobs the system-package path generally takes precedence (for
+`SPIRV_HEADERS` this is explicit — the build warns and ignores the override).
+
+**The path points to a directory _containing_ a subdirectory named after the
+dependency, not to the dependency directory itself.** For example
+`SLANG_OVERRIDE_GLSLANG_PATH=/work/deps` expects the source under
+`/work/deps/glslang/`:
+
+```bash
+cmake --preset default -DSLANG_OVERRIDE_GLSLANG_PATH=/work/deps
+#   expects /work/deps/glslang/CMakeLists.txt
+```
+
+Most overrides are consumed via `add_subdirectory`, so the directory must hold a
+buildable checkout: `LZ4`, `MINIZ`, `UNORDERED_DENSE`, `VULKAN_HEADERS`,
+`SPIRV_HEADERS`, `SPIRV_TOOLS`, `GLSLANG`, `SLANG_RHI`, `MIMALLOC`, `CMARK`. The
+rest supply only an include directory: `IMGUI`, `LUA`, `FAST_FLOAT` (and `GLM`,
+`TINYOBJLOADER` — but see the caveat below). "Include-directory-only" here means
+the build just adds the path to an include search list — the source is still
+compiled where relevant (`LUA`'s C source, for instance, is `#include`d into a
+C++ translation unit and compiled as part of it).
+
+Per-dependency gotchas worth knowing before you set one:
+
+- **LZ4 has a nested layout:** its CMake project lives under `build/cmake/`, so
+  the override resolves to `<path>/lz4/build/cmake/`.
+- **FAST_FLOAT is under `include/`:** the override resolves to
+  `<path>/fast_float/include/`.
+- **`MIMALLOC` and `FAST_FLOAT` fail loudly on a bad path.** `FAST_FLOAT` stops
+  at configure time with a `FATAL_ERROR` if `<path>/fast_float/include/` is
+  missing. `MIMALLOC` does the same for `<path>/mimalloc/CMakeLists.txt`, but only
+  when mimalloc is actually being built (`SLANG_ENABLE_MIMALLOC` /
+  `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC`); a bad override with mimalloc unused is not
+  checked. (That same check also fires when the bundled submodule is simply
+  uninitialized.)
+- **`SPIRV_HEADERS` override is ignored when `SLANG_USE_SYSTEM_SPIRV_HEADERS=ON`**
+  (the build warns and the system package wins). Pick one knob, not both.
+- **`GLM` and `TINYOBJLOADER` overrides currently take no effect.** Their only
+  consumers are `tools/` targets, and there the override does not replace the
+  bundled include root — the bundled `external/` path is still searched first, so
+  the bundled copy wins. Use the submodule for these until that is fixed.
 
 ## Submodule pin policy
 
