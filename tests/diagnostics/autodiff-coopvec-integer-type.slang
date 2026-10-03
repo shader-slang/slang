@@ -37,6 +37,14 @@ float uintParam(CoopVec<uint, 4> x, float y)
     return y * y;
 }
 
+// BFloat16 is a valid CoopVec element type (ICoopElement) but is not __BuiltinFloatingPointType,
+// so a BFloat16 CoopVec must not be differentiable, exactly like the integer cases above.
+[Differentiable]
+CoopVec<float, 4> bfloat16Param(CoopVec<BFloat16, 4> x)
+{
+    return CoopVec<float, 4>(1.0);
+}
+
 void useIntReturn(CoopVec<float, 4> x)
 {
     let pair = diffPair(x, CoopVec<float, 4>(1.0));
@@ -60,4 +68,12 @@ void useUIntParam(float y)
 //CHECK:        ^^^^^^^^^^^^^^^^ type argument 'CoopVec<uint, 4>' does not conform to the required interface 'IDifferentiable'
     var yPair = diffPair(y, 0.0);
     bwd_diff(uintParam)(xPair, yPair, 1.0);
+}
+
+void useBFloat16Param()
+{
+    let pair = DifferentialPair<CoopVec<BFloat16, 4>>(CoopVec<BFloat16, 4>(1), CoopVec<BFloat16, 4>(0));
+//CHECK:       ^^^^^^^^^^^^^^^^ type argument doesn't conform to interface
+//CHECK:       ^^^^^^^^^^^^^^^^ type argument 'CoopVec<BFloat16, 4>' does not conform to the required interface 'IDifferentiable'
+    let result = fwd_diff(bfloat16Param)(pair);
 }
