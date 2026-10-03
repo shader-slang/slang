@@ -1990,3 +1990,19 @@ NVRTC2 passes and NVVM4 matching E52017 rejections. All six final cells pass. So
 provenance, runtime contract and exact transitions are in `runtime_workloads` in the application
 corpus manifest. Compute workload selection, prior replay identities and working-tier membership
 are unchanged. Raw evidence lives under `build/nvvm-falcor-trace/`.
+
+### CUDA GeometryIndex qualification
+
+With the shared Falcor environment sourced, run:
+
+```sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/pipeline/ray-tracing/nvvm-geometry-index
+```
+
+Seven checks pass: closest-hit execution at NVRTC O3/NVVM O0/O3 and any-hit/intersection PTX
+compilation on both routes. Raw evidence `build/nvvm-falcor-geometry/` also contains
+`multiple-geometries.py`; run it from the existing Falcor checkout with `.venv/bin/python`,
+`SLANGPY_TEST_CUDA_COMPILER=nvrtc|nvvm` and `FALCOR_IDENTITY_REPORT` set. Three separate BLAS inputs,
+instanceID17, four rays and a guard produce `[0,1,2,456,3735928559]` on both routes. Full NVVM
+units570 and smoke16 pass. Falcor comparison remains blocked at the subsequent mip-level
+Texture2D.GetDimensions overload; exact history is retained in the application manifest.

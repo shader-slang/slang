@@ -59,6 +59,16 @@ wide values, low-word carries and unsigned sum wrap at NVRTC O3 and NVVM O0/O3. 
 arithmetic admission are unchanged. The [Falcor reproducer](../../tests/cuda/applications/falcor-wave64-sum.slang)
 has three passing compile/assembly modes; the actual application now completes scene setup.
 
+## Geometry index in CUDA hit shaders
+
+`GeometryIndex()` supports NVRTC and NVVM intersection, any-hit and closest-hit shaders.
+NVVM uses the SDK `_optix_read_sbt_gas_idx` uint32/no-operand primitive through the existing
+query interface. CUDA applications must use one SBT record per geometry and no per-primitive
+SBT offsets; slang-rhi follows that convention. The [fixture](../../tests/pipeline/ray-tracing/nvvm-geometry-index.slang)
+executes closest-hit at NVRTC O3 and NVVM O0/O3 and compiles the other hit stages on both routes.
+Existing unit matrices cover invalid stages and signatures. A three-geometry application probe
+returns indices0/1/2 with instanceID17 on both routes. See falcor2-status.json for current evidence.
+
 ## Empty fields in OptiX payloads
 
 `TupleTypeBuilder::getResult` preserves removed non-optimizable fields as `Void`. NVVM payload

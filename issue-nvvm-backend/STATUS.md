@@ -6,6 +6,13 @@ necessary fixes until Falcor renders through NVVM or a blocker requires human in
 render, compare matched per-iteration performance between backends and capture compilation times
 separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
 
+**CUDA GeometryIndex repaired (2026-10-03):** standard-library support now covers NVRTC and
+NVVM with the exact OptiX hit-stage query. Falcor's shim and all nine references are replaced.
+Focused checks **7/7**, NVVM units **570/570**, smoke **16/16**, six routing controls and a
+three-geometry runtime oracle on both backends pass. NVRTC Falcor passes (**12.82 s**); NVVM
+advances to an unsupported mip-level `Texture2D.GetDimensions` CUDA-text overload (**10.90 s**).
+Continue that bounded repair under the authorization above; no successful NVVM render yet.
+
 **Empty fields in OptiX payloads repaired (2026-10-03):** NVVM payload admission now ignores
 canonical `Void` field placeholders, matching the existing serializer and zero-byte CUDA layout.
 Public empty fields before/between/after live fields, including nested arrays, are covered. Focused

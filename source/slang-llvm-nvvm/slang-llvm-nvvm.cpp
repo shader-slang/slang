@@ -3838,7 +3838,8 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
                              "_optix_get_attribute_6",        "_optix_get_attribute_7",
                              "_optix_read_primitive_idx",     "_optix_read_instance_idx",
                              "_optix_read_instance_id",       "_optix_get_ray_flags",
-                             "_optix_get_hit_kind",           "_optix_get_transform_list_size"};
+                             "_optix_get_hit_kind",           "_optix_get_transform_list_size",
+                             "_optix_read_sbt_gas_idx"};
     if (!intrinsic.operandCount)
     {
         for (auto query : queries)

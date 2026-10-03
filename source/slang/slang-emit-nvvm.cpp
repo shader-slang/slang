@@ -3306,7 +3306,8 @@ bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
                    stage == Stage::Intersection;
     // Hit properties describe the current candidate in AnyHit or the selected hit in ClosestHit.
     // A miss has only ray state.
-    if (name == toSlice("_optix_read_primitive_idx") ||
+    if (name == toSlice("_optix_read_sbt_gas_idx") ||
+        name == toSlice("_optix_read_primitive_idx") ||
         name == toSlice("_optix_read_instance_idx") || name == toSlice("_optix_read_instance_id") ||
         name == toSlice("_optix_get_transform_list_size") ||
         name == toSlice("_optix_get_transform_list_handle"))

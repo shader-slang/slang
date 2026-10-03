@@ -22802,19 +22802,32 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 // DXR 1.1 and `TraceRayInline` support
 //
 
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixGeometryIndex()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_read_sbt_gas_idx";
+    }
+}
+
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
 /// @return Zero-based index of the geometry in the current instance
 /// @remarks Available in intersection, any-hit, and closest-hit shaders
+/// @remarks On CUDA, each geometry must use one SBT record and no per-primitive SBT offsets.
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case nvvm: return __nvvmOptixGeometryIndex();
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };

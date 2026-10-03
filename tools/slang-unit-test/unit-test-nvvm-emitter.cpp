@@ -81,6 +81,7 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
         {"_optix_get_world_ray_direction_z", "float", QueryStage::RayCallback},
         {"_optix_get_ray_tmin", "float", QueryStage::RayCallback},
         {"_optix_get_ray_tmax", "float", QueryStage::RayCallback},
+        {"_optix_read_sbt_gas_idx", "uint", QueryStage::HitCandidate},
         {"_optix_read_primitive_idx", "uint", QueryStage::HitCandidate},
         {"_optix_read_instance_idx", "uint", QueryStage::HitCandidate},
         {"_optix_read_instance_id", "uint", QueryStage::HitCandidate},

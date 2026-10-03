@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "3bd391c9c95c4a4055b1e59a5e07a1cb14efc24b"
+    "slang": "30fafdbfc0573383001fdcfed0a29285735b4ed1"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
   "configuration": {
@@ -63,7 +63,7 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 12.77,
+      "pytest_seconds": 12.82,
       "phase": "render and assertions completed"
     },
     "nvvm": {
@@ -72,12 +72,9 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 1,
-      "pytest_seconds": 11.1,
-      "phase": "Scene setup completes; ReferencePathTracerNode._render at command encoder finish rejects a Falcor CUDA-text compatibility intrinsic. Original optixTraceRay rejection no longer occurs.",
-      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=optixGetSbtGASIndex(), signature=uint()'",
-      "operation": "optixGetSbtGASIndex CUDA-text intrinsic",
-      "call_site": "slang/falcor2/render/slang_compat.slang:15; tests/python/pathtracer/test_pathtracer.py:416 -> ReferencePathTracerNode._render",
-      "rhi_operation": "command_encoder.finish"
+      "pytest_seconds": 10.9,
+      "phase": "Scene setup completes; path tracer compilation reaches mip-level Texture2D.GetDimensions CUDA-text overload. GeometryIndex shim rejection resolved.",
+      "diagnostic": "E52017 GenericAsm txq.level.width/height and txq.num_mipmap_levels; signature Void(Texture2D,uint,OutParam<uint>,OutParam<uint>,OutParam<uint>)"
     }
   },
   "failure_history": [
@@ -144,24 +141,35 @@
       "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=optixGetSbtGASIndex(), signature=uint()'",
       "source": "slang/falcor2/render/slang_compat.slang:15",
       "notes": "Newly exposed after empty-field repair. Application helper embeds CUDA C++ expression text. No NVVM compatibility-shim change attempted; no successful NVVM render."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "resolved",
+      "family": "Falcor optixGetSbtGASIndex CUDA-text shim",
+      "notes": "Standard-library GeometryIndex supports both CUDA routes. All nine Falcor source references migrated and shim removed. Three-geometry oracle passes both backends."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "unresolved",
+      "family": "mip-level Texture2D.GetDimensions uses CUDA text",
+      "notes": "E52017 GenericAsm txq.level.width/height and txq.num_mipmap_levels; signature Void(Texture2D,uint,OutParam<uint>,OutParam<uint>,OutParam<uint>)"
     }
   ],
   "loaded_artifact_sha256": {
-    "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d10ac2c45cc2c027ada1eb3a5f13514f8d9db7d281a2ab39a0341fe41a33d442",
     "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
     "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
-    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "b1708a84f40b5999aaee703d970733e1f5b09b8268cdc0361919caae5cc9fff1",
+    "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "0e7ac5fadbc0fac4430c75e87935817a8d8289da07f2c639249b0dcacee0d48b",
     "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
     "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
-    "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6"
+    "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "34386849d0f39ad34c296702ec76d4ac3f1361e24a7ab748f23b3b9323cd49c6"
   },
-  "raw_evidence": "build/nvvm-falcor-trace/",
+  "raw_evidence": "build/nvvm-falcor-geometry/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
-    "NVVM completes scene setup but fails during render preparation at a CUDA-text compatibility intrinsic; no successful NVVM render is claimed.",
-    "No image-equivalence comparison, full application suite refresh or automatic corpus-tier admission.",
-    "New standalone GPU coverage is four payload words through closest-hit/miss.32-word boundary is compile/static coverage; AnyHit is not newly exercised.",
-    "Compute corpus replay is unchanged; the OptiX reproducer is separately registered with the existing runtime runner."
+    "NVVM still fails during render compilation at mip-level Texture2D.GetDimensions; no successful render or timing claimed.",
+    "Focused runtime covers closest-hit GeometryIndex on three geometries. Any-hit/intersection positive checks compile PTX; stage/signature negatives use existing unit matrices.",
+    "No complete application suite or automatic corpus-tier admission."
   ],
   "downstream_libraries": {
     "application_nvrtc": {
@@ -383,12 +391,42 @@
       },
       "raw_evidence": "build/nvvm-falcor-wave64/",
       "notes": "After64-bit wave arithmetic repair, before empty-field payload admission."
+    },
+    {
+      "phase": "after empty payload fix, before GeometryIndex support",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 12.77,
+          "phase": "render and assertions completed"
+        },
+        "nvvm": {
+          "passed": 0,
+          "failed": 1,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 1,
+          "pytest_seconds": 11.1,
+          "phase": "Scene setup completes; ReferencePathTracerNode._render at command encoder finish rejects a Falcor CUDA-text compatibility intrinsic. Original optixTraceRay rejection no longer occurs.",
+          "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=optixGetSbtGASIndex(), signature=uint()'",
+          "operation": "optixGetSbtGASIndex CUDA-text intrinsic",
+          "call_site": "slang/falcor2/render/slang_compat.slang:15; tests/python/pathtracer/test_pathtracer.py:416 -> ReferencePathTracerNode._render",
+          "rhi_operation": "command_encoder.finish"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-trace/"
     }
   ],
   "compiler_source_state": {
-    "base_revision": "3bd391c9c95c4a4055b1e59a5e07a1cb14efc24b",
+    "base_revision": "30fafdbfc0573383001fdcfed0a29285735b4ed1",
     "implementation_source_sha256": {
-      "source/slang/slang-ir-legalize-varying-params.cpp": "56ef6adeb9efa57183008fc53fbee2f99655a082f396555df2a4b8aef83a6c4e"
+      "source/slang/hlsl.meta.slang": "54aafbafc98cbab18537bd063b92b57f1f3e1a6857db0b4d70d1a95ec08cada0",
+      "source/slang/slang-emit-nvvm.cpp": "a87f9be0151c49eddb345a480646aba888da83b2596c85978ab978cef9c6db09",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "026be163d6b6513bc12a752e765a92dd8da71fc4f268077bedda04e6fcd73217"
     }
   },
   "select_fix": {
@@ -438,7 +476,7 @@
     "module_abi_unchanged": true,
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
   },
-  "current_failure": "Falcor compatibility shim optixGetSbtGASIndex() CUDA-text GenericAsm rejection while preparing the render; empty-field trace payload is resolved.",
+  "current_failure": "Mip-level Texture2D.GetDimensions lacks typed NVVM lowering; investigation continues under Falcor milestone authorization.",
   "wave64_fix": {
     "date": "2026-10-03",
     "source_state": {
@@ -492,7 +530,7 @@
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
   },
   "built_core_module_sha256": {
-    "build/RelWithDebInfo/lib/slang-core-module.bin": "6eee303520d132bf69b56189b1e41ec6cedf342e7b24d919040e025270087cca"
+    "build/RelWithDebInfo/lib/slang-core-module.bin": "37310a92fc8f7e5607f7f4c3a6a2d3ff17b6659d1496f654011d25efc3066a53"
   },
   "empty_payload_fix": {
     "date": "2026-10-03",
@@ -536,5 +574,53 @@
     "raw_evidence": "build/nvvm-falcor-trace/",
     "module_abi_unchanged": true,
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+  },
+  "geometry_index_fix": {
+    "date": "2026-10-03",
+    "source_state": {
+      "base_revision": "30fafdbfc0573383001fdcfed0a29285735b4ed1",
+      "implementation_source_sha256": {
+        "source/slang/hlsl.meta.slang": "54aafbafc98cbab18537bd063b92b57f1f3e1a6857db0b4d70d1a95ec08cada0",
+        "source/slang/slang-emit-nvvm.cpp": "a87f9be0151c49eddb345a480646aba888da83b2596c85978ab978cef9c6db09",
+        "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "026be163d6b6513bc12a752e765a92dd8da71fc4f268077bedda04e6fcd73217"
+      }
+    },
+    "implementation": "Public GeometryIndex uses typed OptiX uint32/no-operand query on NVVM and SDK wrapper on NVRTC. CUDA contract: one SBT record per geometry, no per-primitive offsets. Falcor removes shim and all nine references.",
+    "checks": {
+      "focused_shaders": {
+        "passed": 7,
+        "failed": 0,
+        "runtime": 3,
+        "compile_only": 4
+      },
+      "nvvm_units": {
+        "passed": 570,
+        "failed": 0
+      },
+      "smoke": {
+        "passed": 16,
+        "failed": 0
+      },
+      "multigeometry": {
+        "nvrtc": "pass",
+        "nvvm": "pass",
+        "expected": [
+          0,
+          1,
+          2,
+          456,
+          3735928559
+        ],
+        "instance_id": 17
+      },
+      "route_controls": {
+        "nvrtc": 3,
+        "nvvm": 3
+      }
+    },
+    "fixture": "tests/pipeline/ray-tracing/nvvm-geometry-index.slang",
+    "fixture_sha256": "5d7e01d4270fa856cb20098d96d864b3e871b903b47f342073970035fd0b7060",
+    "raw_evidence": "build/nvvm-falcor-geometry/",
+    "review": "Independent implementation and final evidence review approved; no remaining findings."
   }
 }

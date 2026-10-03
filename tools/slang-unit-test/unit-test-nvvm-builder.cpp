@@ -27,6 +27,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         {"_optix_get_attribute_5", NVVMSemantics::kUnsignedI32},
         {"_optix_get_attribute_6", NVVMSemantics::kUnsignedI32},
         {"_optix_get_attribute_7", NVVMSemantics::kUnsignedI32},
+        {"_optix_read_sbt_gas_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_primitive_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_id", NVVMSemantics::kUnsignedI32},
