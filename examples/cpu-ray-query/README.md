@@ -39,7 +39,7 @@ build/cpu-ray-query-example/cpu-ray-query cornell-box.ppm 512 256
 With a multi-configuration generator, the executable is in the `Release` subdirectory.
 `--test` checks opaque closest hits, non-opaque candidate commits, ignored candidates, abort,
 misses, instance masks, ray bounds, accept-first-hit, triangle skipping, and face culling.
-It reuses a query and checks that the final candidate expires on the next `Proceed`.
+It checks copied and interleaved query cursors, query reuse, and final-candidate expiry on `Proceed`.
 It also renders a small image and checks for finite radiance, both colored walls, and the light.
 
 Alternatively, from this directory on macOS or Linux, use a source-built `slangc` matching the

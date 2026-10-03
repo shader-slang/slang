@@ -8,13 +8,21 @@ glob_append(prelude_headers "*-prelude.h")
 set(prelude_source)
 foreach(input ${prelude_headers})
     get_filename_component(input_name ${input} NAME)
+    set(input_dependencies ${input})
+    if(input_name MATCHES "^slang-cpp-")
+        list(
+            APPEND
+            input_dependencies
+            "${CMAKE_CURRENT_SOURCE_DIR}/slang-cpp-ray-query.h"
+        )
+    endif()
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${input_name}.cpp")
     add_custom_command(
         OUTPUT ${output}
         COMMAND
             slang-embed "${input}" ${output}
             "-I$<JOIN:$<TARGET_PROPERTY:core,INCLUDE_DIRECTORIES>, -I>"
-        DEPENDS ${input} slang-embed
+        DEPENDS ${input_dependencies} slang-embed
         VERBATIM
     )
     list(APPEND prelude_source ${output})

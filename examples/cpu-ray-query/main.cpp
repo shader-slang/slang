@@ -36,17 +36,17 @@ struct TriangleScene : IRaytracingAccelerationStructure
             (opaque && (flags & SLANG_RAY_QUERY_FLAG_CULL_OPAQUE)) ||
             (!opaque && (flags & SLANG_RAY_QUERY_FLAG_CULL_NON_OPAQUE)))
         {
-            state->traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
+            state->traversalComplete = 1;
             return false;
         }
 
         const float3 origin = _slangRayQueryGetFloat3(state->worldRayOrigin);
         const float3 direction = _slangRayQueryGetFloat3(state->worldRayDirection);
-        // Use the query's leaf cursor as the next triangle index, including across candidate
-        // yields.
-        for (uint32_t i = state->tlasLeafOffset; i < triangleCount; ++i)
+        // The first provider-private word stores the next triangle index across candidate yields.
+        uint32_t& nextTriangle = state->providerData[0];
+        for (uint32_t i = nextTriangle; i < triangleCount; ++i)
         {
-            state->tlasLeafOffset = i + 1;
+            nextTriangle = i + 1;
             const Triangle& triangle = triangles[i];
             const float3 edge1 = triangle.b - triangle.a;
             const float3 edge2 = triangle.c - triangle.a;
@@ -95,12 +95,12 @@ struct TriangleScene : IRaytracingAccelerationStructure
                 state->candidateType = SLANG_RAY_QUERY_CANDIDATE_NON_OPAQUE_TRIANGLE;
                 state->candidatePending = 1;
                 if (i + 1 == triangleCount)
-                    state->traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
+                    state->traversalComplete = 1;
                 return true;
             }
             break;
         }
-        state->traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
+        state->traversalComplete = 1;
         return false;
     }
 
@@ -198,9 +198,28 @@ static bool testQueries()
             return false;
         }
     }
+    // Copies and interleaved queries must keep independent provider cursors.
+    const RayDesc ray = {{0.25f, 0.2f, 0}, 0, {0, 0, 1}, 10};
+    query.TraceRayInline({&scene}, SLANG_RAY_QUERY_FLAG_FORCE_NON_OPAQUE, 0xff, ray);
+    if (!query.Proceed())
+        return false;
+    RayQuery<0> copiedQuery = query;
+    query.CommitNonOpaqueTriangleHit();
+    copiedQuery.Abort();
+    if (!(query.Proceed() && query.CandidatePrimitiveIndex() == 2 && !copiedQuery.Proceed()))
+    {
+        fprintf(stderr, "CPU RayQuery copied cursor was not independent.\n");
+        return false;
+    }
+    copiedQuery.TraceRayInline({&scene}, SLANG_RAY_QUERY_FLAG_FORCE_NON_OPAQUE, 0xff, ray);
+    if (!(copiedQuery.Proceed() && copiedQuery.CandidatePrimitiveIndex() == 0 && !query.Proceed()))
+    {
+        fprintf(stderr, "CPU RayQuery provider cursor did not reset.\n");
+        return false;
+    }
+
     scene.triangles[0] = scene.triangles[2];
     scene.triangleCount = 1;
-    const RayDesc ray = {{0.25f, 0.2f, 0}, 0, {0, 0, 1}, 10};
     query.TraceRayInline({&scene}, SLANG_RAY_QUERY_FLAG_FORCE_NON_OPAQUE, 0xff, ray);
     if (!(query.Proceed() && query.state.candidatePending && !query.Proceed() &&
           !query.state.candidatePending))

@@ -13,7 +13,7 @@ struct IRaytracingAccelerationStructure
     // or traversal completes.
     // All mutable traversal data belongs to `state`; the acceleration structure remains read-only.
     // The handle is borrowed: the provider and its geometry must outlive every query using it.
-    // A final candidate may be returned with traversalPhase == COMPLETE; candidatePending still
+    // A final candidate may be returned with traversalComplete set; candidatePending still
     // keeps it valid until the shader consumes it.
     // See docs/cpu-target.md for the provider contract and a standalone example.
     virtual bool proceed(RayQueryState* state) const = 0;
@@ -58,13 +58,6 @@ enum : uint32_t
     SLANG_RAY_QUERY_CANDIDATE_PROCEDURAL_PRIMITIVE = 1,
 };
 
-enum : uint32_t
-{
-    SLANG_RAY_QUERY_TRAVERSAL_COMPLETE = 0,
-    SLANG_RAY_QUERY_TRAVERSAL_TLAS = 1,
-    SLANG_RAY_QUERY_TRAVERSAL_BLAS = 2,
-};
-
 struct RayQueryHit
 {
     float rayT;
@@ -86,20 +79,10 @@ struct RayQueryHit
 struct RayQueryState
 {
     // Generated C++ initializes the query, clears an unconsumed candidate before each Proceed,
-    // and applies shader-side commit or abort operations. The CPU RHI's proceed implementation
-    // advances the traversal cursors, writes candidates, and automatically commits opaque
-    // triangles. Traversal starts in TLAS, temporarily enters BLAS for an instance, returns to
-    // TLAS after that BLAS is exhausted, and ends in COMPLETE. Both sides may transition directly
-    // to COMPLETE for Abort or ACCEPT_FIRST_HIT_AND_END_SEARCH.
-    //
-    // Keeping this protocol in the shared prelude makes RayQueryState the single ABI contract
-    // between generated shaders and the CPU RHI; neither side depends on the other's BVH layout.
-
-    // The CPU RHI provider keeps traversal cursors and bounded stacks in each query so Proceed
-    // can resume without allocating or replaying. A stateless custom provider can ignore them.
-    static const uint32_t kTLASStackCapacity = 64;
-    static const uint32_t kBLASStackCapacity = 256;
-    static const uint32_t kInvalidNode = 0xffffffffu;
+    // and applies shader-side commit or abort operations. The provider advances its private
+    // traversal state, writes candidates, and automatically commits opaque triangles.
+    // Both sides may end traversal for Abort or ACCEPT_FIRST_HIT_AND_END_SEARCH.
+    static const uint32_t kProviderDataCapacity = 336;
 
     IRaytracingAccelerationStructure* accelerationStructure;
 
@@ -110,21 +93,15 @@ struct RayQueryState
 
     uint32_t rayFlags;
     uint32_t instanceInclusionMask;
-    uint32_t traversalPhase;   // One of SLANG_RAY_QUERY_TRAVERSAL_*.
-    uint32_t candidatePending; // A 0/1 flag indicating whether Candidate* is valid.
-    uint32_t candidateType;    // One of SLANG_RAY_QUERY_CANDIDATE_*.
-    uint32_t committedStatus;  // One of SLANG_RAY_QUERY_COMMITTED_*.
+    uint32_t traversalComplete; // A 0/1 flag preventing further provider callbacks.
+    uint32_t candidatePending;  // A 0/1 flag indicating whether Candidate* is valid.
+    uint32_t candidateType;     // One of SLANG_RAY_QUERY_CANDIDATE_*.
+    uint32_t committedStatus;   // One of SLANG_RAY_QUERY_COMMITTED_*.
 
-    uint32_t tlasNode;
-    uint32_t tlasLeafOffset;
-    uint32_t tlasStackSize;
-    uint32_t tlasStack[kTLASStackCapacity];
-
-    uint32_t blasNode;
-    uint32_t blasLeafOffset;
-    uint32_t blasStackSize;
-    uint32_t blasStack[kBLASStackCapacity];
-    uint32_t currentInstanceIndex;
+    // Provider-private words, zeroed by TraceRayInline and copied with the query. Access words
+    // directly, or memcpy value representations; do not alias this array as another object type.
+    // Store only self-contained values that need no cleanup when a query ends or is reset.
+    uint32_t providerData[kProviderDataCapacity];
 
     RayQueryHit candidate;
     RayQueryHit committed;
@@ -175,16 +152,14 @@ struct RayQuery
     //             query.CommitNonOpaqueTriangleHit();
     //     }
     //
-    // TraceRayInline initializes the shared state, each Proceed asks the CPU RHI to resume from
-    // its saved traversal cursors, and a commit copies the current candidate into the committed
-    // hit. This preserves the HLSL RayQuery state machine without exposing the RHI's BVH.
+    // TraceRayInline initializes the shared state, each Proceed asks the provider to resume
+    // traversal, and a commit copies the current candidate into the committed hit.
 
-    // Constructs an inactive query with invalid traversal cursors.
+    // Constructs an inactive query.
     RayQuery()
     {
         state = {};
-        state.tlasNode = RayQueryState::kInvalidNode;
-        state.blasNode = RayQueryState::kInvalidNode;
+        state.traversalComplete = 1;
     }
 
     // Initializes a new inline traversal and copies the ray parameters into shared ABI state.
@@ -209,13 +184,7 @@ struct RayQuery
         const bool skipAllGeometry =
             (state.rayFlags & SLANG_RAY_QUERY_FLAG_SKIP_TRIANGLES) &&
             (state.rayFlags & SLANG_RAY_QUERY_FLAG_SKIP_PROCEDURAL_PRIMITIVES);
-        state.traversalPhase = state.accelerationStructure && !skipAllGeometry
-                                   ? SLANG_RAY_QUERY_TRAVERSAL_TLAS
-                                   : SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
-        state.tlasNode = state.traversalPhase == SLANG_RAY_QUERY_TRAVERSAL_TLAS
-                             ? 0
-                             : RayQueryState::kInvalidNode;
-        state.blasNode = RayQueryState::kInvalidNode;
+        state.traversalComplete = !state.accelerationStructure || skipAllGeometry;
         state.committed.rayT = ray.TMax;
         state.committedStatus = SLANG_RAY_QUERY_COMMITTED_NOTHING;
     }
@@ -226,8 +195,7 @@ struct RayQuery
         // Proceed consumes the previous candidate even when the provider yielded its final hit
         // with traversal already complete. Candidate lifetime is separate from traversal lifetime.
         state.candidatePending = 0;
-        if (!state.accelerationStructure ||
-            state.traversalPhase == SLANG_RAY_QUERY_TRAVERSAL_COMPLETE)
+        if (!state.accelerationStructure || state.traversalComplete)
         {
             return false;
         }
@@ -239,9 +207,7 @@ struct RayQuery
     SLANG_FORCE_INLINE void Abort()
     {
         state.candidatePending = 0;
-        state.traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
-        state.tlasNode = RayQueryState::kInvalidNode;
-        state.blasNode = RayQueryState::kInvalidNode;
+        state.traversalComplete = 1;
     }
 
     // Commits the current non-opaque triangle when it is closer than the previous committed hit.
@@ -265,9 +231,7 @@ struct RayQuery
 
         if (accepted && (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH))
         {
-            state.traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
-            state.tlasNode = RayQueryState::kInvalidNode;
-            state.blasNode = RayQueryState::kInvalidNode;
+            state.traversalComplete = 1;
         }
     }
 
@@ -294,9 +258,7 @@ struct RayQuery
         if (accepted && (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH))
         {
             state.candidatePending = 0;
-            state.traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
-            state.tlasNode = RayQueryState::kInvalidNode;
-            state.blasNode = RayQueryState::kInvalidNode;
+            state.traversalComplete = 1;
         }
     }
 
