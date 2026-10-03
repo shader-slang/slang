@@ -136,7 +136,10 @@ void finalizeCoverageInstrumentationMetadata(
 // *different* blocks may appear in any relative
 // order — a cross-block pair never coalesces — so block and function groups
 // need not be globally sorted. `collectCoverageMarkerOps` produces markers
-// grouped by function, then block, then position, which satisfies this.
+// grouped by function, then block, then position, which satisfies this. The
+// function validates this precondition at entry and fails loudly
+// (`SLANG_RELEASE_ASSERT`) on a violation, so a mis-ordered hand-built marker
+// list is caught immediately instead of silently mis-coalescing.
 //
 // Line markers in the same basic block, with nothing between them that can
 // abandon the invocation, all execute exactly the same number of times, so
