@@ -12,6 +12,10 @@ struct IRaytracingAccelerationStructure
     // Resumes traversal until a non-opaque triangle or procedural primitive candidate is found,
     // or traversal completes.
     // All mutable traversal data belongs to `state`; the acceleration structure remains read-only.
+    // The handle is borrowed: the provider and its geometry must outlive every query using it.
+    // A final candidate may be returned with traversalPhase == COMPLETE; candidatePending still
+    // keeps it valid until the shader consumes it.
+    // See docs/cpu-target.md for the provider contract and a standalone example.
     virtual bool proceed(RayQueryState* state) const = 0;
 };
 
@@ -91,8 +95,8 @@ struct RayQueryState
     // Keeping this protocol in the shared prelude makes RayQueryState the single ABI contract
     // between generated shaders and the CPU RHI; neither side depends on the other's BVH layout.
 
-    // TinyBVH uses these same maximum stack depths for its scalar BVH/TLAS traversal. Keeping the
-    // cursor in the query object makes Proceed genuinely resumable without allocating or replaying.
+    // The CPU RHI provider keeps traversal cursors and bounded stacks in each query so Proceed
+    // can resume without allocating or replaying. A stateless custom provider can ignore them.
     static const uint32_t kTLASStackCapacity = 64;
     static const uint32_t kBLASStackCapacity = 256;
     static const uint32_t kInvalidNode = 0xffffffffu;
@@ -219,14 +223,15 @@ struct RayQuery
     // Resumes traversal until a shader-visible candidate is available or traversal completes.
     SLANG_FORCE_INLINE bool Proceed()
     {
+        // Proceed consumes the previous candidate even when the provider yielded its final hit
+        // with traversal already complete. Candidate lifetime is separate from traversal lifetime.
+        state.candidatePending = 0;
         if (!state.accelerationStructure ||
             state.traversalPhase == SLANG_RAY_QUERY_TRAVERSAL_COMPLETE)
         {
             return false;
         }
 
-        // A pending candidate that was not committed before the next Proceed is ignored.
-        state.candidatePending = 0;
         return state.accelerationStructure->proceed(&state);
     }
 

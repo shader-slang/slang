@@ -22,6 +22,59 @@ These limitations apply to Slang transpiling to C++.
 
 For current C++ source output, the compiler needs to support partial specialization. 
 
+## CPU RayQuery providers
+
+CPU `RayQuery` is supported through the C++ target and CPU binaries compiled from that C++.
+The direct LLVM emission path (`-emit-cpu-via-llvm`) does not support it.
+
+There are two ways to supply the acceleration structure:
+
+- Use slang-rhi's CPU backend, which builds and traverses its acceleration structures.
+- Implement `IRaytracingAccelerationStructure` from `prelude/slang-cpp-prelude.h` in your own
+  application and call the generated shader directly. No RHI library or RHI device is required.
+
+The [standalone example](../examples/cpu-ray-query/README.md) demonstrates the second path by
+rendering a Cornell box with a linear scan over triangles, without a BVH. It also tests candidate
+commits and traversal termination. The host puts
+`RaytracingAccelerationStructure{&provider}` in the global-parameter payload, at the position
+of the shader's `RaytracingAccelerationStructure` variable, and calls the generated entry point
+with `ComputeVaryingInput`. The group range determines which shader invocations run; scheduling
+and parallel execution remain the host's responsibility.
+
+The interface has one callback: `bool proceed(RayQueryState* state) const`. The generated
+`RayQuery` object owns `state`; `TraceRayInline` initializes it for each new ray. The provider
+implements geometry traversal, while the prelude implements shader accessors, commits, and abort.
+Both the host and generated C++ must use matching prelude headers and a compatible C++ ABI.
+
+| State fields                                                                                                              | Contract                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `accelerationStructure`, `worldRayOrigin`, `worldRayDirection`, `rayTMin`, `rayTMax`, `rayFlags`, `instanceInclusionMask` | Inputs initialized by `TraceRayInline`. Flags combine the generic and dynamic flags. The provider applies geometry filtering, opacity, face culling, masks, and ray bounds.                                                                                              |
+| `candidate`, `candidateType`, `candidatePending`                                                                          | The provider fills a complete hit, sets its type and `candidatePending = 1`, and returns `true` to expose a non-opaque triangle or procedural candidate. The prelude clears the pending flag before the next `Proceed`; ignoring a candidate must not restart traversal. |
+| `committed`, `committedStatus`                                                                                            | Initially no hit, with `committed.rayT = rayTMax`. The provider commits opaque triangles directly and preserves the closest accepted hit. Shader-side commit methods update these fields for other hits. Traverse only up to the current committed distance.             |
+| `traversalPhase`                                                                                                          | Initially `TLAS` for an active query. `COMPLETE` prevents further provider calls. Set it and clear `candidatePending` when returning `false`. A provider may set `COMPLETE` while returning its final candidate: that candidate remains valid until consumed.            |
+| `tlas*`, `blas*`, `currentInstanceIndex`                                                                                  | Per-query traversal storage used by the CPU RHI provider. The example uses `tlasLeafOffset` as its next triangle index; stateless providers can ignore these fields. The current ABI still exposes this storage.                                                         |
+
+Populate all hit fields exposed by the corresponding shader accessors, including instance and
+geometry indices, object-space rays, barycentrics for triangles, and object/world transforms.
+Transforms are three row-major rows of four floats; prelude accessors convert them to the
+requested matrix shape. The example uses identity transforms, zero instance and geometry indices,
+and a primitive index identifying the triangle in its list.
+
+`Proceed` resumes traversal and returns `true` only for a shader-visible candidate. Opaque
+triangles are committed without yielding. `CommitNonOpaqueTriangleHit` consumes a triangle
+candidate. `CommitProceduralPrimitiveHit` accepts a distance within the ray bounds, but normally
+keeps the procedural candidate available for additional, closer commits. `Abort` discards the
+pending candidate and ends traversal while preserving any committed hit.
+`ACCEPT_FIRST_HIT_AND_END_SEARCH` ends traversal on the first accepted hit: the provider handles
+opaque hits, and the prelude handles shader-side commits. Returning `false` or calling `Abort`
+never discards an already committed hit.
+
+The handle is borrowed; it does not retain or delete the provider. The provider and all referenced
+geometry must outlive shader execution and any unfinished queries. The provider may be shared
+by concurrent invocations if its geometry is immutable and traversal state is private to each
+query. Do not advance the same query concurrently. The example keeps its next triangle index in
+each query, with no shared mutable traversal state or per-query allocations.
+
 # How it works
 
 The initial version works by using a 'downstream' C/C++ compiler. A C++ compiler does *not* in general need to be installed on a system to compile and execute code as long as [slang-llvm](#slang-llvm) is available. A [regular C/C++](#regular-cpp) compiler can also be used, allowing access to tooling, such as profiling and debuggers, as well as being able to use regular host development features such as linking, libraries, shared libraries/dlls and executables. 
