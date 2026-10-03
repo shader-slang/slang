@@ -6,6 +6,12 @@ necessary fixes until Falcor renders through NVVM or a blocker requires human in
 render, compare matched per-iteration performance between backends and capture compilation times
 separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
 
+**Typed mip texture queries implemented (2026-10-03):** mip-level GetDimensions now uses
+logical extent/count operations through the existing texture provider. Focused checks **16/16**
+and non-square2D/3D exact mip probes pass on both backends. NVVM units **572/572** and smoke **16/16** pass.
+Falcor NVRTC passes (**21.03 s**), while NVVM progresses to another `optixTraceRay` rejection
+(**11.57 s**). Capture that payload next; no successful NVVM render or timing is claimed.
+
 **CUDA GeometryIndex repaired (2026-10-03):** standard-library support now covers NVRTC and
 NVVM with the exact OptiX hit-stage query. Falcor's shim and all nine references are replaced.
 Focused checks **7/7**, NVVM units **570/570**, smoke **16/16**, six routing controls and a

@@ -2006,3 +2006,18 @@ compilation on both routes. Raw evidence `build/nvvm-falcor-geometry/` also cont
 instanceID17, four rays and a guard produce `[0,1,2,456,3735928559]` on both routes. Full NVVM
 units570 and smoke16 pass. Falcor comparison remains blocked at the subsequent mip-level
 Texture2D.GetDimensions overload; exact history is retained in the application manifest.
+
+### Falcor mip-dimension qualification
+
+```sh
+source build/nvvm-falcor2/environment.sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/pipeline/ray-tracing/texture-get-dimensions-cuda tests/cuda/applications/falcor-mip-dimensions tests/cuda/nvvm-texture-query-unsupported tests/cuda/nvvm-texture-dimensions slang-unit-test-tool/nvvmIRBuilderMipQueries slang-unit-test-tool/nvvmSlangMipQueries
+```
+
+Focused16/16 pass. Raw `build/nvvm-falcor-mip/nonsquare.py` loads its adjacent shader from the
+existing Falcor environment and validates every extent/count at mips0–4 of16x8 and16x8x4 textures,
+plus a guard. Both compiler routes pass. Use the same backend/identity environment as GeometryIndex.
+Mip count retains ray-stage restrictions and mip array layer output retains the existing zero
+contract. Exact application transitions and source/binary identities are in falcor2-status.json.
+
+Full NVVM units pass572/572, including direct-provider malformed mip-call no-mutation checks; smoke passes16/16.

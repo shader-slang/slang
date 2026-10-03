@@ -426,7 +426,10 @@ SlangResult NVVMIRBuilder::emitTextureOperation(
         return SLANG_E_UNINITIALIZED;
     const size_t expectedOperandCount =
         operation.operation == SLANG_NVVM_TEXTURE_OP_GATHER ||
-                operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE
+                operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT ||
+                operation.operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_DEPTH
             ? 2
         : operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
                 operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL

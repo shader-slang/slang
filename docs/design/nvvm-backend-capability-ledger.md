@@ -59,6 +59,18 @@ wide values, low-word carries and unsigned sum wrap at NVRTC O3 and NVVM O0/O3. 
 arithmetic admission are unchanged. The [Falcor reproducer](../../tests/cuda/applications/falcor-wave64-sum.slang)
 has three passing compile/assembly modes; the actual application now completes scene setup.
 
+## Mip-level texture dimensions in ray shaders
+
+NVVM GetDimensions mip overloads use TextureQuerySizeLevel and TextureQueryLevels, preserving
+spatial rank and ordinary uint/int/float conversions. The provider validates a64-bit sampled
+texture handle and32-bit mip before emitting txq.level width/height/depth; mip count uses its
+LLVM intrinsic. CUDA mip-count queries remain restricted to ray stages. Mip overloads retain
+the existing zero layer output for arrays; qualified non-mip layer queries are unchanged.
+The [Falcor fixture](../../tests/cuda/applications/falcor-mip-dimensions.slang) exercises all five
+mips with output guards, with neighboring shape coverage and non-square2D/3D exact runtime
+probes on both compiler routes. Stable IR IDs938/939 append without changing old layouts;
+provider ABI46 and semantic module43 remain unchanged. New operation values negotiate support.
+
 ## Geometry index in CUDA hit shaders
 
 `GeometryIndex()` supports NVRTC and NVVM intersection, any-hit and closest-hit shaders.

@@ -910,5 +910,7 @@ return {
 	["GetTensorViewData"] = 934,
 	["GetTensorViewStride"] = 935,
 	["GetTensorViewSize"] = 936,
-	["GetTensorViewDimensionCount"] = 937
+	["GetTensorViewDimensionCount"] = 937,
+	["textureQuerySizeLevel"] = 938,
+	["textureQueryLevels"] = 939
 }

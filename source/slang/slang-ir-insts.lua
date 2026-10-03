@@ -1658,6 +1658,10 @@ local insts = {
 	{ textureGather = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "component" } } } },
 	-- Base spatial extents as uint/uint2/uint3; array layers are not part of this result.
 	{ textureQuerySize = { operands = { { "texture" } } } },
+	-- Spatial extents at a specified uint mip level, excluding array layers.
+	{ textureQuerySizeLevel = { operands = { { "texture" }, { "level" } } } },
+	-- Number of mip levels visible through a sampled texture view, as scalar uint.
+	{ textureQueryLevels = { operands = { { "texture" } } } },
 	-- Number of array layers visible through the bound texture view, as scalar uint.
 	{ textureQueryLayerCount = { operands = { { "texture" } } } },
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },

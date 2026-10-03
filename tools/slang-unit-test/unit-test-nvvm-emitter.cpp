@@ -15216,3 +15216,51 @@ SLANG_UNIT_TEST(nvvmSlangEquivalentBufferViewsScaleCounts)
                 SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
             }
 }
+
+// Raw logical intrinsics bypass the public capability declaration. The backend still owns
+// stage and texture-role admission before creating a provider module.
+SLANG_UNIT_TEST(nvvmSlangMipQueriesRejectInvalidStagesAndRoles)
+{
+    const char* sources[] = {
+        R"SLANG(
+            __intrinsic_op(textureQueryLevels) uint levels(Texture2D<float4> t);
+            Texture2D<float4> texture; RWStructuredBuffer<uint> output;
+            [numthreads(1,1,1)] void computeMain() { output[0] = levels(texture); }
+        )SLANG",
+        R"SLANG(
+            __intrinsic_op(textureQuerySizeLevel) uint2 size(RWTexture2D<float4> t, uint mip);
+            RWTexture2D<float4> texture; RWStructuredBuffer<uint2> output;
+            [numthreads(1,1,1)] void computeMain() { output[0] = size(texture, 0); }
+        )SLANG",
+        R"SLANG(
+            __intrinsic_op(textureQuerySizeLevel) uint2 size(Texture2D<float4> t, float mip);
+            Texture2D<float4> texture; RWStructuredBuffer<uint2> output;
+            [numthreads(1,1,1)] void computeMain() { output[0] = size(texture, 0.5); }
+        )SLANG",
+    };
+    for (const char* source : sources)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (diagnostics)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK(SLANG_FAILED(result));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(diagnostics && _getBlobText(diagnostics).contains("E52017"));
+        SLANG_CHECK(
+            diagnostics &&
+            _getBlobText(diagnostics)
+                .contains(
+                    source == sources[0] ? "texture mip count stage" : "textureQuerySizeLevel"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}

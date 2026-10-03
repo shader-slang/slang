@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry raygenMain -stage raygeneration
 //TEST(optix):COMPARE_COMPUTE_EX:-cuda -rt -output-using-type -compute-dispatch 6,1,1
+//TEST(optix):COMPARE_COMPUTE_EX:-cuda -rt -output-using-type -compute-dispatch 6,1,1 -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O0
+//TEST(optix):COMPARE_COMPUTE_EX:-cuda -rt -output-using-type -compute-dispatch 6,1,1 -capability cuda_sm_8_0 -Xslang -emit-cuda-via-nvvm -Xslang -O3
 
 //CHECK: txq.level.width.b32 %0, [%1], %2;
 //CHECK-SAME: "r"((1U))

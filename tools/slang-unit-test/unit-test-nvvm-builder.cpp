@@ -2097,6 +2097,139 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
     }
 }
 
+// Mip queries preserve the uint64 handle/uint32 level boundary and reject invalid calls
+// before mutating the module. The mip-count operation has no level operand.
+SLANG_UNIT_TEST(nvvmIRBuilderMipQueriesKeepExactOperands)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    String control;
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("mip-queries"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr, i32 = nullptr, i64 = nullptr,
+                            functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, i64)));
+        const SlangNVVMTypeHandle parameters[] = {i64, i32};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, parameters, 2, functionType)));
+        SlangNVVMValueHandle function = nullptr, foreignFunction = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("query"),
+            function)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("foreign"),
+            foreignFunction)));
+        SlangNVVMValueHandle texture = nullptr, level = nullptr, foreign = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, texture)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, level)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(scope.module, foreignFunction, 1, foreign)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        const SlangNVVMTextureOperation queries[] = {
+            SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH,
+            SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT,
+            SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_DEPTH,
+            SLANG_NVVM_TEXTURE_OP_QUERY_LEVELS};
+        for (auto query : queries)
+        {
+            SlangNVVMTextureOperationDesc desc =
+                {query, SLANG_NVVM_TEXTURE_SHAPE_3D, 0, NVVMSemantics::kFloat32};
+            SlangNVVMValueHandle operands[] = {texture, level};
+            const size_t count = query == SLANG_NVVM_TEXTURE_OP_QUERY_LEVELS ? 1 : 2;
+            SLANG_CHECK(builder.supportsTextureOperation(desc));
+            if (reject)
+            {
+                for (int variant = 0; variant < 9; ++variant)
+                {
+                    auto invalid = desc;
+                    SlangNVVMValueHandle badOperands[] = {texture, level};
+                    size_t badCount = count;
+                    if (variant == 0)
+                        badCount = count == 1 ? 2 : 1;
+                    if (variant == 1)
+                        badOperands[0] = level;
+                    if (variant == 2)
+                        badOperands[count - 1] = nullptr;
+                    if (variant == 3)
+                        badOperands[count - 1] = foreign;
+                    if (variant == 4)
+                        invalid.isArray = 1;
+                    if (variant == 5)
+                        invalid.component = 1;
+                    if (variant == 6)
+                        invalid.elementType.bitWidth = 16;
+                    if (variant == 7)
+                    {
+                        invalid.elementType.laneCount = 3;
+                    }
+                    if (variant == 8)
+                        badOperands[count - 1] = count == 1 ? level : texture;
+                    SlangNVVMValueHandle result = texture;
+                    SLANG_CHECK(SLANG_FAILED(builder.getTextureOperationsAPI()->emitOperation(
+                        scope.module,
+                        &invalid,
+                        badOperands,
+                        badCount,
+                        &result)));
+                    SLANG_CHECK(!result);
+                }
+            }
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitTextureOperation(scope.module, desc, operands, count, result)));
+            SLANG_CHECK(result);
+        }
+        for (auto shape :
+             {SLANG_NVVM_TEXTURE_SHAPE_1D,
+              SLANG_NVVM_TEXTURE_SHAPE_2D,
+              SLANG_NVVM_TEXTURE_SHAPE_CUBE})
+        {
+            SlangNVVMTextureOperationDesc desc =
+                {SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_DEPTH, shape, 0, NVVMSemantics::kFloat32};
+            SLANG_CHECK(!builder.supportsTextureOperation(desc));
+            desc.operation = SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT;
+            SLANG_CHECK(
+                builder.supportsTextureOperation(desc) == (shape != SLANG_NVVM_TEXTURE_SHAPE_1D));
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        ComPtr<ISlangBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, blob)));
+        auto text = _getBlobText(blob);
+        for (auto name :
+             {"txq.level.width",
+              "txq.level.height",
+              "txq.level.depth",
+              "llvm.nvvm.txq.num.mipmap.levels"})
+            SLANG_CHECK(text.contains(name));
+        if (reject)
+        {
+            SLANG_CHECK(text == control);
+        }
+        else
+            control = text;
+    }
+}
+
 // A surface handle uses SUQ rather than the sampled-texture TXQ namespace. Check every
 // spatial dimension and layer count, including narrow storage, before serializing both dialects.
 SLANG_UNIT_TEST(nvvmIRBuilderEmitsSurfaceDimensionQueries)

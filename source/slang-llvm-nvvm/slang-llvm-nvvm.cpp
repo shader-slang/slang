@@ -5340,11 +5340,17 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
         return isSurface && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
     case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE:
         return isSurface && operation.isArray;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_LEVELS:
+    case SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH:
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return isNumericElement;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT:
+        return isNumericElement && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
         return isNumericElement &&
                (operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D || operation.isArray);
+    case SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_DEPTH:
+        return isNumericElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
         return isNumericElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||
@@ -5392,6 +5398,8 @@ static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperatio
         // keep the logical array role explicit while selecting these verified physical queries.
         return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D ? llvm::Intrinsic::nvvm_suq_height
                                                               : llvm::Intrinsic::nvvm_suq_depth;
+    case SLANG_NVVM_TEXTURE_OP_QUERY_LEVELS:
+        return llvm::Intrinsic::nvvm_txq_num_mipmap_levels;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return llvm::Intrinsic::nvvm_txq_width;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
@@ -5455,8 +5463,12 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
     const bool isGather = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_GATHER;
     const bool isSample = operation && operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE;
+    const bool isLevelQuery =
+        operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH ||
+                      operation->operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT ||
+                      operation->operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_DEPTH);
     const size_t expectedOperandCount =
-        isGather || isSample ? 2
+        isGather || isSample || isLevelQuery ? 2
         : operation && (operation->operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL ||
                         operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
             ? 3
@@ -5473,7 +5485,9 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
     const bool isFetchLevel = operation->operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
     const bool hasCoordinate = isSample || isSampleLevel || isFetchLevel || isGather;
     llvm::Value* coordinate = hasCoordinate ? _getValue(operands[1]) : nullptr;
-    llvm::Value* level = isSampleLevel || isFetchLevel ? _getValue(operands[2]) : nullptr;
+    llvm::Value* level = isLevelQuery                    ? _getValue(operands[1])
+                         : isSampleLevel || isFetchLevel ? _getValue(operands[2])
+                                                         : nullptr;
     llvm::Type* floatType = llvm::Type::getFloatTy(state->context);
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     const uint32_t coordinateLaneCount = _getTextureCoordinateLaneCount(*operation);
@@ -5490,7 +5504,10 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
                             (!level || level->getType() != (isFetchLevel ? int32Type : floatType) ||
                              !_isValueUsableAtInsertionPoint(state, insertionBlock, level))) ||
                            !_isValueUsableAtInsertionPoint(state, insertionBlock, coordinate))) ||
-        (!isFetchLevel && !isGather && intrinsicID == llvm::Intrinsic::not_intrinsic) ||
+        (isLevelQuery && (!level || level->getType() != int32Type ||
+                          !_isValueUsableAtInsertionPoint(state, insertionBlock, level))) ||
+        (!isFetchLevel && !isGather && !isLevelQuery &&
+         intrinsicID == llvm::Intrinsic::not_intrinsic) ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, texture))
     {
         return SLANG_E_INVALID_ARG;
@@ -5498,6 +5515,23 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
 
     llvm::SmallVector<llvm::Value*, 6> arguments;
     arguments.push_back(texture);
+    if (isLevelQuery)
+    {
+        // LLVM has no txq.level intrinsic. Emit the exact PTX signature here, after validating
+        // the texture handle and mip operand, just as the typed fetch operation does below.
+        const char* axis = operation->operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH ? "width"
+                           : operation->operation == SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_HEIGHT
+                               ? "height"
+                               : "depth";
+        const std::string assembly = std::string("txq.level.") + axis + ".b32 $0, [$1], $2;";
+        llvm::FunctionType* functionType =
+            llvm::FunctionType::get(int32Type, {texture->getType(), int32Type}, false);
+        llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(functionType, assembly, "=r,l,r", false);
+        arguments.push_back(level);
+        *outValue =
+            reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(inlineAsm, arguments));
+        return SLANG_OK;
+    }
     if (!hasCoordinate)
     {
         llvm::Function* intrinsic =

@@ -921,6 +921,35 @@
         "module_abi_unchanged": true,
         "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
       }
+    },
+    {
+      "name": "falcor-mip-dimensions",
+      "source": "tests/cuda/applications/falcor-mip-dimensions.slang",
+      "source_sha256": "c50e8bec597f1ffd6e5f8236ebdb57d22e59bea70538e743e842e853baeb4df6",
+      "application": {
+        "name": "Falcor2",
+        "revision": "851f207a35c937f668301577dd42ed6bee5ee437",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "origin_sources": [
+        "slang/falcor2/render/texture_manager.slang:197"
+      ],
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "preserved_shape": "Texture2D.GetDimensions(uint mip,out uint width,out uint height,out uint levels) in a ray stage.",
+      "desired_semantics": "Spatial extents at selected mip and total mip count; ordinary conversions for int/float outputs.",
+      "runner": "build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-mip-dimensions.slang",
+      "selection_contract": "Runtime metadata for existing OptiX runner, not compute-only replay or working-tier admission.",
+      "observations": {
+        "nvrtc-o3": "passed",
+        "nvvm-o0": "passed",
+        "nvvm-o3": "passed",
+        "raw_evidence": "build/nvvm-falcor-mip/focused-final.log"
+      },
+      "coverage": "Dynamic mips0..4, uint/int/float dimensions,1D/2Darrays with unchanged zero layer output, guard. Neighboring fixture covers other shapes; separate non-square probe tests exact axis extents.",
+      "baseline": "Existing texture-get-dimensions-cuda fixture: NVRTC2pass, NVVM2E52017 GenericAsm rejections."
     }
   ],
   "runtime_workload_scope": "Separate OptiX fixtures run with their recorded existing runtime runner. These records do not change the compute-only workload selection or refresh prior compile/assembly observations."

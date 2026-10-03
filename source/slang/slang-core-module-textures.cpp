@@ -662,11 +662,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder nvvm;
             // Spatial extents and the qualified 1D/2D array layer counts are distinct queries.
             // Other array families retain their existing integer-output contract.
-            if (!includeMipInfo && !isMultisample &&
-                (dimType != DimType::Float || !isArray || baseShape == SLANG_TEXTURE_1D ||
-                 baseShape == SLANG_TEXTURE_2D))
+            if (!isMultisample && (dimType != DimType::Float || !isArray ||
+                                   baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D))
             {
-                nvvm << "let size = __nvvmTextureQuerySize(this);\n";
+                nvvm
+                    << (includeMipInfo ? "let size = __nvvmTextureQuerySizeLevel(this, mipLevel);\n"
+                                       : "let size = __nvvmTextureQuerySize(this);\n");
                 nvvm << "width = " << rawT << "(size.x);\n";
                 if (baseShape != SLANG_TEXTURE_1D)
                     nvvm << "height = " << rawT << "(size.y);\n";
@@ -675,11 +676,14 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 if (isArray)
                 {
                     nvvm << "elements = " << rawT << "("
-                         << (baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D
+                         << (!includeMipInfo && (baseShape == SLANG_TEXTURE_1D ||
+                                                 baseShape == SLANG_TEXTURE_2D)
                                  ? "__nvvmTextureQueryLayerCount(this)"
                                  : "0")
                          << ");\n";
                 }
+                if (includeMipInfo)
+                    nvvm << "numberOfLevels = " << rawT << "(__nvvmTextureQueryLevels(this));\n";
                 nvvm << "return;";
             }
 

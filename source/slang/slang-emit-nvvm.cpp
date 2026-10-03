@@ -3043,19 +3043,25 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
     outOperation = {};
     const IROp op = inst->getOp();
     const bool isLayerQuery = op == kIROp_TextureQueryLayerCount;
-    const bool isQuery = op == kIROp_TextureQuerySize || isLayerQuery;
+    const bool isLevelSizeQuery = op == kIROp_TextureQuerySizeLevel;
+    const bool isLevelsQuery = op == kIROp_TextureQueryLevels;
+    const bool isQuery =
+        op == kIROp_TextureQuerySize || isLayerQuery || isLevelSizeQuery || isLevelsQuery;
     const bool isFetch = op == kIROp_TextureFetch;
     const bool isGather = op == kIROp_TextureGather;
     const bool isLevel = op == kIROp_SampleLevel;
-    const UInt operandCount = isQuery ? 1 : (isFetch || op == kIROp_Sample) ? 3 : 4;
+    const UInt operandCount = isLevelSizeQuery                  ? 2
+                              : isQuery                         ? 1
+                              : (isFetch || op == kIROp_Sample) ? 3
+                                                                : 4;
     if (inst->getOperandCount() != operandCount)
         return false;
 
     IRInst* texture = inst->getOperand(0);
     NVVMReadOnlyTextureType textureType;
     NVVMSurfaceType surfaceType;
-    const bool isSurfaceQuery =
-        isQuery && getNVVMSupportedSurfaceType(texture->getDataType(), surfaceType);
+    const bool isSurfaceQuery = isQuery && !isLevelSizeQuery && !isLevelsQuery &&
+                                getNVVMSupportedSurfaceType(texture->getDataType(), surfaceType);
     if (isSurfaceQuery)
     {
         textureType.textureType = surfaceType.textureType;
@@ -3074,6 +3080,20 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
     operation.isArray = textureType.isArray ? 1u : 0u;
     operation.elementType = textureType.elementType;
 
+    if (isLevelsQuery)
+    {
+        if (!isNVVMUnsignedI32Type(inst->getDataType()))
+            return false;
+        operation.operation = SLANG_NVVM_TEXTURE_OP_QUERY_LEVELS;
+        outOperation.diagnosticName = "sampled texture mip count";
+        return true;
+    }
+    if (isLevelSizeQuery)
+    {
+        if (!isNVVMUnsignedI32Type(inst->getOperand(1)->getDataType()))
+            return false;
+        outOperation.level = inst->getOperand(1);
+    }
     if (isLayerQuery)
     {
         if (!textureType.isArray ||
@@ -3114,7 +3134,10 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
                 SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH,
             };
             outOperation.operations[i].operation =
-                isSurfaceQuery ? surfaceQueries[i] : queryOperations[i];
+                isSurfaceQuery ? surfaceQueries[i]
+                : isLevelSizeQuery
+                    ? SlangNVVMTextureOperation(SLANG_NVVM_TEXTURE_OP_QUERY_LEVEL_WIDTH + i)
+                    : queryOperations[i];
         }
         return true;
     }
@@ -7233,8 +7256,15 @@ SlangResult _validateNVVMFunction(
             case kIROp_TextureFetch:
             case kIROp_TextureGather:
             case kIROp_TextureQuerySize:
+            case kIROp_TextureQuerySizeLevel:
+            case kIROp_TextureQueryLevels:
             case kIROp_TextureQueryLayerCount:
                 {
+                    if (inst->getOp() == kIROp_TextureQueryLevels &&
+                        !_isNVVMOptixStage(selectedStage))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("texture mip count stage"));
                     NVVMTextureOperationRequirement operation;
                     if (!_resolveNVVMTextureOperation(inst, operation))
                         return _diagnoseUnsupportedIR(
@@ -8243,6 +8273,8 @@ SlangResult _validateNVVMFunction(
             case kIROp_TextureFetch:
             case kIROp_TextureGather:
             case kIROp_TextureQuerySize:
+            case kIROp_TextureQuerySizeLevel:
+            case kIROp_TextureQueryLevels:
             case kIROp_TextureQueryLayerCount:
                 for (UInt i = 0; i < inst->getOperandCount(); ++i)
                 {
@@ -12710,18 +12742,19 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_TextureFetch:
                 case kIROp_TextureGather:
                 case kIROp_TextureQuerySize:
+                case kIROp_TextureQuerySizeLevel:
+                case kIROp_TextureQueryLevels:
                 case kIROp_TextureQueryLayerCount:
                     {
                         const auto* operation =
                             _findTextureOperationRequirement(requirements.textureOperations, inst);
                         SLANG_RELEASE_ASSERT(operation);
-                        IRInst* operands[] = {
-                            operation->texture,
-                            operation->coordinate,
-                            operation->level};
-                        const UInt operandCount = operation->level        ? 3
-                                                  : operation->coordinate ? 2
-                                                                          : 1;
+                        IRInst* operands[3] = {operation->texture};
+                        UInt operandCount = 1;
+                        if (operation->coordinate)
+                            operands[operandCount++] = operation->coordinate;
+                        if (operation->level)
+                            operands[operandCount++] = operation->level;
                         SlangNVVMValueHandle loweredOperands[3] = {};
                         for (UInt i = 0; i < operandCount; ++i)
                         {

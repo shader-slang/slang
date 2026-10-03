@@ -2440,6 +2440,18 @@ vector<uint,Shape.planeDimensions> __nvvmTextureQuerySize(_Texture<T,Shape,isArr
 
 //@hidden:
 [require(nvvm)]
+__intrinsic_op($(kIROp_TextureQuerySizeLevel))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+vector<uint,Shape.planeDimensions> __nvvmTextureQuerySizeLevel(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, uint level);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_TextureQueryLevels))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+uint __nvvmTextureQueryLevels(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+
+//@hidden:
+[require(nvvm)]
 __intrinsic_op($(kIROp_TextureQueryLayerCount))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 uint __nvvmTextureQueryLayerCount(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
