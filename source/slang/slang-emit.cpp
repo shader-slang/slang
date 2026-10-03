@@ -1963,8 +1963,9 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
         // Give empty ray/callable payloads physical storage at native interfaces before type
-        // legalization erases their logical values. Ordinary helper signatures/copies are left
-        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
+        // legalization erases their logical values, and wrap non-struct D3D payloads in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
         SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
 
         if (isMetalTarget(targetRequest))
