@@ -3547,3 +3547,109 @@ SLANG_UNIT_TEST(nvvmPointerQualificationPreservesMutableParameterRoots)
         SLANG_CHECK(selected && *selected == source);
     }
 }
+
+// Retained declarations need no physical type until a checked executable/storage role uses them.
+SLANG_UNIT_TEST(nvvmRetainedStructDeclarationsKeepLiveRoleChecks)
+{
+    enum class Use
+    {
+        Metadata,
+        Local,
+        Entry,
+        Helper,
+        Global,
+        ConventionalGlobal,
+        ExtraFunction
+    };
+    for (auto use :
+         {Use::Metadata,
+          Use::Local,
+          Use::Entry,
+          Use::Helper,
+          Use::Global,
+          Use::ConventionalGlobal,
+          Use::ExtraFunction})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto child = builder.createStructType();
+        builder.createStructField(
+            child,
+            builder.createStructKey(),
+            builder.getType(kIROp_StringType));
+        auto retained = builder.createStructType();
+        builder.createStructField(retained, builder.createStructKey(), child);
+        builder.addKeepAliveDecoration(retained);
+        IRFunc* helper = nullptr;
+        if (use == Use::Helper || use == Use::ExtraFunction)
+        {
+            helper = builder.createFunc();
+            IRType* params[] = {child};
+            helper->setFullType(
+                builder.getFuncType(use == Use::Helper ? 1 : 0, params, builder.getVoidType()));
+            builder.setInsertInto(helper);
+            builder.emitBlock();
+            if (use == Use::Helper)
+                builder.emitParam(child);
+            builder.emitReturn();
+            builder.setInsertInto(module);
+        }
+        if (use == Use::Global)
+            builder.createGlobalVar(child);
+        if (use == Use::ConventionalGlobal)
+        {
+            auto globals = builder.createStructType();
+            builder.addSynthesizedParameterGroupDecoration(globals);
+            builder.createStructField(globals, builder.createStructKey(), child);
+            builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+        }
+        auto entry = builder.createFunc();
+        IRType* params[] = {child};
+        entry->setFullType(
+            builder.getFuncType(use == Use::Entry ? 1 : 0, params, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        if (use == Use::Entry)
+            builder.emitParam(child);
+        if (use == Use::Local)
+            builder.emitVar(child);
+        if (use == Use::Helper)
+        {
+            IRInst* arg = builder.getPoison(child);
+            builder.emitCallInst(builder.getVoidType(), helper, 1, &arg);
+        }
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        SLANG_CHECK((use == Use::Metadata) == SLANG_SUCCEEDED(result));
+        if (use != Use::Metadata)
+        {
+            auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+            SLANG_CHECK(diagnostic.indexOf(toSlice("E52017")) >= 0);
+            const char* role = use == Use::Local                ? "'var'"
+                               : use == Use::Entry              ? "entry-point parameter"
+                               : use == Use::Helper             ? "helper function parameter"
+                               : use == Use::Global             ? "'global_var'"
+                               : use == Use::ConventionalGlobal ? "conventional global field"
+                                                                : "'func'";
+            if (diagnostic.indexOf(UnownedStringSlice(role)) < 0)
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    context.sink.outputBuffer.getBuffer());
+            SLANG_CHECK(diagnostic.indexOf(UnownedStringSlice(role)) >= 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}

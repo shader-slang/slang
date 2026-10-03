@@ -1010,6 +1010,36 @@
       },
       "baseline": "Boolean:8NVRTCpass/16NVVMreject. Nested:5pass/4NVVMcallbackreject.",
       "checks": 9
+    },
+    {
+      "name": "falcor-retained-types",
+      "source": "tests/cuda/applications/falcor-retained-types.slang",
+      "source_sha256": "cb8ffc48940fd7446842a54c95064eb2d3ce4601e6dae9b7ff47b299fe18f62e",
+      "application": {
+        "name": "Falcor2",
+        "revision": "851f207a35c937f668301577dd42ed6bee5ee437",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "origin_sources": [
+        "falcor2/rendernodes/reference_pathtracer_node.py:507",
+        "slang/falcor2/render/light_sampler.slang:194"
+      ],
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "preserved_shape": "Exported sampler -> distribution -> structured-buffer element declaration graph, no executable use.",
+      "desired_semantics": "Retained type metadata does not require an executable representation; live type roles remain checked.",
+      "runner": "build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-retained-types",
+      "selection_contract": "Existing compiler/runtime directives; no working-tier admission.",
+      "observations": {
+        "nvrtc-o3": "passed",
+        "nvvm-o0": "passed",
+        "nvvm-o3": "passed",
+        "raw_evidence": "build/nvvm-falcor-retained-types/"
+      },
+      "coverage": "3compile+3exact37/guard runtime checks.",
+      "baseline": "1NVRTCpass/2NVVM E52017struct rejections."
     }
   ],
   "runtime_workload_scope": "Separate OptiX fixtures run with their recorded existing runtime runner. These records do not change the compute-only workload selection or refresh prior compile/assembly observations."

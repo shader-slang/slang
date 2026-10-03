@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "4e167816dad4b82b86dd91f7b25884dbab914007",
+    "slang": "58df2e6112636ca1a729c38d91d8b58236a4355a",
     "falcor2_geometry_fix": "851f207a35c937f668301577dd42ed6bee5ee437"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
@@ -64,18 +64,17 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 12.78,
-      "phase": "render and assertions completed"
+      "pytest_seconds": 12.7,
+      "phase": "render and original smoke assertions completed"
     },
     "nvvm": {
-      "passed": 0,
-      "failed": 1,
+      "passed": 1,
+      "failed": 0,
       "errors": 0,
       "skipped": 0,
-      "exit_code": 1,
-      "pytest_seconds": 13.67,
-      "phase": "See retained diagnostic in raw log",
-      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'struct'"
+      "exit_code": 0,
+      "pytest_seconds": 16.35,
+      "phase": "render and original smoke assertions completed"
     }
   },
   "failure_history": [
@@ -184,23 +183,29 @@
       "status": "unresolved",
       "family": "struct type after nested trace admission",
       "notes": "E52017 struct: exported PowerLightSampler retains AliasTable1D and Entry as type-only metadata in visibility miss; module-scope audit incorrectly requires executable reachability."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "resolved",
+      "family": "struct type after nested trace admission",
+      "notes": "Retained exported type-only graph now classified as metadata. Both original application tests pass."
     }
   ],
   "loaded_artifact_sha256": {
     "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
     "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
     "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
-    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "02035aa03fff9c1a1d07dfa2827525921f2696b608aa3e5218eec5ee22bb03f9",
+    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "3f6fef8f05ffbd9f24c266e3927b9af8b5197fd3cbef4cc1175c7487390160c2",
     "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
     "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
     "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221"
   },
-  "raw_evidence": "build/nvvm-falcor-nested-trace/",
+  "raw_evidence": "build/nvvm-falcor-retained-types/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
-    "NVVM application still fails compiling retained type metadata; no successful NVVM render or timing comparison yet.",
-    "Mip-count is ray-stage only; mip array layers retain NVRTC zero output. Non-mip layer support unchanged.",
-    "No complete application suite or automatic corpus-tier admission."
+    "One existing64x64 path-tracer smoke test, not the full Falcor suite or proof of image equivalence.",
+    "GPU iteration performance and compilation comparison are in progress as a separate matched workload.",
+    "Persistent module/shader caches disabled; driver/OptiX caches can remain warm."
   ],
   "downstream_libraries": {
     "application_nvrtc": {
@@ -229,7 +234,7 @@
   "review": "Independent implementation, fixture and final evidence review complete; no remaining findings.",
   "reduction": {
     "date": "2026-10-03",
-    "status": "Scalar select, uint64 wave arithmetic and empty-field trace payload are resolved. Current failure is a Falcor CUDA-text OptiX compatibility intrinsic.",
+    "status": "Original select, wide-wave, payload, GeometryIndex, mip-query, nested-trace and retained-type failures resolved; both original application tests pass.",
     "source": "tests/cuda/applications/falcor-scalar-vector-select.slang",
     "source_sha256": "bc42cb21da8dfe5e4a9fc8875c507c65c3b22dfd87abf2edded7d493f0763ff3",
     "corpus_manifest": "issue-nvvm-backend/application-corpus.manifest.json",
@@ -525,14 +530,37 @@
         }
       },
       "raw_evidence": "build/nvvm-falcor-visibility/"
+    },
+    {
+      "phase": "after Boolean/nested tracing, before retained type metadata repair",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 12.78,
+          "phase": "render and assertions completed"
+        },
+        "nvvm": {
+          "passed": 0,
+          "failed": 1,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 1,
+          "pytest_seconds": 13.67,
+          "phase": "See retained diagnostic in raw log",
+          "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'struct'"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-nested-trace/"
     }
   ],
   "compiler_source_state": {
-    "base_revision": "4e167816dad4b82b86dd91f7b25884dbab914007",
+    "base_revision": "58df2e6112636ca1a729c38d91d8b58236a4355a",
     "implementation_source_sha256": {
-      "source/slang/slang-ir-legalize-varying-params.cpp": "020ee22157e3f94280393946af131e9fd7e581a71eef7dbf09eae4d4276fc0b9",
-      "source/slang/slang-ir-legalize-varying-params.h": "ce3ba74f2a2424ba839c3c47d26c83b89cffad4437d9d8f3e00dd8268c279902",
-      "source/slang/slang-emit-nvvm.cpp": "4affee6725997d68f8a4cd57af13f66acc60754a1bf1d65306949101f60ea45c"
+      "source/slang/slang-emit-nvvm.cpp": "4e2b91274934968bf44feacfd19a9feafb313a4f3073f932b505e97496889f06"
     }
   },
   "select_fix": {
@@ -582,7 +610,7 @@
     "module_abi_unchanged": true,
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
   },
-  "current_failure": "E52017 struct: exported PowerLightSampler retains AliasTable1D and Entry as type-only metadata in visibility miss; module-scope audit incorrectly requires executable reachability.",
+  "current_failure": null,
   "wave64_fix": {
     "date": "2026-10-03",
     "source_state": {
@@ -834,5 +862,56 @@
     ],
     "review": "Independent implementation, fixture and final evidence review approved; source, fixture, loaded artifact and static binary hashes verified.",
     "static_binary_sha256": "6120120fc8a5cf538c04031be6be6fa14e86025afd545ace26bd27aa9abc20e7"
+  },
+  "retained_type_fix": {
+    "source_state": {
+      "base_revision": "58df2e6112636ca1a729c38d91d8b58236a4355a",
+      "implementation_source_sha256": {
+        "source/slang/slang-emit-nvvm.cpp": "4e2b91274934968bf44feacfd19a9feafb313a4f3073f932b505e97496889f06"
+      }
+    },
+    "implementation": "Retained struct declarations are metadata; remove redundant declaration reachability graph and storage exception, retain live use-site type/layout checks. Provider lowering remains demand-driven.",
+    "fixture": "tests/cuda/applications/falcor-retained-types.slang",
+    "fixture_sha256": "cb8ffc48940fd7446842a54c95064eb2d3ce4601e6dae9b7ff47b299fe18f62e",
+    "baseline": {
+      "nvrtc_pass": 1,
+      "nvvm_reject": 2,
+      "diagnostic": "E52017 struct"
+    },
+    "checks": {
+      "focused": {
+        "passed": 51,
+        "failed": 0
+      },
+      "conventional_global_static": {
+        "passed": 2,
+        "failed": 0
+      },
+      "optix_static": {
+        "passed": 6,
+        "failed": 0
+      },
+      "retained_type_static": {
+        "passed": 1,
+        "failed": 0,
+        "cases": 7
+      },
+      "nvvm_units": {
+        "passed": 572,
+        "failed": 0
+      },
+      "smoke": {
+        "passed": 16,
+        "failed": 0
+      },
+      "route_controls": {
+        "nvrtc": 3,
+        "nvvm": 3
+      }
+    },
+    "raw_evidence": "build/nvvm-falcor-retained-types/",
+    "review": "Independent implementation, fixture and final evidence review approved; implementation, fixture and loaded artifact hashes verified.",
+    "static_binary_sha256": "abaed3552b7ebe145b9669ecd52ca4bc5b8b68ff942d8d820e18caf59b92d51f",
+    "static_fixture_sha256": "559435c0e7284e138e61fb20726dfdec770ae3320bb571c2d9a9c01641ba3a38"
   }
 }

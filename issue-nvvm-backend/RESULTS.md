@@ -2037,3 +2037,16 @@ unqualified at the earlier pre-empty pass. Raw attempts and final evidence live 
 to the command above for57/57. Raw `build/nvvm-falcor-nested-trace/runtime.py` executes with the
 existing Falcor Python environment, explicit backend and OPT_LEVEL=0|3; recursion2,32outer words,
 innerBoolean,12exact checks and4guards pass in all3modes. Actual Falcor now reaches E52017 struct.
+
+### Falcor retained-type metadata qualification
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-retained-types tests/cuda/applications/falcor-bool-payload tests/cuda/applications/falcor-nested-trace
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test nvvmRetainedStruct
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test nvvmConventionalGlobal
+```
+
+Focused51/51 pass. The original Falcor pytest now passes both routes (12.70sNVRTC,16.35sNVVM total),
+with loaded identities captured under `build/nvvm-falcor-retained-types/`. These totals include
+setup/compilation and are not GPU iteration timings. The next performance slice defines a lit exterior
+512x512workload with explicit camera/light and repeated GPU timestamps.

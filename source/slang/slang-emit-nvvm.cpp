@@ -188,29 +188,6 @@ bool _findNVVMStructField(
     return false;
 }
 
-// Returns whether a retained struct declaration is an exact storage type owned by the accepted
-// conventional CUDA parameter block.
-bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& params, IRInst* inst)
-{
-    // A raw CUDA kernel can retain by-value struct declarations without having a collected global
-    // parameter block. In that case there are no conventional-global storage types to recognize.
-    if (!params.elementType)
-        return false;
-
-    if (inst == params.elementType)
-        return true;
-    for (auto field : params.elementType->getFields())
-    {
-        IRType* parameterGroupElementType = nullptr;
-        if (asNVVMSupportedParameterGroupType(field->getFieldType(), &parameterGroupElementType) &&
-            inst == parameterGroupElementType)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Proves that this array pointer comes from mutable local storage or an internal out/inout/readonly
 // parameter. For example, forwarding `out Payload values[2]` to an inout helper preserves the
 // same storage; a matching pointer on a global, block parameter or external function does not.
@@ -1910,73 +1887,6 @@ uint32_t _getNVVMPhysicalAggregateStorageAlignment(CodeGenContext* codeGenContex
         return 0;
     }
     return uint32_t(layout.alignment);
-}
-
-// Retains the canonical declaration closure of a selected struct. Consider a
-// `ParameterBlock<Parameters>` where `Parameters` contains a zero-field `Empty` struct. Global-
-// parameter collection retains a typed pointer to `Parameters`, and type lowering therefore
-// visits both declarations even when optimized code never loads the handle. The explicit
-// parameter-group role carries permission for that finite zero-state child through the closure;
-// ordinary signatures, locals, and storage roots continue using their nonempty classifiers.
-void _addNVVMReachableStructTypes(
-    IRType* type,
-    HashSet<IRInst*>& reachableTypes,
-    bool allowZeroStateStructs = false)
-{
-    IRType* pointerValueType = nullptr;
-    if (asNVVMSupportedDeviceCopyableValuePointerType(type, &pointerValueType))
-        type = pointerValueType;
-    else if (auto pointer = asNVVMSupportedLayoutTransportPointerType(type))
-        type = pointer->getValueType();
-    IRType* parameterGroupElementType = nullptr;
-    if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
-    {
-        type = parameterGroupElementType;
-        allowZeroStateStructs = true;
-    }
-    // A buffer inside a value record still owns its element declaration, even when
-    // constant folding leaves only scalar stores and no whole-element value in a function.
-    NVVMRawBufferType bufferType;
-    if (getNVVMSupportedRawBufferType(type, bufferType) &&
-        bufferType.kind == NVVMRawBufferKind::Structured)
-    {
-        _addNVVMReachableStructTypes(
-            bufferType.structuredElementType,
-            reachableTypes,
-            allowZeroStateStructs);
-        return;
-    }
-    if (auto arrayType = as<IRArrayType>(type))
-    {
-        if (!asNVVMSupportedHelperArrayType(arrayType) &&
-            !asNVVMSupportedResourceArrayType(arrayType) &&
-            !asNVVMSupportedAggregateStorageArrayType(arrayType) &&
-            !asNVVMSupportedLocalSubstandardRecordArrayType(arrayType) &&
-            !(allowZeroStateStructs &&
-              isNVVMSupportedParameterGroupElementStorageType(arrayType)) &&
-            !isNVVMSupportedStructuredBufferStorageType(arrayType))
-            return;
-        _addNVVMReachableStructTypes(
-            arrayType->getElementType(),
-            reachableTypes,
-            allowZeroStateStructs);
-        return;
-    }
-    auto structType = as<IRStructType>(type);
-    if (!structType ||
-        (!asNVVMSupportedHelperStructType(structType) &&
-         !asNVVMSupportedResourceStructType(structType) &&
-         !asNVVMSupportedAggregateStorageStructType(structType) &&
-         !asNVVMSupportedLocalSubstandardRecordType(structType) &&
-         !(allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(structType)) &&
-         !isNVVMSupportedStructuredBufferStorageType(structType)) ||
-        reachableTypes.contains(structType))
-        return;
-    reachableTypes.add(structType);
-    for (auto field : structType->getFields())
-    {
-        _addNVVMReachableStructTypes(field->getFieldType(), reachableTypes, allowZeroStateStructs);
-    }
 }
 
 IRIntLit* _asExecutableInteger32Constant(IRInst* value);
@@ -10701,7 +10611,6 @@ SlangResult validateNVVMSupportedIR(
         if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
             conventionalGlobalParams = globalParams;
     }
-    HashSet<IRInst*> selectedReachableStructTypes;
     if (conventionalGlobalParams.elementType)
     {
         for (auto field : conventionalGlobalParams.elementType->getFields())
@@ -10734,12 +10643,6 @@ SlangResult validateNVVMSupportedIR(
                         codeGenContext,
                         toSlice("aggregate storage layout"));
                 }
-                if (auto elementStruct = storageStruct
-                                             ? storageStruct
-                                             : as<IRStructType>(storageArray->getElementType()))
-                {
-                    _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
-                }
             }
             IRType* parameterGroupElementType = nullptr;
             if (asNVVMSupportedParameterGroupType(fieldType, &parameterGroupElementType) &&
@@ -10753,13 +10656,6 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("parameter-group storage layout"));
             }
-            if (auto parameterGroupStruct = as<IRStructType>(parameterGroupElementType))
-            {
-                _addNVVMReachableStructTypes(
-                    parameterGroupStruct,
-                    selectedReachableStructTypes,
-                    true);
-            }
             if (resourceStruct)
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, resourceStruct))
@@ -10768,7 +10664,6 @@ SlangResult validateNVVMSupportedIR(
                         codeGenContext,
                         toSlice("conventional resource-struct layout"));
                 }
-                _addNVVMReachableStructTypes(resourceStruct, selectedReachableStructTypes);
             }
             NVVMRawBufferType rawBufferType;
             if (getNVVMSupportedRawBufferType(fieldType, rawBufferType) &&
@@ -10778,24 +10673,13 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("structured-buffer element layout"));
             }
-            _addNVVMReachableStructTypes(fieldType, selectedReachableStructTypes);
         }
     }
 
     for (auto function : functions)
     {
-        IRType* resultType = function->getResultType();
-        _addNVVMReachableStructTypes(resultType, selectedReachableStructTypes);
         for (auto parameter : function->getParams())
         {
-            IRType* parameterType = parameter->getDataType();
-            _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
-            if (auto reference = _getNVVMLocalSubstandardRecordArrayPointer(parameter))
-            {
-                _addNVVMReachableStructTypes(
-                    reference->getValueType(),
-                    selectedReachableStructTypes);
-            }
             NVVMRawBufferType rawBufferType;
             if (getNVVMSupportedRawBufferType(parameter->getDataType(), rawBufferType) &&
                 !_hasNVVMCompatibleRawBufferElementLayout(codeGenContext, parameter->getDataType()))
@@ -10804,96 +10688,14 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("structured-buffer element layout"));
             }
-            IRType* pointerValueType = nullptr;
-            if (asNVVMSupportedLocalResourceValuePointerType(
-                    parameter->getDataType(),
-                    &pointerValueType))
-            {
-                _addNVVMReachableStructTypes(pointerValueType, selectedReachableStructTypes);
-            }
-            IRType* copyablePointerValueType = nullptr;
-            if (asNVVMSupportedLocalCopyableValuePointerType(
-                    parameter->getDataType(),
-                    &copyablePointerValueType))
-            {
-                _addNVVMReachableStructTypes(
-                    copyablePointerValueType,
-                    selectedReachableStructTypes);
-            }
-            IRType* helperPointerValueType = nullptr;
-            if (asNVVMSupportedLocalHelperValuePointerType(
-                    parameter->getDataType(),
-                    &helperPointerValueType))
-            {
-                _addNVVMReachableStructTypes(helperPointerValueType, selectedReachableStructTypes);
-            }
-        }
-        for (auto block : function->getBlocks())
-        {
-            for (auto inst : block->getOrdinaryInsts())
-            {
-                _addNVVMReachableStructTypes(inst->getDataType(), selectedReachableStructTypes);
-                if (auto pointer = _getNVVMLocalSubstandardRecordArrayPointer(inst))
-                    _addNVVMReachableStructTypes(
-                        pointer->getValueType(),
-                        selectedReachableStructTypes);
-                IRType* localValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableValuePointerType(
-                                                      inst->getDataType(),
-                                                      &localValueType))
-                {
-                    _addNVVMReachableStructTypes(localValueType, selectedReachableStructTypes);
-                }
-                IRType* localResourceValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceValuePointerType(
-                                                      inst->getDataType(),
-                                                      &localResourceValueType))
-                {
-                    _addNVVMReachableStructTypes(
-                        localResourceValueType,
-                        selectedReachableStructTypes);
-                }
-                IRType* localHelperValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalHelperValuePointerType(
-                                                      inst->getDataType(),
-                                                      &localHelperValueType))
-                {
-                    _addNVVMReachableStructTypes(
-                        localHelperValueType,
-                        selectedReachableStructTypes);
-                }
-            }
         }
     }
-    // Packing a constant payload can eliminate every record-valued instruction while the
-    // trace still retains its original type for admission. This checked metadata operand is
-    // a type dependency just like a function signature; it does not require a storage witness.
-    for (const auto& trace : outRequirements.emissionPlan.traceRays)
-        _addNVVMReachableStructTypes(
-            cast<IRType>(trace.source->getOperand(0)),
-            selectedReachableStructTypes);
-
-    // Validated HitObject operations also retain empty records for their zero-word payloads.
-    // This is a metadata dependency, not admission of an empty ordinary executable value.
-    for (const auto& operation : outRequirements.emissionPlan.hitObjectOperations)
-        if (operation.payloadType)
-            _addNVVMReachableStructTypes(operation.payloadType, selectedReachableStructTypes, true);
-
-    // A group-shared global is also a canonical type root. Its pointer spelling does not make the
-    // pointee reachable through ordinary SSA-type traversal, so collect the finite storage value
-    // directly from the producer before auditing retained module-scope type declarations.
-    for (auto globalInst : linkedIR.module->getGlobalInsts())
-    {
-        NVVMSharedGlobal sharedGlobal;
-        if (getNVVMSupportedSharedGlobal(globalInst, &sharedGlobal))
-            _addNVVMReachableStructTypes(sharedGlobal.storageType, selectedReachableStructTypes);
-    }
-    // Linking can retain module-scope types, layouts, capabilities, and constants needed to spell
-    // the reachable functions. IRStructKey is also layout-only identity retained for raw CUDA
-    // parameter layouts. A selected struct used by a reachable signature, local, or raw structured
-    // buffer is its canonical value type, not an unrelated dropped global. Reject every other
-    // semantic global so this emitter cannot silently drop a function, parameter, initializer, or
-    // storage object.
+    // Consider an exported Sampler containing a Distribution with StructuredBuffer<Entry>.
+    // Linking intentionally retains all three declarations even for an entry that never uses
+    // the sampler. Their type-to-type references do not require an executable representation.
+    // Signatures, operations and storage roots above validate every live use; provider type
+    // lowering is demand-driven. Keep declarations as metadata, but still reject unsupported
+    // functions, parameters, initializers and storage objects rather than silently dropping them.
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         if (auto globalFunction = as<IRFunc>(globalInst))
@@ -10932,18 +10734,10 @@ SlangResult validateNVVMSupportedIR(
         if (_isNVVMSupportedModuleConstantValue(globalInst) ||
             as<IRGlobalHashedStringLiterals>(globalInst) || as<IRDecoration>(globalInst) ||
             as<IRConstant>(globalInst) || as<IRStructKey>(globalInst) ||
-            getIROpInfo(globalInst->getOp()).isHoistable())
+            as<IRStructType>(globalInst) || getIROpInfo(globalInst->getOp()).isHoistable())
         {
             continue;
         }
-        if (selectedReachableStructTypes.contains(globalInst))
-            continue;
-        // An exported link-time type can survive empty-type legalization solely because of
-        // keepAlive. With no IR uses it needs no executable representation or provider declaration.
-        if (as<IRStructType>(globalInst) && !globalInst->hasUses())
-            continue;
-        if (_isNVVMConventionalGlobalStorageType(conventionalGlobalParams, globalInst))
-            continue;
         return _diagnoseUnsupportedIR(
             codeGenContext,
             UnownedStringSlice(getIROpInfo(globalInst->getOp()).name));

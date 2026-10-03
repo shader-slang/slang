@@ -105,8 +105,19 @@ cover127/128/129Boolean bytes and explicit overlapping field offsets. Falcor's B
 rejection resolves. Nested trace now admits closest-hit and miss, preserving compute/any-hit/
 intersection/direct-callable rejection. The [nested fixture](../../tests/cuda/applications/falcor-nested-trace.slang)
 compiles all3stages in3modes; an existing SlangPy runtime harness verifies32outer words across inner
-Boolean tracing, crossed hit/miss paths and guards. Falcor next rejects a struct type; no successful
-NVVM application render is claimed.
+Boolean tracing, crossed hit/miss paths and guards. The subsequent retained-type issue is repaired
+below; the original Falcor test now renders on both backends.
+
+## Retained type metadata
+
+An exported type graph may survive linking/DCE without executable values. NVVM now admits these
+struct declarations as metadata, using existing live signature/operation/storage role checks and
+demand-driven provider type lowering. The redundant declaration reachability collector is removed.
+The [Falcor-derived fixture](../../tests/cuda/applications/falcor-retained-types.slang) retains nested
+sampler/distribution/buffer-element types and executes an exact37+guard oracle in3modes. A rawIR
+matrix keeps unsupported local/entry/helper/global/conventional-storage and extra-function rejection.
+The original64x64 DamagedHelmet application test now passes both backends; image comparison and
+GPU timing are qualified separately in the application manifest.
 
 ## TensorView, references and canonical numeric storage
 

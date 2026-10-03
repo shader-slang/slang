@@ -354,6 +354,13 @@ layout, address relationships and target requirements before output-module or ve
 mutation. Unsupported forms return diagnostics. Important negative tests assert no output and
 zero creation/mutation counters; a failed trial emission is not the support query.
 
+Exported struct declarations can remain solely as metadata, including references to other structs
+through fields or resource element types. The module audit permits these declarations alongside
+other type metadata; it does not infer execution from IR use counts or reconstruct a separate
+selected-type closure. Every live signature, operation and storage root still requires its existing
+role/layout proof. Provider type lowering occurs on demand from those validated uses. Unselected
+functions, unsupported global variables and initializers remain errors.
+
 `NVVMEmissionPlan` owns reachable function order, collision-checked physical names and source-keyed
 operation recipes. `NVVMEmissionPlanIndex` enforces unique sources and supplies typed emission
 lookups. Requirements are deduplicated by exact overload; emitted operations retain one record per

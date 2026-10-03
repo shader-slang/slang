@@ -6,6 +6,13 @@ necessary fixes until Falcor renders through NVVM or a blocker requires human in
 render, compare matched per-iteration performance between backends and capture compilation times
 separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
 
+**Falcor renders on NVVM (2026-10-03):** the original64x64 DamagedHelmet path-tracing test now
+passes on both backends (**12.70sNVRTC /16.35sNVVM** total pytest time). Retained exported nested
+struct declarations are correctly treated as metadata; live value/storage type and layout checks
+remain intact. Focused shaders **51/51**, static checks **9/9**, NVVM units **572/572** and smoke
+**16/16** pass. A matched512x512GPU iteration and compilation comparison is next; pytest durations
+are not render timings.
+
 **Boolean and nested OptiX traces repaired (2026-10-03):** canonical CUDA byte packing now
 supports Boolean payload leaves, and TraceRay admits closest-hit/miss visibility calls. Focused
 checks **57/57**, static OptiX **6/6**, NVVM units **572/572** and smoke **16/16** pass. Nested GPU
