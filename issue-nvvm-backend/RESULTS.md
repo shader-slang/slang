@@ -2050,3 +2050,22 @@ Focused51/51 pass. The original Falcor pytest now passes both routes (12.70sNVRT
 with loaded identities captured under `build/nvvm-falcor-retained-types/`. These totals include
 setup/compilation and are not GPU iteration timings. The next performance slice defines a lit exterior
 512x512workload with explicit camera/light and repeated GPU timestamps.
+
+### Falcor unused texture metadata qualification
+
+```bash
+source build/nvvm-falcor2/environment.sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-unused-texture-levels tests/cuda/applications/falcor-mip-dimensions tests/cuda/nvvm-texture-query-unsupported tests/cuda/nvvm-texture-dimensions slang-unit-test-tool/nvvmIRBuilderMipQueries slang-unit-test-tool/nvvmSlangMipQueries
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test nvvm
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test irShaderTermination
+```
+
+The faithful vector-component reproducer failed on both NVVM optimization modes before shared
+memory cleanup; scalar query purity alone was insufficient. Focused checks now pass **19/19**,
+including two live-count rejections. Broad static checks report **34 passed / 4 failed**. Reverting
+both production files reproduces the same four resource-admission failures (exact names/diagnostics
+in `build/nvvm-falcor-dead-texture-query/static-baseline.log`); this is not a fully green static suite.
+The storage snapshot/attribute check passes, as does the separate shader-termination check **1/1**.
+The lit 128×128 Falcor pilot now renders successfully through NVVM. Raw failed attempts, module
+capture, baseline drill and passing evidence are retained under `build/nvvm-falcor-dead-texture-query/`
+and `build/nvvm-falcor-performance/`. Live compute mip counts remain unsupported.

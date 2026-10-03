@@ -867,6 +867,12 @@ Sampled-texture TXQ operations cannot query surface handles. Both descriptor fam
 LLVM instruction. Integer 1DArray fetches similarly preserve canonical (x, layer) coordinates until
 the provider selects PTX's (layer, x) order.
 
+Texture size, selected-mip size, mip count and layer count are immutable view metadata. Their
+IR operations are side-effect-free, unlike texel reads. After compact CUDA storage lowering,
+NVVM runs the shared redundant load/store cleanup before its existing DCE: a GetDimensions
+output overwritten through a vector component must not keep an unused, stage-restricted count
+query live. This preserves SSA and does not relax validation of live query stages or resource roles.
+
 Texture operations use canonical sample/fetch/gather/query IR with typed resources, samplers,
 coordinates and results. Existing ignored gather offsets and zero array-count outputs are not full
 API repairs. Base geometry cannot determine allocated/view mip count. Opaque handles are not an

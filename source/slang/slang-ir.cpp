@@ -9504,6 +9504,15 @@ bool IRInst::mightHaveSideEffects(
     default:
         break;
 
+    // Texture-view dimensions and mip/layer counts depend only on the bound view and explicit
+    // LOD. Unlike texel reads, they cannot observe writes to image contents. This also lets DCE
+    // discard unused GetDimensions outputs, such as a mip count replaced by the caller.
+    case kIROp_TextureQuerySize:
+    case kIROp_TextureQuerySizeLevel:
+    case kIROp_TextureQueryLevels:
+    case kIROp_TextureQueryLayerCount:
+        return false;
+
     // Keep surface reads memory-dependent, like ImageLoad. Treating a read as pure would let
     // CSE reuse its value across a physical surface write.
     case kIROp_NVVMSurfaceLoad:

@@ -6,6 +6,13 @@ necessary fixes until Falcor renders through NVVM or a blocker requires human in
 render, compare matched per-iteration performance between backends and capture compilation times
 separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
 
+**Lit Falcor rendering qualified (2026-10-03):** immutable texture metadata and shared late
+memory cleanup remove an overwritten mip-count query in EnvMapLight. Both original smoke tests
+pass (13.35 s NVRTC / 14.20 s NVVM); the lit 128×128 pilot also renders. Focused **19/19**, NVVM
+units **572/572**, smoke **16/16**, six route controls and shader-termination static **1/1** pass.
+Broad static: **34 pass / 4 pre-existing failures**, reproduced unchanged in a production-code
+revert drill; exact failures remain in the application manifest. Matched 512×512 timing is next.
+
 **Falcor renders on NVVM (2026-10-03):** the original64x64 DamagedHelmet path-tracing test now
 passes on both backends (**12.70sNVRTC /16.35sNVVM** total pytest time). Retained exported nested
 struct declarations are correctly treated as metadata; live value/storage type and layout checks

@@ -7,6 +7,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-global-values.h"
+#include "slang-ir-redundancy-removal.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -866,6 +867,15 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     _legalizeNVVMTextureDescriptorWordConversions(linkedIR);
     _legalizeNVVMLayoutPointerObservations(linkedIR);
     SLANG_RETURN_ON_FAIL(_legalizeNVVMBitfields(codeGenContext, linkedIR));
+
+    // CUDA storage lowering can leave component stores such as GetDimensions(..., dims.z)
+    // followed by dims.z = firstbithigh(dims.x) + 1. The source emitters run non-SSA cleanup,
+    // but NVVM keeps SSA form. Reuse the ordinary memory cleanup before DCE so the overwritten
+    // store does not keep an unused, stage-restricted texture query alive at preflight.
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    for (auto global : linkedIR.module->getGlobalInsts())
+        if (auto function = as<IRFunc>(global))
+            eliminateRedundantLoadStore(function, &calleeSideEffectCache);
 
     // No simplifying/hoisting pass follows this target handoff. Ordinary clones stay in
     // their consuming blocks without introducing GlobalValueRef wrappers.

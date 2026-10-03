@@ -1175,16 +1175,26 @@ SLANG_UNIT_TEST(nvvmGlobalExpressionsLocalizeWithoutCloningEffects)
         builder.setInsertInto(entry);
         auto entryBlock = builder.emitBlock();
         auto output = builder.emitParam(outputType);
+        // Each observed value needs a live output: late memory cleanup removes overwritten
+        // stores, so retaining pointers to several stores to one address would be invalid.
+        IRInst* outputs[] = {
+            output,
+            builder.emitGetOffsetPtr(output, builder.getIntValue(builder.getIntType(), 1)),
+            builder.emitGetOffsetPtr(output, builder.getIntValue(builder.getIntType(), 2)),
+            builder.emitGetOffsetPtr(output, builder.getIntValue(builder.getIntType(), 3)),
+            builder.emitGetOffsetPtr(output, builder.getIntValue(builder.getIntType(), 4))};
         auto directLane = builder.emitElementExtract(vector, IRIntegerValue(0));
-        builder.emitStore(output, directLane);
-        auto projectedStore = cast<IRStore>(builder.emitStore(output, projectedNegation));
+        builder.emitStore(outputs[0], directLane);
+        auto projectedStore = cast<IRStore>(builder.emitStore(outputs[1], projectedNegation));
         auto projectedLane = builder.emitElementExtract(vectorProjection, IRIntegerValue(0));
-        builder.emitStore(output, projectedLane);
+        builder.emitStore(outputs[2], projectedLane);
         auto directArray = builder.emitFieldExtract(record, arrayField->getKey());
-        builder.emitStore(output, builder.emitElementExtract(directArray, IRIntegerValue(0)));
+        builder.emitStore(outputs[3], builder.emitElementExtract(directArray, IRIntegerValue(0)));
         auto call = builder.emitCallInst(recordType, helper, 0, nullptr);
         auto returnedVector = builder.emitFieldExtract(call, vectorField->getKey());
-        builder.emitStore(output, builder.emitElementExtract(returnedVector, IRIntegerValue(1)));
+        builder.emitStore(
+            outputs[4],
+            builder.emitElementExtract(returnedVector, IRIntegerValue(1)));
         builder.emitReturn();
         LinkedIR linked = {};
         linked.module = module;

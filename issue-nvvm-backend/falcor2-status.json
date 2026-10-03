@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "58df2e6112636ca1a729c38d91d8b58236a4355a",
+    "slang": "ae9c31b43a5850d6605c6d4cd7d5e2a2ec7d5fd6",
     "falcor2_geometry_fix": "851f207a35c937f668301577dd42ed6bee5ee437"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
@@ -64,8 +64,8 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 12.7,
-      "phase": "render and original smoke assertions completed"
+      "pytest_seconds": 13.35,
+      "phase": "Original smoke renders; additional lit128 benchmark pilot also renders."
     },
     "nvvm": {
       "passed": 1,
@@ -73,8 +73,8 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 16.35,
-      "phase": "render and original smoke assertions completed"
+      "pytest_seconds": 14.2,
+      "phase": "Original smoke renders; additional lit128 benchmark pilot also renders."
     }
   },
   "failure_history": [
@@ -192,15 +192,16 @@
     }
   ],
   "loaded_artifact_sha256": {
+    "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
     "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
     "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
     "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
-    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "3f6fef8f05ffbd9f24c266e3927b9af8b5197fd3cbef4cc1175c7487390160c2",
+    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
     "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
     "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
     "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221"
   },
-  "raw_evidence": "build/nvvm-falcor-retained-types/",
+  "raw_evidence": "build/nvvm-falcor-dead-texture-query/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
     "One existing64x64 path-tracer smoke test, not the full Falcor suite or proof of image equivalence.",
@@ -555,12 +556,46 @@
         }
       },
       "raw_evidence": "build/nvvm-falcor-nested-trace/"
+    },
+    {
+      "phase": "Original smoke after retained-type fix, before lit workload cleanup",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 12.7,
+          "phase": "render and original smoke assertions completed"
+        },
+        "nvvm": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 16.35,
+          "phase": "render and original smoke assertions completed"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-retained-types/",
+      "loaded_artifact_sha256": {
+        "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+        "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+        "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+        "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "3f6fef8f05ffbd9f24c266e3927b9af8b5197fd3cbef4cc1175c7487390160c2",
+        "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+        "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
+        "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221"
+      }
     }
   ],
   "compiler_source_state": {
-    "base_revision": "58df2e6112636ca1a729c38d91d8b58236a4355a",
+    "base_revision": "ae9c31b43a5850d6605c6d4cd7d5e2a2ec7d5fd6",
     "implementation_source_sha256": {
-      "source/slang/slang-emit-nvvm.cpp": "4e2b91274934968bf44feacfd19a9feafb313a4f3073f932b505e97496889f06"
+      "source/slang/slang-ir.cpp": "add65448ac4b94deba255f22f5b4e2d262fd69da8a1ab57a2cff4eae7555978b",
+      "source/slang/slang-ir-nvvm-legalize.cpp": "7c275bfdda3fb877d48044c5521ab137c733fda05ce1fc1c3b89a10331a86786"
     }
   },
   "select_fix": {
@@ -913,5 +948,72 @@
     "review": "Independent implementation, fixture and final evidence review approved; implementation, fixture and loaded artifact hashes verified.",
     "static_binary_sha256": "abaed3552b7ebe145b9669ecd52ca4bc5b8b68ff942d8d820e18caf59b92d51f",
     "static_fixture_sha256": "559435c0e7284e138e61fb20726dfdec770ae3320bb571c2d9a9c01641ba3a38"
-  }
+  },
+  "dead_texture_query_fix": {
+    "source_state": {
+      "base_revision": "ae9c31b43a5850d6605c6d4cd7d5e2a2ec7d5fd6",
+      "implementation_source_sha256": {
+        "source/slang/slang-ir.cpp": "add65448ac4b94deba255f22f5b4e2d262fd69da8a1ab57a2cff4eae7555978b",
+        "source/slang/slang-ir-nvvm-legalize.cpp": "7c275bfdda3fb877d48044c5521ab137c733fda05ce1fc1c3b89a10331a86786"
+      }
+    },
+    "implementation": "Pure immutable texture metadata plus existing redundant load/store cleanup after NVVM storage lowering; live stage restrictions unchanged.",
+    "fixture": "tests/cuda/applications/falcor-unused-texture-levels.slang",
+    "fixture_sha256": "9b03aac13d9e9ddbe9dacf8c7a0f4bb42c3a76d760808a90ede38c79f83189c6",
+    "baseline": "Faithful uint3: 1 NVRTC pass / 4 NVVM reject before memory cleanup. Purity-only scalar success did not resolve actual Falcor.",
+    "checks": {
+      "focused": {
+        "passed": 19,
+        "failed": 0
+      },
+      "nvvm_units": {
+        "passed": 572,
+        "failed": 0
+      },
+      "smoke": {
+        "passed": 16,
+        "failed": 0
+      },
+      "static_nvvm": {
+        "passed": 34,
+        "failed": 4,
+        "baseline_same_failures": true,
+        "failure_names": [
+          "nvvmResourceEntriesRetainCheckedPackingAndQueries",
+          "nvvmResourceEntryFormatsRequireDeclaredOwners",
+          "nvvmAccelerationHandlesKeepOpaqueRoles",
+          "nvvmResourceHelperRolesPreserveStorageAndAccess"
+        ]
+      },
+      "static_shader_termination": {
+        "passed": 1,
+        "failed": 0
+      },
+      "route_controls": {
+        "nvrtc": 3,
+        "nvvm": 3
+      }
+    },
+    "raw_evidence": "build/nvvm-falcor-dead-texture-query/",
+    "review": "Independent implementation, fixture and final evidence review approved; exact pre-existing static failures retained, current and historical identities separated."
+  },
+  "lit_workload_history": [
+    {
+      "phase": "after original smoke success, before immutable-query/cleanup fix",
+      "nvrtc": "lit128 pilot passes",
+      "nvvm": "E52017 texture mip count stage during EnvMapLight.power_estimate",
+      "raw_evidence": "build/nvvm-falcor-performance/pilot-nvvm.log"
+    },
+    {
+      "phase": "purity-only intermediate fix",
+      "nvrtc": "lit128 pilot passes",
+      "nvvm": "same rejection: count remains live through overwritten vector-component store",
+      "raw_evidence": "build/nvvm-falcor-performance/pilot-fixed-nvvm.log"
+    },
+    {
+      "phase": "after shared memory cleanup",
+      "nvvm": "lit128 pilot passes; finite/nonzeroRGB; first RGB RMSE against NVRTC 6.2561855e-7",
+      "raw_evidence": "build/nvvm-falcor-performance/pilot-cleanup-nvvm.json"
+    }
+  ]
 }

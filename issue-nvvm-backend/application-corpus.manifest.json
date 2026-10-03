@@ -1040,6 +1040,35 @@
       },
       "coverage": "3compile+3exact37/guard runtime checks.",
       "baseline": "1NVRTCpass/2NVVM E52017struct rejections."
+    },
+    {
+      "name": "falcor-unused-texture-levels",
+      "source": "tests/cuda/applications/falcor-unused-texture-levels.slang",
+      "source_sha256": "9b03aac13d9e9ddbe9dacf8c7a0f4bb42c3a76d760808a90ede38c79f83189c6",
+      "application": {
+        "name": "Falcor2",
+        "revision": "851f207a35c937f668301577dd42ed6bee5ee437",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "origin_sources": [
+        "slang/falcor2/render/lights/env_map_light.slang:19"
+      ],
+      "application_tests": [
+        "Lit DamagedHelmet benchmark scene.update / EnvMapLight.power_estimate"
+      ],
+      "preserved_shape": "GetDimensions stores mip count into uint3 component, then firstbithigh(width)+1 overwrites it.",
+      "desired_semantics": "Normal dead-store/DCE cleanup removes unused count; live count remains stage-restricted.",
+      "runner": "build/RelWithDebInfo/bin/slang-test tests/cuda/applications/falcor-unused-texture-levels",
+      "selection_contract": "Existing compiler/runtime directives, -ignore-capabilities to reproduce linked typed-IR boundary; no working-tier admission.",
+      "coverage": "3 runtime modes with 5 mip results and guard, 2 PTX absence checks, 2 live-count negative checks.",
+      "observations": {
+        "nvrtc-o3": "passed",
+        "nvvm-o0": "passed",
+        "nvvm-o3": "passed",
+        "raw_evidence": "build/nvvm-falcor-dead-texture-query/"
+      },
+      "baseline": "Faithful uint3: 1 NVRTC pass / 4 NVVM reject before memory cleanup. Purity-only scalar success did not resolve actual Falcor."
     }
   ],
   "runtime_workload_scope": "Separate OptiX fixtures run with their recorded existing runtime runner. These records do not change the compute-only workload selection or refresh prior compile/assembly observations."
