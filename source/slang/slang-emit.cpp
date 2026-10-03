@@ -3640,21 +3640,31 @@ static SlangResult createArtifactFromIR(
             break;
         }
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
-            // Check if we need to output a separate SPIRV file containing debug info. If so
-            // then strip all debug instructions from the artifact. The dbgArtifact will still
-            // contain all instructions.
-            if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            // Named so it shows up in -report-perf-benchmark: downstream compiler time (e.g.
+            // spirv-opt at the default optimization level) was previously tracked only via
+            // Session::m_downstreamCompileTime below, which -report-downstream-time reports
+            // separately -- so compileInner's children in -report-perf-benchmark did not sum
+            // to its own total whenever a downstream compile actually ran. See the sibling
+            // wrapped call sites in slang-code-gen.cpp and slang-artifact-output-util.cpp.
+            SLANG_PROFILE_SECTION(downstreamCompile);
+            if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
             {
-                auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+                // Check if we need to output a separate SPIRV file containing debug info. If so
+                // then strip all debug instructions from the artifact. The dbgArtifact will still
+                // contain all instructions.
+                if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+                {
+                    auto strippedArtifact =
+                        ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
+                    SLANG_RETURN_ON_FAIL(
+                        stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
+                    artifact = _Move(strippedArtifact);
+                    dbgArtifact = _Move(optimizedArtifact);
+                }
+                else
+                    artifact = _Move(optimizedArtifact);
             }
-            else
-                artifact = _Move(optimizedArtifact);
         }
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
