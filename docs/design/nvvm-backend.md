@@ -54,6 +54,11 @@ by rereading storage after a write. Likewise, legal source spelling of a canonic
 belongs to the shared source emitter. These are not reasons to teach NVVM about accidental source
 or IR representations.
 
+`fixEntryPointCallsites` separates launch entries from ordinary direct callees before entry ABI
+legalization. This includes functions marked only `[CUDAKernel]`, such as a SlangPy fill function
+called by a generated compute wrapper. The helper clone drops the launch decoration; dispatch uses
+retain the original kernel. NVVM therefore keeps rejecting kernel roles at ordinary helper boundaries.
+
 `legalizeIRForNVVM` runs after linking and late bitcast normalization. It folds typed layout
 queries, handles the selected derivative and bounds policies, removes the canonical read-none
 `unmodified` check, performs cleanup and verifies postconditions. Zero-index bounds policy becomes
@@ -494,7 +499,11 @@ from the local address. Storage conversion commutes through exact-pointee qualif
 preflight checks access and provenance, records the source and emits its generic pointer identity.
 This keeps pointer arrays/records correctly typed without granting global memory or writable access.
 New bare helper-pointee launch pointers use entry AS1 to executable AS0 conversion; existing
-copyable-pointee entry pointers retain AS1, including their scoped global-memory operations. Global-context
+copyable-pointee entry pointers retain AS1, including their scoped global-memory operations.
+Scalar UserPointer loads from both collected globals and explicit parameter-group fields/elements
+retain their checked AS1 storage provenance. Existing helper-boundary conversion widens those values
+to AS0 when constructing or storing a local descriptor or passing a helper argument. Readonly local
+borrows do not acquire parameter-group provenance merely from their access qualifier. Global-context
 replacement propagates address space through child addresses and phi edges while preserving opcode,
 access and layout. Checked child references reuse their root proof, including readonly forwarding;
 an explicit pointer spelling alone grants no local provenance.

@@ -1,5 +1,12 @@
 # NVVM development workflow
 
+**Bounded easy Torch fixes (2026-10-03):** the maintainer authorized repairing the easy cases after
+corpus creation. This slice covers CUDAKernel direct-call roles and packed-tensor pointer provenance.
+The five mapped application nodes now pass; local/neighboring checks and review establish the bounded
+acceptance recorded in STATUS. Polynomial AD layout, softplus optimizer investigation and the general
+feature loop remain outside this request. The earlier corpus-only restriction below is superseded
+for these two families.
+
 **Bounded application-reproducer work (2026-10-03):** the maintainer requested portable shaders
 for the four newly exposed Torch failure families and a reusable application capture workflow.
 This authorizes fixtures, provenance, replay and documentation; compiler fixes and the general

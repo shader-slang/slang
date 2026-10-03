@@ -2,14 +2,14 @@
   "schema": 1,
   "scope": "compile-and-assemble-only",
   "architecture": 80,
-  "purpose": "Portable application-derived exploratory reproducers. Observed failures are open issues, not expected-success criteria. This manifest owns provenance and local compile observations; it does not admit runtime working configurations.",
+  "purpose": "Portable application-derived reproducers with current compile/assembly observations and original application mappings. Resolved cases also carry authored compile regressions; remaining failures stay exploratory. This manifest does not admit runtime working configurations.",
   "application": {
     "name": "SlangPy",
     "repository": "https://github.com/shader-slang/slangpy",
     "revision": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "license": "Apache-2.0 WITH LLVM-exception",
     "test_id_base": "SlangPy repository root",
-    "scope": "Same 688 Torch-related nodes; CUDA and non-device nodes explicitly selected. Native slangpy-torch 0.7.0 installed against PyTorch 2.8.0+cu128. Not a new full SlangPy checkpoint.",
+    "scope": "Initial capture before the bounded fixes. Same 688 Torch-related nodes; CUDA and non-device nodes explicitly selected. Native slangpy-torch 0.7.0 installed against PyTorch 2.8.0+cu128. Not a new full SlangPy checkpoint.",
     "observed_on": "2026-10-03",
     "counts": {
       "passed": 626,
@@ -72,7 +72,7 @@
     {
       "name": "torch-cuda-kernel-call",
       "source": "tests/cuda/applications/torch-cuda-kernel-call.slang",
-      "source_sha256": "bb9e46d5a7b407099d9505597e09008397a9a07b80703035be2096d981874904",
+      "source_sha256": "dfce4c6caac9e6780be2f005de2dbd161646e6127c7521608a298a0c7dbc1215",
       "entry_points": [
         "computeMain",
         "helperControl"
@@ -87,7 +87,6 @@
         "slangpy/tests/slangpy_tests/test_tensorview.slang",
         "slangpy/tests/slangpy_tests/test_difftensorview.slang"
       ],
-      "application_observation": "E52017: unsupported call",
       "preserved_shape": "Compute entry calls a CUDAKernel-decorated helper using TensorView; identical undecorated helper is a control.",
       "desired_behavior": "output[i] == i for all active i; guarded tail unchanged.",
       "reduction_scope": "One representative source shape for the diagnostic family; does not replace every mapped application variant. Core Slang only; package helpers reduced and inlined.",
@@ -97,16 +96,10 @@
             "status": "passed"
           },
           "nvvm-o0": {
-            "status": "preflight-rejected",
-            "diagnostics": [
-              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'call'"
-            ]
+            "status": "passed"
           },
           "nvvm-o3": {
-            "status": "preflight-rejected",
-            "diagnostics": [
-              "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'call'"
-            ]
+            "status": "passed"
           }
         },
         "helperControl": {
@@ -120,12 +113,70 @@
             "status": "passed"
           }
         }
+      },
+      "initial_application_observation": "E52017: unsupported call",
+      "observation_history": [
+        {
+          "date": "2026-10-03",
+          "source_sha256": "bb9e46d5a7b407099d9505597e09008397a9a07b80703035be2096d981874904",
+          "observations": {
+            "computeMain": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'call'"
+                ]
+              },
+              "nvvm-o3": {
+                "status": "preflight-rejected",
+                "diagnostics": [
+                  "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'call'"
+                ]
+              }
+            },
+            "helperControl": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "passed"
+              },
+              "nvvm-o3": {
+                "status": "passed"
+              }
+            }
+          },
+          "raw_evidence": "build/nvvm-application-reproducers/qualification-2/results.json"
+        }
+      ],
+      "resolution": {
+        "state": "resolved",
+        "fix": "Shared fixEntryPointCallsites selects CUDAKernel roots and removes launch decoration from the ordinary direct-call clone; kernel launch uses remain on the original.",
+        "application_nodes_passed": 3,
+        "application_evidence": "build/nvvm-torch-easy/application.xml",
+        "compile_regression": "Authored SIMPLE/PTX checks at NVRTC O3 and NVVM O0/O3 in this same source.",
+        "runtime_scope": "Mapped original application tests executed; this standalone corpus runner still establishes compilation/assembly only.",
+        "runtime_control": {
+          "source": "tests/cuda/cuda-kernel-direct-call.slang",
+          "source_sha256": "959aa0a59a2d0009d04ff2162fdd725f9d5673e4eea59805dbec8e641ccf5882",
+          "modes": [
+            "nvrtc-o3",
+            "nvvm-o0",
+            "nvvm-o3"
+          ],
+          "oracle": "Output [11,12,13,99] after non-inlined direct and forwarded calls; guard99 unchanged. Separate CUDA-source check retains both launchable original and ordinary helper.",
+          "raw_evidence": "build/nvvm-torch-easy/focused-tests-2.log",
+          "tier_admission": "None; standalone focused runtime qualification."
+        }
       }
     },
     {
       "name": "torch-packed-tensor",
       "source": "tests/cuda/applications/torch-packed-tensor.slang",
-      "source_sha256": "b2b4a62f94e02c9c92b4d487d04faf320070d748d2abf22491048c6ffe8d30c2",
+      "source_sha256": "096443dc38d489998029b72399c60db1de2fdb2681b5d3fa93135ece06d5dda7",
       "entry_points": [
         "computeMain"
       ],
@@ -141,7 +192,6 @@
         "slangpy/slang/tensorcommon.slang",
         "slangpy/slang/tensor_indices_generated.slang"
       ],
-      "application_observation": "E52018: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809",
       "preserved_shape": "ParameterBlock<Tensor<float,1>> invokes generic slicing load with SliceD == D, then passes the local descriptor by value. Both load overloads and slice out-parameters are intentional.",
       "desired_behavior": "result[0] == tensor.data[tensor.offset], including packed values and distinct descriptor values.",
       "reduction_scope": "One representative source shape for the diagnostic family; does not replace every mapped application variant. Core Slang only; package helpers reduced and inlined.",
@@ -151,18 +201,47 @@
             "status": "passed"
           },
           "nvvm-o0": {
-            "status": "compile-failed",
-            "diagnostics": [
-              "error[E52018]: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809"
-            ]
+            "status": "passed"
           },
           "nvvm-o3": {
-            "status": "compile-failed",
-            "diagnostics": [
-              "error[E52018]: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809"
-            ]
+            "status": "passed"
           }
         }
+      },
+      "initial_application_observation": "E52018: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809",
+      "observation_history": [
+        {
+          "date": "2026-10-03",
+          "source_sha256": "b2b4a62f94e02c9c92b4d487d04faf320070d748d2abf22491048c6ffe8d30c2",
+          "observations": {
+            "computeMain": {
+              "nvrtc-o3": {
+                "status": "passed"
+              },
+              "nvvm-o0": {
+                "status": "compile-failed",
+                "diagnostics": [
+                  "error[E52018]: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809"
+                ]
+              },
+              "nvvm-o3": {
+                "status": "compile-failed",
+                "diagnostics": [
+                  "error[E52018]: LLVM 14 NVVM IR builder operation 'value store' failed with result -2147024809"
+                ]
+              }
+            }
+          },
+          "raw_evidence": "build/nvvm-application-reproducers/qualification-2/results.json"
+        }
+      ],
+      "resolution": {
+        "state": "resolved",
+        "fix": "_planNVVMLoad retains explicit parameter-group AS1 pointer provenance; the existing _getLoweredNVVMHelperValue conversion supplies AS0 at local descriptor/helper boundaries.",
+        "application_nodes_passed": 2,
+        "application_evidence": "build/nvvm-torch-easy/application.xml",
+        "compile_regression": "Authored SIMPLE/PTX checks at NVRTC O3 and NVVM O0/O3 in this same source.",
+        "runtime_scope": "Mapped original application tests executed; this standalone corpus runner still establishes compilation/assembly only."
       }
     },
     {
@@ -187,7 +266,6 @@
         "slangpy/slang/tensor.slang",
         "slangpy/slang/difftensor.slang"
       ],
-      "application_observation": "E52017: unsupported local helper-value layout",
       "preserved_shape": "Generic Context mapping and tensor methods with custom backward derivatives surround an out-parameter polynomial. Reducing to a scalar derivative loses the failure.",
       "desired_behavior": "Accumulate (2*a*x+b)*outputGradient into inputGradient at each mapped element; replay rank-1/rank-3 and native/fallback variants.",
       "reduction_scope": "One representative source shape for the diagnostic family; does not replace every mapped application variant. Core Slang only; package helpers reduced and inlined.",
@@ -209,7 +287,8 @@
             ]
           }
         }
-      }
+      },
+      "initial_application_observation": "E52017: unsupported local helper-value layout"
     },
     {
       "name": "torch-softplus-backward",
@@ -228,7 +307,6 @@
         "slangpy/slang/core.slang",
         "slangpy/slang/difftensor.slang"
       ],
-      "application_observation": "backward timeout after 60 seconds",
       "preserved_shape": "Softplus branch differentiated through pointer-backed tensor custom load/store derivatives, with observable atomic gradient accumulation. Scalar-only differentiation is a control.",
       "desired_behavior": "Accumulate outputGradient * (x > 20 ? 1 : 1/(1+exp(-x))) into inputGradient, using the original parity tolerance and inputs.",
       "reduction_scope": "One representative source shape for the diagnostic family; does not replace every mapped application variant. Core Slang only; package helpers reduced and inlined.",
@@ -244,7 +322,7 @@
             "status": "timeout",
             "timeout_seconds": 60,
             "runner_status": "infrastructure-failed",
-            "note": "Explicit TimeoutExpired in attempt error, not a missing-tool diagnosis."
+            "note": "Explicit TimeoutExpired, not missing infrastructure."
           }
         },
         "scalarControl": {
@@ -258,20 +336,31 @@
             "status": "passed"
           }
         }
-      }
+      },
+      "initial_application_observation": "backward timeout after 60 seconds"
     }
   ],
   "current_replay": {
     "date": "2026-10-03",
-    "slang_revision": "3ad0b131a2c99387399f71bf1969ad97698dd0d4",
+    "base_revision": "f531d1615372980b66bb0145276eda554a07f960",
+    "implementation_source_sha256": {
+      "source/slang/slang-ir-fix-entrypoint-callsite.cpp": "e6c168b3c234026e531087361507236caaca5ca8fa57a1ad0401a599eec385c2",
+      "source/slang/slang-emit-nvvm.cpp": "d918301a317a8166268d138255e0a2a1928dab24965a8dfe7ee1ee574df7018a"
+    },
     "cuda_version": "12.9",
     "samples": 1,
     "warmup": 0,
     "timeout_seconds": 60,
-    "raw_evidence": "build/nvvm-application-reproducers/qualification-2/results.json",
-    "loaded_identity_evidence": "build/nvvm-application-reproducers/qualification-1/loaded-identity.json",
+    "raw_evidence": "build/nvvm-torch-easy/corpus/results.json",
+    "loaded_identity_evidence": "build/nvvm-torch-easy/loaded-identity.json",
     "gpu_execution": false,
-    "status": "reproduced-open-failures",
+    "status": "two-families-resolved-two-open",
+    "counts": {
+      "passed": 15,
+      "preflight_rejected": 2,
+      "timeout": 1
+    },
+    "runner_exit_code": 1,
     "artifact_sha256": {
       "build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
       "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "e2749db3cf6f78c36025eb21488b6fb984b911fccdc0e8134b228f4c826492ec",
@@ -279,15 +368,34 @@
       "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
       "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
     },
-    "compiler_library_sha256": "650c203c49f892902e2f5d75c7b86ca7eebf047f587c06a3369304ccc58d53e0",
-    "counts": {
-      "passed": 11,
-      "preflight_rejected": 4,
-      "compile_failed": 2,
-      "timeout": 1
-    },
-    "runner_exit_code": 1,
+    "compiler_library_sha256": "9a5322d57f22ca9aae527f766c43e3f35e37734bc2d39d17e218e7bfa3a58f92",
     "compiler_version": "2026.18.3-423-g3f1250d61",
-    "identity_note": "slang_revision is the checkout revision during replay. compiler_version retains the older configured version string; it does not match that checkout revision. Artifact hashes and the loaded compiler library hash identify the tested bytes."
+    "identity_note": "Built with the bounded implementation diff on base_revision. Source hashes identify the implementation; artifact hashes identify loaded bytes. The configured compiler version retains its older revision string."
+  },
+  "application_followup": {
+    "date": "2026-10-03",
+    "scope": "54 exact nodes from the three affected files, plus five explicit NVVM route controls. No full Torch/SlangPy refresh; polynomial/softplus application nodes were not rerun.",
+    "counts": {
+      "resolved_failures": 5,
+      "preserved_passes": 49,
+      "route_controls_passed": 5
+    },
+    "raw_comparison": "build/nvvm-torch-easy/application-comparison.json",
+    "identity": {
+      "base_revision": "f531d1615372980b66bb0145276eda554a07f960",
+      "implementation_source_sha256": {
+        "source/slang/slang-ir-fix-entrypoint-callsite.cpp": "e6c168b3c234026e531087361507236caaca5ca8fa57a1ad0401a599eec385c2",
+        "source/slang/slang-emit-nvvm.cpp": "d918301a317a8166268d138255e0a2a1928dab24965a8dfe7ee1ee574df7018a"
+      },
+      "loaded_artifact_sha256": {
+        "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "e2749db3cf6f78c36025eb21488b6fb984b911fccdc0e8134b228f4c826492ec",
+        "build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "9a5322d57f22ca9aae527f766c43e3f35e37734bc2d39d17e218e7bfa3a58f92",
+        "build/nvvm-slangpy/native/RelWithDebInfo/libsgl.so": "b8fe2e97c9a73b84050df39a0a29d1a04b3401f09eb5bd86f89db0ff7bab020d",
+        "build/nvvm-slangpy/python/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "a92b4c1bb352bc7c1d9267338cb665ff96939bd469c9e3bb868994778fa5fe21",
+        "../slangpy/.venv/lib/python3.12/site-packages/slangpy_torch.cpython-312-x86_64-linux-gnu.so": "64239d80745dee7ea59039a658845eb453e6503e5d0e5b55bce57e8e6f3bc309"
+      },
+      "same_compiler_provider_as_smoke": true
+    },
+    "native_bridge": "Verified API available, native library loaded, fallback disabled. Existing application bridge bytes unchanged."
   }
 }

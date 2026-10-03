@@ -6571,9 +6571,13 @@ SlangResult _planNVVMLoad(
                         : SLANG_NVVM_LOAD_FLAG_NONE;
     if (isNVVMHitObjectStorageType(load->getDataType()))
         outLoad.flags = SLANG_NVVM_LOAD_FLAG_NONE;
+    // Consider `ParameterBlock<Tensor> tensor`, where Tensor contains a device pointer.
+    // Loading that field has the same AS1 representation as a pointer in collected globals.
+    // Retain its provenance so passing it to a helper or storing it in a local descriptor uses
+    // the existing AS1-to-AS0 conversion instead of leaking a storage pointer into a value slot.
     outLoad.isGlobalUserPointer =
         asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
-        address.isConventionalGlobal;
+        (address.isConventionalGlobal || address.isParameterGroupStorage);
     return SLANG_OK;
 }
 
@@ -9467,8 +9471,8 @@ SlangResult _getLoweredNVVMValue(
 
 // Returns the physical helper representation of one selected value. Most values already have one
 // representation. An exact UserPointer is provenance-sensitive: kernel parameters and pointers
-// loaded from conventional global storage stay AS1 for ordinary memory operations, then widen to
-// AS0 only when a helper value boundary must also admit local addresses.
+// loaded from conventional globals or parameter-group storage stay AS1 for ordinary memory
+// operations, then widen to AS0 when a helper value boundary must also admit local addresses.
 SlangResult _getLoweredNVVMHelperValue(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,

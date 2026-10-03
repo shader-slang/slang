@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+//TEST:SIMPLE(filecheck=PTX): -target ptx -emit-cuda-via-nvrtc -entry computeMain -stage compute -capability cuda_sm_8_0 -O3
+//TEST:SIMPLE(filecheck=PTX): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_8_0 -O0
+//TEST:SIMPLE(filecheck=PTX): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_8_0 -O3
+
 // Reduced from SlangPy's pack(TorchTensor) -> read_first(Tensor<float, 1>) wrapper.
 // Consider a tensor stored in a ParameterBlock and passed to a value-taking helper. The load
 // below resolves to the generic slicing overload with SliceD == D, even for a full-rank value.
@@ -142,3 +146,5 @@ void computeMain(
     __tmp__result = read_first(__tmp_buf);
     _result.__slangpy_store(__slangpy_context__.map(_m__result), __tmp__result);
 }
+
+// PTX: .visible .entry computeMain

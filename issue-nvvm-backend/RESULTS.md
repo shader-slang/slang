@@ -114,6 +114,12 @@ timeout --kill-after=5s 60s build/RelWithDebInfo/bin/slangc \
   -O3 -emit-cuda-via-nvvm -o build/softplus-backward.ptx
 ```
 
+The kernel-call and packed-tensor sources now also contain authored compile regressions following
+their bounded repair. Run those with `slang-test tests/cuda/applications/torch-cuda-kernel-call`
+and `slang-test tests/cuda/applications/torch-packed-tensor`; the separate
+`tests/cuda/cuda-kernel-direct-call.slang` checks non-inlined GPU calls and the preserved CUDA launch
+entry. The polynomial and softplus sources remain opt-in unresolved cases without default directives.
+
 `helperControl` in the CUDAKernel source and `scalarControl` in the softplus source test reduced
 alternatives. They are compilation controls, not runtime qualifications. Update source hashes after
 intentional fixture edits and recheck fidelity; the runner refuses stale source pins. Capture the

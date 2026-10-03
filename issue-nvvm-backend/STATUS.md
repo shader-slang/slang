@@ -1,9 +1,18 @@
 # NVVM current status
 
+**Two easy Torch families repaired and stopped (2026-10-03):** CUDAKernel direct calls now use
+ordinary helper clones, and explicit parameter-group pointer loads retain their global-memory
+provenance for existing helper conversion. All **five mapped failures now pass**, with **49 prior
+neighboring passes preserved** and **five NVVM route controls passing**. Focused compiler/runtime
+checks pass **16/16**, units **570/570**, and smoke **16/16**. Local corpus replay is **15 pass /
+two polynomial-layout rejections / one softplus O3 timeout**. No provider change, ABI bump or working
+tier admission. The six polynomial application failures and softplus timeout remain unresolved;
+this is focused acceptance, not a new full Torch/SlangPy checkpoint. General development stays stopped.
+
 **Application reproducer corpus added (2026-10-03):** four portable Torch-derived shaders now
 isolate all four newly exposed NVVM diagnostic/timeout families, with two passing controls.
-The existing runner covers 18 compile/assembly cells. Compiler fixes and the general loop remain
-stopped. See [current Torch findings](#torch-findings-and-local-application-reproducers), the
+The existing runner covers 18 compile/assembly cells. The bounded repairs above supersede the
+original corpus-only stop for two families; the general loop remains stopped. See [current Torch findings](#torch-findings-and-local-application-reproducers), the
 [manifest](application-corpus.manifest.json), [workflow](WORKFLOW.md#application-derived-reproducers)
 and [replay command](RESULTS.md#application-reproducer-corpus).
 
@@ -39,7 +48,7 @@ below; the earlier non-Torch SlangPy failures are resolved and development is st
 
 The callable family and requested RHI/working integration are complete. Explicit OptiX8.0/8.1/9.0
 targeting and common raygen/trace/callable qualification are now accepted. Application-led feature
-development remains stopped; the new Torch failures below are not repaired. **The legacy HitObject compatibility decision remains parked:** native8.x
+development remains stopped; the unresolved Torch families are recorded below. **The legacy HitObject compatibility decision remains parked:** native8.x
 Invoke loses ray flags that9 retains;
 preserving modern visibility without reducing the32-word payload capacity needs a private
 cross-stage context ABI. No older HitObject implementation is enabled. Use eight-job builds and
@@ -142,39 +151,46 @@ remains `build/nvvm-results/2026-10-03-current1/presentation/report.md`. The
 
 ## Torch findings and local application reproducers
 
-With PyTorch 2.8.0+cu128 and the native `slangpy-torch` 0.7.0 bridge installed, the same 688-node
-Torch-related selection gives **626 pass / 11 compilation failures / 1 timeout / 50 authored skips**.
+The initial capture with PyTorch 2.8.0+cu128 and the native `slangpy-torch` 0.7.0 bridge installed
+used the same 688-node
+Torch-related selection: **626 pass / 11 compilation failures / 1 timeout / 50 authored skips**.
 All 514 earlier passes remain passing. Of 113 bridge-blocked nodes, 110 now pass and three expose
 native variants of the existing polynomial layout failure; two previously skipped bridge contracts
 also pass. The previous eight compile failures and softplus timeout persist. All **12 exact problem
-nodes pass with NVRTC**, with five route controls passing for each selected backend. No compiler fix
-was made and no formerly passing node regressed. This is not a new full SlangPy checkpoint.
+nodes passed with NVRTC**, with five route controls passing for each selected backend. These are
+the pre-fix outcomes; the original node histories and binary identity remain in the manifest.
 
 The [application manifest](application-corpus.manifest.json) maps all 12 nodes to four standalone
-source reductions, preserving the failure shape and desired semantics. Local SM80/CUDA12.9 replay
-uses the same compiler/provider bytes as the application run, without SlangPy/Torch dependencies:
+source reductions, preserving the failure shape and desired semantics. The bounded follow-up fixes
+CUDAKernel roles in `fixEntryPointCallsites` and explicit parameter-group pointer provenance in
+`_planNVVMLoad`, reusing existing cloning and address-space conversion. All five affected application
+nodes execute correctly, and all 49 previously passing neighbors in those three files remain passing.
+The native bridge and explicit NVVM routing are verified. Polynomial/softplus application nodes were
+not rerun. Current SM80/CUDA12.9 source replay uses the repaired compiler, without package dependencies:
 
 | Local entry / mapped application nodes | NVRTC O3 | NVVM O0 | NVVM O3 |
 | --- | --- | --- | --- |
-| CUDAKernel helper call / 3 | Pass | E52017 `call` | E52017 `call` |
-| Packed tensor / 2 | Pass | E52018 `value store` | E52018 `value store` |
+| CUDAKernel helper call / 3 | Pass | Pass | Pass |
+| Packed tensor / 2 | Pass | Pass | Pass |
 | Polynomial out backward / 6 | Pass | E52017 `local helper-value layout` | Same |
 | Softplus tensor backward / 1 | Pass | Pass | 60-second timeout |
 | Ordinary helper control | Pass | Pass | Pass |
 | Scalar softplus backward control | Pass | Pass | Pass |
 
-All passes include PTX assembly, **not GPU execution**: 11 pass, six diagnostic failures and one
+All local corpus passes include PTX assembly, **not GPU execution**: 15 pass, two layout failures and one
 timeout across 18 cells. Softplus now has a standalone O3 compilation timeout; its native stalled
-phase and identity with the application stall remain unproven. The packed reduction must retain the
-slicing overload selected with `SliceD == D`; replacing it with a descriptor copy changes the error.
-These are diagnostic families, not established root causes. Each reduction represents a family,
+phase and identity with the application stall remain unproven. The packed reduction retains the
+slicing overload selected with `SliceD == D`; replacing it with a descriptor copy changed the original
+diagnostic. The two remaining diagnostic families do not establish root causes. Each reduction represents a family,
 not every rank, bridge mode or differentiation variant in its application mapping.
 
-Raw application evidence is `build/nvvm-torch-native-status/`; local captures, failed reductions,
-loaded identity and replay evidence are under `build/nvvm-application-reproducers/`. The manifest
-owns compact observations and provenance. These cases remain opt-in exploratory inputs. A local
-repair must pass its controls, appropriate runtime checks and all original mapped application nodes
-before acceptance; no working/smoke admission or broad-suite refresh is claimed.
+Initial application evidence is `build/nvvm-torch-native-status/`; original captures/reductions and
+before-fix replay remain under `build/nvvm-application-reproducers/`. Current application comparisons,
+loaded identities, local replay, units and smoke are under `build/nvvm-torch-easy/`. The manifest
+preserves the resolved diagnostic histories and exact source/binary pins. Kernel/packed sources now
+also have authored compile regressions; the other two remain opt-in exploratory inputs. The separate
+non-inlined kernel control executes on NVRTC O3 and NVVM O0/O3 and checks the untouched tail. No
+working/smoke admission or broad-suite refresh is claimed. Independent review found no blocking defects.
 
 ## Prior application acceptance — non-Torch SlangPy failures resolved
 

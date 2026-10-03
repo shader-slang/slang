@@ -106,7 +106,19 @@ failures and fixes remain in the maintained manifests.
 
 ## Application value and AD update qualification
 
-The full CUDA-selected SlangPy inventory passes 1,591 with zero failures,807 skips and3 expected failures
+The focused Torch follow-up qualifies direct calls to `[CUDAKernel]` functions, including the
+SlangPy `_thread_count` fill/append and differentiated forward wrappers. Shared callsite lowering
+preserves the launchable original and supplies an ordinary helper clone; the
+[non-inlined runtime control](../../tests/cuda/cuda-kernel-direct-call.slang) passes NVRTC O3 and
+NVVM O0/O3 with active outputs and an untouched tail checked.
+Packed Torch tensor descriptors now preserve global-pointer provenance when loading explicit
+parameter-group fields, reusing the established helper-value address-space conversion. Both original
+packed-tensor nodes pass. The [application corpus](../../issue-nvvm-backend/application-corpus.manifest.json)
+retains exact mappings, before/after observations and compilation controls. Six polynomial-out
+application failures and the softplus backward timeout remain unresolved; this follow-up does not
+refresh the earlier full SlangPy checkpoint or admit the compile-only corpus to working runtime tiers.
+
+The earlier non-Torch CUDA-selected SlangPy inventory passes 1,591 with zero failures,807 skips and3 expected failures
 across2,401 nodes plus14 module skips. All 29 previous failures resolve; all 1,561 prior passes remain passing.
 The extra node completes RGB Float/Sint/Uint metadata coverage, using the real texture-type factory
 without allocating CUDA RGB textures. This does not establish physical three-channel texture support.
