@@ -2421,7 +2421,9 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
+    // HLSL can assign through a texture subscript (`tex[i].w = v`), but these targets can't, so we
+    // rewrite such writes into whole-texel image loads and stores. `target` is the format we
+    // generate source for, so `-target ptx` reaches here as `CUDASource`.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2430,6 +2432,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
         }

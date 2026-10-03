@@ -755,10 +755,22 @@ protected:
     // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
 
-    // Special handling for swizzleStore call, save the right-handside vector to a temporary
-    // variable first, then assign the corresponding elements to the left-handside vector one by
-    // one.
-    void _emitSwizzleStorePerElement(IRInst* inst);
+    /// Emit a `swizzledStore` or `swizzleSet` for which `_isSwizzleAssignmentSpelledPerElement`
+    /// holds as one assignment per component, e.g. `v.x = s.x; v.z = s.y;` for `v.xz = s`. The
+    /// left-hand side is the value a `swizzledStore`'s destination points to, or a `swizzleSet`'s
+    /// own result, which the caller has already declared and initialized from the base. The source
+    /// is emitted once per component, so it must not be folded into its use; see
+    /// `shouldFoldInstIntoUseSites`.
+    void _emitSwizzleAssignmentPerElement(IRInst* inst);
+
+    /// Return true if the target can assign to a multi-component swizzle such as `v.xy = ...`.
+    /// The C++, CUDA and WGSL vector types have no such l-value.
+    bool _doesTargetSupportSwizzleAssignment();
+
+    /// Return true if `inst` is a multi-component `swizzledStore` or `swizzleSet` on a target
+    /// without swizzle assignment, which we spell one component at a time with
+    /// `_emitSwizzleAssignmentPerElement`.
+    bool _isSwizzleAssignmentSpelledPerElement(IRInst* inst);
 
     String _emitLiteralOneWithType(int bitWidth);
 
