@@ -476,6 +476,13 @@ IRFunc* lowerOutParameters(
     auto funcType = builder.getFuncType(newParamTypes, resultType);
     newFunc->setFullType(funcType);
 
+    // transferFunctionDecorations bare-cloned the original's DebugFuncDecoration onto the wrapper,
+    // so both now share one IRDebugFunction whose debug type still describes the pre-lowering
+    // signature. Give the wrapper its own record matching its lifted type, mirroring the
+    // specialization path in slang-ir-specialize.cpp. The wrapper's signature always changed here,
+    // so fixUpDebugFuncType's type-unchanged early-return does not fire.
+    fixUpDebugFuncType(newFunc);
+
     // Create function body
     auto firstBlock = builder.createBlock();
     newFunc->addBlock(firstBlock);
