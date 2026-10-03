@@ -132,6 +132,17 @@ void ReplayStream::setMirrorFile(const char* path)
 {
     closeMirrorFile();
 
+    // The mirror must be seekable, because `write` seeks it before every write, and persistent,
+    // because it exists to survive a crash. We refuse an existing path that is not a regular file:
+    // a FIFO cannot seek, and a device such as `/dev/null` keeps nothing, yet `FileStream` would
+    // open either for writing.
+    SlangPathType pathType;
+    if (File::exists(path) && !(SLANG_SUCCEEDED(Slang::Path::getPathType(path, &pathType)) &&
+                                pathType == SLANG_PATH_TYPE_FILE))
+    {
+        throw Slang::Exception(String("Mirror file is not a regular file: ") + path);
+    }
+
     m_mirrorFile = new FileStream();
     SlangResult result =
         m_mirrorFile->init(String(path), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
