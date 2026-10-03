@@ -2021,3 +2021,19 @@ Mip count retains ray-stage restrictions and mip array layer output retains the 
 contract. Exact application transitions and source/binary identities are in falcor2-status.json.
 
 Full NVVM units pass572/572, including direct-provider malformed mip-call no-mutation checks; smoke passes16/16.
+
+### Falcor Boolean payload qualification
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-bool-payload tests/cuda/applications/falcor-empty-payload tests/pipeline/ray-tracing/nvvm-optix-triangle
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test nvvmOptix
+```
+
+Focused48/48 pass:24TraceRay,12modern HitObject,12neighbor checks. Boolean arrays use a record
+because the source-CUDA root-array constructor is independently unqualified. Shared HitObject
+coverage uses scalar/array-in-record/matrix/mixed forms; public-empty HitObject input remains
+unqualified at the earlier pre-empty pass. Raw attempts and final evidence live under
+`build/nvvm-falcor-visibility/`. Nested trace stage admission is also repaired. Add `tests/cuda/applications/falcor-nested-trace`
+to the command above for57/57. Raw `build/nvvm-falcor-nested-trace/runtime.py` executes with the
+existing Falcor Python environment, explicit backend and OPT_LEVEL=0|3; recursion2,32outer words,
+innerBoolean,12exact checks and4guards pass in all3modes. Actual Falcor now reaches E52017 struct.

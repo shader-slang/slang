@@ -3617,7 +3617,10 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
 bool _planNVVMTraceRay(IRInst* inst, Stage stage, NVVMPlannedTraceRay& plan)
 {
     plan = {};
-    if (stage != Stage::RayGeneration || inst->getOperandCount() < 17)
+    // Closest-hit and miss shaders can trace nested visibility rays. Slang Callable entries
+    // are direct callables, so they do not have OptiX continuation-callable trace permission.
+    if ((stage != Stage::RayGeneration && stage != Stage::ClosestHit && stage != Stage::Miss) ||
+        inst->getOperandCount() < 17)
         return false;
     auto payloadType = as<IRType>(inst->getOperand(0));
     UInt count = payloadType ? getNVVMOptixPayloadRegisterCount(payloadType) : 0;

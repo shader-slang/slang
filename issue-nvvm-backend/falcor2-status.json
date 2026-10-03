@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "dc8d8b5ddefeea71605ba1d45aeee095ee2fef6a",
+    "slang": "4e167816dad4b82b86dd91f7b25884dbab914007",
     "falcor2_geometry_fix": "851f207a35c937f668301577dd42ed6bee5ee437"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
@@ -64,7 +64,7 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 0,
-      "pytest_seconds": 21.03,
+      "pytest_seconds": 12.78,
       "phase": "render and assertions completed"
     },
     "nvvm": {
@@ -73,9 +73,9 @@
       "errors": 0,
       "skipped": 0,
       "exit_code": 1,
-      "pytest_seconds": 11.57,
-      "phase": "Mip texture query rejection resolved; render compilation reaches a further optixTraceRay payload rejection. Exact shape under investigation.",
-      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'optixTraceRay'"
+      "pytest_seconds": 13.67,
+      "phase": "See retained diagnostic in raw log",
+      "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'struct'"
     }
   },
   "failure_history": [
@@ -166,21 +166,39 @@
       "status": "unresolved",
       "family": "further optixTraceRay rejection after mip-query repair",
       "notes": "Exact payload shape not yet captured; do not conflate with prior repaired empty fields."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "resolved",
+      "family": "further optixTraceRay rejection after mip-query repair",
+      "notes": "Debugger captured VisibilityPayload { Bool visible; Void evaluator }. Canonical byte layout and partial-word serialization now pass."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "resolved",
+      "family": "nested visibility trace stage rejected",
+      "notes": "OptiX register trace planner now admits closesthit/miss in addition to raygen; direct callable remains excluded. Exact nested32word/Boolean runtime passes3modes."
+    },
+    {
+      "observed_on": "2026-10-03",
+      "status": "unresolved",
+      "family": "struct type after nested trace admission",
+      "notes": "E52017 struct: exported PowerLightSampler retains AliasTable1D and Entry as type-only metadata in visibility miss; module-scope audit incorrectly requires executable reachability."
     }
   ],
   "loaded_artifact_sha256": {
     "falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
     "falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
     "falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
-    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "e69ab3d2800b8c6ff58c4600360fe40b873326a5ca4a433a1d0ac843e2700df9",
+    "slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "02035aa03fff9c1a1d07dfa2827525921f2696b608aa3e5218eec5ee22bb03f9",
     "falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
     "falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
     "slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221"
   },
-  "raw_evidence": "build/nvvm-falcor-mip/",
+  "raw_evidence": "build/nvvm-falcor-nested-trace/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
-    "NVVM still fails during render compilation at another optixTraceRay; no successful render or timing claimed.",
+    "NVVM application still fails compiling retained type metadata; no successful NVVM render or timing comparison yet.",
     "Mip-count is ray-stage only; mip array layers retain NVRTC zero output. Non-mip layer support unchanged.",
     "No complete application suite or automatic corpus-tier admission."
   ],
@@ -442,6 +460,31 @@
           "errors": 0,
           "skipped": 0,
           "exit_code": 0,
+          "pytest_seconds": 12.82,
+          "phase": "render and assertions completed"
+        },
+        "nvvm": {
+          "passed": 0,
+          "failed": 1,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 1,
+          "pytest_seconds": 10.9,
+          "phase": "GeometryIndex shim resolved; mip-level Texture2D.GetDimensions CUDA-text overload rejected.",
+          "diagnostic": "E52017: GenericAsm txq.level.width/height and txq.num_mipmap_levels"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-geometry/"
+    },
+    {
+      "phase": "after mip queries, before Boolean payload support",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
           "pytest_seconds": 21.03,
           "phase": "render and assertions completed"
         },
@@ -456,21 +499,40 @@
           "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'optixTraceRay'"
         }
       },
-      "raw_evidence": "build/nvvm-falcor-geometry/"
+      "raw_evidence": "build/nvvm-falcor-mip/"
+    },
+    {
+      "phase": "after Boolean serialization, before nested trace admission",
+      "results": {
+        "nvrtc": {
+          "passed": 1,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 0,
+          "pytest_seconds": 12.7,
+          "phase": "render and assertions completed"
+        },
+        "nvvm": {
+          "passed": 0,
+          "failed": 1,
+          "errors": 0,
+          "skipped": 0,
+          "exit_code": 1,
+          "pytest_seconds": 10.93,
+          "phase": "Boolean payload admission resolved; nested visibility trace rejected by RayGeneration-only stage gate.",
+          "diagnostic": "E52017: direct NVVM lowering does not support Slang IR instruction or shape 'OptiX register trace'"
+        }
+      },
+      "raw_evidence": "build/nvvm-falcor-visibility/"
     }
   ],
   "compiler_source_state": {
-    "base_revision": "dc8d8b5ddefeea71605ba1d45aeee095ee2fef6a",
+    "base_revision": "4e167816dad4b82b86dd91f7b25884dbab914007",
     "implementation_source_sha256": {
-      "source/compiler-core/slang-nvvm-ir-builder-api.h": "700a122b9be934bf8ffb2a15928a4029d415a5172b2e2357295399fdb6378e70",
-      "source/compiler-core/slang-nvvm-ir-builder.cpp": "5039528640b09fdef8847e392c1820f471723ecebbdd92a6baf2cead398714ca",
-      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "c450b26465123d1d86d8ed73f051840d4cec094c8448e34a0695500d55ef991c",
-      "source/slang/hlsl.meta.slang": "92882b5f71c42dc83b05b8f8a0d7aa0fd388cbce4339afc20e764b1dd77f613a",
-      "source/slang/slang-core-module-textures.cpp": "9d5874312ee0f327dcd067afbdb0e3d001bf8c38b3871ed62b32bfd5f478a958",
-      "source/slang/slang-emit-nvvm.cpp": "9b8a5ee3d72e8af9d612a098d5eb1aff4ad70f877cae74d42d8d0d7f4492b927",
-      "source/slang/slang-ir-insts-stable-names.cpp": "66f4e87d3d2f0cf2d98e44aaab02cbeec89369040c8f122b791f685cb924ad36",
-      "source/slang/slang-ir-insts-stable-names.lua": "c3577ac12f0e15449454ee32594c73d659958951943e088c3c4b7f99931f8a07",
-      "source/slang/slang-ir-insts.lua": "ee5888a2c6099fd0436d31f2e26f5ae32fcbd4120b4c2ddd08cc733b7594c549"
+      "source/slang/slang-ir-legalize-varying-params.cpp": "020ee22157e3f94280393946af131e9fd7e581a71eef7dbf09eae4d4276fc0b9",
+      "source/slang/slang-ir-legalize-varying-params.h": "ce3ba74f2a2424ba839c3c47d26c83b89cffad4437d9d8f3e00dd8268c279902",
+      "source/slang/slang-emit-nvvm.cpp": "4affee6725997d68f8a4cd57af13f66acc60754a1bf1d65306949101f60ea45c"
     }
   },
   "select_fix": {
@@ -520,7 +582,7 @@
     "module_abi_unchanged": true,
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
   },
-  "current_failure": "Further optixTraceRay rejection after typed mip-query support; exact payload capture pending.",
+  "current_failure": "E52017 struct: exported PowerLightSampler retains AliasTable1D and Entry as type-only metadata in visibility miss; module-scope audit incorrectly requires executable reachability.",
   "wave64_fix": {
     "date": "2026-10-03",
     "source_state": {
@@ -722,5 +784,55 @@
     "coverage": "Existing 1D/2D/3D/cube/2Darray/cubearray mip1 oracle; dynamic0..4 uint/int/float and1Darrayfloat/2Darrayuint. Mip array layer outputs retain existing zero contract. Provider malformed calls preserve module bytes; raw IR rejects compute count, surfaces and float mip.",
     "raw_evidence": "build/nvvm-falcor-mip/",
     "review": "Independent implementation and final evidence review approved; source and loaded artifact hashes verified."
+  },
+  "boolean_nested_trace_fix": {
+    "source_state": {
+      "base_revision": "4e167816dad4b82b86dd91f7b25884dbab914007",
+      "implementation_source_sha256": {
+        "source/slang/slang-ir-legalize-varying-params.cpp": "020ee22157e3f94280393946af131e9fd7e581a71eef7dbf09eae4d4276fc0b9",
+        "source/slang/slang-ir-legalize-varying-params.h": "ce3ba74f2a2424ba839c3c47d26c83b89cffad4437d9d8f3e00dd8268c279902",
+        "source/slang/slang-emit-nvvm.cpp": "4affee6725997d68f8a4cd57af13f66acc60754a1bf1d65306949101f60ea45c"
+      }
+    },
+    "implementation": "CUDA byte-extent admission and shared caller/callback Boolean packing; typed TraceRay accepts raygen/closesthit/miss, retains compute/anyhit/intersection/directCallable rejection. No ABI/provider changes.",
+    "fixtures": {
+      "tests/cuda/applications/falcor-bool-payload.slang": "2d91070a8ad22b7703ba3cbc7d782b75b3a72f782be7f2ca3b9501c2f9de065a",
+      "tests/cuda/applications/falcor-nested-trace.slang": "d38d4c30b92ecc42f8cc8758b3c5a70003da74b24ff5697d98f407498c6d1d14"
+    },
+    "checks": {
+      "focused": {
+        "passed": 57,
+        "failed": 0
+      },
+      "optix_static": {
+        "passed": 6,
+        "failed": 0
+      },
+      "nested_runtime": {
+        "nvrtc_o3": "passed",
+        "nvvm_o0": "passed",
+        "nvvm_o3": "passed",
+        "oracle": "All32 outer words preserved/updated across nested Bool trace;4crossed outer/inner hit/miss paths,12ones+4guards"
+      },
+      "route_controls": {
+        "nvrtc": 3,
+        "nvvm": 3
+      },
+      "nvvm_units": {
+        "passed": 572,
+        "failed": 0
+      },
+      "smoke": {
+        "passed": 16,
+        "failed": 0
+      }
+    },
+    "raw_evidence": "build/nvvm-falcor-nested-trace/",
+    "limitations": [
+      "Other narrow/wide payload leaves remain unadmitted.",
+      "Root Boolean array source-CUDA constructor and public-empty HitObject pre-empty admission remain unqualified; failed attempts preserved in build/nvvm-falcor-visibility/."
+    ],
+    "review": "Independent implementation, fixture and final evidence review approved; source, fixture, loaded artifact and static binary hashes verified.",
+    "static_binary_sha256": "6120120fc8a5cf538c04031be6be6fa14e86025afd545ace26bd27aa9abc20e7"
   }
 }

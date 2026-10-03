@@ -92,6 +92,22 @@ and NVVM O0/O3, plus separate 32-word compile/static boundaries. No new AnyHit o
 coverage is claimed. Falcor passes its original trace rejection and exposes a separate application
 compatibility helper using CUDA C++ assembly text.
 
+## Boolean ray payloads
+
+Canonical CUDA byte layout now admits Boolean scalar/vector/matrix/array/record leaves alongside
+existing32-bit numeric leaves. Only the final byte extent rounds to registers. Dense attributes,
+unsupported numeric widths and32-word capacity stay bounded. The
+[portable fixture](../../tests/cuda/applications/falcor-bool-payload.slang) executes eight TraceRay
+forms at NVRTC O3 and NVVM O0/O3, checking incoming/outgoing values and guards. Four modern
+HitObject forms qualify the shared serializer. Public empty HitObject fields still encounter an
+earlier admission pass before empty legalization; that combination is unqualified. Static cases
+cover127/128/129Boolean bytes and explicit overlapping field offsets. Falcor's Boolean payload
+rejection resolves. Nested trace now admits closest-hit and miss, preserving compute/any-hit/
+intersection/direct-callable rejection. The [nested fixture](../../tests/cuda/applications/falcor-nested-trace.slang)
+compiles all3stages in3modes; an existing SlangPy runtime harness verifies32outer words across inner
+Boolean tracing, crossed hit/miss paths and guards. Falcor next rejects a struct type; no successful
+NVVM application render is claimed.
+
 ## TensorView, references and canonical numeric storage
 
 TensorView/DiffTensorView use a typed 56-byte descriptor with the existing host offsets and alignment.

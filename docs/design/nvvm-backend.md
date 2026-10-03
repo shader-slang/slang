@@ -168,9 +168,12 @@ bound determine allocation. Deferred pipelines copy the recognized extension at 
 application-owned descriptor memory is not retained until later compilation.
 
 `TraceRay` constructs a typed IR operation with explicit ray fields and the original payload type.
-CUDA payload values admit nonempty Int32/UInt32/Float32 scalars, vectors, matrices,
+CUDA payload values admit nonempty Bool/Int32/UInt32/Float32 scalars, vectors, matrices,
 records and positive literal fixed arrays within 32 physical words, including internal and tail
-padding. Explicit strides and unsupported leaves remain rejected. The distinct `CUDAPayload`
+padding. Boolean leaves occupy bytes; only the complete canonical byte extent is rounded up
+to words. Recursive child byte extents retain the lower bound against overlapping field layouts.
+Caller SSA words and callback registers share byte packing through role-aware word accessors.
+Explicit strides and other unsupported leaves remain rejected. The distinct `CUDAPayload`
 layout rule reuses CUDA field/vector alignment but stores matrices as logical rows, matching
 CUDA's prelude and NVVM's legalized row arrays regardless of external matrix-layout annotations.
 Its separate cache identity keeps these value offsets distinct from external buffer layout.
@@ -180,7 +183,7 @@ callback traversal selects canonical field offsets and advances by complete aggr
 Unsupported shapes retain an operation or pointer fallback that preflight rejects. The lowered
 trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
 contract before provider mutation. The original payload type is an explicit type dependency even
-when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit/intersection;
+when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen/closest-hit/miss; direct callables remain excluded. Payload registers in miss/closest-hit/any-hit/intersection;
 attributes in closest-hit/any-hit. These stage checks cover the reachable helper closure.
 
 The optional versioned trace interface uses the existing provider query mechanism without changing

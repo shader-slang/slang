@@ -1111,22 +1111,28 @@ protected:
 // turn our attention to the target-specific subtypes that handle
 // translation of "leaf" varying parameters.
 
-static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
+// Return CUDA payload bytes or dense 32-bit attribute leaves, rejecting unsupported shapes.
+static UInt _getNVVMOptixLayoutSize(IRType* type, bool denseAttributes)
 {
     UInt count = 0;
+    const UInt limit = denseAttributes ? 32 : 128;
     if (type->getOp() == kIROp_IntType || type->getOp() == kIROp_UIntType ||
         type->getOp() == kIROp_FloatType)
+        count = denseAttributes ? 1 : 4;
+    else if (!denseAttributes && type->getOp() == kIROp_BoolType)
         count = 1;
     else if (auto vectorType = as<IRVectorType>(type))
     {
+        UInt elementSize = _getNVVMOptixLayoutSize(vectorType->getElementType(), denseAttributes);
         auto lanes = as<IRIntLit>(vectorType->getElementCount());
         if (!lanes || lanes->getValue() < 2 || lanes->getValue() > 4 ||
-            _getNVVMOptixRegisterCount(vectorType->getElementType(), denseAttributes) != 1)
+            !as<IRBasicType>(vectorType->getElementType()) || !elementSize)
             return 0;
-        count = UInt(lanes->getValue());
+        count = UInt(lanes->getValue()) * elementSize;
     }
     else if (auto matrixType = as<IRMatrixType>(type))
     {
+        UInt elementSize = _getNVVMOptixLayoutSize(matrixType->getElementType(), denseAttributes);
         auto rows = as<IRIntLit>(matrixType->getRowCount());
         auto columns = as<IRIntLit>(matrixType->getColumnCount());
         auto layout = as<IRIntLit>(matrixType->getLayout());
@@ -1134,9 +1140,9 @@ static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
             columns->getValue() < 1 || columns->getValue() > 4 ||
             (layout->getValue() != SLANG_MATRIX_LAYOUT_ROW_MAJOR &&
              layout->getValue() != SLANG_MATRIX_LAYOUT_COLUMN_MAJOR) ||
-            _getNVVMOptixRegisterCount(matrixType->getElementType(), denseAttributes) != 1)
+            !as<IRBasicType>(matrixType->getElementType()) || !elementSize)
             return 0;
-        count = UInt(rows->getValue() * columns->getValue());
+        count = UInt(rows->getValue() * columns->getValue()) * elementSize;
     }
     else if (auto arrayType = as<IRArrayType>(type))
     {
@@ -1145,11 +1151,10 @@ static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
         auto elements = as<IRIntLit>(arrayType->getElementCount());
         if (arrayType->getArrayStride() || !elements || elements->getValue() <= 0)
             return 0;
-        UInt elementWords =
-            _getNVVMOptixRegisterCount(arrayType->getElementType(), denseAttributes);
-        if (!elementWords || elements->getValue() > IRIntegerValue(32 / elementWords))
+        UInt elementSize = _getNVVMOptixLayoutSize(arrayType->getElementType(), denseAttributes);
+        if (!elementSize || elements->getValue() > IRIntegerValue(limit / elementSize))
             return 0;
-        count = UInt(elements->getValue()) * elementWords;
+        count = UInt(elements->getValue()) * elementSize;
     }
     else if (auto structType = as<IRStructType>(type))
     {
@@ -1161,34 +1166,36 @@ static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
             // must do the same. Attribute flattening has a separate, dense-leaf contract.
             if (!denseAttributes && as<IRVoidType>(field->getFieldType()))
                 continue;
-            UInt fieldCount = _getNVVMOptixRegisterCount(field->getFieldType(), denseAttributes);
-            if (!fieldCount || count + fieldCount > 32)
+            UInt fieldCount = _getNVVMOptixLayoutSize(field->getFieldType(), denseAttributes);
+            if (!fieldCount || count + fieldCount > limit)
                 return 0;
             count += fieldCount;
         }
     }
-    if (!count || count > 32)
+    if (!count || count > limit)
         return 0;
     if (denseAttributes)
         return count;
-    // Register count includes every physical word, including internal and tail padding.
-    // Callers initialize all words before filling live fields; callbacks skip padding.
+    // Payloads use byte extents so neighboring Boolean leaves can share a register. Require
+    // enough space for all children, preserving rejection of overlapping explicit offsets.
     IRSizeAndAlignment layout;
     if (SLANG_FAILED(
             getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDAPayload(), type, &layout)) ||
-        layout.size < IRIntegerValue(count * 4) || layout.size > 128 || layout.size % 4)
+        layout.size < IRIntegerValue(count) || layout.size > 128)
         return 0;
-    return UInt(layout.size / 4);
+    return UInt(layout.size);
 }
 
 UInt getNVVMOptixPayloadRegisterCount(IRType* type)
 {
-    return _getNVVMOptixRegisterCount(type, false);
+    // Consider Visibility { bool visible; }: CUDA stores one byte and PayloadRegisters rounds
+    // that up to one word. Round only the complete layout, not each leaf or array element.
+    return (_getNVVMOptixLayoutSize(type, false) + 3) / 4;
 }
 
 bool getNVVMOptixAttributeRegisterCount(IRType* type, UInt& outCount)
 {
-    outCount = _getNVVMOptixRegisterCount(type, true);
+    outCount = _getNVVMOptixLayoutSize(type, true);
     if (outCount)
         return outCount <= 8;
     auto record = as<IRStructType>(type);
@@ -1226,9 +1233,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRInst* payloadReadArray = nullptr;
     List<IRInst*>* payloadWriteWords = nullptr;
 
-    // Reuses the callback's layout traversal for the caller's SSA register array.
+    // Reuses the callback's layout traversal for caller packing and returned SSA words.
+    // A partial-byte write reads the current packed word, not the callback's hardware registers.
     IRInst* readPayloadWord(IRBuilder* builder, IRInst* index)
     {
+        if (payloadWriteWords)
+            return (*payloadWriteWords)[as<IRIntLit>(index)->getValue()];
         if (payloadReadArray)
             return builder->emitElementExtract(builder->getUIntType(), payloadReadArray, index);
         return builder
@@ -1533,11 +1543,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     // Read 1 byte from the appropriate position in the register
                     int byteInReg = ioByteOffset % 4;
                     ioByteOffset += 1;
-                    auto regVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
+                    auto regVal = readPayloadWord(builder, regIdxInst);
                     if (byteInReg > 0)
                     {
                         auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
@@ -1758,11 +1764,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     }
 
                     // Read current register value
-                    auto oldVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
+                    auto oldVal = readPayloadWord(builder, regIdxInst);
                     // Clear the byte we're writing
                     auto clearMask =
                         builder->getIntValue(uintType, ~IRIntegerValue(0xFFu << (byteInReg * 8)));
@@ -1770,12 +1772,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     // OR in the new value
                     auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
 
-                    IRInst* args[] = {regIdxInst, newVal};
-                    builder->emitIntrinsicInst(
-                        builder->getVoidType(),
-                        kIROp_SetOptiXPayloadRegister,
-                        2,
-                        args);
+                    writePayloadWord(builder, regIdxInst, newVal);
                     ioByteOffset += 1;
                     return;
                 }
@@ -2829,7 +2826,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 int offset = 0;
                 emitOptiXPayloadWrite(offset, inst->getOperand(expected - 1), type, &builder);
                 payloadWriteWords = nullptr;
-                SLANG_ASSERT(offset == int(count * 4));
+                SLANG_ASSERT(offset == getTypeCppSize(type, &builder));
             }
             if (attributes)
             {
@@ -2917,7 +2914,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                                                 : emitOptiXPayloadRead(offset, type, &builder))
                                   : builder.emitMakeStruct(type, 0, nullptr);
             payloadReadArray = nullptr;
-            SLANG_ASSERT(offset == int(attributes ? count : count * 4));
+            SLANG_ASSERT(offset == (attributes ? int(count) : getTypeCppSize(type, &builder)));
             inst->replaceUsesWith(value);
             inst->removeAndDeallocate();
         }
@@ -2951,7 +2948,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             int byteOffset = 0;
             emitOptiXPayloadWrite(byteOffset, trace->getOperand(10), payloadType, &builder);
             payloadWriteWords = nullptr;
-            SLANG_ASSERT(byteOffset == int(count * 4));
+            SLANG_ASSERT(byteOffset == getTypeCppSize(payloadType, &builder));
             List<IRInst*> operands;
             operands.add(payloadType);
             operands.add(trace->getOperand(0));
@@ -2984,7 +2981,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             byteOffset = 0;
             auto value = emitOptiXPayloadRead(byteOffset, payloadType, &builder);
             payloadReadArray = nullptr;
-            SLANG_ASSERT(value && byteOffset == int(count * 4));
+            SLANG_ASSERT(value && byteOffset == getTypeCppSize(payloadType, &builder));
             trace->replaceUsesWith(value);
             trace->removeAndDeallocate();
         }

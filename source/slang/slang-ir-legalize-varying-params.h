@@ -20,7 +20,7 @@ struct EntryPointInfo
     IREntryPointDecoration* entryPointDecor;
 };
 
-// Returns the physical register count for the selected 32-bit CUDA value payload algebra.
+// Returns the physical register count for the CUDA payloads with Boolean and 32-bit numeric leaves.
 // Both trace callers and callback parameters use this check before their type is erased.
 UInt getNVVMOptixPayloadRegisterCount(IRType* type);
 

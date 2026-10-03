@@ -772,7 +772,10 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         HalfArray,
         UInt64Array,
         Compute,
-        CallbackTrace,
+        MissTrace,
+        ClosestHitTrace,
+        IntersectionTrace,
+        DirectCallableTrace,
         AnyHitTrace,
         Bool,
         Padding,
@@ -797,7 +800,10 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
           Case::HalfArray,
           Case::UInt64Array,
           Case::Compute,
-          Case::CallbackTrace,
+          Case::MissTrace,
+          Case::ClosestHitTrace,
+          Case::IntersectionTrace,
+          Case::DirectCallableTrace,
           Case::AnyHitTrace,
           Case::Bool,
           Case::Padding,
@@ -825,7 +831,6 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
             break;
         case Case::Bool:
             leaf = builder.getBoolType();
-            payloadValid = false;
             break;
         case Case::Padding:
             count = 8;
@@ -915,8 +920,9 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
                     stride);
                 payloadValid = testCase == Case::FloatArray12 || testCase == Case::Float3Array ||
                                testCase == Case::NestedMixed32 ||
-                               testCase == Case::PaddedRecordArray;
-                count = testCase == Case::NestedMixed32       ? 32
+                               testCase == Case::PaddedRecordArray || testCase == Case::BoolArray;
+                count = testCase == Case::BoolArray           ? 3
+                        : testCase == Case::NestedMixed32     ? 32
                         : testCase == Case::PaddedRecordArray ? 16
                                                               : 12;
                 break;
@@ -931,7 +937,8 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
                 builder.createStructKey(),
                 builder.getVectorType(builder.getFloatType(), 4));
         const bool valid = payloadValid && testCase != Case::Compute &&
-                           testCase != Case::CallbackTrace && testCase != Case::AnyHitTrace &&
+                           testCase != Case::IntersectionTrace &&
+                           testCase != Case::DirectCallableTrace && testCase != Case::AnyHitTrace &&
                            testCase != Case::WrongOperand;
         SLANG_CHECK(getNVVMOptixPayloadRegisterCount(payload) == (payloadValid ? count : 0));
         auto entry = builder.createFunc();
@@ -939,10 +946,13 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         builder.addEntryPointDecoration(
             entry,
             Profile(
-                testCase == Case::Compute         ? Stage::Compute
-                : testCase == Case::CallbackTrace ? Stage::Miss
-                : testCase == Case::AnyHitTrace   ? Stage::AnyHit
-                                                  : Stage::RayGeneration),
+                testCase == Case::Compute               ? Stage::Compute
+                : testCase == Case::MissTrace           ? Stage::Miss
+                : testCase == Case::ClosestHitTrace     ? Stage::ClosestHit
+                : testCase == Case::IntersectionTrace   ? Stage::Intersection
+                : testCase == Case::DirectCallableTrace ? Stage::Callable
+                : testCase == Case::AnyHitTrace         ? Stage::AnyHit
+                                                        : Stage::RayGeneration),
             toSlice("probe"),
             toSlice("test"));
         builder.setInsertInto(entry);
@@ -2842,16 +2852,61 @@ SLANG_UNIT_TEST(nvvmOptixPayloadAndAttributeLayoutsStayDistinct)
         builder.getArrayType(chunk, builder.getIntValue(builder.getIntType(), 16)));
     builder.createStructField(nested, builder.createStructKey(), builder.getVoidType());
     SLANG_CHECK(getNVVMOptixPayloadRegisterCount(nested) == 32);
-    builder.createStructField(nested, builder.createStructKey(), builder.getUIntType());
-    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(nested) == 0);
+    // Construct a new outer type rather than mutating a type with cached layout decorations.
+    auto beyondLimit = builder.createStructType();
+    builder.createStructField(beyondLimit, builder.createStructKey(), nested);
+    builder.createStructField(beyondLimit, builder.createStructKey(), builder.getUIntType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(beyondLimit) == 0);
 
     // Ignoring a placeholder must not admit an empty root or hide an unsupported live field.
     auto empty = builder.createStructType();
     builder.createStructField(empty, builder.createStructKey(), builder.getVoidType());
     SLANG_CHECK(getNVVMOptixPayloadRegisterCount(empty) == 0);
     SLANG_CHECK(getNVVMOptixPayloadRegisterCount(builder.getVoidType()) == 0);
-    builder.createStructField(empty, builder.createStructKey(), builder.getBoolType());
+    builder.createStructField(empty, builder.createStructKey(), builder.getHalfType());
     SLANG_CHECK(getNVVMOptixPayloadRegisterCount(empty) == 0);
+
+    // Boolean leaves occupy bytes and may share registers. Dense hit attributes still require
+    // 32-bit leaves, while trace/callback payload counts round only the complete byte extent.
+    auto boolean = builder.getBoolType();
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(boolean) == 1);
+    SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(boolean, attributes));
+    for (int lanes = 2; lanes <= 4; ++lanes)
+        SLANG_CHECK(getNVVMOptixPayloadRegisterCount(builder.getVectorType(boolean, lanes)) == 1);
+    for (int length : {1, 3, 4, 5, 13, 127, 128, 129})
+    {
+        auto values =
+            builder.getArrayType(boolean, builder.getIntValue(builder.getIntType(), length));
+        SLANG_CHECK(
+            getNVVMOptixPayloadRegisterCount(values) ==
+            (length <= 128 ? UInt((length + 3) / 4) : 0));
+        SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(values, attributes));
+    }
+    for (int length : {1, 128, 129})
+    {
+        auto flags = builder.createStructType();
+        builder.createStructField(flags, builder.createStructKey(), builder.getVoidType());
+        for (int i = 0; i < length; ++i)
+            builder.createStructField(flags, builder.createStructKey(), boolean);
+        SLANG_CHECK(
+            getNVVMOptixPayloadRegisterCount(flags) ==
+            (length <= 128 ? UInt((length + 3) / 4) : 0));
+        SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(flags, attributes));
+    }
+    // Explicit overlapping offsets must not hide live bytes when counting physical words.
+    IRType* overlappingScalars[] = {builder.getUIntType(), builder.getBoolType()};
+    for (auto scalar : overlappingScalars)
+    {
+        auto overlapping = builder.createStructType();
+        for (int i = 0; i < 2; ++i)
+        {
+            auto key = builder.createStructKey();
+            IRInst* offset = builder.getIntValue(builder.getIntType(), 0);
+            builder.addDecoration(key, kIROp_VkStructOffsetDecoration, offset);
+            builder.createStructField(overlapping, key, scalar);
+        }
+        SLANG_CHECK(getNVVMOptixPayloadRegisterCount(overlapping) == 0);
+    }
 }
 
 SLANG_UNIT_TEST(nvvmTypedBufferBindingsStayStorageOnly)

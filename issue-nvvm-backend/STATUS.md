@@ -6,6 +6,14 @@ necessary fixes until Falcor renders through NVVM or a blocker requires human in
 render, compare matched per-iteration performance between backends and capture compilation times
 separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
 
+**Boolean and nested OptiX traces repaired (2026-10-03):** canonical CUDA byte packing now
+supports Boolean payload leaves, and TraceRay admits closest-hit/miss visibility calls. Focused
+checks **57/57**, static OptiX **6/6**, NVVM units **572/572** and smoke **16/16** pass. Nested GPU
+oracles preserve32outer words across innerBoolean hit/miss traces in all3modes. Falcor NVRTC
+passes (**12.78s**); NVVM reaches a separate retained-struct metadata rejection (**13.67s**).
+A standalone exported nested sampler reproduces it. Continue the next bounded repair; no successful
+NVVM application render or performance result yet.
+
 **Typed mip texture queries implemented (2026-10-03):** mip-level GetDimensions now uses
 logical extent/count operations through the existing texture provider. Focused checks **16/16**
 and non-square2D/3D exact mip probes pass on both backends. NVVM units **572/572** and smoke **16/16** pass.

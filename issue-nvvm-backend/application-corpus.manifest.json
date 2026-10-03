@@ -950,6 +950,66 @@
       },
       "coverage": "Dynamic mips0..4, uint/int/float dimensions,1D/2Darrays with unchanged zero layer output, guard. Neighboring fixture covers other shapes; separate non-square probe tests exact axis extents.",
       "baseline": "Existing texture-get-dimensions-cuda fixture: NVRTC2pass, NVVM2E52017 GenericAsm rejections."
+    },
+    {
+      "name": "falcor-bool-payload",
+      "source": "tests/cuda/applications/falcor-bool-payload.slang",
+      "source_sha256": "2d91070a8ad22b7703ba3cbc7d782b75b3a72f782be7f2ca3b9501c2f9de065a",
+      "application": {
+        "name": "Falcor2",
+        "revision": "851f207a35c937f668301577dd42ed6bee5ee437",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "origin_sources": [
+        "slang/falcor2/rendernodes/reference_pathtracer.slang:1075"
+      ],
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "preserved_shape": "Visibility Bool payload and nested TraceRay from closest-hit shading.",
+      "desired_semantics": "Canonical CUDA payload bytes and independent inner/outer values.",
+      "runner": "build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-bool-payload.slang",
+      "selection_contract": "Existing OptiX shader checks; nested GPU uses existing SlangPy API with recursion2. No working-tier admission.",
+      "coverage": "EightTraceRay forms and four modernHitObject forms; input/output byte patterns, mixed numeric fields, partial words and guards.",
+      "observations": {
+        "nvrtc-o3": "passed",
+        "nvvm-o0": "passed",
+        "nvvm-o3": "passed",
+        "raw_evidence": "build/nvvm-falcor-nested-trace/"
+      },
+      "baseline": "Boolean:8NVRTCpass/16NVVMreject. Nested:5pass/4NVVMcallbackreject.",
+      "checks": 36
+    },
+    {
+      "name": "falcor-nested-trace",
+      "source": "tests/cuda/applications/falcor-nested-trace.slang",
+      "source_sha256": "d38d4c30b92ecc42f8cc8758b3c5a70003da74b24ff5697d98f407498c6d1d14",
+      "application": {
+        "name": "Falcor2",
+        "revision": "851f207a35c937f668301577dd42ed6bee5ee437",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "origin_sources": [
+        "slang/falcor2/rendernodes/reference_pathtracer.slang:1075"
+      ],
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "preserved_shape": "Visibility Bool payload and nested TraceRay from closest-hit shading.",
+      "desired_semantics": "Canonical CUDA payload bytes and independent inner/outer values.",
+      "runner": "build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-nested-trace.slang",
+      "selection_contract": "Existing OptiX shader checks; nested GPU uses existing SlangPy API with recursion2. No working-tier admission.",
+      "coverage": "RG/CH/MS compile3modes; separate runtime nested32word outer+Boolean inner,4crossed hit/miss paths,12ones+4guards.",
+      "observations": {
+        "nvrtc-o3": "passed",
+        "nvvm-o0": "passed",
+        "nvvm-o3": "passed",
+        "raw_evidence": "build/nvvm-falcor-nested-trace/"
+      },
+      "baseline": "Boolean:8NVRTCpass/16NVVMreject. Nested:5pass/4NVVMcallbackreject.",
+      "checks": 9
     }
   ],
   "runtime_workload_scope": "Separate OptiX fixtures run with their recorded existing runtime runner. These records do not change the compute-only workload selection or refresh prior compile/assembly observations."
