@@ -47,6 +47,11 @@ SLANG_UNIT_TEST(precompiledModuleWithUserDefinedAttribute)
         {
             string name;
         };
+        [__AttributeUsage(_AttributeTargets.EnumCase)]
+        public struct DisplayNameAttribute
+        {
+            string name;
+        };
     )";
     const char* testSource = R"(
         module test;
@@ -54,6 +59,13 @@ SLANG_UNIT_TEST(precompiledModuleWithUserDefinedAttribute)
 
         [Texture("myTextureName")]
         RWTexture2D texture;
+
+        public enum LogLevel
+        {
+            [DisplayName("Detailed diagnostics")]
+            Verbose,
+            Info,
+        }
 
         [numthreads(1, 1, 1)]
         void computeMain(uint3 idx: SV_DispatchThreadID)
@@ -124,6 +136,23 @@ SLANG_UNIT_TEST(precompiledModuleWithUserDefinedAttribute)
         ComPtr<ISlangBlob> diagnostics;
         auto module = session->loadModule("test", diagnostics.writeRef());
         SLANG_CHECK_ABORT(module != nullptr);
+
+        // User attributes live in AST modifiers, not IR decorations, so serializing
+        // the module must round-trip the modifier on the `EnumCaseDecl` for reflection
+        // to still see it after reload.
+        auto layout = module->getLayout();
+        SLANG_CHECK_ABORT(layout != nullptr);
+        auto logLevelType = layout->findTypeByName("LogLevel");
+        SLANG_CHECK_ABORT(logLevelType != nullptr);
+        SLANG_CHECK(logLevelType->getKind() == slang::TypeReflection::Kind::Enum);
+        auto verboseCase = logLevelType->getFieldByIndex(0);
+        SLANG_CHECK_ABORT(verboseCase != nullptr);
+        auto displayName = verboseCase->findUserAttributeByName(globalSession.get(), "DisplayName");
+        SLANG_CHECK_ABORT(displayName != nullptr);
+        size_t nameSize = 0;
+        const char* nameArg = displayName->getArgumentValueString(0, &nameSize);
+        SLANG_CHECK(
+            nameArg != nullptr && UnownedStringSlice(nameArg, nameSize) == "Detailed diagnostics");
 
         // Generate code.
         ComPtr<slang::IEntryPoint> entryPoint;

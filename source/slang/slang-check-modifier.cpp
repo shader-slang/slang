@@ -320,6 +320,11 @@ bool SemanticsVisitor::getAttributeTargetSyntaxClasses(
         cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("ParamDecl"));
         return true;
     }
+    if (typeFlags == (int)UserDefinedAttributeTargets::EnumCase)
+    {
+        cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("EnumCaseDecl"));
+        return true;
+    }
     return false;
 }
 
