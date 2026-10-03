@@ -1,5 +1,20 @@
 # NVVM development workflow
 
+**Falcor milestone continuation authorized (2026-10-03):** implement `GeometryIndex()` in the
+standard library for NVRTC and NVVM, remove Falcor's CUDA workaround, then continue resolving
+application blockers until successful NVVM rendering or a decision requiring human input. Once
+rendering succeeds, compare matched per-iteration GPU performance and separately capture compile
+times. This supersedes earlier per-failure stops for work necessary to that application milestone;
+use bounded reviewed local commits and existing test infrastructure. Unrelated feature work and
+the legacy HitObject semantic decision remain outside this authorization.
+
+**Bounded empty trace-payload fix complete (2026-10-03):** the maintainer authorized repairing
+Falcor's `optixTraceRay` rejection. Canonical Void field placeholders now agree with existing
+payload serialization; focused execution/static checks pass and the original application rejection
+is gone. Falcor now rejects its CUDA-text `optixGetSbtGASIndex()` compatibility helper. This
+supersedes the earlier trace-shape stop only for zero-storage payload fields. Compatibility-shim
+changes, broader packing/OptiX work and the general loop remain stopped.
+
 **Bounded 64-bit wave arithmetic fix complete (2026-10-03):** the maintainer authorized repairing
 the newly exposed Falcor wave-sum restriction. Core signed/unsigned64 sum/product reductions and
 prefixes are now qualified; scene setup completes. NVVM reaches the path tracer render call and

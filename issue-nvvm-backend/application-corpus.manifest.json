@@ -790,5 +790,138 @@
     "compiler_library_sha256": "86520437e81f8299d8088038b808b9de36c3838c79d03a901eb19c531fcd9ab2",
     "core_module_sha256": "0599e5766c75ec26d5a8769536173fbe2ce2846cb4f8b6869e1b986bf56c253c",
     "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
-  }
+  },
+  "runtime_workloads": [
+    {
+      "name": "falcor-empty-payload",
+      "source": "tests/cuda/applications/falcor-empty-payload.slang",
+      "source_sha256": "e224ab30cea95392506ee39c79045c906675989da166a60932ae8c7708f59ac7",
+      "application": {
+        "name": "Falcor2",
+        "revision": "4ab8df487e479c78dfc30f064ad05ab33a609ba4",
+        "license": "Apache-2.0",
+        "status_manifest": "issue-nvvm-backend/falcor2-status.json"
+      },
+      "application_tests": [
+        "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]"
+      ],
+      "origin_sources": [
+        "slang/falcor2/rendernodes/reference_pathtracer.slang:1065-1071"
+      ],
+      "preserved_shape": "Public PathPayload contains live nested path state and an empty evaluator retained as Void by empty-type legalization.",
+      "desired_semantics": "Zero-storage fields consume no payload words. Caller and hit/miss shaders preserve all live field values and physical payload layout.",
+      "runner": "build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries tests/cuda/applications/falcor-empty-payload.slang",
+      "selection_contract": "Runtime metadata only; run-complex-corpus.py continues to consume only compute workloads. Existing OptiX runtime directives validate the ray pipeline; SIMPLE directives separately check32-word compilation without standalone ptxas.",
+      "runtime_contract": {
+        "entry_points": {
+          "raygenMain": "raygeneration",
+          "missMain": "miss",
+          "closestHitMain": "closesthit"
+        },
+        "payload_words": 4,
+        "dispatch": [
+          4,
+          1,
+          1
+        ],
+        "rays": "Two triangle hits and two misses. Callbacks check incoming uint2/float2, mutate all components, caller checks returned values; four output guard words stay unchanged.",
+        "modes": [
+          "nvrtc-o3",
+          "nvvm-o0",
+          "nvvm-o3"
+        ],
+        "anyhit_covered": false,
+        "compile_boundary_words": 32
+      },
+      "input_shape_audit": {
+        "canonical": true,
+        "producer": "TupleTypeBuilder::getResult preserves removed non-optimizable fields as Void; legalizeEmptyTypes precedes NVVM varying legalization.",
+        "consumer": "_getNVVMOptixRegisterCount -> legalizeNVVMTraceRays -> explicit OptixTraceRayPayload; callback payload admission shares the same gate.",
+        "ownership": "Skip the same zero-storage Void fields already handled by emitOptiXPayloadRead/Write. No change to checked CUDA layout, serialization or provider ABI.",
+        "retained_boundaries": "Dense attributes, whole-empty trace roots, unsupported live scalar types, stage rules and32-word limit."
+      },
+      "observations": {
+        "runtime": {
+          "nvrtc-o3": "passed",
+          "nvvm-o0": "passed",
+          "nvvm-o3": "passed"
+        },
+        "compile32": {
+          "nvrtc-o3": "passed",
+          "nvvm-o0": "passed",
+          "nvvm-o3": "passed"
+        },
+        "raw_evidence": "build/nvvm-falcor-trace/focused.log",
+        "transitions": {
+          "rejected_to_passed": 4,
+          "preserved_passes": 2
+        }
+      },
+      "observation_history": [
+        {
+          "date": "2026-10-03",
+          "source_sha256": "e224ab30cea95392506ee39c79045c906675989da166a60932ae8c7708f59ac7",
+          "raw_evidence": "build/nvvm-falcor-trace/baseline-final.log",
+          "runtime": {
+            "nvrtc-o3": "passed",
+            "nvvm-o0": "E52017 optixTraceRay",
+            "nvvm-o3": "E52017 optixTraceRay"
+          },
+          "compile32": {
+            "nvrtc-o3": "passed",
+            "nvvm-o0": "E52017 optixTraceRay",
+            "nvvm-o3": "E52017 optixTraceRay"
+          }
+        }
+      ],
+      "reduction_evidence": "build/nvvm-falcor-trace/gdb-type-visible.log",
+      "development_observations": [
+        "Initial fixture missed required raypayload qualifiers. Corrected fixture then exposed existing render-test maxRayPayloadSize16; final runtime stays at four words and compile/static tests cover32. Both failed attempts retained under raw evidence."
+      ],
+      "fix": {
+        "date": "2026-10-03",
+        "source_state": {
+          "base_revision": "3bd391c9c95c4a4055b1e59a5e07a1cb14efc24b",
+          "implementation_source_sha256": {
+            "source/slang/slang-ir-legalize-varying-params.cpp": "56ef6adeb9efa57183008fc53fbee2f99655a082f396555df2a4b8aef83a6c4e"
+          }
+        },
+        "implementation": "Skip canonical zero-storage Void struct fields in NVVM payload admission, matching existing serializer behavior. Dense attributes and all live-field/root/stage/size restrictions remain unchanged.",
+        "checks": {
+          "focused_shaders": {
+            "passed": 14,
+            "failed": 0,
+            "scope": "New fixture3 runtime +3 compile32 modes, prior CUDA empty-field2 source checks, triangle6 runtime controls."
+          },
+          "optix_static_units": {
+            "passed": 6,
+            "failed": 0
+          },
+          "nvvm_units": {
+            "passed": 570,
+            "failed": 0
+          },
+          "smoke": {
+            "passed": 16,
+            "failed": 0
+          },
+          "application_route_controls": {
+            "nvrtc_passed": 3,
+            "nvvm_passed": 3
+          }
+        },
+        "runtime_fixture": "tests/cuda/applications/falcor-empty-payload.slang",
+        "runtime_fixture_sha256": "e224ab30cea95392506ee39c79045c906675989da166a60932ae8c7708f59ac7",
+        "runtime_scope": "Four-word payload through two triangle hits/two misses; nested public empty fields before/between/after live fields, input/output value checks and output guards. Three separate compile cells cover32 words. No new AnyHit or32-word GPU coverage.",
+        "static_scope": "Existing payload/attribute layout unit adds Void placeholders, nested32-word and33-word boundaries, empty/Void roots and unsupported live Bool. Six affected OptiX units pass.",
+        "static_binary_sha256": {
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "eb3b1d39fef99dac6cbf0e3d906eee54bf12297c711a096d966d2ba0a1d3ddc8"
+        },
+        "raw_evidence": "build/nvvm-falcor-trace/",
+        "module_abi_unchanged": true,
+        "review": "Independent implementation, fixture and final evidence review complete; no remaining findings."
+      }
+    }
+  ],
+  "runtime_workload_scope": "Separate OptiX fixtures run with their recorded existing runtime runner. These records do not change the compute-only workload selection or refresh prior compile/assembly observations."
 }

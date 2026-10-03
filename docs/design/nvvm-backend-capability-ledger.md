@@ -42,10 +42,11 @@ producer and provider LLVM `CreateSelect` emission are unchanged. See the
 [Falcor-derived compile regressions](../../tests/cuda/applications/falcor-scalar-vector-select.slang).
 All nine standalone compile/assembly cells pass, resolving four original rejections.
 
-The subsequent Falcor `WaveActiveSum(uint64_t3)` restriction is also repaired. Scene setup now
-completes; the render call exposes an `optixTraceRay` lowering rejection. No successful NVVM render
-is claimed. The [application manifest](../../issue-nvvm-backend/falcor2-status.json) retains exact
-outcomes and all three failure stages. Aggregate/matrix selection is not added.
+Falcor's subsequent wave-sum and empty-field trace-payload restrictions are also repaired.
+The render call now rejects a CUDA-text `optixGetSbtGASIndex()` expression in Falcor's compatibility
+shim. No successful NVVM render is claimed. The
+[application manifest](../../issue-nvvm-backend/falcor2-status.json) retains exact failure transitions.
+Aggregate/matrix selection is not added.
 
 ## 64-bit integer wave arithmetic
 
@@ -57,6 +58,17 @@ vector2/3/4 and matrix2x2, full/sparse/partial/singleton masks, implicit active/
 wide values, low-word carries and unsigned sum wrap at NVRTC O3 and NVVM O0/O3. Bitwise and narrow
 arithmetic admission are unchanged. The [Falcor reproducer](../../tests/cuda/applications/falcor-wave64-sum.slang)
 has three passing compile/assembly modes; the actual application now completes scene setup.
+
+## Empty fields in OptiX payloads
+
+`TupleTypeBuilder::getResult` preserves removed non-optimizable fields as `Void`. NVVM payload
+admission now skips those canonical zero-storage placeholders, matching existing CUDA payload
+layout and serialization. Live numeric types, physical 32-word limit, empty-root refusal and dense
+attribute rules are unchanged. The [Falcor-derived fixture](../../tests/cuda/applications/falcor-empty-payload.slang)
+qualifies public/nested empty fields around live values: four-word hit/miss round-trips at NVRTC O3
+and NVVM O0/O3, plus separate 32-word compile/static boundaries. No new AnyHit or 32-word GPU
+coverage is claimed. Falcor passes its original trace rejection and exposes a separate application
+compatibility helper using CUDA C++ assembly text.
 
 ## TensorView, references and canonical numeric storage
 

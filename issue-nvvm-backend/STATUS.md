@@ -1,17 +1,35 @@
 # NVVM current status
 
+**Falcor qualification resumed (2026-10-03):** the maintainer explicitly authorized implementing
+standard-library `GeometryIndex()` for NVRTC and NVVM, removing Falcor's workaround, then continuing
+necessary fixes until Falcor renders through NVVM or a blocker requires human input. After a successful
+render, compare matched per-iteration performance between backends and capture compilation times
+separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
+
+**Empty fields in OptiX payloads repaired (2026-10-03):** NVVM payload admission now ignores
+canonical `Void` field placeholders, matching the existing serializer and zero-byte CUDA layout.
+Public empty fields before/between/after live fields, including nested arrays, are covered. Focused
+shader checks pass **14/14**, affected OptiX static units **6/6**, NVVM units **570/570**, and
+smoke **16/16**. The new fixture executes four-word hit/miss payloads and separately compiles the
+32-word boundary. No payload ABI, serializer, provider or live-type admission changes.
+
+**Falcor2 advances past `optixTraceRay`.** NVRTC renders successfully (**1 pass, 12.77 s**).
+NVVM fails during render preparation at a different operation: Falcor's compatibility shim embeds
+`optixGetSbtGASIndex()` as CUDA C++ text (**1 failure, 11.10 s**). The source is
+`slang/falcor2/render/slang_compat.slang:15`. Six backend-routing controls pass. No successful NVVM
+render is claimed. This bounded payload repair is complete. The new authorization above starts the application
+compatibility fix and subsequent Falcor qualification.
+
 **64-bit integer wave arithmetic repaired (2026-10-03):** the core arithmetic fold now admits
 `int64_t` and `uint64_t`, reusing existing typed sum/product and exact two-word shuffle transport.
 GPU tests pass on NVRTC O3 and NVVM O0/O3 for scalar, vector2/3/4 and matrix2x2 reductions and
 inclusive/exclusive prefixes, including sparse/partial/singleton masks. Focused coverage passes
 **18/18**, standalone compile/assembly **3/3**, NVVM units **570/570** and smoke **16/16**.
 
-**Falcor2 now completes scene setup.** NVRTC renders successfully (**1 pass, 15.25 s**). NVVM
-reaches `ReferencePathTracerNode._render` and fails at command encoder finish with E52017 for
-`optixTraceRay` (**1 failure, 10.05 s**, no fixture error). No successful NVVM render is claimed.
-The exact trace shape remains to be reduced; this is not a claim that all OptiX tracing is
-unsupported. Six backend-routing controls pass. This bounded wave arithmetic fix is complete;
-OptiX repair, unrelated Torch work and the general development loop remain stopped.
+**Falcor2 follow-up after wave repair:** scene setup succeeded and the next rejection was
+`optixTraceRay` during render preparation. The later empty-field fix above resolves that rejection.
+Exact comparison outcomes and the subsequent compatibility-shim failure remain in
+[application status](falcor2-status.json).
 
 **Scalar-condition vector select repaired (2026-10-03):** the shared NVVM admission rule now
 accepts scalar Boolean predicates for existing numeric/Boolean vectors, reusing the current lane
@@ -148,6 +166,31 @@ passes 1/1, leaving 570 accepted unit outcomes. Smoke 16 passes; no working-tier
 Falcor's scene setup completes and the next failure occurs at the render call's `optixTraceRay`
 lowering. Raw evidence is `build/nvvm-falcor-wave64/`; the maintained manifests retain current
 loaded identities, exact application outcomes, and the original select and wave failure histories.
+
+## Falcor2 empty trace payload fields
+
+The debugger captured `PathPayload { path:PathState; opacityEvaluator:Void }` with zero admitted
+payload words. `TupleTypeBuilder::getResult` intentionally preserves removed public/non-optimizable
+fields as `Void` so their positions remain stable; `legalizeEmptyTypes` runs before CUDA varying
+legalization. CUDA payload layout gives `Void` size zero, and the existing serializer skips it.
+`_getNVVMOptixRegisterCount` was the inconsistent consumer: it rejected the placeholder as an
+unsupported live field. The fix makes payload admission skip that same canonical shape. Dense
+attributes, whole-empty trace roots, live-type restrictions and the 32-word limit are unchanged.
+
+The [portable shader](../tests/cuda/applications/falcor-empty-payload.slang) retains public empty
+fields at multiple nested positions. Before the fix, NVRTC runtime/compile controls passed while
+NVVM O0/O3 rejected both (two passes, four failures). All six now pass. The runtime harness supports
+four words; it checks caller-to-hit/miss inputs, all returned live values and output guards.
+Separate compile/static checks cover the 32-word boundary; no new 32-word GPU or AnyHit coverage
+is claimed. Initial fixture qualifier and harness-limit failures remain in raw evidence.
+
+This OptiX source is registered under `runtime_workloads` in
+[the application corpus](application-corpus.manifest.json), with an explicit existing `slang-test`
+runner contract. The compute-only replay selection remains unchanged. Six affected OptiX static
+checks cover the updated gate plus stage/type/size boundaries; the broader unit and smoke checks
+pass. Raw evidence is `build/nvvm-falcor-trace/`. Falcor's original trace rejection is gone, and its
+next CUDA-text compatibility intrinsic failure is separately recorded without enabling CUDA-text
+interpretation in the compiler.
 
 ## Current validation and maintenance
 

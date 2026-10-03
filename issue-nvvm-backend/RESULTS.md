@@ -105,7 +105,9 @@ compile must also pass `ptxas`. Exit 1 preserves the current failures and is not
 pass; exit 0 requires all cells to succeed. Inspect `results.json` and per-cell logs, including
 attempt errors. The existing runner labels process timeouts `infrastructure-failed` with an explicit
 `timed out` attempt error; record these as timeouts rather than inferring missing infrastructure.
-No failed or timed-out attempt is a successful compile-time sample. The corpus has no GPU oracle yet.
+No failed or timed-out attempt is a successful compile-time sample. These compute replay workloads
+have no GPU oracle in this runner. Separate `runtime_workloads` metadata records OptiX fixtures
+and their existing runtime-runner contracts; it does not change this compute-only selection.
 
 For a single debugger invocation, select an entry and route explicitly (bound known stalls):
 
@@ -1876,6 +1878,12 @@ fails in `ReferencePathTracerNode._render` at command encoder finish with E52017
 All six routing controls pass. Current raw logs, JUnit and loaded-library identity reports are
 under `build/nvvm-falcor-wave64/`; earlier comparisons remain in manifest history.
 
+After the empty-field payload repair, NVRTC passes (12.77 s). NVVM no longer rejects
+`optixTraceRay`; it fails at Falcor's `slang_compat.slang:15` CUDA-text `optixGetSbtGASIndex()`
+intrinsic while preparing the render (1 failure, 11.10 s). Six routing controls pass. Raw logs,
+JUnit and loaded identities are under `build/nvvm-falcor-trace/`; all earlier comparisons remain
+in manifest history.
+
 Downstream-library provenance matters here: although `CUDA_PATH` selects toolkit12.9, the
 application process maps NVRTC12.8.93 from its existing `.venv` (`nvidia-cuda-nvrtc-cu12`).
 The standalone NVRTC probe additionally maps system NVRTC12.9.86; its import order differs from
@@ -1955,3 +1963,30 @@ O3 test-server timeout; the final driver retains all cases without that duplicat
 Raw failed and successful attempts remain under `build/nvvm-falcor-wave64/`. Neighboring
 `nvvm-fp64-masked-wave`, `nvvm-fp64-wave-aggregate`, `nvvm-wave-shuffle-widths` and `nvvm-core-waves`
 pass 12 GPU checks; the portable fixture has three authored compile checks. Units retain 569 passes from the full run plus 1 repaired admission test pass; smoke 16 passes. These checks do not admit new working-tier configurations or claim OptiX trace support.
+
+### Standalone Falcor empty trace-payload fields
+
+Use the OptiX runtime runner for `falcor-empty-payload.slang`, not the compute-only corpus runner.
+With the same selected compiler/provider/toolkit environment:
+
+```sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/applications/falcor-empty-payload.slang \
+  tests/pipeline/ray-tracing/nvvm-optix-triangle.slang \
+  tests/optix/optix-payload-registers-empty-field.slang
+build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test nvvmOptix
+```
+
+The shader selection passes 14/14: new hit/miss runtime3 +32-word compile3, existing triangle6
+runtime and CUDA empty-field2 source checks. Six affected static units pass, including nested Void
+placeholders, the 32/33-word boundary, empty roots and unsupported live fields. Full NVVM units570
+and smoke16 pass. Rebuild the existing isolated static configuration after changing its compiler
+source; do not reuse an old binary just because its path exists.
+
+The new fixture uses four live payload words because render-test currently configures16 bytes.
+The 32-word boundary has compile/static checks, not fresh GPU execution. Its initial missing
+qualifiers and over-limit runtime attempt are preserved, followed by a clean baseline with
+NVRTC2 passes and NVVM4 matching E52017 rejections. All six final cells pass. Source hash,
+provenance, runtime contract and exact transitions are in `runtime_workloads` in the application
+corpus manifest. Compute workload selection, prior replay identities and working-tier membership
+are unchanged. Raw evidence lives under `build/nvvm-falcor-trace/`.

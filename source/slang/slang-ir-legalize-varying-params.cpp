@@ -1155,6 +1155,12 @@ static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
     {
         for (auto field : structType->getFields())
         {
+            // Consider a public payload with a uint field and an empty evaluator field.
+            // Empty-type legalization retains the latter as Void to preserve field indices.
+            // The payload serializer already skips that zero-storage placeholder, so admission
+            // must do the same. Attribute flattening has a separate, dense-leaf contract.
+            if (!denseAttributes && as<IRVoidType>(field->getFieldType()))
+                continue;
             UInt fieldCount = _getNVVMOptixRegisterCount(field->getFieldType(), denseAttributes);
             if (!fieldCount || count + fieldCount > 32)
                 return 0;

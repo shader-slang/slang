@@ -2824,6 +2824,34 @@ SLANG_UNIT_TEST(nvvmOptixPayloadAndAttributeLayoutsStayDistinct)
     SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(array, attributes));
     auto tooBig = builder.getArrayType(record, builder.getIntValue(builder.getIntType(), 5));
     SLANG_CHECK(getNVVMOptixPayloadRegisterCount(tooBig) == 0);
+
+    // Empty-type legalization preserves public empty fields as Void. Their positions must
+    // not consume payload words, including inside nested arrays at the 32-word boundary.
+    auto chunk = builder.createStructType();
+    builder.createStructField(chunk, builder.createStructKey(), builder.getVoidType());
+    builder.createStructField(chunk, builder.createStructKey(), builder.getUIntType());
+    builder.createStructField(chunk, builder.createStructKey(), builder.getVoidType());
+    builder.createStructField(chunk, builder.createStructKey(), builder.getFloatType());
+    builder.createStructField(chunk, builder.createStructKey(), builder.getVoidType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(chunk) == 2);
+    SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(chunk, attributes));
+    auto nested = builder.createStructType();
+    builder.createStructField(
+        nested,
+        builder.createStructKey(),
+        builder.getArrayType(chunk, builder.getIntValue(builder.getIntType(), 16)));
+    builder.createStructField(nested, builder.createStructKey(), builder.getVoidType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(nested) == 32);
+    builder.createStructField(nested, builder.createStructKey(), builder.getUIntType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(nested) == 0);
+
+    // Ignoring a placeholder must not admit an empty root or hide an unsupported live field.
+    auto empty = builder.createStructType();
+    builder.createStructField(empty, builder.createStructKey(), builder.getVoidType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(empty) == 0);
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(builder.getVoidType()) == 0);
+    builder.createStructField(empty, builder.createStructKey(), builder.getBoolType());
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(empty) == 0);
 }
 
 SLANG_UNIT_TEST(nvvmTypedBufferBindingsStayStorageOnly)
