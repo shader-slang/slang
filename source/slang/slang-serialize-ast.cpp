@@ -656,8 +656,12 @@ public:
 
     /// Construct an AST deserialization context.
     ///
-    /// The `linkage`, `astBuilder`, and `sink` arguments must
-    /// all remain valid for as long as this context will be used.
+    /// The `linkage` and `astBuilder` arguments must remain valid
+    /// for as long as this context will be used. The `sink` may be
+    /// null, and is expected to remain valid for as long, but it is
+    /// the sink of the loading request, so on-demand reads that
+    /// happen after that request has returned do not satisfy this
+    /// (see the TODO on `_sink`).
     ///
     /// The context will retain the `sourceLocReader` and the
     /// `blobHoldingSerializedData`. It is assumed that the
@@ -695,6 +699,9 @@ public:
     /// serialized AST and the same data blob that were passed into
     /// the constructor for `ASTDeserializationContext`.
     ///
+    /// Throws `AbortCompilationException` if the declaration refers to an
+    /// imported module or declaration that can no longer be resolved.
+    ///
     Decl* readFossilizedDecl(Fossilized<Decl>* fossilizedDecl);
 
     /// Look up an export from the fossilized module, by its mangled name.
@@ -710,6 +717,12 @@ public:
 private:
     Linkage* _linkage = nullptr;
     ASTBuilder* _astBuilder = nullptr;
+
+    /// The sink of the request that loaded the module, or null when the core module is read.
+    ///
+    /// TODO(#13351): On-demand reads that happen after that request has returned still use this
+    /// sink, which may no longer be valid by then.
+    ///
     DiagnosticSink* _sink = nullptr;
     RefPtr<SerialSourceLocReader> _sourceLocReader = nullptr;
     SourceLoc _requestingSourceLoc;
@@ -719,6 +732,9 @@ private:
     //
     // The actual cache for the mapping from fossilized declaration pointers
     // to their revitalized `Decl*`s is maintained by the `Fossil::ReadContext`.
+    //
+    // TODO(#13351): An abort during an on-demand read, after the module has
+    // been loaded, leaves this context partially read while the module stays registered.
     //
 
     Fossil::ReadContext _readContext;
@@ -745,7 +761,12 @@ public:
     SerialSourceLocReader* getSourceLocReader() { return _sourceLocReader; }
 
 private:
+    /// Import the module named by a serialized imported-module record.
+    /// Never returns null: if the module cannot be imported, this diagnoses and aborts.
     ModuleDecl* _readImportedModule(ASTSerializer const& serializer);
+
+    /// Resolve a serialized imported-declaration record to the declaration it names.
+    /// Never returns null: if the declaration is not exported, this diagnoses and aborts.
     NodeBase* _readImportedDecl(ASTSerializer const& serializer);
 
     void _cleanUpASTNode(NodeBase* node);
@@ -1482,6 +1503,19 @@ void ASTSerialReadContext::handleASTNode(ASTSerializer const& serializer, NodeBa
 // `PseudoASTNodeType` cases as its tag, and then
 // store a single field with the name of the module.
 //
+// When reading, neither an imported module nor a declaration
+// imported from one ever comes back null. If the module cannot
+// be imported, or no longer exports a declaration under the
+// recorded mangled name, the module being read is unusable, so
+// we diagnose the problem and abort the load. A null would
+// otherwise reach consumers that cannot represent one, such as
+// the `Decl*`-keyed requirement dictionary of a `WitnessTable`.
+//
+// The abort message repeats what the diagnostic says, because it
+// is the only report when there is no sink. API entry points such
+// as `Linkage::loadModule` also print it after the diagnostic, as
+// they do for the message of every fatal diagnostic.
+//
 
 void ASTSerialWriteContext::_writeImportedModule(
     ASTSerializer const& serializer,
@@ -1513,11 +1547,16 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
     if (!module)
     {
+        auto moduleNameText = moduleName ? moduleName->text : String();
         if (_sink)
             _sink->diagnose(Diagnostics::ImportFailed{
-                .path = moduleName ? moduleName->text : String(),
+                .path = moduleNameText,
                 .location = _requestingSourceLoc});
-        return nullptr;
+
+        StringBuilder message;
+        message << "failed to import module '" << moduleNameText
+                << "' required by a serialized module";
+        SLANG_ABORT_COMPILATION(message.produceString().begin());
     }
     return module->getModuleDecl();
 }
@@ -1551,22 +1590,25 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
     serialize(serializer, importedFromModuleDecl);
     serialize(serializer, mangledName);
 
-    if (!importedFromModuleDecl)
-        return nullptr;
-
+    // The module decl comes from `_readImportedModule`, which never returns null, and
+    // `Module::setModuleDecl` always sets the decl's back-pointer to its module.
+    SLANG_RELEASE_ASSERT(importedFromModuleDecl && importedFromModuleDecl->module);
     auto importedFromModule = importedFromModuleDecl->module;
-    if (!importedFromModule)
-    {
-        return nullptr;
-    }
 
     auto importedDecl =
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
-            .declName = mangledName,
-            .moduleName = importedFromModule->getName()});
+        if (_sink)
+            _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
+                .declName = mangledName,
+                .moduleName = importedFromModule->getName(),
+                .location = _requestingSourceLoc});
+
+        StringBuilder message;
+        message << "cannot resolve imported declaration '" << mangledName << "' from module '"
+                << importedFromModule->getName() << "'";
+        SLANG_ABORT_COMPILATION(message.produceString().begin());
     }
     return importedDecl;
 }
@@ -2104,6 +2146,7 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 
     Decl* decl = nullptr;
     serialize(serializer, decl);
+    reader.flush();
     return decl;
 }
 
