@@ -348,8 +348,11 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 paramFieldKey,
                 entryPointParamsStructLayout->getFieldLayout(paramIndex));
 
+            // The field takes the parameter's source location, so that diagnostics about the
+            // field point at the parameter's declaration.
+            //
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
-            SLANG_UNUSED(paramField);
+            paramField->sourceLoc = param->sourceLoc;
 
             // We will transfer all decorations on the parameter over to the key
             // so that they can affect downstream emit logic.

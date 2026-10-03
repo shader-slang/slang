@@ -275,8 +275,12 @@ struct CollectGlobalUniformParametersContext
             // will stand in for the parameter: it will have the key we
             // just generated, and the type of the original parameter.
             //
+            // The field also takes the parameter's source location, so that diagnostics about
+            // the field point at the parameter's declaration.
+            //
             auto globalParamType = globalParam->getFullType();
-            builder->createStructField(wrapperStructType, fieldKey, globalParamType);
+            auto field = builder->createStructField(wrapperStructType, fieldKey, globalParamType);
+            field->sourceLoc = globalParam->sourceLoc;
 
             // Next we need to replace the uses of the parameter will
             // logic to extract the appropriate field from the aggregated

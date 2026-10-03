@@ -13,6 +13,7 @@
 #include "compiler-core/slang-name.h"
 #include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-explicit-global-init.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -928,60 +929,121 @@ static LegalVal legalizeAbort(
     return LegalVal::simple(newAbort);
 }
 
-static LegalVal legalizeDebugVar(
+/// Returns true if a debug variable can be emitted for every leaf of `type`, the legal type of
+/// a debug variable's pointer: every simple leaf points to a debuggable type. `none` leaves hold
+/// no data and need no debug variable. A `pair` is never debuggable, because its ordinary half
+/// keeps `void` placeholders for the special fields. The other flavors (`implicitDeref`,
+/// `wrappedBuffer`) only arise from parameter groups, which do not get debug variables, so we
+/// decline them.
+static bool areLegalDebugVarLeavesDebuggable(
     IRTypeLegalizationContext* context,
     LegalType type,
-    IRDebugVar* originalInst)
+    DebugValueStoreContext& debugContext)
 {
-    // For now we just discard any special part and keep the ordinary part.
-
     switch (type.flavor)
     {
+    case LegalType::Flavor::none:
+        return true;
+    case LegalType::Flavor::simple:
+        return debugContext.isDebuggableType(
+            tryGetPointedToType(context->builder, type.getSimple()));
+    case LegalType::Flavor::tuple:
+        for (auto ee : type.getTuple()->elements)
+        {
+            if (!areLegalDebugVarLeavesDebuggable(context, ee.type, debugContext))
+                return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+static UnownedStringSlice findNameHint(IRInst* inst);
+
+/// Emits one debug variable per leaf of `type`, returning them with the same structure as
+/// `type`. Each leaf split out of a struct field is named after its field path, as `declareVars`
+/// names the variables it declares; every leaf keeps the original variable's source position and
+/// argument index, since each describes a part of that variable. Requires
+/// `areLegalDebugVarLeavesDebuggable(type)`.
+static LegalVal emitLegalDebugVar(
+    IRTypeLegalizationContext* context,
+    LegalType type,
+    IRDebugVar* originalInst,
+    UnownedStringSlice nameHint)
+{
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::none:
+        return LegalVal();
     case LegalType::Flavor::simple:
         {
-            auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
-
-            // Check if the type is debuggable before creating DebugVar
-            DebugValueStoreContext debugContext;
-            if (!debugContext.isDebuggableType(pointedToType))
-            {
-                return LegalVal();
-            }
-
             auto legalVal = context->builder->emitDebugVar(
-                pointedToType,
+                tryGetPointedToType(context->builder, type.getSimple()),
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
                 originalInst->getScope(),
                 originalInst->getArgIndex());
             copyNameHintAndDebugDecorations(legalVal, originalInst);
+            if (nameHint.getLength() && nameHint != findNameHint(originalInst))
+            {
+                if (auto decoration = legalVal->findDecoration<IRNameHintDecoration>())
+                    decoration->removeAndDeallocate();
+                context->builder->addNameHintDecoration(legalVal, nameHint);
+            }
             return LegalVal::simple(legalVal);
-        }
-    case LegalType::Flavor::none:
-        return LegalVal();
-    case LegalType::Flavor::pair:
-        {
-            auto pairType = type.getPair();
-            auto ordinaryVal = legalizeDebugVar(context, pairType->ordinaryType, originalInst);
-            return ordinaryVal;
         }
     case LegalType::Flavor::tuple:
         {
-            auto tupleType = type.getTuple();
-            for (auto ee : tupleType->elements)
+            RefPtr<TuplePseudoVal> tupleVal = new TuplePseudoVal();
+            for (auto ee : type.getTuple()->elements)
             {
-                auto innerResult = legalizeDebugVar(context, ee.type, originalInst);
-                if (innerResult.flavor != LegalVal::Flavor::none)
-                    return innerResult;
+                String fieldNameHint;
+                if (nameHint.getLength())
+                {
+                    if (auto keyNameHint = ee.key->findDecoration<IRNameHintDecoration>())
+                        fieldNameHint = String(nameHint) + "." + keyNameHint->getName();
+                }
+
+                TuplePseudoVal::Element element;
+                element.key = ee.key;
+                element.val = emitLegalDebugVar(
+                    context,
+                    ee.type,
+                    originalInst,
+                    fieldNameHint.getUnownedSlice());
+                tupleVal->elements.add(element);
             }
-            return LegalVal();
+            return LegalVal::tuple(tupleVal);
         }
     default:
-        return LegalVal();
+        SLANG_UNEXPECTED("debug variable leaf flavor rejected by areLegalDebugVarLeavesDebuggable");
+        UNREACHABLE_RETURN(LegalVal());
     }
 }
 
+static LegalVal legalizeDebugVar(
+    IRTypeLegalizationContext* context,
+    LegalType type,
+    IRDebugVar* originalInst)
+{
+    // The address projections and `DebugValue`s rooted at a debug variable are legalized
+    // against the variable's legal type, so the legalized debug variable must have exactly
+    // that structure. If some leaf cannot be described (such as a resource, or the ordinary
+    // half of a split struct, which keeps `void` placeholders for its special fields), we
+    // drop the whole debug variable rather than emit a partial structure that its uses would
+    // not match.
+    DebugValueStoreContext debugContext;
+    if (!areLegalDebugVarLeavesDebuggable(context, type, debugContext))
+        return LegalVal();
+    return emitLegalDebugVar(context, type, originalInst, findNameHint(originalInst));
+}
+
+/// Emits a `DebugValue` for each leaf of `debugValue` into the matching leaf of `debugVar`.
+/// `legalizeDebugVar` gives a debug variable the same structure as the legal type of the values
+/// stored to it, so the two are walked in lockstep. `DebugValue` has no result, so this always
+/// returns `none`.
 static LegalVal legalizeDebugValue(
     IRTypeLegalizationContext* context,
     LegalVal debugVar,
@@ -991,41 +1053,33 @@ static LegalVal legalizeDebugValue(
     if (debugVar.flavor == LegalVal::Flavor::none)
         return LegalVal();
 
-    // For now we just discard any special part and keep the ordinary part.
     switch (debugValue.flavor)
     {
-    case LegalType::Flavor::simple:
-        return LegalVal::simple(
-            context->builder->emitDebugValue(debugVar.getSimple(), debugValue.getSimple()));
     case LegalType::Flavor::none:
-        return LegalVal();
-    case LegalType::Flavor::pair:
-        {
-            // The var should be legalized as a simple value, because we discard the special part
-            // for debug info insts.
-            //
-            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
-            auto ordinaryVal = legalizeDebugValue(
-                context,
-                debugVar,
-                debugValue.getPair()->ordinaryVal,
-                originalInst);
-            return ordinaryVal;
-        }
+        break;
+    case LegalType::Flavor::simple:
+        context->builder->emitDebugValue(debugVar.getSimple(), debugValue.getSimple());
+        break;
     case LegalType::Flavor::tuple:
         {
-            auto tupleVal = debugValue.getTuple();
-            for (auto ee : tupleVal->elements)
+            auto varTuple = debugVar.getTuple();
+            auto valueTuple = debugValue.getTuple();
+            SLANG_ASSERT(varTuple->elements.getCount() == valueTuple->elements.getCount());
+            for (Index i = 0; i < valueTuple->elements.getCount(); i++)
             {
-                auto innerResult = legalizeDebugValue(context, debugVar, ee.val, originalInst);
-                if (innerResult.flavor != LegalVal::Flavor::none)
-                    return innerResult;
+                SLANG_ASSERT(varTuple->elements[i].key == valueTuple->elements[i].key);
+                legalizeDebugValue(
+                    context,
+                    varTuple->elements[i].val,
+                    valueTuple->elements[i].val,
+                    originalInst);
             }
-            return LegalVal();
+            break;
         }
     default:
-        return LegalVal();
+        SLANG_UNEXPECTED("debug value flavor rejected by areLegalDebugVarLeavesDebuggable");
     }
+    return LegalVal();
 }
 
 static LegalVal legalizeStore(
@@ -4067,7 +4121,8 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
 //
 // The differences between the two passes come down to some very small
 // distinctions about what types each pass considers "special" (e.g.,
-// resources in one case and existential boxes in the other), along
+// resources, and on some targets logical pointers, in one case and
+// existential boxes in the other), along
 // with what they want to do when a uniform/constant buffer needs to
 // be made where the element type is non-simple (that is, includes
 // some fields of "special" type).
@@ -4083,10 +4138,25 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSpecialType(IRType* type) override
     {
-        // For resource type legalization, the "special" types
-        // we are working with are resource types.
+        if (isResourceType(type))
+            return true;
+
+        // On targets where a logical pointer may not be a member of a
+        // composite value (SPIR-V), logical pointers are special too.
+        // They only take the paths of this pass that stay within
+        // function-local and private memory: variables, parameters,
+        // results, and calls. The paths that place special fields in
+        // other memory (uniform and structured buffers, global
+        // parameters, `groupshared` variables) would be wrong for a
+        // logical pointer, and `validateLogicalPointerStorage` rejects
+        // every shape that would reach them before this pass runs.
         //
-        return isResourceType(type);
+        // An array of logical pointers is split out whole, like an array
+        // of resources, so where it flows as an array value it is still
+        // built as a composite, which SPIR-V rejects (#9062).
+        //
+        return doesTargetLegalizeLogicalPointers(targetProgram->getTargetReq()) &&
+               isLogicalPointerType(type);
     }
 
     bool isSimpleType(IRType*) override { return false; }
@@ -4199,9 +4269,29 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // wrappers around `legalizeTypes()` that pick an appropriately
 // specialized context type to use to get the job done.
 
+static bool hasInitializedGlobalVarHoldingLogicalPointer(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(inst);
+        if (globalVar && globalVar->getFirstBlock() &&
+            typeContainsLogicalPointer(globalVar->getDataType()->getValueType()))
+            return true;
+    }
+    return false;
+}
+
 void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
+
+    // Type legalization cannot split a global variable that has an initializer, and on these
+    // targets a `static` variable holding a logical pointer is split. These targets move the
+    // initializers of `static` globals onto the entry points after this pass anyway, so when a
+    // module has such a variable we move them all now, in one pass that keeps their order.
+    if (doesTargetLegalizeLogicalPointers(target->getTargetReq()) &&
+        hasInitializedGlobalVarHoldingLogicalPointer(module))
+        moveGlobalVarInitializationToEntryPoints(module, target);
 
     IRResourceTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
