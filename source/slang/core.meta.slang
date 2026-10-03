@@ -4179,6 +4179,7 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     [__ref] void reduceAdd(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
         __target_switch
@@ -4193,6 +4194,7 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     [__ref] void reduceSub(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
         __target_switch
@@ -4207,6 +4209,7 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     [__ref] void reduceMax(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
         __target_switch
@@ -4221,6 +4224,7 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     [require(atomic_reduce)]
     __cuda_sm_version(7.0)
     [ForceInline]
+    [KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
     [__ref] void reduceMin(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
         __target_switch
@@ -4337,12 +4341,14 @@ extension<T : IBitAtomicable> Atomic<T>
 
 __generic<T : IArithmeticAtomicable>
 [ForceInline]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 T operator +=(__ref Atomic<T> v, T value)
 {
     return v.add(value) + value;
 }
 __generic<T : IArithmeticAtomicable>
 [ForceInline]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 T operator -=(__ref Atomic<T> v, T value)
 {
     return v.sub(value) - value;

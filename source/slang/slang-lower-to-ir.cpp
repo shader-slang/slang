@@ -867,6 +867,42 @@ struct TryClauseEnvironment
     IRBlock* catchBlock = nullptr;
 };
 
+// Give an atomic's output value the same derivative-free representation as a direct atomic
+// result. Consider `InterlockedAdd(buffer[0], detach(x), original); accumulator.add(original);`.
+// Passing `original` directly by address leaves a load from an escaped local, which the
+// differentiability checker must conservatively assume can carry a derivative. Instead, receive
+// the atomic result in a temporary and copy back a detached value. SSA can then propagate that
+// value through the caller, without treating later assignments to `original` as derivative-free.
+//
+// Only the body of a differentiable function is checked for lost derivatives, so we rewrite only
+// there. Elsewhere the call keeps its direct `out` argument, and the emitted code, including the
+// name of the variable that receives the original value, is unchanged.
+static void detachAtomicOutArguments(IRGenContext* context, IRCall* call)
+{
+    if (!context->funcDecl || !context->funcDecl->findModifier<DifferentiableAttribute>())
+        return;
+    if (getBuiltinFuncEnum(call->getCallee()) != KnownBuiltinDeclName::AtomicOperation)
+        return;
+
+    auto builder = context->irBuilder;
+    auto funcType = as<IRFuncType>(call->getCallee()->getFullType());
+    SLANG_RELEASE_ASSERT(funcType && funcType->getParamCount() == call->getArgCount());
+    for (UInt i = 0; i < call->getArgCount(); i++)
+    {
+        auto [direction, valueType] = splitParameterDirectionAndType(funcType->getParamType(i));
+        if (direction.kind != ParameterDirectionInfo::Kind::Out)
+            continue;
+
+        auto destination = call->getArg(i);
+        IRBuilder tempBuilder(builder->getModule());
+        tempBuilder.setInsertBefore(call);
+        auto temporary = tempBuilder.emitVar(valueType);
+        call->setArg(i, temporary);
+        auto value = builder->emitLoad(temporary);
+        builder->emitStore(destination, builder->emitDetachDerivative(valueType, value));
+    }
+}
+
 // Given a `LoweredValInfo` for something callable, along with a
 // bunch of arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToVal(
@@ -905,11 +941,10 @@ LoweredValInfo emitCallToVal(
                 }
                 else
                 {
-                    return LoweredValInfo::simple(builder->emitCallInst(
-                        type,
-                        getSimpleVal(context, funcVal),
-                        argCount,
-                        args));
+                    auto call =
+                        builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args);
+                    detachAtomicOutArguments(context, call);
+                    return LoweredValInfo::simple(call);
                 }
             }
 
@@ -5947,6 +5982,28 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNEXPECTED("PrimalSubstituteExpr should not appear during IR lowering");
     }
 
+    // Record the intent of a `no_diff` (or treat-as-differentiable) expression on the
+    // instruction it lowered to. A call carries it as a decoration that the differentiability
+    // checker and autodiff consult. An atomic operation carries the `no_diff` intent too:
+    // `Atomic<T>` methods lower directly to atomic instructions rather than calls, and the
+    // checker needs the marker to accept an atomic that writes a derivative-carrying value.
+    void addTreatAsDifferentiableDecoration(IRInst* inst, TreatAsDifferentiableExpr::Flavor flavor)
+    {
+        switch (flavor)
+        {
+        case TreatAsDifferentiableExpr::Flavor::NoDiff:
+            if (as<IRCall>(inst) || as<IRAtomicOperation>(inst))
+                getBuilder()->addDecoration(inst, kIROp_TreatCallAsDifferentiableDecoration);
+            break;
+        case TreatAsDifferentiableExpr::Flavor::Differentiable:
+            if (as<IRCall>(inst))
+                getBuilder()->addDecoration(inst, kIROp_DifferentiableCallDecoration);
+            break;
+        default:
+            SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
+        }
+    }
+
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->innerExpr);
@@ -5962,19 +6019,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // multiple calls (multiple index operations?). Not quite sure what the right way
                 // to handle that case might be.
                 //
-                if (as<IRCall>(materializedVal.val))
-                {
-                    if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
-                        getBuilder()->addDecoration(
-                            materializedVal.val,
-                            kIROp_TreatCallAsDifferentiableDecoration);
-                    else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
-                        getBuilder()->addDecoration(
-                            materializedVal.val,
-                            kIROp_DifferentiableCallDecoration);
-                    else
-                        SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
-                }
+                if (materializedVal.val)
+                    addTreatAsDifferentiableDecoration(materializedVal.val, expr->flavor);
 
                 innerInst = getSimpleVal(context, materializedVal);
 
@@ -5994,15 +6040,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            if (auto callInst = as<IRCall>(baseVal.val))
-                if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
-                    getBuilder()->addDecoration(
-                        callInst,
-                        kIROp_TreatCallAsDifferentiableDecoration);
-                else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
-                    getBuilder()->addDecoration(callInst, kIROp_DifferentiableCallDecoration);
-                else
-                    SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
+            if (baseVal.val)
+                addTreatAsDifferentiableDecoration(baseVal.val, expr->flavor);
 
             innerInst = baseVal.val;
         }

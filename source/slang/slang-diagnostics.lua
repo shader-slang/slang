@@ -5372,6 +5372,13 @@ err(
 )
 
 err(
+    "loss-of-derivative-in-atomic-operation",
+    41037,
+    "derivative is lost in atomic operation",
+    span { loc = "location", message = "derivative is lost when an atomic operation writes it to non-differentiable memory, use 'no_diff' or 'detach()' to clarify intention." }
+)
+
+err(
     "loss-of-derivative-using-non-differentiable-location-as-out-arg",
     41025,
     "derivative is lost passing non-differentiable location",

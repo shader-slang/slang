@@ -241,6 +241,10 @@ FIDDLE() namespace Slang
         WaveIsFirstLane,
         WaveReadLaneFirst,
         CallShader,
+        /// An atomic entry point that can take a floating-point value, such as the global
+        /// `Interlocked*` functions. The differentiability checker uses it to recognize a call
+        /// that writes a derivative-carrying value into non-differentiable memory.
+        AtomicOperation,
         COUNT
     };
 
