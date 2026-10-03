@@ -425,6 +425,11 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
+/// Return true if `addr` is an address of groupshared memory, either because its type
+/// carries the `GroupShared` rate or because its pointer type is in the `GroupShared`
+/// address space. Both forms reach the emitters (see `emitRateQualifiersAndAddressSpace`).
+bool isGroupSharedAddr(IRInst* addr);
+
 // `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
 // in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
 // Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
