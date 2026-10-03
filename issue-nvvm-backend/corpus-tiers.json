@@ -470,6 +470,40 @@
         "tests/cuda/nvvm-specialized-pointer-identity.slang"
       ],
       "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+    },
+    {
+      "id": "cuda/nvvm-bitfield-boundaries.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-bitfield-legalization",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-bitfield-boundaries.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-bitfield-boundaries.slang"
+      ],
+      "rationale": "Exact authored runtime mode; explicit signedness and independent zero/full/top-bit/interior expectations across scalar/vector integer widths, with sentinel."
+    },
+    {
+      "id": "cuda/nvvm-bitfield-boundaries.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-bitfield-legalization",
+      "outcome_path": [
+        "validation",
+        "source_controls",
+        "outcomes",
+        "tests/cuda/nvvm-bitfield-boundaries.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-bitfield-boundaries.slang"
+      ],
+      "rationale": "Exact authored runtime mode; explicit signedness and independent zero/full/top-bit/interior expectations across scalar/vector integer widths, with sentinel."
     }
   ],
   "smoke": [

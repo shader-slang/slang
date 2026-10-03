@@ -132,6 +132,12 @@ aggregate-entry regression and differentiated-array application control pass.
 Captured LLVM confirms i8-to-i64 zero extension; captured CUDA12.9 PTX qualifies a fixed local frame.
 The vendor optimizer stall and rejected entry-hoisting/select-chain attempts remain recorded.
 
+The [bitfield boundary fixture](../../tests/cuda/nvvm-bitfield-boundaries.slang) qualifies zero/full,
+top-bit and interior extraction/insertion for signed/unsigned 8/16/32/64-bit scalars and vectors2–4
+at NVVM O0/O3. Canonical bitfield operations now lower to ordinary IR; exact signature negatives and
+module-expression placement are checked before provider mutation. Runtime behavior is preserved;
+LLVM-poison intermediate shifts are avoided. Invalid ranges remain outside the contract.
+
 ## Explicit OptiX versions
 
 `OptixVersion` / `-optix-version 80000|80100|90000` selects an SDK contract independent of CUDA

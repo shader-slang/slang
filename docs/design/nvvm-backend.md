@@ -445,6 +445,13 @@ unchanged leaves. Independent bytes preserve poison-lane independence. Unchanged
 remain identity conversions, so the differentiated-array path keeps its constant provider instruction
 count. Boolean-containing arrays require conversion instructions proportional to their element count.
 
+Bitfield extraction and insertion lower to ordinary typed IR before NVVM preflight and module-value
+placement. The legalizer preserves the exact existing integer scalar/vector signature and uses
+bounded intermediate shift counts plus explicit empty-field selection for valid zero/full widths.
+Signed extraction restores signedness before its final right shift. Ordinary numeric lowering owns
+scalar-count broadcasting and narrow physical carriers. There is no separate bitfield plan or emitter
+recipe, and no new behavior is promised for ranges exceeding the logical integer width.
+
 Generic specialization names encode canonical linked leaves and framed structural IR arguments,
 including type and literal payload. Diagnostic display hints are not symbol identity. Unlinked
 nominal values, unresolved parameters and child-bearing witnesses retain private IR identity; only

@@ -137,7 +137,6 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
     _indexOperations(plan.uint64WordConstructions, m_uint64WordConstructions);
     _indexOperations(plan.numericTruthinessOperations, m_numericTruthinessOperations);
     _indexOperations(plan.floatingRemainderOperations, m_floatingRemainderOperations);
-    _indexOperations(plan.bitfieldOperations, m_bitfieldOperations);
     _indexOperations(plan.resourceBitCasts, m_resourceBitCasts);
     _indexOperations(plan.defaultResourceValues, m_defaultResourceValues);
     _indexOperations(plan.ephemeralValues, m_ephemeralValues);
@@ -202,11 +201,6 @@ SLANG_NVVM_DEFINE_PLAN_FIND(
     NVVMPlannedFloatingRemainder,
     floatingRemainderOperations,
     m_floatingRemainderOperations)
-SLANG_NVVM_DEFINE_PLAN_FIND(
-    findBitfieldOperation,
-    NVVMPlannedBitfieldOperation,
-    bitfieldOperations,
-    m_bitfieldOperations)
 SLANG_NVVM_DEFINE_PLAN_FIND(
     findResourceBitCast,
     NVVMPlannedResourceBitCast,

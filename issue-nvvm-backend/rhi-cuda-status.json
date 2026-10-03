@@ -1515,6 +1515,23 @@
         "path": "build/nvvm-current-checkpoint/repair-identity-after.json",
         "sha256": "d684fa10ae183a4b54e9cdca2195c372c934b6e6ed75f84978ad7082d5c7d0be"
       }
+    },
+    "bitfield-final-rhi-full1": {
+      "gate": {
+        "path": "build/nvvm-bitfield-legalization/rhi-full1.json",
+        "sha256": "f13beb55f407166b26924b0617c9ad41db7be1764f68d160de84e58429324c11"
+      },
+      "log": {
+        "path": "build/nvvm-bitfield-legalization/rhi-full1.log",
+        "sha256": "04cfd25e3a13fea32242c71755c4b49f561c41069c4c2e3aabfcbbe6efcd06fd"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 294.4348077774048,
+      "identity": {
+        "path": "build/nvvm-bitfield-legalization/identity-after.json",
+        "sha256": "8dabdb5b44113ec206ce3ae5b86a985fc241533331c57514cb058d0b909114d2"
+      },
+      "scope": "Fresh complete NVVM run after bitfield legalization; all prior repaired outcomes preserved."
     }
   },
   "reconciliation": {
@@ -1871,6 +1888,15 @@
           "terminal_line": 4,
           "detail": "0.54s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 4,
+          "detail": "0.54s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -1932,6 +1958,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 5,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -2005,6 +2040,15 @@
           "terminal_line": 6,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 6,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -2066,6 +2110,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 8,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -2139,6 +2192,15 @@
           "terminal_line": 9,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 9,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -2206,6 +2268,15 @@
           "terminal_line": 10,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 10,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -2267,6 +2338,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 11,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -2391,6 +2471,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 12,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -2543,6 +2632,15 @@
           "terminal_line": 13,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 13,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "combined_sampler_values",
@@ -2670,6 +2768,15 @@
           "terminal_line": 14,
           "detail": "0.06s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 14,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "texture_fetch",
@@ -2776,6 +2883,15 @@
           "terminal_line": 15,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 15,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -2837,6 +2953,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 16,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -2910,6 +3035,15 @@
           "terminal_line": 17,
           "detail": "0.30s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 17,
+          "detail": "0.31s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -2971,6 +3105,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 18,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3044,6 +3187,15 @@
           "terminal_line": 19,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 19,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3105,6 +3257,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 20,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3178,6 +3339,15 @@
           "terminal_line": 21,
           "detail": "0.29s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 21,
+          "detail": "0.29s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3239,6 +3409,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 22,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3312,6 +3491,15 @@
           "terminal_line": 23,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 23,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3373,6 +3561,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 24,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3446,6 +3643,15 @@
           "terminal_line": 25,
           "detail": "0.15s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 25,
+          "detail": "0.15s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3507,6 +3713,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 26,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3580,6 +3795,15 @@
           "terminal_line": 27,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 27,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3641,6 +3865,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 28,
+          "detail": "0.13s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3714,6 +3947,15 @@
           "terminal_line": 29,
           "detail": "0.13s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 29,
+          "detail": "0.13s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3775,6 +4017,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 30,
+          "detail": "0.11s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3848,6 +4099,15 @@
           "terminal_line": 31,
           "detail": "0.11s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 31,
+          "detail": "0.11s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -3909,6 +4169,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 32,
+          "detail": "0.11s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -3982,6 +4251,15 @@
           "terminal_line": 33,
           "detail": "0.11s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 33,
+          "detail": "0.11s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4043,6 +4321,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 34,
+          "detail": "0.39s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4116,6 +4403,15 @@
           "terminal_line": 35,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 35,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4177,6 +4473,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 36,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4250,6 +4555,15 @@
           "terminal_line": 37,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 37,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4311,6 +4625,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 38,
+          "detail": "0.10s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4384,6 +4707,15 @@
           "terminal_line": 39,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 39,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4445,6 +4777,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 40,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4518,6 +4859,15 @@
           "terminal_line": 41,
           "detail": "0.33s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 41,
+          "detail": "0.33s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4579,6 +4929,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 42,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4652,6 +5011,15 @@
           "terminal_line": 43,
           "detail": "0.13s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 43,
+          "detail": "0.14s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4717,6 +5085,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 44,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4795,6 +5172,15 @@
           "terminal_line": 45,
           "detail": "0.07s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 45,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
         }
       ],
       "registration_mapping": "duplicate name; preserve occurrence but do not assign a source line without independent proof"
@@ -4857,6 +5243,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 46,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -4930,6 +5325,15 @@
           "terminal_line": 47,
           "detail": "0.07s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 47,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -4991,6 +5395,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 48,
+          "detail": "0.16s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5064,6 +5477,15 @@
           "terminal_line": 49,
           "detail": "0.30s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 49,
+          "detail": "0.30s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5125,6 +5547,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 50,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5198,6 +5629,15 @@
           "terminal_line": 51,
           "detail": "0.08s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 51,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5259,6 +5699,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 52,
+          "detail": "0.30s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5332,6 +5781,15 @@
           "terminal_line": 53,
           "detail": "0.07s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 53,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5393,6 +5851,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 54,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5466,6 +5933,15 @@
           "terminal_line": 55,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 55,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5527,6 +6003,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 56,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5600,6 +6085,15 @@
           "terminal_line": 57,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 57,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5661,6 +6155,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 58,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5734,6 +6237,15 @@
           "terminal_line": 59,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 59,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5795,6 +6307,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 60,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -5868,6 +6389,15 @@
           "terminal_line": 61,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 61,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -5929,6 +6459,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 62,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6002,6 +6541,15 @@
           "terminal_line": 63,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 63,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6063,6 +6611,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 64,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6136,6 +6693,15 @@
           "terminal_line": 65,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 65,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6197,6 +6763,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 66,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6270,6 +6845,15 @@
           "terminal_line": 67,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 67,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6331,6 +6915,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 68,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6404,6 +6997,15 @@
           "terminal_line": 69,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 69,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6465,6 +7067,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 70,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6538,6 +7149,15 @@
           "terminal_line": 71,
           "detail": "0.19s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 71,
+          "detail": "0.19s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6599,6 +7219,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 72,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6672,6 +7301,15 @@
           "terminal_line": 73,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 73,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6733,6 +7371,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 74,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6806,6 +7453,15 @@
           "terminal_line": 75,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 75,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -6867,6 +7523,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 76,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -6940,6 +7605,15 @@
           "terminal_line": 77,
           "detail": "0.10s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 77,
+          "detail": "0.10s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -7001,6 +7675,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 78,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -7074,6 +7757,15 @@
           "terminal_line": 79,
           "detail": "0.14s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 79,
+          "detail": "0.15s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -7135,6 +7827,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 80,
+          "detail": "0.13s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -7208,6 +7909,15 @@
           "terminal_line": 81,
           "detail": "0.09s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 81,
+          "detail": "0.09s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -7275,6 +7985,15 @@
           "terminal_line": 82,
           "detail": "0.06s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 82,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -7336,6 +8055,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 83,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -7424,6 +8152,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 84,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -7557,6 +8294,15 @@
           "terminal_line": 85,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 85,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "combined_sampler_values",
@@ -7663,6 +8409,15 @@
           "terminal_line": 86,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 86,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -7724,6 +8479,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 87,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -7796,6 +8560,15 @@
           "reported_status": "passed",
           "terminal_line": 90,
           "detail": "0.09s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 90,
+          "detail": "0.10s",
           "failed_assertion_records": 0
         }
       ]
@@ -7879,6 +8652,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 182,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8012,6 +8794,15 @@
           "terminal_line": 183,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 183,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -8139,6 +8930,15 @@
           "terminal_line": 184,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 184,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -8245,6 +9045,15 @@
           "terminal_line": 185,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 185,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8306,6 +9115,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 186,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8379,6 +9197,15 @@
           "terminal_line": 187,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 187,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8440,6 +9267,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 188,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8513,6 +9349,15 @@
           "terminal_line": 189,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 189,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8574,6 +9419,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 190,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8647,6 +9501,15 @@
           "terminal_line": 191,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 191,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8714,6 +9577,15 @@
           "terminal_line": 192,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 192,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8775,6 +9647,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 193,
+          "detail": "0.14s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8857,6 +9738,15 @@
           "terminal_line": 194,
           "detail": "0.96s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 194,
+          "detail": "0.98s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -8918,6 +9808,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 196,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -8991,6 +9890,15 @@
           "terminal_line": 197,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 197,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9057,6 +9965,15 @@
           "reported_status": "passed",
           "terminal_line": 198,
           "detail": "0.43s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 198,
+          "detail": "0.44s",
           "failed_assertion_records": 0
         }
       ],
@@ -9126,6 +10043,15 @@
           "terminal_line": 199,
           "detail": "0.77s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 199,
+          "detail": "0.78s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9193,6 +10119,15 @@
           "terminal_line": 200,
           "detail": "0.14s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 200,
+          "detail": "0.15s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9254,6 +10189,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 201,
+          "detail": "0.15s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -9347,6 +10291,15 @@
           "reported_status": "passed",
           "terminal_line": 202,
           "detail": "0.37s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 202,
+          "detail": "0.38s",
           "failed_assertion_records": 0
         }
       ],
@@ -9454,6 +10407,15 @@
           "terminal_line": 203,
           "detail": "0.71s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 203,
+          "detail": "0.71s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9515,6 +10477,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 204,
+          "detail": "0.19s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -9588,6 +10559,15 @@
           "terminal_line": 205,
           "detail": "0.18s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 205,
+          "detail": "0.19s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9649,6 +10629,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 206,
+          "detail": "0.97s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -9722,6 +10711,15 @@
           "terminal_line": 207,
           "detail": "0.28s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 207,
+          "detail": "0.28s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9783,6 +10781,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 208,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -9856,6 +10863,15 @@
           "terminal_line": 209,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 209,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -9917,6 +10933,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 210,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -9990,6 +11015,15 @@
           "terminal_line": 211,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 211,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10051,6 +11085,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 212,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10124,6 +11167,15 @@
           "terminal_line": 213,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 213,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10185,6 +11237,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 214,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10258,6 +11319,15 @@
           "terminal_line": 215,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 215,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10325,6 +11395,15 @@
           "terminal_line": 216,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 216,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10386,6 +11465,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 217,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10474,6 +11562,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 218,
+          "detail": "0.12s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10595,6 +11692,15 @@
           "terminal_line": 219,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 219,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10665,6 +11771,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 220,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10747,6 +11862,15 @@
           "terminal_line": 221,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 221,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10817,6 +11941,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 222,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -10899,6 +12032,15 @@
           "terminal_line": 224,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 224,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -10969,6 +12111,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 225,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11051,6 +12202,15 @@
           "terminal_line": 226,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 226,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11121,6 +12281,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 227,
+          "detail": "0.43s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11203,6 +12372,15 @@
           "terminal_line": 228,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 228,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11279,6 +12457,15 @@
           "terminal_line": 229,
           "detail": "0.10s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 229,
+          "detail": "0.10s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11340,6 +12527,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 230,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11413,6 +12609,15 @@
           "terminal_line": 231,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 231,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11474,6 +12679,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 232,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11547,6 +12761,15 @@
           "terminal_line": 233,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 233,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11608,6 +12831,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 234,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11681,6 +12913,15 @@
           "terminal_line": 235,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 235,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -11742,6 +12983,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 236,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -11872,6 +13122,15 @@
           "terminal_line": 237,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 237,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "typed_buffer_global",
@@ -11985,6 +13244,15 @@
           "terminal_line": 239,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 239,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12051,6 +13319,15 @@
           "reported_status": "passed",
           "terminal_line": 240,
           "detail": "0.15s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 240,
+          "detail": "0.05s",
           "failed_assertion_records": 0
         }
       ]
@@ -12119,6 +13396,15 @@
           "terminal_line": 250,
           "detail": "0.50s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 250,
+          "detail": "0.53s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12180,6 +13466,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 251,
+          "detail": "0.37s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -12253,6 +13548,15 @@
           "terminal_line": 253,
           "detail": "0.34s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 253,
+          "detail": "0.35s",
+          "failed_assertion_records": 0
         }
       ],
       "compiler_owner": "custom device/session omits selector; not proof of NVVM shader compilation"
@@ -12320,6 +13624,15 @@
           "reported_status": "passed",
           "terminal_line": 254,
           "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 254,
+          "detail": "0.07s",
           "failed_assertion_records": 0
         }
       ],
@@ -12438,6 +13751,15 @@
           "terminal_line": 255,
           "detail": "0.84s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 255,
+          "detail": "0.87s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12554,6 +13876,15 @@
           "terminal_line": 257,
           "detail": "0.90s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 257,
+          "detail": "0.90s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12615,6 +13946,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 260,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -12688,6 +14028,15 @@
           "terminal_line": 261,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 261,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12755,6 +14104,15 @@
           "terminal_line": 262,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 262,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -12816,6 +14174,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 263,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -12897,6 +14264,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 355,
+          "detail": "0.09s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -13054,6 +14430,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 356,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -13219,6 +14604,15 @@
           "terminal_line": 358,
           "detail": "0.07s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 358,
+          "detail": "0.07s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -13320,6 +14714,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "reported_status": "failed",
+          "terminal_line": 374,
+          "detail": "0.12s",
+          "failed_assertion_records": 2
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "failed",
           "reported_status": "failed",
@@ -13492,6 +14895,15 @@
           "terminal_line": 375,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 375,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -13592,6 +15004,15 @@
           "terminal_line": 376,
           "detail": "ray tracing motion blur not supported",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 376,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "ray tracing motion blur not supported"
@@ -13654,6 +15075,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 377,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "skipped",
           "reported_status": "skipped",
@@ -13736,6 +15166,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 379,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -13850,6 +15289,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 380,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -13977,6 +15425,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 381,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -14111,6 +15568,15 @@
           "terminal_line": 382,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 382,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -14239,6 +15705,15 @@
           "terminal_line": 383,
           "detail": "0.05s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 383,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -14347,6 +15822,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 384,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -14474,6 +15958,15 @@
           "terminal_line": 385,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 385,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -14582,6 +16075,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 386,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -14702,6 +16204,15 @@
           "terminal_line": 387,
           "detail": "0.05s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 387,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -14810,6 +16321,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 388,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -14930,6 +16450,15 @@
           "terminal_line": 389,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 389,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -15038,6 +16567,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 390,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -15158,6 +16696,15 @@
           "terminal_line": 391,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 391,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -15266,6 +16813,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 392,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -15386,6 +16942,15 @@
           "terminal_line": 393,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 393,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -15486,6 +17051,15 @@
           "terminal_line": 394,
           "detail": "ray tracing motion blur not supported",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 394,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "ray tracing motion blur not supported"
@@ -15554,6 +17128,15 @@
           "terminal_line": 418,
           "detail": "0.81s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 418,
+          "detail": "0.86s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -15615,6 +17198,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 419,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -15687,6 +17279,15 @@
           "reported_status": "passed",
           "terminal_line": 420,
           "detail": "0.85s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 420,
+          "detail": "0.88s",
           "failed_assertion_records": 0
         }
       ]
@@ -15803,6 +17404,15 @@
           "terminal_line": 421,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 421,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "callable_abi",
@@ -15896,6 +17506,15 @@
           "terminal_line": 422,
           "detail": "0.82s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 422,
+          "detail": "0.84s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -15957,6 +17576,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 423,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -16030,6 +17658,15 @@
           "terminal_line": 424,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 424,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16091,6 +17728,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 425,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -16164,6 +17810,15 @@
           "terminal_line": 426,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 426,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16230,6 +17885,15 @@
           "reported_status": "passed",
           "terminal_line": 428,
           "detail": "0.82s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 428,
+          "detail": "0.84s",
           "failed_assertion_records": 0
         }
       ]
@@ -16298,6 +17962,15 @@
           "terminal_line": 429,
           "detail": "0.83s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 429,
+          "detail": "0.85s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16365,6 +18038,15 @@
           "terminal_line": 430,
           "detail": "0.84s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 430,
+          "detail": "0.87s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16426,6 +18108,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 431,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "skipped",
           "reported_status": "skipped",
@@ -16500,6 +18191,15 @@
           "terminal_line": 432,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 432,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16567,6 +18267,15 @@
           "terminal_line": 433,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 433,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16628,6 +18337,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 434,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -16701,6 +18419,15 @@
           "terminal_line": 435,
           "detail": "0.03s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 435,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -16762,6 +18489,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 436,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -16834,6 +18570,15 @@
           "reported_status": "passed",
           "terminal_line": 437,
           "detail": "0.07s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 437,
+          "detail": "0.04s",
           "failed_assertion_records": 0
         }
       ]
@@ -16924,6 +18669,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 438,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -17053,6 +18807,15 @@
           "terminal_line": 439,
           "detail": "ray query not supported",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 439,
+          "detail": "ray query not supported",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "ray query not supported"
@@ -17164,6 +18927,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 440,
+          "detail": "0.03s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -17291,6 +19063,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 441,
+          "detail": "0.25s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -17439,6 +19220,15 @@
           "terminal_line": 442,
           "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 442,
+          "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache"
@@ -17531,6 +19321,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 457,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -17664,6 +19463,15 @@
           "terminal_line": 465,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 465,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -17746,6 +19554,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 466,
+          "detail": "0.06s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -17891,6 +19708,15 @@
           "terminal_line": 467,
           "detail": "0.05s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 467,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -18030,6 +19856,15 @@
           "terminal_line": 468,
           "detail": "0.05s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 468,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -18148,6 +19983,15 @@
           "terminal_line": 469,
           "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 469,
+          "detail": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "CUDA/OptiX uses __ldg to load entrypoint parameters which uses non-coherent read-only data cache"
@@ -18210,6 +20054,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 470,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -18298,6 +20151,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 471,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -18471,6 +20333,15 @@
           "terminal_line": 472,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 472,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "trace_payload_boundary",
@@ -18599,6 +20470,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 473,
+          "detail": "0.13s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -18744,6 +20624,15 @@
           "terminal_line": 474,
           "detail": "0.12s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 474,
+          "detail": "0.12s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "hitobject_representation",
@@ -18862,6 +20751,15 @@
           "terminal_line": 510,
           "detail": "0.84s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 510,
+          "detail": "0.85s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -18930,6 +20828,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 511,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -19035,6 +20942,15 @@
           "terminal_line": 512,
           "detail": "0.09s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 512,
+          "detail": "0.09s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "active_list_matrix_composition",
@@ -19128,6 +21044,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 513,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -19233,6 +21158,15 @@
           "terminal_line": 514,
           "detail": "0.09s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 514,
+          "detail": "0.09s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "active_list_matrix_composition",
@@ -19325,6 +21259,15 @@
           "terminal_line": 515,
           "detail": "ray tracing motion blur not supported",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 515,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "ray tracing motion blur not supported"
@@ -19387,6 +21330,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 516,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -19460,6 +21412,15 @@
           "terminal_line": 517,
           "detail": "ray tracing motion blur not supported",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 517,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
         }
       ],
       "skip_reason": "ray tracing motion blur not supported"
@@ -19522,6 +21483,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "skipped",
+          "reported_status": "skipped",
+          "terminal_line": 518,
+          "detail": "ray tracing motion blur not supported",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "skipped",
           "reported_status": "skipped",
@@ -19633,6 +21603,15 @@
           "terminal_line": 519,
           "detail": "0.05s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 519,
+          "detail": "0.05s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -19694,6 +21673,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 521,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -19782,6 +21770,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 522,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -19915,6 +21912,15 @@
           "terminal_line": 523,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 523,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -20036,6 +22042,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 524,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -20169,6 +22184,15 @@
           "terminal_line": 525,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 525,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -20290,6 +22314,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 526,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -20423,6 +22456,15 @@
           "terminal_line": 527,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 527,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -20529,6 +22571,15 @@
           "terminal_line": 528,
           "detail": "0.40s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 528,
+          "detail": "0.39s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -20590,6 +22641,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 530,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -20678,6 +22738,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 531,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -20790,6 +22859,15 @@
           "terminal_line": 532,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 532,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -20851,6 +22929,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 533,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -20924,6 +23011,15 @@
           "terminal_line": 534,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 534,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -20985,6 +23081,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 535,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21058,6 +23163,15 @@
           "terminal_line": 536,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 536,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21119,6 +23233,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 537,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21192,6 +23315,15 @@
           "terminal_line": 538,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 538,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21253,6 +23385,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 539,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21326,6 +23467,15 @@
           "terminal_line": 540,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 540,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21387,6 +23537,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 541,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21460,6 +23619,15 @@
           "terminal_line": 547,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 547,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21521,6 +23689,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 548,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21594,6 +23771,15 @@
           "terminal_line": 549,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 549,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21655,6 +23841,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 550,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21728,6 +23923,15 @@
           "terminal_line": 551,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 551,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21789,6 +23993,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 552,
+          "detail": "0.30s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21862,6 +24075,15 @@
           "terminal_line": 553,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 553,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -21923,6 +24145,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 554,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -21996,6 +24227,15 @@
           "terminal_line": 555,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 555,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22057,6 +24297,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 556,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22130,6 +24379,15 @@
           "terminal_line": 557,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 557,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22191,6 +24449,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 558,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22264,6 +24531,15 @@
           "terminal_line": 559,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 559,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22325,6 +24601,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 560,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22398,6 +24683,15 @@
           "terminal_line": 561,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 561,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22459,6 +24753,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 562,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22532,6 +24835,15 @@
           "terminal_line": 563,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 563,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22593,6 +24905,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 564,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22666,6 +24987,15 @@
           "terminal_line": 565,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 565,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22733,6 +25063,15 @@
           "terminal_line": 566,
           "detail": "0.00s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 566,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -22794,6 +25133,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 567,
+          "detail": "0.00s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -22882,6 +25230,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 568,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -23007,6 +25364,15 @@
           "terminal_line": 569,
           "detail": "0.08s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 569,
+          "detail": "0.08s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -23089,6 +25455,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 570,
+          "detail": "0.71s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -23222,6 +25597,15 @@
           "terminal_line": 571,
           "detail": "1.41s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 571,
+          "detail": "1.43s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -23349,6 +25733,15 @@
           "terminal_line": 572,
           "detail": "1.46s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 572,
+          "detail": "1.47s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -23470,6 +25863,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 573,
+          "detail": "0.20s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -23603,6 +26005,15 @@
           "terminal_line": 574,
           "detail": "0.18s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 574,
+          "detail": "0.18s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -23724,6 +26135,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 575,
+          "detail": "0.17s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -23857,6 +26277,15 @@
           "terminal_line": 576,
           "detail": "0.11s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 576,
+          "detail": "0.10s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_family": "compute_entry_parameters",
@@ -23963,6 +26392,15 @@
           "terminal_line": 578,
           "detail": "0.02s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 578,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -24050,6 +26488,15 @@
           "reported_status": "passed",
           "terminal_line": 238,
           "detail": "0.99s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 238,
+          "detail": "1.00s",
           "failed_assertion_records": 0
         }
       ],
@@ -24169,6 +26616,15 @@
         },
         {
           "run": "current-checkpoint-rhi-full2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 520,
+          "detail": "0.94s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
           "compiler_selection": "nvvm",
           "status": "passed",
           "reported_status": "passed",
@@ -24345,6 +26801,15 @@
           "reported_status": "passed",
           "terminal_line": 543,
           "detail": "0.88s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 543,
+          "detail": "0.89s",
           "failed_assertion_records": 0
         }
       ],
@@ -24607,6 +27072,15 @@
           "reported_status": "passed",
           "terminal_line": 357,
           "detail": "1.36s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 357,
+          "detail": "1.40s",
           "failed_assertion_records": 0
         }
       ],
@@ -25026,6 +27500,15 @@
           "terminal_line": 7,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 7,
+          "detail": "0.02s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -25167,6 +27650,15 @@
           "terminal_line": 256,
           "detail": "0.98s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 256,
+          "detail": "1.00s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -25307,6 +27799,15 @@
           "reported_status": "passed",
           "terminal_line": 258,
           "detail": "0.89s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 258,
+          "detail": "0.91s",
           "failed_assertion_records": 0
         }
       ],
@@ -25547,6 +28048,15 @@
           "terminal_line": 378,
           "detail": "0.88s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 378,
+          "detail": "0.90s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -25770,6 +28280,15 @@
           "terminal_line": 577,
           "detail": "0.01s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 577,
+          "detail": "0.01s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [
@@ -25879,6 +28398,15 @@
           "reported_status": "passed",
           "terminal_line": 259,
           "detail": "1.13s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 259,
+          "detail": "1.15s",
           "failed_assertion_records": 0
         }
       ],
@@ -26016,6 +28544,15 @@
           "terminal_line": 427,
           "detail": "0.04s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 427,
+          "detail": "0.04s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [],
@@ -26113,6 +28650,15 @@
           "terminal_line": 195,
           "detail": "0.32s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 195,
+          "detail": "0.32s",
+          "failed_assertion_records": 0
         }
       ],
       "failure_history": [],
@@ -26187,6 +28733,15 @@
           "terminal_line": 3,
           "detail": "2.72s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 3,
+          "detail": "2.76s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -26231,6 +28786,15 @@
           "terminal_line": 529,
           "detail": "0.73s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 529,
+          "detail": "0.75s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -26274,6 +28838,15 @@
           "reported_status": "passed",
           "terminal_line": 252,
           "detail": "0.77s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 252,
+          "detail": "0.78s",
           "failed_assertion_records": 0
         }
       ]
@@ -26328,6 +28901,15 @@
           "terminal_line": 89,
           "detail": "81.10s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 89,
+          "detail": "81.58s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -26371,6 +28953,15 @@
           "reported_status": "passed",
           "terminal_line": 88,
           "detail": "0.81s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 88,
+          "detail": "0.84s",
           "failed_assertion_records": 0
         }
       ]
@@ -26427,6 +29018,15 @@
           "terminal_line": 545,
           "detail": "0.87s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 545,
+          "detail": "0.86s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -26465,6 +29065,15 @@
           "reported_status": "passed",
           "terminal_line": 546,
           "detail": "85.47s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 546,
+          "detail": "81.82s",
           "failed_assertion_records": 0
         }
       ]
@@ -26510,6 +29119,15 @@
           "terminal_line": 544,
           "detail": "6.20s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 544,
+          "detail": "6.15s",
+          "failed_assertion_records": 0
         }
       ]
     },
@@ -26548,6 +29166,15 @@
           "reported_status": "passed",
           "terminal_line": 542,
           "detail": "81.10s",
+          "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 542,
+          "detail": "79.72s",
           "failed_assertion_records": 0
         }
       ]
@@ -26593,6 +29220,15 @@
           "terminal_line": 223,
           "detail": "0.13s",
           "failed_assertion_records": 0
+        },
+        {
+          "run": "bitfield-final-rhi-full1",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "reported_status": "passed",
+          "terminal_line": 223,
+          "detail": "0.13s",
+          "failed_assertion_records": 0
         }
       ]
     }
@@ -26600,7 +29236,7 @@
   "current_known_outcomes": {
     "registration_count": 291,
     "unique_name_count": 290,
-    "scope": "Fresh full NVVM291-registration run after Boolean snapshot and CUDA heap ownership repairs:280pass/1intentionalunsupportedMakeHit/10skip. NVRTC retains prior mixed-age results plus one new unrun heap registration. Initial Boolean failures, OOM and crash remain in run histories.",
+    "scope": "Fresh full NVVM291-registration run after bitfield legalization:280pass/1intentionalunsupportedMakeHit/10skip. NVRTC retains earlier mixed-age evidence. Initial Boolean failures, OOM and crash remain in run histories.",
     "by_compiler": {
       "nvvm": {
         "passed": 280,
@@ -26658,8 +29294,8 @@
   },
   "current_reconciliation": {
     "raw": {
-      "path": "build/nvvm-current-checkpoint/reconciliation.json",
-      "sha256": "476bd1526b80669b41219f0d24370dc90953fb0843b6881daa29216b007df934"
+      "path": "build/nvvm-bitfield-legalization/reconciliation.json",
+      "sha256": "aaac05203c7e30662dabc5cf452dcaaf5a8f7af3b906cae8b0a911388a94a24b"
     },
     "exact_nvvm_terminal_multiset": true,
     "nvvm_unrun": [],
@@ -26668,14 +29304,10 @@
       "passed": 72074710,
       "failed": 2
     },
-    "scope": "Fresh full NVVM run on repaired provider/RHI; NVRTC outcomes retain their earlier identities.",
+    "scope": "Fresh full291-registration NVVM run; exact outcomes preserved from the repaired checkpoint. NVRTC remains mixed-age.",
     "nvrtc_reference": {
       "path": "build/nvvm-optix-callable/reconciliation.json",
       "sha256": "38fdad35348bd4d4ae0c03d2e27e4a7b17e80bb1a12ac653a7d980bb594e5eaa"
-    },
-    "identity": {
-      "path": "build/nvvm-current-checkpoint/repair-identity-after.json",
-      "sha256": "d684fa10ae183a4b54e9cdca2195c372c934b6e6ed75f84978ad7082d5c7d0be"
     }
   },
   "optix_version_qualification": {
@@ -26698,7 +29330,7 @@
     "scope": "NVVM common raygen/triangle/recursive payload/callable families on8.0,8.1,9.0.8.x HitObject rejected before emission. NVRTC matching-header raygen/device controls only; no mixed-backend callable ABI promise."
   },
   "current_identity": {
-    "path": "build/nvvm-current-checkpoint/repair-identity-after.json",
-    "sha256": "d684fa10ae183a4b54e9cdca2195c372c934b6e6ed75f84978ad7082d5c7d0be"
+    "path": "build/nvvm-bitfield-legalization/identity-after.json",
+    "sha256": "8dabdb5b44113ec206ce3ae5b86a985fc241533331c57514cb058d0b909114d2"
   }
 }

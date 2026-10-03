@@ -1,7 +1,7 @@
 # NVVM current status
 
 **Current authorized work (2026-10-03):** fresh working/unit/RHI validation, bounded bitfield
-simplification, then compilation and GPU performance refresh. These three items are in progress;
+simplification, then compilation and GPU performance refresh. The correctness checkpoint and bitfield cleanup are complete; the performance report is being finalized;
 the prior application acceptance below remains unchanged. Legacy OptiX8 HitObjects remain parked.
 
 The CUDA-text route migration is **complete with focused local acceptance**. NVVM no longer
@@ -44,9 +44,15 @@ the two failed assertions belong to MakeHit. The earlier wrong outputs, OOM and 
 [RHI manifest](rhi-cuda-status.json). Nested Boolean snapshots pass both NVVM modes and NVRTC; the
 SlangPy differentiated-array control also passes. This does not rerun the full SlangPy acceptance.
 
-The bitfield cleanup and final compiler/unit/working qualification are next, followed by compilation
-and GPU performance refresh. Current evidence is under `build/nvvm-current-checkpoint/` and the
-`nvvm-current-checkpoint` record in [focused evidence](focused-evidence.json).
+The bitfield cleanup is complete: extract/insert lower to ordinary IR, and the custom planner and
+emitter family is removed. Dynamic boundary controls cover signed/unsigned 8/16/32/64-bit scalars
+and vectors, including empty and full-width operations. Final validation passes **569/569 units,
+16/16 smoke and 1,726/1,726 working configurations** with unchanged source and binaries. All 1,724
+previous working passes remain passing; two bitfield configurations are new. The fresh full RHI run
+preserves the exact 280 pass / 1 intentional unsupported MakeHit / 10 skip outcomes.
+
+Current evidence is under `build/nvvm-current-checkpoint/` and `build/nvvm-bitfield-legalization/`;
+[focal records](focused-evidence.json) retain the initial failures, controls and final reconciliation.
 
 ## Current application acceptance — SlangPy failures resolved
 

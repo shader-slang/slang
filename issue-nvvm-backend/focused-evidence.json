@@ -94362,7 +94362,7 @@
       }
     },
     "nvvm-current-checkpoint": {
-      "status": "accepted",
+      "status": "accepted-focused",
       "date": "2026-10-03",
       "identity": {
         "base_commit": "3f1250d61",
@@ -94460,6 +94460,142 @@
         "limits": [
           "Boolean-containing arrays require linear conversion IR. Numeric snapshots retain constant provider emission and exact read-site placement.",
           "Full SlangPy is not rerun; prior1591acceptance remains its own identity. LegacyOptiX8HitObject remains parked."
+        ]
+      }
+    },
+    "nvvm-bitfield-legalization": {
+      "status": "accepted-focused",
+      "date": "2026-10-03",
+      "identity": {
+        "source_sha256": {
+          "tests/cuda/nvvm-bitfield-boundaries.slang": "2f3a64cd97f0ed64f88a097e432810dbd3a29ffc4e5af3bc5d50c00d4888d6ad"
+        },
+        "final": {
+          "path": "build/nvvm-bitfield-legalization/identity-after.json",
+          "sha256": "8dabdb5b44113ec206ce3ae5b86a985fc241533331c57514cb058d0b909114d2"
+        }
+      },
+      "validation": {
+        "source_controls": {
+          "outcomes": {
+            "tests/cuda/nvvm-bitfield-boundaries.slang (cuda)": "passed",
+            "tests/cuda/nvvm-bitfield-boundaries.slang.1 (cuda)": "passed"
+          },
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/boundary1.json",
+            "sha256": "202e94bb901a9e7ae531dd732d5cc7fd2e9f49fbe84ab41e3f3b1e7dfc66fd16"
+          }
+        },
+        "static": {
+          "passed": 2,
+          "failed": 0,
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/static1.json",
+            "sha256": "f7f39eadecce51821abd828a7195b4f3c5f22c3f1d79048fdaf298feb6e9cf64"
+          }
+        },
+        "pointer_static": {
+          "passed": 1,
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/pointer-static1.json",
+            "sha256": "b0eb1488953378536c1a5c054a3eaeb19bf101ef850f1e1563112152f442e4ab"
+          }
+        },
+        "fake_provider": {
+          "passed": 1,
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/fake-unit1.json",
+            "sha256": "04285059a0d24c6a202552353cfa566d8a3dfdf87abac7bb91bedfd8bcb7b694"
+          }
+        },
+        "real_provider": {
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/real-unit1.json",
+            "sha256": "35ef3c85d96a4fec4896fc3a61cabb36192f3349bd36f068980f339626745f1a"
+          }
+        },
+        "scope": "Focused bitfield acceptance plus fresh units/smoke/working/fullRHI on unchanged source and binaries; prior1724working passes and exactRHI outcomes preserved.",
+        "working": {
+          "passed": 1726,
+          "failed": 0,
+          "prior_passes_preserved": 1724,
+          "new_cells": [
+            ["cuda/nvvm-bitfield-boundaries.slang#cuda-1", "nvvm-o0"],
+            ["cuda/nvvm-bitfield-boundaries.slang#cuda-1", "nvvm-o3"]
+          ],
+          "input_changes": [],
+          "selection": {
+            "path": "build/nvvm-bitfield-legalization/working1/selection.json",
+            "sha256": "78dfcf941734ae1c4eaf3199d2edbe18a17e925ce62853735db25a20652ffc56"
+          }
+        },
+        "nvvm_units": {
+          "passed": 569,
+          "failed": 0,
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/units1.json",
+            "sha256": "5ba06a1e77a361e5b0e5751a855428cf8a18b5c28ffc603c6f53ec85bc778e32"
+          }
+        },
+        "smoke": {
+          "passed": 16,
+          "failed": 0,
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/smoke1.json",
+            "sha256": "30d43503c1e03125be3a0d78447c2bd1acc25787038b1d1e1f9d21217148409d"
+          }
+        },
+        "rhi": {
+          "registrations": 291,
+          "counts": {
+            "passed": 280,
+            "failed": 1,
+            "skipped": 10
+          },
+          "assertions": {
+            "total": 72074712,
+            "passed": 72074710,
+            "failed": 2
+          },
+          "gate": {
+            "path": "build/nvvm-bitfield-legalization/rhi-full1.json",
+            "sha256": "f13beb55f407166b26924b0617c9ad41db7be1764f68d160de84e58429324c11"
+          }
+        },
+        "reconciliation": {
+          "path": "build/nvvm-bitfield-legalization/reconciliation.json",
+          "sha256": "aaac05203c7e30662dabc5cf452dcaaf5a8f7af3b906cae8b0a911388a94a24b"
+        }
+      },
+      "failure_history": {
+        "static_baseline": {
+          "path": "build/nvvm-bitfield-legalization/static-baseline1.json",
+          "sha256": "09ecf6b6fb466d2e0ab187f01875f36ae3e8e1ce2fb7ff4a7413003459b831c8"
+        },
+        "boundary_initial": {
+          "path": "build/nvvm-bitfield-legalization/boundary-baseline1.json",
+          "sha256": "0c3901140bdb09600e6422e8146f63d1fdfeba42c6aa2b91717395ae21549122"
+        },
+        "boundary_corrected_baseline": {
+          "path": "build/nvvm-bitfield-legalization/boundary-baseline2.json",
+          "sha256": "f7b87091e650ce5bc0bb439696abbd6a59c7cd57fa4c196e6efca4999d354bb4"
+        },
+        "static_build_initial": {
+          "path": "build/nvvm-bitfield-legalization/static-baseline-build1.json",
+          "sha256": "c0e215ba6d671d91a2fe0027f53fe3e0ee2deec20fa50e58d1e6bafc7247a210"
+        },
+        "explanations": [
+          "Old module-owned bitfield expression does not localize to its consuming block and fails preflight; new ordinary composition passes.",
+          "Corrected runtime boundary fixture passes both old/new O0/O3. Initial UInt64flags24 arose with inferred Signed=T(-1)<T(0); explicit oracle Signed parameter and0-91 construction remove unrelated assumptions. No reproduced GPUboundarybug claimed.",
+          "Static rebuild exposed stale scalar comparison of the current pointer-space record. Assert Generic/knownlocal orShared/nonlocal against current producer; independently reviewed."
+        ]
+      },
+      "review": {
+        "independent": "bitfield_review",
+        "result": "No blockers. Exactsignature/null/type admission preserved; complete custom family deleted; canonical core/AnyValue producers and ordinary composition/placement own their respective layers.",
+        "helpers": ["_legalizeNVVMBitfields"],
+        "limits": [
+          "Valid offset+count<=width only. No new out-of-range promise, type admission, ABI/module version, or performance claim."
         ]
       }
     }

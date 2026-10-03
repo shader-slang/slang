@@ -84,39 +84,6 @@ struct NVVMPlannedFloatingRemainder
     NVVMValueRecipeStep scalarStep;
 };
 
-enum class NVVMPlannedBitfieldOperationKind
-{
-    None,
-    Extract,
-    Insert,
-};
-
-struct NVVMPlannedBitfieldOperation
-{
-    IRInst* source = nullptr;
-    NVVMPlannedBitfieldOperationKind kind = NVVMPlannedBitfieldOperationKind::None;
-    IRInst* value = nullptr;
-    IRInst* insertedValue = nullptr;
-    IRInst* offset = nullptr;
-    IRInst* count = nullptr;
-    IRType* dataIRType = nullptr;
-    SlangNVVMValueTypeDesc dataType = {};
-    SlangNVVMValueTypeDesc unsignedDataType = {};
-    SlangNVVMValueTypeDesc unsignedScalarType = {};
-    bool needsCountConversion = false;
-    bool isSigned = false;
-    NVVMValueRecipeStep countConversion;
-    NVVMValueRecipeStep toUnsigned;
-    NVVMValueRecipeStep toSigned;
-    NVVMValueRecipeStep subtract;
-    NVVMValueRecipeStep shiftLeft;
-    NVVMValueRecipeStep logicalShiftRight;
-    NVVMValueRecipeStep signedShiftRight;
-    NVVMValueRecipeStep bitAnd;
-    NVVMValueRecipeStep bitOr;
-    NVVMValueRecipeStep bitNot;
-};
-
 enum class NVVMPlannedResourceBitCastKind
 {
     OpaqueHandle64,
@@ -505,7 +472,6 @@ struct NVVMEmissionPlan
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
-    List<NVVMPlannedBitfieldOperation> bitfieldOperations;
     List<NVVMPlannedResourceBitCast> resourceBitCasts;
     List<NVVMPlannedDefaultResourceValue> defaultResourceValues;
     List<NVVMPlannedEphemeralValue> ephemeralValues;
@@ -574,7 +540,6 @@ public:
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
     const NVVMPlannedFloatingRemainder* findFloatingRemainder(IRInst* source) const;
-    const NVVMPlannedBitfieldOperation* findBitfieldOperation(IRInst* source) const;
     const NVVMPlannedResourceBitCast* findResourceBitCast(IRInst* source) const;
     const NVVMPlannedDefaultResourceValue* findDefaultResourceValue(IRInst* source) const;
     const NVVMPlannedEphemeralValue* findEphemeralValue(IRInst* source) const;
@@ -597,7 +562,6 @@ private:
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;
-    Dictionary<IRInst*, Index> m_bitfieldOperations;
     Dictionary<IRInst*, Index> m_resourceBitCasts;
     Dictionary<IRInst*, Index> m_defaultResourceValues;
     Dictionary<IRInst*, Index> m_ephemeralValues;

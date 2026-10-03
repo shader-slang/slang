@@ -254,6 +254,125 @@ SlangResult _diagnoseNVVMLegalization(
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
+// Lowers canonical bitfield operations before the ordinary NVVM preflight and value emitter.
+// Consider this example:
+//
+//     uint whole = bitfieldInsert(base, value, 0, 32);
+//     int empty = bitfieldExtract(int(value), 32, 0);
+//
+// The core intrinsics produce BitfieldInsert/Extract, as does AnyValue integer packing. A
+// mask computed as `(1 << count) - 1` shifts by 32 in the first example, and extraction using
+// `width - count` does so in the second. LLVM makes those shifts poison. Keep every intermediate
+// count below the logical width, then explicitly select the empty result or mask. For the valid
+// domain `offset + count <= width`, this also preserves full-width and signed extraction. It
+// does not define out-of-range bitfields. Ordinary value lowering owns scalar-count broadcasting
+// and narrow physical carriers; this pass only expresses the operation's logical semantics.
+SlangResult _legalizeNVVMBitfields(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
+{
+    IRBuilder builder(linkedIR.module);
+    List<IRInst*> workList;
+    workList.add(linkedIR.module->getModuleInst());
+    while (workList.getCount())
+    {
+        auto inst = workList.getLast();
+        workList.removeLast();
+        for (auto child : inst->getChildren())
+            workList.add(child);
+
+        if (inst->getOp() != kIROp_BitfieldExtract && inst->getOp() != kIROp_BitfieldInsert)
+            continue;
+        const bool isInsert = inst->getOp() == kIROp_BitfieldInsert;
+        if (inst->getOperandCount() != (isInsert ? 4u : 3u))
+            return _diagnoseNVVMLegalization(codeGenContext, toSlice("bitfield signature"));
+
+        auto type = inst->getDataType();
+        auto vectorType = asNVVMRegisterVectorType(type);
+        auto scalarType = vectorType ? vectorType->getElementType() : type;
+        uint32_t width = 0;
+        bool isSigned = false;
+        auto value = inst->getOperand(0);
+        auto offset = inst->getOperand(isInsert ? 2 : 1);
+        auto count = inst->getOperand(isInsert ? 3 : 2);
+        if (!value || !offset || !count || (isInsert && !inst->getOperand(1)) ||
+            !isNVVMSupportedIntegerScalarType(scalarType, &width, &isSigned) ||
+            !isTypeEqual(type, value->getDataType()) ||
+            (isInsert && !isTypeEqual(type, inst->getOperand(1)->getDataType())) ||
+            !isNVVMUnsignedI32Type(offset->getDataType()) ||
+            !isNVVMUnsignedI32Type(count->getDataType()))
+        {
+            return _diagnoseNVVMLegalization(codeGenContext, toSlice("bitfield signature"));
+        }
+
+        builder.setInsertBefore(inst);
+        auto unsignedType = isSigned ? getUnsignedTypeFromSignedType(&builder, type) : type;
+        auto unsignedScalarType =
+            isSigned ? getUnsignedTypeFromSignedType(&builder, scalarType) : scalarType;
+        auto uintType = builder.getUIntType();
+        auto zeroCount = builder.getIntValue(uintType, 0);
+        auto countMask = builder.getIntValue(uintType, width - 1);
+        auto safeOffset = builder.emitBitAnd(uintType, offset, countMask);
+        auto highCount = builder.emitBitAnd(
+            uintType,
+            builder.emitSub(uintType, builder.getIntValue(uintType, width), count),
+            countMask);
+        IRInst* isEmpty = builder.emitEql(count, zeroCount);
+        if (vectorType)
+        {
+            isEmpty = builder.emitMakeVectorFromScalar(
+                builder.getVectorType(builder.getBoolType(), vectorType->getElementCount()),
+                isEmpty);
+        }
+        IRInst* zero = builder.getIntValue(unsignedScalarType, 0);
+        if (vectorType)
+            zero = builder.emitMakeVectorFromScalar(unsignedType, zero);
+        auto unsignedValue = isSigned ? builder.emitBitCast(unsignedType, value) : value;
+        IRInst* result = nullptr;
+        if (isInsert)
+        {
+            auto inserted = inst->getOperand(1);
+            if (isSigned)
+                inserted = builder.emitBitCast(unsignedType, inserted);
+            auto lowMask =
+                builder.emitShr(unsignedType, builder.emitBitNot(unsignedType, zero), highCount);
+            IRInst* maskOperands[] = {isEmpty, zero, lowMask};
+            auto mask = builder.emitShl(
+                unsignedType,
+                builder.emitIntrinsicInst(unsignedType, kIROp_Select, 3, maskOperands),
+                safeOffset);
+            result = builder.emitBitOr(
+                unsignedType,
+                builder.emitBitAnd(
+                    unsignedType,
+                    unsignedValue,
+                    builder.emitBitNot(unsignedType, mask)),
+                builder.emitBitAnd(
+                    unsignedType,
+                    builder.emitShl(unsignedType, inserted, safeOffset),
+                    mask));
+            if (isSigned)
+                result = builder.emitBitCast(type, result);
+        }
+        else
+        {
+            auto highBits = builder.emitShl(
+                unsignedType,
+                builder.emitShr(unsignedType, unsignedValue, safeOffset),
+                highCount);
+            if (isSigned)
+            {
+                highBits = builder.emitBitCast(type, highBits);
+                zero = builder.emitBitCast(type, zero);
+            }
+            auto extracted = builder.emitShr(type, highBits, highCount);
+            IRInst* resultOperands[] = {isEmpty, zero, extracted};
+            result = builder.emitIntrinsicInst(type, kIROp_Select, 3, resultOperands);
+        }
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
+    }
+    return SLANG_OK;
+}
+
 // Resolves one source query through the shared CUDA layout rules. An offset is owned by
 // the exact struct-field key already present in IR, never by positional or structural matching.
 bool _getNVVMOffsetQueryValue(
@@ -746,6 +865,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
     _legalizeNVVMTextureDescriptorWordConversions(linkedIR);
     _legalizeNVVMLayoutPointerObservations(linkedIR);
+    SLANG_RETURN_ON_FAIL(_legalizeNVVMBitfields(codeGenContext, linkedIR));
 
     // No simplifying/hoisting pass follows this target handoff. Ordinary clones stay in
     // their consuming blocks without introducing GlobalValueRef wrappers.

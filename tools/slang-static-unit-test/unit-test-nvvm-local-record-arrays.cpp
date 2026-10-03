@@ -3349,7 +3349,14 @@ SLANG_UNIT_TEST(nvvmPointerQualificationKeepsExactPointeeAndLayout)
                 requirements.emissionPlan.pointerQualificationValues.tryGetValue(conversion);
             SLANG_CHECK(selected && *selected == source);
             auto space = requirements.emissionPlan.scopedPointerSpaces.tryGetValue(conversion);
-            SLANG_CHECK(sharedSource ? space && *space == SLANG_NVVM_ADDRESS_SPACE_SHARED : !space);
+            SLANG_CHECK(space);
+            if (space)
+            {
+                SLANG_CHECK(
+                    space->addressSpace == (sharedSource ? SLANG_NVVM_ADDRESS_SPACE_SHARED
+                                                         : SLANG_NVVM_ADDRESS_SPACE_GENERIC));
+                SLANG_CHECK(space->isKnownLocalStorage == !sharedSource);
+            }
         }
         else
             SLANG_CHECK(
