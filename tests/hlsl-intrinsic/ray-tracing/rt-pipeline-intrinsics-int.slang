@@ -15,6 +15,7 @@
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn LaunchSize{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmin{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn RayTmax{{NV|KHR}}
+// SPIRV-DAG: OpDecorate %{{.*}} Volatile
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn IncomingRayFlags{{NV|KHR}}
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceId
 // SPIRV-DAG: OpDecorate %{{.*}} BuiltIn InstanceCustomIndex{{NV|KHR}}
