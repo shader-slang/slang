@@ -94360,6 +94360,108 @@
         },
         "root": "TypeFlowSpecializationContext::analyzeCall assumes pointer-wrapped argInfo for BorrowIn; explicit read(__constref Params) called with ConstantBuffer<Params> reaches non-pointer argInfo. No guard/workaround added."
       }
+    },
+    "nvvm-current-checkpoint": {
+      "status": "accepted",
+      "date": "2026-10-03",
+      "identity": {
+        "base_commit": "3f1250d61",
+        "source_sha256": {
+          "tests/cuda/nvvm-dynamic-array-snapshots.slang": "d5796158c3f50b102741e9e7c36ea0031388846d58a78a0514d4959d823093e5"
+        },
+        "repair": {
+          "path": "build/nvvm-current-checkpoint/repair-identity-after.json",
+          "sha256": "d684fa10ae183a4b54e9cdca2195c372c934b6e6ed75f84978ad7082d5c7d0be"
+        }
+      },
+      "validation": {
+        "initial_working": {
+          "cells": 1724,
+          "passed": 1724,
+          "failed": 0,
+          "input_changes": [],
+          "selection": {
+            "path": "build/nvvm-current-checkpoint/working1/selection.json",
+            "sha256": "b670d44e4c92f92037ac5fb700f1ece00986bc7e5a395c439cdf725a38fb22cb"
+          },
+          "scope": "Fresh frozen source before the two checkpoint repairs; final post-bitfield working run recorded separately."
+        },
+        "initial_nvvm_units": {
+          "passed": 569,
+          "failed": 0,
+          "gate": {
+            "path": "build/nvvm-current-checkpoint/units1.json",
+            "sha256": "17d8e040f7c519a1f09c23613537f4d56f0790ff9de289bcc6b2a20911998eb5"
+          },
+          "scope": "Before the checkpoint repairs; final post-bitfield unit run recorded separately."
+        },
+        "rhi": {
+          "registrations": 291,
+          "counts": {
+            "passed": 280,
+            "failed": 1,
+            "skipped": 10
+          },
+          "assertions": {
+            "total": 72074712,
+            "passed": 72074710,
+            "failed": 2
+          },
+          "gate": {
+            "path": "build/nvvm-current-checkpoint/rhi-full2.json",
+            "sha256": "45a0c7efabeb3587d00f13519ad56768e7f21b85b98bde3bdc4edb448f00147f"
+          }
+        },
+        "source_controls": {
+          "outcomes": {
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang (cuda)": "passed",
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-dynamic-array-snapshots.slang.2 (cuda)": "passed"
+          },
+          "gate": {
+            "path": "build/nvvm-current-checkpoint/bool-nested1.json",
+            "sha256": "547dfceefa7a686f1e04a84f23b2f9382fadb16f5f0c03483f660d6596696b9b"
+          }
+        },
+        "differentiated_array": {
+          "passed": 1,
+          "gate": {
+            "path": "build/nvvm-current-checkpoint/ad-guard1.json",
+            "sha256": "e9470975e03441fccf2922492c35b79f3bec7bd17abb3a84b2f5fe1d0126a3ed"
+          }
+        },
+        "heap": {
+          "gate": {
+            "path": "build/nvvm-current-checkpoint/heap-fix1.json",
+            "sha256": "ec1268d6539bf8c1a30c9af8bef45830fe639ba049e08faca8d0ced564bd203c"
+          },
+          "scope": "All selected heap cases pass; new regression covers caching and eviction combinations. Device-memory oracle only."
+        }
+      },
+      "failure_history": {
+        "reconciliation": {
+          "path": "build/nvvm-current-checkpoint/reconciliation.json",
+          "sha256": "476bd1526b80669b41219f0d24370dc90953fb0843b6881daa29216b007df934"
+        },
+        "explanations": [
+          "Initial RHI full101selected: Bool aggregate8wronglanes, compactstorageOOM, externaldeviceSIGSEGV. Exact189remainder contains intentionalMakeHit and5OOMfailures. Isolatedcompact/externalpass.",
+          "BooleanRecord regression failsNVVMO0/O3, passesNVRTC. Staged temporarySSA-select revert repairs both minimal andoriginalRHI. First revertattempt built childprovider without staging; retained failedlogs and corrected target.",
+          "Page ownership regression loses256MiB in both caching modes without explicitremoveEmptyPages; fixedPageImpldestructor releasesnativeallocationafterevents, removingduplicatefrees.",
+          "Buildattempts record doctestCAPTUREarity, CUDAassertmacrobraces and unavailableSlangassertmacro in standaloneprovider; all corrected before acceptance."
+        ]
+      },
+      "review": {
+        "independent": "bitfield_review",
+        "result": "No semantic or ownership blockers after invariant mechanism, per-lane byte storage and nested/all-index coverage corrections.",
+        "helpers": [
+          "_getNVVMArraySnapshotStorageType maps only stored type children and preserves unchanged identities.",
+          "_convertNVVMArraySnapshotValue encodes complete immutable snapshot and decodes selected element; no pointer-pointee traversal or source reload."
+        ],
+        "limits": [
+          "Boolean-containing arrays require linear conversion IR. Numeric snapshots retain constant provider emission and exact read-site placement.",
+          "Full SlangPy is not rerun; prior1591acceptance remains its own identity. LegacyOptiX8HitObject remains parked."
+        ]
+      }
     }
   }
 }

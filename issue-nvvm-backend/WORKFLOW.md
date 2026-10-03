@@ -7,6 +7,12 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
+**Bounded work authorized (2026-10-03):** establish a fresh working/unit/RHI checkpoint,
+simplify the bitfield operation path after qualification, then refresh compilation and GPU
+performance measurements on the resulting compiler. Investigate reproduced performance weaknesses
+within that bounded scope. Stop after these three items; unrelated feature work and the legacy
+OptiX8 HitObject decision remain parked. This supersedes the stop below only for this scope.
+
 **Stopped after completion (2026-10-03):** all 29 remaining SlangPy failures resolve. The fresh
 CUDA-selected checkpoint passes 1,591 with zero failures,807 skips and3 expected failures across2,401 nodes,
 plus14 module skips. All 1,561 previous passes are preserved; one RGB metadata test is new. No failure was

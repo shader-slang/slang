@@ -372,7 +372,7 @@
     {
       "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
       "mode": "nvvm-o0",
-      "feature": "nvvm-application-values",
+      "feature": "nvvm-current-checkpoint",
       "outcome_path": [
         "validation",
         "source_controls",
@@ -384,12 +384,12 @@
         "source_sha256",
         "tests/cuda/nvvm-dynamic-array-snapshots.slang"
       ],
-      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+      "rationale": "Boolean2/3/4 dynamic snapshots, nested mixed records and all indices with complete independent outputs; NVVMO0/O3 and NVRTC pass."
     },
     {
       "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
       "mode": "nvvm-o3",
-      "feature": "nvvm-application-values",
+      "feature": "nvvm-current-checkpoint",
       "outcome_path": [
         "validation",
         "source_controls",
@@ -401,12 +401,12 @@
         "source_sha256",
         "tests/cuda/nvvm-dynamic-array-snapshots.slang"
       ],
-      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+      "rationale": "Boolean2/3/4 dynamic snapshots, nested mixed records and all indices with complete independent outputs; NVVMO0/O3 and NVRTC pass."
     },
     {
       "id": "cuda/nvvm-dynamic-array-snapshots.slang#cuda-1",
       "mode": "nvrtc-o3",
-      "feature": "nvvm-application-values",
+      "feature": "nvvm-current-checkpoint",
       "outcome_path": [
         "validation",
         "source_controls",
@@ -418,7 +418,7 @@
         "source_sha256",
         "tests/cuda/nvvm-dynamic-array-snapshots.slang"
       ],
-      "rationale": "Exact authored runtime mode and complete output oracle. CPU AD comparison remains separate; no unexecuted NVRTC AD claim."
+      "rationale": "Boolean2/3/4 dynamic snapshots, nested mixed records and all indices with complete independent outputs; NVVMO0/O3 and NVRTC pass."
     },
     {
       "id": "cuda/nvvm-specialized-pointer-identity.slang#cuda-1",

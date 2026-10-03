@@ -126,6 +126,9 @@ failure remains historical evidence; that separate combined fixture has not been
 [Aggregate updates](../../tests/cuda/nvvm-aggregate-value-updates.slang) qualify reverse AD through
 field/vector/array/matrix chains while retaining the original value. [Array snapshots](../../tests/cuda/nvvm-dynamic-array-snapshots.slang)
 qualify high-bit uint8 dynamic reads, repeated mutation and padded nested-record values at O0/O3.
+Boolean2/3/4 leaves, every dynamic record index, nested arrays and numeric sibling fields also pass
+NVVM O0/O3 and NVRTC. Provider-private byte lanes preserve Boolean snapshots; the original RHI
+aggregate-entry regression and differentiated-array application control pass.
 Captured LLVM confirms i8-to-i64 zero extension; captured CUDA12.9 PTX qualifies a fixed local frame.
 The vendor optimizer stall and rejected entry-hoisting/select-chain attempts remain recorded.
 

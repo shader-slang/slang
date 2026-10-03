@@ -29,6 +29,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -2047,6 +2048,109 @@ _emitValueReturn(SlangNVVMModuleHandle module, SlangNVVMValueHandle value)
     return SLANG_OK;
 }
 
+// Chooses storage for a provider-private array snapshot. Consider an array of records with
+// a bool3 field. Its canonical value contains <3 x i1>, but CUDA 12.9 libNVVM can pack the
+// vector store into one byte and then read its lanes as separate bytes. This temporary has no
+// external ABI, so store each Boolean lane in a separate i8 array element. Leave other subtrees in
+// their original representation, including the large numeric arrays used by differentiation.
+static llvm::Type* _getNVVMArraySnapshotStorageType(llvm::Type* type)
+{
+    if (auto vectorType = llvm::dyn_cast<llvm::FixedVectorType>(type))
+    {
+        if (vectorType->getElementType()->isIntegerTy(1))
+        {
+            return llvm::ArrayType::get(
+                llvm::Type::getInt8Ty(type->getContext()),
+                vectorType->getNumElements());
+        }
+    }
+    if (auto arrayType = llvm::dyn_cast<llvm::ArrayType>(type))
+    {
+        auto elementType = _getNVVMArraySnapshotStorageType(arrayType->getElementType());
+        if (elementType != arrayType->getElementType())
+            return llvm::ArrayType::get(elementType, arrayType->getNumElements());
+    }
+    if (auto structType = llvm::dyn_cast<llvm::StructType>(type))
+    {
+        llvm::SmallVector<llvm::Type*, 8> fields;
+        bool changed = false;
+        for (auto fieldType : structType->elements())
+        {
+            auto storageType = _getNVVMArraySnapshotStorageType(fieldType);
+            fields.push_back(storageType);
+            changed |= storageType != fieldType;
+        }
+        if (changed)
+            return llvm::StructType::get(type->getContext(), fields, structType->isPacked());
+    }
+    return type;
+}
+
+// Converts between a logical snapshot value and its private storage representation. The type
+// pair comes only from _getNVVMArraySnapshotStorageType. Pack the snapshot once before storing
+// it, then unpack only the selected element after loading it. Independent byte lanes also keep
+// a poison lane from affecting its defined siblings, as packing all bits into one byte could.
+static llvm::Value* _convertNVVMArraySnapshotValue(
+    ModuleState* state,
+    llvm::Value* value,
+    llvm::Type* targetType)
+{
+    auto sourceType = value->getType();
+    if (sourceType == targetType)
+        return value;
+    auto& builder = state->builder;
+    if (auto vectorType = llvm::dyn_cast<llvm::FixedVectorType>(sourceType))
+    {
+        if (!vectorType->getElementType()->isIntegerTy(1))
+            llvm::report_fatal_error("snapshot conversion requires Boolean vector lanes");
+        auto storageType = llvm::cast<llvm::ArrayType>(targetType);
+        if (!storageType->getElementType()->isIntegerTy(8))
+            llvm::report_fatal_error("snapshot storage requires byte lanes");
+        llvm::Value* packed = llvm::UndefValue::get(targetType);
+        for (unsigned lane = 0; lane < vectorType->getNumElements(); ++lane)
+        {
+            auto bit = builder.CreateZExt(
+                builder.CreateExtractElement(value, lane),
+                storageType->getElementType());
+            packed = builder.CreateInsertValue(packed, bit, lane);
+        }
+        return packed;
+    }
+    if (auto vectorType = llvm::dyn_cast<llvm::FixedVectorType>(targetType))
+    {
+        if (!llvm::cast<llvm::ArrayType>(sourceType)->getElementType()->isIntegerTy(8))
+            llvm::report_fatal_error("snapshot storage requires byte lanes");
+        if (!vectorType->getElementType()->isIntegerTy(1))
+            llvm::report_fatal_error("snapshot conversion requires Boolean vector lanes");
+        llvm::Value* unpacked = llvm::UndefValue::get(targetType);
+        for (unsigned lane = 0; lane < vectorType->getNumElements(); ++lane)
+        {
+            auto bit = builder.CreateTrunc(
+                builder.CreateExtractValue(value, lane),
+                vectorType->getElementType());
+            unpacked = builder.CreateInsertElement(unpacked, bit, lane);
+        }
+        return unpacked;
+    }
+    auto arrayType = llvm::dyn_cast<llvm::ArrayType>(targetType);
+    auto structType = llvm::dyn_cast<llvm::StructType>(targetType);
+    if (!arrayType && !structType)
+        llvm::report_fatal_error("snapshot conversion requires matching aggregate types");
+    uint64_t count = arrayType ? arrayType->getNumElements() : structType->getNumElements();
+    llvm::Value* result = llvm::UndefValue::get(targetType);
+    for (uint64_t index = 0; index < count; ++index)
+    {
+        auto childType =
+            arrayType ? arrayType->getElementType() : structType->getElementType(unsigned(index));
+        auto childValue = builder.CreateExtractValue(value, unsigned(index));
+        result = builder.CreateInsertValue(
+            result,
+            _convertNVVMArraySnapshotValue(state, childValue, childType),
+            unsigned(index));
+    }
+    return result;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitSequentialElementExtract(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle sequentialValue,
@@ -2103,20 +2207,23 @@ static SlangResult SLANG_NVVM_CALL _emitSequentialElementExtract(
         // pathology. Qualified NVVM O0/O3 output assigns these temporaries to a fixed local frame.
         if (!arrayType->isSized())
             return SLANG_E_INVALID_ARG;
+        auto storageType = llvm::cast<llvm::ArrayType>(_getNVVMArraySnapshotStorageType(arrayType));
         const auto& layout = state->module->getDataLayout();
-        const auto alignment = layout.getABITypeAlign(arrayType);
-        auto size = state->builder.getInt64(layout.getTypeAllocSize(arrayType).getFixedValue());
-        auto storage = state->builder.CreateAlloca(arrayType, nullptr, "slangArraySnapshot");
+        const auto alignment = layout.getABITypeAlign(storageType);
+        auto size = state->builder.getInt64(layout.getTypeAllocSize(storageType).getFixedValue());
+        auto storage = state->builder.CreateAlloca(storageType, nullptr, "slangArraySnapshot");
         storage->setAlignment(alignment);
         state->builder.CreateLifetimeStart(storage, size);
-        _emitStorePreservingNestedStructLayout(state, llvmSequentialValue, storage, alignment);
+        auto storedValue = _convertNVVMArraySnapshotValue(state, llvmSequentialValue, storageType);
+        _emitStorePreservingNestedStructLayout(state, storedValue, storage, alignment);
         // GEP sign-extends narrow indices. Preserve the old lane-selection bit patterns:
         // an i8 index with bits 200 selects element 200, not element -56.
         auto addressIndex =
             state->builder.CreateZExtOrTrunc(llvmElementIndex, state->builder.getInt64Ty());
         llvm::Value* indices[] = {state->builder.getInt32(0), addressIndex};
-        auto element = state->builder.CreateGEP(arrayType, storage, indices);
-        result = state->builder.CreateLoad(elementType, element);
+        auto element = state->builder.CreateGEP(storageType, storage, indices);
+        auto loadedValue = state->builder.CreateLoad(storageType->getElementType(), element);
+        result = _convertNVVMArraySnapshotValue(state, loadedValue, elementType);
         state->builder.CreateLifetimeEnd(storage, size);
     }
     else if (!constantIndex && elementType->isIntegerTy(1))

@@ -1,5 +1,9 @@
 # NVVM current status
 
+**Current authorized work (2026-10-03):** fresh working/unit/RHI validation, bounded bitfield
+simplification, then compilation and GPU performance refresh. These three items are in progress;
+the prior application acceptance below remains unchanged. Legacy OptiX8 HitObjects remain parked.
+
 The CUDA-text route migration is **complete with focused local acceptance**. NVVM no longer
 infers operations from CUDA assembly-body strings or active semantic tags. The final field-offset
 recognizer is replaced by a typed query that preserves the exact field key before optimization.
@@ -26,6 +30,23 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 `build/nvvm-integration/full-after-cleanup-1/`; Half evidence remains under
 `build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
+
+## Current validation and maintenance
+
+The fresh initial checkpoint passes **1,724/1,724 working configurations** and **569/569 NVVM units**
+with unchanged inputs. The full RHI run then exposed two regressions: provider-created dynamic array
+snapshots lost Boolean vector lanes, and CUDA heap destruction leaked native pages while a shared
+context remained alive. Both are repaired at their producers/owners, with failing-before controls.
+
+The repaired fresh full NVVM RHI checkpoint is **280 passes, 1 intentional unsupported MakeHit failure
+and 10 skips across all 291 registrations**. All 72,074,710 successful assertions are retained;
+the two failed assertions belong to MakeHit. The earlier wrong outputs, OOM and crash remain in the
+[RHI manifest](rhi-cuda-status.json). Nested Boolean snapshots pass both NVVM modes and NVRTC; the
+SlangPy differentiated-array control also passes. This does not rerun the full SlangPy acceptance.
+
+The bitfield cleanup and final compiler/unit/working qualification are next, followed by compilation
+and GPU performance refresh. Current evidence is under `build/nvvm-current-checkpoint/` and the
+`nvvm-current-checkpoint` record in [focused evidence](focused-evidence.json).
 
 ## Current application acceptance — SlangPy failures resolved
 

@@ -437,6 +437,14 @@ fixed-size read temporaries to a fixed local frame at O0/O3. Entry-hoisted snaps
 reads exposed a vendor optimizer stall in reverse AD; both failed attempts remain in the evidence.
 This is an LLVM-dialect adaptation, not a bounds check or a generic LLVM stack-allocation guarantee.
 
+The provider owns the snapshot's private storage representation. Boolean vector leaves become
+arrays of byte lanes before the snapshot is stored, and only the selected element is reconstructed
+to its original value type. This prevents libNVVM from packing a Boolean vector store while loading
+its lanes as separate bytes. Arrays and records retain their shape and field order; pointers are
+unchanged leaves. Independent bytes preserve poison-lane independence. Unchanged numeric subtrees
+remain identity conversions, so the differentiated-array path keeps its constant provider instruction
+count. Boolean-containing arrays require conversion instructions proportional to their element count.
+
 Generic specialization names encode canonical linked leaves and framed structural IR arguments,
 including type and literal payload. Diagnostic display hints are not symbol identity. Unlinked
 nominal values, unresolved parameters and child-bearing witnesses retain private IR identity; only
