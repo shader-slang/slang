@@ -297,6 +297,162 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
+    // Where one lane of a `makeVector` result comes from. A lane is a position in the result, the
+    // position that a swizzle or `getElement` index selects. The source is the operand that
+    // supplies the lane and, when that operand is a vector, `indexInOperand`, the element of the
+    // operand that holds it (-1 for a scalar operand). A default-constructed source is
+    // unresolved.
+    struct MakeVectorLaneSource
+    {
+        IRInst* operand = nullptr;
+        IRIntegerValue indexInOperand = -1;
+
+        bool isResolved() const { return operand != nullptr; }
+        bool isInVectorOperand() const { return indexInOperand >= 0; }
+    };
+
+    // Find where lane `laneIndex` of `makeVector`'s result comes from. A scalar operand supplies
+    // one lane and a vector operand one lane per element, so lane 2 of `uint4(a, b)` is element 0
+    // of `b`.
+    //
+    // An operand supplies lanes only if it is a scalar of the result's element type, or an
+    // `IRVectorType` with that element type and a literal element count, ignoring type
+    // attributes such as `unorm` on both sides. Any other operand leaves its own lanes and every
+    // later lane unresolved, as does an out-of-range `laneIndex`. That rule conservatively skips
+    // the `makeVector(float4, packed)` that Metal buffer lowering uses to convert a packed load:
+    // the packed operand's elements do line up with the result's lanes, but we don't look
+    // through a `MetalPackedVectorType`, so that conversion is never folded away.
+    //
+    // The `makeVector` itself has a vector type, or a `MetalPackedVectorType` for the opposite
+    // conversion, `makeVector(packed, v)`, which Metal buffer lowering emits before a store.
+    // Resolving lanes of the latter keeps the `getElement` fold's earlier behaviour for it; any
+    // other result type is left unresolved.
+    static MakeVectorLaneSource findMakeVectorLaneSource(
+        IRInst* makeVector,
+        IRIntegerValue laneIndex)
+    {
+        SLANG_ASSERT(makeVector->getOp() == kIROp_MakeVector);
+        auto makeVectorType = unwrapAttributedType(makeVector->getDataType());
+        IRInst* elementType = nullptr;
+        if (auto vectorType = as<IRVectorType>(makeVectorType))
+            elementType = unwrapAttributedType(vectorType->getElementType());
+        else if (auto packedType = as<IRMetalPackedVectorType>(makeVectorType))
+            elementType = unwrapAttributedType(packedType->getElementType());
+        else
+            return {};
+        IRIntegerValue startIndex = 0;
+        for (UInt i = 0; i < makeVector->getOperandCount(); i++)
+        {
+            auto operand = makeVector->getOperand(i);
+            auto operandType = unwrapAttributedType(operand->getDataType());
+            auto operandVectorType = as<IRVectorType>(operandType);
+            if (!operandVectorType)
+            {
+                if (operandType != elementType)
+                    return {};
+                if (laneIndex == startIndex)
+                    return {operand, -1};
+                startIndex++;
+                continue;
+            }
+            if (unwrapAttributedType(operandVectorType->getElementType()) != elementType)
+                return {};
+            auto operandSize = as<IRIntLit>(operandVectorType->getElementCount());
+            if (!operandSize)
+                return {};
+            if (laneIndex >= startIndex && laneIndex < startIndex + operandSize->getValue())
+                return {operand, laneIndex - startIndex};
+            startIndex += operandSize->getValue();
+        }
+        return {};
+    }
+
+    // `source` must be resolved.
+    static IRInst* getMakeVectorLaneValue(IRBuilder& builder, MakeVectorLaneSource source)
+    {
+        SLANG_ASSERT(source.isResolved());
+        if (!source.isInVectorOperand())
+            return source.operand;
+        return builder.emitElementExtract(source.operand, source.indexInOperand);
+    }
+
+    static IRInst* findSoleVectorOperand(const ShortList<MakeVectorLaneSource, 4>& sources)
+    {
+        IRInst* soleOperand = nullptr;
+        for (auto source : sources)
+        {
+            if (!source.isInVectorOperand() || (soleOperand && source.operand != soleOperand))
+                return nullptr;
+            soleOperand = source.operand;
+        }
+        return soleOperand;
+    }
+
+    // Return the value of `swizzle(makeVector(...), ...)` computed directly from the `makeVector`
+    // operands, or nullptr if any selected lane is unresolved. For example:
+    //
+    //   uint3(v, 0).y   ->  v.y              (a scalar result is the lane's value)
+    //   uint3(v, 0).xy  ->  v                (every element of `v`, in order)
+    //   uint3(v, 0).yx  ->  v.yx             (lanes from `v` alone)
+    //   uint4(a, b).yz  ->  uint2(a.y, b.x)  (lanes from several operands)
+    //
+    // New instructions go before `swizzle`, and the caller replaces its uses. When the fold fails,
+    // the IR is left unchanged.
+    IRInst* tryFoldSwizzleOfMakeVector(IRSwizzle* swizzle)
+    {
+        ShortList<MakeVectorLaneSource, 4> sources;
+        for (UInt i = 0; i < swizzle->getElementCount(); i++)
+        {
+            auto index = as<IRIntLit>(swizzle->getElementIndex(i));
+            if (!index)
+                return nullptr;
+            auto source = findMakeVectorLaneSource(swizzle->getBase(), index->getValue());
+            if (!source.isResolved())
+                return nullptr;
+            sources.add(source);
+        }
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, swizzle->sourceLoc);
+        builder.setInsertBefore(swizzle);
+
+        auto resultType = swizzle->getDataType();
+        if (!as<IRVectorType>(resultType))
+        {
+            SLANG_RELEASE_ASSERT(sources.getCount() == 1);
+            return getMakeVectorLaneValue(builder, sources[0]);
+        }
+
+        // When every lane comes from one vector operand, we read that operand directly, whole or
+        // through a swizzle of it. Rebuilding it lane by lane would leave `uint2(v.x, v.y)` in
+        // place of `v`, and nothing folds that back.
+        if (auto soleOperand = findSoleVectorOperand(sources))
+        {
+            bool isIdentity = soleOperand->getDataType() == resultType;
+            for (Index i = 0; isIdentity && i < sources.getCount(); i++)
+                isIdentity = sources[i].indexInOperand == i;
+            if (isIdentity)
+                return soleOperand;
+
+            ShortList<IRInst*, 4> indices;
+            for (auto source : sources)
+                indices.add(builder.getIntValue(builder.getIntType(), source.indexInOperand));
+            return builder.emitSwizzle(
+                resultType,
+                soleOperand,
+                (UInt)indices.getCount(),
+                indices.getArrayView().getBuffer());
+        }
+
+        ShortList<IRInst*, 4> vals;
+        for (auto source : sources)
+            vals.add(getMakeVectorLaneValue(builder, source));
+        return builder.emitMakeVector(
+            resultType,
+            (UInt)vals.getCount(),
+            vals.getArrayView().getBuffer());
+    }
+
     void processInst(IRInst* inst)
     {
         if (as<IRGlobalValueWithCode>(inst))
@@ -906,47 +1062,15 @@ struct PeepholeContext : InstPassBase
                 auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
                 if (!index)
                     break;
-                auto opCount = inst->getOperand(0)->getOperandCount();
-                IRIntegerValue startIndex = 0;
-                for (UInt i = 0; i < opCount; i++)
-                {
-                    auto element = inst->getOperand(0)->getOperand(i);
-                    if (auto elementVecType = as<IRVectorType>(element->getDataType()))
-                    {
-                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
-                        if (!vecSize)
-                            break;
-                        if (index->getValue() >= startIndex &&
-                            index->getValue() < startIndex + vecSize->getValue())
-                        {
-                            IRBuilder builder(module);
-                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-
-                            builder.setInsertBefore(inst);
-                            auto newElement = builder.emitElementExtract(
-                                element,
-                                builder.getIntValue(
-                                    builder.getIntType(),
-                                    index->getValue() - startIndex));
-                            inst->replaceUsesWith(newElement);
-                            maybeRemoveOldInst(inst);
-                            changed = true;
-                            break;
-                        }
-                        startIndex += vecSize->getValue();
-                    }
-                    else
-                    {
-                        if (startIndex == index->getValue())
-                        {
-                            inst->replaceUsesWith(element);
-                            maybeRemoveOldInst(inst);
-                            changed = true;
-                            break;
-                        }
-                        startIndex++;
-                    }
-                }
+                auto source = findMakeVectorLaneSource(inst->getOperand(0), index->getValue());
+                if (!source.isResolved())
+                    break;
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(getMakeVectorLaneValue(builder, source));
+                maybeRemoveOldInst(inst);
+                changed = true;
             }
             else if (
                 inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement ||
@@ -1738,47 +1862,11 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     break;
                 }
-                // If we see a swizzle(makeVector) then we can replace it with the values from
-                // makeVector.
-                auto makeVector = inst->getOperand(0);
-                if (makeVector->getOp() != kIROp_MakeVector)
+                if (inst->getOperand(0)->getOp() != kIROp_MakeVector)
                     break;
-                auto swizzle = as<IRSwizzle>(inst);
-                List<IRInst*> vals;
-                auto vectorType = as<IRVectorType>(makeVector->getDataType());
-                auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
-                if (!vectorSize)
-                    break;
-                if (makeVector->getOperandCount() != (UInt)vectorSize->getValue())
-                    break;
-                for (UInt i = 0; i < swizzle->getElementCount(); i++)
+                if (auto folded = tryFoldSwizzleOfMakeVector(as<IRSwizzle>(inst)))
                 {
-                    auto index = swizzle->getElementIndex(i);
-                    auto intLitIndex = as<IRIntLit>(index);
-                    if (!intLitIndex)
-                        return;
-                    if (intLitIndex->getValue() < (Int)makeVector->getOperandCount())
-                        vals.add(makeVector->getOperand((UInt)intLitIndex->getValue()));
-                    else
-                        return;
-                }
-                if (vals.getCount() == 1)
-                {
-                    inst->replaceUsesWith(vals[0]);
-                    maybeRemoveOldInst(inst);
-                    changed = true;
-                }
-                else
-                {
-                    IRBuilder builder(module);
-                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-
-                    builder.setInsertBefore(inst);
-                    auto newMakeVector = builder.emitMakeVector(
-                        swizzle->getDataType(),
-                        (UInt)vals.getCount(),
-                        vals.getBuffer());
-                    inst->replaceUsesWith(newMakeVector);
+                    inst->replaceUsesWith(folded);
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
