@@ -2559,3 +2559,78 @@ A production scoped graph contract still needs the existing replay and motion ca
 See the [pipeline configuration inventory](../docs/design/nvvm-backend.md#optix-pipeline-configuration)
 for native OptiX controls and their current RHI exposure. This bounded comparison is complete;
 production API changes and further HitObject compatibility investigation are separate work.
+
+### Optimized Falcor PTX comparison
+
+The remaining fast/single-level NVRTC lead was investigated with actual inputs intercepted at
+OptiX module creation. All eight stage PTX bodies match the prior fast-mode captures after
+removing only `.file` paths. Production compiler/provider/runtime identities are unchanged.
+Both routes use PTX8.8/sm80 and CUDA12.9; graph specialization takes place afterward in OptiX.
+Six capture processes pass, with first images bit-identical to accepted fast/single-level images.
+Capture artifacts and analysis/diagnostic scripts live under ignored `build/nvvm-fast-ptx/`.
+
+| Closest-hit observation | NVRTC | NVVM |
+| --- | ---: | ---: |
+| PTX instruction sites (including inline assembly, excluding directives/comments) | 13,747 | 11,153 |
+| Fast sin / cos / sqrt sites | 17 / 17 / 123 | 17 / 17 / 123 |
+| Approximate division / reciprocal sites | 492 / 26 | 489 / 4 |
+| PTX local allocation, bytes | 16 | 32 |
+| OptiX-reported register count | 128 | 128 |
+| OptiX direct stack, bytes | 24 | 40 |
+| OptiX direct spills, bytes | 0 | 0 |
+| OptiX continuation stack / spill bytes | 160 / 144 | 160 / 144 |
+
+Fast math is effective in both routes. No large-angle trig routines, extra trace calls, ordinary
+helper calls or HitObject snapshot operations explain the difference. Each raygen and closest-hit
+contains one trace site, with matching OptiX query/payload call inventories. Raygen and both miss
+programs have matching reported register/stack/spill properties. PTX virtual register declarations
+and static instruction counts are not occupancy or dynamic native-work measurements. The native
+properties above come from actual OptiX compiler feedback, obtained by forwarding its existing
+level 4 callback and disabling only the diagnostic context's disk cache; no profiling permissions
+or driver settings changed. Full OptiX SASS/counters remain unavailable.
+
+The concrete local-memory difference originates in
+`falcor2/slang/falcor2/render/materials/standard_material.slang:85-86`: two runtime channel indices
+select metallic and roughness from one sampled `float4`. The captured LLVM IR contains two ordinary
+`extractelement` operations on the same value. `_emitSequentialElementExtract` correctly emits that
+canonical shape; libNVVM subsequently materializes two 16-byte slots instead of NVRTC's reused slot.
+This is downstream code-quality work, not a malformed producer representation or register spilling.
+
+A second lead is constant-one division. `_emitApproximateFloat32Divide` uses the explicit NVVM
+approximate-division intrinsic. In an isolated CUDA12.9/SM89 assembly probe, `div.approx.ftz(1,x)`
+and `rcp.approx.ftz(x)` both use `MUFU.RCP`, but division adds `FADD.FTZ`; both need eight registers
+and no stack/spills. These are not identical native sequences, and the PTX approximate-operation
+contracts do not promise generally identical rounding or NaN bits. The diagnostic reciprocal
+substitution is limited to 24 division sites with a unique unpredicated positive-one definition.
+
+Temporary closest-hit PTX substitutions tested these leads without changing production sources.
+The local-reuse arm shares the two sequential nonescaping slots; the selection arm removes those
+local accesses using register selections with the same existing index mask. Native direct stack
+becomes 24 and zero bytes respectively, while registers and continuation properties stay unchanged.
+The reciprocal arm changes only the 24 checked divisions. The unchanged harness uses fast math,
+single-level graph/depth2, 512x512 DamagedHelmet, six bounces, NEE and late TraceRay visibility, with
+at least three seconds of warmup and 1,000 timed iterations. Two rotated/bracketed rounds give:
+
+| Diagnostic arm | Median ms/iteration per process |
+| --- | --- |
+| NVRTC baseline | 0.226 / 0.229 |
+| NVVM baseline around local controls | 0.262 / 0.256 |
+| NVVM reuse one local slot | 0.251 / 0.250 |
+| NVVM register selections | 0.252 / 0.254 |
+| NVVM baseline around reciprocal control | 0.272 / 0.250 |
+| NVVM reciprocal substitution | 0.251 / 0.262 |
+
+Neither control closes the backend gap. Small local-control effects overlap the broader NVVM
+baseline variation; reciprocal has no demonstrated repeatable gain. These remain concrete
+code-quality opportunities, not an established explanation or production optimization result.
+All twelve timed processes exit 0; all twenty-six full-RGBA capture/control comparisons are bit-identical
+within backend. This does not extend to cross-backend equivalence or arbitrary shader inputs.
+All measured NVVM SM clocks are 2040 MHz; NVRTC samples 1980/1995/2010/2040 MHz. Memory is 6251 MHz/P0
+throughout. Clocks are observed, not locked, and no precise fixed-clock backend ratio is claimed.
+
+Exact hashes, stage/native properties and per-process outcomes are in
+`falcor2-status.json:fast_ptx_comparison`. Retain the unsuccessful initial `cuobjdump` path lookup
+and successful existing CUDA12.9 `nvdisasm` fallback in raw evidence. The reused historical capture
+helper writes its valid identity JSON to `[vsyscall]` because of a shadowed path variable; the
+identity contents were checked against accepted fast/graph production libraries. Timing uses the
+maintained harness and correctly named identity files. No compiler, RHI or application fix was made.

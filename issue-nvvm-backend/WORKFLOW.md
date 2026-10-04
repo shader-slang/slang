@@ -1,5 +1,10 @@
 # NVVM development workflow
 
+**Bounded optimized PTX comparison complete (2026-10-04):** actual fast/single-level Falcor module
+inputs, native OptiX compiler feedback and diagnostic PTX controls are independently reviewed. Local storage and reciprocal
+code-quality differences are identified, but neither control explains the remaining backend gap.
+Production sources remain unchanged; this finite investigation does not resume the general loop.
+
 **Bounded combined fast/graph comparison complete (2026-10-04):** the maintainer requested testing
 fast mode together with graph specialization and clarification of OptiX pipeline controls. Twelve
 matched runs and independent evidence review establish about 27% NVRTC / 20% NVVM lower observed

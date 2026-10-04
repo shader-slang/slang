@@ -1,5 +1,15 @@
 # NVVM current status
 
+**Optimized Falcor PTX comparison (2026-10-04):** actual fast/single-level module inputs confirm
+fast math and matching trace/query calls. Closest-hit NVVM PTX has fewer instruction sites, with
+both routes reporting 128 native registers and zero direct spills. Two dynamic material-channel
+extracts give NVVM 40 versus NVRTC 24 bytes direct stack; diagnostic reuse/select controls reduce it
+to 24/0 bytes but do not close the timing gap. A constant-one division probe adds an FTZ instruction
+versus reciprocal; substituting 24 sites likewise shows no repeatable gain. All 12 timed runs and
+6 captures pass;26 within-backend full-RGBA comparisons are exact. No production code changed.
+Exact measurements, clock variation and limits are in [RESULTS](RESULTS.md#optimized-falcor-ptx-comparison)
+and `falcor2-status.json:fast_ptx_comparison`; full OptiX SASS/counters remain unavailable.
+
 **Fast math plus graph specialization (2026-10-04):** two rotated 1,000-iteration runs per
 configuration show fast/general **0.316/0.315 ms NVRTC, 0.315/0.315 ms NVVM**; fast/single-level
 **0.228/0.233 ms NVRTC, 0.255/0.250 ms NVVM**. About 27%/20% less observed time. Reducing only

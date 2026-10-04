@@ -4766,5 +4766,674 @@
     "review": "Independent read-only audit of timings, clock intervals, RGBA images, effective configuration and loaded identities; durable documentation reviewed before local commit.",
     "raw_evidence": "build/nvvm-fast-graph",
     "results_reference": "RESULTS.md#fast-math-combined-with-graph-specialization"
+  },
+  "fast_ptx_comparison": {
+    "observed_on": "2026-10-04",
+    "status": "accepted diagnostic comparison; production unchanged",
+    "raw_evidence": "build/nvvm-fast-ptx/",
+    "protocol": "Same fast/single-level/depth2 lit512x512 DamagedHelmet, depth6/NEE/late TraceRay. First bracket: NVRTC base, NVVM base/reuse/select, reversed. Second: NVVM base/rcp/rcp/base. 1000 iterations per process after >=3s warmup. No dump/profiler during timing. Wrapper logs setup and substitutes only the chosen closest-hit PTX in controls. Production libraries match accepted fast/graph identities.",
+    "captures": {
+      "nvrtc": {
+        "native_function_properties": {
+          "__miss___scene_visibility_miss": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 0,
+            "continuation spills (bytes)": 0
+          },
+          "__raygen__raygen_main": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 64,
+            "continuation spills (bytes)": 64
+          },
+          "__miss___scene_scatter_miss": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 0,
+            "continuation spills (bytes)": 0
+          },
+          "__closesthit___scene_scatter_triangle_closest_hit": {
+            "register count": 128,
+            "direct stack size (bytes)": 24,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 160,
+            "continuation spills (bytes)": 144
+          }
+        },
+        "identity_file": "uncached-nvrtc/[vsyscall]",
+        "identity_sha256": "9d7dd61f46ad7ee24b1d67126a69116676dd72496538f29a9484ac09d2520996",
+        "compiler_log_sha256": "c7968dcdcfcaab43c61a5832537bb9fe065e285696c6b962be8c0ef94fd7295b",
+        "production_libraries_match_fast_graph": true,
+        "modules": [
+          {
+            "file": "nvrtc/module-0.ptx",
+            "sha256": "bc5a563c1b7a3d04557ab612c8dcea6cf9eb5b45c9ccef7ed57986ef3e5c86e0",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvrtc/module-1.ptx",
+            "sha256": "30b571ad83a045ea1f587ba51dbd9c2c0dac7a0c533665f5267703f3a31e7e72",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvrtc/module-2.ptx",
+            "sha256": "79def59ac8685774e8fed8f5d4f7d973c4a16ce314fb8d0bcdd94ffd3eaf6cbd",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvrtc/module-3.ptx",
+            "sha256": "84bbcc91f8db2e60fb3537353d2139a6248a8815a788ac5e087fcd0a14b0ff60",
+            "matches_prior_except_file_paths": true
+          }
+        ]
+      },
+      "nvvm": {
+        "native_function_properties": {
+          "__miss___scene_visibility_miss": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 0,
+            "continuation spills (bytes)": 0
+          },
+          "__miss___scene_scatter_miss": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 0,
+            "continuation spills (bytes)": 0
+          },
+          "__raygen__raygen_main": {
+            "register count": 94,
+            "direct stack size (bytes)": 0,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 64,
+            "continuation spills (bytes)": 64
+          },
+          "__closesthit___scene_scatter_triangle_closest_hit": {
+            "register count": 128,
+            "direct stack size (bytes)": 40,
+            "direct spills (bytes)": 0,
+            "continuation stack size (bytes)": 160,
+            "continuation spills (bytes)": 144
+          }
+        },
+        "identity_file": "uncached-nvvm/[vsyscall]",
+        "identity_sha256": "9385334f13da64b12846fbe116d7a3513c423534ceb163d3bc9cc6aef8b702da",
+        "compiler_log_sha256": "a4061dc4f9d911d9da05537d27ad325a4f4a33187b20d2f45b7598d34ff60895",
+        "production_libraries_match_fast_graph": true,
+        "modules": [
+          {
+            "file": "nvvm/module-0.ptx",
+            "sha256": "93e3fdf6e82e57ce1904839f2a1b95197df7465ba6732f0219aee373659aef74",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvvm/module-1.ptx",
+            "sha256": "88029053d0e52b56408bb0d6938dd1036ae62bd27320e1fb0cf8174a9e6efd38",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvvm/module-2.ptx",
+            "sha256": "2e11541894955a2d75f20af21969e1a9170cea42ca9617c8feb08e73b68e1171",
+            "matches_prior_except_file_paths": true
+          },
+          {
+            "file": "nvvm/module-3.ptx",
+            "sha256": "52e499c15c453efea6e7d14b022ccfb932ed17f1fd76c59eecd9e7ab7c085bfd",
+            "matches_prior_except_file_paths": true
+          }
+        ]
+      }
+    },
+    "closest_hit_ptx": {
+      "nvrtc": {
+        "instruction_sites": 13747,
+        "local_bytes": 16,
+        "sin_approx_ftz": 17,
+        "cos_approx_ftz": 17,
+        "sqrt_approx_ftz": 123,
+        "div_approx_ftz": 492,
+        "rcp_approx_ftz": 26,
+        "optix_calls": {
+          "_optix_get_payload": 31,
+          "_optix_get_attribute_0": 1,
+          "_optix_get_attribute_1": 1,
+          "_optix_read_instance_id": 1,
+          "_optix_read_sbt_gas_idx": 1,
+          "_optix_read_primitive_idx": 1,
+          "_optix_get_ray_tmax": 1,
+          "_optix_trace_typed_32": 1,
+          "_optix_set_payload": 31
+        }
+      },
+      "nvvm": {
+        "instruction_sites": 11153,
+        "local_bytes": 32,
+        "sin_approx_ftz": 17,
+        "cos_approx_ftz": 17,
+        "sqrt_approx_ftz": 123,
+        "div_approx_ftz": 489,
+        "rcp_approx_ftz": 4,
+        "optix_calls": {
+          "_optix_get_payload": 31,
+          "_optix_get_attribute_0": 1,
+          "_optix_get_attribute_1": 1,
+          "_optix_read_instance_id": 1,
+          "_optix_read_sbt_gas_idx": 1,
+          "_optix_read_primitive_idx": 1,
+          "_optix_get_ray_tmax": 1,
+          "_optix_trace_typed_32": 1,
+          "_optix_set_payload": 31
+        }
+      }
+    },
+    "runs": [
+      {
+        "name": "nvrtc-base-1",
+        "median_gpu_ms": 0.22600000000139175,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 23,
+          "sm_mhz": [
+            2010,
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "9fb25ed0354af032f76ca0966ce2eac4017037f955aa7b8c3baff9c391823b12",
+        "log_sha256": "478c2f5c05b03167ebc351b064f8b2389380fde1cfcf428ade1e9842d0ea96d6",
+        "identity_sha256": "569bb9928b8d7ff060bdd2ff119d4928a6e6cdeb590e4eea1c9a20c7c233d2f2",
+        "process_exit": 0
+      },
+      {
+        "name": "nvrtc-base-2",
+        "median_gpu_ms": 0.2290000000009229,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 23,
+          "sm_mhz": [
+            1980,
+            1995,
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "3fba14cb9cf6649f0e3d8b8bb59ed67b8d38bda2ba636168ac650b0f33d6755f",
+        "log_sha256": "dd3dd7736711bc95b7314e0b4613c0c03435448b67f134ae3451517cc2db3232",
+        "identity_sha256": "569bb9928b8d7ff060bdd2ff119d4928a6e6cdeb590e4eea1c9a20c7c233d2f2",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-base-1",
+        "median_gpu_ms": 0.2620000000010947,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 26,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "82d3e21fb818eecce05dbb520f97783bbe0a06683983d425f360c9bbf4928c8c",
+        "log_sha256": "81df3e9a9e88b74aa7ac1a6d21976c30ffd30911677d020bdc60e6793152e011",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-base-2",
+        "median_gpu_ms": 0.2559999999967033,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "de7fcc44744cb7fea7a559ac228e8802649971e4b9a2bc48a2367bfd426b4ad5",
+        "log_sha256": "9e5e224e7017b90882db01515b2eacab5e1b15e11f427c1e1cf00168785e9f11",
+        "identity_sha256": "e2295db72031411291cb380a186371bb90e27606d791d7e2cda2753d89d52c60",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-base-3",
+        "median_gpu_ms": 0.27199999999893976,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 27,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "4d2339677d13a7e80d60e8cdbbe4d8754955340059dcb9e16d55045707c57129",
+        "log_sha256": "963983262275b93795ff2c82a1b140316374561de22a9babbfca7b5671b0c9be",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-base-4",
+        "median_gpu_ms": 0.2500000000011937,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "cbc85250170ff700ad481987657065d0842608c8a2356348f7719b8146229481",
+        "log_sha256": "83b6058e15dd9bec3d21756334cdf62feef7523cec209bda979303208406125f",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-rcp-1",
+        "median_gpu_ms": 0.25099999999866895,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "89a40b93bfdc72d198a24227d28c6f2b5d87cb8c0c940c80ee1929a910a4f399",
+        "log_sha256": "f161e899de08ce2376afc3eaef51f938da61de93fc74c51cd485c0ef548c1337",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-rcp-2",
+        "median_gpu_ms": 0.26199999999931833,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 26,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "da2e585b813ecfb7b3ff32b9fd7a5aad50aa3ece1d2f80d388e9fb21c585dd88",
+        "log_sha256": "1fd8089e23ff393d10169a71773bd86464d199b38bf47919ae40971180b92dc6",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-reuse-1",
+        "median_gpu_ms": 0.25100000000222167,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "703b2cbeaa97c0fe023847089b639d13bce1a71af81f339eab44b3bbe9ca44f6",
+        "log_sha256": "6a6c7f68020c25fc7d4908bb8ca89bca0b9ef2cabb388831db466d72ee1fc4c2",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-reuse-2",
+        "median_gpu_ms": 0.2500000000011937,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "43b40d940794ff8d21e19606bb51c813dbefe877a99f9c798c5a3476a19212bc",
+        "log_sha256": "d928352c41ac0b1b0133a2f5192ef3622eeded06a3e68f59bb321c1766ac2f0a",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-select-1",
+        "median_gpu_ms": 0.2520000000032496,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "590386c0d7cd28b0979d9db8794f7f04eb236b3867c51672a10ed797bd97d2f1",
+        "log_sha256": "14f955eca4d2a2e853d9afee599be854c0d2424150e3cd1bee0065434c070830",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      },
+      {
+        "name": "nvvm-select-2",
+        "median_gpu_ms": 0.25399999999997647,
+        "iterations": 1000,
+        "clocks": {
+          "samples": 25,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "result_sha256": "a814cb59519ce226c22672f69ef18fa96cf0e0595a2a78f44108c2d1fe9cf000",
+        "log_sha256": "369f86b815e05fb49e618f57b2f5e3a8468e333902c0839a79631327d41c360c",
+        "identity_sha256": "006a46d28a973b66cc78f0daa8e92893462938fe0b5275bc50ae162d81e01221",
+        "process_exit": 0
+      }
+    ],
+    "comparisons": [
+      {
+        "a": "nvrtc/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvrtc-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "log-nvrtc/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvrtc-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "uncached-nvrtc/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvrtc-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "nvvm/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvvm-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "log-nvvm/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvvm-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "uncached-nvvm/capture.first.npy",
+        "b": "../nvvm-fast-graph/nvvm-single-1.first.npy",
+        "rgba_bit_identical": true
+      },
+      {
+        "a": "nvrtc-base-2",
+        "b": "nvrtc-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvrtc-base-2",
+        "b": "nvrtc-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-2",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-2",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-3",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-3",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-4",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-base-4",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-rcp-1",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-rcp-1",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-rcp-2",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-rcp-2",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-reuse-1",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-reuse-1",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-reuse-2",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-reuse-2",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-select-1",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-select-1",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-select-2",
+        "b": "nvvm-base-1",
+        "frame": "first",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      },
+      {
+        "a": "nvvm-select-2",
+        "b": "nvvm-base-1",
+        "frame": "last",
+        "rgba_bit_identical": true,
+        "rgb_rmse": 0.0,
+        "max_abs": 0.0,
+        "finite": true
+      }
+    ],
+    "diagnostic_files": {
+      "reuse.ptx": "f5adeafa4f9509a610973a809f1017c9ef5e9a6ff3590226f48a9ebfb79ca494",
+      "select.ptx": "c24015c5a4e31956651048e77a1cfd500da24936b94c1f091748ab19c7384c46",
+      "rcp.ptx": "88e490f80c036affbc36785ce7315909f534f49d566e781a307adce17ebd9b4c",
+      "rcp-changes.json": "5b2a7c599dc661c2cec84f6020a447ccf3c99e89b4ec0890367fa534f1fcf113",
+      "optix_probe.cpp": "b496d08c4219741cf37fa35c3a281813538d4878c760a3790cdc6f71952f3a7c",
+      "libnvoptix.so.1": "15580943292a707439a7ef3ffda1dfc091371240e1237c6c8df6ae1fb90e520e",
+      "reciprocal.ptx": "f0ff962e9390376b22c846b85ac20d58426b32ab9ee7162b4dddc439693738dd",
+      "reciprocal.sass": "57c8ba22615a9f1df3dabde803d012f0ed5fd11d878a06fe631e095f40799a2c",
+      "reciprocal.ptxas.log": "376855046354d0ac42be95547e3b3db84d4e7af0c9f62e10d0b8ce7e98fb5ff9",
+      "control.sh": "c39349ac4e80615eaf8d1ac9e7c08fd85e78e825aea443591df6bc5cfa98638f",
+      "control-rcp.sh": "32bd05af39205970f3875d584ca4cb8056a24b1194afd0b424232622de00ea63"
+    },
+    "findings": [
+      "Fast trig/sqrt present in both; no extra ray trace or HitObject calls. Both PTX8.8/sm80, produced using CUDA12.9.",
+      "Closest-hit native feedback:128registers,zero direct spills,160continuation stack/144continuation spill bytes on both. Direct stack NVRTC24 vs NVVM40.",
+      "Two canonical dynamic extractelement operations on one metallic/roughness float4 become two local slots on NVVM; NVRTC reuses one. PTX reserve32 vs16 bytes. Input shape is valid; issue is downstream lowering quality.",
+      "Temporary local-slot reuse gives native direct stack24 and .251/.250ms; register-select replacement gives direct stack0 and .252/.254ms. NVVM baselines .262/.256 then .272/.250; no closure of .226/.229ms NVRTC gap and small effects overlap baseline variation.",
+      "24 uniquely defined unpredicated constant-one divisions replaced by reciprocal for diagnosis. Isolated CUDA12.9 SM89 assembly: same MUFU.RCP core but division adds FADD.FTZ; both8registers/no stack/no spills. Approximate contracts are not generally bit-equivalent.",
+      "Reciprocal control .251/.262ms, between baseline .272/.250ms: no repeatable gain demonstrated.",
+      "All12timed processes and6capture processes exit0; all26full-RGBA checks bit-identical within backend/capture baseline. No cross-backend equivalence claim.",
+      "NVVM clock samples2040MHz; NVRTC1980/1995/2010/2040; memory6251MHz/P0 throughout. Clocks not locked."
+    ],
+    "limitations": [
+      "PTX/static compiler instruction counts are not dynamic native instruction counts.",
+      "Registers/stacks are native OptiX compiler feedback; full OptiX SASS and counters remain unavailable.",
+      "PTX substitutions are diagnostic only, not production compiler implementations or universal numerical equivalence.",
+      "Clocks observed, not locked. Capture processes are not timing samples.",
+      "Legacy capture helper writes identity to [vsyscall] because its output path is shadowed.",
+      "Initial cuobjdump lookup failed; existing versioned CUDA12.9 nvdisasm succeeded."
+    ],
+    "summary_sha256": "919a90c044935627af6f0382a1000261650b7f7f77366f52f17356827f4db7ef",
+    "result_reference": "issue-nvvm-backend/RESULTS.md#optimized-falcor-ptx-comparison",
+    "review": "Independent read-only review verified12000timings,300clock samples,26nontrivialRGBA comparisons,11loaded-library hashes,11diagnostic hashes,native properties and24reciprocal substitutions."
   }
 }
