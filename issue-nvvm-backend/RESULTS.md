@@ -2502,3 +2502,60 @@ directories. Exact retained metrics and failure transitions are in the focused/a
 Final qualification: rebuilt static **34 pass / the same four known failures**, smoke **16/16**,
 and working **1,735/1,735**, with zero working regressions or changed inputs. Independent
 implementation and evidence review accepted the bounded change.
+
+### Fast math combined with graph specialization
+
+On the qualified fast-mode compiler, run the unchanged Falcor harness through the unchanged
+process-local OptiX wrapper for all arms. The control sets both graph probes to zero; the depth
+control sets only `PROBE_GRAPH_DEPTH2=1`; the specialization sets both
+`PROBE_GRAPH_DEPTH2=1 PROBE_SINGLE_LEVEL=1`. Keep `--fast-math --visibility trace --iterations 1000`
+and the default three-second warmup. The diagnostic wrapper is rebuilt against the actual OptiX9
+headers, with the real driver selected explicitly. No production RHI configuration changes.
+
+Two rotated rounds on the same lit 512×512 scene give:
+
+| Fast-math pipeline | NVRTC, ms/iteration | NVVM, ms/iteration |
+| --- | --- | --- |
+| General graph, depth bound 31 | 0.316 / 0.315 | 0.315 / 0.315 |
+| General graph, depth bound 2 | 0.316 / 0.315 | 0.316 / 0.315 |
+| Single-level instancing, depth bound 2 | 0.228 / 0.233 | 0.255 / 0.250 |
+
+The combined specialization reduces observed time by about **27% NVRTC / 20% NVVM** relative to
+fast/general. Depth-bound reduction alone has no measurable benefit. This isolates the graph
+compile contract as the substantial lever; it does not attribute the gain exclusively to hardware
+traversal rather than optimized transform/query/shader code. NVRTC is faster in the restricted
+configuration; the general-graph parity does not carry over. All NVVM and general/depth-only NVRTC
+samples are 2,040 MHz SM. Both NVRTC single-level runs sample 1,995 and 2,040 MHz; report that
+variation rather than claim a fixed-clock cross-backend ratio. All measured memory clocks are
+6,251 MHz and P0. Prior matched Vulkan trace control 0.264192 ms and default visibility 0.2007 ms
+are historical references, not fresh measurements in this comparison.
+
+All twelve processes exit 0. Twenty full-RGBA first/final comparisons show bit-identical images
+across graph settings and between rounds within each backend. This does not erase the previously
+recorded fast/default or cross-backend image differences. Effective pipeline logs confirm 32 payload
+words, recursion 2, custom+triangle primitive flags (2147483649), six program groups and unchanged
+384-byte continuation allocation; only the intended graph flag/depth differs. Each arm records
+loaded-library identities, and compiler/provider/application binaries match the prior fast-mode
+qualification. The wrapper is the only additional loaded library. Raw evidence, all 12,000 iteration
+samples, clock samples, images and logs are under `build/nvvm-fast-graph/`; the current application
+manifest owns the compact accepted comparison. An initial analysis assertion incorrectly expected
+primitive mask 3; the installed SDK defines triangle at bit31, so the expected mask was corrected.
+No runtime measurement failed or was replaced.
+
+HitObjects do **not** add an acceleration-structure level. `IAS -> GAS` has graph depth 2;
+`IAS -> motion-transform -> GAS` has depth 3. Normal instance matrices already fit the first form.
+The graph flags declare which structures may occur, while the stack API's graph-depth argument
+bounds their depth. The ray-call recursion limit is a third, independent control: this Falcor
+configuration uses two nested trace calls despite six path bounces.
+
+The current owned HitObject implementation captures a GAS handle, opaque traversal data and an
+ordered transform list, then restores them with `_optix_hitobject_make_with_traverse_data_v2`.
+Earlier SDK9/driver tests produced zero instance IDs and a linear-swept-sphere replay failure under
+single-level specialization; changing only the RHI graph flag to `ALLOW_ANY` repaired those cases.
+That is a retained compatibility constraint, not proof that HitObjects intrinsically require
+`ALLOW_ANY` or another graph level. These Falcor tests qualify the conventional TraceRay path only.
+A production scoped graph contract still needs the existing replay and motion cases to remain valid.
+
+See the [pipeline configuration inventory](../docs/design/nvvm-backend.md#optix-pipeline-configuration)
+for native OptiX controls and their current RHI exposure. This bounded comparison is complete;
+production API changes and further HitObject compatibility investigation are separate work.

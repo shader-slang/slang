@@ -1,5 +1,13 @@
 # NVVM development workflow
 
+**Bounded combined fast/graph comparison complete (2026-10-04):** the maintainer requested testing
+fast mode together with graph specialization and clarification of OptiX pipeline controls. Twelve
+matched runs and independent evidence review establish about 27% NVRTC / 20% NVVM lower observed
+time under single-level specialization, with bit-identical within-backend images. Depth reduction
+alone provides no measured benefit. HitObjects do not add a graph level; existing owned-replay
+compatibility remains a separate constraint. No production compiler/RHI code changed. The local
+results/documentation commit completes this bounded request without restarting the general loop.
+
 **Bounded NVVM fast-mode implementation complete (2026-10-04):** the maintainer authorized making
 fast mode effective and explicitly deferred pipeline configuration. Target-aware library selection,
 typed approximate Float32 division, sqrt and FTZ policy are implemented and numerically qualified.

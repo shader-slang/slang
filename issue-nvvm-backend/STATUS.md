@@ -1,5 +1,19 @@
 # NVVM current status
 
+**Fast math plus graph specialization (2026-10-04):** two rotated 1,000-iteration runs per
+configuration show fast/general **0.316/0.315 ms NVRTC, 0.315/0.315 ms NVVM**; fast/single-level
+**0.228/0.233 ms NVRTC, 0.255/0.250 ms NVVM**. About 27%/20% less observed time. Reducing only
+the graph-depth bound 31→2 has no measurable benefit. All twelve processes exit0 and twenty
+first/final full-RGBA comparisons are bit-identical within each backend. NVRTC single-level clocks
+vary 1,995–2,040 MHz; all other SM samples are 2,040 MHz, memory 6,251 MHz/P0 throughout.
+
+This is a diagnostic wrapper comparison with unchanged production RHI. HitObjects do not add an
+acceleration-structure level: current `ALLOW_ANY` protects an observed SDK9/driver compatibility
+failure in owned-hit reconstruction, not an extra-level requirement. The [configuration inventory](../docs/design/nvvm-backend.md#optix-pipeline-configuration)
+distinguishes graph shape, graph-depth bounds, ray recursion, stacks and module options. Exact
+results and qualifications are in [RESULTS](RESULTS.md#fast-math-combined-with-graph-specialization)
+and the application manifest. This bounded comparison is complete; production policy remains deferred.
+
 **NVVM fast mode qualified (2026-10-04):** approximate Float32 library math, division and square
 root now follow explicit fast mode, including default FTZ and explicit denormal preservation.
 General OptiX pipeline configuration is unchanged. On the lit 512×512 Falcor workload, two

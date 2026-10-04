@@ -298,8 +298,9 @@ The sibling RHI adapter uses `OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY` for this r
 recorded SDK9/driver combination, the single-level specialization produced zero instance identity
 and a linear-swept-sphere failure after owned-hit restoration. The conservative option preserves
 that restored transform list in the tested cases. This is an observed compatibility constraint,
-not a universal prohibition on the specialization; its performance impact has not been measured.
-The option alone does not establish support for deeper application scene graphs.
+not a universal prohibition on the specialization or a requirement for an extra graph level.
+The option alone does not establish support for deeper application scene graphs. The conventional
+Falcor TraceRay path now has a separate [fast/graph performance comparison](../../issue-nvvm-backend/RESULTS.md#fast-math-combined-with-graph-specialization); it does not qualify owned replay under restricted flags.
 
 OptiX9 cannot represent arbitrary MakeHit identity/attribute construction through the removed older
 ABI primitives. All four public arbitrary constructors diagnose explicitly; traced-hit restoration is
@@ -775,6 +776,47 @@ Nondefault FP16/FP64 denormal policies and duplicate managed overrides reject be
 NVRTC option aggregation differs; comparisons record effective options rather than equating labels.
 The maintained three-mode corpus uses NVRTC O3 and NVVM O0/O3; fast-mode numerical and code-generation
 qualification is separate in [RESULTS](../../issue-nvvm-backend/RESULTS.md#nvvm-fast-mode-qualification).
+
+## OptiX pipeline configuration
+
+The scene-graph contract and its depth bound are separate. `ALLOW_SINGLE_GAS` permits a bare GAS;
+`ALLOW_SINGLE_LEVEL_INSTANCING` permits IAS directly over GAS, including ordinary instance matrices,
+but no intervening transform traversables. These two flags may be combined. `ALLOW_ANY` permits
+general supported graphs. They specialize compilation and must agree across modules and pipeline
+creation. `maxTraversableGraphDepth` passed to `optixPipelineSetStackSize` bounds traversal depth:
+IAS/GAS is two, IAS/motion-transform/GAS is three. It does not add graph nodes or change which
+shapes are allowed. HitObject storage/reconstruction is not an additional scene-graph node.
+
+The ray-call recursion limit is independent of graph depth and path bounce count. Falcor's tested
+six-bounce tracer uses `maxRecursion=2` for a shadow trace nested inside closest-hit. Its path-bounce
+loop does not require six simultaneously nested trace frames.
+
+Current sibling RHI `src/cuda/optix-api-impl.cpp::ContextImpl::createPipeline` maps controls as follows:
+
+| OptiX control | Current RHI configuration |
+| --- | --- |
+| `traversableGraphFlags` | Hardcoded `ALLOW_ANY` to preserve the qualified owned HitObject replay path. No public graph-contract field yet. |
+| `maxTraversableGraphDepth` | Queried device limit (31 on this system), not scene-derived or exposed through the current extension. |
+| `maxTraceDepth` | `RayTracingPipelineDesc::maxRecursion`; two in the tested Falcor trace-visibility configuration. |
+| Payload/attribute capacity | Descriptor byte counts rounded to 32-bit words. Falcor uses 32 payload words. Trace modules do not currently receive typed per-word payload-liveness annotations. |
+| Continuation/direct-call stacks | Computed from program-group requirements and recursion. The existing `OptixRayTracingPipelineDesc` exposes direct-call depths from state/traversal, defaulting to 1/0. |
+| Primitive types | Custom and triangles always enabled; sphere and round-linear support added from descriptor flags. |
+| Motion | `usesMotionBlur` currently hardcoded to zero in this adapter. |
+| Opacity micromaps/clusters | Forwarded from corresponding pipeline flags; clusters require OptiX9. |
+| Module register/optimization/debug controls | No register cap; default optimization/debug levels. Native bound-value specialization is unused. These are module compile options, not fields currently exposed by this RHI pipeline descriptor. |
+| Exceptions/launch parameters | Exceptions disabled; launch-parameter symbol selected from the emitted ABI. The latter is an ABI requirement, not a performance switch. |
+
+Native API definitions are in the [OptiX reference](https://raytracing-docs.nvidia.com/optix9/api/OptiX_API_Reference.pdf).
+The [programming guide](https://raytracing-docs.nvidia.com/optix9/guide/optix_guide.250130.A4.pdf)
+explains compile-time specialization of transform intrinsics from graph/motion options. Acceleration
+structure build preferences are separate build-time settings. Shader fast math is also selected
+upstream, when Slang/NVRTC/NVVM produces PTX, rather than by a graph/depth pipeline option.
+
+The measured fast-mode Falcor graph specialization is a diagnostic opt-in, not a general RHI
+policy change. Reconstructed HitObject identity/curve behavior under restricted flags remains an
+observed SDK9/driver compatibility issue. Neither all HitObject usage nor the union of single-GAS
+and single-level flags has been qualified by this Falcor experiment. Production configuration
+should express the actual allowed graph and replay contract rather than assume an extra level.
 
 ## Numerical and target-specific boundaries
 

@@ -300,8 +300,9 @@ compile cells each select one entry at O0/O3; they do not run the host.
 The sibling RHI adapter now selects the conservative `ALLOW_ANY` graph option. On the recorded
 SDK9/driver combination, the previous single-level specialization yielded zero instance identity
 and a linear-swept-sphere failure after replay; the isolated corrected instance-ID and LSS cases pass 70 assertions.
-This is observed compatibility evidence, not a universal API prohibition. Performance is unmeasured,
-and this option does not extend the RHI scene-depth qualification.
+This is observed compatibility evidence, not a universal API prohibition or an extra graph-level
+requirement. This option does not extend the RHI scene-depth qualification. The conventional
+Falcor TraceRay path has a separate [fast/graph performance comparison](../../issue-nvvm-backend/RESULTS.md#fast-math-combined-with-graph-specialization); that comparison does not qualify owned replay under restricted flags.
 
 The retained compatibility gate compiles the two explicit SDK8.1 constructors through NVRTC, but
 OptiX9 rejects both at module creation7204 (maximum supported ABI102, current105). A NOP control
