@@ -1,5 +1,26 @@
 # NVVM current status
 
+**Falcor Vulkan comparison and code inspection (2026-10-04):** on the same lit 512×512
+DamagedHelmet/L4 workload, 150 iterations per mode give median GPU times **0.7235 ms NVRTC**,
+**0.7010 ms NVVM**, **1.7961 ms Vulkan default**, and **2.0234 ms Vulkan trace-ray control**.
+NVVM is **2.56× faster than default Vulkan in this case**. Vulkan default uses ray-query/early
+visibility; the control matches CUDA's trace-ray/late configuration. Float4 output formats match, while
+the existing helper's debug-info setting differs by API. All 12 timing runs pass; sparse image
+differences remain unqualified. See [exact evidence](RESULTS.md#falcor-vulkan-comparison-and-nvvm-code-inspection).
+
+The strongest generated-code lead is split NVVM `sincos`: closest-hit PTX has 34 large-angle
+range-reduction sequences versus 21 on NVRTC. An isolated SM89 shader confirms **32-byte versus
+zero stack frame** and **3,072 versus 2,560 executable bytes**, with no spills on either route.
+The extra local-memory path is large-angle-only; Falcor performance impact is not established.
+No compiler/runtime implementation changes were made.
+
+Full OptiX SASS/counter inspection is **blocked by ERR_NVGPUCTRPERM**. A capture-only launcher
+works around a separately diagnosed slang-rhi CUDA-symbol collision so Nsight starts with an optixLaunch filter;
+profiling access is the remaining known capture blocker. No global permissions were changed.
+The comparison, PTX review and isolated native-code evidence are independently reviewed. This
+finite investigation does not resume general feature work; the existing four static baseline
+failures and prior CUDA image differences remain recorded.
+
 **Falcor milestone complete (2026-10-03):** standard-library `GeometryIndex()` works on NVRTC
 and NVVM, Falcor's workaround is removed, and the necessary compiler blockers are repaired. The
 original path-tracer test and a lit 512×512 DamagedHelmet workload run on both backends. On L4,

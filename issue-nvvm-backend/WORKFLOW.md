@@ -1,5 +1,12 @@
 # NVVM development workflow
 
+**Bounded Vulkan comparison/code inspection (2026-10-04):** the maintainer requested matched
+Vulkan timings and review of generated NVVM PTX/SASS. The four-mode comparison and PTX/isolated
+SASS inspection are complete and reviewed; full OptiX native-code profiling is blocked by GPU
+counter permissions. No compiler/runtime optimization or global profiling-setting change was
+made. Retain the sincos lead, loader collision and exact capture boundary in current evidence.
+This finite analysis does not restart the general development loop.
+
 **Falcor milestone complete (2026-10-03):** standard-library GeometryIndex and the necessary
 application fixes are accepted. Original smoke and lit path tracing render on both backends; the
 matched iteration/compilation comparison is recorded in STATUS, RESULTS and falcor2-status.json.

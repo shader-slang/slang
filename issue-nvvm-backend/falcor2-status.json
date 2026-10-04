@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "observed_on": "2026-10-03",
-  "scope": "One existing CUDA path tracer smoke test; not image equivalence or a complete application suite.",
+  "observed_on": "2026-10-04",
+  "scope": "Original CUDA path-tracer smoke qualification, lit CUDA/Vulkan timing comparison, and NVVM PTX/isolated SASS inspection; full OptiX SASS blocked by profiling permissions, full Falcor suite not run.",
   "test_id": "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]",
   "scene": "data/assets/kronos/DamagedHelmet/glTF/DamagedHelmet.gltf",
   "dimensions": [
@@ -1341,5 +1341,745 @@
       "last": 49
     },
     "images_are_accumulated": false
+  },
+  "vulkan_comparison": {
+    "workload": {
+      "dimensions": [
+        512,
+        512
+      ],
+      "scene": "DamagedHelmet",
+      "camera_position": [
+        0,
+        0,
+        3
+      ],
+      "fov_y": 45,
+      "illumination": "ConstantLight RGB(1,1,1)",
+      "iterations": 50,
+      "warmup_iterations": 10,
+      "settings": {
+        "max_depth": "6",
+        "rr_depth": "3",
+        "use_background_color": "False",
+        "background_color": "{0, 0, 0}"
+      }
+    },
+    "cycles": 3,
+    "order": [
+      [
+        "nvrtc",
+        "nvvm",
+        "vulkan-default",
+        "vulkan-trace"
+      ],
+      [
+        "vulkan-default",
+        "vulkan-trace",
+        "nvvm",
+        "nvrtc"
+      ],
+      [
+        "nvvm",
+        "vulkan-default",
+        "nvrtc",
+        "vulkan-trace"
+      ]
+    ],
+    "modes": {
+      "nvrtc": {
+        "specialization_constants": {
+          "ENABLE_NEE": true,
+          "ENABLE_MIS": true,
+          "ENABLE_INTERIOR_TRACKING": true,
+          "ENABLE_NESTED_INTERIORS": false,
+          "ENABLE_HOMOGENEOUS_MEDIA": true,
+          "ENABLE_RUSSIAN_ROULETTE": true,
+          "ENABLE_DEPTH_OF_FIELD": true,
+          "ENABLE_TRIANGLE_BACKFACE_CULLING": false,
+          "ENABLE_PRECISE_RAY_OFFSETS": false,
+          "SCHEDULING_MODE": 0,
+          "VISIBILITY_RAY_MODE": 1,
+          "VISIBILITY_RAY_PLACEMENT": 1
+        },
+        "compiler_options": {
+          "optimization": "SlangOptimizationLevel.default",
+          "floating_point_mode": "SlangFloatingPointMode.default",
+          "debug_info": "SlangDebugInfoLevel.standard",
+          "matrix_layout": "SlangMatrixLayout.row_major",
+          "shader_model": "ShaderModel.unknown"
+        },
+        "device_info": {
+          "api_name": "CUDA",
+          "adapter_name": "NVIDIA L4",
+          "timestamp_frequency": 1000000,
+          "optix_version": 90000
+        },
+        "debug_layers": true,
+        "module_cache": false,
+        "shader_cache": false,
+        "samples": 150,
+        "median_gpu_ms": 0.7235000000003211,
+        "mean_gpu_ms": 0.7230399999999312,
+        "p10_gpu_ms": 0.7090000000005148,
+        "p90_gpu_ms": 0.7369999999990995,
+        "run_medians": [
+          0.7250000000000867,
+          0.7250000000000867,
+          0.7199999999993878
+        ],
+        "median_first_render_wall_seconds": 2.922649754968006,
+        "median_scene_setup_seconds": 8.709908477030694,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 2.2295830000000008,
+            "compile_slang_time": 1.5358476470000009,
+            "compile_downstream_time": 0.6937353529999999,
+            "create_pipeline_time": 0.027101781000000002
+          },
+          {
+            "compile_time": 2.2282119999999996,
+            "compile_slang_time": 1.5377433029999996,
+            "compile_downstream_time": 0.690468697,
+            "create_pipeline_time": 0.029050502000000002
+          },
+          {
+            "compile_time": 2.3065500000000005,
+            "compile_slang_time": 1.6049111920000003,
+            "compile_downstream_time": 0.7016388080000002,
+            "create_pipeline_time": 0.026528368
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 2.2295830000000008,
+          "compile_slang_time": 1.5377433029999996,
+          "compile_downstream_time": 0.6937353529999999,
+          "create_pipeline_time": 0.027101781000000002
+        },
+        "loaded_libraries_sha256": {
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+          "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+          "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+        }
+      },
+      "nvvm": {
+        "specialization_constants": {
+          "ENABLE_NEE": true,
+          "ENABLE_MIS": true,
+          "ENABLE_INTERIOR_TRACKING": true,
+          "ENABLE_NESTED_INTERIORS": false,
+          "ENABLE_HOMOGENEOUS_MEDIA": true,
+          "ENABLE_RUSSIAN_ROULETTE": true,
+          "ENABLE_DEPTH_OF_FIELD": true,
+          "ENABLE_TRIANGLE_BACKFACE_CULLING": false,
+          "ENABLE_PRECISE_RAY_OFFSETS": false,
+          "SCHEDULING_MODE": 0,
+          "VISIBILITY_RAY_MODE": 1,
+          "VISIBILITY_RAY_PLACEMENT": 1
+        },
+        "compiler_options": {
+          "optimization": "SlangOptimizationLevel.default",
+          "floating_point_mode": "SlangFloatingPointMode.default",
+          "debug_info": "SlangDebugInfoLevel.standard",
+          "matrix_layout": "SlangMatrixLayout.row_major",
+          "shader_model": "ShaderModel.unknown"
+        },
+        "device_info": {
+          "api_name": "CUDA",
+          "adapter_name": "NVIDIA L4",
+          "timestamp_frequency": 1000000,
+          "optix_version": 90000
+        },
+        "debug_layers": true,
+        "module_cache": false,
+        "shader_cache": false,
+        "samples": 150,
+        "median_gpu_ms": 0.7010000000002847,
+        "mean_gpu_ms": 0.7009666666665382,
+        "p10_gpu_ms": 0.6848999999991889,
+        "p90_gpu_ms": 0.7169999999998566,
+        "run_medians": [
+          0.6915000000002891,
+          0.7019999999986481,
+          0.7059999999992073
+        ],
+        "median_first_render_wall_seconds": 4.774880038981792,
+        "median_scene_setup_seconds": 8.185223780979868,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 4.00091,
+            "compile_slang_time": 1.8194475860000001,
+            "compile_downstream_time": 2.1814624140000003,
+            "create_pipeline_time": 0.021760266
+          },
+          {
+            "compile_time": 3.941956,
+            "compile_slang_time": 1.7493472449999996,
+            "compile_downstream_time": 2.192608755,
+            "create_pipeline_time": 0.020793814
+          },
+          {
+            "compile_time": 4.114668,
+            "compile_slang_time": 1.7674053559999998,
+            "compile_downstream_time": 2.3472626440000006,
+            "create_pipeline_time": 0.020632533
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 4.00091,
+          "compile_slang_time": 1.7674053559999998,
+          "compile_downstream_time": 2.192608755,
+          "create_pipeline_time": 0.020793814
+        },
+        "loaded_libraries_sha256": {
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+          "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+        }
+      },
+      "vulkan-default": {
+        "specialization_constants": {
+          "ENABLE_NEE": true,
+          "ENABLE_MIS": true,
+          "ENABLE_INTERIOR_TRACKING": true,
+          "ENABLE_NESTED_INTERIORS": false,
+          "ENABLE_HOMOGENEOUS_MEDIA": true,
+          "ENABLE_RUSSIAN_ROULETTE": true,
+          "ENABLE_DEPTH_OF_FIELD": true,
+          "ENABLE_TRIANGLE_BACKFACE_CULLING": false,
+          "ENABLE_PRECISE_RAY_OFFSETS": false,
+          "SCHEDULING_MODE": 0,
+          "VISIBILITY_RAY_MODE": 0,
+          "VISIBILITY_RAY_PLACEMENT": 0
+        },
+        "compiler_options": {
+          "optimization": "SlangOptimizationLevel.default",
+          "floating_point_mode": "SlangFloatingPointMode.default",
+          "debug_info": "SlangDebugInfoLevel.none",
+          "matrix_layout": "SlangMatrixLayout.row_major",
+          "shader_model": "ShaderModel.unknown"
+        },
+        "device_info": {
+          "api_name": "Vulkan",
+          "adapter_name": "NVIDIA L4",
+          "timestamp_frequency": 1000000000,
+          "optix_version": 0
+        },
+        "debug_layers": true,
+        "module_cache": false,
+        "shader_cache": false,
+        "samples": 150,
+        "median_gpu_ms": 1.7960960103664547,
+        "mean_gpu_ms": 1.7973657584904383,
+        "p10_gpu_ms": 1.7786879907362163,
+        "p90_gpu_ms": 1.820774411316961,
+        "run_medians": [
+          1.7976319941226393,
+          1.7940480029210448,
+          1.7976320232264698
+        ],
+        "median_first_render_wall_seconds": 2.7835013060248457,
+        "median_scene_setup_seconds": 6.85219797398895,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 2.115412,
+            "compile_slang_time": 1.464492276,
+            "compile_downstream_time": 0.650919724,
+            "create_pipeline_time": 0.022128562
+          },
+          {
+            "compile_time": 2.060835,
+            "compile_slang_time": 1.420275352,
+            "compile_downstream_time": 0.6405596479999999,
+            "create_pipeline_time": 0.022690473000000003
+          },
+          {
+            "compile_time": 2.3610059999999997,
+            "compile_slang_time": 1.6300984239999998,
+            "compile_downstream_time": 0.730907576,
+            "create_pipeline_time": 0.021984402
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 2.115412,
+          "compile_slang_time": 1.464492276,
+          "compile_downstream_time": 0.650919724,
+          "create_pipeline_time": 0.022128562
+        },
+        "loaded_libraries_sha256": {
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+          "/usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.595.71.05": "05227acb05efa773285681e823f02ea4a6f70bc118b7ff97de86093991259347",
+          "/usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.595.71.05": "aaea13caed6e5e85e3e7900139340196e91701f36060e6c99f9c0d400736d6c8",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+          "/usr/lib/x86_64-linux-gnu/libvulkan.so.1.3.275": "e833b010f814b72c6aca0300c8b5f19b6106ffa06c24ddc95a293970c7d6058e",
+          "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+          "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+        }
+      },
+      "vulkan-trace": {
+        "specialization_constants": {
+          "ENABLE_NEE": true,
+          "ENABLE_MIS": true,
+          "ENABLE_INTERIOR_TRACKING": true,
+          "ENABLE_NESTED_INTERIORS": false,
+          "ENABLE_HOMOGENEOUS_MEDIA": true,
+          "ENABLE_RUSSIAN_ROULETTE": true,
+          "ENABLE_DEPTH_OF_FIELD": true,
+          "ENABLE_TRIANGLE_BACKFACE_CULLING": false,
+          "ENABLE_PRECISE_RAY_OFFSETS": false,
+          "SCHEDULING_MODE": 0,
+          "VISIBILITY_RAY_MODE": 1,
+          "VISIBILITY_RAY_PLACEMENT": 1
+        },
+        "compiler_options": {
+          "optimization": "SlangOptimizationLevel.default",
+          "floating_point_mode": "SlangFloatingPointMode.default",
+          "debug_info": "SlangDebugInfoLevel.none",
+          "matrix_layout": "SlangMatrixLayout.row_major",
+          "shader_model": "ShaderModel.unknown"
+        },
+        "device_info": {
+          "api_name": "Vulkan",
+          "adapter_name": "NVIDIA L4",
+          "timestamp_frequency": 1000000000,
+          "optix_version": 0
+        },
+        "debug_layers": true,
+        "module_cache": false,
+        "shader_cache": false,
+        "samples": 150,
+        "median_gpu_ms": 2.0234239927958697,
+        "mean_gpu_ms": 1.9995921035297215,
+        "p10_gpu_ms": 1.986252807546407,
+        "p90_gpu_ms": 2.0853760128375143,
+        "run_medians": [
+          2.0249600056558847,
+          2.022911998210475,
+          2.0203519670758396
+        ],
+        "median_first_render_wall_seconds": 2.776846982014831,
+        "median_scene_setup_seconds": 6.856521293986589,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 2.0551899999999996,
+            "compile_slang_time": 1.4374571839999997,
+            "compile_downstream_time": 0.6177328160000001,
+            "create_pipeline_time": 0.022050621000000003
+          },
+          {
+            "compile_time": 1.995282,
+            "compile_slang_time": 1.426047389,
+            "compile_downstream_time": 0.569234611,
+            "create_pipeline_time": 0.021849533
+          },
+          {
+            "compile_time": 2.0869510000000004,
+            "compile_slang_time": 1.4856561140000004,
+            "compile_downstream_time": 0.6012948859999999,
+            "create_pipeline_time": 0.022838164
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 2.0551899999999996,
+          "compile_slang_time": 1.4374571839999997,
+          "compile_downstream_time": 0.6012948859999999,
+          "create_pipeline_time": 0.022050621000000003
+        },
+        "loaded_libraries_sha256": {
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+          "/usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.595.71.05": "05227acb05efa773285681e823f02ea4a6f70bc118b7ff97de86093991259347",
+          "/usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.595.71.05": "aaea13caed6e5e85e3e7900139340196e91701f36060e6c99f9c0d400736d6c8",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+          "/usr/lib/x86_64-linux-gnu/libvulkan.so.1.3.275": "e833b010f814b72c6aca0300c8b5f19b6106ffa06c24ddc95a293970c7d6058e",
+          "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+          "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+        }
+      }
+    },
+    "image_comparisons": [
+      {
+        "reference": "nvvm",
+        "mode": "nvrtc",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "mae": 3.8458118360802825e-06,
+        "rmse": 0.0009041507331576603,
+        "max_abs": 0.3475896120071411,
+        "pixels_above_0_001": 6,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "nvvm",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "mae": 0.0,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "vulkan-default",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "mae": 0.0001408554160168494,
+        "rmse": 0.009102027306357289,
+        "max_abs": 1.0,
+        "pixels_above_0_001": 188,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "vulkan-trace",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "mae": 0.00014085541576497665,
+        "rmse": 0.009102027306357442,
+        "max_abs": 1.0,
+        "pixels_above_0_001": 188,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "vulkan-default",
+        "mode": "vulkan-trace",
+        "frame": "first",
+        "mae": 3.7135666359118984e-12,
+        "rmse": 3.9145496831473845e-10,
+        "max_abs": 1.1920928955078125e-07
+      },
+      {
+        "reference": "nvvm",
+        "mode": "nvrtc",
+        "frame": "last",
+        "iteration": 49,
+        "finite_nonzero": true,
+        "mae": 1.0048525803930226e-05,
+        "rmse": 0.0021420130112767347,
+        "max_abs": 0.7010501027107239,
+        "pixels_above_0_001": 11,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "nvvm",
+        "frame": "last",
+        "iteration": 49,
+        "finite_nonzero": true,
+        "mae": 0.0,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "vulkan-default",
+        "frame": "last",
+        "iteration": 49,
+        "finite_nonzero": true,
+        "mae": 0.00012742693011968728,
+        "rmse": 0.008523780566611478,
+        "max_abs": 0.9823766350746155,
+        "pixels_above_0_001": 184,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "nvvm",
+        "mode": "vulkan-trace",
+        "frame": "last",
+        "iteration": 49,
+        "finite_nonzero": true,
+        "mae": 0.00012742693004341496,
+        "rmse": 0.008523780568485894,
+        "max_abs": 0.9823766350746155,
+        "pixels_above_0_001": 184,
+        "repeat_bit_identical": true
+      },
+      {
+        "reference": "vulkan-default",
+        "mode": "vulkan-trace",
+        "frame": "last",
+        "mae": 3.3099449107491332e-12,
+        "rmse": 3.5848261614369595e-10,
+        "max_abs": 1.1920928955078125e-07
+      }
+    ],
+    "harness_sha256": "7b975ccae696c1119ae2e43cbde7a2c5a52bb62d3c39f9be705301cf32b66d82",
+    "raw_evidence": "build/nvvm-falcor-vulkan/",
+    "time_relative_to_nvvm": {
+      "nvrtc": 1.0320970042796394,
+      "nvvm": 1.0,
+      "vulkan-default": 2.5621911702792084,
+      "vulkan-trace": 2.88648215805285
+    },
+    "limitations": [
+      "One scene/configuration on L4; no general CUDA-versus-Vulkan claim.",
+      "Debug layers and RHI validation enabled, but GPU-assisted and RT validation off. Vulkan Slang debug_info none vs CUDA standard (existing helper workaround).",
+      "Module/shader caches disabled; driver/OptiX caches may be warm; clocks not locked.",
+      "Default Vulkan uses ray_query/early, matched Vulkan uses trace_ray/late; CUDA trace_ray/late. Float4 Tensor output matches.",
+      "No image equivalence claim: finite/nonzero outputs and sparse cross-backend differences recorded."
+    ],
+    "review": "Independent audit approved: all600timings,12run identities/settings,report snapshots,CSV,image metrics and hashes verified.",
+    "replay": {
+      "cwd": "../falcor2",
+      "environment": "source ../slang/build/nvvm-falcor2/environment.sh",
+      "vulkan_default": "SLANGPY_DEVICE=vulkan SLANGPY_TEST_CUDA_COMPILER=nvrtc FALCOR_IDENTITY_REPORT=../slang/build/nvvm-falcor-vulkan/replay-vulkan-identity.json .venv/bin/python ../slang/build/nvvm-falcor-vulkan/benchmark.py --api vulkan --output ../slang/build/nvvm-falcor-vulkan/replay-vulkan.json",
+      "vulkan_trace_control": "Add --visibility trace, with distinct output/identity paths.",
+      "cuda": "Use --api cuda and SLANGPY_DEVICE=cuda; select SLANGPY_TEST_CUDA_COMPILER=nvrtc|nvvm.",
+      "cycles": "[nvrtc,nvvm,vulkan-default,vulkan-trace], [vulkan-default,vulkan-trace,nvvm,nvrtc], [nvvm,vulkan-default,nvrtc,vulkan-trace], all serial."
+    }
+  },
+  "code_generation_review": {
+    "scope": "Actual Falcor stage PTX plus isolated SM89 sincos native code; no full OptiX SASS or hardware-counter claim.",
+    "source_revision": "0cfb37140f799d162d4576a9f0b451ce4cf4b15e",
+    "ptx": {
+      "nvrtc": {
+        "__raygen__raygen_main": {
+          "file": "capture-nvrtc/render2.ptx",
+          "sha256": "b56a96db8d54bb98623bba25cf0485ae14fe9238972de6b8b9aa021dc1ad9354",
+          "bytes": 94508,
+          "entry": "__raygen__raygen_main",
+          "static_instruction_lines": 891,
+          "ptx_local_bytes": 52,
+          "local_loads": 4,
+          "local_stores": 8,
+          "fp64_instructions": 3,
+          "optix_call_sites": {
+            "_optix_get_launch_index_x": 1,
+            "_optix_get_launch_index_y": 1,
+            "_optix_get_launch_index_z": 1,
+            "_optix_trace_typed_32": 1
+          }
+        },
+        "__closesthit___scene_scatter_triangle_closest_hit": {
+          "file": "capture-nvrtc/render4.ptx",
+          "sha256": "308879c78ad4360b64d9de15cf8c2e58200efa3b0b6083acee01237eeeb26ba1",
+          "bytes": 1435730,
+          "entry": "__closesthit___scene_scatter_triangle_closest_hit",
+          "static_instruction_lines": 17131,
+          "ptx_local_bytes": 48,
+          "local_loads": 65,
+          "local_stores": 44,
+          "fp64_instructions": 65,
+          "optix_call_sites": {
+            "_optix_get_payload": 31,
+            "_optix_get_attribute_0": 1,
+            "_optix_get_attribute_1": 1,
+            "_optix_read_instance_id": 1,
+            "_optix_read_sbt_gas_idx": 1,
+            "_optix_read_primitive_idx": 1,
+            "_optix_get_ray_tmax": 1,
+            "_optix_trace_typed_32": 1,
+            "_optix_set_payload": 31
+          }
+        },
+        "__miss___scene_scatter_miss": {
+          "file": "capture-nvrtc/render6.ptx",
+          "sha256": "390dc4b2c74deda9ec232e49e2e4b8da71b457f2487e87835320a6202e0dcc80",
+          "bytes": 184396,
+          "entry": "__miss___scene_scatter_miss",
+          "static_instruction_lines": 1497,
+          "ptx_local_bytes": 28,
+          "local_loads": 6,
+          "local_stores": 4,
+          "fp64_instructions": 6,
+          "optix_call_sites": {
+            "_optix_get_payload": 31,
+            "_optix_get_ray_tmax": 1,
+            "_optix_set_payload": 31
+          }
+        },
+        "__miss___scene_visibility_miss": {
+          "file": "capture-nvrtc/render8.ptx",
+          "sha256": "e0281567b09af6cff7b7d1d44510d8f9635e99a576dffcce7b64930bc152cdf8",
+          "bytes": 10271,
+          "entry": "__miss___scene_visibility_miss",
+          "static_instruction_lines": 7,
+          "ptx_local_bytes": 0,
+          "local_loads": 0,
+          "local_stores": 0,
+          "fp64_instructions": 0,
+          "optix_call_sites": {
+            "_optix_get_payload": 2,
+            "_optix_set_payload": 1
+          }
+        }
+      },
+      "nvvm": {
+        "__raygen__raygen_main": {
+          "file": "capture-nvvm/render2.ptx",
+          "sha256": "47846ba6d7f5b41e8a8c93ed2490c1300553bce907c2f82300d16de9a159693b",
+          "bytes": 33262,
+          "entry": "__raygen__raygen_main",
+          "static_instruction_lines": 988,
+          "ptx_local_bytes": 48,
+          "local_loads": 6,
+          "local_stores": 4,
+          "fp64_instructions": 6,
+          "optix_call_sites": {
+            "_optix_get_launch_index_x": 1,
+            "_optix_get_launch_index_y": 1,
+            "_optix_get_launch_index_z": 1,
+            "_optix_trace_typed_32": 1
+          }
+        },
+        "__closesthit___scene_scatter_triangle_closest_hit": {
+          "file": "capture-nvvm/render4.ptx",
+          "sha256": "52a9294cf71fd8946f2a44bfd1534ee4a67271bc85a63b4173536afe159bf2e5",
+          "bytes": 573773,
+          "entry": "__closesthit___scene_scatter_triangle_closest_hit",
+          "static_instruction_lines": 16270,
+          "ptx_local_bytes": 64,
+          "local_loads": 102,
+          "local_stores": 68,
+          "fp64_instructions": 102,
+          "optix_call_sites": {
+            "_optix_get_payload": 31,
+            "_optix_get_attribute_0": 1,
+            "_optix_get_attribute_1": 1,
+            "_optix_read_instance_id": 1,
+            "_optix_read_sbt_gas_idx": 1,
+            "_optix_read_primitive_idx": 1,
+            "_optix_get_ray_tmax": 1,
+            "_optix_trace_typed_32": 1,
+            "_optix_set_payload": 31
+          }
+        },
+        "__miss___scene_scatter_miss": {
+          "file": "capture-nvvm/render6.ptx",
+          "sha256": "d60aa12024fc00f00b9748ffc2a106bf3d2a48309d74d11f58215bc575021696",
+          "bytes": 49337,
+          "entry": "__miss___scene_scatter_miss",
+          "static_instruction_lines": 1441,
+          "ptx_local_bytes": 28,
+          "local_loads": 6,
+          "local_stores": 4,
+          "fp64_instructions": 6,
+          "optix_call_sites": {
+            "_optix_get_payload": 31,
+            "_optix_get_ray_tmax": 1,
+            "_optix_set_payload": 31
+          }
+        },
+        "__miss___scene_visibility_miss": {
+          "file": "capture-nvvm/render8.ptx",
+          "sha256": "52e499c15c453efea6e7d14b022ccfb932ed17f1fd76c59eecd9e7ab7c085bfd",
+          "bytes": 630,
+          "entry": "__miss___scene_visibility_miss",
+          "static_instruction_lines": 7,
+          "ptx_local_bytes": 0,
+          "local_loads": 0,
+          "local_stores": 0,
+          "fp64_instructions": 0,
+          "optix_call_sites": {
+            "_optix_get_payload": 2,
+            "_optix_set_payload": 1
+          }
+        }
+      }
+    },
+    "findings": [
+      {
+        "id": "split-sincos",
+        "status": "confirmed code-generation inefficiency candidate; Falcor runtime impact unmeasured",
+        "producer": "source/slang/hlsl.meta.slang:15668 NVVM sincos calls separate sin and cos; NVRTC uses F32_sincos -> sincosf",
+        "source_sha256": "92882b5f71c42dc83b05b8f8a0d7aa0fd388cbce4339afc20e764b1dd77f613a",
+        "application_shape": "Sampling helpers such as falcor2/utils/math/warp.slang:228 use paired sincos.",
+        "range_reduction_sequences": {
+          "closest_hit": {
+            "nvrtc": 21,
+            "nvvm": 34
+          },
+          "raygen": {
+            "nvrtc": 1,
+            "nvvm": 2
+          },
+          "miss": {
+            "nvrtc": 2,
+            "nvvm": 2
+          }
+        },
+        "isolated_shader": "build/nvvm-falcor-vulkan/sincos.slang",
+        "isolated_shader_sha256": "5f040d599e255cca7db7ebb5a5b9b83adeffa47033dcda8500d19b4a0d362da7",
+        "isolated_toolchain": "CUDA12.9.86 NVRTC/NVVM, ptxas12.9.86, sm_89, O3",
+        "isolated_native": {
+          "nvrtc": {
+            "registers": 21,
+            "stack_bytes": 0,
+            "spill_load_bytes": 0,
+            "spill_store_bytes": 0,
+            "text_bytes": 2560
+          },
+          "nvvm": {
+            "registers": 20,
+            "stack_bytes": 32,
+            "spill_load_bytes": 0,
+            "spill_store_bytes": 0,
+            "text_bytes": 3072
+          }
+        },
+        "qualification": "Extra local-memory work is large-angle range reduction, gated by abs(input)>=105615 in isolated SASS. Sampling angles may keep it cold. No measured Falcor speedup is claimed."
+      },
+      {
+        "id": "other-ptx-review",
+        "status": "no other obvious NVVM-specific expansion identified in inspected families",
+        "observations": [
+          "User helpers inline on both routes; no residual .func helper call chain.",
+          "Matching major texture sample/fetch shapes and one TraceRay call site in raygen/closest-hit.",
+          "Precise f32 division sites are similar; not an NVVM-only regression.",
+          "PTX virtual-register declarations are not physical allocation; debug/prelude content inflates NVRTC PTX byte size."
+        ]
+      }
+    ],
+    "full_optix_sass": {
+      "status": "blocked",
+      "reason": "Nsight starts successfully with an optixLaunch filter, but reports ERR_NVGPUCTRPERM before producing a profile report. Profiling access is the remaining known capture blocker; full ray-tracer SASS remains unavailable.",
+      "ready_tool": "build/nvvm-falcor-vulkan/tools/nsight_compute-linux-x86_64-2026.3.1.2-archive/ncu",
+      "capture_launcher": "build/nvvm-falcor-vulkan/preload-sgl-launch.py",
+      "log": "build/nvvm-falcor-vulkan/ncu-optix-nvvm.log",
+      "attempt_history": [
+        "GDB public CUDA module-loader callbacks: only21setup PTX loads, no ray ELF.",
+        "CUPTI moduleloaded/profiled callbacks:378records/6MB, only setup cubins, no raygen.",
+        "Nsight2025.2.1 and2026.3.1 both crash writing cuGetErrorString in rhiCudaDriverApiInit.",
+        "GDB confirms function/data symbol collision: RHI exported pointer storage resolves to Nsight injection text.",
+        "Global Python RTLD_DEEPBIND attempt also exits11; targeted ctypes libsgl RTLD_DEEPBIND preload succeeds.",
+        "Successful startup diagnostic lists optixLaunch among available kernels; rerun with that filter rejects GPU counter access before producing a report."
+      ],
+      "loader_source_sha256": "247ddc07dbcedb9577f3bb2cd9914b7c67602c98cc7b8fc443bece2d8035ccd9",
+      "global_profiling_settings_changed": false,
+      "replay": "From Falcor checkout after sourcing environment: SLANGPY_TEST_CUDA_COMPILER=nvvm FALCOR_IDENTITY_REPORT=<output-identity.json> <portable-ncu> --section LaunchStats --kernel-name regex:optixLaunch --launch-count 1 --clock-control none --cache-control none -f -o <report> .venv/bin/python ../slang/build/nvvm-falcor-vulkan/preload-sgl-launch.py ../slang/build/nvvm-falcor-vulkan/benchmark.py --iterations 1 --output <output.json>"
+    },
+    "capture_limitations": [
+      "Verbose/dump capture runs produced render/artifacts/identities, then failed during teardown resetting RHI task pool; separate timing runs all exit0.",
+      "Standalone ptxas SASS is only for the sincos reproducer, never substituted for OptiX linked pipeline code."
+    ],
+    "references": [
+      "https://docs.nvidia.com/cupti/main/main.html#sass-source-correlation",
+      "https://docs.nvidia.com/nsight-compute/ReleaseNotes/topics/library-support-optix.html"
+    ],
+    "review": "Independent code and evidence review approved; standalone SASS distinction and full OptiX profiling-permission block retained."
   }
 }

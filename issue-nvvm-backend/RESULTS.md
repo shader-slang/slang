@@ -2121,3 +2121,90 @@ FALCOR_IDENTITY_REPORT=../slang/build/nvvm-falcor-performance/replay-nvvm-identi
 Use `nvrtc` for the paired replay. Serialize GPU runs and builds. The 572-unit and 16-case smoke
 suites, original Falcor tests and six backend-route controls pass. The broader static suite still
 has the four unchanged baseline failures documented above; the full Falcor suite was not run.
+
+### Falcor Vulkan comparison and NVVM code inspection
+
+On 2026-10-04 the accepted lit 512×512 DamagedHelmet case was replayed in four modes, with
+three rotated cycles and 50 measured iterations after 10 warmups per process. No compiler/runtime
+implementation changes were made. All 12 timing runs exit successfully; actual loaded artifacts,
+settings, float images and all 600 GPU measurements are retained under `build/nvvm-falcor-vulkan/`.
+
+| Mode | Median GPU iteration | p10–p90 | Shader generation median | First-render wall median |
+| --- | ---: | ---: | ---: | ---: |
+| CUDA NVRTC | 0.7235 ms | 0.709–0.737 ms | 2.230 s | 2.923 s |
+| CUDA NVVM | 0.7010 ms | 0.685–0.717 ms | 4.001 s | 4.775 s |
+| Vulkan default | 1.7961 ms | 1.779–1.821 ms | 2.115 s | 2.784 s |
+| Vulkan trace-ray control | 2.0234 ms | 1.986–2.085 ms | 2.055 s | 2.777 s |
+
+NVVM is **2.56× faster than default Vulkan** in this case, and **2.89× faster** than the Vulkan
+control. This does not establish a general backend ranking. Vulkan's default visibility uses inline
+ray queries placed early; CUDA uses nested trace rays placed late. The control explicitly sets
+Vulkan to trace-ray/late, matching CUDA's constants and recursion depth 2. All use simple scheduling,
+max depth 6, RR depth 3, white ConstantLight, the same camera/seeds and float4 Tensor output.
+The explicit output avoids Falcor's default half-versus-float texture-format difference.
+
+Debug layers and RHI validation are enabled, but GPU-assisted and ray-tracing validation are off.
+The existing helper disables Slang debug info on Vulkan and uses standard info on CUDA; this
+backend-specific difference is disclosed. Persistent module/shader caches are off, driver caches
+may be warm, GPU clocks are not locked, and timing is outside any debugger/profiler. Compiler reports
+measure PTX/SPIR-V generation, not equivalent internal compiler phases across APIs.
+
+All images are finite, nonzero and repeatable within each mode. Vulkan's two configurations differ
+by at most 1.1921e-7 in RGB. Against NVVM, Vulkan's iteration-49 RGB RMSE is 0.008524, MAE 0.0001274,
+maximum absolute difference 0.98238; 184 of 262,144 pixels differ by more than 0.001. These are
+single-iteration outputs at indices 0/49. Sparse cross-backend differences remain unqualified;
+visual agreement and timing success are not an image-equivalence proof.
+
+#### Generated-code findings
+
+Actual captured Falcor PTX shows no residual user-helper call chain or obvious extra texture-fetch
+family on NVVM. Precise float division is common to both routes. PTX register names are virtual;
+their counts do not establish hardware register pressure. NVRTC debug/prelude content also makes
+raw PTX byte size unsuitable as a native-code-size comparison.
+
+The strongest concrete lead is **paired sincos lowering**. `hlsl.meta.slang`'s NVVM branch calls
+`sin(x)` and `cos(x)` separately; CUDA emission uses `F32_sincos`, which calls `sincosf`. Closest-hit
+PTX has 34 large-angle range-reduction sequences on NVVM versus 21 on NVRTC, with more associated
+local-array traffic. Raygen has 2 versus 1; miss has 2 on each route. The local arrays are libdevice
+range-reduction temporaries, not demonstrated payload spills.
+
+An isolated runtime-input `sincos` shader, compiled with CUDA 12.9.86 on both routes and assembled
+for SM89, confirms the machine-code difference:
+
+| Isolated sincos kernel | NVRTC | NVVM |
+| --- | ---: | ---: |
+| Registers | 21 | 20 |
+| Stack frame | 0 bytes | 32 bytes |
+| Spill loads/stores | 0 / 0 bytes | 0 / 0 bytes |
+| Executable text | 2,560 bytes | 3,072 bytes |
+
+The extra local-memory reduction path is gated by `abs(input) >= 105615` in this isolated SASS.
+Falcor sampling angles can keep it cold, so this is a confirmed code-generation lead, not a proven
+hot bottleneck or predicted speedup. The local reproducer and both PTX/cubin/SASS outputs are in
+`build/nvvm-falcor-vulkan/sincos*`. No optimization was implemented.
+
+#### Full OptiX SASS capture boundary
+
+GDB CUDA loader interception and CUPTI module callbacks exposed setup kernels but no final OptiX
+ray-tracing binary. Portable Nsight Compute was then installed under ignored build tools. Its initial
+startup crash was isolated to slang-rhi's exported CUDA function-pointer variables: the loader tries
+to write `cuGetErrorString` through a symbol preempted by Nsight's same-named function in read-only
+injection-library text. A capture-only `ctypes` preload of libsgl with `RTLD_DEEPBIND` avoids this
+collision without source or binary edits; it is never used for timing.
+
+A diagnostic run lists `optixLaunch` among available kernels. Nsight starts with that filter,
+but collection fails with **ERR_NVGPUCTRPERM** before producing a report. Profiling access is the
+remaining known capture blocker; full OptiX SASS/register/spill/occupancy claims remain unavailable. No
+profiling permissions or global settings were changed. The failed attempts, backtraces, tool hashes,
+working launcher and exact command are retained locally. Verbose intermediate-dump runs also hit
+an RHI task-pool teardown failure after producing images/artifacts; their timings are excluded.
+
+The capture approach follows NVIDIA's [CUPTI JIT cubin documentation](https://docs.nvidia.com/cupti/main/main.html#sass-source-correlation)
+and [Nsight OptiX support documentation](https://docs.nvidia.com/nsight-compute/ReleaseNotes/topics/library-support-optix.html).
+Public profiling can expose user-defined OptiX code, while internal code can remain hidden. Ordinary
+`ptxas` output from a reduced compute shader is not a substitute for the linked OptiX executable.
+
+Replay commands and current compact evidence remain in `falcor2-status.json` under
+`vulkan_comparison` and `code_generation_review`; exact iteration rows are in
+`build/nvvm-falcor-vulkan/iterations.csv`. The original two-CUDA-backend comparison remains separately
+recorded. Unrelated feature work remains stopped.
