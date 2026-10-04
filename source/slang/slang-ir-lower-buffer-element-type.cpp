@@ -442,13 +442,27 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
         return "std140";
     case IRTypeLayoutRuleName::Std430:
         return "std430";
+    // A Metal constant buffer shares the "natural" name hint so that its lowered types keep the
+    // names they are emitted with in MSL; its layout is still the native one.
     case IRTypeLayoutRuleName::Natural:
+    case IRTypeLayoutRuleName::MetalConstantBuffer:
         return "natural";
     case IRTypeLayoutRuleName::C:
         return "c";
     default:
         return "default";
     }
+}
+
+// Return whether a buffer laid out with `ruleName` places struct fields and matrix rows where its
+// target already places them in the logical type, so that a struct or default-layout matrix needs
+// lowering only when one of its members does. Natural layout leaves vectors to the target policy
+// (Metal packs them), and a Metal constant buffer's native layout is MSL's own; every other rule
+// imposes offsets or strides the logical type does not have.
+static bool isLayoutRuleOfLogicalType(IRTypeLayoutRuleName ruleName)
+{
+    return ruleName == IRTypeLayoutRuleName::Natural ||
+           ruleName == IRTypeLayoutRuleName::MetalConstantBuffer;
 }
 
 void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweringConfig config)
@@ -793,7 +807,7 @@ struct LoweredElementTypeContext
                 auto loweredFieldTypeInfo = getLoweredTypeInfo(field->getFieldType(), config);
                 fieldLoweredTypeInfo.add(loweredFieldTypeInfo);
                 if (loweredFieldTypeInfo.convertLoweredToOriginal ||
-                    config.layoutRuleName != IRTypeLayoutRuleName::Natural)
+                    !isLayoutRuleOfLogicalType(config.layoutRuleName))
                     isTrivial = false;
             }
 
@@ -2411,6 +2425,17 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
+
+    // A Metal constant buffer keeps the native MSL layout that reflection reports for it, unless
+    // it names `ScalarDataLayout`, which gives it the natural layout of a Metal device buffer.
+    if (auto constantBufferType = as<IRConstantBufferType>(bufferType);
+        constantBufferType && isMetalTarget(targetReq))
+    {
+        auto dataLayout = constantBufferType->getDataLayout();
+        if (dataLayout && dataLayout->getOp() == kIROp_ScalarBufferLayoutType)
+            return IRTypeLayoutRuleName::Natural;
+        return IRTypeLayoutRuleName::MetalConstantBuffer;
+    }
     if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
         if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
@@ -2613,7 +2638,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config)
     {
         if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
-            config.getLayoutRule()->ruleName == IRTypeLayoutRuleName::Natural)
+            isLayoutRuleOfLogicalType(config.getLayoutRule()->ruleName))
         {
             // We only lower the matrix types if they differ from the default
             // matrix layout.
@@ -2958,9 +2983,10 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 // (e.g. `float3` has size and alignment 16) and so cannot express natural
 // layout, so this policy lowers vectors in such buffers to packed vectors
 // (MSL `packed_T<N>`, e.g. `packed_float3`: 12 bytes, 4-byte alignment) and
-// matrices to structs of packed-vector arrays. Constant buffers and argument
-// buffers (Uniform address space) keep the native Metal layout, which is what
-// reflection reports for them.
+// matrices to structs of packed-vector arrays. A constant buffer that names
+// `ScalarDataLayout` is laid out the same way. Argument buffers and other
+// constant buffers keep the native Metal layout, which is what reflection
+// reports for them.
 struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalBufferElementTypeLoweringPolicy(
@@ -2983,11 +3009,10 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
 
-    // Decide whether a buffer with this config uses packed vector storage.
-    // Only device-memory buffers laid out with natural rules do: constant
-    // and argument buffers (Uniform address space) keep the native MSL
-    // layout reflection reports, and an explicit non-natural data layout
-    // (e.g. `Std140DataLayout`) opts out via the rule-name check.
+    // Only buffers laid out with natural rules use packed vector storage: device-memory buffers,
+    // and constant buffers (Uniform address space) that name `ScalarDataLayout`. Argument buffers
+    // and other constant buffers have their own Metal rule names and keep the native MSL layout
+    // reflection reports for them.
     bool usesPackedVectorStorage(TypeLoweringConfig config)
     {
         if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
@@ -2996,6 +3021,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         {
         case AddressSpace::StorageBuffer:
         case AddressSpace::UserPointer:
+        case AddressSpace::Uniform:
             return true;
         default:
             return false;
@@ -3337,8 +3363,8 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     //
     // TODO: False positives are NOT free for already-[PhysicalType]-
     // decorated types (re-processed via shouldSkipPhysicalTypes = false).
-    // When all field lowerings are identity, the non-Natural layout
-    // rule in getLoweredTypeInfoImpl still forces creation of a
+    // When all field lowerings are identity, a layout rule that fails
+    // isLayoutRuleOfLogicalType (e.g. MetalParameterBlock) still forces creation of a
     // structurally new type, triggering unnecessary pack/unpack helper
     // generation. Output is correct after simplification, but it's
     // wasteful IR churn. Fixing this requires needsElementLowering to

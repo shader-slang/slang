@@ -556,7 +556,10 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             IRType* layoutType = nullptr;
 
-            if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
+            // A Metal constant buffer uses scalar layout only when the user names
+            // `ScalarDataLayout`, so the Vulkan scalar-layout option does not apply to it.
+            if (m_options.targetReq->getOptionSet().shouldUseScalarLayout() &&
+                !isMetalTarget(m_options.targetReq))
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
             else if (m_options.targetReq->getOptionSet().shouldUseCLayout())
                 layoutType = builder.getType(kIROp_CBufferLayoutType);

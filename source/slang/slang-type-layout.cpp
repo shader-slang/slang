@@ -2796,8 +2796,15 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getAnyValueRules()
     return &kHLSLAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type* containerType)
 {
+    // An explicit `ScalarDataLayout` gives a constant buffer the natural layout of a Metal device
+    // buffer; otherwise it keeps the native MSL layout.
+    auto constantBufferType = as<ConstantBufferType>(containerType);
+    if (constantBufferType && as<ScalarDataLayoutType>(constantBufferType->getLayoutType()))
+        return &kMetalStructuredBufferLayoutRulesImpl_;
     return &kMetalConstantBufferLayoutRulesImpl_;
 }
 

@@ -530,6 +530,7 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    MetalConstantBuffer = 8,
     _Count,
 };
 
