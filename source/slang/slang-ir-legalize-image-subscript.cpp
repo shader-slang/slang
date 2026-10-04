@@ -270,8 +270,6 @@ void legalizeStore(
         auto originalTexel = builder.emitImageLoad(texelType, loadParams);
         if (swizzledStore)
         {
-            // Here we assume the imageElementType is already lowered into a vector from any
-            // user-defined type.
             SLANG_ASSERT(imageElementType->getOp() == kIROp_VectorType);
             Array<IRInst*, 4> indices;
             for (UInt i = 0; i < swizzledStore->getElementCount(); i++)

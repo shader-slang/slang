@@ -24,8 +24,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // METAL: float4 [[T:_S[0-9]+]] = [[R]];
     // METAL: [[T]].yx = {{.*}};
     // METAL: gNarrow_{{[0-9]+}}.write([[T]],
-    // SPIRV: OpImageRead
-    // SPIRV: OpImageWrite
+    // SPIRV: [[R:%[0-9]+]] = OpImageRead %v4float
+    // SPIRV: [[T:%[0-9]+]] = OpVectorShuffle %v4float [[R]] {{%[0-9]+}} 5 4 2 3
+    // SPIRV: OpImageWrite {{%[0-9]+}} {{%[0-9]+}} [[T]]
     gNarrow[tid.xy].yx = values[0].xy;
 
     // GLSL-NOT: imageLoad(gWide

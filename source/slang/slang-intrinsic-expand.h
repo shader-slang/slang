@@ -19,8 +19,8 @@ namespace Slang
 /// (shader-slang/slang#13364).
 ///
 /// We keep this next to the `$C`/`$E` expansion so that both spellings share its private format
-/// helpers. Only the image-op path acts on `isConversionAvailable`: the accessors' output predates
-/// it and is unchanged.
+/// helpers. The image-op path rejects an access whose conversion is not available; the accessor
+/// strings do not check `isConversionAvailable`.
 struct CUDASurfaceAccessInfo
 {
     /// The access calls the `_convert` variant, because the resource's `[format(...)]` differs
