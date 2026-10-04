@@ -442,8 +442,8 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
         return "std140";
     case IRTypeLayoutRuleName::Std430:
         return "std430";
-    // A Metal constant buffer shares the "natural" name hint so that its lowered types keep the
-    // names they are emitted with in MSL; its layout is still the native one.
+    // "natural" is only a generated type-name hint. Metal constant buffers keep it so that their
+    // MSL type names stay stable, while their layout rules are the native ones.
     case IRTypeLayoutRuleName::Natural:
     case IRTypeLayoutRuleName::MetalConstantBuffer:
         return "natural";
@@ -454,11 +454,11 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
     }
 }
 
-// Return whether a buffer laid out with `ruleName` places struct fields and matrix rows where its
-// target already places them in the logical type, so that a struct or default-layout matrix needs
-// lowering only when one of its members does. Natural layout leaves vectors to the target policy
-// (Metal packs them), and a Metal constant buffer's native layout is MSL's own; every other rule
-// imposes offsets or strides the logical type does not have.
+// Return whether, under `ruleName`, a struct needs a storage type only when one of its members
+// does, and a matrix in the default layout needs none. Other rules impose offsets or strides that
+// the logical types do not have, so their structs and matrices are always lowered. Under
+// `Natural`, the target policy lowers any leaf whose layout differs (Metal packs vectors), and a
+// Metal constant buffer's native layout is the layout of the logical MSL types.
 static bool isLayoutRuleOfLogicalType(IRTypeLayoutRuleName ruleName)
 {
     return ruleName == IRTypeLayoutRuleName::Natural ||
@@ -1937,6 +1937,21 @@ struct LoweredElementTypeContext
         }
     }
 
+    // Return whether the storage value at `src` can be copied into `dest` without first converting
+    // it to its logical type. That holds when both locations have the same storage type, and when
+    // we emit SPIR-V directly, where `OpCopyLogical` copies between storage types of one logical
+    // type. No other backend can emit `kIROp_CopyLogical`, so on those targets a copy between two
+    // storage types (for example from a Metal constant buffer into a structured buffer) has to
+    // unpack the value and pack it again.
+    bool canCopyStorageValue(IRBuilder& builder, IRInst* dest, IRInst* src)
+    {
+        if (target->shouldEmitSPIRVDirectly())
+            return true;
+        return isTypeEqual(
+            tryGetPointedToType(&builder, dest->getDataType()),
+            tryGetPointedToType(&builder, src->getDataType()));
+    }
+
     void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         auto destValType = tryGetPointedToType(&builder, dest->getDataType());
@@ -2119,7 +2134,8 @@ struct LoweredElementTypeContext
                                     addr,
                                     alignedAttr->getAlignment());
                             }
-                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
+                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref &&
+                                canCopyStorageValue(builder, addr, originalVal->getOperand(0)))
                             {
                                 auto valAddr = originalVal->getOperand(0);
 
@@ -2427,7 +2443,10 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     auto targetReq = target->getTargetReq();
 
     // A Metal constant buffer keeps the native MSL layout that reflection reports for it, unless
-    // it names `ScalarDataLayout`, which gives it the natural layout of a Metal device buffer.
+    // it names `ScalarDataLayout`, which gives it the natural layout of a Metal device buffer. The
+    // other explicit data layouts are not available on Metal. Reflection makes the same choice in
+    // `MetalLayoutRulesFamilyImpl::getConstantBufferRules`, and the two must agree. Every other
+    // Metal buffer except a parameter block gets `Natural` below.
     if (auto constantBufferType = as<IRConstantBufferType>(bufferType);
         constantBufferType && isMetalTarget(targetReq))
     {
@@ -2641,7 +2660,10 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             isLayoutRuleOfLogicalType(config.getLayoutRule()->ruleName))
         {
             // We only lower the matrix types if they differ from the default
-            // matrix layout.
+            // matrix layout, or if the buffer's rules impose row strides that the
+            // matrix type does not have. The rule is read from the rules object, so
+            // `MetalParameterBlock`, whose rules are the natural ones, keeps its
+            // default-layout matrices.
             return false;
         }
         return true;
@@ -3009,10 +3031,11 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
 
-    // Only buffers laid out with natural rules use packed vector storage: device-memory buffers,
-    // and constant buffers (Uniform address space) that name `ScalarDataLayout`. Argument buffers
-    // and other constant buffers have their own Metal rule names and keep the native MSL layout
-    // reflection reports for them.
+    // Only buffer memory laid out with natural rules uses packed vector storage: device buffers,
+    // user pointers, and constant buffers (Uniform address space) that name `ScalarDataLayout`.
+    // `getTypeLayoutRuleNameForBuffer` gives every other constant buffer and every argument
+    // buffer a Metal rule name of its own, so they keep the native MSL layout reflection reports
+    // for them. Stage inputs and outputs are not buffer memory and keep native vectors.
     bool usesPackedVectorStorage(TypeLoweringConfig config)
     {
         if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
@@ -3354,8 +3377,9 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     // contains ANY pointer (including single-level). The actual lowering
     // decision is narrower (lowerLeafLogicalType uses the address-space
     // rule to skip single-level pointers in non-StorageBuffer contexts).
-    // False positives are safe for Natural layout (the framework detects
-    // identity and skips), but not free for non-Natural layout — see TODO.
+    // False positives are safe for a layout rule that passes
+    // isLayoutRuleOfLogicalType (the framework detects identity and skips),
+    // but not free for other rules — see TODO.
     //
     // Recursion through arrays/structs is needed because processModule
     // asks about the TOP-LEVEL element type (e.g. the struct), not

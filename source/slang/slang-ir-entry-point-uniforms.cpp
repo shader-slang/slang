@@ -556,8 +556,13 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             IRType* layoutType = nullptr;
 
-            // A Metal constant buffer uses scalar layout only when the user names
-            // `ScalarDataLayout`, so the Vulkan scalar-layout option does not apply to it.
+            // On Metal, buffer lowering packs a constant buffer whose data layout is
+            // `ScalarBufferLayoutType`, while reflection lays out entry-point uniforms with
+            // the native constant-buffer rules, because it sees the parameter struct and not
+            // a `ConstantBuffer<T, ScalarDataLayout>`. `GLSLForceScalarLayout` therefore does
+            // not tag this buffer on Metal, so that the two stay in agreement. A C layout
+            // tag needs no guard, because the Metal case of `getTypeLayoutRuleNameForBuffer`
+            // honors only the scalar one.
             if (m_options.targetReq->getOptionSet().shouldUseScalarLayout() &&
                 !isMetalTarget(m_options.targetReq))
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);

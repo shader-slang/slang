@@ -519,6 +519,15 @@ enum class SideEffectAnalysisOptions
     UseDominanceTree,
 };
 
+// The layout rules a buffer's contents are lowered with. The values are stored as integer
+// literals in IR (for example in `[SizeAndAlignment]` and `[Offset]` decorations), so new names
+// are appended before `_Count` and existing values do not change.
+//
+// Two names are Metal-specific. `MetalParameterBlock` is the natural layout of an argument
+// buffer, whose resource fields are lowered to descriptor handles. `MetalConstantBuffer` is the
+// native MSL layout of a constant buffer that does not name `ScalarDataLayout` (`float3` is 16
+// bytes). That is the layout of the logical MSL types, so, as under `Natural`, lowering only
+// creates storage types for members that need them, such as a matrix in a non-default layout.
 enum class IRTypeLayoutRuleName
 {
     Natural,
@@ -2259,7 +2268,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 33;
-    const static UInt k_maxSupportedModuleVersion = 33;
+    const static UInt k_maxSupportedModuleVersion = 34;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

@@ -8,7 +8,10 @@ using namespace Slang;
 
 // A constant buffer that names `ScalarDataLayout` keeps natural layout when its
 // enclosing struct is laid out with the Metal argument buffer tier 2 rules, and
-// a default constant buffer next to it keeps the native MSL layout.
+// a default constant buffer next to it keeps the native MSL layout. The tier 2
+// family's own `getConstantBufferRules` ignores the data layout; the nested
+// buffers are laid out by the tier 1 family, which the tier 2 rules point at,
+// and this test pins that.
 SLANG_UNIT_TEST(metalScalarConstantBufferTier2Reflection)
 {
     const char* testSource = R"(
@@ -63,12 +66,14 @@ SLANG_UNIT_TEST(metalScalarConstantBufferTier2Reflection)
 
     auto scalarArgs = outerLayout->getFieldByIndex(0)->getTypeLayout()->getElementTypeLayout();
     SLANG_CHECK_ABORT(scalarArgs != nullptr);
+    SLANG_CHECK_ABORT(scalarArgs->getFieldCount() == 2);
     SLANG_CHECK(scalarArgs->getFieldByIndex(0)->getOffset() == 0);
     SLANG_CHECK(scalarArgs->getFieldByIndex(1)->getOffset() == 12);
     SLANG_CHECK(scalarArgs->getFieldByIndex(1)->getTypeLayout()->getSize() == 12);
 
     auto defaultArgs = outerLayout->getFieldByIndex(1)->getTypeLayout()->getElementTypeLayout();
     SLANG_CHECK_ABORT(defaultArgs != nullptr);
+    SLANG_CHECK_ABORT(defaultArgs->getFieldCount() == 2);
     SLANG_CHECK(defaultArgs->getFieldByIndex(0)->getOffset() == 0);
     SLANG_CHECK(defaultArgs->getFieldByIndex(1)->getOffset() == 16);
     SLANG_CHECK(defaultArgs->getFieldByIndex(1)->getTypeLayout()->getSize() == 16);

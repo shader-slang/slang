@@ -928,10 +928,13 @@ struct LLVMLayoutRules : IRTypeLayoutRules
     }
 };
 
-// The native MSL layout of a Metal constant buffer, matching `MetalLayoutRulesImpl` in
-// reflection: C layout (one-byte `bool`, struct sizes rounded up to their alignment), except that
-// a vector is padded to a power-of-two element count and aligned to its size (`float3` is 16
-// bytes).
+// The native MSL layout of a Metal constant buffer: C layout (one-byte `bool`, struct sizes
+// rounded up to their alignment), except that a vector is padded to a power-of-two element count
+// and aligned to its size (`float3` is 16 bytes). Reflection computes the same layout in
+// `MetalLayoutRulesImpl` (`slang-type-layout.cpp`), and nothing checks the two against each
+// other, so a change to one has to be made to both. Buffer lowering uses these rules for the
+// array strides and size decorations of a constant buffer's storage types; the MSL emitter does
+// not print them, because the native MSL types already have this layout.
 struct MetalConstantBufferLayoutRules : CLayoutRules
 {
     MetalConstantBufferLayoutRules() { ruleName = IRTypeLayoutRuleName::MetalConstantBuffer; }

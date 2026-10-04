@@ -2801,7 +2801,10 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getConstantBufferRules(
     Type* containerType)
 {
     // An explicit `ScalarDataLayout` gives a constant buffer the natural layout of a Metal device
-    // buffer; otherwise it keeps the native MSL layout.
+    // buffer; otherwise it keeps the native MSL layout. Buffer lowering makes the same choice in
+    // `getTypeLayoutRuleNameForBuffer`, and the two must agree. A constant buffer nested in a type
+    // laid out with the argument buffer tier 2 rules also comes here, because those rules
+    // (`kMetalTier2*LayoutRulesImpl_`) name this family.
     auto constantBufferType = as<ConstantBufferType>(containerType);
     if (constantBufferType && as<ScalarDataLayoutType>(constantBufferType->getLayoutType()))
         return &kMetalStructuredBufferLayoutRulesImpl_;
