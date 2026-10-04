@@ -2260,3 +2260,160 @@ Replay commands and current compact evidence remain in `falcor2-status.json` und
 `vulkan_comparison` and `code_generation_review`; exact iteration rows are in
 `build/nvvm-falcor-vulkan/iterations.csv`. The original two-CUDA-backend comparison remains separately
 recorded. Unrelated feature work remains stopped.
+
+### Falcor performance isolation
+
+The 2026-10-04 follow-up identifies two substantial contributors: general OptiX traversal graph
+configuration and floating-point policy. No production compiler, RHI or Falcor source was changed.
+The same lit 512×512 DamagedHelmet uses trace-ray/late visibility, depth 6, RR depth 3 and float4
+output. Each row has 1,000 GPU timestamp measurements after at least three seconds of warmup.
+
+| Diagnostic configuration | CUDA NVRTC | CUDA NVVM | Vulkan trace control |
+| --- | ---: | ---: | ---: |
+| Default math, general graph | 0.699 ms | 0.692 ms | 0.265216 ms |
+| Default math, single-level graph | 0.575 ms | 0.520 ms | — |
+| Fast math, general graph, repeated | 0.315 / 0.316 ms | 0.479 / 0.479 ms | 0.264192 ms |
+| Fast math, single-level graph | 0.232 ms† | 0.362 ms | — |
+
+All measured clock samples are 2,040 MHz SM / 6,251 MHz memory, except †NVRTC fast/single-level
+which includes 1,965 MHz SM. Clocks are observed, not locked. These are diagnostic controls on one
+scene, not interchangeable default configurations. Vulkan's previously accepted default visibility
+result remains 0.2007 ms; this table uses the matching nested-trace visibility control.
+
+**Graph specialization:** the actual built RHI is sibling `../slang-rhi`, established by the Falcor
+CMake cache/compile commands and confirmed by runtime interception. Its pipeline uses
+`OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY`. A process-local OptiX function-table wrapper changes both
+module and pipeline options to `ALLOW_SINGLE_LEVEL_INSTANCING`, with graph depth 2. NVVM repeats at
+0.519/0.520 ms versus general 0.702/0.692 ms. First and iteration-999 images are bit-identical within
+each compiler and math mode. Changing only graph depth 31→2 gives 0.697 ms versus 0.702 ms, so the
+large effect is not explained by the stack depth limit alone.
+
+General graph mode is intentional: `src/cuda/optix-api-impl.cpp::createPipeline` documents that
+owned HitObject replay reconstructs a GAS hit with an explicit transform list; single-level mode
+loses instance IDs and faults on curve queries in OptiX 9. A production optimization needs a scoped
+pipeline contract, preserving that path and accounting for graph shape and motion. Do not globally
+restore the single-level flag based on this scene.
+
+**Math policy:** CUDA emission's `CUDASourceEmitter::emitFrontMatterImpl` enables
+`SLANG_CUDA_ENABLE_FAST_MATH`; the CUDA prelude redirects sin/cos/sincos/log/pow to approximate
+intrinsics. NVRTC also receives `--use_fast_math`. NVVM requests relaxed division/sqrt and
+contraction but retains ordinary libdevice transcendental calls; its denormal option is independent.
+Actual fast-mode Falcor closest-hit PTX has NVRTC sin/cos/lg2 approximation counts 17/17/10 versus
+0/0/0 on NVVM, and approximate sqrt 123 versus round-to-nearest sqrt 128. Division also differs.
+These observations identify a broader fast-mode lowering gap, not solely a sincos issue.
+
+The standalone [math shader](../tests/cuda/applications/falcor-fast-math.slang) makes that gap
+reproducible with runtime `sincos`, `log` and `pow` inputs. CUDA 12.9 SM89 assembly gives:
+
+| Reduced math shader | NVRTC default | NVRTC fast | NVVM default | NVVM fast |
+| --- | ---: | ---: | ---: | ---: |
+| Native non-NOP instruction sites | 271 | 19 | 303 | 303 |
+| Registers | 23 | 18 | 24 | 24 |
+| Stack frame | 0 B | 0 B | 32 B | 32 B |
+| Spill loads/stores | 0 / 0 B | 0 / 0 B | 0 / 0 B | 0 / 0 B |
+
+Counts are static sites, including cold paths and terminal branches, not dynamic instruction counts
+or the full linked OptiX executable. All six runtime modes (NVRTC/NVVM/Vulkan × default/fast) exit 0
+and pass a float64 reference with absolute/relative tolerances 2e-6/5e-6 over the documented input
+domain. Runtime medians are 0.019–0.025 ms with differing clocks and substantial buffer traffic;
+static code shrinkage is not a proportional performance prediction.
+
+Fast mode changes Falcor images: first-frame RGB RMSE against each compiler's default is
+0.00836233 NVRTC / 0.00694394 NVVM, maxima 0.98244 / 0.99288, with 162 / 111 pixels above 0.001.
+General/single-level images remain identical, and fast general images repeat exactly. These sparse
+outliers remain unqualified. The total fast-mode speedup also includes division/sqrt, contraction
+and denormal policy; it cannot be assigned entirely to approximate transcendental math.
+
+**Payload and other controls:** Falcor really uses 32 scatter words, including two CUDA padding
+words protecting a known 17–31-word NVRTC lowering issue. Its shadow payload has one live word.
+The OptiX 9 trace32 ABI name carries an explicit payload size; padded operands do not imply 32 live
+shadow words. Lowering the 128-byte Falcor pipeline limit is invalid without separate repair and
+qualification. Source read/write annotations currently do not become OptiX module payload types.
+
+The [trace shader](../tests/cuda/applications/falcor-trace-performance.slang) separates live payload
+words from capacity, with an exact integer oracle for hits, misses and nested visibility. Eighteen
+initial runs cover six variants on three backends; six repeated capacity/graph controls also pass.
+For one live word at 1024×1024, NVVM general 4/128-byte capacity gives 0.143/0.166 ms; single-level
+4/128 gives 0.100/0.109 ms. Vulkan gives 0.094208 ms at either capacity. SM clocks vary across these
+workloads, so this establishes observed configuration sensitivity, not a fixed-frequency cost or
+a predicted Falcor improvement.
+
+The actual Falcor program stacks are RG 96 B / CH 160 B / MS 0 B, with four real and two empty
+groups. Reducing continuation allocation 416→256 B alone gives 0.681 ms; triangle-only flags give
+0.681 ms; BLAS prefer-fast-trace gives 0.6775 ms, versus 0.702 ms baseline. These small, single-pass
+changes are not established wins. Disabling next-event estimation gives 0.271 ms NVVM / 0.128 ms
+Vulkan, both at full observed clocks. NVVM early visibility is slower (0.922 ms) than late; removing
+visibility or forcing a miss gives 0.450/0.627 ms. Those changes affect rendered work, code generation
+and live state, so subtraction does not isolate hardware traversal cost. Lighter Vulkan controls
+frequently lower clocks; exact observations and exclusions remain in the manifest.
+
+**Replay and measurement contract:** reusable [Falcor](falcor-performance.py) and
+[standalone shader](shader-performance.py) drivers share [timing/provenance](nvvm_perf.py).
+Run from the existing Falcor checkout; use one GPU process at a time and distinct output paths.
+The environment contains source-checkout SlangPy test helpers and the existing scene assets.
+
+```bash
+source ../slang/build/nvvm-falcor2/environment.sh
+SLANGPY_DEVICE=cuda SLANGPY_TEST_CUDA_COMPILER=nvvm .venv/bin/python \
+  ../slang/issue-nvvm-backend/falcor-performance.py --api cuda --visibility trace \
+  --iterations 1000 --output ../slang/build/nvvm-falcor-perf-isolation/replay-nvvm.json
+SLANGPY_DEVICE=cuda SLANGPY_TEST_CUDA_COMPILER=nvvm .venv/bin/python \
+  ../slang/issue-nvvm-backend/shader-performance.py --api cuda --size 1024 \
+  --words 1 --capacity 128 --output ../slang/build/nvvm-falcor-perf-isolation/replay-trace.json
+```
+
+Select `nvrtc` for the other CUDA route; for Vulkan use `SLANGPY_DEVICE=vulkan --api vulkan`.
+Add `--fast-math` for changed precision, `--workload math` for the reduced math case, `--empty`,
+`--words 32`, `--nested`, or `--traces 8` for trace controls. Falcor exposes depth, NEE and visibility
+placement controls; skip/miss visibility uses a generated source copy under the requested output
+path. Production application sources are untouched. Timing records contain every iteration,
+measured clock rows, source/harness hashes and compilation reports; `.identity.json` records actual
+loaded libraries and build source paths. Successful JSON output is not proof of successful process
+teardown: also require exit 0. The harness requires a single GPU visible through NVML.
+The default graph repeats and all 15 final durable-tool runs have loaded-library identities.
+Twenty-three earlier prototype records lack per-run identity JSON: four original fast-math Falcor
+controls, the final Vulkan guaranteed-miss control, and 18 initial trace variants. Their output and
+timing evidence is retained with that provenance limitation. Final fast/general runs reproduce the
+prototype CUDA first/final images exactly. Fast/single results remain exploratory. Shader formatting
+changed whitespace only after execution; raw records retain the tested source hashes.
+
+For OptiX controls, build the diagnostic wrapper from the Slang root:
+
+```bash
+mkdir -p build/nvvm-falcor-perf-isolation/optix-shim
+c++ -shared -fPIC -O2 -I/usr/local/cuda-12.9/include \
+  -I../falcor2/build/linux-gcc/_deps/optix_9_0-src/include \
+  issue-nvvm-backend/falcor-performance-optix.cpp -ldl \
+  -o build/nvvm-falcor-perf-isolation/optix-shim/libnvoptix.so.1
+```
+
+For that child process only, prepend the shim directory to `LD_LIBRARY_PATH` and set
+`NVVM_PERF_OPTIX_LIBRARY` to the absolute real `libnvoptix` driver path (here
+`/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05`). Require `PROBE_ACTIVE` in its log. The wrapper
+supports the built OptiX 9 ABI; other ABIs are forwarded without controls. No flags means an
+observational pass-through. Set `PROBE_SINGLE_LEVEL=1 PROBE_GRAPH_DEPTH2=1` for the single-level
+control; separately select `PROBE_SIMPLE_STACK=1`, `PROBE_GRAPH_DEPTH2=1`, `PROBE_FAST_TRACE=1`
+or `PROBE_TRIANGLES_ONLY=1` for the other controls. These are deliberately restricted experiments
+for the recorded scene/trace corpus, not a general application wrapper. Simple stack sizing rejects
+unrecognized program groups and recursion shapes. Driver files and global settings are unchanged.
+
+Compile reduced math with `slangc ... -entry computeMain -stage compute -target ptx
+-capability cuda_sm_8_9 -emit-cuda-via-nvrtc` (or `nvvm`) `-O3 -fp-mode default` (or `fast`),
+then CUDA 12.9 `ptxas -arch=sm_89 -v` and `nvdisasm`. The raw native-code analysis and actual Falcor
+fast PTX captures are under `build/nvvm-falcor-perf-isolation/`; full OptiX SASS/counters still hit
+`ERR_NVGPUCTRPERM`. No complete hardware-cost attribution is claimed.
+
+The timing helper records a fresh command buffer for each warmup batch: RHI consumes/retires these
+buffers, so replaying one buffer produced an invalid initial warmup. Initial `optix-*` and
+`shim-observe-nvvm` runs are excluded. An in-process clock thread also starved under GIL-held waits;
+clock sampling now uses an independent process and only in-measurement samples. A possible overlap
+excludes `batch-miss-vulkan` and the idle-context pilot; the serial replacement is 0.250880 ms at
+2,040 MHz. The first durable math run failed from unbound global buffers; using SlangPy's existing
+`vars` binding convention repairs the harness and all six reruns pass. Initial inconsistent
+module/pipeline graph flags were rejected by OptiX and corrected at both boundaries. Failure
+history is retained with the accepted evidence, not silently treated as successful measurements.
+
+`falcor2-status.json::performance_isolation` owns these runtime fixtures and exact current results;
+the existing application manifest remains compile-only. The next bounded work should address NVVM
+fast-math policy and a safe RHI graph specialization contract. Payload liveness and hardware profiling
+remain useful follow-ups. This diagnosis does not restart the general implementation loop.

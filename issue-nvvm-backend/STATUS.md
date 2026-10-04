@@ -1,5 +1,22 @@
 # NVVM current status
 
+**Falcor performance isolation (2026-10-04):** two substantial contributors are confirmed.
+A process-local OptiX single-level graph control reduces NVVM **0.692→0.520 ms**, with
+bit-identical first/final images. General graph mode is required for an existing HitObject replay
+path, so a production change needs a scoped contract. Fast math reduces general-graph NVRTC
+**0.699→0.315/0.316 ms** and NVVM **0.692→0.479 ms**; matched Vulkan remains **0.264 ms**.
+Fast math changes some pixels and is not an equivalent-output improvement.
+
+The portable sincos/log/pow shader confirms missing NVVM fast intrinsic lowering: static native
+instruction sites **271→19 NVRTC**, **303→303 NVVM**, with a 32-byte NVVM stack frame and no
+spills. Actual Falcor PTX shows the same policy difference, plus division/sqrt differences.
+Payload capacity affects the minimal trace control, but Falcor really uses all 32 scatter words;
+its one-word shadow trace is not secretly a 32-word live payload. Stack/build-flag controls showed
+only small initial effects. Reusable timing tools and exact shader oracles are retained in the
+[performance isolation evidence](RESULTS.md#falcor-performance-isolation). No production changes
+or global driver changes; full OptiX profiling still needs counter access. This bounded diagnosis
+is complete; general feature work remains stopped.
+
 **Falcor Vulkan timing correction (2026-10-04):** the earlier short benchmark did not warm
 Vulkan GPU clocks sufficiently. With at least three seconds of rendering before measurement,
 two runs of 1,000 iterations per mode give **0.724 ms NVRTC**, **0.697 ms NVVM**,

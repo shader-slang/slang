@@ -1,5 +1,12 @@
 # NVVM development workflow
 
+**Bounded performance isolation complete (2026-10-04):** the maintainer authorized causal
+investigation of the corrected Vulkan/CUDA gap. Graph specialization and fast-math policy are
+confirmed substantial leads, with reusable Falcor/portable controls and current evidence. No
+production optimization or global driver change was made. Future graph specialization must
+preserve the general HitObject path; fast math requires numerical qualification. This finite
+diagnosis does not restart the general loop; full OptiX profiling remains permission-limited.
+
 **Bounded Vulkan hardware/clock audit (2026-10-04):** L4 native hardware ray tracing is verified.
 The prior short Vulkan timing was confounded by GPU clock ramp-up. Sustained warmup reverses
 the result: Vulkan default/control are 0.2007/0.2657 ms versus NVVM 0.697 ms. Current evidence

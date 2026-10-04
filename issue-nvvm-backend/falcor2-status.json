@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "observed_on": "2026-10-04",
-  "scope": "Original CUDA path-tracer smoke qualification, lit CUDA/Vulkan timing comparison, and NVVM PTX/isolated SASS inspection; full OptiX SASS blocked by profiling permissions, full Falcor suite not run.",
+  "scope": "Original CUDA path-tracer smoke, lit CUDA/Vulkan comparison, configuration/math isolation and portable performance corpus; no production optimization. Full OptiX SASS blocked by profiling permissions; full Falcor suite not run.",
   "test_id": "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]",
   "scene": "data/assets/kronos/DamagedHelmet/glTF/DamagedHelmet.gltf",
   "dimensions": [
@@ -2320,5 +2320,872 @@
     ],
     "replay": "From ../falcor2, source ../slang/build/nvvm-falcor2/environment.sh; select SLANGPY_DEVICE=cuda|vulkan and SLANGPY_TEST_CUDA_COMPILER=nvrtc|nvvm, then .venv/bin/python ../slang/build/nvvm-falcor-vulkan-audit/benchmark.py --api cuda|vulkan --iterations 1000 --output <distinct-path>. Add --visibility trace for Vulkan control; set distinct FALCOR_IDENTITY_REPORT.",
     "review": "Independent review approved: all 8000 timings, 233 clock records, eight identities/current binary hashes, repeat images, unchanged first images, harness hash, medians and ratios verified."
+  },
+  "performance_isolation": {
+    "observed_on": "2026-10-04",
+    "status": "Bounded diagnosis complete and independently reviewed; no compiler/runtime/application production changes.",
+    "raw_evidence": "build/nvvm-falcor-perf-isolation/",
+    "configuration": "Same L4/driver/binaries/lit512x512DamagedHelmet, float4 output, depth6, RR3, simple scheduling, trace-ray/late visibility. Debug/RHI validation on; persistent module/shader caches off. Fast mode and shim changes are explicit diagnostic variants.",
+    "measurement": "1000 GPU timestamp pairs, one prerecorded measured submission; fresh64-dispatch warmup batches for >=3seconds and300dispatches; independent NVML process sampled during measurement. Serial runs, exit0 for accepted rows; clocks observed, never locked.",
+    "source_provenance": "CMakeCache.txt and compile_commands.json identify sibling ../slang-rhi as the actual built RHI source, not the embedded SlangPy submodule. Runtime wrapper confirms ALLOW_ANY.",
+    "identity_reference": {
+      "python": "/home/skallweit/codex/agent-sandbox/falcor2/.venv/bin/python",
+      "backend": "nvvm",
+      "status": "render-and-oracle-complete; process exit checked separately",
+      "packages": {
+        "falcor2": "/home/skallweit/codex/agent-sandbox/falcor2/falcor2/__init__.py",
+        "slangpy": "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/__init__.py",
+        "slangpy.slangpy_ext": "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so",
+        "falcor2.falcor2_ext": "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so"
+      },
+      "libraries_sha256": {
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "cb2eecc9cbfa164c72aaa202216213951c0c64e91df50d8e7e36dc0071ed4221",
+        "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+        "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+        "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "6f1f720cc2fef8ce4797131c41fdf7824689053dd9f0f0bd697bdc78ee038bb7",
+        "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+        "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044"
+      },
+      "build_sources": {
+        "SLANG_RHI_SLANG_BINARY_DIR:STRING": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo",
+        "SLANG_RHI_SLANG_INCLUDE_DIR:STRING": "/home/skallweit/codex/agent-sandbox/slang/include",
+        "slang-rhi_SOURCE_DIR:STATIC": "/home/skallweit/codex/agent-sandbox/slang-rhi"
+      }
+    },
+    "falcor_controls": [
+      {
+        "run": "repeat-nvrtc-general",
+        "median_gpu_ms": 0.6990000000000052,
+        "p10_gpu_ms": 0.686999999999216,
+        "p90_gpu_ms": 0.7101000000012903,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 70
+        }
+      },
+      {
+        "run": "repeat-nvrtc-single",
+        "median_gpu_ms": 0.5750000000013245,
+        "p10_gpu_ms": 0.565000000001703,
+        "p90_gpu_ms": 0.5859999999984211,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 57
+        }
+      },
+      {
+        "run": "repeat-nvvm-general",
+        "median_gpu_ms": 0.6920000000008031,
+        "p10_gpu_ms": 0.6810000000001537,
+        "p90_gpu_ms": 0.7079999999994868,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 69
+        }
+      },
+      {
+        "run": "repeat-nvvm-single",
+        "median_gpu_ms": 0.5200000000016303,
+        "p10_gpu_ms": 0.5099999999984561,
+        "p90_gpu_ms": 0.5330000000007828,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 52
+        }
+      },
+      {
+        "run": "fast-nvrtc-general",
+        "median_gpu_ms": 0.3150000000005093,
+        "p10_gpu_ms": 0.3109999999999502,
+        "p90_gpu_ms": 0.3229999999980748,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 31
+        }
+      },
+      {
+        "run": "fast-nvrtc-single",
+        "median_gpu_ms": 0.23199999999690135,
+        "p10_gpu_ms": 0.22400000000288856,
+        "p90_gpu_ms": 0.23699999999848842,
+        "clocks": {
+          "sm_mhz": [
+            1965,
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 23
+        }
+      },
+      {
+        "run": "fast-nvvm-general",
+        "median_gpu_ms": 0.4789999999985639,
+        "p10_gpu_ms": 0.4710000000009984,
+        "p90_gpu_ms": 0.4880000000007101,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 48
+        }
+      },
+      {
+        "run": "fast-nvvm-single",
+        "median_gpu_ms": 0.36200000000086163,
+        "p10_gpu_ms": 0.3550000000025477,
+        "p90_gpu_ms": 0.3700000000002035,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 36
+        }
+      },
+      {
+        "run": "final-fast-nvrtc",
+        "median_gpu_ms": 0.3159999999997609,
+        "p10_gpu_ms": 0.3109999999999502,
+        "p90_gpu_ms": 0.3229999999998512,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 31
+        }
+      },
+      {
+        "run": "final-fast-nvvm",
+        "median_gpu_ms": 0.4789999999985639,
+        "p10_gpu_ms": 0.4710000000009984,
+        "p90_gpu_ms": 0.4880000000007101,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 48
+        }
+      },
+      {
+        "run": "final-fast-vulkan",
+        "median_gpu_ms": 0.26419200003147125,
+        "p10_gpu_ms": 0.26009598514065146,
+        "p90_gpu_ms": 0.26941440301015973,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 27
+        }
+      },
+      {
+        "run": "sustained-observe-nvvm",
+        "median_gpu_ms": 0.7020000000004245,
+        "p10_gpu_ms": 0.6909999999997751,
+        "p90_gpu_ms": 0.7169999999984356,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 70
+        }
+      },
+      {
+        "run": "sustained-stack-nvvm",
+        "median_gpu_ms": 0.6810000000001537,
+        "p10_gpu_ms": 0.6680000000010011,
+        "p90_gpu_ms": 0.6959999999978095,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 68
+        }
+      },
+      {
+        "run": "sustained-graph-depth-nvvm",
+        "median_gpu_ms": 0.6970000000023902,
+        "p10_gpu_ms": 0.6839999999996849,
+        "p90_gpu_ms": 0.7110000000025707,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 70
+        }
+      },
+      {
+        "run": "sustained-single-level-nvvm",
+        "median_gpu_ms": 0.5190000000006023,
+        "p10_gpu_ms": 0.5079000000002054,
+        "p90_gpu_ms": 0.5309999999987269,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 51
+        }
+      },
+      {
+        "run": "sustained-fast-trace-nvvm",
+        "median_gpu_ms": 0.6775000000001086,
+        "p10_gpu_ms": 0.6659999999989452,
+        "p90_gpu_ms": 0.6920000000008031,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 68
+        }
+      },
+      {
+        "run": "sustained-triangles-nvvm",
+        "median_gpu_ms": 0.6810000000001537,
+        "p10_gpu_ms": 0.6680000000010011,
+        "p90_gpu_ms": 0.694000000002859,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 67
+        }
+      },
+      {
+        "run": "batch-base-vulkan",
+        "median_gpu_ms": 0.26521598920226097,
+        "p10_gpu_ms": 0.2611199743114412,
+        "p90_gpu_ms": 0.27033599908463657,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 26
+        }
+      },
+      {
+        "run": "batch-no-nee-nvvm",
+        "median_gpu_ms": 0.27099999999968816,
+        "p10_gpu_ms": 0.2670000000009054,
+        "p90_gpu_ms": 0.27500000000024727,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 27
+        }
+      },
+      {
+        "run": "batch-no-nee-vulkan",
+        "median_gpu_ms": 0.12799998512491584,
+        "p10_gpu_ms": 0.12185599189251661,
+        "p90_gpu_ms": 0.1310720108449459,
+        "clocks": {
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ],
+          "samples": 13
+        }
+      }
+    ],
+    "graph_result": "General to single-level instancing plus graphDepth2: NVVM0.692->0.520ms, NVRTC0.699->0.575ms; all measured samples2040/6251MHz. First/iteration999 images bit-identical within compiler and math mode. GraphDepth2 alone0.697vs0.702ms, so depth limit alone does not explain the large graph-specialization effect.",
+    "graph_constraint": "Actual RHI ALLOW_ANY protects owned HitObject replay: explicit transform lists lose instance IDs and curve queries fault with single-level specialization in OptiX9. A future pipeline-scoped opt-in needs a valid scene/HitObject/motion contract; do not globally revert.",
+    "math_result": "Fast-mode general graph repeated: NVRTC0.315/0.316ms, NVVM0.479/0.479ms, Vulkan control0.264192ms versus default0.265216ms. Fast single graph0.232msNVRTC(mixed1965/2040MHz),0.362msNVVM(2040MHz). Fast mode changes output and several numerical policies; these are not equivalent-output wins.",
+    "image_checks": [
+      {
+        "a": "repeat-nvrtc-general",
+        "b": "repeat-nvrtc-single",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "repeat-nvrtc-general",
+        "b": "repeat-nvrtc-single",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvrtc-general",
+        "b": "fast-nvrtc-single",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvrtc-general",
+        "b": "fast-nvrtc-single",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "repeat-nvrtc-general",
+        "b": "fast-nvrtc-general",
+        "frame": "first",
+        "bit_identical": false,
+        "rmse": 0.008362328445799807,
+        "max_abs": 0.9824362993240356,
+        "pixels_above_0_001": 162
+      },
+      {
+        "a": "repeat-nvrtc-general",
+        "b": "fast-nvrtc-general",
+        "frame": "last",
+        "bit_identical": false,
+        "rmse": 0.007065243692898443,
+        "max_abs": 0.9810317754745483,
+        "pixels_above_0_001": 132
+      },
+      {
+        "a": "fast-nvrtc-general",
+        "b": "final-fast-nvrtc",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvrtc-general",
+        "b": "final-fast-nvrtc",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "repeat-nvvm-general",
+        "b": "repeat-nvvm-single",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "repeat-nvvm-general",
+        "b": "repeat-nvvm-single",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvvm-general",
+        "b": "fast-nvvm-single",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvvm-general",
+        "b": "fast-nvvm-single",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "repeat-nvvm-general",
+        "b": "fast-nvvm-general",
+        "frame": "first",
+        "bit_identical": false,
+        "rmse": 0.006943935038296912,
+        "max_abs": 0.9928794056177139,
+        "pixels_above_0_001": 111
+      },
+      {
+        "a": "repeat-nvvm-general",
+        "b": "fast-nvvm-general",
+        "frame": "last",
+        "bit_identical": false,
+        "rmse": 0.004906368025602388,
+        "max_abs": 0.9810531139373779,
+        "pixels_above_0_001": 91
+      },
+      {
+        "a": "fast-nvvm-general",
+        "b": "final-fast-nvvm",
+        "frame": "first",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "fast-nvvm-general",
+        "b": "final-fast-nvvm",
+        "frame": "last",
+        "bit_identical": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      }
+    ],
+    "payload_audit": {
+      "pipeline_capacity_words": 32,
+      "scatter_live_words": 32,
+      "visibility_live_words": 1,
+      "note": "OptiX9 trace32 ABI name includes an explicit payloadSize: padding operands do not imply32 live shadow words. Falcor CUDA PathState has2 initialized padding words to avoid known17-31word NVRTC lowering issue; do not reduce128bytes without separate repair/qualification. Module typed payload semantics are currently absent despite source read/write annotations."
+    },
+    "stack_audit": {
+      "raygen_bytes": 96,
+      "closest_hit_bytes": 160,
+      "miss_bytes": 0,
+      "groups": 6,
+      "empty_groups": 2,
+      "general_continuation_bytes": 416,
+      "diagnostic_simple_continuation_bytes": 256,
+      "general_graph_depth": 31,
+      "diagnostic_graph_depth": 2,
+      "result": "Stack-only0.681ms, triangle-only0.681ms, BLASprefer-fast-trace0.6775ms versus0.702ms control: small single-pass changes, not established optimization wins."
+    },
+    "portable_trace": {
+      "shader": "tests/cuda/applications/falcor-trace-performance.slang",
+      "oracle": "Exact all-pixel uint checksum for alternating hits/misses; optionally nested guaranteed-miss one-word trace,1/4/16/32 live words, independent capacity. 1024x1024,1000iterations.",
+      "initial_successful_runs": 18,
+      "initial_variants": [
+        "empty",
+        "one-word capacity4",
+        "one-word capacity128",
+        "32words capacity128",
+        "nested",
+        "8traces"
+      ],
+      "backends": [
+        "nvrtc",
+        "nvvm",
+        "vulkan"
+      ],
+      "repeat_controls": [
+        {
+          "run": "trace-final-nvvm-general-128",
+          "median_gpu_ms": 0.16599999999966641,
+          "p10_gpu_ms": 0.16399999999983095,
+          "p90_gpu_ms": 0.16799999999994597,
+          "clocks": {
+            "sm_mhz": [
+              2040
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 16
+          }
+        },
+        {
+          "run": "trace-final-nvvm-general-4",
+          "median_gpu_ms": 0.14300000000000423,
+          "p10_gpu_ms": 0.140000000000029,
+          "p90_gpu_ms": 0.144000000000144,
+          "clocks": {
+            "sm_mhz": [
+              1875,
+              1905
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 14
+          }
+        },
+        {
+          "run": "trace-final-nvvm-single-128",
+          "median_gpu_ms": 0.10900000000013677,
+          "p10_gpu_ms": 0.10699999999985721,
+          "p90_gpu_ms": 0.11099999999997223,
+          "clocks": {
+            "sm_mhz": [
+              1845,
+              1905
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 11
+          }
+        },
+        {
+          "run": "trace-final-nvvm-single-4",
+          "median_gpu_ms": 0.10000000000021103,
+          "p10_gpu_ms": 0.09799999999993148,
+          "p90_gpu_ms": 0.1029999999997866,
+          "clocks": {
+            "sm_mhz": [
+              1845
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 10
+          }
+        },
+        {
+          "run": "trace-final-vulkan-general-128",
+          "median_gpu_ms": 0.09420799324288964,
+          "p10_gpu_ms": 0.09318400407209992,
+          "p90_gpu_ms": 0.09420805145055056,
+          "clocks": {
+            "sm_mhz": [
+              2025
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 10
+          }
+        },
+        {
+          "run": "trace-final-vulkan-general-4",
+          "median_gpu_ms": 0.09420799324288964,
+          "p10_gpu_ms": 0.09420799324288964,
+          "p90_gpu_ms": 0.09523204062134027,
+          "clocks": {
+            "sm_mhz": [
+              1995,
+              2025
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 9
+          }
+        }
+      ],
+      "interpretation": "NVVM one-word general4/128bytes0.143/0.166ms; single4/128bytes0.100/0.109ms; Vulkan4/128bytes both0.094208ms. Clock levels differ by workload, so these are observed configuration effects, not fixed-frequency cost estimates or Falcor payload-size forecasts."
+    },
+    "portable_math": {
+      "shader": "tests/cuda/applications/falcor-fast-math.slang",
+      "operations": [
+        "sincos",
+        "log",
+        "pow"
+      ],
+      "native_non_nop_instruction_sites": {
+        "nvrtc_default": 271,
+        "nvrtc_fast": 19,
+        "nvvm_default": 303,
+        "nvvm_fast": 303
+      },
+      "registers": {
+        "nvrtc_default": 23,
+        "nvrtc_fast": 18,
+        "nvvm_default": 24,
+        "nvvm_fast": 24
+      },
+      "stack_bytes": {
+        "nvrtc": 0,
+        "nvvm": 32
+      },
+      "spill_bytes": 0,
+      "qualification": "CUDA12.9 SM89 ptxas/nvdisasm; static instruction sites including cold paths and terminal branches, not executed instruction count or full OptiX SASS.",
+      "runtime": [
+        {
+          "run": "math-runtime-default-nvrtc",
+          "median_gpu_ms": 0.02300000000010627,
+          "p10_gpu_ms": 0.02199999999996649,
+          "p90_gpu_ms": 0.024000000000246047,
+          "clocks": {
+            "sm_mhz": [
+              1530
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 2
+          },
+          "max_oracle_error": 1.33700579052487e-07
+        },
+        {
+          "run": "math-runtime-default-nvvm",
+          "median_gpu_ms": 0.024000000000246047,
+          "p10_gpu_ms": 0.02300000000010627,
+          "p90_gpu_ms": 0.024999999999941735,
+          "clocks": {
+            "sm_mhz": [
+              1485
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 3
+          },
+          "max_oracle_error": 1.33700579052487e-07
+        },
+        {
+          "run": "math-runtime-default-vulkan",
+          "median_gpu_ms": 0.020480016246438026,
+          "p10_gpu_ms": 0.020479958038777113,
+          "p90_gpu_ms": 0.020480016246438026,
+          "clocks": {
+            "sm_mhz": [
+              2040
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 2
+          },
+          "max_oracle_error": 7.051895214021942e-07
+        },
+        {
+          "run": "math-runtime-fast-nvrtc",
+          "median_gpu_ms": 0.018999999999991246,
+          "p10_gpu_ms": 0.018999999999991246,
+          "p90_gpu_ms": 0.020000000000131024,
+          "clocks": {
+            "sm_mhz": [
+              2040
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 2
+          },
+          "max_oracle_error": 7.051895214021942e-07
+        },
+        {
+          "run": "math-runtime-fast-nvvm",
+          "median_gpu_ms": 0.024999999999941735,
+          "p10_gpu_ms": 0.023999999999801958,
+          "p90_gpu_ms": 0.026000000000081513,
+          "clocks": {
+            "sm_mhz": [
+              1470
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 3
+          },
+          "max_oracle_error": 1.33700579052487e-07
+        },
+        {
+          "run": "math-runtime-fast-vulkan",
+          "median_gpu_ms": 0.020480016246438026,
+          "p10_gpu_ms": 0.020479958038777113,
+          "p90_gpu_ms": 0.020480016246438026,
+          "clocks": {
+            "sm_mhz": [
+              2040
+            ],
+            "memory_mhz": [
+              6251
+            ],
+            "pstate": [
+              0
+            ],
+            "samples": 2
+          },
+          "max_oracle_error": 7.051895214021942e-07
+        }
+      ],
+      "oracle": "All six modes exit0; float64 reference atol2e-6/rtol5e-6 over angle0..2pi,base0.1..1,exponent0.5..4. Memory traffic and adaptive clocks limit runtime attribution; static shrinkage is not a proportional performance prediction.",
+      "source_trace": [
+        "slang-emit-cuda.cpp: emitFrontMatterImpl emits SLANG_CUDA_ENABLE_FAST_MATH; slang-cuda-prelude.h redirects F32 math to approximate intrinsics.",
+        "slang-nvrtc-compiler.cpp requests --use_fast_math including FTZ.",
+        "slang-nvvm-compiler.cpp requests prec-div0,prec-sqrt0,fma1; denormal mode independent.",
+        "hlsl.meta.slang separates sincos; slang-llvm-nvvm.cpp maps ordinary libdevice __nv_sinf/__nv_cosf/__nv_logf/__nv_powf."
+      ],
+      "actual_falcor_fast_ptx": "Closest-hit NVRTC sin.approx17/cos.approx17/lg2.approx10, sqrt.approx123; NVVM0/0/0, sqrt.rn128. PTX also differs in division. Actual captures exit0. The total Falcor fast-mode gain cannot be assigned solely to transcendental policy."
+    },
+    "other_ablations": "No NEE: NVVM0.271ms vs Vulkan0.128ms, both2040MHz. NVVM early visibility0.922ms, skip visibility0.450ms, guaranteed-miss visibility0.627ms, all2040MHz. Lighter Vulkan/small-resolution/depth1 runs have lower/mixed clocks and are not matched-clock attribution. Final serial Vulkan guaranteed-miss rerun0.250880ms at2040MHz; prior0.220160ms excluded due possible overlap. Removing/changing traversal also changes compiler/liveness and rendered work, so timing differences are not isolated hardware traversal costs.",
+    "failures_and_corrections": [
+      "shim-observe-nvvm and initial optix-* warmup reused consumed command buffer",
+      "batch-miss-vulkan and held-depth1-vulkan potentially overlapped; replaced miss by final-miss-vulkan",
+      "initial math run exit134 from unbound globals; fixed harness vars binding; note preserves overwritten failure log",
+      "single-level initial module/pipeline mismatch rejected by OptiX; fixed consistent options",
+      "Initial in-process Python-thread NVML sampler starved under blocking GIL-held submission; replaced with subprocess and in-measurement filtering.",
+      "First single-level wrapper changed only pipeline options; OptiX rejected inconsistent module options. Both boundaries now changed consistently.",
+      "Idle CUDA-context experiment did not hold fixed clocks; removed from durable tools.",
+      "Full OptiX SASS/counters remain ERR_NVGPUCTRPERM; no profiling permissions changed."
+    ],
+    "corpus_ownership": "falcor2-status.json owns runtime evidence for these explicit performance fixtures; application-corpus.manifest.json remains compile-only. Reusable harnesses replace raw prototype scripts; raw logs/images/PTX/SASS remain ignored build evidence, current conclusions update in place.",
+    "replay": "RESULTS.md#falcor-performance-isolation; use falcor-performance.py and shader-performance.py from existing Falcor checkout. Optional OptiX9 wrapper affects only the child process.",
+    "next_work": [
+      "Implement principled NVVM fast-math intrinsic policy and independently qualify precision/denorm/special-value behavior.",
+      "Expose scoped single-level OptiX graph specialization while preserving general HitObject paths.",
+      "Use profiling access for remaining shader/live-state/traversal attribution; payload/liveness tests are retained for that work."
+    ],
+    "provenance_limit": "Twenty-three earlier prototype records lack per-run identity JSON: four fast-{nvrtc,nvvm}-{general,single}, final-miss-vulkan and18initial trace variants. Their timing/output evidence is retained with that limitation. Default graph repeats and all15final durable-tool runs have identities; final fast general reproduces prototype first/final images exactly. Single-fast results remain exploratory, with NVRTC mixed clocks. Current shader formatting changed whitespace only after execution; tested source hashes remain in raw records.",
+    "review": "Independent review recomputed61rawrecords/61000timestamp pairs/1811clock rows,16imagechecks and14current library hashes. All15final run identities and current Python harness hashes verified; code and source/native evidence reviewed. Eight full-RGBA graph comparisons additionally verified by lead. Older prototype identity limitation explicitly retained."
   }
 }
