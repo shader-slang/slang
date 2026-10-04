@@ -3028,9 +3028,20 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
                 }
             }
         }
+        else if (as<DeclRefType>(checkedBase->type.type))
+        {
+            // A swizzle (`uv.y`, `m._m00`), a tuple element (`t._0`) or a member of an
+            // opened existential (a `LetExpr`) is a value of a `DeclRefType`, and a value
+            // cannot take generic arguments. Expressions that name a type, function or
+            // generic have a `TypeType`, `FuncType` or `GenericDeclRefType` instead.
+            baseKind = BaseGenericKind::NonGeneric;
+        }
 
-        if (as<MemberExpr>(base) &&
-            (as<DeclRefExpr>(checkedBase) || as<OverloadedExpr>(checkedBase)))
+        // Checking a `MemberExpr` rewrites its base in place, so the unchecked node cannot
+        // always be checked again (`p->y` with `float2* p` would report that `p` cannot be
+        // dereferenced). An `Unknown` checked node may be a wrapper that generic application
+        // does not accept, such as the `LetExpr` opening the existential in `h.o.get<3>()`.
+        if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
         {
             base = checkedBase;
         }
