@@ -1,7 +1,7 @@
 // Metal materializes each `groupshared` global as a `threadgroup` local of the entry
 // point, reached from other functions through the kernel context. Loads and stores of
-// that memory must not be forwarded, re-loaded or eliminated across a barrier or a call
-// that can write it.
+// that memory must not be forwarded, re-loaded or eliminated across a barrier or any
+// other call, including a side-effect-free call that only reads it.
 
 //TEST:SIMPLE(filecheck=PERMUTE): -target metal -stage compute -entry permuteMain
 //TEST:SIMPLE(filecheck=CALL): -target metal -stage compute -entry callMain

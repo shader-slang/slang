@@ -3,6 +3,8 @@
 // the slot must observe the callee's store.
 
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain
+// render-test compiles with debug info by default, and with debug info the unfixed compiler
+// does not reorder this access, so we pass -g0 for the runtime check to catch it.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 
 // CPP: [[S:shared_[0-9]+]]{{\[}}[[T:t_[0-9]+]]{{\]}} = 1.0f;

@@ -3521,8 +3521,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 // Metal and the CPU targets declare groupshared memory as a local `var` of the entry
 // point, so a groupshared `var` directly followed by a store to it is valid IR. Metal
 // declares `threadgroup` variables without an initializer, so for groupshared variables
-// we emit the store as a separate assignment on every target, which is equally valid
-// C++ on the CPU targets.
+// we always emit the store as a separate assignment, which is equally valid C++ on the
+// CPU targets.
 static bool isStoreFoldedIntoVarDecl(IRStore* store)
 {
     auto var = as<IRVar>(store->getPtr());

@@ -10,6 +10,7 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // METALLIB-NOT: error :
+// METALLIB: result code = 0
 
 // MESH-NOT: threadgroup float {{.*}} =
 // MESH: threadgroup float [[S:meshShared_[0-9]+]];

@@ -3,6 +3,8 @@
 // materialize groupshared memory as a local of the entry point that callees reach
 // through the kernel context.
 
+// render-test compiles with debug info by default, and with debug info the unfixed compiler
+// does not reorder this access, so we pass -g0 for the runtime check to catch it.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

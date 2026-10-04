@@ -1445,13 +1445,14 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // Groupshared memory can be a function-local variable on targets that
-            // materialize it in the entry point (see `introduceExplicitGlobalContext`),
-            // yet callees still read and write it through the kernel context, and a
-            // barrier call orders it against other threads. We therefore treat any call,
-            // including one without side effects, as reading and writing it.
+            // On Metal and the CPU targets, `introduceExplicitGlobalContext` turns groupshared
+            // memory into a local variable of the entry point, and other functions reach it by
+            // loading its address from the kernel context. Either root is local to `func`, yet
+            // callees can read and write the memory and a barrier orders it against other
+            // threads, so we treat any call, including one without side effects, as reading
+            // and writing it. A groupshared global takes the non-local path below.
             auto rootAddr = getRootAddr(addr);
-            if (isGroupSharedAddr(rootAddr))
+            if (isGroupSharedAddr(rootAddr) && isChildInstOf(rootAddr, func))
                 return true;
 
             // If addr is a global variable, calling a function may change its value.
@@ -1462,7 +1463,8 @@ bool canInstHaveSideEffectAtAddress(
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                 {
                     // An exception is if the callee is side-effect free: it may read the
-                    // global but cannot write it.
+                    // global but cannot write it, and reads of a non-local root do not
+                    // matter here because `tryRemoveRedundantStore` never asks about one.
                 }
                 else
                 {
