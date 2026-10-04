@@ -12,12 +12,11 @@
 
 namespace Slang
 {
-// Return true if `swizzledStore` assigns every component of a texel of type `texelType` exactly
-// once, as `t[i].xyzw = v` does, or `t[i].yx = v` on a two-component texel. Such a store replaces
-// the whole texel, so it needs no read of the current texel.
-static bool doesSwizzleWriteWholeTexel(IRSwizzledStore* swizzledStore, IRType* texelType)
+// Return true if `swizzledStore` assigns every component of a value of type `writtenType`
+// exactly once, as `t[i].xyzw = v` does, or `t[i].yx = v` with a two-component `writtenType`.
+static bool doesSwizzleAssignEveryComponent(IRSwizzledStore* swizzledStore, IRType* writtenType)
 {
-    const UInt componentCount = UInt(getIRVectorElementSize(texelType));
+    const UInt componentCount = UInt(getIRVectorElementSize(writtenType));
     if (swizzledStore->getElementCount() != componentCount)
         return false;
     UInt writtenComponentMask = 0;
@@ -29,26 +28,32 @@ static bool doesSwizzleWriteWholeTexel(IRSwizzledStore* swizzledStore, IRType* t
     return writtenComponentMask == (UInt(1) << componentCount) - 1;
 }
 
-// Return the texel that a store satisfying `doesSwizzleWriteWholeTexel` writes: component `c` of
-// the texel is the source component that the swizzle assigns to `c`.
-static IRInst* emitWholeTexelFromSwizzle(
+// Return the value that a store satisfying `doesSwizzleAssignEveryComponent` writes: its component
+// `c` is the source component that the swizzle assigns to `c`. For `t[i].yzwx = v`, that is
+// `v.wxyz`.
+static IRInst* emitValueOfFullSwizzle(
     IRBuilder& builder,
     IRSwizzledStore* swizzledStore,
-    IRType* texelType)
+    IRType* writtenType)
 {
     const UInt componentCount = swizzledStore->getElementCount();
-    UInt sourceIndexOfComponent[4];
+    SLANG_ASSERT(componentCount <= 4);
+    UInt sourceIndexOfComponent[4] = {};
     bool isIdentity = true;
     for (UInt i = 0; i < componentCount; i++)
     {
         auto component = UInt(cast<IRIntLit>(swizzledStore->getElementIndex(i))->getValue());
+        SLANG_ASSERT(component < componentCount);
         sourceIndexOfComponent[component] = i;
         isIdentity = isIdentity && component == i;
     }
     if (isIdentity)
         return swizzledStore->getSource();
-    return builder
-        .emitSwizzle(texelType, swizzledStore->getSource(), componentCount, sourceIndexOfComponent);
+    return builder.emitSwizzle(
+        writtenType,
+        swizzledStore->getSource(),
+        componentCount,
+        sourceIndexOfComponent);
 }
 
 // Return `texel` with the component at `index` replaced by `value`. A constant index is a
@@ -84,11 +89,13 @@ static IRInst* emitSetTexelComponent(
         components.getArrayView().getBuffer());
 }
 
-// Report a texel access that CUDA cannot express. CUDA reaches a surface only through its
-// prelude's `surf{1D,2D,3D}[Layered]{read,write}[_convert]` functions, and only some of the
-// `_convert` variants exist (see `CUDASurfaceAccessInfo::isConversionAvailable`). We check here,
-// where the surface access is introduced, so that the CUDA emitter only receives accesses it can
-// spell.
+// Report a write through a texture subscript that we cannot spell on CUDA, at the store. We
+// spell CUDA surface accesses only for the shapes `getCUDASurfaceDimensionCount` accepts, and a
+// `_convert` access only when `CUDASurfaceAccessInfo::isConversionAvailable` holds; a multisampled
+// texture is reported by `legalizeStore`. A reported error makes `linkAndOptimizeIR` fail before
+// emission, so `CUDASourceEmitter::_emitSurfaceAccess` only receives accesses it can spell and
+// asserts that it does. When a read-modify-write lacks both conversions, we report only the read,
+// which comes first.
 static void diagnoseUnavailableCUDASurfaceAccess(
     IRInst* image,
     IRTextureType* textureType,
@@ -96,25 +103,21 @@ static void diagnoseUnavailableCUDASurfaceAccess(
     IRInst* storeInst,
     DiagnosticSink* sink)
 {
-    switch (textureType->GetBaseShape())
+    if (getCUDASurfaceDimensionCount(textureType->GetBaseShape()) == 0)
     {
-    case SLANG_TEXTURE_1D:
-    case SLANG_TEXTURE_2D:
-    case SLANG_TEXTURE_3D:
-        break;
-    default:
         sink->diagnose(Diagnostics::CudaSurfaceShapeUnsupported{.location = storeInst->sourceLoc});
         return;
     }
 
-    if (readsTexel && !getCUDASurfaceAccessInfo(image, false).isConversionAvailable)
+    const bool isWrite = true;
+    if (readsTexel && !getCUDASurfaceAccessInfo(image, !isWrite).isConversionAvailable)
     {
         sink->diagnose(Diagnostics::CudaSurfaceFormatConversionUnavailable{
             .access = "read",
             .location = storeInst->sourceLoc,
         });
     }
-    else if (!getCUDASurfaceAccessInfo(image, true).isConversionAvailable)
+    else if (!getCUDASurfaceAccessInfo(image, isWrite).isConversionAvailable)
     {
         sink->diagnose(Diagnostics::CudaSurfaceFormatConversionUnavailable{
             .access = "write",
@@ -133,9 +136,12 @@ void legalizeStore(
 
     builder.setInsertBefore(storeInst);
     IRBuilderSourceLocRAII sourceLocationScope(&builder, storeInst->sourceLoc);
+    // A texel is a scalar or a vector, so the store's address is the subscript itself or a
+    // `getElementPtr` of one of its components.
     auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
-    IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst->getOperand(0)));
-    SLANG_ASSERT(imageSubscript);
+    IRImageSubscript* imageSubscript = as<IRImageSubscript>(
+        getElementPtr ? getElementPtr->getOperand(0) : storeInst->getOperand(0));
+    SLANG_RELEASE_ASSERT(imageSubscript);
     SLANG_ASSERT(imageSubscript->getImage());
     IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
     SLANG_ASSERT(textureType);
@@ -153,7 +159,7 @@ void legalizeStore(
         (isMetalTarget(target) && textureType->isArray());     // seperate array param
     bool seperateSampleCoord = (textureType->isMultisample()); // seperate sample param
 
-    if (seperateSampleCoord && (isMetalTarget(target) || isCUDATarget(target)))
+    if (textureType->isMultisample() && (isMetalTarget(target) || isCUDATarget(target)))
     {
         sink->diagnose(Diagnostics::MultiSampledTextureDoesNotAllowWrites{
             .target = target->getTarget(),
@@ -161,9 +167,14 @@ void legalizeStore(
         });
     }
 
+    // A store keeps the texel's other components, and so reads the texel first, unless it writes
+    // every component of the image op's texel: a plain `store` to the subscript, or a swizzle that
+    // assigns every component of `texelType`. On Metal, GLSL and SPIR-V, `t[i].yx = v` on an
+    // `RWTexture2D<float2>` still reads the texel, so that the backing format's other channels
+    // survive.
     auto swizzledStore = as<IRSwizzledStore>(storeInst);
     const bool readsTexel = swizzledStore
-                                ? !doesSwizzleWriteWholeTexel(swizzledStore, imageElementType)
+                                ? !doesSwizzleAssignEveryComponent(swizzledStore, texelType)
                                 : getElementPtr != nullptr;
 
     if (isCUDATarget(target))
@@ -286,9 +297,8 @@ void legalizeStore(
     }
     else
     {
-        newTexel = swizzledStore
-                       ? emitWholeTexelFromSwizzle(builder, swizzledStore, imageElementType)
-                       : storeInst->getOperand(1);
+        newTexel = swizzledStore ? emitValueOfFullSwizzle(builder, swizzledStore, texelType)
+                                 : storeInst->getOperand(1);
         if (getIRVectorElementSize(imageElementType) != getIRVectorElementSize(texelType))
         {
             newTexel = builder.emitVectorReshape(texelType, newTexel);

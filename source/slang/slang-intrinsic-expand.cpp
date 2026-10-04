@@ -318,7 +318,8 @@ CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrit
 
     info.isFormatConversion = true;
     auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
-    const bool isLayered = textureType && textureType->isArray();
+    SLANG_ASSERT(textureType);
+    const bool isLayered = textureType->isArray();
     if (isWrite)
     {
         info.isConversionAvailable = !isLayered;
@@ -339,6 +340,21 @@ CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrit
         break;
     }
     return info;
+}
+
+Index getCUDASurfaceDimensionCount(SlangResourceShape shape)
+{
+    switch (shape)
+    {
+    case SLANG_TEXTURE_1D:
+        return 1;
+    case SLANG_TEXTURE_2D:
+        return 2;
+    case SLANG_TEXTURE_3D:
+        return 3;
+    default:
+        return 0;
+    }
 }
 
 static bool _isResourceWrite(IRCall* call)
@@ -608,6 +624,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'E':
         {
+            // `$E` appears only in CUDA surface accessor strings, where it is the scale applied to
+            // the x coordinate (the backing element size, or 1 for a converting write).
             size_t xScale =
                 getCUDASurfaceAccessInfo(m_callInst->getArg(0), _isResourceWrite(m_callInst))
                     .xScale;

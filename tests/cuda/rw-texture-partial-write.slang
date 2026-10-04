@@ -102,6 +102,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK-NOT: surf2Dread
     // CHECK: surf2Dwrite<float2 >({{.*}}[[V]].y, [[V]].x{{.*}}, {{.*}}t2DFloat2_{{[0-9]+}}, ({{.*}}).x * 8, ({{.*}}).y, SLANG_CUDA_BOUNDARY_MODE);
     t2DFloat2[tid.xy].yx = values[1].xy;
+
+    // Each component of the texel takes the source component assigned to it: `.yzwx = v` writes
+    // `v.wxyz`.
+    // CHECK: float4 [[V:_S[0-9]+]] = {{.*}}values_{{[0-9]+}}{{.*}};
+    // CHECK-NOT: surf2Dread
+    // CHECK: surf2Dwrite<float4 >({{.*}}[[V]].w, [[V]].x, [[V]].y, [[V]].z{{.*}}, {{.*}}t2D_{{[0-9]+}}, ({{.*}}).x * 16, ({{.*}}).y, SLANG_CUDA_BOUNDARY_MODE);
+    t2D[tid.xy].yzwx = values[2];
 }
 
 // No surface handle is ever subscripted like an array.

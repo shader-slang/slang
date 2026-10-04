@@ -769,7 +769,8 @@ protected:
 
     /// Return true if `inst` is a multi-component `swizzledStore` or `swizzleSet` on a target
     /// without swizzle assignment, which we spell one component at a time with
-    /// `_emitSwizzleAssignmentPerElement`.
+    /// `_emitSwizzleAssignmentPerElement`. A one-component swizzle has a scalar source, and
+    /// `v.x = s` is valid on every target, so it keeps the ordinary spelling.
     bool _isSwizzleAssignmentSpelledPerElement(IRInst* inst);
 
     String _emitLiteralOneWithType(int bitWidth);

@@ -2411,9 +2411,11 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // HLSL can assign through a texture subscript (`tex[i].w = v`), but these targets can't, so we
-    // rewrite such writes into whole-texel image loads and stores. `target` is the format we
-    // generate source for, so `-target ptx` reaches here as `CUDASource`.
+    // HLSL source can assign through a texture subscript (`tex[i].w = v`). The HLSL target keeps
+    // that form; for these targets we rewrite such writes into whole-texel image loads and stores.
+    // WGSL and C++ need the same and are not handled yet (shader-slang/slang#13361, #13365).
+    // `target` is the format we generate source for, so `-target ptx` reaches here as
+    // `CUDASource`.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:

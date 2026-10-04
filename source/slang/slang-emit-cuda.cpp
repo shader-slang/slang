@@ -717,9 +717,10 @@ void CUDASourceEmitter::_emitInitializerList(
 ///
 /// On CUDA these ops come only from `legalizeImageSubscript`, which turns a write through a texture
 /// subscript, such as `tex[i].w = v`, into whole-texel image ops whose texel type is the texture's
-/// element type, and which reports every access the CUDA prelude cannot express. We spell the call
-/// the same way the `RWTexture` `Load`/`Store` accessors in hlsl.meta.slang do (see
-/// `CUDASurfaceAccessInfo`), e.g.
+/// element type. That pass reports every access we cannot spell (see
+/// `diagnoseUnavailableCUDASurfaceAccess`), and a reported error stops compilation before
+/// emission, so the asserts below hold. We spell the call the same way the `RWTexture`
+/// `Load`/`Store` accessors in hlsl.meta.slang do (see `CUDASurfaceAccessInfo`), e.g.
 /// `surf2Dwrite<float4>(value, tex, (coord).x * 16, (coord).y, SLANG_CUDA_BOUNDARY_MODE)`.
 void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
 {
@@ -736,25 +737,8 @@ void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
     SLANG_RELEASE_ASSERT(
         (isWrite ? imageStore->getValue()->getDataType() : imageLoad->getDataType()) == texelType);
 
-    const char* shapeName = nullptr;
-    Index dimensionCount = 0;
-    switch (textureType->GetBaseShape())
-    {
-    case SLANG_TEXTURE_1D:
-        shapeName = "1D";
-        dimensionCount = 1;
-        break;
-    case SLANG_TEXTURE_2D:
-        shapeName = "2D";
-        dimensionCount = 2;
-        break;
-    case SLANG_TEXTURE_3D:
-        shapeName = "3D";
-        dimensionCount = 3;
-        break;
-    default:
-        SLANG_UNEXPECTED("CUDA surface access to an unsupported texture shape");
-    }
+    const Index dimensionCount = getCUDASurfaceDimensionCount(textureType->GetBaseShape());
+    SLANG_RELEASE_ASSERT(dimensionCount != 0);
     const bool isArray = textureType->isArray();
     const CUDASurfaceAccessInfo access = getCUDASurfaceAccessInfo(image, isWrite);
     SLANG_RELEASE_ASSERT(access.isConversionAvailable);
@@ -766,7 +750,8 @@ void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
         m_extensionTracker->requireBaseType(BaseType::Half);
 
     m_writer->emit("surf");
-    m_writer->emit(shapeName);
+    m_writer->emitInt64(dimensionCount);
+    m_writer->emit("D");
     if (isArray)
         m_writer->emit("Layered");
     m_writer->emit(isWrite ? "write" : "read");
