@@ -1937,13 +1937,13 @@ struct LoweredElementTypeContext
         }
     }
 
-    // Return whether the storage value at `src` can be copied into `dest` without first converting
-    // it to its logical type. That holds when both locations have the same storage type, and when
-    // we emit SPIR-V directly, where `OpCopyLogical` copies between storage types of one logical
-    // type. No other backend can emit `kIROp_CopyLogical`, so on those targets a copy between two
-    // storage types (for example from a Metal constant buffer into a structured buffer) has to
-    // unpack the value and pack it again.
-    bool canCopyStorageValue(IRBuilder& builder, IRInst* dest, IRInst* src)
+    // Return whether the storage value at `src` can be copied into `dest` directly, without first
+    // converting it to its logical type. That holds when both locations have the same storage type,
+    // and when we emit SPIR-V directly, where `OpCopyLogical` copies between storage types of one
+    // logical type. No other backend can emit `kIROp_CopyLogical`, so on those targets a copy
+    // between two storage types (for example from a Metal constant buffer into a structured
+    // buffer) has to unpack the value and pack it again.
+    bool canCopyStorageValueDirectly(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         if (target->shouldEmitSPIRVDirectly())
             return true;
@@ -1952,6 +1952,8 @@ struct LoweredElementTypeContext
             tryGetPointedToType(&builder, src->getDataType()));
     }
 
+    // Copy the storage value at `src` into `dest`. Only SPIR-V can emit the `kIROp_CopyLogical`
+    // this produces when the two storage types differ; see `canCopyStorageValueDirectly`.
     void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         auto destValType = tryGetPointedToType(&builder, dest->getDataType());
@@ -2135,14 +2137,17 @@ struct LoweredElementTypeContext
                                     alignedAttr->getAlignment());
                             }
                             if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref &&
-                                canCopyStorageValue(builder, addr, originalVal->getOperand(0)))
+                                canCopyStorageValueDirectly(
+                                    builder,
+                                    addr,
+                                    originalVal->getOperand(0)))
                             {
                                 auto valAddr = originalVal->getOperand(0);
 
-                                // In case `originalVal->getOperand(0)` is a tmp var of logical
-                                // storage type (created for SPIRV conformance), we need to use a
-                                // logical copy instead of a plain store to convert it to the actual
-                                // storage type.
+                                // The source has either the destination's storage type, or, on
+                                // SPIR-V, may be a tmp var of logical storage type (created for
+                                // SPIRV conformance) that needs a logical copy instead of a plain
+                                // store to convert it to the actual storage type.
                                 copyLogical(builder, addr, valAddr);
                             }
                             else
@@ -2443,8 +2448,10 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     auto targetReq = target->getTargetReq();
 
     // A Metal constant buffer keeps the native MSL layout that reflection reports for it, unless
-    // it names `ScalarDataLayout`, which gives it the natural layout of a Metal device buffer. The
-    // other explicit data layouts are not available on Metal. Reflection makes the same choice in
+    // it names `ScalarDataLayout`, which gives it the natural layout of a Metal device buffer. Any
+    // other data layout operand is ignored: user code cannot name the other explicit layouts on
+    // Metal, and the operands that compiler options or push constants attach to a constant buffer
+    // do not change its Metal layout. Reflection makes the same choice in
     // `MetalLayoutRulesFamilyImpl::getConstantBufferRules`, and the two must agree. Every other
     // Metal buffer except a parameter block gets `Natural` below.
     if (auto constantBufferType = as<IRConstantBufferType>(bufferType);

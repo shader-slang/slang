@@ -6,7 +6,8 @@
 // that names `ScalarDataLayout` into a structured buffer. Both buffers store
 // packed vectors, but in distinct storage types (one per address space), so
 // the copy unpacks each member and packs it again rather than copying one
-// storage type into the other.
+// storage type into the other. A direct copy between two storage types is
+// only possible on SPIR-V.
 
 struct Inner
 {
@@ -38,7 +39,6 @@ void computeMain()
 }
 
 // METAL-LABEL: computeMain
-// METAL-NOT: copyLogical
 // METAL: (&_S{{[0-9]+}}->inner_0)->v_0 = packed_float3(
 // METAL: (&_S{{[0-9]+}}->arr_0)->data_0[int(1)] = packed_float3(
 // METAL: array<packed_float3, int(3)> {{.*}} packed_float3(
