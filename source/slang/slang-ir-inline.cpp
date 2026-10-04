@@ -659,7 +659,7 @@ struct InliningPassBase
                     inst->getLine(),
                     inst->getCol(),
                     inst->getFile(),
-                    inst->getDebugFunc(),
+                    inst->getScope(),
                     newDebugInlinedAt);
                 inst->replaceUsesWith(newInlinedAt);
                 inst->removeAndDeallocate();
@@ -913,7 +913,7 @@ struct InliningPassBase
                         inlinedAt->getLine(),
                         inlinedAt->getCol(),
                         inlinedAt->getFile(),
-                        inlinedAt->getDebugFunc(),
+                        inlinedAt->getScope(),
                         newDebugInlinedAt);
                     inlinedAt->replaceUsesWith(newInlinedAt);
                     inlinedAt->removeAndDeallocate();

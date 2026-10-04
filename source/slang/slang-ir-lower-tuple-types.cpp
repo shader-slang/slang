@@ -65,6 +65,8 @@ struct TupleLoweringContext
         {
             builder->addNameHintDecoration(structType, tupleNameType->getName()->getStringSlice());
             builder->addDecoration(structType, kIROp_OptimizableTypeDecoration);
+            if (tupleNameType->findDecoration<IRAutodiffParameterContextTypeDecoration>())
+                builder->addDecoration(structType, kIROp_AutodiffParameterContextTypeDecoration);
             operandCount--; // exclude the TupleNameType from field iteration
         }
         else

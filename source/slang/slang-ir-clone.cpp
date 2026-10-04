@@ -48,6 +48,45 @@ IRInst* findCloneForOperand(IRCloneEnv* env, IRInst* oldOperand)
     return oldOperand;
 }
 
+// Clone the declaration scopes owned by a function before specializing its body.
+// Consider `void f(IFoo value) { { int local = value.get(); } }` specialized for
+// two concrete implementations of IFoo. Each copy needs its own DebugFunction,
+// and `local` must refer to a lexical block parented to that same copy. Otherwise
+// both executable functions would name the same debug definition and share their
+// local declaration scopes. Follow only lexical parent edges; the normal
+// clone environment then remaps scope operands and decorations in the body.
+static void cloneDebugScopesForFunc(IRCloneEnv* cloneEnv, IRBuilder* builder, IRFunc* oldFunc)
+{
+    auto decoration = oldFunc->findDecoration<IRDebugFuncDecoration>();
+    if (!decoration || lookUp(cloneEnv, decoration->getDebugFunc()))
+        return;
+
+    // Start with the function's debug metadata, not the executable IRFunc. The scopes
+    // are siblings of that function, so cloning its children would not copy them.
+    List<IRInst*> scopes;
+    scopes.add(decoration->getDebugFunc());
+    while (scopes.getCount())
+    {
+        auto scope = scopes.getLast();
+        scopes.removeLast();
+        SLANG_ASSERT(!lookUp(cloneEnv, scope));
+        // Record the parent clone before visiting its lexical children. Their parent
+        // operands, and later the function body's scope operands, use this mapping.
+        cloneInst(cloneEnv, builder, scope);
+        // A nested lexical block refers to this scope through its parent operand.
+        // Follow those uses to discover children, leaving variables and scope markers
+        // to the ordinary function-body clone instead of traversing all users.
+        for (auto use = scope->firstUse; use; use = use->nextUse)
+        {
+            if (auto lexicalBlock = as<IRDebugLexicalBlock>(use->getUser()))
+            {
+                if (lexicalBlock->getParentScope() == scope)
+                    scopes.add(lexicalBlock);
+            }
+        }
+    }
+}
+
 IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
 {
     SLANG_ASSERT(env);
@@ -218,6 +257,14 @@ static void _cloneInstDecorationsAndChildren(
     //
     IRBuilder builderStorage(module);
     auto builder = &builderStorage;
+    if (auto oldFunc = as<IRFunc>(oldInst))
+    {
+        // A function copy owns its declaration scopes. Cloning an enclosing generic
+        // or module already maps those siblings, so reuse that mapping when present.
+        // Otherwise seed the private scope tree before cloning any body decorations.
+        builder->setInsertBefore(newInst);
+        cloneDebugScopesForFunc(env, builder, oldFunc);
+    }
     builder->setInsertInto(newInst);
 
     // If `newInst` already has non-decoration children, we want to
