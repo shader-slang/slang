@@ -3976,6 +3976,26 @@ DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
     return declRef;
 }
 
+/// Returns the instance method that `decl` names, looking through a generic, when its
+/// derivative takes an implicit `this`. A core intrinsic op has no body to differentiate that way.
+static FunctionDeclBase* getDifferentiableInstanceMethod(Decl* decl)
+{
+    if (auto genericDecl = as<GenericDecl>(decl))
+        decl = genericDecl->inner;
+    auto funcDecl = as<FunctionDeclBase>(decl);
+    if (!funcDecl || funcDecl->hasModifier<HLSLStaticModifier>() || as<ConstructorDecl>(funcDecl))
+        return nullptr;
+    if (funcDecl->hasModifier<IntrinsicOpModifier>() && isFromCoreModule(funcDecl))
+        return nullptr;
+    return funcDecl;
+}
+
+static DifferentiateExpr* desugarDerivativeOfMemberCall(
+    SemanticsVisitor* semantics,
+    InvokeExpr* invoke,
+    DifferentiateExpr* diffExpr);
+static void bindReceiverOfMemberDerivative(SemanticsVisitor* semantics, InvokeExpr* invoke);
+
 // Convert an expression of the form "hof(fn)" where "hof" is a higher-order function like
 // "fwd_diff" or "bwd_diff", into a lookup of the form "fn.fwd_diff" or "fn.bwd_diff"
 //
@@ -4502,7 +4522,15 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
+                    higherOrderInvoke =
+                        desugarDerivativeOfMemberCall(this, invoke, higherOrderInvoke);
+                    if (!higherOrderInvoke)
+                        return CreateErrorExpr(invoke);
+                    bool isStaticMemberForm = as<StaticMemberExpr>(
+                        getInnerMostExprFromHigherOrderExpr(higherOrderInvoke));
                     invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                    if (isStaticMemberForm)
+                        bindReceiverOfMemberDerivative(this, invoke);
                 }
             }
         }
@@ -5838,9 +5866,12 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
         }
         else
         {
-            auto noDiffThisType = m_astBuilder->getModifiedType(
-                thisQualType.type,
-                {m_astBuilder->getNoDiffModifierVal()});
+            // A `[NoDiffThis]` method's `this` type is already `no_diff`.
+            auto noDiffThisType = thisQualType.type;
+            if (!doesTypeHaveNoDiffModifier(noDiffThisType))
+                noDiffThisType = m_astBuilder->getModifiedType(
+                    noDiffThisType,
+                    {m_astBuilder->getNoDiffModifierVal()});
             paramTypes.add(
                 thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
                                          : noDiffThisType);
@@ -5962,12 +5993,24 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
+    // The derivative of `funcExpr`, at any nesting, takes an implicit `this` as its first
+    // parameter when `funcExpr` references an instance method statically, as `T.method`.
+    static bool hasImplicitThisParam(Expr* funcExpr)
+    {
+        auto staticMemberExpr = as<StaticMemberExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr));
+        return staticMemberExpr &&
+               getDifferentiableInstanceMethod(staticMemberExpr->declRef.getDecl());
+    }
+
     // Extract the implicit `this` type for a statically-referenced non-static
     // member method (e.g. `Type::method`).  Returns a null QualType for free
     // functions, static methods, constructors, and member methods referenced
     // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
     QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
     {
+        // A nested derivative's type already carries the `this` parameter.
+        if (as<HigherOrderInvokeExpr>(funcExpr))
+            return QualType();
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
         // Only produce a this-type when the method is accessed via Type::method
         // (StaticMemberExpr). When referenced by name within the same struct
@@ -5988,10 +6031,16 @@ struct HigherOrderInvokeExprCheckingActions
             if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
             {
                 auto callableDecl = callableDeclRef.getDecl();
-                if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
-                    !as<ConstructorDecl>(callableDecl))
+                if (getDifferentiableInstanceMethod(callableDecl))
                 {
-                    return getTypeForThisExpr(semantics, callableDeclRef);
+                    auto thisType = getTypeForThisExpr(semantics, callableDeclRef);
+                    auto astBuilder = semantics->getASTBuilder();
+                    if (thisType.type && callableDecl->hasModifier<NoDiffThisAttribute>() &&
+                        !doesTypeHaveNoDiffModifier(thisType.type))
+                        thisType.type = astBuilder->getModifiedType(
+                            thisType.type,
+                            {astBuilder->getNoDiffModifierVal()});
+                    return thisType;
                 }
             }
         }
@@ -6029,7 +6078,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
-                if (thisType.type)
+                if (hasImplicitThisParam(funcExpr))
                     resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
@@ -6052,6 +6101,13 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         Expr* funcExpr) override
     {
         resultDiffExpr->baseFunction = funcExpr;
+        if (as<DifferentiateExpr>(funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            semantics->getSink()->diagnose(
+                Diagnostics::CannotBackwardDifferentiateDerivativeDirectly{.expr = funcExpr});
+            return;
+        }
         auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
         if (!baseFuncType)
         {
@@ -6070,7 +6126,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
-                if (thisType.type)
+                if (hasImplicitThisParam(funcExpr))
                     resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
@@ -6134,8 +6190,18 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
-    SemanticsVisitor subVisitor(semantics->getShared());
-    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    // A receiver, under any nesting, is checked as in a plain call: with the caller's rules for
+    // static references, and captured by an enclosing lambda.
+    auto innerExpr = expr->baseFunction;
+    while (auto innerHigherOrderExpr = as<HigherOrderInvokeExpr>(innerExpr))
+        innerExpr = innerHigherOrderExpr->baseFunction;
+    if (auto memberExpr = as<MemberExpr>(innerExpr))
+        memberExpr->baseExpression = semantics->CheckTerm(memberExpr->baseExpression);
+
+    // The rest of the operand names a function, so it is checked outside any enclosing lambda,
+    // but keeps the caller's expression-local scope, where an existential receiver is opened.
+    SemanticsVisitor subVisitor(semantics->allowStaticReferenceToNonStaticMember()
+                                    .withParentLambdaExpr(nullptr, nullptr, nullptr));
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
     expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
     expr->baseFunction =
@@ -6150,12 +6216,17 @@ static Expr* _checkHigherOrderInvokeExpr(
     // This is done by pushing the `differentiate` operator to each item in the overloaded expr.
     if (auto overloadedExpr = as<OverloadedExpr>(expr->baseFunction))
     {
+        // Each candidate keeps a value receiver so that it can be desugared; `T.method` stays
+        // unqualified.
+        auto receiver = overloadedExpr->base;
+        if (receiver && as<TypeType>(receiver->type.type))
+            receiver = nullptr;
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
         for (auto item : overloadedExpr->lookupResult2)
         {
-            auto lookupResultExpr = semantics->ConstructLookupResultExpr(
+            auto lookupResultExpr = subVisitor.ConstructLookupResultExpr(
                 item,
-                nullptr,
+                receiver,
                 overloadedExpr->name,
                 overloadedExpr->loc,
                 nullptr);
@@ -6248,7 +6319,7 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
                 funcDecl = as<CallableDecl>(genDecl->inner);
             if (funcDecl)
             {
-                if (thisType.type)
+                if (hasImplicitThisParam(funcExpr))
                     resultExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                     resultExpr->newParameterNames.add(param->getName());
@@ -6256,6 +6327,264 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         }
     }
 };
+
+/// Calls a user-written member derivative found for `__fwd_diff(T.method)(receiver, args)` as
+/// `receiver.methodFwd(args)`, since it takes the receiver as its implicit `this`.
+static void bindReceiverOfMemberDerivative(SemanticsVisitor* semantics, InvokeExpr* invoke)
+{
+    auto calleeExpr = as<DeclRefExpr>(invoke->functionExpr);
+    if (!calleeExpr || invoke->arguments.getCount() == 0)
+        return;
+    auto calleeDeclRef = calleeExpr->declRef.as<FunctionDeclBase>();
+    if (!calleeDeclRef)
+        return;
+    auto calleeDecl = calleeDeclRef.getDecl();
+    if (as<SynthesizedFuncDecl>(calleeDecl) || !getDifferentiableInstanceMethod(calleeDecl))
+        return;
+
+    auto astBuilder = semantics->getASTBuilder();
+    if (invoke->arguments.getCount() != getParameters(astBuilder, calleeDeclRef).getCount() + 1)
+        return;
+    auto thisType = getTypeForThisExpr(semantics, calleeDeclRef);
+    auto receiver = invoke->arguments[0];
+    if (!thisType.type || !unwrapModifiedType(receiver->type.type)->equals(thisType.type))
+        return;
+
+    auto memberExpr = astBuilder->create<MemberExpr>();
+    memberExpr->loc = calleeExpr->loc;
+    memberExpr->name = calleeExpr->name;
+    memberExpr->scope = calleeExpr->scope;
+    memberExpr->declRef = calleeExpr->declRef;
+    memberExpr->type = calleeExpr->type;
+    memberExpr->baseExpression = receiver;
+    memberExpr->checked = true;
+    invoke->functionExpr = memberExpr;
+    invoke->arguments.removeAt(0);
+}
+
+/// Wraps `expr` in a fresh mutable local scoped to this expression, yielding an l-value for it.
+static Expr* bindToMutableTemp(SemanticsVisitor* semantics, Expr* expr)
+{
+    auto astBuilder = semantics->getASTBuilder();
+
+    auto varDecl = astBuilder->create<VarDecl>();
+    // The temporary belongs to the enclosing lambda or function: in a lambda it is then not
+    // captured, and in an initializer outside any function it does not become a field.
+    if (auto lambdaExpr = semantics->getParentLambdaExpr())
+        lambdaExpr->paramScopeDecl->addMember(varDecl);
+    else if (auto outerScope = semantics->getOuterScope();
+             semantics->getParentFuncOfVisitor() && outerScope && outerScope->containerDecl)
+        outerScope->containerDecl->addMember(varDecl);
+    addModifier(varDecl, astBuilder->create<LocalTempVarModifier>());
+    addModifier(varDecl, astBuilder->create<MutableLocalTempVarModifier>());
+    varDecl->checkState = DeclCheckState::DefinitionChecked;
+    varDecl->nameAndLoc.loc = expr->loc;
+    varDecl->initExpr = expr;
+    varDecl->type.type = expr->type.type;
+
+    auto varExpr = astBuilder->create<VarExpr>();
+    varExpr->loc = expr->loc;
+    varExpr->declRef = makeDeclRef(varDecl);
+    varExpr->type = QualType(expr->type.type, true);
+    varExpr->checked = true;
+
+    auto letExpr = astBuilder->create<LetExpr>();
+    letExpr->loc = expr->loc;
+    letExpr->decl = varDecl;
+    letExpr->body = varExpr;
+    letExpr->type = varExpr->type;
+    letExpr->checked = true;
+    return letExpr;
+}
+
+/// Creates a derivative expression of the same kind as `kind` over `base`.
+static Expr* rebuildDifferentiateExpr(
+    SemanticsVisitor* semantics,
+    DifferentiateExpr* kind,
+    Expr* base)
+{
+    ForwardDifferentiateExprCheckingActions fwdActions;
+    BackwardDifferentiateExprCheckingActions bwdActions;
+    HigherOrderInvokeExprCheckingActions* actions = nullptr;
+    if (as<ForwardDifferentiateExpr>(kind))
+        actions = &fwdActions;
+    else if (as<BackwardDifferentiateExpr>(kind))
+        actions = &bwdActions;
+    SLANG_RELEASE_ASSERT(actions);
+
+    auto result = actions->createHigherOrderInvokeExpr(semantics);
+    actions->fillHigherOrderInvokeExpr(result, semantics, base);
+    result->loc = kind->loc;
+    result->checked = true;
+    return result;
+}
+
+/// Builds `diffPair(primal)` for `pairType`, using the core `diffPair` specialized with the pair
+/// type's own conformance witness.
+static Expr* makeDiffPairWithZeroDifferential(
+    SemanticsVisitor* semantics,
+    DifferentialPairType* pairType,
+    Expr* primal)
+{
+    auto astBuilder = semantics->getASTBuilder();
+    auto pairModule = getModuleDecl(pairType->getDeclRef().getDecl());
+    SLANG_RELEASE_ASSERT(pairModule && pairModule->ownedScope);
+
+    auto name = semantics->getName("diffPair");
+    DeclRef<GenericDecl> diffPairGeneric;
+    auto lookupResult = lookUp(astBuilder, semantics, name, pairModule->ownedScope);
+    for (auto item : lookupResult)
+    {
+        auto genericDecl = as<GenericDecl>(item.declRef.getDecl());
+        auto funcDecl = genericDecl ? as<FuncDecl>(genericDecl->inner) : nullptr;
+        if (funcDecl && funcDecl->getParameters().getCount() == 1)
+            diffPairGeneric = makeDeclRef(genericDecl);
+    }
+    SLANG_RELEASE_ASSERT(diffPairGeneric);
+
+    auto pairArgs = findInnerMostGenericArgs(SubstitutionSet(pairType->getDeclRef()));
+    auto funcDeclRef = astBuilder->getGenericAppDeclRef(diffPairGeneric, pairArgs);
+
+    auto call = astBuilder->create<InvokeExpr>();
+    call->loc = primal->loc;
+    call->functionExpr =
+        semantics->ConstructDeclRefExpr(funcDeclRef, nullptr, name, SourceLoc(), nullptr);
+    call->originalFunctionExpr = call->functionExpr;
+    call->arguments.add(primal);
+    return semantics->CheckInvokeExprWithCheckedOperands(call);
+}
+
+/// Rewrites `__fwd_diff(obj.method)(args)` as `__fwd_diff(T.method)(receiver, args)`, pairing a
+/// differentiable receiver with a zero differential. Returns null after a diagnostic.
+static DifferentiateExpr* desugarDerivativeOfMemberCall(
+    SemanticsVisitor* semantics,
+    InvokeExpr* invoke,
+    DifferentiateExpr* diffExpr)
+{
+    // The member reference can be under any nesting, as in `__fwd_diff(__fwd_diff(obj.method))`.
+    List<DifferentiateExpr*> chain;
+    chain.add(diffExpr);
+    while (auto inner = as<DifferentiateExpr>(chain.getLast()->baseFunction))
+        chain.add(inner);
+
+    // `__apply(obj.method)` already takes the receiver implicitly, as the method itself does.
+    for (auto link : chain)
+    {
+        if (as<ApplyForBwdExpr>(link))
+            return diffExpr;
+    }
+
+    auto memberExpr = as<MemberExpr>(chain.getLast()->baseFunction);
+    if (!memberExpr || !memberExpr->baseExpression)
+        return diffExpr;
+    auto methodDeclRef = memberExpr->declRef;
+    if (auto genericDeclRef = methodDeclRef.as<GenericDecl>())
+        methodDeclRef = semantics->getASTBuilder()->getMemberDeclRef(
+            genericDeclRef,
+            genericDeclRef.getDecl()->inner);
+    auto methodDecl = getDifferentiableInstanceMethod(methodDeclRef.getDecl());
+    if (!methodDecl)
+        return diffExpr;
+
+    auto astBuilder = semantics->getASTBuilder();
+
+    // A generic receiver reaches the member through an implicit upcast to its interface; the
+    // static form wants the receiver itself, typed as the generic parameter.
+    auto receiver = memberExpr->baseExpression;
+    while (auto castExpr = as<CastToSuperTypeExpr>(receiver))
+    {
+        if (!isDeclRefTypeOf<InterfaceDecl>(castExpr->type.type))
+            break;
+        receiver = castExpr->valueArg;
+    }
+
+    auto receiverTypeExpr = astBuilder->create<SharedTypeExpr>();
+    receiverTypeExpr->loc = receiver->loc;
+    receiverTypeExpr->base.type = receiver->type.type;
+    receiverTypeExpr->type = QualType(astBuilder->getTypeType(receiver->type.type));
+
+    auto staticMethodExpr = astBuilder->create<StaticMemberExpr>();
+    staticMethodExpr->loc = memberExpr->loc;
+    staticMethodExpr->name = memberExpr->name;
+    staticMethodExpr->scope = memberExpr->scope;
+    staticMethodExpr->declRef = memberExpr->declRef;
+    staticMethodExpr->type = memberExpr->type;
+    staticMethodExpr->baseExpression = receiverTypeExpr;
+    staticMethodExpr->checked = true;
+
+    // The chain is rebuilt, innermost first, on top of the static reference.
+    Expr* base = staticMethodExpr;
+    for (Index i = chain.getCount() - 1; i >= 0; --i)
+        base = rebuildDifferentiateExpr(semantics, chain[i], base);
+    auto staticDiffExpr = as<DifferentiateExpr>(base);
+
+    auto staticFuncType = as<FuncType>(staticDiffExpr->type.type);
+    auto instanceFuncType = as<FuncType>(diffExpr->type.type);
+    // A variadic method's expanded parameters do not line up with the static form's.
+    if (!staticFuncType || !instanceFuncType ||
+        staticFuncType->getParamCount() != instanceFuncType->getParamCount() + 1)
+        return diffExpr;
+
+    // The derivative takes `this` as the receiver wrapped in one `DifferentialPair` per level of
+    // differentiation that sees it as differentiable, outermost first.
+    auto thisParam = staticFuncType->getParamInfo(0);
+    List<DifferentialPairType*> pairTypes;
+    auto receiverType = unwrapModifiedType(receiver->type.type);
+    for (auto type = thisParam.type; type && !unwrapModifiedType(type)->equals(receiverType);)
+    {
+        if (as<DifferentialPtrPairType>(type))
+        {
+            semantics->getSink()->diagnose(
+                Diagnostics::CannotDifferentiateMemberOfDifferentiablePtrTypeThroughInstance{
+                    .method = methodDecl,
+                    .thisType = thisParam.type,
+                    .expr = diffExpr});
+            return nullptr;
+        }
+        auto pairType = as<DifferentialPairType>(type);
+        if (!pairType)
+            break;
+        pairTypes.add(pairType);
+        type = pairType->getPrimalType();
+    }
+
+    bool isMutating = isEffectivelyMutating(methodDecl);
+
+    // A method that is not differentiable is left to be diagnosed as such.
+    if (isMutating && semantics->getShared()->getFuncDifferentiableLevel(methodDecl) ==
+                          FunctionDifferentiableLevel::None)
+        return diffExpr;
+
+    Expr* receiverArg = receiver;
+    if (pairTypes.getCount() > 0)
+    {
+        if (isMutating)
+        {
+            semantics->getSink()->diagnose(
+                Diagnostics::CannotDifferentiateMutatingMemberWithDifferentiableThis{
+                    .method = methodDecl,
+                    .thisType = thisParam.type,
+                    .expr = diffExpr});
+            return nullptr;
+        }
+        for (Index level = pairTypes.getCount() - 1; level >= 0; --level)
+            receiverArg =
+                makeDiffPairWithZeroDifferential(semantics, pairTypes[level], receiverArg);
+
+        // The backward derivative writes the receiver's gradient, which is discarded, back
+        // through `this`.
+        if (as<BackwardDifferentiateExpr>(diffExpr))
+            receiverArg = bindToMutableTemp(semantics, receiverArg);
+    }
+    else if (isMutating)
+    {
+        if (!semantics->checkMutatingReceiver(methodDeclRef, receiver, memberExpr->loc, true))
+            return nullptr;
+    }
+
+    invoke->arguments.insert(0, receiverArg);
+    return staticDiffExpr;
+}
 
 Expr* SemanticsExprVisitor::visitApplyForBwdExpr(ApplyForBwdExpr* expr)
 {

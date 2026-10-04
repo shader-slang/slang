@@ -5838,6 +5838,8 @@ struct ExprLoweringContext
     }
 };
 
+static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
+
 template<typename Derived>
 struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 {
@@ -7855,6 +7857,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // different use cases of `LetExpr`: the definitely-immutable case that
         // actually behaves like a `let`, and this other mutable-alias case that
         // feels kind of messy and gross.
+
+        if (expr->decl->findModifier<MutableLocalTempVarModifier>())
+        {
+            auto initVal = lowerRValueExpr(context, expr->decl->initExpr);
+            context->setGlobalValue(expr->decl, moveIntoMutableTemp(context, initVal));
+            return lowerSubExpr(expr->body);
+        }
 
         auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
         context->setGlobalValue(expr->decl, initVal);

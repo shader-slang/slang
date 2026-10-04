@@ -189,20 +189,19 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
             ? nullptr
             : getDiffWitness(funcType->getResultType());
 
-    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
+    QualType thisValueType;
     Type* thisParamType = nullptr;
-
-    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
-        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    if (!callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() &&
+        !as<ConstructorDecl>(callableDeclRef.getDecl()))
     {
-        thisParamType = nullptr;
-    }
-    else if (thisValueType.type)
-    {
-        if (thisValueType.isLeftValue)
-            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
-        else
-            thisParamType = thisValueType.type;
+        thisValueType = getTypeForThisExpr(this, callableDeclRef);
+        if (thisValueType.type)
+        {
+            if (thisValueType.isLeftValue)
+                thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
+            else
+                thisParamType = thisValueType.type;
+        }
     }
 
     SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;

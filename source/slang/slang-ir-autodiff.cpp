@@ -157,6 +157,25 @@ bool isBackwardDerivativeValue(IRInst* inst)
     // itself), so a specialized/generic backward-derivative value such as
     // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
     inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
+
+    // Through an existential, a backward derivative is looked up from its conformance table.
+    if (auto lookup = as<IRLookupWitnessMethod>(inst))
+    {
+        auto key = as<IRBuiltinRequirementKey>(lookup->getRequirementKey());
+        if (!key)
+            return false;
+        switch (BuiltinRequirementKind(key->getKind()))
+        {
+        case BuiltinRequirementKind::BwdApplyFunc:
+        case BuiltinRequirementKind::BwdCallableRematFunc:
+        case BuiltinRequirementKind::BwdCallablePropFunc:
+        case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     switch (inst->getOp())
     {
     // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),

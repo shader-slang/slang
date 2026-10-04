@@ -1508,6 +1508,8 @@ public:
         return result;
     }
 
+    LambdaExpr* getParentLambdaExpr() const { return m_parentLambdaExpr; }
+
     SemanticsContext withParentLambdaExpr(
         LambdaExpr* expr,
         LambdaDecl* decl,
@@ -3756,6 +3758,12 @@ public:
     ///
     ParamDecl* isReferenceIntoFunctionInputParameter(Expr* expr);
 
+    bool checkMutatingReceiver(
+        DeclRef<Decl> funcDeclRef,
+        Expr* baseExpr,
+        SourceLoc loc,
+        bool diagnose);
+
     // Create a witness that attests to the fact that `type`
     // is equal to itself.
     TypeEqualityWitness* createTypeEqualityWitness(Type* type);
@@ -4548,6 +4556,9 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
 
 QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
+
+/// Returns whether a call to `decl` can modify its `this`.
+bool isEffectivelyMutating(CallableDecl* decl);
 
 bool isUnsizedArrayType(Type* type);
 

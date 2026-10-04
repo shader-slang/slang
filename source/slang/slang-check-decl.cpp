@@ -1166,7 +1166,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitAggTypeCtorExpr(AggTypeCtorExpr*) { return; }
     void visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr) { dispatchIfNotNull(expr->valueArg); }
     void visitModifierCastExpr(ModifierCastExpr* expr) { dispatchIfNotNull(expr->valueArg); }
-    void visitLetExpr(LetExpr* expr) { dispatchIfNotNull(expr->body); }
+    void visitLetExpr(LetExpr* expr)
+    {
+        // A mutable temporary's initializer is reached only through its declaration.
+        if (expr->decl && expr->decl->findModifier<MutableLocalTempVarModifier>())
+            dispatchIfNotNull(expr->decl->initExpr);
+        dispatchIfNotNull(expr->body);
+    }
     void visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
         dispatchIfNotNull(expr->declRef.declRefBase);
@@ -1859,8 +1865,25 @@ QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDec
     expr->scope = funcDecl->ownedScope;
     expr->loc = funcDecl->loc;
 
+    // A deserialized or synthesized declaration has no scope, so one is rebuilt from its parents.
+    if (!expr->scope)
+    {
+        List<ContainerDecl*> containers;
+        for (ContainerDecl* decl = funcDecl; decl; decl = decl->parentDecl)
+            containers.add(decl);
+        for (Index i = containers.getCount() - 1; i >= 0; --i)
+        {
+            auto scope = visitor->getASTBuilder()->create<Scope>();
+            scope->containerDecl = containers[i];
+            scope->parent = expr->scope;
+            expr->scope = scope;
+        }
+    }
+
+    // `this` is checked outside any enclosing lambda, so that it is not captured into it.
     DiagnosticSink dummySink;
-    auto tempVisitor = SemanticsVisitor(visitor->withSink(&dummySink));
+    auto tempVisitor = SemanticsVisitor(
+        visitor->withSink(&dummySink).withParentLambdaExpr(nullptr, nullptr, nullptr));
 
     auto checkedExpr = tempVisitor.CheckTerm(expr);
 

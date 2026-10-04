@@ -19,6 +19,17 @@
 namespace Slang
 {
 
+// Whether `callee` is itself a forward derivative, such as one an interface provides.
+static bool isForwardDerivativeCallee(IRInst* callee)
+{
+    if (as<IRForwardDifferentiate>(callee))
+        return true;
+    auto lookup = as<IRLookupWitnessMethod>(callee);
+    auto key = lookup ? as<IRBuiltinRequirementKey>(lookup->getRequirementKey()) : nullptr;
+    return key &&
+           BuiltinRequirementKind(key->getKind()) == BuiltinRequirementKind::ForwardDerivativeFunc;
+}
+
 
 static void emitAnnotationsFromWitnessTable(
     DifferentiableTypeConformanceContext* context,
@@ -1331,7 +1342,10 @@ struct ForwardDiffTranslationContext
             // TODO: It may be better to lower this as a SynthesizedFuncDecl from the front-end
             // if a function is backward-differentiable, but not forward-differentiable.
             //
-            if (this->useTrivialFwdsForBwdDifferentiableFuncs)
+            // A derivative whose own derivative is absent, as one from an interface can be, has
+            // none to fall back on: it is diagnosed below rather than treated as zero.
+            if (this->useTrivialFwdsForBwdDifferentiableFuncs &&
+                !isForwardDerivativeCallee(primalCallee))
             {
                 // See if the callee is backward differentiable.
                 if (this->diffTypeContext.tryGetAssociationOfKind(
@@ -1364,6 +1378,7 @@ struct ForwardDiffTranslationContext
             // Diagnose.
             getSink()->diagnose(
                 Diagnostics::EncounteredNonDifferentiableFunctionDuringHigherOrderDiff{
+                    .func = getResolvedInstForDecorations(primalCallee),
                     .location = origCall->sourceLoc});
             IRInst* primalCall = maybeCloneForPrimalInst(builder, origCall);
             return InstPair(primalCall, nullptr);
@@ -2472,7 +2487,12 @@ struct ForwardDiffTranslationContext
         InstPair pair = this->translateFuncHeader(inBuilder, origFunc);
         fwdDiffFunc = pair.differential;
 
+        auto errorCount = getSink()->getErrorCount();
         this->translateFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
+
+        // A derivative whose translation was diagnosed is incomplete; it is not processed further.
+        if (getSink()->getErrorCount() != errorCount)
+            return;
 
         fwdDiffFunc = maybeHoist(*inBuilder, fwdDiffFunc);
         stripTempDecorations(fwdDiffFunc);
@@ -3566,7 +3586,16 @@ IRInst* maybeTranslateForwardDerivative(
     IRBuilder builder(sharedContext->moduleInst);
 
     builder.setInsertAfter(targetFunc);
+    auto errorCount = sink->getErrorCount();
     translater._translateFuncImpl(&builder, targetFunc, fwdDiffFunc);
+
+    // A translation that was diagnosed is incomplete, so the translate inst stays in place.
+    if (sink->getErrorCount() != errorCount)
+    {
+        if (!fwdDiffFunc->hasUses())
+            fwdDiffFunc->removeAndDeallocate();
+        return inst;
+    }
 
     // TODO: Should hoist outside..
     return fwdDiffFunc;
@@ -3587,7 +3616,16 @@ IRInst* maybeTranslateRawForwardDerivativeWithAnnotations(
     InstPair pair = translater.translateFuncHeader(&builder, origFunc);
     fwdDiffFunc = pair.differential;
 
+    auto errorCount = sink->getErrorCount();
     translater.translateFunc(&builder, origFunc, cast<IRFunc>(fwdDiffFunc));
+
+    // A translation that was diagnosed is incomplete, so there is no derivative.
+    if (sink->getErrorCount() != errorCount)
+    {
+        if (!fwdDiffFunc->hasUses())
+            fwdDiffFunc->removeAndDeallocate();
+        return nullptr;
+    }
     copyDebugInfo(origFunc, fwdDiffFunc);
 
     // For this version, we won't try to remove any generated annotations.
