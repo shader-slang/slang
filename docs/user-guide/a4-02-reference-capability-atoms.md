@@ -1486,6 +1486,10 @@ Compound Capabilities
 `ser_nvapi`
 > Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
+`ser_position_raygen_closesthit_miss`
+> Collection of capabilities for raytracing + shader execution reordering +
+> ray_tracing_position_fetch and the shader stages of raygen, closesthit, and miss.
+
 `ser_raygen`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.
 
@@ -1577,14 +1581,22 @@ Compound Capabilities
 `texture_querylod`
 > Capabilities required to query texture LOD info
 
+`texture_shadow`
+> Capabilities required for plain shadow-comparison texture sampling that takes
+> no explicit LOD (SampleCmp, SampleCmpLevelZero).
+
+`texture_shadowbias`
+> Capabilities required for shadow-comparison texture sampling with an LOD bias
+> (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+
 `texture_shadowgrad`
-> Capabilities required for shadow texture sampling with bias and gradients.
+> Capabilities required for shadow texture sampling with gradients (SampleCmpGrad).
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowlod`
-> Capabilities required for shadow texture LOD sampling on types
-> natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
-> sampler2DShadow).
+> Capabilities required for shadow texture LOD sampling with an explicit LOD
+> (SampleCmpLevel) on types natively supported by GLSL 1.50 (sampler1DShadow,
+> sampler1DArrayShadow, sampler2DShadow).
 
 `texture_shadowlod_ext`
 > Capabilities required for shadow texture LOD sampling on types

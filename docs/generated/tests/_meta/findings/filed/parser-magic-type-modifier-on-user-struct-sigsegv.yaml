@@ -1,0 +1,57 @@
+schema_version: 1
+id: parser-magic-type-modifier-on-user-struct-sigsegv
+bundle: coverage/parser
+suspected_kind: sigsegv
+scope: parser
+title: "`__magic_type(Name)` on a user struct crashes slangc with SIGSEGV"
+observed_at: "2026-08-05T00:00:00+00:00"
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc -target hlsl -entry main -stage compute /tmp/pt/x1.slang"
+  source_slang: docs/generated/tests/coverage/parser/magic-type-modifier-on-user-struct.slang
+  observed_summary: |
+    Writing the internal modifier `__magic_type(...)` on an ordinary user-declared
+    struct terminates slangc with SIGSEGV (exit 139) and no output at all -- no
+    diagnostic on stdout or stderr, no partial HLSL.
+
+    Both a magic name the compiler knows and one it does not crash identically:
+
+      __magic_type(FloatType)
+      struct MyFloat {}
+      [numthreads(1,1,1)]
+      void main() {}
+
+      __magic_type(NotARealMagicTypeName)
+      struct MyThing {}
+      [numthreads(1,1,1)]
+      void main() {}
+
+    The neighbouring internal modifier `__intrinsic_type(1)` on the same shape of
+    declaration does not crash -- it compiles to completion with exit 0 -- so the
+    crash is specific to `__magic_type`, not to internal modifiers in general.
+
+    The test file named above was NOT committed: a crashing input cannot ship as a
+    passing characterization test. The crash was found while triaging the uncovered
+    `parseMagicTypeModifierImpl` region of source/slang/slang-parser.cpp (lines
+    ~10560-10590) to decide whether it is core-module-only or reachable from the
+    CLI.
+  exit_code: 139
+  stderr_tail: "(empty -- the process dies before writing any diagnostic)"
+expected:
+  claim: |
+    A modifier that user code is not supposed to write must be rejected with a normal
+    diagnostic, not by killing the process. The project already treats "internal
+    modifier applied to hostile/user input" as a robustness contract: tests/language-server/robustness-5.slang
+    applies the equally internal `__attributeTarget(StructDecl)` to a user declaration
+    and requires the compiler to survive it.
+  citation_kind: sibling-test
+  citation: tests/language-server/robustness-5.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/tests/coverage/METHODOLOGY.md#triage-first--only-target-reachable-gaps
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Bad probe input: ruled out -- `__magic_type(FloatType)` uses a magic name that core.meta.slang itself uses (source/slang/core.meta.slang), and an unknown name crashes the same way, so there is no spelling of the modifier that is diagnosed rather than fatal."
+    - "All internal modifiers crash on user input: ruled out -- `__intrinsic_type(1)` on the identical struct compiles with exit 0."
+    - "Crash is in the parser: not asserted. The coverage counters for parseMagicTypeModifierImpl are all zero in the profile written by the crashing run, but a profile from a SIGSEGV is truncated, so it does not establish where the fault is."

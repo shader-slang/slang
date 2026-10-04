@@ -75,7 +75,7 @@ int _calcResourceAccessFlags(MemoryType memType)
     case MemoryType::Upload:
         return D3D11_CPU_ACCESS_WRITE;
     default:
-        assert(!"Invalid flags");
+        SLANG_ASSERT_FAILURE("Invalid flags");
         return 0;
     }
 }
@@ -236,7 +236,7 @@ D3D11_BLEND_OP translateBlendOp(BlendOp op)
     switch (op)
     {
     default:
-        assert(!"unimplemented");
+        SLANG_ASSERT_FAILURE("unimplemented");
         return (D3D11_BLEND_OP)-1;
 
 #define CASE(FROM, TO)  \
@@ -256,7 +256,7 @@ D3D11_BLEND translateBlendFactor(BlendFactor factor)
     switch (factor)
     {
     default:
-        assert(!"unimplemented");
+        SLANG_ASSERT_FAILURE("unimplemented");
         return (D3D11_BLEND)-1;
 
 #define CASE(FROM, TO)      \
@@ -327,7 +327,7 @@ void initSrvDesc(
             descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
             break;
         default:
-            assert(!"Unknown dimension");
+            SLANG_ASSERT_FAILURE("Unknown dimension");
         }
 
         descOut.Texture2D.MipLevels = textureDesc.numMipLevels;
@@ -354,7 +354,7 @@ void initSrvDesc(
     }
     else
     {
-        assert(textureDesc.size.depth > 1 || arraySize > 1);
+        SLANG_ASSERT(textureDesc.size.depth > 1 || arraySize > 1);
 
         switch (textureDesc.type)
         {
@@ -369,7 +369,7 @@ void initSrvDesc(
             break;
 
         default:
-            assert(!"Unknown dimension");
+            SLANG_ASSERT_FAILURE("Unknown dimension");
         }
 
         descOut.Texture2DArray.ArraySize = std::max(textureDesc.size.depth, arraySize);

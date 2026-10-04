@@ -7,7 +7,6 @@
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {

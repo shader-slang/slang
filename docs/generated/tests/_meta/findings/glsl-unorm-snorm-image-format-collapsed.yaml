@@ -1,0 +1,38 @@
+schema_version: 1
+id: glsl-unorm-snorm-image-format-collapsed
+bundle: design/ast-reference/modifiers
+suspected_kind: wrong-codegen
+title: "GLSL: unorm and snorm storage images both emit layout(rgba32f)"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: glsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ast-reference/modifiers/unorm-snorm-resource-format-emits-on-hlsl.slang -target glsl -entry main -stage compute"
+  source_slang: docs/generated/tests/design/ast-reference/modifiers/unorm-snorm-resource-format-emits-on-hlsl.slang
+  observed_summary: |
+    `RWTexture2D<unorm float4>` and `RWTexture2D<snorm float4>` declared in the same module
+    emit as the identical GLSL image uniform, both carrying `layout(rgba32f)`:
+      layout(rgba32f) layout(binding = 0) uniform image2D uTex_0;
+      layout(rgba32f) layout(binding = 1) uniform image2D sTex_0;
+    Compiling the same file with `-target spirv-asm` does keep the two apart --
+    `OpTypeImage %float 2D 2 0 0 2 Rgba8` for the unorm texture and
+    `OpTypeImage %float 2D 2 0 0 2 Rgba8Snorm` for the snorm one -- so the two Khronos
+    paths disagree about the format the same declaration selects, and the GLSL one also
+    disagrees about the component width (rgba32f vs Rgba8).
+  exit_code: 0
+expected:
+  claim: |
+    The GLSL and direct-SPIR-V paths should record the same storage-image format for the
+    same declaration, so `unorm float4` and `snorm float4` should emit distinct GLSL format
+    qualifiers (`rgba8` and `rgba8_snorm`) rather than collapsing onto `rgba32f`.
+  citation_kind: sibling-test
+  citation: tests/language-feature/types/modifiers/unorm-modifier.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/generated/design/ast-reference/modifiers.md#type-modifiers-wrapping-the-type-rather-than-the-declaration
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "GLSL has no normalized image formats: ruled out -- GLSL spells them `rgba8` and `rgba8_snorm`, and the emitter already writes other explicit format qualifiers such as `rgba16f`."
+    - "The SPIR-V result is the wrong one and rgba32f is correct: possible, but then the two Khronos back ends still disagree for identical input, which is the observation either way."
+    - "Test bug (both textures collapsed by dedup): ruled out -- the two uniforms are emitted separately with distinct names and bindings, only the format qualifier is identical."

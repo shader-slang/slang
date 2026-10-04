@@ -5,7 +5,6 @@
 #include "core/slang-riff.h"
 #include "core/slang-type-text-util.h"
 
-#include <assert.h>
 
 // Serialization
 #include "slang-serialize-container.h"

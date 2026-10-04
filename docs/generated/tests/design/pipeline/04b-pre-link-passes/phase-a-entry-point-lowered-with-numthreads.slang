@@ -1,20 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=e1b449b7fcdd81d8efc3a0ebc0902561859fb0966734d156746b5be25c2fee00
-//META: purpose=Phase A's lowerFrontEndEntryPointToIR (A6) produces an IRFunc with [entryPoint(...)] and [numThreads(...)] decorations visible in the LOWER-TO-IR dump.
+//META: doc_section_digest=2fe8dd7a16950f4d25991c1ed50ffc7708abb01cec59410111613533f4e48c3a
+//META: purpose=Phase A's lowerFrontEndEntryPointToIR (A6) produces an IRFunc carrying the entryPoint and numThreads decorations in the LOWER-TO-IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Phase A row A6 of the doc table establishes the entry-point
-// `IRFunc` before the full declaration walk. The compute entry
-// point appears in the `### LOWER-TO-IR:` block carrying both
-// `entryPoint` and `numThreads` decorations.
+// Verifies that the per-entry-point lowering step of Phase A leaves an
+// `IRFunc` behind that still carries the stage/thread-group metadata the
+// front end attached. The CHECKs read the post-Phase-D IR snapshot for the
+// `entryPoint` and `numThreads` decorations sitting on `func %main`; that
+// pair can only be there if the entry point was lowered as a function
+// rather than, say, kept as an AST-only decl.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

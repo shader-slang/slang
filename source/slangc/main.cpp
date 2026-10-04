@@ -7,7 +7,6 @@
 
 using namespace Slang;
 
-#include <assert.h>
 
 #ifdef _WIN32
 #define MAIN slangc_main
@@ -163,7 +162,7 @@ int wmain(int argc, wchar_t** argv)
 
     int memleakDetected = _CrtDumpMemoryLeaks();
     SLANG_UNUSED(memleakDetected);
-    assert(!memleakDetected);
+    SLANG_ASSERT(!memleakDetected);
 #endif
 
     return result;

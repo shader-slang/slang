@@ -160,6 +160,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             }
             break;
         case CompilerOptionName::TraceCoverageReservedSpace: // intValue0: space
+        case CompilerOptionName::TraceCoverageBindlessIndex: // intValue0: array index
             for (auto v : option.value)
             {
                 sb << " " << name << " " << v.intValue;
@@ -314,6 +315,19 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << " " << (v.intValue * 8);
             }
             break;
+        case CompilerOptionName::BitfieldPackingRules:
+            {
+                for (auto v : option.value)
+                {
+                    SLANG_RELEASE_ASSERT(v.kind == CompilerOptionValueKind::Int);
+                    const auto ruleName = NameValueUtil::findName(
+                        TypeTextUtil::getBitfieldPackingRulesInfos(),
+                        v.intValue);
+                    SLANG_RELEASE_ASSERT(ruleName.getLength() != 0);
+                    sb << " " << name << " " << ruleName;
+                }
+                break;
+            }
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
@@ -343,7 +357,6 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::IncompleteLibrary:
         case CompilerOptionName::EnableExperimentalDynamicDispatch:
         case CompilerOptionName::GenerateWholeProgram:
-        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
         case CompilerOptionName::ExperimentalFeature:
         case CompilerOptionName::EmitSeparateDebug:
         case CompilerOptionName::TraceCoverage:
@@ -363,6 +376,14 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             if (option.value.getCount() && option.value[0].intValue != 0)
                 sb << " " << name;
             break;
+        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
+            // API clients can set both bitfield options, and the explicit rule takes precedence.
+            // The CLI rejects both flags on one command line, so we omit this boolean when an
+            // explicit rule is also present in the option set.
+            if (!hasOption(CompilerOptionName::BitfieldPackingRules) && option.value.getCount() &&
+                option.value[0].intValue != 0)
+                sb << " " << name;
+            break;
         default:
             // Other option kinds are currently omitted.
             break;
@@ -370,16 +391,33 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
     }
 }
 
+// Append a string to the digest with a length prefix so it is self-delimiting. Without the prefix,
+// concatenated strings are ambiguous: MacroDefine("AB","C") and MacroDefine("A","BC") both feed the
+// byte stream "ABC" and would collide.
+static void appendDelimitedString(DigestBuilder<SHA1>& builder, const String& str)
+{
+    builder.append(str.getLength());
+    builder.append(str);
+}
+
 void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
+    // Hash keys in a fixed (sorted-by-enum) order so the digest depends only on the option set, not
+    // on the order options happened to be inserted; otherwise the same logical options assembled in
+    // a different order would produce a spurious cache miss.
+    List<CompilerOptionName> keys;
     for (auto& kv : options)
+        keys.add(kv.key);
+    keys.sort();
+
+    for (auto key : keys)
     {
         // These are output-policy sidecar paths, not generated shader code. Locked by
         // _testCoverageManifestOutputDoesNotAffectCompilerOptionHash and
         // _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash; re-including them would
         // invalidate persistent module caches on every sidecar-path change.
-        if (kv.key == CompilerOptionName::CoverageManifestOutput ||
-            kv.key == CompilerOptionName::SeparateDebugInfoOutput)
+        if (key == CompilerOptionName::CoverageManifestOutput ||
+            key == CompilerOptionName::SeparateDebugInfoOutput)
             continue;
 
         // This is a load-time acceptance-policy knob, not generated shader code: it only decides
@@ -388,21 +426,24 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         // enables it (its sole purpose) would otherwise fold it into the recompute and never match
         // that baked digest, making the freshness check unable to accept any default-compiled
         // module (issue #6557). Excluding it keeps the write/read digest symmetric.
-        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+        if (key == CompilerOptionName::UseUpToDateBinaryModule)
             continue;
 
-        builder.append(kv.key);
-        builder.append(kv.value.getCount());
-        for (auto& v : kv.value)
+        auto values = options.tryGetValue(key);
+        builder.append(key);
+        builder.append(values->getCount());
+        for (auto& v : *values)
         {
+            builder.append(v.kind);
             if (v.kind == CompilerOptionValueKind::Int)
             {
                 builder.append(v.intValue);
+                builder.append(v.intValue2);
             }
             else
             {
-                builder.append(v.stringValue);
-                builder.append(v.stringValue2);
+                appendDelimitedString(builder, v.stringValue);
+                appendDelimitedString(builder, v.stringValue2);
             }
         }
     }
@@ -417,6 +458,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
@@ -549,6 +591,9 @@ void CompilerOptionSet::addCapabilityAtom(CapabilityName cap)
     add(CompilerOptionName::Capability, cap);
 }
 
+// Return the downstream-tool arguments for `downstreamToolName`, concatenating the serialized
+// argument list of every stored `DownstreamArgs` entry that targets that tool, in the order the
+// entries appear.
 List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
 {
     List<String> result;
@@ -561,7 +606,6 @@ List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
             args.deserialize(argSet.stringValue2);
             for (auto arg : args.m_args)
                 result.add(arg.value);
-            break;
         }
     }
     return result;
@@ -612,6 +656,16 @@ void applySettingsToDiagnosticSink(
             Severity::Warning,
             Severity::Disable);
     }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
+            Severity::Disable);
+    }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);
     for (auto& element : enableArray)
     {
@@ -660,6 +714,13 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
     }
 
     // Handle diagnostic color setting.

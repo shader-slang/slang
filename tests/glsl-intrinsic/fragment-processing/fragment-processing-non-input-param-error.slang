@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/fragment-processing/fragment-processing-non-input-param-error.slang -target glsl -stage fragment -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/fragment-processing/fragment-processing-non-input-param-error.slang -target spirv -emit-spirv-directly -stage fragment -entry main
 #version 450
 // CHECK_SPV-DAG: error[E31208]
 // CHECK_GLSL-DAG: error[E31208]

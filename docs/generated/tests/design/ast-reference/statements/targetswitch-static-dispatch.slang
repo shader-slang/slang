@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#targetswitchstmt-stageswitchstmt-targetcasestmt
-//META: doc_section_digest=bda3b9e2ee202a8291e932d7767da7f7aac9944fa990f3b9e42bb6aa33d4e673
-//META: purpose=A TargetSwitchStmt is "a static dispatch chosen at compile time by matching capabilities"; compiling for a target that does not match any TargetCaseStmt selects the `default` body and the unmatched case bodies are resolved away.
+//META: doc_section_digest=0b6b3241e8d1a60c730c681e1068a13925045cf731aff9e8daf4bce3460293db
+//META: purpose=A TargetSwitchStmt is a static dispatch chosen at compile time by matching capabilities; a target that matches no TargetCaseStmt selects the `default` body and the unmatched case bodies do not reach the emitted code.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

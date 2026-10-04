@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:25Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#builtinoperationintval-and-the-single-representation-invariant
-//META: doc_section_digest=4229b55a01470c7ad99014966f3313e48dd3d9bca875bef59b0f7b4c86cbc182
-//META: purpose=Logical && and || over comparisons of a generic value parameter fold with the enclosing ?: to a concrete array bound after substitution.
+//META: doc_section_digest=7294e983132681667c88eb7937aa63061a1f9c975bb9567ce8dd36184dcda775
+//META: purpose=The short-circuit operators are resolved-operator-call forms of the symbolic builtin-operation value, so && and || over a generic value parameter fold with the enclosing ?: to a concrete array bound.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that the short-circuit operators (resolved-operator-call
-// forms of the symbolic builtin operation) evaluate at compile time
-// once their generic operands are substituted. gateAnd's bound selects
-// 3 only when both comparisons hold; gateOr's selects 1 only when
-// either holds. Each call type-checks against the folded bound, and
-// CHECK asserts the sums from both branches of both operators.
+// Verifies that `&&` and `||` evaluate at compile time once their
+// generic operands are substituted. gateAnd's bound selects 3 only when
+// both comparisons hold; gateOr's selects 1 only when either holds.
+// Each call type-checks against the folded bound, and CHECK asserts the
+// sums from both branches of both operators.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

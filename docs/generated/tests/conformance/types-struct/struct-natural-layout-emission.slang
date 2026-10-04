@@ -15,6 +15,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
@@ -49,6 +50,14 @@ void main()
 // GLSL: x_{{[0-9]+}}
 // GLSL: y_{{[0-9]+}}
 // GLSL: z_{{[0-9]+}}
+
+// SPIR-V records the member order twice: once in the OpMemberName indices (0/1/2) and once in
+// the OpTypeStruct operand list, which is `%int %float %int` — the declaration order of
+// `int x; float y; int z;`. Pinned at -O0, where the struct still exists in the module.
+// SPV: OpMemberName %Mixed 0 "x"
+// SPV: OpMemberName %Mixed 1 "y"
+// SPV: OpMemberName %Mixed 2 "z"
+// SPV: %Mixed = OpTypeStruct %int %float %int
 
 // Metal emits struct Mixed with all three fields in order.
 // METAL: struct Mixed_{{[0-9]+}}

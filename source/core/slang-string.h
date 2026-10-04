@@ -33,41 +33,71 @@ inline void reverseInplaceAscii(char* buffer, int length)
         buffer[j] = c;
     }
 }
+
+/// @brief Converts a number to its ASCII representation.
+///
+/// @param[out]   buffer     The output buffer. Must be big enough to hold the string.
+/// @param[in]    val        Number to stringify
+/// @param[in]    radix      Radix, must be in range [2, 36]
+/// @param[in]    padTo      The minimum number of digits, zero-padded if necessary. Note that this
+///                          does not contain the possible sign character.
+/// @return                  The number of characters written (not including the terminating '\0')
+///
+/// The buffer must be big enough to contain:
+/// - The sign character (for negative values)
+/// - All digits, including padding if specified
+/// - The terminator (`\0`)
+///
+/// For an arbitrary `int64_t`/`uint64_t` number, radix 10, no padding, the
+/// required buffer size is 21 bytes (`int64_t`: sign + 19 digits + terminator;
+/// `uint64_t`: 20 digits + terminator).
 template<typename IntType>
 inline int intToAscii(char* buffer, IntType val, int radix, int padTo = 0)
 {
     static_assert(std::is_integral_v<IntType>);
+    using UintType = std::make_unsigned_t<IntType>;
 
-    int i = 0;
-    IntType sign;
+    SLANG_ASSERT(radix >= 2 && radix <= 36);
 
-    sign = val;
-    if (sign < 0)
-    {
-        val = (IntType)(0 - val);
-    }
+    // The written-out character count (not including the terminator)
+    int numChars = 0;
 
+    // Determine the sign and the values
+    const bool isNegative = (val < 0);
+
+    // Negate in the unsigned domain: '-val' on the most negative value of a
+    // signed type overflows, e.g., (0 - INT64_MIN) is UB. But the unsigned
+    // wraparound is well defined and produces otherwise identical results.
+    UintType absVal =
+        isNegative ? UintType{0} - static_cast<UintType>(val) : static_cast<UintType>(val);
+
+    // Write out the digits in reverse order
     do
     {
-        int digit = (val % radix);
+        unsigned int digit = (absVal % static_cast<unsigned>(radix));
         if (digit <= 9)
-            buffer[i++] = (char)(digit + '0');
+            buffer[numChars++] = (char)(digit + '0');
         else
-            buffer[i++] = (char)(digit - 10 + 'A');
-    } while ((val /= radix) > 0);
+            buffer[numChars++] = (char)(digit - 10 + 'A');
 
-    SLANG_ASSERT(i >= 0);
-    while (i < padTo)
-        buffer[i++] = '0';
+        absVal = absVal / static_cast<unsigned>(radix);
 
-    if (sign < 0)
-        buffer[i++] = '-';
+    } while (absVal > 0U);
+
+    // Zero-pad
+    while (numChars < padTo)
+        buffer[numChars++] = '0';
+
+    // Write out the sign
+    if (isNegative)
+        buffer[numChars++] = '-';
 
     // Put in normal character order
-    reverseInplaceAscii(buffer, i);
+    reverseInplaceAscii(buffer, numChars);
 
-    buffer[i] = '\0';
-    return i;
+    // Terminate and return
+    buffer[numChars] = '\0';
+    return numChars;
 }
 
 SLANG_FORCE_INLINE bool isUtf8LeadingByte(char ch)
@@ -173,7 +203,7 @@ public:
 
     const char& operator[](Index i) const
     {
-        assert(i >= 0 && i < Index(m_end - m_begin));
+        SLANG_ASSERT(i >= 0 && i < Index(m_end - m_begin));
         return m_begin[i];
     }
 

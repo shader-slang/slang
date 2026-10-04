@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "a",
@@ -116,10 +117,132 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "a",
+                "binding": {"kind": "subElementRegisterSpace", "index": 1},
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "Helper",
+                        "fields": [
+                            {
+                                "name": "t",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "descriptorTableSlot", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "descriptorTableSlot", "index": 0}
+                            },
+                            {
+                                "name": "s",
+                                "type": {
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "descriptorTableSlot", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "descriptorTableSlot", "index": 1}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "descriptorTableSlot", "value": 2}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "subElementRegisterSpace", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "Helper",
+                            "fields": [
+                                {
+                                    "name": "t",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "descriptorTableSlot", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "descriptorTableSlot", "index": 0}
+                                },
+                                {
+                                    "name": "s",
+                                    "type": {
+                                        "kind": "samplerState",
+                                        "sizes": [
+                                            {"kind": "descriptorTableSlot", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "descriptorTableSlot", "index": 1}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "descriptorTableSlot", "value": 2}
+                            ]
+                        },
+                        "binding": {"kind": "descriptorTableSlot", "index": 0, "count": 2}
+                    },
+                    "sizes": [
+                        {"kind": "subElementRegisterSpace", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "b",
+                "binding": {"kind": "descriptorTableSlot", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

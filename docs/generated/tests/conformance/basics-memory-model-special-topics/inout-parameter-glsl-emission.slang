@@ -18,6 +18,8 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -45,11 +47,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void multiReadWrite_{{[0-9]+}}(int thread* val_{{[0-9]+}})
 // MTL: *val_{{[0-9]+}} =
 
-// CUDA: __device__ void multiReadWrite_{{[0-9]+}}(int {{.*}}val_{{[0-9]+}})
+// CUDA: void multiReadWrite_{{[0-9]+}}(int {{.*}}val_{{[0-9]+}})
 // CUDA: *val_{{[0-9]+}} =
 
-// CPP: static void multiReadWrite_{{[0-9]+}}(int32_t {{.*}}val_{{[0-9]+}}
+// CPP: void multiReadWrite_{{[0-9]+}}(int32_t {{.*}}val_{{[0-9]+}}
 // CPP: *val_{{[0-9]+}} =
 
 // WGSL: fn multiReadWrite_{{[0-9]+}}( val_{{[0-9]+}} : ptr<function, i32>)
 // WGSL: (*val_{{[0-9]+}}) =
+
+// HLSL: void multiReadWrite_{{[0-9]+}}(inout int val_{{[0-9]+}})
+// HLSL: val_{{[0-9]+}} =
+
+// SPIRV: %_ptr_Function_int = OpTypePointer Function %int
+// SPIRV: %multiReadWrite = OpFunction %void DontInline
+// SPIRV: %val = OpFunctionParameter %_ptr_Function_int
+// SPIRV: OpLoad %int %val
+// SPIRV: OpLoad %int %val
+// SPIRV: OpStore %val

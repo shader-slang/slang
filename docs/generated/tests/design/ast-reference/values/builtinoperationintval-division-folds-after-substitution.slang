@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:25Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#builtinoperationintval-and-the-single-representation-invariant
-//META: doc_section_digest=4229b55a01470c7ad99014966f3313e48dd3d9bca875bef59b0f7b4c86cbc182
-//META: purpose=A BuiltinOperationIntVal for N / 2 stays symbolic in the generic body and folds to its concrete quotient once N is substituted; the array parameter carries the folded element count.
+//META: doc_section_digest=7294e983132681667c88eb7937aa63061a1f9c975bb9567ce8dd36184dcda775
+//META: purpose=A symbolic builtin operator whose operand is a generic value parameter re-evaluates on substitution and folds to a constant, so N / 2 becomes the concrete element count of the parameter array.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

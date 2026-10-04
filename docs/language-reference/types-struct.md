@@ -128,9 +128,8 @@ in *`modifier-list`*). The default member visibility is `internal`, except that 
 member of a `public` struct is `public`). Nested `struct` members have access to
 `private` members of the enclosing `struct`. See [access control (TODO)](TODO) for further information.
 
-
-> ⚠️ **Warning:** Structure inheriting from another structure is deprecated. It may not work as expected.
-
+> ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
+> has been removed in Slang 2026. Use composition (a struct as a member) instead.
 
 ## Objects {#object}
 

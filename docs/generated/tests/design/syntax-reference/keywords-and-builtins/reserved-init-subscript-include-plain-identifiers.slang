@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T00:00:00Z
-//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#reserved-identifier-prefixes
-//META: doc_section_digest=80647084abaebbe609d96190648e92969798dc148e077cfaa14fde905e6b2ed2
+//META: doc_section_digest=405c1dcbf86de884cd29e998392a217bcd5570f5aefd6ae1874ec63241cb54b8
 //META: purpose=`__init`, `__subscript`, and `__include` have no underscore-free spelling in `g_parseSyntaxEntries[]`; the bare names `init`, `subscript`, and `include` are ordinary identifiers usable as function names and call expressions.
 //META: intent=functional
 //META: pipeline_stage=parse

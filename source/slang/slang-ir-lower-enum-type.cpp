@@ -119,6 +119,36 @@ struct EnumTypeLoweringContext
         inst->removeAndDeallocate();
     }
 
+    // Rewrite every `IRIntLit` typed by `enumType` into a canonical `IRBoolLit`, for an enum
+    // whose tag type is `bool`. Such a constant is built (e.g. a switch case label in
+    // `lowerSwitchCases`) while its type is still the opaque `IREnumType`, so the bool
+    // canonicalization in `IRBuilder::getIntValue` is bypassed; the type-operand swap in
+    // `processModule` alone would then leave an `IRIntLit` of `bool` type -- a second
+    // representation of a bool constant that breaks `IRBoolLit` identity/dedup and has no bool
+    // arm in the C-like literal emitter. Canonicalizing at this producer keeps one form.
+    void canonicalizeBoolTagConstants(IRInst* enumType)
+    {
+        IRBuilder builder(module);
+
+        // `replaceUsesWith` below rewrites the enumerator constants' users; collect the
+        // constants first so we are not mutating a use list we are still walking.
+        List<IRIntLit*> enumConstants;
+        for (auto use = enumType->firstUse; use; use = use->nextUse)
+        {
+            auto lit = as<IRIntLit>(use->getUser());
+            if (lit && lit->getFullType() == enumType)
+                enumConstants.add(lit);
+        }
+
+        // Remove each replaced literal so no `IRIntLit` of `bool` type survives in the module
+        // (or its constant-dedup map / serialized form) alongside the canonical `IRBoolLit`.
+        for (auto lit : enumConstants)
+        {
+            lit->replaceUsesWith(builder.getBoolValue(lit->getValue() != 0));
+            lit->removeAndDeallocate();
+        }
+    }
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -156,7 +186,14 @@ struct EnumTypeLoweringContext
 
         // Replace all enum types with their lowered equivalent types.
         for (const auto& [key, value] : loweredEnumTypes)
+        {
+            // For a `bool`-tagged enum, first rewrite its enumerator constants to canonical
+            // `IRBoolLit`; the type-operand swap alone would leave a non-canonical `IRIntLit`
+            // of `bool` type (see canonicalizeBoolTagConstants).
+            if (value->loweredType->getOp() == kIROp_BoolType)
+                canonicalizeBoolTagConstants(key);
             key->replaceUsesWith(value->loweredType);
+        }
     }
 };
 

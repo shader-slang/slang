@@ -20,6 +20,10 @@
 
 // This is a wrapper to allow us to run the `glslang` compiler
 // in a controlled fashion.
+//
+// A new exported entry point must also be added to slang-glslang.version-script, or ELF and macOS
+// builds will not export it (both derive their export list from that file); the client's lookup
+// then returns null and that entry point is silently unavailable.
 
 #define UNLIMITED 9999
 
@@ -596,7 +600,7 @@ static int spirv_Optimize_1_3(const glslang_CompileRequest_1_3& request)
     return err;
 }
 
-static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
+static constexpr glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
     int majorVersion,
     int minorVersion)
 {
@@ -705,7 +709,7 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_3 request)
 {
     // Check that the encoding matches
-    assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
+    SLANG_COMPILE_TIME_ASSERT(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
 
     EShLanguage glslangStage;
     switch (request.slangStage)

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:28:39Z
-//META: source_commit=7a45a039cb7fb0a34e9184c7069a96bccdf08115
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#modifier-parsing
-//META: doc_section_digest=85307207e3b8f9c4a6840f45c1896c59f8f18e3bce3e9753d2b831e1d7ea443a
+//META: doc_section_digest=70d14f0d0b9b4cd7db70e075594b53bdc6fa2b49b6e87e525073bfaf49b1a033
 //META: purpose=A call to a `[NoDiscard]` function whose result is consumed compiles cleanly and runs — the attribute only errors in result-discarding contexts.
 //META: intent=functional
 //META: pipeline_stage=check

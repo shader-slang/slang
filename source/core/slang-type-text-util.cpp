@@ -118,8 +118,9 @@ static const NamesDescriptionValue s_languageInfos[] = {
 
 static const NamesDescriptionValue s_languageVersionInfos[] = {
     {SLANG_LANGUAGE_VERSION_LEGACY, "legacy,default,2018", "Legacy Slang language"},
-    {SLANG_LANGUAGE_VERSION_2025, "2025", "Slang language rules for 2025 and older"},
-    {SLANG_LANGUAGE_VERSION_2026, "2026,latest", "Slang language rules for 2026 and newer"},
+    {SLANG_LANGUAGE_VERSION_2025, "2025,202a", "Slang language rules for 2025 and older"},
+    {SLANG_LANGUAGE_VERSION_2026, "2026,202b,latest", "Slang language rules for 2026"},
+    {SLANG_LANGUAGE_VERSION_202C, "202c,next", "Slang language rules for 202c"},
 };
 
 static const NamesDescriptionValue s_compilerInfos[] = {
@@ -194,6 +195,25 @@ static const NamesDescriptionValue s_fpDenormalModes[] = {
      "Use any denormal handling mode (default). The mode used is implementation defined."},
     {SLANG_FP_DENORM_MODE_PRESERVE, "preserve", "Preserve denormal values"},
     {SLANG_FP_DENORM_MODE_FTZ, "ftz", "Flush denormals to zero"},
+};
+
+static const NamesDescriptionValue s_bitfieldPackingRules[] = {
+    {ValueInt(slang::BitfieldPackingRules::Default),
+     "default",
+     "Bits are packed LSB-first; fields with different underlying type sizes may share a storage "
+     "unit."},
+    {ValueInt(slang::BitfieldPackingRules::MSVC),
+     "msvc",
+     "Bits are packed LSB-first, and a new storage unit starts when the underlying type size "
+     "changes. "
+     "Use for MSVC-compatible bitfield packing on little-endian platforms. Zero-width bitfields "
+     "are not supported."},
+    {ValueInt(slang::BitfieldPackingRules::LegacyMSBFirstMSVC),
+     "legacy-msb-first-msvc",
+     "Bits are packed MSB-first, and a new storage unit starts when the underlying type size "
+     "changes. "
+     "Not recommended; use only when the layout produced by -msvc-style-bitfield-packing is "
+     "required. This bit order differs from MSVC on little-endian platforms."},
 };
 
 static const NamesDescriptionValue s_optimizationLevels[] = {
@@ -284,6 +304,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormalModeInfos()
 {
     return makeConstArrayView(s_fpDenormalModes);
+}
+
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getBitfieldPackingRulesInfos()
+{
+    return makeConstArrayView(s_bitfieldPackingRules);
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()

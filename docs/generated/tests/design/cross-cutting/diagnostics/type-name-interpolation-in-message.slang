@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-rich-diagnostic
-//META: doc_section_digest=774b3e17fe133bbbca49eac77d5daf7cffeb5bdd8c8ccb91721cdfe554dd3389
-//META: purpose=Type parameters interpolated into the message format appear as quoted type names in rendered output.
-//META: intent=negative
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry
+//META: doc_section_digest=3a623795b5dd78e308025c61705ad0257495b87ee059b06c6f6541a5d86c1a61
+//META: purpose=A `~param:Type` interpolation parameter renders the concrete type name inside the span message.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc shows `{found}`/`{expected}` parameter interpolation in
-// rich diagnostics. The observable consequence is that the actual
-// and expected type names appear (quoted) in the rendered message.
-// Verify that calling `f(B)` where `f` takes `A` produces a
-// type-mismatch message with both type names rendered.
+// Verifies that a `~param:Type` interpolation parameter reaches the rendered
+// text as a concrete type name. A function taking `A` is called with a `B`;
+// the caret-anchored CHECK asserts the span message names both `'A'` and `'B'`,
+// which is only possible if the two type arguments supplied at the call site
+// were substituted into the message.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
@@ -28,5 +28,4 @@ void g(B b)
       ^ type mismatch in expression
       ^ expected an expression of type 'A', got 'B'
 */
-// CHECK: E30019
 }

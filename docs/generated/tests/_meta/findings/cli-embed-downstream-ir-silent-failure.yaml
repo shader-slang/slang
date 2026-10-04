@@ -1,0 +1,45 @@
+schema_version: 1
+id: cli-embed-downstream-ir-silent-failure
+bundle: coverage/cli-options
+suspected_kind: wrong-diagnostic
+title: "-embed-downstream-ir fails silently (exit 255, no output) off -target spirv"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/cli-options/_repro/embed-downstream-ir-silent-failure.slang -target hlsl -entry main -stage compute -embed-downstream-ir -emit-ir -o /tmp/m.slang-module"
+  source_slang: docs/generated/tests/coverage/cli-options/_repro/embed-downstream-ir-silent-failure.slang
+  exit_code: 255
+  stderr_tail: ""
+  observed_summary: |
+    `-embed-downstream-ir` on the trivial compute shader in the repro was run
+    against seven targets with everything else on the command line held fixed:
+
+      spirv      -> exit 0
+      spirv-asm  -> exit 255
+      hlsl       -> exit 255
+      glsl       -> exit 255
+      metal      -> exit 255
+      wgsl       -> exit 255
+      cpp        -> exit 255
+
+    Every failing case writes zero bytes to both standard output and standard
+    error. There is no error, no warning and no note — the only signal the user
+    gets is the process exit code. The same holds with and without `-emit-ir`,
+    with and without `-o <path>`, and with SLANG_ASSERT=release-assert-only.
+expected:
+  claim: |
+    When `-embed-downstream-ir` cannot precompile the translation unit for the
+    selected target, slangc should report a diagnostic naming the target (or the
+    downstream compiler it could not use) instead of exiting non-zero silently.
+  citation_kind: sibling-test
+  citation: tests/library/precompiled-glsl.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "That the option is simply spirv-only and the failure is by design: even so, an unsupported target should be reported; the shipped tests (tests/library/precompiled-*.slang) all pair it with -target spirv or -target dxil, so there is no evidence the silence is intentional."
+    - "That the failure is really a missing downstream compiler (no DXC on this machine): that would explain -target hlsl/dxil but not -target spirv-asm, glsl, metal, wgsl or cpp, none of which need DXC."
+    - "That diagnostics were emitted but swallowed by the shell redirection: ruled out by capturing stdout and stderr to separate files and checking both are zero bytes."
