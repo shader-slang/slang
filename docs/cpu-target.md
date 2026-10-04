@@ -30,8 +30,9 @@ The direct LLVM emission path (`-emit-cpu-via-llvm`) does not support it.
 There are two ways to supply the acceleration structure:
 
 - Use slang-rhi's CPU backend, which builds and traverses its acceleration structures.
-- Implement `IRaytracingAccelerationStructure` from `prelude/slang-cpp-prelude.h` in your own
-  application and call the generated shader directly. No RHI library or RHI device is required.
+- Implement `IRaytracingAccelerationStructure` (defined in `prelude/slang-cpp-ray-query.h`,
+  available via `prelude/slang-cpp-prelude.h`) in your own application and call the generated
+  shader directly. No RHI library or RHI device is required.
 
 The [standalone example](../examples/cpu-ray-query/README.md) demonstrates the second path by
 rendering a Cornell box with a linear scan over triangles, without a BVH. It also tests candidate

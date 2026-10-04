@@ -407,6 +407,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             Threads::Threads
         LINK_WITH_FRAMEWORK Foundation Metal
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
+        INCLUDE_FROM_PRIVATE prelude
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools

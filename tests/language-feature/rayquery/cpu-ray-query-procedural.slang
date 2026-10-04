@@ -1,11 +1,13 @@
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
+// CPP: void _computeMain(
 // CPP: CandidateType
 // CPP: CandidateProceduralPrimitiveNonOpaque
 // CPP: CommitProceduralPrimitiveHit
 //
 // Slang's render-test scene currently contains only opaque triangles, so this test validates C++
-// emission rather than procedural traversal at runtime. The paired slang-rhi PR provides executable
-// CPU coverage for procedural and non-opaque commits, abort/skip behavior, and matrix accessors:
+// emission rather than procedural traversal at runtime. Slang's independent provider runtime test
+// covers commits, abort/skip behavior, and matrix accessors in unit-test-cpu-ray-query.cpp.
+// The paired slang-rhi PR also tests geometry traversal:
 // https://github.com/shader-slang/slang-rhi/pull/803
 
 RaytracingAccelerationStructure scene;

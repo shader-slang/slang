@@ -3,6 +3,9 @@
 //TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 //TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type -render-feature ray-query
 
+// The CPU run requires a slang-rhi build with ray-query support; otherwise it is ignored.
+// The standalone provider runtime test lives in tools/slang-unit-test/unit-test-cpu-ray-query.cpp.
+
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
 

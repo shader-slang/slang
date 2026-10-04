@@ -82,6 +82,9 @@ struct RayQueryState
     // and applies shader-side commit or abort operations. The provider advances its private
     // traversal state, writes candidates, and automatically commits opaque triangles.
     // Both sides may end traversal for Abort or ACCEPT_FIRST_HIT_AND_END_SEARCH.
+    // The current RHI provider needs 8 cursor/phase words and 64 + 256 stack words (328 total),
+    // rounded up to a multiple of 16 words. Changing this capacity changes the shared
+    // ABI, so hosts and generated code must be rebuilt with matching prelude headers.
     static const uint32_t kProviderDataCapacity = 336;
 
     IRaytracingAccelerationStructure* accelerationStructure;
@@ -120,20 +123,20 @@ SLANG_FORCE_INLINE float2 _slangRayQueryGetFloat2(const float value[2])
 }
 
 template<int ROWS, int COLS>
-SLANG_FORCE_INLINE Matrix<float, ROWS, COLS> _slangRayQueryGetMatrix(
-    const float value[12],
-    bool transpose)
+SLANG_FORCE_INLINE Matrix<float, ROWS, COLS> _slangRayQueryGetMatrix(const float value[12])
 {
-    // The ABI always stores a row-major 3x4 matrix with a row stride of four. RayQuery only
-    // instantiates this helper as 3x4 without transposition or 4x3 with transposition, so both
-    // forms address exactly the same twelve packed values.
+    static_assert(
+        (ROWS == 3 && COLS == 4) || (ROWS == 4 && COLS == 3),
+        "RayQuery transforms are 3x4 or 4x3 matrices.");
+    // The ABI stores a row-major 3x4 matrix. Derive transposition from the checked dimensions
+    // so both forms address exactly the same twelve packed values.
     Matrix<float, ROWS, COLS> result;
     for (int row = 0; row < ROWS; ++row)
     {
         for (int column = 0; column < COLS; ++column)
         {
             result.rows[row][column] =
-                transpose ? value[column * 4 + row] : value[row * 4 + column];
+                ROWS == 4 ? value[column * 4 + row] : value[row * 4 + column];
         }
     }
     return result;
@@ -227,6 +230,7 @@ struct RayQuery
             state.committedStatus = SLANG_RAY_QUERY_COMMITTED_TRIANGLE_HIT;
             accepted = true;
         }
+        // A triangle has one intersection, so committing it consumes the candidate.
         state.candidatePending = 0;
 
         if (accepted && (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH))
@@ -239,8 +243,8 @@ struct RayQuery
     SLANG_FORCE_INLINE void CommitProceduralPrimitiveHit(float rayT)
     {
         if (!state.candidatePending ||
-            state.candidateType != SLANG_RAY_QUERY_CANDIDATE_PROCEDURAL_PRIMITIVE || rayT != rayT ||
-            rayT < state.rayTMin || rayT > state.rayTMax)
+            state.candidateType != SLANG_RAY_QUERY_CANDIDATE_PROCEDURAL_PRIMITIVE ||
+            rayT != rayT /* Reject NaN. */ || rayT < state.rayTMin || rayT > state.rayTMax)
         {
             return;
         }
@@ -255,6 +259,8 @@ struct RayQuery
             accepted = true;
         }
 
+        // A procedural primitive may have several intersections. Keep its candidate available
+        // for additional, closer commits unless this accepted hit ends traversal.
         if (accepted && (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH))
         {
             state.candidatePending = 0;
@@ -344,35 +350,35 @@ struct RayQuery
 
     SLANG_FORCE_INLINE Matrix<float, 3, 4> CandidateObjectToWorld3x4() const
     {
-        return _slangRayQueryGetMatrix<3, 4>(state.candidate.objectToWorld, false);
+        return _slangRayQueryGetMatrix<3, 4>(state.candidate.objectToWorld);
     }
     SLANG_FORCE_INLINE Matrix<float, 3, 4> CommittedObjectToWorld3x4() const
     {
-        return _slangRayQueryGetMatrix<3, 4>(state.committed.objectToWorld, false);
+        return _slangRayQueryGetMatrix<3, 4>(state.committed.objectToWorld);
     }
     SLANG_FORCE_INLINE Matrix<float, 4, 3> CandidateObjectToWorld4x3() const
     {
-        return _slangRayQueryGetMatrix<4, 3>(state.candidate.objectToWorld, true);
+        return _slangRayQueryGetMatrix<4, 3>(state.candidate.objectToWorld);
     }
     SLANG_FORCE_INLINE Matrix<float, 4, 3> CommittedObjectToWorld4x3() const
     {
-        return _slangRayQueryGetMatrix<4, 3>(state.committed.objectToWorld, true);
+        return _slangRayQueryGetMatrix<4, 3>(state.committed.objectToWorld);
     }
     SLANG_FORCE_INLINE Matrix<float, 3, 4> CandidateWorldToObject3x4() const
     {
-        return _slangRayQueryGetMatrix<3, 4>(state.candidate.worldToObject, false);
+        return _slangRayQueryGetMatrix<3, 4>(state.candidate.worldToObject);
     }
     SLANG_FORCE_INLINE Matrix<float, 3, 4> CommittedWorldToObject3x4() const
     {
-        return _slangRayQueryGetMatrix<3, 4>(state.committed.worldToObject, false);
+        return _slangRayQueryGetMatrix<3, 4>(state.committed.worldToObject);
     }
     SLANG_FORCE_INLINE Matrix<float, 4, 3> CandidateWorldToObject4x3() const
     {
-        return _slangRayQueryGetMatrix<4, 3>(state.candidate.worldToObject, true);
+        return _slangRayQueryGetMatrix<4, 3>(state.candidate.worldToObject);
     }
     SLANG_FORCE_INLINE Matrix<float, 4, 3> CommittedWorldToObject4x3() const
     {
-        return _slangRayQueryGetMatrix<4, 3>(state.committed.worldToObject, true);
+        return _slangRayQueryGetMatrix<4, 3>(state.committed.worldToObject);
     }
 
     // The following accessors expose the parameters of the ray being traversed.
