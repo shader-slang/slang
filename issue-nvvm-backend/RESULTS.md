@@ -2069,3 +2069,55 @@ The storage snapshot/attribute check passes, as does the separate shader-termina
 The lit 128×128 Falcor pilot now renders successfully through NVVM. Raw failed attempts, module
 capture, baseline drill and passing evidence are retained under `build/nvvm-falcor-dead-texture-query/`
 and `build/nvvm-falcor-performance/`. Live compute mip counts remain unsupported.
+
+### Falcor path-tracer iteration comparison
+
+The first real-application milestone is reached: the original Falcor test and a lit exterior
+DamagedHelmet render run through NVRTC and NVVM. The final compiler is `b52b8bb0c`; Falcor uses
+standard-library GeometryIndex with its shim removed. All six timing processes load identical
+compiler, provider and application libraries where applicable; identities are captured per process.
+
+Workload: NVIDIA L4, driver 595.71.05, OptiX 9, 512×512, camera (0,0,3) toward origin, 45° FOV,
+white ConstantLight, max depth 6, RR depth 3, NEE/MIS enabled, one sample per render iteration.
+Three paired repeats alternate NVRTC/NVVM order. Each process has 10 warmup and 50 measured
+iterations, with matching iteration indices. CUDA timestamps bracket the complete `_render`
+command range; CPU submit/wait is separately recorded. GPU clocks are not locked.
+
+| Measurement | NVRTC | NVVM |
+| --- | ---: | ---: |
+| GPU median, 150 iterations each | 0.722 ms | 0.693 ms |
+| GPU p10–p90 | 0.710–0.738 ms | 0.679–0.708 ms |
+| Per-run GPU medians | 0.724 / 0.721 / 0.723 ms | 0.6905 / 0.6945 / 0.689 ms |
+| Path-tracer PTX compilation, median | 2.327 s | 4.113 s |
+| First-render wall time, median | 3.141 s | 4.879 s |
+| Scene setup wall time, median | 8.994 s | 8.349 s |
+
+NVVM uses **4.02% less median GPU time** (1.042× speedup) in this workload. PTX compilation is
+slower. Compilation-report snapshots separate scene programs from the newly added ray-tracing
+program; first-render wall time also includes additional setup. Module/shader disk caches are
+disabled, but driver/OptiX caches may be warm: these are not cold-cache compilation measurements.
+The application loads NVRTC 12.8.93 from its environment; NVVM uses toolkit 12.9.
+
+Images at iteration 0 and 49 are single-iteration outputs, not accumulated 50-sample images.
+They are finite, nonzero and visually recognizable, and reproducible bit-for-bit within each
+backend across the three runs, but differ between backends. First/final RGB RMSE is
+0.00090415 / 0.00214201; final MAE is 0.00001005. Of 262,144 pixels, 6 in the first frame and 11 in
+the final frame have any RGB component differing by more than 0.001. Maximum absolute differences
+are 0.34759 / 0.70105. Their cause remains unqualified; do not infer bitwise or complete image
+equivalence from a successful run or small aggregate error.
+
+The current compact evidence is in `falcor2-status.json` under `performance`. Raw harness,
+per-process compilation reports, loaded-library identities, float images, previews, exact paired
+`iterations.csv` and summary are under `build/nvvm-falcor-performance/`. Replay from the existing
+Falcor checkout after sourcing `../slang/build/nvvm-falcor2/environment.sh`:
+
+```bash
+SLANGPY_TEST_CUDA_COMPILER=nvvm \
+FALCOR_IDENTITY_REPORT=../slang/build/nvvm-falcor-performance/replay-nvvm-identity.json \
+.venv/bin/python ../slang/build/nvvm-falcor-performance/benchmark.py \
+  --output ../slang/build/nvvm-falcor-performance/replay-nvvm.json
+```
+
+Use `nvrtc` for the paired replay. Serialize GPU runs and builds. The 572-unit and 16-case smoke
+suites, original Falcor tests and six backend-route controls pass. The broader static suite still
+has the four unchanged baseline failures documented above; the full Falcor suite was not run.

@@ -19,7 +19,7 @@
     "local_slangpy": "4bfa86b26338b213c37204aff7ea77480e82f908",
     "falcor2_slangpy_merged": "81819b92c4b0aff9d1862e6a67c0539baf553606",
     "slang_rhi": "be78baad4f84d3df91a9d96b684d12ba6c80f399",
-    "slang": "ae9c31b43a5850d6605c6d4cd7d5e2a2ec7d5fd6",
+    "slang": "b52b8bb0cd4f7ecfa5b641dac43bc3078edc0636",
     "falcor2_geometry_fix": "851f207a35c937f668301577dd42ed6bee5ee437"
   },
   "integration": "Local SlangPy changes merged into the existing Falcor submodule to preserve its required decompose_trs API. Existing Falcor .venv and Release build reused. Local Slang and RHI selected with existing CMake options; SGL_ENABLE_NVVM_TESTING=ON. The merge is local, not published upstream.",
@@ -204,9 +204,10 @@
   "raw_evidence": "build/nvvm-falcor-dead-texture-query/",
   "reproduction": "RESULTS.md#falcor2-path-tracer-comparison",
   "limitations": [
-    "One existing64x64 path-tracer smoke test, not the full Falcor suite or proof of image equivalence.",
-    "GPU iteration performance and compilation comparison are in progress as a separate matched workload.",
-    "Persistent module/shader caches disabled; driver/OptiX caches can remain warm."
+    "Original64x64 smoke plus one lit512x512 benchmark; not the full Falcor test suite.",
+    "Images are finite and close overall, but rare deterministic pixel differences remain unexplained; see performance.image_detail.",
+    "Persistent module/shader caches disabled; driver/OptiX caches can remain warm.",
+    "Broad staticNVVM34pass/4baselinefail; no new failures from final cleanup."
   ],
   "downstream_libraries": {
     "application_nvrtc": {
@@ -1015,5 +1016,330 @@
       "nvvm": "lit128 pilot passes; finite/nonzeroRGB; first RGB RMSE against NVRTC 6.2561855e-7",
       "raw_evidence": "build/nvvm-falcor-performance/pilot-cleanup-nvvm.json"
     }
-  ]
+  ],
+  "performance": {
+    "workload": {
+      "dimensions": [
+        512,
+        512
+      ],
+      "scene": "DamagedHelmet",
+      "camera_position": [
+        0,
+        0,
+        3
+      ],
+      "fov_y": 45,
+      "illumination": "ConstantLight RGB(1,1,1)",
+      "iterations": 50,
+      "warmup_iterations": 10,
+      "settings": {
+        "max_depth": "6",
+        "rr_depth": "3",
+        "use_background_color": "False",
+        "background_color": "{0, 0, 0}"
+      },
+      "specialization_constants": {
+        "ENABLE_NEE": true,
+        "ENABLE_MIS": true,
+        "ENABLE_INTERIOR_TRACKING": true,
+        "ENABLE_NESTED_INTERIORS": false,
+        "ENABLE_HOMOGENEOUS_MEDIA": true,
+        "ENABLE_RUSSIAN_ROULETTE": true,
+        "ENABLE_DEPTH_OF_FIELD": true,
+        "ENABLE_TRIANGLE_BACKFACE_CULLING": false,
+        "ENABLE_PRECISE_RAY_OFFSETS": false,
+        "SCHEDULING_MODE": 0,
+        "VISIBILITY_RAY_MODE": 1,
+        "VISIBILITY_RAY_PLACEMENT": 1
+      },
+      "debug_layers": true,
+      "compiler_options": {
+        "optimization": "SlangOptimizationLevel.default",
+        "floating_point_mode": "SlangFloatingPointMode.default",
+        "debug_info": "SlangDebugInfoLevel.standard",
+        "matrix_layout": "SlangMatrixLayout.row_major",
+        "shader_model": "ShaderModel.unknown"
+      },
+      "device_info": {
+        "api_name": "CUDA",
+        "adapter_name": "NVIDIA L4",
+        "timestamp_frequency": 1000000,
+        "optix_version": 90000
+      },
+      "module_cache": false,
+      "shader_cache": false
+    },
+    "pairs": 3,
+    "order": [
+      "nvrtc,nvvm",
+      "nvvm,nvrtc",
+      "nvrtc,nvvm"
+    ],
+    "backends": {
+      "nvrtc": {
+        "samples": 150,
+        "median_gpu_ms": 0.7219999999996674,
+        "mean_gpu_ms": 0.7231333333333367,
+        "p10_gpu_ms": 0.7098999999996636,
+        "p90_gpu_ms": 0.7380000000001274,
+        "run_median_gpu_ms": [
+          0.7239999999999469,
+          0.7210000000004158,
+          0.7230000000006953
+        ],
+        "scene_setup_seconds": [
+          9.241605630028062,
+          8.974898184009362,
+          8.993706800974905
+        ],
+        "median_scene_setup_seconds": 8.993706800974905,
+        "first_render_wall_seconds": [
+          3.1412337479996495,
+          3.0641675740480423,
+          3.205521047988441
+        ],
+        "median_first_render_wall_seconds": 3.1412337479996495,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 2.3271359999999994,
+            "compile_slang_time": 1.6082437049999996,
+            "compile_downstream_time": 0.7188922949999998,
+            "create_pipeline_time": 0.028782963,
+            "all_program_compile_time": 5.736755999999999,
+            "scene_program_compile_time": 3.4096199999999994
+          },
+          {
+            "compile_time": 2.317177,
+            "compile_slang_time": 1.6109301669999998,
+            "compile_downstream_time": 0.7062468330000002,
+            "create_pipeline_time": 0.023806039,
+            "all_program_compile_time": 5.62756,
+            "scene_program_compile_time": 3.310383
+          },
+          {
+            "compile_time": 2.443079,
+            "compile_slang_time": 1.6670111300000001,
+            "compile_downstream_time": 0.7760678699999999,
+            "create_pipeline_time": 0.02384634,
+            "all_program_compile_time": 5.772002,
+            "scene_program_compile_time": 3.3289229999999996
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 2.3271359999999994,
+          "compile_slang_time": 1.6109301669999998,
+          "compile_downstream_time": 0.7188922949999998,
+          "create_pipeline_time": 0.02384634,
+          "all_program_compile_time": 5.736755999999999,
+          "scene_program_compile_time": 3.3289229999999996
+        }
+      },
+      "nvvm": {
+        "samples": 150,
+        "median_gpu_ms": 0.6930000000000547,
+        "mean_gpu_ms": 0.6926333333332954,
+        "p10_gpu_ms": 0.6789999999998741,
+        "p90_gpu_ms": 0.7079999999994868,
+        "run_median_gpu_ms": [
+          0.6905000000010375,
+          0.6944999999998203,
+          0.6889999999994956
+        ],
+        "scene_setup_seconds": [
+          8.349345843016636,
+          8.480747443041764,
+          8.320566107984632
+        ],
+        "median_scene_setup_seconds": 8.349345843016636,
+        "first_render_wall_seconds": [
+          4.878871787979733,
+          4.930019144027028,
+          4.82954637799412
+        ],
+        "median_first_render_wall_seconds": 4.878871787979733,
+        "compilation_seconds_per_run": [
+          {
+            "compile_time": 4.1131009999999995,
+            "compile_slang_time": 1.8353053519999993,
+            "compile_downstream_time": 2.277795648,
+            "create_pipeline_time": 0.021677655,
+            "all_program_compile_time": 6.828809,
+            "scene_program_compile_time": 2.7157080000000002
+          },
+          {
+            "compile_time": 4.130549000000001,
+            "compile_slang_time": 1.8745169040000007,
+            "compile_downstream_time": 2.2560320959999998,
+            "create_pipeline_time": 0.022411388,
+            "all_program_compile_time": 6.871412000000002,
+            "scene_program_compile_time": 2.7408630000000005
+          },
+          {
+            "compile_time": 4.040785,
+            "compile_slang_time": 1.8233202209999995,
+            "compile_downstream_time": 2.217464779,
+            "create_pipeline_time": 0.022379302,
+            "all_program_compile_time": 6.7379169999999995,
+            "scene_program_compile_time": 2.697132
+          }
+        ],
+        "compilation_seconds_median": {
+          "compile_time": 4.1131009999999995,
+          "compile_slang_time": 1.8353053519999993,
+          "compile_downstream_time": 2.2560320959999998,
+          "create_pipeline_time": 0.022379302,
+          "all_program_compile_time": 6.828809,
+          "scene_program_compile_time": 2.7157080000000002
+        }
+      }
+    },
+    "image_comparisons": [
+      {
+        "pair": 1,
+        "frame": "first",
+        "finite": true,
+        "nvrtc_max_rgb": 7.457240581512451,
+        "nvvm_max_rgb": 7.457240581512451,
+        "mae": 3.8458118360802825e-06,
+        "rmse": 0.0009041507331576603,
+        "max_abs": 0.3475896120071411,
+        "reference_rms": 0.8287649976325296,
+        "differing_components": 31603,
+        "components": 786432
+      },
+      {
+        "pair": 1,
+        "frame": "last",
+        "finite": true,
+        "nvrtc_max_rgb": 11.107439041137695,
+        "nvvm_max_rgb": 11.107440948486328,
+        "mae": 1.0048525803930226e-05,
+        "rmse": 0.0021420130112767347,
+        "max_abs": 0.7010501027107239,
+        "reference_rms": 0.8291703412038537,
+        "differing_components": 32153,
+        "components": 786432
+      },
+      {
+        "pair": 2,
+        "frame": "first",
+        "finite": true,
+        "nvrtc_max_rgb": 7.457240581512451,
+        "nvvm_max_rgb": 7.457240581512451,
+        "mae": 3.8458118360802825e-06,
+        "rmse": 0.0009041507331576603,
+        "max_abs": 0.3475896120071411,
+        "reference_rms": 0.8287649976325296,
+        "differing_components": 31603,
+        "components": 786432
+      },
+      {
+        "pair": 2,
+        "frame": "last",
+        "finite": true,
+        "nvrtc_max_rgb": 11.107439041137695,
+        "nvvm_max_rgb": 11.107440948486328,
+        "mae": 1.0048525803930226e-05,
+        "rmse": 0.0021420130112767347,
+        "max_abs": 0.7010501027107239,
+        "reference_rms": 0.8291703412038537,
+        "differing_components": 32153,
+        "components": 786432
+      },
+      {
+        "pair": 3,
+        "frame": "first",
+        "finite": true,
+        "nvrtc_max_rgb": 7.457240581512451,
+        "nvvm_max_rgb": 7.457240581512451,
+        "mae": 3.8458118360802825e-06,
+        "rmse": 0.0009041507331576603,
+        "max_abs": 0.3475896120071411,
+        "reference_rms": 0.8287649976325296,
+        "differing_components": 31603,
+        "components": 786432
+      },
+      {
+        "pair": 3,
+        "frame": "last",
+        "finite": true,
+        "nvrtc_max_rgb": 11.107439041137695,
+        "nvvm_max_rgb": 11.107440948486328,
+        "mae": 1.0048525803930226e-05,
+        "rmse": 0.0021420130112767347,
+        "max_abs": 0.7010501027107239,
+        "reference_rms": 0.8291703412038537,
+        "differing_components": 32153,
+        "components": 786432
+      }
+    ],
+    "raw_evidence": "build/nvvm-falcor-performance/",
+    "iteration_csv": "build/nvvm-falcor-performance/iterations.csv",
+    "harness_sha256": "705145a129dec11948b4b2a3af1ad389d6606e49b1887b0b02236328f562bee0",
+    "nvvm_gpu_time_reduction_percent": 4.016620498563162,
+    "nvvm_speedup": 1.0418470418464796,
+    "limitations": [
+      "One lit DamagedHelmet scene on NVIDIA L4; not the full Falcor suite.",
+      "150 samples per backend in three serial paired runs; timestamps have1us resolution.",
+      "Module/shader caches disabled; driver and OptiX caches may be warm. Compilation is not a cold-cache measurement.",
+      "Compile reports are PTX program generation and pipeline creation; first-render wall includes additional setup.",
+      "Broad NVVM static checks retain4baseline failures; focused/runtime checks pass.",
+      "Rare deterministic RGB outliers remain unexplained; successful rendering is not proof of bitwise or full image equivalence."
+    ],
+    "compiler_revision": "b52b8bb0cd4f7ecfa5b641dac43bc3078edc0636",
+    "image_detail": {
+      "first": {
+        "pixels": 262144,
+        "pixel_max_abs_percentiles": {
+          "50": 0.0,
+          "90": 0.0,
+          "99": 4.470348358154297e-08,
+          "99.9": 1.7881393432617188e-07,
+          "99.99": 8.654246630612761e-05,
+          "100": 0.3475896120071411
+        },
+        "pixels_over_1e-3": 6,
+        "pixels_over_0_1": 5,
+        "backend_repeats_bit_identical": {
+          "nvrtc": true,
+          "nvvm": true
+        }
+      },
+      "last": {
+        "pixels": 262144,
+        "pixel_max_abs_percentiles": {
+          "50": 0.0,
+          "90": 0.0,
+          "99": 4.470348358154297e-08,
+          "99.9": 1.7881393432617188e-07,
+          "99.99": 6.527292134705931e-05,
+          "100": 0.7010501027107239
+        },
+        "pixels_over_1e-3": 11,
+        "pixels_over_0_1": 8,
+        "backend_repeats_bit_identical": {
+          "nvrtc": true,
+          "nvvm": true
+        }
+      }
+    },
+    "identity_reports": {
+      "1-nvrtc": "build/nvvm-falcor-performance/run-1-nvrtc-identity.json",
+      "1-nvvm": "build/nvvm-falcor-performance/run-1-nvvm-identity.json",
+      "2-nvrtc": "build/nvvm-falcor-performance/run-2-nvrtc-identity.json",
+      "2-nvvm": "build/nvvm-falcor-performance/run-2-nvvm-identity.json",
+      "3-nvrtc": "build/nvvm-falcor-performance/run-3-nvrtc-identity.json",
+      "3-nvvm": "build/nvvm-falcor-performance/run-3-nvvm-identity.json"
+    },
+    "driver_version": "595.71.05",
+    "nvrtc_version": "12.8.93",
+    "nvvm_toolkit": "12.9",
+    "review": "Independent methodology and final evidence review approved: timings, image metrics, settings, compilation snapshots, CSV and loaded identities independently verified.",
+    "image_snapshot_iterations": {
+      "first": 0,
+      "last": 49
+    },
+    "images_are_accumulated": false
+  }
 }

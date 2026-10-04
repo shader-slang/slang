@@ -1,5 +1,11 @@
 # NVVM development workflow
 
+**Falcor milestone complete (2026-10-03):** standard-library GeometryIndex and the necessary
+application fixes are accepted. Original smoke and lit path tracing render on both backends; the
+matched iteration/compilation comparison is recorded in STATUS, RESULTS and falcor2-status.json.
+The bounded request is complete. Rare cross-backend pixel outliers and four pre-existing static
+expectation failures remain recorded; unrelated feature work and the general loop stay stopped.
+
 **Falcor milestone continuation authorized (2026-10-03):** implement `GeometryIndex()` in the
 standard library for NVRTC and NVVM, remove Falcor's CUDA workaround, then continue resolving
 application blockers until successful NVVM rendering or a decision requiring human input. Once

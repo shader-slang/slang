@@ -1,23 +1,27 @@
 # NVVM current status
 
-**Falcor qualification resumed (2026-10-03):** the maintainer explicitly authorized implementing
-standard-library `GeometryIndex()` for NVRTC and NVVM, removing Falcor's workaround, then continuing
-necessary fixes until Falcor renders through NVVM or a blocker requires human input. After a successful
-render, compare matched per-iteration performance between backends and capture compilation times
-separately. Continue in bounded reviewed steps; unrelated feature development remains outside scope.
+**Falcor milestone complete (2026-10-03):** standard-library `GeometryIndex()` works on NVRTC
+and NVVM, Falcor's workaround is removed, and the necessary compiler blockers are repaired. The
+original path-tracer test and a lit 512×512 DamagedHelmet workload run on both backends. On L4,
+three paired runs of 50 measured iterations give **0.722 ms NVRTC / 0.693 ms NVVM** median GPU
+time (**4.02% lower on NVVM**). Path-tracer PTX compilation is **2.327 s / 4.113 s**, respectively;
+first-render wall time is **3.141 s / 4.879 s**. Driver caches may be warm.
 
-**Lit Falcor rendering qualified (2026-10-03):** immutable texture metadata and shared late
-memory cleanup remove an overwritten mip-count query in EnvMapLight. Both original smoke tests
-pass (13.35 s NVRTC / 14.20 s NVVM); the lit 128×128 pilot also renders. Focused **19/19**, NVVM
-units **572/572**, smoke **16/16**, six route controls and shader-termination static **1/1** pass.
-Broad static: **34 pass / 4 pre-existing failures**, reproduced unchanged in a production-code
-revert drill; exact failures remain in the application manifest. Matched 512×512 timing is next.
+Images are finite and visually recognizable, but not bit-identical. Final RGB RMSE is **0.002142**;
+11 of 262,144 pixels differ by more than 0.001, with maximum absolute difference 0.70105. These
+rare deterministic outliers remain unexplained. See [results](RESULTS.md#falcor-path-tracer-iteration-comparison)
+and [the application manifest](falcor2-status.json) for exact settings, timings and limitations.
+
+Final cleanup qualification: focused **19/19**, NVVM units **572/572**, smoke **16/16**, original
+Falcor tests on both routes, six route controls and shader-termination static **1/1** pass. Broad
+static is **34 pass / 4 pre-existing failures**, reproduced in a production-code revert drill.
+This bounded milestone is complete; unrelated feature work and the general loop remain stopped.
 
 **Falcor renders on NVVM (2026-10-03):** the original64x64 DamagedHelmet path-tracing test now
 passes on both backends (**12.70sNVRTC /16.35sNVVM** total pytest time). Retained exported nested
 struct declarations are correctly treated as metadata; live value/storage type and layout checks
 remain intact. Focused shaders **51/51**, static checks **9/9**, NVVM units **572/572** and smoke
-**16/16** pass. A matched512x512GPU iteration and compilation comparison is next; pytest durations
+**16/16** pass. This checkpoint preceded the matched 512×512 comparison above; pytest durations
 are not render timings.
 
 **Boolean and nested OptiX traces repaired (2026-10-03):** canonical CUDA byte packing now
