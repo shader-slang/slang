@@ -741,19 +741,40 @@ loading. Dead helpers do not request a library, and LLVM-only calls need no libd
 timestamp-based cache hash is not an atomic filesystem snapshot. Named LLVM attributes are preserved;
 library definition attributes are not copied onto output declarations.
 
-The route passes explicit virtual architecture and O0/O3. Floating mode and Float32 denormal mode
-are independent:
+The route passes explicit virtual architecture and O0/O3. Fast mode defaults to flushing Float32
+subnormals; an explicit denormal option overrides that default.
 
-| Policy                           | libNVVM options                            |
-| -------------------------------- | ------------------------------------------ |
-| Default floating mode            | Vendor defaults for division, sqrt and FMA |
-| Precise                          | `-prec-div=1 -prec-sqrt=1 -fma=0`          |
-| Fast                             | `-prec-div=0 -prec-sqrt=0 -fma=1`          |
-| Preserve/flush Float32 denormals | `-ftz=0` / `-ftz=1`                        |
+| Policy | libNVVM options |
+| --- | --- |
+| Default floating mode | Vendor defaults for division, sqrt and FMA |
+| Precise | `-prec-div=1 -prec-sqrt=1 -fma=0` |
+| Fast | `-prec-div=0 -prec-sqrt=0 -fma=1`, plus `-ftz=1` unless overridden |
+| Explicit preserve/flush Float32 denormals | `-ftz=0` / `-ftz=1` |
+
+These switches alone do not replace ordinary LLVM operations or library calls. The pure core query
+`__isFloat32FastIntrinsicAllowed()` survives shared-module optimization and folds against each
+linked target's options. `CompilerOptionSet::isFloat32FastIntrinsicAllowed()` owns the policy:
+Fast mode with no explicit Float32 Preserve request. The query selects `__nv_fast_*f` for Float32
+sin/cos/tan/exp/log/log2/log10/pow, and `__nv_sqrtf` for the libdevice-controlled fast square root.
+Existing Half promotion/narrowing and vector/matrix scalar composition reuse those selections;
+Double and ordinary/default/precise library paths remain unchanged. Explicitly named user
+intrinsics retain their specified meaning. Core `sincos` still composes sine and cosine.
+
+Canonical Float32 `Div` selects append-only typed operation `DIVIDE_APPROX_FTZ` during semantic
+planning, before capability validation and immutable plan capture. The existing FloatBinary family
+checks scalar/vector widths 1–4 and broadcasts. The provider emits LLVM's registered
+`nvvm_div_approx_ftz_f`, scalarizing vector lanes after existing broadcast materialization. The
+legacy serializer validates that exact intrinsic and translates its LLVM14 attributes to the
+supported NVVM dialect. No source/PTX rewriting or blanket unsafe LLVM flags are used. Explicit
+Float32 Preserve disables this inherently flushing approximation, just as it disables the fast
+library choices. This policy does not claim IEEE division accuracy or ordinary math's full-domain
+accuracy in fast mode; see NVIDIA's [PTX division contract](https://docs.nvidia.com/cuda/archive/12.8.0/parallel-thread-execution/index.html#floating-point-instructions-div)
+and [fast library contracts](https://docs.nvidia.com/cuda/libdevice-users-guide/__nv_fast_sinf.html).
 
 Nondefault FP16/FP64 denormal policies and duplicate managed overrides reject before program creation.
 NVRTC option aggregation differs; comparisons record effective options rather than equating labels.
-The maintained three-mode corpus uses NVRTC O3 and NVVM O0/O3.
+The maintained three-mode corpus uses NVRTC O3 and NVVM O0/O3; fast-mode numerical and code-generation
+qualification is separate in [RESULTS](../../issue-nvvm-backend/RESULTS.md#nvvm-fast-mode-qualification).
 
 ## Numerical and target-specific boundaries
 

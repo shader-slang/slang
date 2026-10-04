@@ -14466,3 +14466,31 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixVersionIsModuleOwned)
         SLANG_CHECK(_getBlobText(before) == _getBlobText(after));
     }
 }
+
+SLANG_UNIT_TEST(nvvmIRBuilderApproximateDivideAcceptsOnlyFloat32Shapes)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (uint32_t width : {16u, 32u, 64u})
+        for (uint32_t lanes : {1u, 2u, 3u, 4u, 5u})
+        {
+            SlangNVVMValueTypeDesc result = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, width, lanes};
+            SlangNVVMValueTypeDesc operands[] = {result, result};
+            SlangNVVMValueOperationDesc desc =
+                {SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ, result, operands, 2};
+            SLANG_CHECK(builder.supportsValueOperation(desc) == (width == 32 && lanes <= 4));
+            operands[1].laneCount = 1;
+            SLANG_CHECK(builder.supportsValueOperation(desc) == (width == 32 && lanes <= 4));
+            operands[0].bitWidth = width == 32 ? 64 : 32;
+            SLANG_CHECK(!builder.supportsValueOperation(desc));
+        }
+    SlangNVVMValueTypeDesc integer = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 32, 1};
+    SlangNVVMValueTypeDesc operands[] = {integer, integer};
+    SlangNVVMValueOperationDesc desc =
+        {SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ, integer, operands, 2};
+    SLANG_CHECK(!builder.supportsValueOperation(desc));
+    desc.resultType = NVVMSemantics::kFloat32;
+    operands[0] = operands[1] = NVVMSemantics::kFloat32;
+    desc.operandCount = 1;
+    SLANG_CHECK(!builder.supportsValueOperation(desc));
+}

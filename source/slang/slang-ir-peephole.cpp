@@ -307,6 +307,22 @@ struct PeepholeContext : InstPassBase
 
         switch (inst->getOp())
         {
+        case kIROp_IsFloat32FastIntrinsicAllowed:
+            {
+                if (!targetProgram)
+                    break;
+                // Consider sin(x) in a module shared by precise and fast target programs.
+                // Keep the query unresolved in that module. Once a target is selected, fold
+                // it so the standard library chooses the permitted function before NVVM's
+                // named-intrinsic plan records its exact symbol and signature.
+                auto& options = targetProgram->getOptionSet();
+                bool allowed = options.isFloat32FastIntrinsicAllowed();
+                IRBuilder builder(module);
+                inst->replaceUsesWith(builder.getBoolValue(allowed));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_AlignOf:
         case kIROp_SizeOf:
             {

@@ -1167,6 +1167,9 @@ local insts = {
 	{ GetWorkGroupSize = { hoistable = true } },
 	-- An inst that returns the current stage of the calling entry point.
 	{ GetCurrentStage = {} },
+	-- Whether target policy permits approximate Float32 intrinsics with inherent FTZ behavior.
+	-- Deferred until target options are known, then folded before intrinsic selection.
+	{ IsFloat32FastIntrinsicAllowed = { hoistable = true } },
 	{ param = {} },
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },

@@ -4636,7 +4636,10 @@ bool _resolveNVVMFloatingRemainderOperation(
 }
 
 // Resolves numeric operations through their family and hardware-wave operations by exact signature.
-bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOperation)
+bool _resolveNVVMValueOperation(
+    IRInst* inst,
+    NVVMResolvedValueOperation& outOperation,
+    bool allowApproximateFloat32 = false)
 {
     outOperation = {};
     if (!inst || inst->getOperandCount() > 3)
@@ -4655,6 +4658,13 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
         if (!operand || !_getNVVMSemanticType(operand->getDataType(), outOperation.operandTypes[i]))
             return false;
     }
+
+    // A Float32 division is canonical ordinary IR, including scalar/vector broadcasts.
+    // Select its permitted target instruction here, before capability validation and plan
+    // capture. Integer/Half/Double division and explicitly named intrinsics keep their meaning.
+    if (allowApproximateFloat32 && operation == SLANG_NVVM_VALUE_OP_DIVIDE &&
+        resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && resultType.bitWidth == 32)
+        operation = SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ;
 
     outOperation.desc = {
         operation,
@@ -6981,7 +6991,12 @@ SlangResult _validateNVVMFunction(
                         break;
                     }
                     NVVMResolvedValueOperation operation;
-                    if (!_resolveNVVMValueOperation(inst, operation))
+                    if (!_resolveNVVMValueOperation(
+                            inst,
+                            operation,
+                            codeGenContext->getTargetProgram()
+                                ->getOptionSet()
+                                .isFloat32FastIntrinsicAllowed()))
                         return inst->getOperandCount() == 2
                                    ? _diagnoseUnsupportedIRTypeRelation(
                                          codeGenContext,

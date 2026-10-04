@@ -1,5 +1,27 @@
 # NVVM current status
 
+**NVVM fast mode qualified (2026-10-04):** approximate Float32 library math, division and square
+root now follow explicit fast mode, including default FTZ and explicit denormal preservation.
+General OptiX pipeline configuration is unchanged. On the lit 512×512 Falcor workload, two
+1,000-iteration runs give **0.316 / 0.314 ms NVVM fast**, versus **0.316 / 0.315 ms NVRTC fast**.
+This is about **34% less GPU time** than prior NVVM fast's 0.479 / 0.479 ms, and effectively
+parity with NVRTC. Every measured Falcor clock sample is 2,040/6,251 MHz/P0; clocks are not locked.
+
+The reduced shader drops **303→19 native instruction sites**, matching NVRTC fast, with its
+**32-byte stack frame eliminated**, 18 registers and no spills. Actual Falcor PTX confirms fast
+trig/division/sqrt lowering. Default first/final images exactly match the previous baseline on both
+routes; repeated images are stable. Fast NVVM/NVRTC final RGB RMSE is **0.00134990**, with **six
+pixels above 0.001** and maximum difference 0.562519. Sparse outliers remain unqualified; fast mode
+is not an equivalent-output optimization. Prior matched Vulkan 0.264192 ms is historical, not rerun.
+
+Validation: focused **23/23**, NVVM units **574/574**, smoke **16/16**, working **1,735/1,735**,
+and rebuilt static **34 pass / the same four known failures**. Shared-module target-order tests
+and explicit named-intrinsic controls pass. Independent implementation and performance-evidence
+reviews are accepted. Compilation observations, numerical limits, exact failure transitions and
+identities are in [RESULTS](RESULTS.md#nvvm-fast-mode-qualification), focused evidence and the
+application manifest. This bounded request is complete; pipeline changes and general feature work
+remain deferred. Full OptiX SASS still requires profiling access.
+
 **Falcor performance isolation (2026-10-04):** two substantial contributors are confirmed.
 A process-local OptiX single-level graph control reduces NVVM **0.692→0.520 ms**, with
 bit-identical first/final images. General graph mode is required for an existing HitObject replay

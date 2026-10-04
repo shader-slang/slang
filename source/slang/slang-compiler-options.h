@@ -423,6 +423,9 @@ struct CompilerOptionSet
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
     }
 
+    /// Whether approximate Float32 intrinsics may use their inherent flush-to-zero behavior.
+    bool isFloat32FastIntrinsicAllowed();
+
     FloatingPointDenormalMode getDenormalModeFp16()
     {
         if (!hasOption(CompilerOptionName::DenormalModeFp16))

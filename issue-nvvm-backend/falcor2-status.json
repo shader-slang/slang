@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "observed_on": "2026-10-04",
-  "scope": "Original CUDA path-tracer smoke, lit CUDA/Vulkan comparison, configuration/math isolation and portable performance corpus; no production optimization. Full OptiX SASS blocked by profiling permissions; full Falcor suite not run.",
+  "scope": "Original CUDA path-tracer smoke, lit CUDA/Vulkan comparison, configuration/math isolation, portable performance corpus and qualified NVVM fast-mode implementation. Full OptiX SASS remains permission-blocked; full Falcor suite not run.",
   "test_id": "tests/python/pathtracer/test_pathtracer.py::test_pathtracer_render_with_geometry[DeviceType.cuda]",
   "scene": "data/assets/kronos/DamagedHelmet/glTF/DamagedHelmet.gltf",
   "dimensions": [
@@ -3187,5 +3187,834 @@
     ],
     "provenance_limit": "Twenty-three earlier prototype records lack per-run identity JSON: four fast-{nvrtc,nvvm}-{general,single}, final-miss-vulkan and18initial trace variants. Their timing/output evidence is retained with that limitation. Default graph repeats and all15final durable-tool runs have identities; final fast general reproduces prototype first/final images exactly. Single-fast results remain exploratory, with NVRTC mixed clocks. Current shader formatting changed whitespace only after execution; tested source hashes remain in raw records.",
     "review": "Independent review recomputed61rawrecords/61000timestamp pairs/1811clock rows,16imagechecks and14current library hashes. All15final run identities and current Python harness hashes verified; code and source/native evidence reviewed. Eight full-RGBA graph comparisons additionally verified by lead. Older prototype identity limitation explicitly retained."
+  },
+  "fast_mode_qualification": {
+    "observed_on": "2026-10-04",
+    "status": "accepted",
+    "identity_reference": "focused-evidence.json#/features/nvvm-fast-mode/identity",
+    "validation_reference": "focused-evidence.json#/features/nvvm-fast-mode/validation",
+    "iteration_protocol": "Existing lit 512x512 DamagedHelmet, depth 6, NEE, trace-ray visibility late, general OptiX graph. Two rotated runs per route/mode, >=3 seconds/300 warmups and 1000 measured iterations, no dumps/profiler. All 12 Falcor/portable processes exit 0.",
+    "runs": {
+      "falcor-nvrtc-default-1": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.7009999999993966,
+        "p10_gpu_ms": 0.6909999999997751,
+        "p90_gpu_ms": 0.7139999999989044,
+        "warmup_iterations": 3584,
+        "warmup_seconds": 3.0203097780467942,
+        "clock_summary": {
+          "samples": 70,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 9.923751152004115,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 5.2400009999999995,
+        "pipeline_create_seconds": 3.9216036890000003,
+        "result_sha256": "fbc5a1094917a955644a9497e41bbced05e2d428e4e68a67eaa4201cffd82ce9",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvrtc-default-1"
+      },
+      "falcor-nvrtc-default-2": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.7009999999993966,
+        "p10_gpu_ms": 0.6909999999997751,
+        "p90_gpu_ms": 0.7140000000003255,
+        "warmup_iterations": 3648,
+        "warmup_seconds": 3.030518605024554,
+        "clock_summary": {
+          "samples": 70,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 3.273320718028117,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 2.4499839999999997,
+        "pipeline_create_seconds": 0.030492342000000002,
+        "result_sha256": "af91d39032455aa2ded90a2b67b335e77d5814663b9961143d886085f65fea50",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvrtc-default-2"
+      },
+      "falcor-nvrtc-fast-1": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.31599999999798456,
+        "p10_gpu_ms": 0.31200000000097816,
+        "p90_gpu_ms": 0.32300000000162754,
+        "warmup_iterations": 6720,
+        "warmup_seconds": 3.0016159209772013,
+        "clock_summary": {
+          "samples": 32,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 7.678027477988508,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 4.740210999999999,
+        "pipeline_create_seconds": 2.154563007,
+        "result_sha256": "a6d64a352ba80671b3db56b39a7dae5ec6be3d8f10c7c87a534fe2bceea399e1",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvrtc-fast-1"
+      },
+      "falcor-nvrtc-fast-2": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.3150000000005093,
+        "p10_gpu_ms": 0.3109999999999502,
+        "p90_gpu_ms": 0.3220000000005996,
+        "warmup_iterations": 6784,
+        "warmup_seconds": 3.0117267559980974,
+        "clock_summary": {
+          "samples": 31,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 3.093193269043695,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 2.312308999999999,
+        "pipeline_create_seconds": 0.022924536000000002,
+        "result_sha256": "e014af67c2e81b32fbaf81cc4c147f0db89867c3b6fc92bffc7cfb2ebcb2e1c6",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvrtc-fast-2"
+      },
+      "falcor-nvvm-default-1": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.6769999999995946,
+        "p10_gpu_ms": 0.6660000000024979,
+        "p90_gpu_ms": 0.6920000000008031,
+        "warmup_iterations": 3712,
+        "warmup_seconds": 3.0170828529517166,
+        "clock_summary": {
+          "samples": 67,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 4.891346246993635,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 4.120604999999999,
+        "pipeline_create_seconds": 0.021830391,
+        "result_sha256": "5c43a49cf8bc62c60379c1cfdbe4ee3ed352e60f0e94b20e49bc71407731ee35",
+        "identity_sha256": "fb2dbbb008648efd046a2afa9085dc3a9c7692934b86edee62d280e1ea0865b5",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvvm-default-1"
+      },
+      "falcor-nvvm-default-2": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.6800000000026785,
+        "p10_gpu_ms": 0.6679999999974484,
+        "p90_gpu_ms": 0.6950000000003342,
+        "warmup_iterations": 3712,
+        "warmup_seconds": 3.0056084700045176,
+        "clock_summary": {
+          "samples": 68,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 4.86593556200387,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 4.161829000000001,
+        "pipeline_create_seconds": 0.022969828,
+        "result_sha256": "3e651c8c23ad45c66d7513c9678f6021bf77061a804b9542af027a42289213b7",
+        "identity_sha256": "ca400d3a9f3077683f76dcc7eba99cc8689b12d5344e18052f84c7873a638cd5",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvvm-default-2"
+      },
+      "falcor-nvvm-fast-1": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.3160000000015373,
+        "p10_gpu_ms": 0.31200000000097816,
+        "p90_gpu_ms": 0.32300000000162754,
+        "warmup_iterations": 6784,
+        "warmup_seconds": 3.0213757189922035,
+        "clock_summary": {
+          "samples": 32,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 5.266168052039575,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 3.5290969999999993,
+        "pipeline_create_seconds": 0.991942007,
+        "result_sha256": "33dabde57d2faefdd52f84293c9b3036d107ef4c3c9dffc1651b08c396ea74c5",
+        "identity_sha256": "fb2dbbb008648efd046a2afa9085dc3a9c7692934b86edee62d280e1ea0865b5",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvvm-fast-1"
+      },
+      "falcor-nvvm-fast-2": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          512,
+          512
+        ],
+        "experiment": {
+          "depth": 6,
+          "nee": true,
+          "placement": "late",
+          "skip_visibility": false,
+          "miss_visibility": false
+        },
+        "iterations": 1000,
+        "median_gpu_ms": 0.31399999999948136,
+        "p10_gpu_ms": 0.30800000000041905,
+        "p90_gpu_ms": 0.3189999999994697,
+        "warmup_iterations": 6784,
+        "warmup_seconds": 3.0096263310406357,
+        "clock_summary": {
+          "samples": 31,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "first_render_wall_seconds": 4.232339602021966,
+        "source_sha256": "4a85aa9d87b23430bc2b104e33335625337b2c81c8f396354e7bb508d7155b14",
+        "harness_sha256": "699ba0358fed0abe5121e68ecec6b6c77f357a9bf6c4b23f0a19e80d6d4180b5",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "path_tracer_compile_seconds": 3.468833,
+        "pipeline_create_seconds": 0.019874423000000002,
+        "result_sha256": "54d7a45e4d84c00fd31e4dd38eb39f62b5a4426dfb03d889f9a3f8cc8cc1daa0",
+        "identity_sha256": "054b32c51b87efc37edadf3f1353300fa240b0aee04230c04d87e2a4296689f4",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/falcor-nvvm-fast-2"
+      },
+      "math-nvrtc-default": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "iterations": 1000,
+        "median_gpu_ms": 0.024000000000246047,
+        "p10_gpu_ms": 0.02300000000010627,
+        "p90_gpu_ms": 0.024999999999941735,
+        "warmup_iterations": 111744,
+        "warmup_seconds": 3.0006739560049027,
+        "clock_summary": {
+          "samples": 3,
+          "sm_mhz": [
+            1470
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "oracle": "float64 reference, atol2e-6/rtol5e-6",
+        "max_oracle_error": 1.33700579052487e-07,
+        "source_sha256": "8a71cef2b558bed53812e217f5cafba1068adebf2e3a0d4f15aefc424a9c9c0d",
+        "harness_sha256": "c6b55ea117809bd6ef4e42c83483047fe407a4e6267fcfc8f36c9c1473fe2096",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "result_sha256": "9cb86f6ec68532aaae2aedebb3bc46a97041db8034bb0199a07de94a5f0f86a5",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/math-nvrtc-default"
+      },
+      "math-nvrtc-fast": {
+        "backend": "nvrtc",
+        "api": "cuda",
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "iterations": 1000,
+        "median_gpu_ms": 0.018999999999991246,
+        "p10_gpu_ms": 0.018900000000021684,
+        "p90_gpu_ms": 0.020000000000131024,
+        "warmup_iterations": 133376,
+        "warmup_seconds": 3.0006147350068204,
+        "clock_summary": {
+          "samples": 2,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "oracle": "float64 reference, atol2e-6/rtol5e-6",
+        "max_oracle_error": 7.051895214021942e-07,
+        "source_sha256": "8a71cef2b558bed53812e217f5cafba1068adebf2e3a0d4f15aefc424a9c9c0d",
+        "harness_sha256": "c6b55ea117809bd6ef4e42c83483047fe407a4e6267fcfc8f36c9c1473fe2096",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "result_sha256": "af9759bd09a197bd117a80d1ed184de4f63c6d15c91ffcc4f77c6cae26b6933b",
+        "identity_sha256": "410fcb003b2841e72be8695c60d014d6319920c9cda8ada525fd9aaba9391d92",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/math-nvrtc-fast"
+      },
+      "math-nvvm-default": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "iterations": 1000,
+        "median_gpu_ms": 0.024999999999941735,
+        "p10_gpu_ms": 0.023999999999801958,
+        "p90_gpu_ms": 0.026000000000081513,
+        "warmup_iterations": 109312,
+        "warmup_seconds": 3.000155244022608,
+        "clock_summary": {
+          "samples": 2,
+          "sm_mhz": [
+            1440
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "oracle": "float64 reference, atol2e-6/rtol5e-6",
+        "max_oracle_error": 1.33700579052487e-07,
+        "source_sha256": "8a71cef2b558bed53812e217f5cafba1068adebf2e3a0d4f15aefc424a9c9c0d",
+        "harness_sha256": "c6b55ea117809bd6ef4e42c83483047fe407a4e6267fcfc8f36c9c1473fe2096",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "result_sha256": "19b98ef77b620dc1bb4a918d26651e979ce90c41deb7f8457895bdd7a943cef1",
+        "identity_sha256": "054b32c51b87efc37edadf3f1353300fa240b0aee04230c04d87e2a4296689f4",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/math-nvvm-default"
+      },
+      "math-nvvm-fast": {
+        "backend": "nvvm",
+        "api": "cuda",
+        "dimensions": [
+          1024,
+          1024
+        ],
+        "iterations": 1000,
+        "median_gpu_ms": 0.018999999999991246,
+        "p10_gpu_ms": 0.018000000000295557,
+        "p90_gpu_ms": 0.020000000000131024,
+        "warmup_iterations": 133760,
+        "warmup_seconds": 3.0011527620372362,
+        "clock_summary": {
+          "samples": 2,
+          "sm_mhz": [
+            2040
+          ],
+          "memory_mhz": [
+            6251
+          ],
+          "pstate": [
+            0
+          ]
+        },
+        "oracle": "float64 reference, atol2e-6/rtol5e-6",
+        "max_oracle_error": 7.051895214021942e-07,
+        "source_sha256": "8a71cef2b558bed53812e217f5cafba1068adebf2e3a0d4f15aefc424a9c9c0d",
+        "harness_sha256": "c6b55ea117809bd6ef4e42c83483047fe407a4e6267fcfc8f36c9c1473fe2096",
+        "timing_helper_sha256": "4dcbdca8372835aa050bb8b74ff7ff87fff18315b0d64727884d04bc0b11fdc8",
+        "diagnostic_environment": {},
+        "result_sha256": "ef6f442bacaa7417c52cb2e7f14445db79b7e7daee5a67e6b3bb5a230f714245",
+        "identity_sha256": "fb2dbbb008648efd046a2afa9085dc3a9c7692934b86edee62d280e1ea0865b5",
+        "process_exit": 0,
+        "raw_prefix": "build/nvvm-fast-math/math-nvvm-fast"
+      }
+    },
+    "images": [
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-2",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-2",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-default-2",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-default-2",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "first",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.008541545777723942,
+        "max_abs": 1.0,
+        "pixels_above_0_001": 158
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "last",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.0070536314365372875,
+        "max_abs": 0.9810317754745483,
+        "pixels_above_0_001": 129
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/repeat-nvvm-general",
+        "b": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/repeat-nvvm-general",
+        "b": "build/nvvm-fast-math/falcor-nvvm-default-1",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/final-fast-nvvm",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "first",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.00877057436824881,
+        "max_abs": 1.0000001192092896,
+        "pixels_above_0_001": 125
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/final-fast-nvvm",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "last",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.0068564112614333496,
+        "max_abs": 0.9117329716682434,
+        "pixels_above_0_001": 121
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-2",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-2",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-default-2",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-default-2",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "frame": "first",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.008362328445799807,
+        "max_abs": 0.9824362993240356,
+        "pixels_above_0_001": 162
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "frame": "last",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.007065243692898443,
+        "max_abs": 0.9810317754745483,
+        "pixels_above_0_001": 132
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/repeat-nvrtc-general",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/repeat-nvrtc-general",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-default-1",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/final-fast-nvrtc",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "frame": "first",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-falcor-perf-isolation/final-fast-nvrtc",
+        "b": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "frame": "last",
+        "bit_identical": true,
+        "finite": true,
+        "rmse": 0.0,
+        "max_abs": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "first",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.0023675819136387533,
+        "max_abs": 1.0000001192092896,
+        "pixels_above_0_001": 10
+      },
+      {
+        "a": "build/nvvm-fast-math/falcor-nvrtc-fast-1",
+        "b": "build/nvvm-fast-math/falcor-nvvm-fast-1",
+        "frame": "last",
+        "bit_identical": false,
+        "finite": true,
+        "rmse": 0.0013499026795295473,
+        "max_abs": 0.5625187531113625,
+        "pixels_above_0_001": 6
+      }
+    ],
+    "portable_native": {
+      "math-nvrtc-default": {
+        "instructions_excluding_nop": 271,
+        "ptxas": "ptxas info    : 242 bytes gmem, 32 bytes cmem[3], 840 bytes cmem[4]\nptxas info    : Compiling entry function 'computeMain' for 'sm_89'\nptxas info    : Function properties for computeMain\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 23 registers, used 0 barriers, 352 bytes cmem[0], 8 bytes cmem[2]\nptxas info    : Compile time = 9.521 ms\n",
+        "sass_sha256": "68ef465c212b6b969f571ae2f6ad7e3b8fa6e7aa892f40291d1c452a687918d4",
+        "ptx_sha256": "bb76760c8372fd5a9f86e001fb57ff7446f7b2484e9f3044eb4b74e274446ed2"
+      },
+      "math-nvrtc-fast": {
+        "instructions_excluding_nop": 19,
+        "ptxas": "ptxas info    : 218 bytes gmem, 32 bytes cmem[3], 832 bytes cmem[4]\nptxas info    : Compiling entry function 'computeMain' for 'sm_89'\nptxas info    : Function properties for computeMain\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 18 registers, used 0 barriers, 352 bytes cmem[0]\nptxas info    : Compile time = 2.350 ms\n",
+        "sass_sha256": "f23381b84bb0e93d091bd4c591c3aeefbae808bda1d780d98305af9f6f7666ce",
+        "ptx_sha256": "73a9cae8735120e92e28cc058c8eeb393a378b438776ddfffffe7c3800b11913"
+      },
+      "math-nvvm-default": {
+        "instructions_excluding_nop": 303,
+        "ptxas": "ptxas info    : 24 bytes gmem, 32 bytes cmem[3], 8 bytes cmem[4]\nptxas info    : Compiling entry function 'computeMain' for 'sm_89'\nptxas info    : Function properties for computeMain\n    32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 24 registers, used 0 barriers, 32 bytes cumulative stack size, 352 bytes cmem[0], 8 bytes cmem[2]\nptxas info    : Compile time = 11.084 ms\n",
+        "sass_sha256": "6d021cf705f5415586fc1a529bcf14a4432b3857efb37c5bb032c9ae5ddc9371",
+        "ptx_sha256": "8b46c1f7aa07c12fc47e28cd9cad65b74f891119ca6eb5b0e524fbf4709cc932"
+      },
+      "math-nvvm-fast": {
+        "instructions_excluding_nop": 19,
+        "ptxas": "ptxas info    : 0 bytes gmem, 32 bytes cmem[3]\nptxas info    : Compiling entry function 'computeMain' for 'sm_89'\nptxas info    : Function properties for computeMain\n    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads\nptxas info    : Used 18 registers, used 0 barriers, 352 bytes cmem[0]\nptxas info    : Compile time = 1.788 ms\n",
+        "sass_sha256": "efc094b65c0ee0cb68797275064aace59cb84927c28401d19c82e3358be3faf8",
+        "ptx_sha256": "f11b4f75858be96803e18028123f91fea4cff5db7667e5452079c7b684f967e8"
+      }
+    },
+    "falcor_fast_ptx": {
+      "nvvm": [
+        {
+          "file": "build/nvvm-fast-math/capture-fast-nvvm/render4.ptx",
+          "bytes": 406602,
+          "opcodes": {
+            "sin.approx.ftz.f32": 17,
+            "cos.approx.ftz.f32": 17,
+            "sqrt.approx.ftz.f32": 123,
+            "sqrt.rn.ftz.f32": 0,
+            "div.approx.ftz.f32": 489,
+            "div.full.ftz.f32": 4,
+            "rcp.approx.ftz.f32": 4,
+            "lg2.approx.ftz.f32": 10,
+            "ex2.approx.ftz.f32": 19
+          },
+          "large_angle_constant_mentions": 0,
+          "visible_entries": [
+            "__closesthit___scene_scatter_triangle_closest_hit"
+          ]
+        }
+      ],
+      "nvrtc": [
+        {
+          "file": "build/nvvm-fast-math/capture-fast-nvrtc/render4.ptx",
+          "bytes": 1330172,
+          "opcodes": {
+            "sin.approx.ftz.f32": 17,
+            "cos.approx.ftz.f32": 17,
+            "sqrt.approx.ftz.f32": 123,
+            "sqrt.rn.ftz.f32": 0,
+            "div.approx.ftz.f32": 492,
+            "div.full.ftz.f32": 4,
+            "rcp.approx.ftz.f32": 26,
+            "lg2.approx.ftz.f32": 10,
+            "ex2.approx.ftz.f32": 19
+          },
+          "large_angle_constant_mentions": 0,
+          "visible_entries": [
+            "__closesthit___scene_scatter_triangle_closest_hit"
+          ]
+        }
+      ]
+    },
+    "conclusions": [
+      "NVVM fast 0.316/0.314 ms versus prior 0.479/0.479: about 34% less time.",
+      "NVRTC fast 0.316/0.315 ms: effectively tied, no demonstrated NVVM win.",
+      "All 401 measured Falcor clock samples are 2040/6251 MHz/P0; observed, not locked.",
+      "Default images match pre-change baseline bit-for-bit; repeated images within each route/mode match.",
+      "Fast final RGB cross-route RMSE 0.00134990268, maximum 0.562518753, 6 pixels above 0.001; no output equivalence claim.",
+      "Reduced NVVM math 303\u219219 native sites, stack 32\u21920 bytes, registers 24\u219218, zero spills.",
+      "Prior matched Vulkan 0.264192 ms is historical, not rerun.",
+      "Compilation/pipeline caches uncontrolled; times are recorded observations, not cold-build ranking."
+    ],
+    "failure_history": [
+      {
+        "stage": "baseline-corrected",
+        "passed": 3,
+        "failed": 2,
+        "reason": "fast PTX lacks approximate operations"
+      },
+      {
+        "stage": "focused1",
+        "passed": 20,
+        "failed": 2,
+        "reason": "five-attribute approximate divide declaration not translated by legacy serializer"
+      },
+      {
+        "stage": "focused2",
+        "passed": 23,
+        "failed": 0
+      }
+    ],
+    "scope_boundary": "Pipeline configuration unchanged. Full OptiX SASS remains permission-blocked. Bounded request complete; no general loop restart.",
+    "raw_evidence": "build/nvvm-fast-math/",
+    "result_reference": "issue-nvvm-backend/RESULTS.md#nvvm-fast-mode-qualification"
   }
 }

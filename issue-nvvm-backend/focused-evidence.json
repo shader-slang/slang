@@ -95272,6 +95272,171 @@
         "shape": "Raw conventional-global numeric array without explicit stride can lose conventional storage provenance in element selection while Storage lowering keeps compact leaves.",
         "scope": "This direct-IR shape never selected the old decoder. No source-level regression demonstrated; normalized source paths are qualified. Separate bounded producer/provenance audit recommended, not a new fallback in this cleanup."
       }
+    },
+    "nvvm-fast-mode": {
+      "observed_on": "2026-10-04",
+      "status": "accepted",
+      "scope": "Explicit NVVM fast Float32 library math, sqrt and division with denormal policy; bounded numerical/code-generation and matched Falcor qualification. General OptiX pipeline configuration unchanged.",
+      "identity": {
+        "base_revision": "516b49d0cc294d0e028341800598744f25babfec",
+        "qualified_working_tree": true,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-compiler.cpp": "aa197770d470c55b2f394c298b6e3435025a931901b71e332bd6997a732513fd",
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "396fdd4bb34eef9424fa1e20765800a1300d7b35568f61705ba981cd4fdf9873",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "24c38bfb3d3de39defd234fd9d9f9897ef33438b6071273707237b8532035689",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "cb45c47eac473acf4fe84faa12b7aa4e09d4387bc3f6732844817d9f350ff973",
+          "source/slang/core.meta.slang": "f2624fd937a6bea9e043185094feb5f2eac28312fb0ef3dbf637e64630a859dc",
+          "source/slang/hlsl.meta.slang": "b7eb89bfb1964c6d2e12c066d2a450e87d6ed67175beda27398bcf5fc50071bd",
+          "source/slang/slang-compiler-options.cpp": "7e522985ec4c73e15b93a747117f993fff039c33f9b509a4f72776590d23f514",
+          "source/slang/slang-compiler-options.h": "33714a67c5ac384cb090dc1649aab7c2879374cb6bd1bbe7f690576cd7e1069e",
+          "source/slang/slang-emit-nvvm.cpp": "dd2b3c7f6f6277db3732f607865580491ebdbc52d99bf4bbebd73b3e0d270771",
+          "source/slang/slang-ir-insts-stable-names.lua": "4e20c070d6c6fd2ffdad0eece3014d199877693b231c407a13406a8ba8548bc7",
+          "source/slang/slang-ir-insts.lua": "ee902142526b7e444d7a217b916ce7119299b6c6efa10082f21b190deca948e5",
+          "source/slang/slang-ir-peephole.cpp": "ea01c70bdbcf38c480a55c1bddb79ad6f4443fcccfb451567a2702950856ae9f",
+          "source/slang/slang-ir.cpp": "fa7a206c0e9af42e82299fdb3ad7a3ff0e89b0172b0b3aa505b6c31710620444",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "ee56ce27f8601a75551a5b5cd806008774ef576c76ce7936e52ee0677abf06f5",
+          "tools/slang-unit-test/unit-test-nvvm-compiler.cpp": "bb5124d45b952244ef0c6269905ef5355609bb2d401afa8b690d113c20c00cfd",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "cccfcb1989586f0d4a734d52a26c20585e3b10dfce6b59401b734e7d25a8cb97",
+          "tests/cuda/nvvm-fast-math.slang": "8de799dfd03d3aea97620201487314017dd506eae079c8813611047e623403d7",
+          "tests/cuda/nvvm-fast-math-runtime.slang": "d8963aaa7975c566e9ed1657e23ed54fb977d4cd5f1e8d231c8ed392e3fbd8e2",
+          "tests/cuda/nvvm-fast-math-explicit.slang": "7eb693787f0d18ea278fe7f6eeba2e1467cffff67eae0a9efb3dc90ba0be21bf"
+        },
+        "artifact_sha256": {
+          "build/RelWithDebInfo/bin/slangc": "6df81f6b99eaa5343883e96a004b372b83c1dd050b0876c1ac9317937b7bfe2d",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4f4e3d4a7dd2f8d56d16c8c5f3c77dc6dc3c9367b88384760f4bf50ca81fdff4",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e3bc88ac3e71f4efa80439c6307603569652d26a41b984ed37292fd1bb407308",
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "c1da24f4882f2337ac4ffcdaaec176ff5f3ba335d8a2e40e437bcc2b39478063"
+        },
+        "loaded_libraries_sha256": {
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/lib/x86_64-linux-gnu/libnvoptix.so.595.71.05": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4f4e3d4a7dd2f8d56d16c8c5f3c77dc6dc3c9367b88384760f4bf50ca81fdff4",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libfalcor2.so": "a8867bd6f95450ad0664598810237d911c5dc0caa5f2fba30dcf66840f59a186",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/python/falcor2/falcor2_ext.cpython-312-x86_64-linux-gnu.so": "e9501b078fda32558f6dcdfe426efb292e0b6f0bb20596d9caca55085bc88fa7",
+          "/home/skallweit/codex/agent-sandbox/falcor2/.venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib/libnvrtc.so.12": "43731e24cd89e3749826304f304e8aa11fbecf1188715271b1f5018d6212b5e6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "16d6024c54cda9b6dbedc948baeee50ca2c00a4342ffa512c41aab1df570a9fc",
+          "/home/skallweit/codex/agent-sandbox/falcor2/build/linux-gcc/Release/libsgl.so": "5a6a58ea739ffd5f636d31cfc6717fcbae09c6577287da42292b21e87e74b76c",
+          "/home/skallweit/codex/agent-sandbox/falcor2/external/slangpy/slangpy/slangpy_ext.cpython-312-x86_64-linux-gnu.so": "32509aaae5a66683dc36cbd51c86bcf710715995a15efbfcba8bbba81e963044",
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+        },
+        "standard_module_sha256": {
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "482025008d64afb47452e04b8de8eec45f9f34b61a3cef8d559174f7925e37c1",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "a8a3e4116b59072012db1b36bf0f18fb603522317dcf19b82ad5421521cd2129",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "c4afc3629a848da38530c1a2c590af11b05242b317a65586142f7f9009358555",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "5664af8967d30af0161d246e84ff4b886c0d21ea7b93cd58fdc512d0cbb5c976",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "53d7c706133409157e252a7663f84181666a6edd5f7af5a25ffa541815bf01dc",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a497dbafb31c14f666a71a25ff9c12d82ea0bdb30879e11e8f06a010cd2fe19a",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "b0ceb63b64c3f4c321a210af19c40673fed8fbf13e1665e37c66758f1a19036a"
+        }
+      },
+      "policy": {
+        "selection": "Fast and Float32 denormal mode != Preserve",
+        "fast_library_functions": [
+          "sin",
+          "cos",
+          "tan",
+          "exp",
+          "log",
+          "log2",
+          "log10",
+          "pow"
+        ],
+        "sqrt": "__nv_sqrtf under permitted fast policy, ordinary llvm.sqrt otherwise",
+        "division": "canonical Float32 Div selects typed DIVIDE_APPROX_FTZ before capability validation/plan capture; scalar/vector 1–4 and broadcasting",
+        "denormals": "Fast+Any defaults FTZ; explicit Preserve/FTZ wins. Inherently flushing approximations disabled under Preserve.",
+        "unchanged_contracts": [
+          "default/precise paths",
+          "Double",
+          "Half promotion/narrowing composition",
+          "explicitly named user intrinsics"
+        ],
+        "implementation_boundaries": [
+          "pure target-linked policy query with stable ID 940",
+          "append-only value operation 84, unchanged function-table ABI",
+          "selected libdevice signatures remain authoritative",
+          "exact LLVM14 intrinsic attributes translated to legacy dialect",
+          "no blanket unsafe LLVM flags or PTX rewriting"
+        ]
+      },
+      "validation": {
+        "focused": {
+          "passed": 23,
+          "failed": 0,
+          "evidence": {
+            "path": "build/nvvm-fast-math/focused-final.log",
+            "sha256": "d45f7cb23070a229498df0953bc78942aa51dcb0987531b1803fc0aa39b212e5"
+          }
+        },
+        "nvvm_units": {
+          "passed": 574,
+          "failed": 0,
+          "evidence": {
+            "path": "build/nvvm-fast-math/units.log",
+            "sha256": "3f6ea6aa785165dcf3346368420602d77877a9c3d26c3477130b71b845289686"
+          },
+          "note": "Final unit-plugin rebuild only removes unrelated whitespace changes; final focused shared-target/provider checks pass again."
+        },
+        "static": {
+          "passed": 34,
+          "failed": 4,
+          "pre_existing_failures": [
+            "nvvmResourceEntriesRetainCheckedPackingAndQueries",
+            "nvvmResourceEntryFormatsRequireDeclaredOwners",
+            "nvvmAccelerationHandlesKeepOpaqueRoles",
+            "nvvmResourceHelperRolesPreserveStorageAndAccess"
+          ],
+          "baseline_comparison": "Exact same named failures and counts as the previous production-revert-qualified baseline.",
+          "evidence": {
+            "path": "build/nvvm-fast-math/static-tests.log",
+            "sha256": "88e2248adf92c509e3768f58d72bcf7ff5a0405c1c23a5cd4f1dfbc26471b9c5"
+          }
+        },
+        "smoke": {
+          "selected": 16,
+          "status": "passed",
+          "regressions": 0,
+          "evidence": {
+            "path": "build/nvvm-fast-math/smoke/selection.json",
+            "sha256": "c72475ec7208bc49b950e7385aef317080782ce4f9793f1211a808bf78947255"
+          }
+        },
+        "working": {
+          "selected": 1735,
+          "status": "passed",
+          "regressions": 0,
+          "evidence": {
+            "path": "build/nvvm-fast-math/working/selection.json",
+            "sha256": "a8db9603f08c734e25aaf371a0ba3edaa29d1d35a7d1c08e65dcefbaa7a48866"
+          }
+        }
+      },
+      "failure_history": [
+        {
+          "stage": "baseline-corrected",
+          "passed": 3,
+          "failed": 2,
+          "reason": "fast PTX lacks approximate operations"
+        },
+        {
+          "stage": "focused1",
+          "passed": 20,
+          "failed": 2,
+          "reason": "five-attribute approximate divide declaration not translated by legacy serializer"
+        },
+        {
+          "stage": "focused2",
+          "passed": 23,
+          "failed": 0
+        }
+      ],
+      "review": "Independent read-only implementation and evidence review; purity, nontrivial subnormal division and shared-target order regressions added. Final gates checked before local acceptance.",
+      "raw_evidence": "build/nvvm-fast-math",
+      "limitations": [
+        "Bounded domains and selected special cases, not full-domain accuracy certification.",
+        "Fast mode changes numerical output; sparse Falcor pixel outliers remain unqualified.",
+        "Full OptiX SASS/counters still permission-blocked; isolated compute native inspection only.",
+        "No pipeline changes; general development loop remains stopped."
+      ]
     }
   }
 }

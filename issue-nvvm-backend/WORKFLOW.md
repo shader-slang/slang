@@ -1,5 +1,14 @@
 # NVVM development workflow
 
+**Bounded NVVM fast-mode implementation complete (2026-10-04):** the maintainer authorized making
+fast mode effective and explicitly deferred pipeline configuration. Target-aware library selection,
+typed approximate Float32 division, sqrt and FTZ policy are implemented and numerically qualified.
+Matched Falcor NVVM fast improves about 34% to parity with NVRTC; no NVVM performance win beyond
+measurement variation is claimed. Default images are unchanged; fast image differences remain
+recorded. Focused/unit/static/smoke/working checks and independent reviews are accepted. This
+bounded request authorizes its reviewed local commit and does not restart the general loop or
+pipeline work. Current evidence lives in STATUS, RESULTS and the focused/application manifests.
+
 **Bounded performance isolation complete (2026-10-04):** the maintainer authorized causal
 investigation of the corrected Vulkan/CUDA gap. Graph specialization and fast-math policy are
 confirmed substantial leads, with reusable Falcor/portable controls and current evidence. No

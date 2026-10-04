@@ -601,7 +601,10 @@ SLANG_UNIT_TEST(nvvmCompilerEnforcesFloatingPointPolicy)
                 _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
             const Index expectedOptionCount =
                 2 + (mode == DownstreamCompileOptions::FloatingPointMode::Default ? 0 : 3) +
-                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Any ? 0 : 1);
+                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Any &&
+                         mode != DownstreamCompileOptions::FloatingPointMode::Fast
+                     ? 0
+                     : 1);
             SLANG_CHECK(gFakeNVVM.compileOptions.getCount() == expectedOptionCount);
             SLANG_CHECK(
                 _hasOption(gFakeNVVM.compileOptions, "-prec-div=1") ==
@@ -626,7 +629,9 @@ SLANG_UNIT_TEST(nvvmCompilerEnforcesFloatingPointPolicy)
                 (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Preserve));
             SLANG_CHECK(
                 _hasOption(gFakeNVVM.compileOptions, "-ftz=1") ==
-                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero));
+                (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::FlushToZero ||
+                 (denormalMode == DownstreamCompileOptions::FloatingPointDenormalMode::Any &&
+                  mode == DownstreamCompileOptions::FloatingPointMode::Fast)));
             SLANG_CHECK(gFakeNVVM.verifyOptions.getCount() == gFakeNVVM.compileOptions.getCount());
             for (Index i = 0; i < gFakeNVVM.compileOptions.getCount(); ++i)
                 SLANG_CHECK(gFakeNVVM.verifyOptions[i] == gFakeNVVM.compileOptions[i]);

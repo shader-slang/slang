@@ -8,6 +8,12 @@
 
 namespace Slang
 {
+bool CompilerOptionSet::isFloat32FastIntrinsicAllowed()
+{
+    return getFloatingPointMode() == FloatingPointMode::Fast &&
+           getDenormalModeFp32() != FloatingPointDenormalMode::Preserve;
+}
+
 void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* entries)
 {
     for (uint32_t i = 0; i < count; i++)

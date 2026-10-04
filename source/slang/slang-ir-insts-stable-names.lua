@@ -912,5 +912,6 @@ return {
 	["GetTensorViewSize"] = 936,
 	["GetTensorViewDimensionCount"] = 937,
 	["textureQuerySizeLevel"] = 938,
-	["textureQueryLevels"] = 939
+	["textureQueryLevels"] = 939,
+	["IsFloat32FastIntrinsicAllowed"] = 940
 }

@@ -486,6 +486,12 @@ void __requirePrelude(constexpr String preludeText);
 __intrinsic_op($(kIROp_RequireTargetExtension))
 void __requireTargetExtension(constexpr String preludeText);
 
+// Approximate Float32 intrinsics may flush subnormals independently of arithmetic options.
+// Explicit denormal preservation therefore takes precedence over fast intrinsic selection.
+[__readNone]
+__intrinsic_op($(kIROp_IsFloat32FastIntrinsicAllowed))
+bool __isFloat32FastIntrinsicAllowed();
+
 /// @experimetal
 /// Perform a compile-time condition check and emit a compile-time error if the condition is false.
 /// @param condition The compile-time condition to check.

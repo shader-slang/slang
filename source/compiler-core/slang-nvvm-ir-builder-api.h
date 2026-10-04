@@ -209,7 +209,9 @@ extern "C"
 // 82 is reserved (retired BF16 dot composition).
 /** Scalar fused multiply-add with one round-to-nearest-even BF16 result. */
 #define SLANG_NVVM_VALUE_OP_FMA ((SlangNVVMValueOperation)83u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 84u
+/** Approximate Float32 division, flushing input/output subnormals to signed zero. */
+#define SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ ((SlangNVVMValueOperation)84u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 85u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

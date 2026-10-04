@@ -9638,7 +9638,12 @@ T cos(T x)
         if (T is half)
             return __realCast<T>(cos(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_cosf", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_cosf", x;
+            else
+                __intrinsic_asm "__nv_cosf", x;
+        }
         else
             __intrinsic_asm "__nv_cos", x;
     case cpp: __intrinsic_asm "$P_cos($0)";
@@ -11024,7 +11029,12 @@ T exp(T x)
         if (T is half)
             return __realCast<T>(exp(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_expf", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_expf", x;
+            else
+                __intrinsic_asm "__nv_expf", x;
+        }
         else
             __intrinsic_asm "__nv_exp", x;
     case cpp: __intrinsic_asm "$P_exp($0)";
@@ -13131,7 +13141,12 @@ T log(T x)
         if (T is half)
             return __realCast<T>(log(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_logf", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_logf", x;
+            else
+                __intrinsic_asm "__nv_logf", x;
+        }
         else
             __intrinsic_asm "__nv_log", x;
     case cpp: __intrinsic_asm "$P_log($0)";
@@ -13198,7 +13213,12 @@ T log10(T x)
         if (T is half)
             return __realCast<T>(log10(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_log10f", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_log10f", x;
+            else
+                __intrinsic_asm "__nv_log10f", x;
+        }
         else
             __intrinsic_asm "__nv_log10", x;
     case hlsl: __intrinsic_asm "log10";
@@ -13275,7 +13295,12 @@ T log2(T x)
         if (T is half)
             return __realCast<T>(log2(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_log2f", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_log2f", x;
+            else
+                __intrinsic_asm "__nv_log2f", x;
+        }
         else
             __intrinsic_asm "__nv_log2", x;
     case cpp: __intrinsic_asm "$P_log2($0)";
@@ -14722,7 +14747,12 @@ T pow(T x, T y)
         if (T is half)
             return __realCast<T>(pow(__realCast<float>(x), __realCast<float>(y)));
         else if (T is float)
-            __intrinsic_asm "__nv_powf", x, y;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_powf", x, y;
+            else
+                __intrinsic_asm "__nv_powf", x, y;
+        }
         else
             __intrinsic_asm "__nv_pow", x, y;
     case cpp: __intrinsic_asm "$P_pow($0, $1)";
@@ -15579,7 +15609,12 @@ T sin(T x)
         if (T is half)
             return __realCast<T>(sin(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_sinf", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_sinf", x;
+            else
+                __intrinsic_asm "__nv_sinf", x;
+        }
         else
             __intrinsic_asm "__nv_sin", x;
     case cpp: __intrinsic_asm "$P_sin($0)";
@@ -15902,6 +15937,15 @@ T sqrt(T x)
         // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
         if (T is half)
             return __realCast<T>(sqrt(__realCast<float>(x)));
+        else if (T is float)
+        {
+            // libdevice honors the selected division/sqrt policy. The ordinary LLVM
+            // intrinsic retains round-to-nearest semantics without approximation flags.
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_sqrtf", x;
+            else
+                __intrinsic_asm "llvm.sqrt", x;
+        }
         else
             __intrinsic_asm "llvm.sqrt", x;
     case cpp: __intrinsic_asm "$P_sqrt($0)";
@@ -16024,7 +16068,12 @@ T tan(T x)
         if (T is half)
             return __realCast<T>(tan(__realCast<float>(x)));
         else if (T is float)
-            __intrinsic_asm "__nv_tanf", x;
+        {
+            if (__isFloat32FastIntrinsicAllowed())
+                __intrinsic_asm "__nv_fast_tanf", x;
+            else
+                __intrinsic_asm "__nv_tanf", x;
+        }
         else
             __intrinsic_asm "__nv_tan", x;
     case cpp: __intrinsic_asm "$P_tan($0)";

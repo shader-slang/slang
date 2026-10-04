@@ -470,6 +470,10 @@ SlangResult NVVMDownstreamCompiler::_calcCompileOptions(
     switch (options.denormalModeFp32)
     {
     case CompileOptions::FloatingPointDenormalMode::Any:
+        // Fast mode defaults to flushing, as on the CUDA-source route. An explicit
+        // preserve/flush request below still owns the denormal policy.
+        if (options.floatingPointMode == FloatingPointMode::Fast)
+            outCommandLine.addArg("-ftz=1");
         break;
     case CompileOptions::FloatingPointDenormalMode::Preserve:
         outCommandLine.addArg("-ftz=0");

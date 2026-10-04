@@ -376,7 +376,9 @@ inline bool resolveValueOperationFamily(
                           desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
                           desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
                           desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
-                          desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER))
+                          desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER ||
+                          (desc.operation == SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ &&
+                           desc.resultType.bitWidth == 32)))
     {
         outResolution = {
             ValueOperationFamily::FloatBinary,

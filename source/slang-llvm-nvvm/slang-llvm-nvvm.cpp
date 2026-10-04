@@ -3105,27 +3105,33 @@ static SlangResult _writeLegacyNVVMAssembly(
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
         else if (
-            intrinsicID == llvm::Intrinsic::sqrt || intrinsicID == llvm::Intrinsic::nvvm_f2h_rn ||
+            intrinsicID == llvm::Intrinsic::sqrt ||
+            intrinsicID == llvm::Intrinsic::nvvm_div_approx_ftz_f ||
+            intrinsicID == llvm::Intrinsic::nvvm_f2h_rn ||
             (_isHalfMathIntrinsic(intrinsicID) && intrinsicID != llvm::Intrinsic::trunc))
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::Type* resultType = function.getReturnType();
             const bool isHalfConversion = intrinsicID == llvm::Intrinsic::nvvm_f2h_rn;
             const bool isHalfMath = _isHalfMathIntrinsic(intrinsicID);
+            const bool isApproximateDivide = intrinsicID == llvm::Intrinsic::nvvm_div_approx_ftz_f;
             const bool hasSelectedResult =
-                isHalfConversion ? resultType->isIntegerTy(16)
-                : isHalfMath     ? resultType->isHalfTy()
-                                 : resultType->isFloatTy() || resultType->isDoubleTy();
+                isHalfConversion      ? resultType->isIntegerTy(16)
+                : isHalfMath          ? resultType->isHalfTy()
+                : isApproximateDivide ? resultType->isFloatTy()
+                                      : resultType->isFloatTy() || resultType->isDoubleTy();
             llvm::Type* operandType =
                 isHalfConversion ? llvm::Type::getFloatTy(state->context) : resultType;
             if (!function.isDeclaration() || !hasSelectedResult ||
-                function.arg_size() != (intrinsicID == llvm::Intrinsic::fma ? 3u : 1u) ||
-                functionAttributes.getNumAttributes() != 6 ||
+                function.arg_size() != (intrinsicID == llvm::Intrinsic::fma ? 3u
+                                        : isApproximateDivide               ? 2u
+                                                                            : 1u) ||
+                functionAttributes.getNumAttributes() != (isApproximateDivide ? 5u : 6u) ||
                 !function.hasFnAttribute(llvm::Attribute::NoFree) ||
                 !function.hasFnAttribute(llvm::Attribute::NoSync) ||
                 !function.hasFnAttribute(llvm::Attribute::NoUnwind) ||
                 !function.hasFnAttribute(llvm::Attribute::ReadNone) ||
-                !function.hasFnAttribute(llvm::Attribute::Speculatable) ||
+                function.hasFnAttribute(llvm::Attribute::Speculatable) == isApproximateDivide ||
                 !function.hasFnAttribute(llvm::Attribute::WillReturn))
             {
                 return SLANG_E_NOT_AVAILABLE;
@@ -3303,6 +3309,8 @@ static SlangResult _writeLegacyNVVMAssembly(
     const llvm::StringRef legacyFloatNegateMarker(" = fsub float -0.000000e+00, ");
     const llvm::StringRef llvm14SpecialRegisterAttributeMarker(
         " = { nofree nosync nounwind readnone speculatable willreturn }");
+    const llvm::StringRef llvm14ApproximateDivideAttributeMarker(
+        " = { nofree nosync nounwind readnone willreturn }");
     const llvm::StringRef llvm14ExecutionRegisterAttributeMarker(
         " = { nounwind readnone speculatable }");
     const llvm::StringRef legacySpecialRegisterAttributes(" = { nounwind readnone }");
@@ -3408,12 +3416,15 @@ static SlangResult _writeLegacyNVVMAssembly(
         else if (
             trimmedLine.startswith("attributes #") &&
             (line.endswith(llvm14SpecialRegisterAttributeMarker) ||
-             line.endswith(llvm14ExecutionRegisterAttributeMarker)))
+             line.endswith(llvm14ExecutionRegisterAttributeMarker) ||
+             line.endswith(llvm14ApproximateDivideAttributeMarker)))
         {
             const llvm::StringRef attributeMarker =
                 line.endswith(llvm14SpecialRegisterAttributeMarker)
                     ? llvm14SpecialRegisterAttributeMarker
-                    : llvm14ExecutionRegisterAttributeMarker;
+                : line.endswith(llvm14ExecutionRegisterAttributeMarker)
+                    ? llvm14ExecutionRegisterAttributeMarker
+                    : llvm14ApproximateDivideAttributeMarker;
             const llvm::StringRef prefix = line.drop_back(attributeMarker.size());
             outSerializedData.append(prefix.begin(), prefix.end());
             outSerializedData.append(
@@ -4195,6 +4206,9 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
         name != "__nv_tanhf" && name != "__nv_tanh" && name != "__nv_fmaf" && name != "__nv_fma" &&
         name != "__nv_fmodf" && name != "__nv_fmod" && name != "__nv_fabsf" &&
         name != "__nv_fabs" && name != "__nv_fminf" && name != "__nv_fmin" &&
+        name != "__nv_fast_sinf" && name != "__nv_fast_cosf" && name != "__nv_fast_tanf" &&
+        name != "__nv_fast_expf" && name != "__nv_fast_logf" && name != "__nv_fast_log2f" &&
+        name != "__nv_fast_log10f" && name != "__nv_fast_powf" && name != "__nv_sqrtf" &&
         name != "__nv_fmaxf" && name != "__nv_fmax" && name != "__nv_frexpf" &&
         name != "__nv_frexp" && name != "__nv_modff" && name != "__nv_modf")
         return nullptr;
@@ -4611,6 +4625,32 @@ static llvm::Value* _materializeBroadcastOperand(
     return _createNVVMVectorConstruct(state, vectorType, elements);
 }
 
+// Emits the exact approximate division selected by the semantic plan. LLVM's ordinary
+// fdiv keeps its full-range implementation even with libNVVM's -prec-div=0. The explicit
+// NVVM intrinsic expresses the narrower fast-mode contract without assuming no NaNs or Infs.
+static llvm::Value* _emitApproximateFloat32Divide(
+    ModuleState* state,
+    llvm::Value* left,
+    llvm::Value* right,
+    uint32_t laneCount)
+{
+    auto function = llvm::Intrinsic::getDeclaration(
+        state->module.get(),
+        llvm::Intrinsic::nvvm_div_approx_ftz_f);
+    if (laneCount == 1)
+        return state->builder.CreateCall(function, {left, right});
+    llvm::SmallVector<llvm::Value*, 4> elements;
+    for (uint32_t lane = 0; lane < laneCount; ++lane)
+        elements.push_back(state->builder.CreateCall(
+            function,
+            {state->builder.CreateExtractElement(left, lane),
+             state->builder.CreateExtractElement(right, lane)}));
+    return _createNVVMVectorConstruct(
+        state,
+        llvm::cast<llvm::FixedVectorType>(left->getType()),
+        elements);
+}
+
 static SlangResult _emitValueOperationFamily(
     SlangNVVMModuleHandle module,
     const SlangNVVMValueOperationDesc& operation,
@@ -4774,6 +4814,13 @@ static SlangResult _emitValueOperationFamily(
             break;
         case SLANG_NVVM_VALUE_OP_DIVIDE:
             result = state->builder.CreateFDiv(llvmOperands[0], llvmOperands[1]);
+            break;
+        case SLANG_NVVM_VALUE_OP_DIVIDE_APPROX_FTZ:
+            result = _emitApproximateFloat32Divide(
+                state,
+                llvmOperands[0],
+                llvmOperands[1],
+                operation.resultType.laneCount);
             break;
         case SLANG_NVVM_VALUE_OP_REMAINDER:
             result = state->builder.CreateFRem(llvmOperands[0], llvmOperands[1]);

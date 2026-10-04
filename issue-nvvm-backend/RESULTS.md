@@ -2417,3 +2417,88 @@ history is retained with the accepted evidence, not silently treated as successf
 the existing application manifest remains compile-only. The next bounded work should address NVVM
 fast-math policy and a safe RHI graph specialization contract. Payload liveness and hardware profiling
 remain useful follow-ups. This diagnosis does not restart the general implementation loop.
+
+## NVVM fast-mode qualification
+
+The explicit fast policy now selects approximate Float32 library math, division and square root.
+`-fp-mode fast` defaults to Float32 FTZ; explicit `-denorm-mode-fp32 preserve` retains ordinary
+implementations for operations whose approximate form inherently flushes. Default/precise paths,
+Double and explicitly named intrinsics retain their contracts. Half keeps existing promotion and
+narrowing. The [design](../docs/design/nvvm-backend.md) records target-query and semantic-plan ownership.
+
+Focused reproduction, with the existing Falcor/CUDA environment sourced:
+
+```sh
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/nvvm-fast-math tests/cuda/cuda-fp-mode-fast tests/cuda/fp-mode-precise-fmad \
+  tests/cuda/nvvm-core-math-composition slang-unit-test-tool/nvvmIRBuilderApproximateDivide \
+  slang-unit-test-tool/nvvmCompilerEnforcesFloatingPointPolicy slang-unit-test-tool/nvvmSlangFastMathQuery
+```
+
+All **23/23** pass. Five PTX policies distinguish fast/default/precise/preserve/explicit FTZ.
+Five GPU lanes exercise O0/O3, small-angle/positive-domain accuracy, scalar/vector division,
+Half promotion, Double, transported subnormal bits, signed zero and selected NaN/Inf/domain cases.
+A real-provider unit rejects unsupported approximate-division shapes. Another compiles one module
+for three target policies in both orders, proving the query remains target-specific. Explicit
+named ordinary sine/sqrt remain ordinary even under fast mode. Full NVVM units pass **574/574**.
+These are bounded numerical checks; they do not establish full-domain approximation accuracy.
+
+The corrected baseline was **3 pass / 2 fail**, with fast PTX missing approximations. The first
+integrated run was **20 pass / 2 fail**: LLVM14's non-Speculatable approximate-division declaration
+was recognized semantically but its five-attribute set lacked a legacy-dialect textual rewrite.
+The narrow translation fixes both failures. Initial flag-spelling/build-target/stable-ID mistakes
+are retained in raw logs and excluded from acceptance. Raw experiments also show plain fdiv stays
+`div.full` under `-prec-div=0`, even with LLVM fast flags; plain llvm.sqrt stays RN without
+approximation flags. Forwarding switches alone was insufficient.
+
+Matched Falcor runs use the existing lit 512×512 DamagedHelmet scene, six-bounce tracer, NEE,
+trace-ray visibility with late placement and **unchanged general OptiX graph configuration**.
+Two rotated rounds per backend/mode measure 1,000 iterations after at least three seconds and
+300 warmup dispatches. All eight processes exit 0. Every measured Falcor clock sample is P0,
+2,040 MHz SM and 6,251 MHz memory; clocks were observed, not locked. No dump/profiler is active
+while timing; loaded-library identities and all per-iteration samples are retained.
+
+| Backend | Default, ms/iteration (two runs) | Fast, ms/iteration (two runs) |
+| --- | --- | --- |
+| NVRTC | 0.701 / 0.701 | 0.316 / 0.315 |
+| NVVM | 0.677 / 0.680 | 0.316 / 0.314 |
+
+NVVM fast improves from the accepted pre-change **0.479 / 0.479 ms** to **0.316 / 0.314 ms**,
+about **34% less time (1.52× throughput)**. The two fast routes are effectively tied; the sub-percent
+median difference does not establish that NVVM is faster. The prior matched Vulkan control remains
+**0.264192 ms** (not rerun in this slice), the new CUDA time is about 19% above that historical
+control. Pipeline optimization is deliberately deferred.
+
+Second-round path-tracer compile times are **2.312 s NVRTC / 3.469 s NVVM** in fast mode, versus
+**2.450 s / 4.162 s** default. These are Slang-plus-downstream shader compilation reports, excluding
+pipeline creation. First-round times differ substantially (NVRTC fast 4.740 s, default 5.240 s;
+NVVM fast 3.529 s, default 4.121 s), and pipeline creation ranges from about 0.02 to 3.92 s.
+Driver caches are uncontrolled, so these observations are not a cold-compilation ranking.
+
+Both rounds produce bit-identical first/final images within each route/mode. Current default images
+are bit-identical to the previous default baseline on both routes. New fast NVVM versus fast NVRTC
+has first/final RGB RMSE **0.00236758 / 0.00134990**, maximum error **1.00000012 / 0.56251875**,
+and **10 / 6** of 262,144 pixels above absolute error 0.001. New fast versus default NVVM has
+RMSE **0.00854155 / 0.00705363**, with **158 / 129** pixels above 0.001. All outputs are finite;
+fast math changes numerical behavior and the sparse cross-backend outliers remain unqualified.
+
+Separate code capture confirms the intended lowering. In the portable sincos/log/pow shader,
+NVVM goes from **303 to 19 native instruction sites** (excluding NOPs), matching NVRTC fast's 19.
+Its **32-byte stack frame becomes zero**, registers go **24→18**, and both routes have zero spills.
+Default code still has 303 NVVM / 271 NVRTC sites. The million-element positive-domain reference
+oracle passes (fast NVVM maximum absolute error 7.052e-7). Portable timings are 0.019 ms on both fast
+routes; the 0.024/0.025 ms default runs used lower observed SM clocks and are below 0.1 ms, so no
+performance ratio is accepted for that control.
+
+Actual Falcor closest-hit fast PTX has 17 sin, 17 cos, 123 approximate sqrt, 10 lg2 and 19 ex2
+sites on each route; approximate division sites are 489 NVVM / 492 NVRTC. Both retain four full
+FTZ divisions inside ordinary helpers. The previously observed large-angle reduction constant
+has no occurrences in either fast capture. This is PTX and isolated compute SASS evidence;
+full OptiX SASS remains unavailable because of the earlier counter-permission restriction.
+
+Raw evidence is under `build/nvvm-fast-math/`: build/focused/unit logs, `summary.json`, eight Falcor
+JSON/image/identity sets, portable oracle runs, PTX/cubins/SASS and separate `capture-fast-*`
+directories. Exact retained metrics and failure transitions are in the focused/application manifests.
+Final qualification: rebuilt static **34 pass / the same four known failures**, smoke **16/16**,
+and working **1,735/1,735**, with zero working regressions or changed inputs. Independent
+implementation and evidence review accepted the bounded change.

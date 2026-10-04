@@ -15264,3 +15264,91 @@ SLANG_UNIT_TEST(nvvmSlangMipQueriesRejectInvalidStagesAndRoles)
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
 }
+
+// A shared source module must retain the query until each target's linked IR is optimized.
+// Compile targets in both orders so the first target cannot determine another target's policy.
+SLANG_UNIT_TEST(nvvmSlangFastMathQueryUsesEachTargetsPolicy)
+{
+    NVVMIRBuilder realBuilder;
+    _requireRealNVVMBuilder(unitTestContext, realBuilder);
+    for (bool reverse : {false, true})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        slang::CompilerOptionEntry options[3][4] = {};
+        slang::TargetDesc targets[3] = {};
+        for (int i = 0; i < 3; ++i)
+        {
+            options[i][0].name = slang::CompilerOptionName::EmitCUDAMethod;
+            options[i][0].value.intValue0 = SLANG_EMIT_CUDA_VIA_NVVM;
+            options[i][1].name = slang::CompilerOptionName::Capability;
+            options[i][1].value.intValue0 = globalSession->findCapability("cuda_sm_8_0");
+            options[i][2].name = slang::CompilerOptionName::FloatingPointMode;
+            options[i][2].value.intValue0 =
+                i == 1 ? SLANG_FLOATING_POINT_MODE_PRECISE : SLANG_FLOATING_POINT_MODE_FAST;
+            options[i][3].name = slang::CompilerOptionName::DenormalModeFp32;
+            options[i][3].value.intValue0 =
+                i == 2 ? SLANG_FP_DENORM_MODE_PRESERVE : SLANG_FP_DENORM_MODE_ANY;
+            for (auto& option : options[i])
+                option.value.kind = slang::CompilerOptionValueKind::Int;
+            targets[i].format = SLANG_PTX;
+            targets[i].compilerOptionEntries = options[i];
+            targets[i].compilerOptionEntryCount = SLANG_COUNT_OF(options[i]);
+        }
+        slang::SessionDesc desc = {};
+        desc.targets = targets;
+        desc.targetCount = SLANG_COUNT_OF(targets);
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+            "fastMathPolicy",
+            "fast-math-policy.slang",
+            R"SLANG(
+                RWStructuredBuffer<uint> outputBuffer;
+                [numthreads(1,1,1)] void computeMain()
+                {
+                    outputBuffer[0] = __isFloat32FastIntrinsicAllowed() ? 123u : 456u;
+                }
+            )SLANG",
+            diagnostics.writeRef()));
+        SLANG_CHECK_ABORT(module);
+        ComPtr<slang::IEntryPoint> entryPoint;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnostics.writeRef())));
+        slang::IComponentType* components[] = {module.get(), entryPoint.get()};
+        ComPtr<slang::IComponentType> program, linked;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            program.writeRef(),
+            diagnostics.writeRef())));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(program->link(linked.writeRef(), diagnostics.writeRef())));
+        for (int step = 0; step < 3; ++step)
+        {
+            const int targetIndex = reverse ? 2 - step : step;
+            gFakeNVVM.resetCalls();
+            ComPtr<slang::IBlob> code;
+            const auto result =
+                linked->getEntryPointCode(0, targetIndex, code.writeRef(), diagnostics.writeRef());
+            if (SLANG_FAILED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code);
+            SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.addedModule.contains(
+                targetIndex == 0 ? "store i32 123," : "store i32 456,"));
+            SLANG_CHECK(!gFakeNVVM.addedModule.contains(
+                targetIndex == 0 ? "store i32 456," : "store i32 123,"));
+        }
+    }
+}

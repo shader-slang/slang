@@ -690,6 +690,20 @@ runtime-loaded integer `mad` results across signed/unsigned widths, scalar Half/
 Half `sincos` are new support. These focused checks establish routing and composition, without
 claiming a new per-operation numerical qualification. Current acceptance remains owned by STATUS.
 
+Explicit fast mode now selects the Float32 fast sin/cos/tan/exp/log/log2/log10/pow library
+functions, libdevice-controlled square root and typed approximate FTZ division. Default and
+precise paths remain unchanged; explicit Float32 denormal preservation disables these inherently
+flushing approximations. Half math retains its existing promotion/narrowing, and Double remains
+ordinary math. The [PTX checks](../../tests/cuda/nvvm-fast-math.slang) distinguish five policy
+combinations; the [runtime oracle](../../tests/cuda/nvvm-fast-math-runtime.slang) checks small-angle
+and positive-domain accuracy, vector broadcasts, Half/Double, subnormals, signed zero and selected
+NaN/infinity/domain cases at O0/O3. [Explicit named intrinsics](../../tests/cuda/nvvm-fast-math-explicit.slang)
+retain their meaning. Provider rejection and shared-module, multi-target compilation have unit
+coverage. This is bounded fast-mode qualification, not full-domain accuracy or cross-backend
+bit equivalence; ordinary math's existing accuracy evidence does not extend to fast mode.
+See the [policy design](nvvm-backend.md#numerical-and-target-specific-boundaries) and
+[accepted evidence](../../issue-nvvm-backend/RESULTS.md#nvvm-fast-mode-qualification).
+
 Public Half bit transport, packed `f16tof32`/`f32tof16`, double word conversion and
 `isfinite`/`isinf`/`isnan` use core expressions. Numeric NaN operation 67 is reserved; seven old
 transport spellings and nine width-specific classification shapes reject before provider mutation.
