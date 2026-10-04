@@ -1175,7 +1175,7 @@ void RenderTestApp::_initializeRenderPass()
 
 void RenderTestApp::_initializeAccelerationStructure()
 {
-    if (!m_device->hasFeature("ray-tracing"))
+    if (!m_device->hasFeature("ray-tracing") && !m_device->hasFeature("ray-query"))
         return;
     BufferDesc vertexBufferDesc = {};
     vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
