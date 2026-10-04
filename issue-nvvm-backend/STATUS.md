@@ -1,12 +1,20 @@
 # NVVM current status
 
-**Falcor Vulkan comparison and code inspection (2026-10-04):** on the same lit 512×512
-DamagedHelmet/L4 workload, 150 iterations per mode give median GPU times **0.7235 ms NVRTC**,
-**0.7010 ms NVVM**, **1.7961 ms Vulkan default**, and **2.0234 ms Vulkan trace-ray control**.
-NVVM is **2.56× faster than default Vulkan in this case**. Vulkan default uses ray-query/early
-visibility; the control matches CUDA's trace-ray/late configuration. Float4 output formats match, while
-the existing helper's debug-info setting differs by API. All 12 timing runs pass; sparse image
-differences remain unqualified. See [exact evidence](RESULTS.md#falcor-vulkan-comparison-and-nvvm-code-inspection).
+**Falcor Vulkan timing correction (2026-10-04):** the earlier short benchmark did not warm
+Vulkan GPU clocks sufficiently. With at least three seconds of rendering before measurement,
+two runs of 1,000 iterations per mode give **0.724 ms NVRTC**, **0.697 ms NVVM**,
+**0.2007 ms Vulkan default**, and **0.2657 ms Vulkan trace-ray control** on the same lit
+512×512 DamagedHelmet/L4 workload. Vulkan is **3.47× faster than NVVM** by default and
+**2.62× faster** with CUDA's trace-ray/late visibility settings. All sampled measured clocks
+are P0, 2,040 MHz SM / 6,251 MHz memory; clocks were observed, not locked. All eight runs exit 0,
+with unchanged binaries/settings and bit-identical first images against the previous run.
+
+L4 has 58 third-generation RT cores. The actual Vulkan device exposes hardware ray tracing and
+ray queries through NVIDIA's driver; RHI dispatches `vkCmdTraceRaysKHR`, with no emulation fallback.
+The previous 1.7961/2.0234 ms Vulkan observations are retained as warmup-confounded results and
+must not be used as the steady-state comparison. Debug/RHI validation remains enabled in the
+corrected runs. Sparse image differences remain unqualified. See
+[exact evidence](RESULTS.md#falcor-vulkan-comparison-and-nvvm-code-inspection).
 
 The strongest generated-code lead is split NVVM `sincos`: closest-hit PTX has 34 large-angle
 range-reduction sequences versus 21 on NVRTC. An isolated SM89 shader confirms **32-byte versus

@@ -2124,6 +2124,58 @@ has the four unchanged baseline failures documented above; the full Falcor suite
 
 ### Falcor Vulkan comparison and NVVM code inspection
 
+**Correction after the hardware/clock audit:** the original ten-iteration warmup below was
+insufficient for Vulkan. A 300-iteration diagnostic reproduced 1.7930 ms for iterations 0–49,
+then approximately 1.33 ms for the next 100, and 0.2068 ms for the last 150. NVML observed
+P8 at 210–285 MHz graphics/SM and 405 MHz memory before P0 at 2,040/6,251 MHz; CUDA was
+already at P0. These coarse samples establish a clock-ramp confounder, not per-iteration
+clock attribution. The original headline that NVVM outperforms Vulkan is withdrawn.
+
+The corrected comparison uses at least **three seconds and 300 warmup iterations**, then
+**1,000 measured iterations per process**, with two rotated cycles of all four modes.
+Warmup and measurement both submit and wait per iteration; the timed region remains the
+same GPU timestamp bracket. No compiler/runtime, shader setting, driver permission or clock
+setting was changed. All eight processes exit 0. Every measured clock sample reports P0,
+2,040 MHz graphics/SM and 6,251 MHz memory (233 samples total).
+
+| Mode | Corrected median GPU iteration | p10–p90 | Two run medians |
+| --- | ---: | ---: | ---: |
+| CUDA NVRTC | 0.7240 ms | 0.7120–0.7370 ms | 0.7240 / 0.7230 ms |
+| CUDA NVVM | 0.6970 ms | 0.6829–0.7130 ms | 0.7020 / 0.6920 ms |
+| Vulkan default | 0.2007 ms | 0.1987–0.2028 ms | 0.2007 / 0.1997 ms |
+| Vulkan trace-ray control | 0.2657 ms | 0.2611–0.2714 ms | 0.2652 / 0.2662 ms |
+
+Thus Vulkan is **3.47× faster than NVVM** with default visibility and **2.62× faster** with
+CUDA's trace-ray/late visibility settings for this workload. This is the current performance
+baseline; the old exact timings/compilation observations below remain historical evidence.
+Settings and loaded binary hashes match the original comparison. First images are bit-identical
+to their previous counterparts; first and iteration-999 images repeat exactly within each mode
+and are finite/nonzero. Cross-backend differences remain unqualified: iteration-999 Vulkan/NVVM
+RGB RMSE 0.007132, maximum difference 0.98103, 148 pixels above 0.001; NVRTC/NVVM RMSE 0.001162,
+maximum 0.50267, five pixels above 0.001. This does not establish image equivalence.
+
+The GPU is an NVIDIA L4 with **58 third-generation RT cores**, per NVIDIA's
+[Ada architecture specification](https://images.nvidia.com/aem-dam/Solutions/Data-Center/l4/nvidia-ada-gpu-architecture-whitepaper-V2.02.pdf).
+Runtime Vulkan features include `hardware_device`, `acceleration_structure`, `ray_tracing` and
+`ray_query`. Loaded libraries identify NVIDIA's proprietary Vulkan driver, and
+slang-rhi's `src/vulkan/vk-command.cpp` dispatches `vkCmdTraceRaysKHR`. No software-emulation
+fallback was found. This verifies the native route, not measured RT-core utilization counters.
+
+Debug/RHI validation stays enabled in all accepted runs; GPU-assisted/RT validation stays off.
+An exploratory validation-disabled run also dropped from 1.789 ms to about 0.207 ms but aborted
+at RHI task-pool teardown after writing results. It is retained as a failed diagnostic and
+excluded from accepted timing evidence. Enabled validation is compatible with the fast Vulkan
+result, so disabling validation is not needed to explain the reversal.
+
+Raw audit evidence is under `build/nvvm-falcor-vulkan-audit/`; `summary.json` records all 8,000
+samples' statistics, observed clocks, run metadata and image checks. Replay from Falcor with the
+existing environment and `benchmark.py --api vulkan --iterations 1000 --output <distinct-path>`;
+add `--visibility trace` for the control, or use `--api cuda` with the existing NVRTC/NVVM route
+environment variables. The harness defaults to the corrected warmup. Continue observing clocks
+when changing workloads; a fixed iteration count alone is not a steady-state criterion.
+
+#### Original short-warmup observations (superseded for steady-state performance)
+
 On 2026-10-04 the accepted lit 512×512 DamagedHelmet case was replayed in four modes, with
 three rotated cycles and 50 measured iterations after 10 warmups per process. No compiler/runtime
 implementation changes were made. All 12 timing runs exit successfully; actual loaded artifacts,
@@ -2136,8 +2188,8 @@ settings, float images and all 600 GPU measurements are retained under `build/nv
 | Vulkan default | 1.7961 ms | 1.779–1.821 ms | 2.115 s | 2.784 s |
 | Vulkan trace-ray control | 2.0234 ms | 1.986–2.085 ms | 2.055 s | 2.777 s |
 
-NVVM is **2.56× faster than default Vulkan** in this case, and **2.89× faster** than the Vulkan
-control. This does not establish a general backend ranking. Vulkan's default visibility uses inline
+Those short runs suggested NVVM was **2.56× faster than default Vulkan** and **2.89× faster**
+than the control; the clock audit above invalidates that steady-state interpretation. Vulkan's default visibility uses inline
 ray queries placed early; CUDA uses nested trace rays placed late. The control explicitly sets
 Vulkan to trace-ray/late, matching CUDA's constants and recursion depth 2. All use simple scheduling,
 max depth 6, RR depth 3, white ConstantLight, the same camera/seeds and float4 Tensor output.

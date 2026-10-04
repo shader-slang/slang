@@ -1850,7 +1850,8 @@
       "vulkan_trace_control": "Add --visibility trace, with distinct output/identity paths.",
       "cuda": "Use --api cuda and SLANGPY_DEVICE=cuda; select SLANGPY_TEST_CUDA_COMPILER=nvrtc|nvvm.",
       "cycles": "[nvrtc,nvvm,vulkan-default,vulkan-trace], [vulkan-default,vulkan-trace,nvvm,nvrtc], [nvvm,vulkan-default,nvrtc,vulkan-trace], all serial."
-    }
+    },
+    "status": "Superseded for steady-state performance: insufficient Vulkan clock warmup. Exact original measurements retained; use vulkan_clock_audit for current GPU timing."
   },
   "code_generation_review": {
     "scope": "Actual Falcor stage PTX plus isolated SM89 sincos native code; no full OptiX SASS or hardware-counter claim.",
@@ -2081,5 +2082,243 @@
       "https://docs.nvidia.com/nsight-compute/ReleaseNotes/topics/library-support-optix.html"
     ],
     "review": "Independent code and evidence review approved; standalone SASS distinction and full OptiX profiling-permission block retained."
+  },
+  "vulkan_clock_audit": {
+    "warmup_min_seconds": 3.0,
+    "warmup_min_iterations": 300,
+    "iterations_per_run": 1000,
+    "cycles": 2,
+    "modes": {
+      "nvrtc": {
+        "median_gpu_ms": 0.7239999999981706,
+        "p10_gpu_ms": 0.7120000000000459,
+        "p90_gpu_ms": 0.7369999999990995,
+        "samples": 2000,
+        "runs": [
+          {
+            "file": "warm-1-nvrtc.json",
+            "median_gpu_ms": 0.7239999999999469,
+            "warmup_iterations": 3346,
+            "warmup_seconds": 3.0007080049836077
+          },
+          {
+            "file": "warm-2-nvrtc.json",
+            "median_gpu_ms": 0.7230000000006953,
+            "warmup_iterations": 3324,
+            "warmup_seconds": 3.0003029410145245
+          }
+        ],
+        "clock_samples": [
+          {
+            "graphics_mhz": 2040,
+            "sm_mhz": 2040,
+            "memory_mhz": 6251,
+            "pstate": 0,
+            "samples": 78
+          }
+        ]
+      },
+      "nvvm": {
+        "median_gpu_ms": 0.6969999999988374,
+        "p10_gpu_ms": 0.6828999999989094,
+        "p90_gpu_ms": 0.7130000000010739,
+        "samples": 2000,
+        "runs": [
+          {
+            "file": "warm-1-nvvm.json",
+            "median_gpu_ms": 0.7020000000004245,
+            "warmup_iterations": 3429,
+            "warmup_seconds": 3.000662362028379
+          },
+          {
+            "file": "warm-2-nvvm.json",
+            "median_gpu_ms": 0.6920000000008031,
+            "warmup_iterations": 3463,
+            "warmup_seconds": 3.000070891052019
+          }
+        ],
+        "clock_samples": [
+          {
+            "graphics_mhz": 2040,
+            "sm_mhz": 2040,
+            "memory_mhz": 6251,
+            "pstate": 0,
+            "samples": 73
+          }
+        ]
+      },
+      "vulkan-default": {
+        "median_gpu_ms": 0.20070397295057774,
+        "p10_gpu_ms": 0.1986559946089983,
+        "p90_gpu_ms": 0.2027520094998181,
+        "samples": 2000,
+        "runs": [
+          {
+            "file": "warm-1-vulkan-default.json",
+            "median_gpu_ms": 0.20070397295057774,
+            "warmup_iterations": 6067,
+            "warmup_seconds": 3.0001056409673765
+          },
+          {
+            "file": "warm-2-vulkan-default.json",
+            "median_gpu_ms": 0.19968004198744893,
+            "warmup_iterations": 6072,
+            "warmup_seconds": 3.00035275000846
+          }
+        ],
+        "clock_samples": [
+          {
+            "graphics_mhz": 2040,
+            "sm_mhz": 2040,
+            "memory_mhz": 6251,
+            "pstate": 0,
+            "samples": 39
+          }
+        ]
+      },
+      "vulkan-trace": {
+        "median_gpu_ms": 0.2657280128914863,
+        "p10_gpu_ms": 0.2611200325191021,
+        "p90_gpu_ms": 0.2713599824346602,
+        "samples": 2000,
+        "runs": [
+          {
+            "file": "warm-1-vulkan-trace.json",
+            "median_gpu_ms": 0.2652160474099219,
+            "warmup_iterations": 5246,
+            "warmup_seconds": 3.0005055619985797
+          },
+          {
+            "file": "warm-2-vulkan-trace.json",
+            "median_gpu_ms": 0.2662399783730507,
+            "warmup_iterations": 5169,
+            "warmup_seconds": 3.000148924009409
+          }
+        ],
+        "clock_samples": [
+          {
+            "graphics_mhz": 2040,
+            "sm_mhz": 2040,
+            "memory_mhz": 6251,
+            "pstate": 0,
+            "samples": 43
+          }
+        ]
+      }
+    },
+    "images": [
+      {
+        "mode": "nvrtc",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.0009041507331576603,
+        "rgb_max_abs_against_nvvm": 0.3475896120071411,
+        "pixels_above_0_001": 6,
+        "matches_previous_first_image": true
+      },
+      {
+        "mode": "nvrtc",
+        "frame": "last",
+        "iteration": 999,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.0011616964805102768,
+        "rgb_max_abs_against_nvvm": 0.5026735663414001,
+        "pixels_above_0_001": 5
+      },
+      {
+        "mode": "nvvm",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.0,
+        "rgb_max_abs_against_nvvm": 0.0,
+        "pixels_above_0_001": 0,
+        "matches_previous_first_image": true
+      },
+      {
+        "mode": "nvvm",
+        "frame": "last",
+        "iteration": 999,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.0,
+        "rgb_max_abs_against_nvvm": 0.0,
+        "pixels_above_0_001": 0
+      },
+      {
+        "mode": "vulkan-default",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.009102027306357289,
+        "rgb_max_abs_against_nvvm": 1.0,
+        "pixels_above_0_001": 188,
+        "matches_previous_first_image": true
+      },
+      {
+        "mode": "vulkan-default",
+        "frame": "last",
+        "iteration": 999,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.0071316789983311285,
+        "rgb_max_abs_against_nvvm": 0.9810331463813782,
+        "pixels_above_0_001": 148
+      },
+      {
+        "mode": "vulkan-trace",
+        "frame": "first",
+        "iteration": 0,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.009102027306357442,
+        "rgb_max_abs_against_nvvm": 1.0,
+        "pixels_above_0_001": 188,
+        "matches_previous_first_image": true
+      },
+      {
+        "mode": "vulkan-trace",
+        "frame": "last",
+        "iteration": 999,
+        "finite_nonzero": true,
+        "repeat_bit_identical": true,
+        "rgb_rmse_against_nvvm": 0.007131678998331064,
+        "rgb_max_abs_against_nvvm": 0.9810331463813782,
+        "pixels_above_0_001": 148
+      }
+    ],
+    "raw_evidence": "build/nvvm-falcor-vulkan-audit/",
+    "nvvm_time_over_vulkan_default": 3.472776297111318,
+    "nvvm_time_over_vulkan_trace": 2.6229827725519743,
+    "harness_sha256": "6f2282550aa42acef5c8a39bcf850ed81d2405fdfd2d9d6ad86db3a7370cc673",
+    "status": "Current sustained-render baseline; eight successful serial runs, observed full clocks, unchanged binaries/settings.",
+    "hardware": "NVIDIA L4, 58 third-generation RT cores; native NVIDIA Vulkan ray-tracing pipeline and ray-query features.",
+    "order": [
+      [
+        "nvvm",
+        "vulkan-default",
+        "nvrtc",
+        "vulkan-trace"
+      ],
+      [
+        "vulkan-default",
+        "nvvm",
+        "vulkan-trace",
+        "nvrtc"
+      ]
+    ],
+    "limitations": [
+      "One scene/configuration; sparse cross-backend image differences remain unqualified.",
+      "Clocks observed through coarse NVML sampling, not locked; no per-iteration clock attribution.",
+      "Same debug/RHI validation and API-dependent Slang debug-info settings as original comparison.",
+      "Validation-disabled exploratory run aborted at task-pool teardown after writing outputs; excluded from accepted timing results."
+    ],
+    "replay": "From ../falcor2, source ../slang/build/nvvm-falcor2/environment.sh; select SLANGPY_DEVICE=cuda|vulkan and SLANGPY_TEST_CUDA_COMPILER=nvrtc|nvvm, then .venv/bin/python ../slang/build/nvvm-falcor-vulkan-audit/benchmark.py --api cuda|vulkan --iterations 1000 --output <distinct-path>. Add --visibility trace for Vulkan control; set distinct FALCOR_IDENTITY_REPORT.",
+    "review": "Independent review approved: all 8000 timings, 233 clock records, eight identities/current binary hashes, repeat images, unchanged first images, harness hash, medians and ratios verified."
   }
 }

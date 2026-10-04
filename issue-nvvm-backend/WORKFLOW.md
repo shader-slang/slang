@@ -1,5 +1,11 @@
 # NVVM development workflow
 
+**Bounded Vulkan hardware/clock audit (2026-10-04):** L4 native hardware ray tracing is verified.
+The prior short Vulkan timing was confounded by GPU clock ramp-up. Sustained warmup reverses
+the result: Vulkan default/control are 0.2007/0.2657 ms versus NVVM 0.697 ms. Current evidence
+records the correction and preserves the old observations with their limitation. No production
+code or driver settings changed; this finite audit does not resume the general loop.
+
 **Bounded Vulkan comparison/code inspection (2026-10-04):** the maintainer requested matched
 Vulkan timings and review of generated NVVM PTX/SASS. The four-mode comparison and PTX/isolated
 SASS inspection are complete and reviewed; full OptiX native-code profiling is blocked by GPU
