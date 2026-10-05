@@ -383,6 +383,83 @@ void validateCodeBody(IRValidateContext* context, IRGlobalValueWithCode* code)
     }
 }
 
+// Check declaration-scope contracts, guarding operand counts before reading fixed positions.
+static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
+{
+    IRInst* scope = nullptr;
+    switch (inst->getOp())
+    {
+    case kIROp_DebugLexicalBlock:
+        {
+            bool validCount = inst->getOperandCount() == 4;
+            validate(context, validCount, inst, "invalid debug declaration operand count");
+            if (!validCount)
+                return;
+            scope = inst->getOperand(3);
+            break;
+        }
+    case kIROp_DebugVar:
+    case kIROp_DebugInlinedAt:
+        {
+            auto count = inst->getOperandCount();
+            bool validCount = count == 4 || count == 5;
+            validate(context, validCount, inst, "invalid debug declaration operand count");
+            if (!validCount)
+                return;
+            scope = inst->getOperand(3);
+            break;
+        }
+    case kIROp_DebugScope:
+        validate(
+            context,
+            inst->getOperandCount() == 1 || inst->getOperandCount() == 2,
+            inst,
+            "invalid DebugScope operand count");
+        if (!inst->getOperandCount())
+            return;
+        scope = inst->getOperand(0);
+        break;
+    case kIROp_DebugLocationDecoration:
+        if (inst->getOperandCount() == 4)
+            scope = inst->getOperand(3);
+        else
+            return;
+        break;
+    default:
+        return;
+    }
+    validate(
+        context,
+        as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope),
+        inst,
+        "debug scope must be a function or lexical block");
+    if (as<IRDebugLexicalBlock>(inst))
+    {
+        validate(
+            context,
+            as<IRDebugSource>(inst->getOperand(0)) && as<IRIntLit>(inst->getOperand(1)) &&
+                as<IRIntLit>(inst->getOperand(2)),
+            inst,
+            "lexical block requires source, line and column");
+        HashSet<IRInst*> parents;
+        parents.add(inst);
+        while (auto block = as<IRDebugLexicalBlock>(scope))
+        {
+            if (!parents.add(block) || block->getOperandCount() != 4)
+            {
+                validate(context, false, inst, "invalid lexical parent chain");
+                return;
+            }
+            scope = block->getParentScope();
+        }
+        validate(
+            context,
+            as<IRDebugFunction>(scope),
+            inst,
+            "lexical parent chain must end at a function");
+    }
+}
+
 void validateIRInst(IRValidateContext* context, IRInst* inst)
 {
     // Validate that any operands of the instruction are used appropriately
@@ -401,6 +478,8 @@ void validateIRInst(IRValidateContext* context, IRInst* inst)
 
     if (as<IRGlobalValueWithCode>(inst))
         context->domTree = nullptr;
+
+    validateDebugScopeOperands(context, inst);
 }
 
 void validateIRInst(IRInst* inst)

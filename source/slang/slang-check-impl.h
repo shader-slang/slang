@@ -988,6 +988,20 @@ struct SharedSemanticsContext : public RefObject
     List<ModuleDecl*> importedModulesList;
     HashSet<ModuleDecl*> importedModulesSet;
 
+    /// Declaration roots synthesized and published during this semantic-checking session.
+    ///
+    /// Some synthesized declarations deliberately stay out of their parent's member list so that
+    /// ordinary lookup cannot find them. Others can be added after the module walk has already
+    /// visited their parent. The ordinary declaration-tree traversal cannot reliably discover
+    /// either shape, so successful synthesis registers its outermost root here.
+    ///
+    /// This registry is append-only for the lifetime of the context. Every whole-module phase
+    /// revisits the same list, which lets a declaration created in an early phase continue through
+    /// all later phases. The set makes publication idempotent; the list preserves stable work-list
+    /// order and permits index-based iteration while checking appends more roots.
+    List<Decl*> m_synthesizedDeclRoots;
+    HashSet<Decl*> m_synthesizedDeclRootSet;
+
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
@@ -1104,6 +1118,21 @@ public:
     SlangLanguageVersion getLanguageVersion() const { return m_languageVersion; }
 
     TranslationUnitRequest* getTranslationUnitRequest() { return m_translationUnitRequest; }
+
+    /// Register an accepted synthesized declaration for eventual whole-module completion.
+    ///
+    /// `decl` must belong to this context's primary module and be the outermost root of the
+    /// synthesized declaration graph, after its parent, scope, signature inputs, and body have
+    /// reached their final published form. Registration does not satisfy immediate semantic
+    /// dependencies; callers that are about to read checked data must still use the accessor that
+    /// establishes the required declaration state.
+    void registerSynthesizedDeclRoot(Decl* decl);
+
+    /// Return the number of roots in the persistent synthesized-declaration work list.
+    Index getSynthesizedDeclRootCount() const { return m_synthesizedDeclRoots.getCount(); }
+
+    /// Return one root from the persistent synthesized-declaration work list.
+    Decl* getSynthesizedDeclRoot(Index index) const { return m_synthesizedDeclRoots[index]; }
 
     bool isInLanguageServer()
     {
@@ -2094,6 +2123,12 @@ public:
 
     void ensureAllDeclsRec(Decl* decl, DeclCheckState state);
 
+    /// Advance every published synthesized declaration root to `state`.
+    ///
+    /// The live list is iterated by index so checking one root can publish another root for the
+    /// same phase. The registry remains intact after this operation for all later phases.
+    void ensureRegisteredSynthesizedDecls(DeclCheckState state);
+
     /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
     ///
     /// `DeclBase` is the base clas of `Decl` and `DeclGroup`. When
@@ -2637,8 +2672,9 @@ public:
         ConformanceCheckingContext* context,
         DeclRef<ContainerDecl> requiredMemberDeclRef,
         Type* resultType,
-        Expr* synBoundStorageExpr,
-        ContainerDecl* synAccesorContainer,
+        LookupResult const& lookupResult,
+        List<Expr*> const& synthesizedContainerArgs,
+        ContainerDecl* synthesizedAccessorContainer,
         RefPtr<WitnessTable> witnessTable);
 
     void _addMethodWitness(
@@ -4092,6 +4128,26 @@ public:
         DeclRefExpr* expr,
         QualType const& baseType,
         bool supressDiagnostic = false);
+
+    /// Called after member lookup on `expr` has failed with `baseType` as the base. If the base is
+    /// a user-declared generic type parameter (directly, or as `T.m` / `v::m`), emit a note for
+    /// each interface that: is visible from the failed access and not from the core module;
+    /// directly declares a visible requirement of the failed name, static when the access is
+    /// static; and, by its unqualified name, resolves to itself at the generic declaration that
+    /// owns the parameter. A non-generic interface gets `where T : IFoo`; a generic one gets
+    /// "consider constraining 'T' to interface 'IFoo'", since its type arguments cannot be
+    /// inferred.
+    void maybeSuggestMissingGenericConstraintForMemberLookup(
+        DeclRefExpr* expr,
+        QualType const& baseType);
+
+    /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
+    /// visible from `scope`) finds exactly one distinct declaration and it is `decl`. A diagnostic
+    /// that prints an unqualified name for the user to write at `scope` uses this to check the name
+    /// will mean `decl` there; for a generic declaration, `decl` is the `GenericDecl`, which is
+    /// what lookup returns for its name. The default mask also finds non-type declarations, so a
+    /// same-named function makes this conservatively return false.
+    bool doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl);
 
     SharedSemanticsContext& operator=(const SharedSemanticsContext&) = delete;
 

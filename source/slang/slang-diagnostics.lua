@@ -378,6 +378,21 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
 err(
     "unknown-source-language",
     19,
@@ -1453,6 +1468,20 @@ err(
     30027,
     "member not found",
     span { loc = "expr:Expr", message = "'~name:Name' is not a member of '~type:Type'." }
+)
+
+standalone_note(
+    "suggest-constraint-for-missing-member",
+    30032,
+    "consider adding a constraint such as 'where ~genericParam:Name : ~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "suggest-generic-interface-constraint-for-missing-member",
+    30033,
+    "consider constraining '~genericParam:Name' to interface '~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
 )
 
 err(
@@ -4112,6 +4141,13 @@ err(
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
 )
 
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
+)
+
 --
 -- 314xx: declaration nesting validation
 --
@@ -5108,6 +5144,13 @@ err(
     40020,
     "loop unrolling failed",
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
+)
+
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
 )
 
 fatal(
