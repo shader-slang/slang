@@ -21,3 +21,6 @@ tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
 # CUDA dynamic __device__ initialization of a module-scope layout-converted matrix array, shader-slang/slang#13444
 tests/language-feature/types/matrix-layout-array-coerce.slang.7 syn (cuda)
+# SPIR-V lays out an integer matrix as row vectors whatever its layout, shader-slang/slang#13446
+tests/language-feature/types/matrix-layout-array-coerce-int.slang.2 (vk)
+tests/language-feature/types/matrix-layout-array-coerce-int.slang.3 (vk)

@@ -14,8 +14,8 @@
 
 // Matrix `k` of each array holds the logical values `m[r][c] == 1 + 8*k + 4*r + c`. The
 // row-major members store them row by row and the column-major members column by column. In a
-// structured buffer a `float2x4` row or column, and an `int2x3` row or column, needs no padding,
-// so one data set serves every target and both default layouts.
+// structured buffer a `float2x4` row or column needs no padding, so one data set serves every
+// target and both default layouts.
 struct Matrices
 {
     row_major float2x4 rowMajor[2];
@@ -28,16 +28,7 @@ struct Matrices
 // clang-format on
 StructuredBuffer<Matrices> input;
 
-// Integer matrix `k` holds `n[r][c] == 1 + 6*k + 3*r + c`, stored column by column.
-struct IntMatrices
-{
-    column_major int2x3 n[2];
-}
-
-//TEST_INPUT:ubuffer(data=[1 4 2 5 3 6 7 10 8 11 9 12], stride=48):name intBuffer
-RWStructuredBuffer<IntMatrices> intBuffer;
-
-//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
 RWStructuredBuffer<float> output;
 
 // Return how many elements of `m` differ from the logical values `first + 8*k + 4*r + c`.
@@ -85,8 +76,6 @@ void fillUnsized(out float2x4 m[], int count)
             for (int c = 0; c < 4; c++)
                 m[k][r][c] = 50 + 8 * k + 4 * r + c;
 }
-
-void addHundredInt(inout int2x3 n[2]) { n[1][0][2] += 100; }
 
 // More than 16 elements, so the conversion is a loop rather than unrolled.
 float countMismatchesLong(float2x2 m[20])
@@ -155,18 +144,12 @@ void computeMain()
     fillUnsized(filledUnsized, 2);
     output[12] = countMismatchesUnsized(filledUnsized, 2, 50);
 
-    // An integer matrix array in a buffer, passed to `inout`, is written back in its own layout.
-    addHundredInt(intBuffer[0].n);
-    output[13] = intBuffer[0].n[1][0][2];
-    output[14] = intBuffer[0].n[1][0][1];
-    output[15] = intBuffer[0].n[1][1][0];
-
     row_major float2x2 longArray[20];
     for (int k = 0; k < 20; k++)
         longArray[k] = float2x2(k, k + 1, k + 2, k + 3);
-    output[16] = countMismatchesLong(longArray);
+    output[13] = countMismatchesLong(longArray);
 
-    output[17] = countMismatchesLong(moduleScopeLongConverted);
+    output[14] = countMismatchesLong(moduleScopeLongConverted);
 }
 
 // CHECK: type: float
@@ -183,8 +166,5 @@ void computeMain()
 // CHECK-NEXT: 116.0
 // CHECK-NEXT: 1.0
 // CHECK-NEXT: 0.0
-// CHECK-NEXT: 109.0
-// CHECK-NEXT: 8.0
-// CHECK-NEXT: 10.0
 // CHECK-NEXT: 0.0
 // CHECK-NEXT: 0.0
