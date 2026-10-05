@@ -372,11 +372,12 @@ record still get the SBT GAS index from these operations. It then differs from t
 the build inputs that follow that build input, and for primitives that use a non-zero SBT index offset.
 
 **Limitation:** with OptiX 9.0 and later, `HitObject.MakeHit` and `HitObject.MakeMotionHit` build the new hit object
-from the serialized _current outgoing hit object_ (`optixHitObjectGetTraverseData`), not from their arguments. The
-`InstanceIndex`, `GeometryIndex`, `PrimitiveIndex`, `HitKind`, `Ray.TMax` and attribute arguments, and the
-shader-table arguments (`RayContributionToHitGroupIndex`, `MultiplierForGeometryContributionToHitGroupIndex`,
-`HitGroupRecordIndex`), are not used, so the result describes the hit object that was current before the call rather
-than the primitive the caller names.
+from the serialized _current outgoing hit object_ (`optixHitObjectGetTraverseData`) rather than from their
+hit-identifying arguments. `AccelerationStructure`, `Ray.Origin`, `Ray.Direction`, `Ray.TMin` and, for motion hits,
+`CurrentTime` are still passed to OptiX. The `InstanceIndex`, `GeometryIndex`, `PrimitiveIndex`, `HitKind`, `Ray.TMax`
+and attribute arguments, and the shader-table arguments (`RayContributionToHitGroupIndex`,
+`MultiplierForGeometryContributionToHitGroupIndex`, `HitGroupRecordIndex`), are not used, so the resulting hit
+describes the hit object that was current before the call rather than the primitive the caller names.
 
 Limitations
 ===========
