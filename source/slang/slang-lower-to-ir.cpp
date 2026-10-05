@@ -874,6 +874,7 @@ static void detachAtomicOutArguments(IRGenContext* context, IRCall* call)
             continue;
 
         auto destination = call->getArg(i);
+        // Declare the temporary before the call. The ambient builder emits the copy-back after it.
         IRBuilder tempBuilder(builder->getModule());
         tempBuilder.setInsertBefore(call);
         auto temporary = tempBuilder.emitVar(valueType);
