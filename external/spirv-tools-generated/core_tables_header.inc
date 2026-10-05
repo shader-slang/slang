@@ -107,6 +107,7 @@ enum Extension : uint32_t {
   kSPV_INTEL_blocking_pipes,
   kSPV_INTEL_cache_controls,
   kSPV_INTEL_debug_module,
+  kSPV_INTEL_device_barrier,
   kSPV_INTEL_device_side_avc_motion_estimation,
   kSPV_INTEL_float_controls2,
   kSPV_INTEL_fp_fast_math_mode,
