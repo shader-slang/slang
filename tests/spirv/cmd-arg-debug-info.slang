@@ -35,6 +35,15 @@
 // CHECK_XW-SAME: -Xspirv-opt -O
 // CHECK_XW-SAME: -trace-coverage-counter-width 32
 
+// The target's option set is re-inherited from the session several times during slangc option
+// processing, so a `-X` argument must still appear exactly once in the command line reconstructed
+// from the target program's options.
+//TEST:SIMPLE(filecheck=CHECK_XN): -target spirv -g3 -Xnvrtc --fmad=false -emit-spirv-directly
+// CHECK_XN:  OpString "-target spirv
+// CHECK_XN-SAME: -Xnvrtc --fmad=false
+// CHECK_XN-NOT: -Xnvrtc
+// CHECK_XN-SAME: -stage compute
+
 [numthreads(1,1,1)]
 void computeMain()
 {}
