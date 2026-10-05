@@ -1573,8 +1573,8 @@ bool canInstHaveSideEffectAtAddress(
 
             // A call with side effects may read or write any storage that is not private to
             // `func`. For a private root, the call can only reach `addr` through its arguments,
-            // which the loop below checks. The callee purity test is a cheap decoration check, so
-            // we run it first and skip the use walk in `isCallerPrivateRoot` for a pure callee.
+            // which the loop below checks. Both answers for a side-effect-free callee lead to that
+            // loop, so we test purity first and skip the use walk in `isCallerPrivateRoot`.
             auto callee = call->getCallee();
             const bool calleeHasSideEffect =
                 !callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache);

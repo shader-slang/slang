@@ -71,7 +71,7 @@ uint storedAfterInit()
     return x;
 }
 
-// The address travels inside a struct passed by value.
+// The call's argument check skips a by-value struct, even one that carries `&x`.
 [noinline]
 uint insideByValueStruct()
 {
@@ -93,7 +93,7 @@ uint retainedByCallee()
     return x;
 }
 
-// The address of an `inout` parameter escapes inside the callee itself.
+// Storing a lent `inout` parameter's address in global memory makes it escape.
 [noinline]
 uint inoutAddressEscapes(inout uint x)
 {
