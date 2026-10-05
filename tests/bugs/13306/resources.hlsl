@@ -1,7 +1,7 @@
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/resources.slang -Gec -target hlsl -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/resources.slang -Gec -target spirv -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/resources.slang -Gec -target metal -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/resources.slang -Gec -target cpp -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target hlsl -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target spirv -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target metal -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/resources.hlsl -Gec -target cpp -entry main -validate-ir
 
 // Enabling compatibility must not introduce static storage for resources, resource arrays,
 // explicit parameter groups, or legacy buffers whose element structs contain resources.

@@ -1,5 +1,5 @@
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/storage-qualifiers.slang -Gec -target hlsl -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/storage-qualifiers.slang -Gec -target spirv -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/storage-qualifiers.hlsl -Gec -target hlsl -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/storage-qualifiers.hlsl -Gec -target spirv -entry main -validate-ir
 
 // Existing global storage and constants keep their behavior. Specialization constants and
 // unbounded resource arrays stay inputs even when the compatibility option is enabled.

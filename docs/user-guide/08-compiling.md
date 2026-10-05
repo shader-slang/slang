@@ -1096,7 +1096,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
-| HLSLCompatibility  | Enables [HLSL uniform parameter temporaries](#hlsl-uniform-parameter-temporaries). `intValue0` encodes a bool value. |
+| EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1152,10 +1152,16 @@ meanings of their `CompilerOptionValue` encodings.
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
 
-### HLSL Uniform Parameter Temporaries
+### Backwards Compatibility Option for Legacy HLSL
 
-For HLSL inputs, `-Gec` enables per-invocation mutable copies of uniform data parameters.
-The equivalent API option is `CompilerOptionName::HLSLCompatibility`.
+For HLSL inputs, `-Gec` enables additional backwards-compatibility features for legacy HLSL.
+The equivalent API option is `CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility`.
+The option currently enables uniform parameter temporaries; additional legacy HLSL behaviors may be added in the future.
+It has no effect on Slang or GLSL inputs.
+
+#### Uniform Parameter Temporaries
+
+With `-Gec`, uniform data parameters can be used as mutable temporaries within each shader invocation.
 For example:
 
 ```hlsl
@@ -1175,10 +1181,10 @@ Reflection continues to describe the original shader inputs and their bindings.
 
 The supported data types are scalars, vectors, matrices, enums, sized arrays, and structs composed of supported data types.
 An implicit legacy `cbuffer` is copied as one struct when all its stored fields are supported data types.
-Resource parameters, explicit parameter groups such as `ConstantBuffer<T>`, unbounded arrays, link-time type aliases, and structs containing resources remain read-only.
+Resource parameters, explicit parameter groups such as `ConstantBuffer<T>`, unbounded arrays, link-time type aliases, externally replaceable structs, and structs containing resources remain read-only.
 In particular, a legacy buffer containing a resource remains read-only as a whole.
 Supporting mutable resource parameters requires additional resource-storage legalization.
-The option does not affect Slang or GLSL inputs, specialization constants, or declarations already marked `static`, `const`, or `groupshared`.
+Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
 

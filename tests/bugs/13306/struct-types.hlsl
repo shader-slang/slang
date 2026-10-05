@@ -1,6 +1,6 @@
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/struct-types.slang -Gec -target hlsl -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/struct-types.slang -Gec -target spirv -entry main -validate-ir
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/bugs/13306/struct-types.slang -Gec -target hlsl -entry main -DTRY_WRITES
+//TEST:COMPILE: tests/bugs/13306/struct-types.hlsl -Gec -target hlsl -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/struct-types.hlsl -Gec -target spirv -entry main -validate-ir
+//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/struct-types.hlsl -Gec -target hlsl -entry main -DTRY_WRITES
 
 // Copy eligibility must use substituted field types and inherited storage. Checking only a
 // struct's own fields, or an unspecialized generic declaration, would miss these resources.

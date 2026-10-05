@@ -1,10 +1,10 @@
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target hlsl -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target spirv -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target metal -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target cpp -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target hlsl -entry main -no-mangle -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -target dxil -profile cs_6_0 -entry main -validate-ir
-//TEST:COMPILE: -lang hlsl tests/bugs/13306/data.slang -Gec -no-codegen -o tests/bugs/13306/data.slang-module -verify-debug-serial-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target hlsl -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target spirv -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target metal -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target cpp -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target hlsl -entry main -no-mangle -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -target dxil -profile cs_6_0 -entry main -validate-ir
+//TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -no-codegen -o tests/bugs/13306/data.slang-module -verify-debug-serial-ir
 //TEST:COMPILE: tests/bugs/13306/data.slang-module -target dxil -profile cs_6_0 -entry main -validate-ir
 
 // The input values must survive the path that does not call replaceValues. Both direct

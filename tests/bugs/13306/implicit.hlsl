@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/bugs/13306/implicit.slang -Gec -target hlsl -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/implicit.hlsl -Gec -target hlsl -entry main
 
 // Bare numeric parameters also become mutable copies. Diagnostics must name the original
 // parameter rather than its generated lookup name.

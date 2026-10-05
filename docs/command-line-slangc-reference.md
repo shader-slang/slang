@@ -1007,6 +1007,11 @@ Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name ext
 Enable experimental compiler passes 
 
 
+<a id="gec"></a>
+### -Gec
+Enable additional backwards-compatibility features for legacy HLSL inputs. 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 

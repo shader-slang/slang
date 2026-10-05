@@ -1265,11 +1265,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
-        {OptionKind::HLSLCompatibility,
+        {OptionKind::EnableExtendedHLSLBackwardsCompatibility,
          "-Gec",
          nullptr,
-         "Allow HLSL uniform data parameters to be used as per-invocation temporaries. "
-         "Resource parameters remain read-only."},
+         "Enable additional backwards-compatibility features for legacy HLSL inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -2928,7 +2927,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
         case OptionKind::EnableExperimentalPasses:
-        case OptionKind::HLSLCompatibility:
+        case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:

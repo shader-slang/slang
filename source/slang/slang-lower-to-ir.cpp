@@ -11480,6 +11480,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl) { return lowerConstantDeclCommon(decl); }
 
+    // Create global variable storage with the linkage, metadata, and debug information of decl.
+    IRGlobalVar* createGlobalVarStorage(IRGenContext* subContext, VarDecl* decl, IRType* valueType)
+    {
+        auto builder = subContext->irBuilder;
+        auto storage = builder->createGlobalVar(valueType);
+        addLinkageDecoration(subContext, storage, decl);
+        addNameHint(subContext, storage, decl);
+        maybeSetRate(subContext, storage, decl);
+        addVarDecorations(subContext, storage, decl);
+        maybeAddDebugLocationDecoration(subContext, storage);
+        builder->addHighLevelDeclDecoration(storage, decl);
+        return storage;
+    }
+
+    // Begin the initializer block of a global variable and insert subsequent instructions there.
+    void beginGlobalVarInitializer(IRBuilder* builder, IRGlobalVar* storage)
+    {
+        builder->setInsertInto(storage);
+        auto block = builder->emitBlock();
+        builder->setInsertInto(block);
+    }
+
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
     {
         // A non-`static` global is actually a shader parameter in HLSL.
@@ -11527,27 +11549,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use
         // a decoration to identify an *actual* global?
 
-        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(varType);
-
-        addLinkageDecoration(subContext, irGlobal, decl);
-        addNameHint(subContext, irGlobal, decl);
-
-        maybeSetRate(subContext, irGlobal, decl);
-
-        addVarDecorations(subContext, irGlobal, decl);
-        maybeAddDebugLocationDecoration(subContext, irGlobal);
-
-        if (decl)
-        {
-            subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
-        }
+        auto irGlobal = createGlobalVarStorage(subContext, decl, varType);
 
         if (auto initExpr = decl->initExpr)
         {
-            subBuilder->setInsertInto(irGlobal);
-
-            IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->setInsertInto(entryBlock);
+            beginGlobalVarInitializer(subBuilder, irGlobal);
 
             LoweredValInfo initVal = lowerLValueExpr(subContext, initExpr);
             subContext->irBuilder->emitReturn(getSimpleVal(subContext, initVal));
@@ -11562,37 +11568,43 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return loweredValue;
     }
 
-    // Lower a compatibility declaration to mutable storage or directly to its immutable input.
-    // We emit the input through normal parameter lowering so that reflection and bindings do not
-    // depend on the storage choice. A mutable copy uses ordinary IRGlobalVar initializer blocks,
-    // which the existing target pipeline can move into each entry point.
-    LoweredValInfo visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl)
+    // Lower a uniform parameter shadow to private storage or an alias to its input.
+    LoweredValInfo visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl* decl)
     {
+        // A shadow stands in for an underlying shader input, so we first lower that input using
+        // ordinary parameter lowering. This preserves the input's reflection and bindings.
         auto parameter = decl->uniformParameter;
         auto input = ensureDecl(context, parameter);
         if (!decl->hasMutableStorage)
         {
+            // Header checking could not prove supported private storage. We map references to
+            // the shadow directly to the immutable input, rather than creating a resource global.
             context->setGlobalValue(decl, input);
             return input;
         }
 
+        // The shadow needs private storage initialized from the input on each invocation. We
+        // create the same IRGlobalVar storage used for source globals, then provide an initializer
+        // block that the target's global-initialization pipeline can move into each entry point.
         NestedContext nested(this);
         auto builder = nested.getBuilder();
         auto subContext = nested.getContext();
         auto valueType = lowerType(subContext, decl->getType());
-        auto storage = builder->createGlobalVar(valueType);
-        addLinkageDecoration(subContext, storage, decl);
-        addNameHint(subContext, storage, decl);
-        builder->addHighLevelDeclDecoration(storage, decl);
+        auto storage = createGlobalVarStorage(subContext, decl, valueType);
 
-        // Bare data parameters already supply a value. A legacy ConstantBuffer supplies a
-        // pointer-like value, so its initializer loads the element struct into private storage.
-        builder->setInsertInto(storage);
-        auto block = builder->emitBlock();
-        builder->setInsertInto(block);
+        // We initialize an ordinary uniform parameter shadow by copying the parameter value.
+        // Legacy `cbuffer CB { float x; }` is different: source references denote buffer contents,
+        // and header checking selected the element struct as the shadow's type. We load those
+        // contents from the implicit ConstantBuffer<T> input. Explicit ConstantBuffer<T> inputs
+        // keep their wrapper type, remain read-only, and were handled by the alias case above.
+        beginGlobalVarInitializer(builder, storage);
         auto initialValue = getSimpleVal(subContext, input);
-        if (as<ConstantBufferType>(parameter->getType()))
+        if (parameter->hasModifier<ImplicitParameterGroupVariableModifier>())
+        {
+            // Header checking permits mutable storage for an implicit group only in this form.
+            SLANG_RELEASE_ASSERT(as<ConstantBufferType>(parameter->getType()));
             initialValue = builder->emitLoad(valueType, initialValue);
+        }
         builder->emitReturn(initialValue);
 
         auto result = LoweredValInfo::ptr(storage);

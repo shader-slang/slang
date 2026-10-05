@@ -687,8 +687,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
-    // Determine the compatibility declaration's value type and whether it owns mutable storage.
-    void visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl);
+    // Determine a uniform parameter shadow's value type and whether it owns mutable storage.
+    void visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl* decl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -952,9 +952,13 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
 
-    // The retained input is checked normally. A compatibility declaration has no independent
-    // source initializer; lowering constructs its copy from the checked input, when supported.
-    void visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl*) {}
+    // Check the body of a synthesized uniform parameter shadow.
+    void visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl*)
+    {
+        // A source variable's body checking validates its written initializer. A shadow has
+        // no source initializer to validate: we derive its initial value from the associated
+        // shader parameter during lowering. That parameter is checked as its own declaration.
+    }
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -1601,8 +1605,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 /// Is `decl` a global shader parameter declaration?
 bool isGlobalShaderParameter(VarDeclBase* decl)
 {
-    // A compatibility declaration references an input but is not a second shader parameter.
-    if (as<HLSLCompatibilityVarDecl>(decl))
+    // A uniform parameter shadow provides temporary storage, not a second shader input.
+    if (as<UniformParameterShadowVarDecl>(decl))
         return false;
 
     // If it's an *actual* global it is not a global shader parameter
@@ -1684,8 +1688,8 @@ QualType getTypeForDeclRef(
         qualType.type = getType(astBuilder, varDeclRef);
 
         bool isLValue = true;
-        if (auto compatibilityVar = as<HLSLCompatibilityVarDecl>(varDeclRef.getDecl()))
-            isLValue = compatibilityVar->hasMutableStorage;
+        if (auto shadowVar = as<UniformParameterShadowVarDecl>(varDeclRef.getDecl()))
+            isLValue = shadowVar->hasMutableStorage;
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
@@ -2664,31 +2668,53 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 }
 
 // Determine whether a checked type can be copied into ordinary per-invocation data storage.
-// We recognize scalars, vectors, matrices, enums, sized arrays, and structs whose fields and
-// bases satisfy the same contract. We inspect field signatures because aggregate TypeTag values
-// are populated during definition checking, after a compatibility declaration needs its type.
-// The active set stops invalid recursive structs from making this classification recurse forever;
-// their ordinary declaration checks remain responsible for the recursive-type diagnostic.
+// A true result proves that the type consists of supported scalars, vectors, matrices, enums,
+// sized arrays, and structs. A false result means that supported private storage was not proven.
 static bool isHLSLUniformDataType(
     SemanticsVisitor* visitor,
     Type* type,
-    HashSet<Type*>& activeTypes)
+    HashSet<Type*>& activeTypes,
+    UInt nestingDepth = 0)
 {
+    // We inspect field signatures because aggregate TypeTag values are populated during
+    // definition checking, after the shadow needs its type. The active set catches repeated
+    // types, but `struct Box<T> { Box<Box<T>> next; };` produces a new type at every step.
+    // We also stop at the compiler's type-nesting limit: such a type cannot be proven to have
+    // supported storage, and ordinary declaration checking diagnoses the excessive nesting.
+    if (nestingDepth >= kMaxTypeNestingDepth)
+        return false;
+
     if (auto modifiedType = as<ModifiedType>(type))
-        return isHLSLUniformDataType(visitor, modifiedType->getBase(), activeTypes);
+        return isHLSLUniformDataType(
+            visitor,
+            modifiedType->getBase(),
+            activeTypes,
+            nestingDepth + 1);
     if (as<BasicExpressionType>(type))
         return true;
     if (auto vectorType = as<VectorExpressionType>(type))
-        return isHLSLUniformDataType(visitor, vectorType->getElementType(), activeTypes);
+        return isHLSLUniformDataType(
+            visitor,
+            vectorType->getElementType(),
+            activeTypes,
+            nestingDepth + 1);
     if (auto matrixType = as<MatrixExpressionType>(type))
-        return isHLSLUniformDataType(visitor, matrixType->getElementType(), activeTypes);
+        return isHLSLUniformDataType(
+            visitor,
+            matrixType->getElementType(),
+            activeTypes,
+            nestingDepth + 1);
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
         // An unbounded parameter array cannot become an ordinary variable. getTypeTags handles
         // both an absent element count and the internal unsized-array sentinel.
         if ((int)visitor->getTypeTags(type) & (int)TypeTag::Unsized)
             return false;
-        return isHLSLUniformDataType(visitor, arrayType->getElementType(), activeTypes);
+        return isHLSLUniformDataType(
+            visitor,
+            arrayType->getElementType(),
+            activeTypes,
+            nestingDepth + 1);
     }
 
     auto declRefType = as<DeclRefType>(type);
@@ -2705,9 +2731,11 @@ static bool isHLSLUniformDataType(
     // The supported builtin data types were handled above by their semantic type classes.
     if (structDecl.getDecl()->hasModifier<MagicTypeModifier>())
         return false;
-    // A link-time type alias can acquire a resource-bearing definition after checking.
-    // We cannot promise ordinary data storage from its local declaration alone.
+    // A link-time alias or externally replaceable struct can acquire resource-bearing storage
+    // after checking. We cannot prove supported private storage from its local definition.
     if (structDecl.getDecl()->aliasedType.type)
+        return false;
+    if (structDecl.getDecl()->hasModifier<ExternModifier>())
         return false;
 
     // Field and base types use the existing declaration-reference substitution path. For
@@ -2725,7 +2753,8 @@ static bool isHLSLUniformDataType(
         if (!isHLSLUniformDataType(
                 visitor,
                 getType(visitor->getASTBuilder(), fieldRef),
-                activeTypes))
+                activeTypes,
+                nestingDepth + 1))
         {
             isDataType = false;
             break;
@@ -2743,7 +2772,7 @@ static bool isHLSLUniformDataType(
             if (as<InterfaceDecl>(baseDeclRefType->getDeclRef()))
                 continue;
         }
-        if (!isHLSLUniformDataType(visitor, baseType, activeTypes))
+        if (!isHLSLUniformDataType(visitor, baseType, activeTypes, nestingDepth + 1))
         {
             isDataType = false;
             break;
@@ -2753,20 +2782,24 @@ static bool isHLSLUniformDataType(
     return isDataType;
 }
 
-// Select the source value exposed by a compatibility declaration, then decide its storage.
-// Consider `cbuffer CB { float x; }`: the input has type ConstantBuffer<T>, but a mutable copy
-// has type T. Only an implicit legacy cbuffer exposes that element struct directly. Explicit
-// ConstantBuffer<T> parameters retain their wrapper type and remain read-only aliases.
-void SemanticsDeclHeaderVisitor::visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl)
+// Select the value type and storage behavior of a uniform parameter shadow.
+void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
+    UniformParameterShadowVarDecl* decl)
 {
     auto parameter = decl->uniformParameter;
     SLANG_RELEASE_ASSERT(parameter);
     ensureDecl(parameter, DeclCheckState::CanUseTypeOfValueDecl);
     Type* valueType = parameter->getType();
+    // We need to choose what value the shadow copies before testing whether private storage is
+    // supported. For `cbuffer CB { float x; }`, the parameter is an implicit ConstantBuffer<T>,
+    // but source field access refers to its contents, so the shadow copies T. In contrast,
+    // `ConstantBuffer<T> cb;` declares the buffer value itself and must retain its wrapper type.
+    // We recognize only the implicit ConstantBuffer form here; tbuffer and explicit groups
+    // retain their original types and consequently remain read-only aliases.
     if (parameter->hasModifier<ImplicitParameterGroupVariableModifier>())
     {
-        if (auto elementType = getConstantBufferElementType(valueType))
-            valueType = elementType;
+        if (auto bufferType = as<ConstantBufferType>(valueType))
+            valueType = bufferType->getElementType();
     }
 
     // We require a positive proof that the value is supported ordinary data. All other types

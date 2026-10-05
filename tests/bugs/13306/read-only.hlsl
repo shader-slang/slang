@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/bugs/13306/read-only.slang -Gec -target hlsl -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/read-only.hlsl -Gec -target hlsl -entry main
 
 // Unsupported parameter copies remain aliases. We reject writes to the input rather than
 // accepting the assignment and silently discarding it during lowering.

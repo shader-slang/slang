@@ -341,15 +341,20 @@ class VarDecl : public VarDeclBase
     FIDDLE(...)
 };
 
-// An HLSL compatibility declaration gives the source name of a uniform parameter either
-// mutable per-invocation storage or a read-only alias to the parameter. The parser keeps the
-// parameter as a separate declaration so that its binding and reflection metadata remain intact.
+// A uniform parameter shadow is a temporary that stands in for a shader input during source
+// lookup. Legacy HLSL permits assignments to uniform parameters; a shadow supplies private
+// storage for those assignments without changing the externally supplied input or its metadata.
+// When the input type cannot be stored in a supported private variable, the shadow instead
+// provides a read-only alias to the input.
 //
 // Header checking determines the storage behavior and the exposed value type. A copied legacy
 // cbuffer exposes its element struct; an alias retains the input's type. Lowering emits ordinary
 // global-variable initialization only for mutable copies. Resource aliases lower to the input.
+// Unlike a source VarDecl, a shadow has no written type or initializer expression: both come
+// from its associated parameter. The distinct declaration kind dispatches those checking and
+// lowering tasks without treating the shadow as an ordinary source variable declaration.
 FIDDLE()
-class HLSLCompatibilityVarDecl : public VarDecl
+class UniformParameterShadowVarDecl : public VarDecl
 {
     FIDDLE(...)
 
