@@ -462,7 +462,6 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
-    case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
@@ -473,6 +472,22 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     }
     return false;
 }
+bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
+{
+    return name == CompilerOptionName::DownstreamArgs;
+}
+
+CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
+{
+    CompilerOptionSet result;
+    for (auto& kv : options)
+    {
+        if (!isLevelLocal(kv.key))
+            result.options[kv.key] = kv.value;
+    }
+    return result;
+}
+
 CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name)
 {
     switch (name)

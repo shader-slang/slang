@@ -118,6 +118,12 @@ public:
 private:
     RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
+    /// Set the `DownstreamArgs` this program passes to downstream tools to the session's, then the
+    /// target's, then the program's own entries, in that order and without merging any of them.
+    /// `DownstreamArgs` is level-local (see `CompilerOptionSet::isLevelLocal`), so this is the one
+    /// place where the levels are combined.
+    void composeDownstreamArgs();
+
     // The program being compiled or laid out
     ComponentType* m_program;
 

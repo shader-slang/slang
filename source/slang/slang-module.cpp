@@ -24,7 +24,7 @@ Module::Module(Linkage* linkage, ASTBuilder* astBuilder)
     {
         m_astBuilder = linkage->getASTBuilder();
     }
-    getOptionSet() = linkage->m_optionSet;
+    getOptionSet() = linkage->m_optionSet.copyWithoutLevelLocalOptions();
     addModuleDependency(this);
 }
 
@@ -54,7 +54,16 @@ SHA1::Digest Module::computeDigest()
         DigestBuilder<SHA1> digestBuilder;
         auto version = String(getBuildTagString());
         digestBuilder.append(version);
-        getOptionSet().buildHash(digestBuilder);
+
+        // The digest is checked against `Linkage::isBinaryModuleUpToDate`, which hashes the
+        // session's options including its `DownstreamArgs`. Those stay part of the digest because
+        // a precompiled module embeds downstream compiler output, so we add them back to the
+        // module's own options, which do not hold them.
+        CompilerOptionSet digestOptions = getOptionSet();
+        if (auto sessionDownstreamArgs =
+                getLinkage()->m_optionSet.options.tryGetValue(CompilerOptionName::DownstreamArgs))
+            digestOptions.options[CompilerOptionName::DownstreamArgs] = *sessionDownstreamArgs;
+        digestOptions.buildHash(digestBuilder);
 
         auto fileDependencies = getFileDependencies();
 

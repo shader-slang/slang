@@ -5,6 +5,8 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <initializer_list>
+
 using namespace Slang;
 
 // `o[1] * o[2] + o[3]` contracts to `fma.rn` unless NVRTC receives `--fmad=false`, so the PTX shows
@@ -20,23 +22,49 @@ static const char kFmaKernel[] = R"(
     }
     )";
 
-static slang::CompilerOptionEntry makeNvrtcArg(const char* arg)
+// NVRTC compiles `FOO + BAR` only when both macros are defined, and folds it to the constant 3 for
+// `FOO=1` and `BAR=2`, so the PTX shows that every `-D` argument arrived.
+static const char kMacroKernel[] = R"slang(
+    int fooPlusBar()
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "(FOO + BAR)";
+        }
+    }
+    RWStructuredBuffer<int> o;
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain()
+    {
+        o[0] = fooPlusBar();
+    }
+    )slang";
+
+typedef std::initializer_list<const char*> Args;
+
+static void addNvrtcArgs(List<slang::CompilerOptionEntry>& entries, Args args)
 {
-    slang::CompilerOptionEntry entry = {};
-    entry.name = slang::CompilerOptionName::DownstreamArgs;
-    entry.value.kind = slang::CompilerOptionValueKind::String;
-    entry.value.stringValue0 = "nvrtc";
-    entry.value.stringValue1 = arg;
-    return entry;
+    for (auto arg : args)
+    {
+        slang::CompilerOptionEntry entry = {};
+        entry.name = slang::CompilerOptionName::DownstreamArgs;
+        entry.value.kind = slang::CompilerOptionValueKind::String;
+        entry.value.stringValue0 = "nvrtc";
+        entry.value.stringValue1 = arg;
+        entries.add(entry);
+    }
 }
 
-// Compile `kFmaKernel` to PTX for the `_cuda_sm_8_0` capability, passing NVRTC arguments at the
-// session, target and link levels.
+// Compile `source` to PTX for the `_cuda_sm_8_0` capability, passing one NVRTC argument per entry
+// at the session, target and link levels, plus the other link-time options in `linkExtra`.
 static SlangResult compileToPTX(
     slang::IGlobalSession* globalSession,
-    const char* sessionArg,
-    const char* targetArg,
-    const char* linkArg,
+    const char* source,
+    Args sessionArgs,
+    Args targetArgs,
+    Args linkArgs,
+    List<slang::CompilerOptionEntry> const& linkExtra,
     String& outPTX)
 {
     List<slang::CompilerOptionEntry> targetOptions;
@@ -45,27 +73,27 @@ static SlangResult compileToPTX(
     capability.value.kind = slang::CompilerOptionValueKind::Int;
     capability.value.intValue0 = globalSession->findCapability("_cuda_sm_8_0");
     targetOptions.add(capability);
-    if (targetArg)
-        targetOptions.add(makeNvrtcArg(targetArg));
+    addNvrtcArgs(targetOptions, targetArgs);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_PTX;
     targetDesc.compilerOptionEntries = targetOptions.getBuffer();
     targetDesc.compilerOptionEntryCount = uint32_t(targetOptions.getCount());
 
-    slang::CompilerOptionEntry sessionOption = makeNvrtcArg(sessionArg ? sessionArg : "");
+    List<slang::CompilerOptionEntry> sessionOptions;
+    addNvrtcArgs(sessionOptions, sessionArgs);
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-    sessionDesc.compilerOptionEntries = sessionArg ? &sessionOption : nullptr;
-    sessionDesc.compilerOptionEntryCount = sessionArg ? 1 : 0;
+    sessionDesc.compilerOptionEntries = sessionOptions.getBuffer();
+    sessionDesc.compilerOptionEntryCount = uint32_t(sessionOptions.getCount());
 
     ComPtr<slang::ISession> session;
     SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, session.writeRef()));
 
     ComPtr<slang::IBlob> diagnostics;
     auto module =
-        session->loadModuleFromSourceString("m", "m.slang", kFmaKernel, diagnostics.writeRef());
+        session->loadModuleFromSourceString("m", "m.slang", source, diagnostics.writeRef());
     if (!module)
         return SLANG_FAIL;
 
@@ -80,35 +108,32 @@ static SlangResult compileToPTX(
         composite.writeRef(),
         diagnostics.writeRef()));
 
-    slang::CompilerOptionEntry linkOption = makeNvrtcArg(linkArg ? linkArg : "");
+    List<slang::CompilerOptionEntry> linkOptions;
+    addNvrtcArgs(linkOptions, linkArgs);
+    linkOptions.addRange(linkExtra);
     ComPtr<slang::IComponentType> linked;
     SLANG_RETURN_ON_FAIL(composite->linkWithOptions(
         linked.writeRef(),
-        linkArg ? 1 : 0,
-        linkArg ? &linkOption : nullptr,
+        uint32_t(linkOptions.getCount()),
+        linkOptions.getBuffer(),
         diagnostics.writeRef()));
 
     ComPtr<slang::IBlob> code;
     SLANG_RETURN_ON_FAIL(linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()));
-    outPTX = String(
-        UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
+    outPTX =
+        String(UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize()));
     return SLANG_OK;
 }
 
-static bool hasTarget(const String& ptx, const char* targetLine)
+static bool contains(const String& ptx, const char* text)
 {
-    return ptx.indexOf(UnownedStringSlice(targetLine)) != -1;
-}
-
-static bool hasFma(const String& ptx)
-{
-    return ptx.indexOf(UnownedStringSlice("fma.rn")) != -1;
+    return ptx.indexOf(UnownedStringSlice(text)) != -1;
 }
 
 // NVRTC arguments given at different levels (session, target description, `linkWithOptions`) all
-// reach NVRTC: adding an unrelated argument at a higher level keeps the architecture selected at
-// a lower level, and vice versa. NVRTC compiles to PTX without a GPU, so the test only needs a
-// loadable NVRTC; otherwise it reports Ignored.
+// reach NVRTC, session level first: adding an unrelated argument at one level keeps the arguments
+// of the others, and arguments given one token per entry arrive exactly as given. NVRTC compiles
+// to PTX without a GPU, so the test only needs a loadable NVRTC; otherwise it reports Ignored.
 SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
@@ -119,39 +144,94 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
 
     const char* arch = "--gpu-architecture=compute_86";
     const char* noFmad = "--fmad=false";
-
-    // Baselines: the capability selects sm_80 and fma contraction is on by default; each argument
-    // on its own takes effect.
+    const List<slang::CompilerOptionEntry> noLinkExtra;
     String ptx;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, nullptr, nullptr, nullptr, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_80"));
-    SLANG_CHECK(hasFma(ptx));
 
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, arch, nullptr, nullptr, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_86"));
-    SLANG_CHECK(hasFma(ptx));
+    // Baselines: the capability selects sm_80 and fma contraction is on by default.
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(compileToPTX(globalSession, kFmaKernel, {}, {}, {}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_80"));
+    SLANG_CHECK(contains(ptx, "fma.rn"));
 
-    // Session architecture + link-time `--fmad=false` (the reported case).
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, arch, nullptr, noFmad, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_86"));
-    SLANG_CHECK(!hasFma(ptx));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(compileToPTX(globalSession, kFmaKernel, {arch}, {}, {}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(contains(ptx, "fma.rn"));
 
-    // Session architecture + target-level `--fmad=false`, without any link-time option.
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, arch, noFmad, nullptr, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_86"));
-    SLANG_CHECK(!hasFma(ptx));
+    // The reported cases: a link-time `--fmad=false`, and a link-time option that is not a
+    // downstream argument, both keep the session architecture.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compileToPTX(globalSession, kFmaKernel, {arch}, {}, {noFmad}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(!contains(ptx, "fma.rn"));
 
-    // Target-level architecture + link-time `--fmad=false`.
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, nullptr, arch, noFmad, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_86"));
-    SLANG_CHECK(!hasFma(ptx));
+    List<slang::CompilerOptionEntry> optimization;
+    slang::CompilerOptionEntry optimizationEntry = {};
+    optimizationEntry.name = slang::CompilerOptionName::Optimization;
+    optimizationEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    optimizationEntry.value.intValue0 = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    optimization.add(optimizationEntry);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compileToPTX(globalSession, kFmaKernel, {arch}, {}, {}, optimization, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
 
-    // Session `--fmad=false` + link-time architecture.
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, noFmad, nullptr, arch, ptx)));
-    SLANG_CHECK(hasTarget(ptx, ".target sm_86"));
-    SLANG_CHECK(!hasFma(ptx));
+    // Each pair of levels, in both directions.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compileToPTX(globalSession, kFmaKernel, {arch}, {noFmad}, {}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(!contains(ptx, "fma.rn"));
 
-    // The same argument at two levels reaches NVRTC once; NVRTC rejects a repeated `--fmad`.
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(globalSession, noFmad, nullptr, noFmad, ptx)));
-    SLANG_CHECK(!hasFma(ptx));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compileToPTX(globalSession, kFmaKernel, {}, {arch}, {noFmad}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(!contains(ptx, "fma.rn"));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compileToPTX(globalSession, kFmaKernel, {noFmad}, {}, {arch}, noLinkExtra, ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(!contains(ptx, "fma.rn"));
+
+    // All three levels, each with a distinct argument.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
+        globalSession,
+        kMacroKernel,
+        {"-DFOO=1"},
+        {arch, "-DBAR=2"},
+        {noFmad},
+        noLinkExtra,
+        ptx)));
+    SLANG_CHECK(contains(ptx, ".target sm_86"));
+    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+
+    // Repeated flags given one token per entry, at the session level, at the link level, and
+    // split across the two.
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
+        globalSession,
+        kMacroKernel,
+        {"-D", "FOO=1", "-D", "BAR=2"},
+        {},
+        {},
+        noLinkExtra,
+        ptx)));
+    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
+        globalSession,
+        kMacroKernel,
+        {},
+        {},
+        {"-D", "FOO=1", "-D", "BAR=2"},
+        noLinkExtra,
+        ptx)));
+    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
+        globalSession,
+        kMacroKernel,
+        {"-D", "FOO=1"},
+        {},
+        {"-D", "BAR=2"},
+        noLinkExtra,
+        ptx)));
+    SLANG_CHECK(contains(ptx, "%r1, 3;"));
 }

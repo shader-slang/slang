@@ -32,8 +32,8 @@
 // CLI bit count (32/64) even though it is stored internally as a byte width.
 //TEST:SIMPLE(filecheck=CHECK_XW): -target spirv -g3 -Xspirv-opt -O -trace-coverage -trace-coverage-counter-width 32 -emit-spirv-directly
 // CHECK_XW:  OpString "-target spirv
-// CHECK_XW-SAME: -Xspirv-opt -O
 // CHECK_XW-SAME: -trace-coverage-counter-width 32
+// CHECK_XW-SAME: -Xspirv-opt -O
 
 // The target's option set is re-inherited from the session several times during slangc option
 // processing, so a `-X` argument must still appear exactly once in the command line reconstructed
@@ -43,6 +43,12 @@
 // CHECK_XN-SAME: -Xnvrtc --fmad=false
 // CHECK_XN-NOT: -Xnvrtc
 // CHECK_XN-SAME: -stage compute
+
+// Arguments given one token per `-X` keep their order and their repeats.
+//TEST:SIMPLE(filecheck=CHECK_XD): -target spirv -g3 -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2 -emit-spirv-directly
+// CHECK_XD:  OpString "-target spirv
+// CHECK_XD-SAME: -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2
+// CHECK_XD-SAME: -stage compute
 
 [numthreads(1,1,1)]
 void computeMain()

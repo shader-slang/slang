@@ -95,6 +95,19 @@ struct CompilerOptionSet
 
     static bool allowDuplicate(CompilerOptionName name);
 
+    /// Return true if `name` is an option that each level (session, target, component type) holds
+    /// only for itself, so it is never inherited or copied from another level.
+    ///
+    /// `DownstreamArgs` is the only such option. A tool's arguments from every level must all reach
+    /// it, and repeated arguments (e.g. `-D A -D B` given one token per entry) must survive as
+    /// given. So the levels cannot be merged into one another by matching entries; instead each
+    /// level keeps its own list, and `TargetProgram` concatenates them once, lowest level first.
+    static bool isLevelLocal(CompilerOptionName name);
+
+    /// Return a copy of this set without the level-local options, for seeding the option set of
+    /// another level from this one.
+    CompilerOptionSet copyWithoutLevelLocalOptions() const;
+
     /// Append a CLI-like reconstruction of the stored options to `sb`, for the descriptive command
     /// line embedded in debug info. Only the option kinds it explicitly handles are emitted; it
     /// reports what is stored (which for some options is a default materialized during option
@@ -172,23 +185,37 @@ struct CompilerOptionSet
         options[name] = List<CompilerOptionValue>{value};
     }
 
-    // Copy settings from other, and replace the current setting.
+    // Copy settings from other, and replace the current setting. Level-local options from other
+    // are appended to the current ones.
     void overrideWith(const CompilerOptionSet& other)
     {
         for (auto& kv : other.options)
         {
-            if (allowDuplicate(kv.key))
+            if (isLevelLocal(kv.key))
+            {
+                // `other` may be `*this`, and growing the destination list would free the source
+                // buffer mid-copy.
+                List<CompilerOptionValue> incoming = kv.value;
+                if (auto existing = options.tryGetValue(kv.key))
+                    existing->addRange(incoming);
+                else
+                    options[kv.key] = incoming;
+            }
+            else if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, true);
             else
                 set(kv.key, kv.value);
         }
     }
 
-    // Copy settings from other, but do not replace the current setting
+    // Copy settings from other, but do not replace the current setting. Level-local options are
+    // not inherited.
     void inheritFrom(const CompilerOptionSet& other)
     {
         for (auto& kv : other.options)
         {
+            if (isLevelLocal(kv.key))
+                continue;
             if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, false);
             else
