@@ -10,7 +10,16 @@ RWStructuredBuffer<int> buf;
 
 typedef int T;
 int g<let N : int>() { return N; }
-static int j5 = 5;
+static int j = 5;
+
+// A use of a name before the statement that declares it in a group still
+// refers to the outer declaration.
+int readGlobalBeforeGroup()
+{
+    int y = j;
+    int j = 1, k = 2;
+    return y + j + k;
+}
 
 // Groups at namespace and struct scope are parsed eagerly, before any semantic
 // checking, and also see their earlier declarators.
@@ -48,11 +57,6 @@ void computeMain()
     for (int i = buf[0], f = i < 2; i < 2; i++)
         e = f;
 
-    // A use of a name before the statement that declares it in a group still
-    // refers to the outer declaration.
-    int y = j5;
-    int j5 = 1, k5 = 2;
-
     buf[0] = k;
     buf[1] = j1;
     buf[2] = k2;
@@ -66,7 +70,7 @@ void computeMain()
     buf[10] = n;
     buf[11] = s1.x;
     buf[12] = e;
-    buf[13] = y + j5 + k5;
+    buf[13] = readGlobalBeforeGroup();
     buf[14] = NS::m * 10 + NS::n;
     buf[15] = Q::m * 10 + Q::n;
 }

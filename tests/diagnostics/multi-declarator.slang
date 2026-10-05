@@ -17,16 +17,6 @@ void computeMain()
 //CHECK:                ^ undefined identifier
 //CHECK:                ^ undefined identifier 'b'.
 
-    // The declarators of a group are not visible before their statement.
-    int y0 = c0;
-//CHECK:     ^^ undefined identifier
-//CHECK:     ^^ undefined identifier 'c0'.
-    int c0 = 1, c1 = 2;
-    int y1 = d0;
-//CHECK:     ^^ undefined identifier
-//CHECK:     ^^ undefined identifier 'd0'.
-    int d0 = 1, d1 = d0 < 2;
-
     // Modifiers written before a type specifier that declares a type apply to
     // the declarators, so they are not diagnosed on the type when at least one
     // declarator follows.
@@ -38,5 +28,24 @@ void computeMain()
     static struct M { int x; } m0;
     static struct N { int x; } n0, n1;
 
-    buf[0] = j + b + m0.x + n0.x + n1.x + y0 + c1 + y1 + d1;
+    buf[0] = j + b + m0.x + n0.x + n1.x;
+}
+
+// The declarators of a group are not visible before their statement.
+int useBeforeGroup()
+{
+    int y = j;
+//CHECK:    ^ undefined identifier
+//CHECK:    ^ undefined identifier 'j'.
+    int j = 1, k = 2;
+    return y + j + k;
+}
+
+int useBeforeGroupWithLessThan()
+{
+    int y = j;
+//CHECK:    ^ undefined identifier
+//CHECK:    ^ undefined identifier 'j'.
+    int j = 1, k = j < 2;
+    return y + j + k;
 }
