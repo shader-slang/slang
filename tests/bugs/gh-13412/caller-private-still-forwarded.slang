@@ -1,7 +1,9 @@
-// Storage private to the function is still forwarded across a call that is not passed it, with
-// the fix for shader-slang/slang#13412 in place. The cases are: a local array kept in memory by a
-// dynamic index; a local var whose address is only lent to an `inout` parameter; and an `inout`
+// A store to storage private to the function is forwarded across a call that is not passed its
+// address (see shader-slang/slang#13412). The cases are: a local array kept in memory by a dynamic
+// index; a local var whose address is only lent to an `inout` parameter; and an `inout`
 // parameter, which has copy-in/copy-out semantics.
+// The CPU lane passes `-g0`: render-test compiles with debug info by default, and that keeps the
+// load the forwarding would remove, so the lane would pass even on a miscompiling compiler.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
@@ -63,6 +65,9 @@ uint inoutParam(inout uint x, uint t)
 // METAL-LABEL: uint localArray_0(
 // METAL: w_{{[0-9]+}}(kernelContext
 // METAL-NEXT: return 1U;
+// METAL-LABEL: uint lentToInout_0(
+// METAL: w_{{[0-9]+}}(kernelContext
+// METAL-NEXT: return 7U;
 // METAL-LABEL: uint inoutParam_0(
 // METAL: w_{{[0-9]+}}(kernelContext
 // METAL-NEXT: return t_{{[0-9]+}};

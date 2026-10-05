@@ -1,6 +1,9 @@
-// A local variable whose address escapes can be written by a call it is not passed to, so a
-// store to it must not be forwarded across such a call (shader-slang/slang#13412). Each entry
-// point leaks `x`'s address differently, and `w` then writes `x` through global memory.
+// A local variable whose address escapes can be read or written by a call it is not passed to.
+// A store to it is therefore neither forwarded to a later load across such a call nor removed as
+// dead before one (shader-slang/slang#13412). Each helper function below leaks the address in a
+// different way, and `w` then writes the variable, or `r` reads it, through global memory.
+// The CPU lane passes `-g0`: render-test compiles with debug info by default, and that keeps the
+// load the forwarding would remove, so the lane would pass even on a miscompiling compiler.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
@@ -14,7 +17,7 @@ struct H
 //TEST_INPUT: set cb = new H{ ubuffer(data=[0 0], stride=8) }
 ConstantBuffer<H> cb;
 
-//TEST_INPUT: set outb = out ubuffer(data=[0 0 0 0 0], stride=4)
+//TEST_INPUT: set outb = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outb;
 
 struct S
@@ -26,6 +29,12 @@ struct S
 void w()
 {
     **cb.pp = 2;
+}
+
+[noinline]
+void r()
+{
+    outb[8] = **cb.pp;
 }
 
 [noinline]
@@ -94,6 +103,50 @@ uint inoutAddressEscapes(inout uint x)
     return x;
 }
 
+// The address of an array element escapes; the array itself is never named again.
+[noinline]
+uint elementAddressEscapes()
+{
+    uint a[2];
+    a[0] = 0;
+    a[1] = 0;
+    *cb.pp = &a[1];
+    a[1] = 1;
+    w();
+    return a[1];
+}
+
+struct F
+{
+    uint g;
+    uint f;
+}
+
+// The address of a struct field escapes.
+[noinline]
+uint fieldAddressEscapes()
+{
+    F s;
+    s.g = 0;
+    s.f = 0;
+    *cb.pp = &s.f;
+    s.f = 1;
+    w();
+    return s.f;
+}
+
+// `x = 1` must survive the later `x = 3`, because `r` reads it through the escaped address.
+[noinline]
+uint storeBeforeReadingCall()
+{
+    uint x = 0;
+    *cb.pp = &x;
+    x = 1;
+    r();
+    x = 3;
+    return x;
+}
+
 // CUDA-LABEL: uint storedBeforeInit_0(
 // CUDA: w_0();
 // CUDA-NEXT: return x_{{[0-9]+}};
@@ -109,12 +162,34 @@ uint inoutAddressEscapes(inout uint x)
 // CUDA-LABEL: uint inoutAddressEscapes_0(
 // CUDA: w_0();
 // CUDA-NEXT: return *x_{{[0-9]+}};
+// CUDA-LABEL: uint elementAddressEscapes_0(
+// CUDA: w_0();
+// CUDA-NEXT: return a_{{[0-9]+}}[int(1)];
+// CUDA-LABEL: uint fieldAddressEscapes_0(
+// CUDA: w_0();
+// CUDA-NEXT: return (&s_{{[0-9]+}})->f_0;
+// CUDA-LABEL: uint storeBeforeReadingCall_0(
+// CUDA: x_{{[0-9]+}} = 1U;
+// CUDA-NEXT: r_0();
 
-// SPV-DAG: %storedBeforeInit = OpFunction
-// SPV-DAG: %insideByValueStruct = OpFunction
-// SPV-DAG: %retainedByCallee = OpFunction
-// SPV-DAG: %inoutAddressEscapes = OpFunction
+// SPV-LABEL: %storedBeforeInit = OpFunction
 // SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
+// SPV-LABEL: %insideByValueStruct = OpFunction
+// SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
+// SPV-LABEL: %retainedByCallee = OpFunction
+// SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
+// SPV-LABEL: %inoutAddressEscapes = OpFunction
+// SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
+// SPV-LABEL: %elementAddressEscapes = OpFunction
+// SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
+// SPV-LABEL: %fieldAddressEscapes = OpFunction
+// SPV-NOT: OpReturnValue %uint_1
+// SPV: OpFunctionEnd
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -125,6 +200,9 @@ void computeMain()
     outb[3] = retainedByCallee();
     uint a = 0;
     outb[4] = inoutAddressEscapes(a);
+    outb[5] = elementAddressEscapes();
+    outb[6] = fieldAddressEscapes();
+    outb[7] = storeBeforeReadingCall();
 }
 
 // BUF: type: uint32_t
@@ -133,3 +211,7 @@ void computeMain()
 // BUF-NEXT: {{^}}2{{$}}
 // BUF-NEXT: {{^}}2{{$}}
 // BUF-NEXT: {{^}}2{{$}}
+// BUF-NEXT: {{^}}2{{$}}
+// BUF-NEXT: {{^}}2{{$}}
+// BUF-NEXT: {{^}}3{{$}}
+// BUF-NEXT: {{^}}1{{$}}

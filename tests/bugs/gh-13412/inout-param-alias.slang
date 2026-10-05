@@ -1,8 +1,9 @@
 // An `inout` or `__constref` argument bound to memory that a nested call writes. The callee's
 // copy `y` holds the value at entry. After specialization the parameter becomes a buffer element
 // address or a plain pointer, which is not storage private to the callee, so its load must stay
-// before the nested call (shader-slang/slang#13412). The CPU lane checks the values; C++ emit
-// does not move loads to their use, so it is correct either way.
+// before the nested call (shader-slang/slang#13412). The CPU lane checks the values only: on CPU
+// every call is also passed the kernel context pointer, which the call's argument check treats as
+// possibly aliasing the load, so the CPU output is correct with or without the fix.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none

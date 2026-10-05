@@ -1,6 +1,13 @@
-// An `inout` parameter is still forwarded across a barrier on Metal after the fix for
-// shader-slang/slang#13412: `inout` has copy-in/copy-out semantics, so the callee may keep its own
-// copy of `x` across the barrier. This holds even when the argument is a groupshared element.
+// A store to an `inout` parameter is forwarded to a later read of it across a barrier (see
+// shader-slang/slang#13412). `inout` has copy-in/copy-out semantics, and the language lets an
+// implementation assume that `inout` arguments never alias, so the callee's copy of `x` cannot
+// change during the barrier.
+//
+// Here the argument `s[t % 32]` is a groupshared element that threads `t` and `t + 32` share, and
+// Metal passes its address directly instead of a copy. The returned `[[V]]` is this thread's own
+// value, which is the copy semantics' answer. The shared element itself may hold the other
+// thread's value after the barrier; that comes from passing the address for an aliased argument,
+// which the no-alias assumption does not cover.
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none
 

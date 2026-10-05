@@ -1,5 +1,8 @@
 // A store through a pointer must not be forwarded to a later load through the same pointer
 // across a call that may write that memory (shader-slang/slang#13412).
+// The CPU lane passes `-g0`: render-test compiles with debug info by default, and that keeps the
+// load the forwarding would remove, so the lane would pass even on a miscompiling compiler.
+// HLSL has no pointer types, so the HLSL output spells the load `*cb.p` as `cb_0.p_0`.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none

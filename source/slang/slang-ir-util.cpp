@@ -1415,10 +1415,21 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-// Return true if `call` passes the address at `argUse` to a parameter whose passing mode
-// (`out`, `inout` or `__constref`) only lends the address for the duration of the call, so
-// the callee cannot keep it for a later call to use. A plain pointer or `__ref` parameter can
-// keep it, and so can any callee whose parameter types we cannot see.
+// Return true if `paramType` is an `out`, `inout` or `__constref` parameter type. These modes
+// have copy-in/copy-out or borrow semantics, and the language lets an implementation assume
+// their arguments never alias (docs/language-reference/declarations.md), so the address behind
+// such a parameter is only lent to the callee for the duration of one call.
+static bool isLentParamType(IRInst* paramType)
+{
+    paramType = unwrapAttributedType(paramType);
+    return as<IROutParamTypeBase>(paramType) || as<IRBorrowInParamType>(paramType);
+}
+
+// Return true if `call` passes the address at `argUse` to a lent parameter (see
+// `isLentParamType`). A callee that kept such an address beyond the call would be relying on
+// behaviour the language leaves undefined. A plain pointer or `__ref` parameter can keep it, and
+// so can a callee whose parameter types we cannot see, such as a call through a value that is not
+// an `IRFuncType`.
 static bool isAddressLentOnlyForCall(IRCall* call, IRUse* argUse)
 {
     if (argUse == call->getCalleeUse())
@@ -1429,23 +1440,25 @@ static bool isAddressLentOnlyForCall(IRCall* call, IRUse* argUse)
     const UInt argIndex = UInt(argUse - call->getArgs());
     if (argIndex >= funcType->getParamCount())
         return false;
-    auto paramType = unwrapAttributedType(funcType->getParamType(argIndex));
-    return as<IROutParamTypeBase>(paramType) || as<IRBorrowInParamType>(paramType);
+    return isLentParamType(funcType->getParamType(argIndex));
 }
 
-// Return true if the address `addr`, or an address derived from it, is used in a way that could
-// let code outside the current function reach it later: stored as a value, packed into an
-// aggregate, cast, passed as a plain pointer, and so on. Loading through it, storing through it
-// and lending it to a call (see `isAddressLentOnlyForCall`) do not leak it.
+// Return true if the address `addr`, or an address derived from it, escapes: some use could let
+// code outside the current function reach the storage later. The allowed uses are the ones that
+// only access the storage through the address (load, the address operand of a store or atomic,
+// `CopyLogical`), that have no runtime effect (decorations, debug and live-range markers), or that
+// lend the address to a call (see `isAddressLentOnlyForCall`). Any other use is an escape, such as
+// storing the address as a value, packing it into an aggregate, casting it, or passing it as a
+// plain pointer.
 //
-// Consider this example, where `w` writes `x` without being passed it:
+// Consider this example, where `w` writes `x` without being passed `x`'s address directly:
 //
 //     uint x = 1;
 //     S s; s.p = &x;  // `x`'s address is now a value inside `s`
 //     w(s);
 //     outb[0] = x;    // must reload `x`
 //
-// The check is flow-insensitive: any leaking use anywhere in the function counts.
+// The check is flow-insensitive: an escaping use anywhere in the function counts.
 static bool doesAddressEscape(IRInst* addr)
 {
     for (auto use = addr->firstUse; use; use = use->nextUse)
@@ -1453,7 +1466,7 @@ static bool doesAddressEscape(IRInst* addr)
         auto user = use->getUser();
         if (as<IRDecoration>(user))
             continue;
-        const bool isFirstOperand = use == user->getOperands();
+        const bool isAddressOperand = use == user->getOperands();
         switch (user->getOp())
         {
         case kIROp_Load:
@@ -1465,12 +1478,12 @@ static bool doesAddressEscape(IRInst* addr)
         case kIROp_Store:
         case kIROp_SwizzledStore:
         case kIROp_MatrixSwizzleStore:
-            if (isFirstOperand)
+            if (isAddressOperand)
                 continue;
             return true;
         case kIROp_FieldAddress:
         case kIROp_GetElementPtr:
-            if (isFirstOperand && !doesAddressEscape(user))
+            if (isAddressOperand && !doesAddressEscape(user))
                 continue;
             return true;
         case kIROp_Call:
@@ -1478,7 +1491,7 @@ static bool doesAddressEscape(IRInst* addr)
                 continue;
             return true;
         default:
-            if (as<IRAtomicOperation>(user) && isFirstOperand)
+            if (as<IRAtomicOperation>(user) && isAddressOperand)
                 continue;
             return true;
         }
@@ -1486,30 +1499,33 @@ static bool doesAddressEscape(IRInst* addr)
     return false;
 }
 
-// Return true if `root` is storage private to one invocation of `func` that a call cannot
-// reach unless the call is passed its address. That holds for two kinds of root:
+// Return true if `root` is storage private to the current invocation of `func`: a call made from
+// `func` can reach it only through the call's arguments. That holds for two kinds of root:
 //
-// - A local `var` of `func` in thread-private memory whose address does not escape. A
-//   groupshared var does not qualify: it is reachable through the kernel context and
-//   ordered by barriers.
-// - A parameter of `func` passed `out`, `inout` or `__constref`, whose address does not
-//   escape. These have copy-in/copy-out or borrow semantics, so the caller's storage behind
-//   them is not visible to other code during the call.
+// - A local `var` of `func` in thread-private memory whose address does not escape. Groupshared
+//   storage does not qualify even as a local `var`, because other invocations in the workgroup
+//   share it and a barrier call exposes their writes. A groupshared local appears either with the
+//   `GroupShared` rate or in the `GroupShared` address space (for example the entry-point local
+//   that `introduceExplicitGlobalContext` creates on Metal), so we accept only the thread-private
+//   address spaces a local `var` can have: `Generic` (unspecialized), `ThreadLocal` and
+//   `Function`.
+// - A parameter of `func` with a lent parameter type (see `isLentParamType`) whose address does
+//   not escape inside `func`.
 //
-// Any other root, such as a pointer value, a pointer or `__ref` parameter, or a buffer
-// element address, can point at memory any call may write.
+// Any other root, such as a pointer value, a pointer or `__ref` parameter, or a buffer element
+// address, can point at memory any call may write.
+//
+// The rule for lent parameters relies on the no-alias assumption for their arguments. When
+// `undoParameterCopy` binds an `inout` parameter directly to storage that another invocation also
+// writes, that assumption does not hold.
 static bool isCallerPrivateRoot(IRInst* root, IRGlobalValueWithCode* func)
 {
     if (auto var = as<IRVar>(root))
     {
-        if (!isChildInstOf(var, func))
-            return false;
+        SLANG_ASSERT(isChildInstOf(var, func));
         if (as<IRGroupSharedRate>(var->getRate()))
             return false;
-        auto ptrType = as<IRPtrTypeBase>(var->getDataType());
-        if (!ptrType)
-            return false;
-        switch (ptrType->getAddressSpace())
+        switch (var->getDataType()->getAddressSpace())
         {
         case AddressSpace::Generic:
         case AddressSpace::ThreadLocal:
@@ -1524,8 +1540,7 @@ static bool isCallerPrivateRoot(IRInst* root, IRGlobalValueWithCode* func)
     {
         if (param->getParent() != func->getFirstBlock())
             return false;
-        auto paramType = param->getDataType();
-        if (!as<IROutParamTypeBase>(paramType) && !as<IRBorrowInParamType>(paramType))
+        if (!isLentParamType(param->getDataType()))
             return false;
         return !doesAddressEscape(param);
     }
@@ -1554,21 +1569,15 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // Unless addr is storage private to this function, a call with side effects may
-            // change its value, so we are conservative.
-            if (!isCallerPrivateRoot(getRootAddr(addr), func))
-            {
-                auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
-                }
-                else
-                {
-                    return true;
-                }
-            }
+            // A call with side effects may read or write any storage that is not private to
+            // `func`. For a private root, the call can only reach `addr` through its arguments,
+            // which the loop below checks. We test the cached callee purity first, so that a call
+            // to a side-effect-free callee never runs the use walk in `isCallerPrivateRoot`.
+            auto callee = call->getCallee();
+            const bool calleeHasSideEffect =
+                !callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache);
+            if (calleeHasSideEffect && !isCallerPrivateRoot(getRootAddr(addr), func))
+                return true;
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
             for (UInt i = 0; i < call->getArgCount(); i++)
