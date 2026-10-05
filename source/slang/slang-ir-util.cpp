@@ -1415,6 +1415,123 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// Return true if `call` passes the address at `argUse` to a parameter whose passing mode
+// (`out`, `inout` or `__constref`) only lends the address for the duration of the call, so
+// the callee cannot keep it for a later call to use. A plain pointer or `__ref` parameter can
+// keep it, and so can any callee whose parameter types we cannot see.
+static bool isAddressLentOnlyForCall(IRCall* call, IRUse* argUse)
+{
+    if (argUse == call->getCalleeUse())
+        return false;
+    auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
+    if (!funcType)
+        return false;
+    const UInt argIndex = UInt(argUse - call->getArgs());
+    if (argIndex >= funcType->getParamCount())
+        return false;
+    auto paramType = unwrapAttributedType(funcType->getParamType(argIndex));
+    return as<IROutParamTypeBase>(paramType) || as<IRBorrowInParamType>(paramType);
+}
+
+// Return true if the address `addr`, or an address derived from it, is used in a way that could
+// let code outside the current function reach it later: stored as a value, packed into an
+// aggregate, cast, passed as a plain pointer, and so on. Loading through it, storing through it
+// and lending it to a call (see `isAddressLentOnlyForCall`) do not leak it.
+//
+// Consider this example, where `w` writes `x` without being passed it:
+//
+//     uint x = 1;
+//     S s; s.p = &x;  // `x`'s address is now a value inside `s`
+//     w(s);
+//     outb[0] = x;    // must reload `x`
+//
+// The check is flow-insensitive: any leaking use anywhere in the function counts.
+static bool doesAddressEscape(IRInst* addr)
+{
+    for (auto use = addr->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (as<IRDecoration>(user))
+            continue;
+        const bool isFirstOperand = use == user->getOperands();
+        switch (user->getOp())
+        {
+        case kIROp_Load:
+        case kIROp_CopyLogical:
+        case kIROp_DebugValue:
+        case kIROp_LiveRangeStart:
+        case kIROp_LiveRangeEnd:
+            continue;
+        case kIROp_Store:
+        case kIROp_SwizzledStore:
+        case kIROp_MatrixSwizzleStore:
+            if (isFirstOperand)
+                continue;
+            return true;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+            if (isFirstOperand && !doesAddressEscape(user))
+                continue;
+            return true;
+        case kIROp_Call:
+            if (isAddressLentOnlyForCall(as<IRCall>(user), use))
+                continue;
+            return true;
+        default:
+            if (as<IRAtomicOperation>(user) && isFirstOperand)
+                continue;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Return true if `root` is storage private to one invocation of `func` that a call cannot
+// reach unless the call is passed its address. That holds for two kinds of root:
+//
+// - A local `var` of `func` in thread-private memory whose address does not escape. The
+//   groupshared exclusion matches `isGroupSharedAddr` in #13421: such a var can be reached
+//   through the kernel context and is ordered by barriers.
+// - A parameter of `func` passed `out`, `inout` or `__constref`, whose address does not
+//   escape. These have copy-in/copy-out or borrow semantics, so the caller's storage behind
+//   them is not visible to other code during the call.
+//
+// Any other root, such as a pointer value, a pointer or `__ref` parameter, or a buffer
+// element address, can point at memory any call may write.
+static bool isCallerPrivateRoot(IRInst* root, IRGlobalValueWithCode* func)
+{
+    if (auto var = as<IRVar>(root))
+    {
+        if (!isChildInstOf(var, func))
+            return false;
+        if (as<IRGroupSharedRate>(var->getRate()))
+            return false;
+        auto ptrType = as<IRPtrTypeBase>(var->getDataType());
+        if (!ptrType)
+            return false;
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Generic:
+        case AddressSpace::ThreadLocal:
+        case AddressSpace::Function:
+            break;
+        default:
+            return false;
+        }
+        return !doesAddressEscape(var);
+    }
+    if (auto param = as<IRParam>(root))
+    {
+        if (param->getParent() != func->getFirstBlock())
+            return false;
+        auto paramType = param->getDataType();
+        if (!as<IROutParamTypeBase>(paramType) && !as<IRBorrowInParamType>(paramType))
+            return false;
+        return !doesAddressEscape(param);
+    }
+    return false;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1437,9 +1554,9 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // Unless addr is storage private to this function, a call with side effects may
+            // change its value, so we are conservative.
+            if (!isCallerPrivateRoot(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
