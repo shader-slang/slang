@@ -3028,9 +3028,23 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
                 }
             }
         }
+        else if (as<DeclRefType>(checkedBase->type.type))
+        {
+            // An expression whose checked type is a `DeclRefType` is a value, such as a swizzle
+            // (`uv.y`) or tuple element (`t._0`), and a value takes no generic arguments. An
+            // expression that names a type, namespace, function, generic or overload set has a
+            // kind-like type that is not a `DeclRefType`, and a wrapper such as the `LetExpr`
+            // that `_CheckTerm` adds for temporaries takes the type of its body.
+            baseKind = BaseGenericKind::NonGeneric;
+        }
 
-        if (as<MemberExpr>(base) &&
-            (as<DeclRefExpr>(checkedBase) || as<OverloadedExpr>(checkedBase)))
+        // Checking a `MemberExpr` stores its dereferenced or opened base back into the node,
+        // so checking the unchecked node again can apply `->` to a non-pointer (`p->y` with
+        // `float2* p` would report that `vector<float,2>` cannot be dereferenced). We reuse the
+        // checked node once the kind is decided: `Generic` is only set for a `DeclRefExpr` or
+        // `OverloadedExpr`, which `AddGenericOverloadCandidates` accepts, while an `Unknown`
+        // node may be a `LetExpr` that it rejects, as in `h.o.get<4>()` with an interface `o`.
+        if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
         {
             base = checkedBase;
         }
