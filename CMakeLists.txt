@@ -924,8 +924,13 @@ configure_package_config_file(
 # unconditional include() of slangTargets.cmake (cmake/SlangConfig.cmake.in)
 # satisfied, so find_package(slang) works for static installs too.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    add_library(slang::slang ALIAS slang)
-    add_executable(slang::slang-compiler ALIAS slangc)
+    if (TARGET slang)
+        add_library(slang::slang ALIAS slang)
+    endif()
+
+    if (TARGET slangc)
+        add_executable(slang::slang-compiler ALIAS slangc)
+    endif()
 
     install(
         EXPORT SlangTargets
@@ -965,4 +970,3 @@ install(
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
-
