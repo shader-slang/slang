@@ -17,7 +17,7 @@ RWStructuredBuffer<uint> buf;
 RWStructuredBuffer<uint> outBuf;
 
 [noinline]
-void writeZero()
+void writeElementZero()
 {
     buf[0] = 7;
 }
@@ -26,7 +26,7 @@ void writeZero()
 void computeMain()
 {
     uint a = buf[0];
-    writeZero();
+    writeElementZero();
     uint b = buf[0];
     outBuf[0] = a * 100 + b;
 }
@@ -36,13 +36,13 @@ void computeMain()
 
 // HLSL-LABEL: void computeMain(
 // HLSL: uint a_0 = buf_0[int(0)];
-// HLSL-NEXT: writeZero_0();
+// HLSL-NEXT: writeElementZero_0();
 // CUDA-LABEL: void computeMain(
 // CUDA: uint a_0 = *
-// CUDA-NEXT: writeZero_0();
+// CUDA-NEXT: writeElementZero_0();
 // METAL-LABEL: void computeMain(
 // METAL: uint a_0 = *
-// METAL-NEXT: writeZero_0(
+// METAL-NEXT: writeElementZero_0(
 // GLSL-LABEL: void main(
 // GLSL: uint a_0 = buf_0._data[uint(0)];
-// GLSL-NEXT: writeZero_0();
+// GLSL-NEXT: writeElementZero_0();

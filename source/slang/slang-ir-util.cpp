@@ -1415,9 +1415,10 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-// Return true if `paramType` is an `out`, `inout` or `__constref` parameter type. `out` and
-// `inout` have copy-out and copy-in/copy-out semantics, and `__constref` is a read-only borrow, so
-// in each mode the callee is given the address only for the duration of one call.
+// Return true if `paramType` is an `out`, `inout` or `__constref` parameter type. In the source
+// language, `out` and `inout` pass a copy that lives only for the call
+// (docs/language-reference/declarations.md), and we treat a `__constref` borrow the same way, so
+// any address passed for these modes is treated as lent for the duration of one call.
 static bool isLentParamType(IRInst* paramType)
 {
     paramType = unwrapAttributedType(paramType);
@@ -1425,10 +1426,12 @@ static bool isLentParamType(IRInst* paramType)
 }
 
 // Return true if `call` passes the address at `argUse` to a lent parameter (see
-// `isLentParamType`). A callee that kept such an address beyond the call would be relying on
-// behaviour the language leaves undefined. A plain pointer or `__ref` parameter can keep it, and
-// so can a callee whose parameter types we cannot see, such as a call through a value that is not
-// an `IRFuncType`.
+// `isLentParamType`). We assume a lent argument does not let the callee keep the caller's address
+// beyond the call. That is a lifetime assumption taken from the source-language modes, not a
+// guarantee of separate storage in the lowered IR, where `undoParameterCopy` may bind the
+// parameter directly to the caller's storage. A plain pointer or `__ref` parameter can keep the
+// address, and so can a callee whose parameter types we cannot see, such as a call through a value
+// that is not an `IRFuncType`.
 static bool isAddressLentOnlyForCall(IRCall* call, IRUse* argUse)
 {
     if (argUse == call->getCalleeUse())
@@ -1514,11 +1517,13 @@ static bool doesAddressEscape(IRInst* addr)
 // Any other root, such as a pointer value, a pointer or `__ref` parameter, or a buffer element
 // address, can point at memory any call may write.
 //
-// A lent parameter counts as private because of its copy or read-only borrow semantics. The
-// language's no-alias allowance for `out`/`inout` arguments is per call site and says nothing
-// about other invocations. When `undoParameterCopy` binds an `inout` parameter directly to storage
-// that another invocation writes, forwarding still gives the copy semantics' value, but the
-// storage itself sees the callee's writes before the call returns.
+// A lent parameter counts as private because, in the source language, it names the callee's own
+// copy, or a borrow we treat the same way. That is an assumption about the argument, not a property
+// of the lowered code: `undoParameterCopy` can bind an `inout` parameter directly to the caller's
+// storage, whatever its address space. If other code writes that storage during the call (another
+// invocation, or a nested call through another pointer), forwarding still returns the copy
+// semantics' value, but `processLoadUse`, which moves a load later, reads the storage after those
+// writes. The lowering that removes the copy owns that case.
 static bool isCallerPrivateRoot(IRInst* root, IRGlobalValueWithCode* func)
 {
     if (auto var = as<IRVar>(root))
@@ -1573,8 +1578,11 @@ bool canInstHaveSideEffectAtAddress(
 
             // A call with side effects may read or write any storage that is not private to
             // `func`. For a private root, the call can only reach `addr` through its arguments,
-            // which the loop below checks. Both answers for a side-effect-free callee lead to that
-            // loop, so we test purity first and skip the use walk in `isCallerPrivateRoot`.
+            // which the loop below checks. A side-effect-free callee is assumed to reach memory
+            // only through its arguments too, so for it the loop decides whatever the root is; we
+            // test purity first and skip the use walk in `isCallerPrivateRoot`. That assumption
+            // ignores reads by a side-effect-free callee, which matter to
+            // `tryRemoveRedundantStore`.
             auto callee = call->getCallee();
             const bool calleeHasSideEffect =
                 !callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache);

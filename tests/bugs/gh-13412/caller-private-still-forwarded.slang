@@ -2,8 +2,8 @@
 // address (see shader-slang/slang#13412). The cases are: a local array kept in memory by a dynamic
 // index; a local var whose address is only lent to an `inout` parameter; and an `inout`
 // parameter, which has copy-in/copy-out semantics.
-// The CPU lane passes `-g0`: render-test compiles with debug info by default, and that keeps the
-// load the forwarding would remove, so the lane would pass even on a miscompiling compiler.
+// The CPU lane checks only the values, which are the same with or without forwarding; the CUDA
+// and Metal lanes check that the forwarding happens.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none

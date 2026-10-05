@@ -4,10 +4,14 @@
 // different way, and `w` then writes the variable, or `r` reads it, through global memory.
 // The CPU lane passes `-g0`: render-test compiles with debug info by default, and that keeps the
 // load the forwarding would remove, so the lane would pass even on a miscompiling compiler.
+// The SPIR-V lane passes `-skip-spirv-validation`: pointers to local memory are supported only on
+// CUDA and CPU (docs/language-reference/types-pointer.md), and storing a `Function` variable's
+// address to memory is invalid SPIR-V. The lane checks only that no function returns the
+// forwarded constant `%uint_1`.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
-//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -skip-spirv-validation
 
 struct H
 {
@@ -172,6 +176,9 @@ uint storeBeforeReadingCall()
 // CUDA: x_{{[0-9]+}} = 1U;
 // CUDA-NEXT: r_0();
 
+// The SPIR-V lane skips the `storedAfterInit` control, which is correct on every build, and
+// `storeBeforeReadingCall`, whose `x = 1` store spirv-opt removes at the default optimization
+// level although the Slang output keeps it.
 // SPV-LABEL: %storedBeforeInit = OpFunction
 // SPV-NOT: OpReturnValue %uint_1
 // SPV: OpFunctionEnd
