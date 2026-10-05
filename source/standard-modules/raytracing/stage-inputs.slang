@@ -7,12 +7,11 @@ namespace rt
 // Native targets expose much of that state through existing core-module intrinsics. The helpers
 // remain force-inlined so capability and stage checks apply at the shader's property access.
 //
-// TODO: Metal stage-input lowering must obtain these values from the generated intersection or
-// post-traversal dispatch parameters. Metal has no corresponding set of implicit DXR-style stage
-// intrinsics, so these implementations cannot simply call the core-module intrinsics there.
-// The default target-switch arms below are frontend placeholders, not meaningful zero-valued
-// Metal implementations. Structural adapter/operation checks currently reject target code
-// generation until the compiler can synthesize those parameters and replace the placeholders.
+// Metal stage-input lowering must obtain these values from generated intersection or
+// post-traversal dispatch parameters. Each pending Metal implementation therefore fails with a
+// target-specific static assertion until that synthesis is added in a following PR. These
+// assertions allow module import and frontend checking; they reject reachable target code
+// generation. Returns after a failed assertion only satisfy return checking and cannot execute.
 
 /// Returns the minimum valid distance for the current ray.
 [ForceInline]
@@ -25,7 +24,11 @@ internal float getStageInputMinDistance()
     case spirv:
     case cuda:
         return RayTMin();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the ray minimum distance from Metal stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing minDistance requires compiler synthesis");
         return 0.0;
     }
 }
@@ -41,7 +44,10 @@ internal float getStageInputCurrentDistance()
     case spirv:
     case cuda:
         return RayTCurrent();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the current hit distance or traversal upper bound
+        // from Metal stage state.
+        static_assert(false, "Metal structural ray-tracing distance requires compiler synthesis");
         return 0.0;
     }
 }
@@ -57,7 +63,10 @@ internal uint getStageInputHitKind()
     case spirv:
     case cuda:
         return HitKind();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the candidate or committed hit classification from
+        // Metal stage state.
+        static_assert(false, "Metal structural ray-tracing hitKind requires compiler synthesis");
         return 0;
     }
 }
@@ -73,7 +82,9 @@ internal uint getStageInputRayFlags()
     case spirv:
     case cuda:
         return RayFlags();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the trace call's ray flags from Metal stage state.
+        static_assert(false, "Metal structural ray-tracing rayFlags requires compiler synthesis");
         return 0;
     }
 }
@@ -89,7 +100,12 @@ internal uint getStageInputPrimitiveIndex()
     case spirv:
     case cuda:
         return PrimitiveIndex();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the candidate or committed primitive index from
+        // Metal stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing primitiveIndex requires compiler synthesis");
         return 0;
     }
 }
@@ -104,7 +120,16 @@ internal uint getStageInputGeometryIndex()
     case glsl:
     case spirv:
         return GeometryIndex();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the candidate or committed geometry index from Metal
+        // stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing geometryIndex requires compiler synthesis");
+        return 0;
+    case cuda:
+        // TODO: A following PR must implement the geometry-index mapping for OptiX.
+        static_assert(false, "CUDA structural ray-tracing geometryIndex is not implemented");
         return 0;
     }
 }
@@ -120,7 +145,11 @@ internal float3 getStageInputWorldSpaceOrigin()
     case spirv:
     case cuda:
         return WorldRayOrigin();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the world-space ray origin from Metal stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing worldSpaceOrigin requires compiler synthesis");
         return 0.0;
     }
 }
@@ -136,7 +165,12 @@ internal float3 getStageInputWorldSpaceDirection()
     case spirv:
     case cuda:
         return WorldRayDirection();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the world-space ray direction from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing worldSpaceDirection requires compiler synthesis");
         return 0.0;
     }
 }
@@ -152,7 +186,12 @@ internal uint3 getStageInputDispatchRaysIndex()
     case spirv:
     case cuda:
         return DispatchRaysIndex();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the originating dispatch index from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing dispatchRaysIndex requires compiler synthesis");
         return 0;
     }
 }
@@ -168,7 +207,12 @@ internal uint3 getStageInputDispatchRaysDimensions()
     case spirv:
     case cuda:
         return DispatchRaysDimensions();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the originating dispatch dimensions from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing dispatchRaysDimensions requires compiler synthesis");
         return 0;
     }
 }
@@ -182,7 +226,13 @@ internal float getStageInputRayTime()
     case glsl:
     case spirv:
         return RayCurrentTime();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the motion-enabled ray time from Metal stage state.
+        static_assert(false, "Metal structural ray-tracing time requires compiler synthesis");
+        return 0.0;
+    case cuda:
+        // TODO: A following PR must expose the current OptiX ray time through the core module.
+        static_assert(false, "CUDA structural ray-tracing time is not implemented");
         return 0.0;
     }
 }
@@ -198,7 +248,12 @@ internal uint getStageInputInstanceIndex()
     case spirv:
     case cuda:
         return InstanceIndex();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the candidate or committed instance index from Metal
+        // stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing instanceIndex requires compiler synthesis");
         return 0;
     }
 }
@@ -214,7 +269,10 @@ internal uint getStageInputInstanceID()
     case spirv:
     case cuda:
         return InstanceID();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the application-provided instance identifier from
+        // Metal stage state.
+        static_assert(false, "Metal structural ray-tracing instanceID requires compiler synthesis");
         return 0;
     }
 }
@@ -236,7 +294,12 @@ internal RayDesc getStageInputCandidateObjectSpaceRay()
         result.TMin = RayTMin();
         result.Direction = ObjectRayDirection();
         result.TMax = RayTCurrent();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the candidate ray in object space from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing objectSpaceRay requires compiler synthesis");
         break;
     }
     return result;
@@ -265,7 +328,12 @@ internal RayDesc getStageInputClosestHitObjectSpaceRay()
         result.TMin = RayTMin();
         result.Direction = mul(worldToObject, float4(WorldRayDirection(), 0.0));
         result.TMax = RayTCurrent();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the committed-hit ray in object space from Metal
+        // stage state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing objectSpaceRay requires compiler synthesis");
         break;
     }
     return result;
@@ -282,7 +350,12 @@ internal float4x3 getStageInputObjectToWorld()
     case spirv:
     case cuda:
         return ObjectToWorld4x3();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the object-to-world transform from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing objectToWorld requires compiler synthesis");
         return 0.0;
     }
 }
@@ -298,7 +371,12 @@ internal float4x3 getStageInputWorldToObject()
     case spirv:
     case cuda:
         return WorldToObject4x3();
-    default:
+    case metal:
+        // TODO: A following PR must synthesize the world-to-object transform from Metal stage
+        // state.
+        static_assert(
+            false,
+            "Metal structural ray-tracing worldToObject requires compiler synthesis");
         return 0.0;
     }
 }
@@ -500,7 +578,11 @@ public struct AnyHitInput<Context> : ICommonHitInput
         case spirv:
         case cuda:
             IgnoreHit();
-        default:
+        case metal:
+            // TODO: A following PR must synthesize Metal candidate rejection.
+            static_assert(
+                false,
+                "Metal structural ray-tracing ignoreHit requires compiler synthesis");
             break;
         }
     }
@@ -514,7 +596,12 @@ public struct AnyHitInput<Context> : ICommonHitInput
         case spirv:
         case cuda:
             AcceptHitAndEndSearch();
-        default:
+        case metal:
+            // TODO: A following PR must synthesize Metal candidate acceptance and traversal
+            // termination.
+            static_assert(
+                false,
+                "Metal structural ray-tracing acceptHitAndEndSearch requires compiler synthesis");
             break;
         }
     }
@@ -591,7 +678,12 @@ public struct IntersectionInput<Context> : ICommonHitInput
         case spirv:
         case cuda:
             return ReportHit(distance, 0, attributes);
-        default:
+        case metal:
+            // TODO: A following PR must synthesize Metal procedural candidate reporting and any-hit
+            // dispatch.
+            static_assert(
+                false,
+                "Metal structural ray-tracing reportHit requires compiler synthesis");
             return false;
         }
     }
@@ -608,7 +700,12 @@ public struct IntersectionInput<Context> : ICommonHitInput
         case spirv:
         case cuda:
             return ReportHit(distance, hitKind, attributes);
-        default:
+        case metal:
+            // TODO: A following PR must synthesize Metal procedural candidate reporting and any-hit
+            // dispatch.
+            static_assert(
+                false,
+                "Metal structural ray-tracing reportHit requires compiler synthesis");
             return false;
         }
     }

@@ -2,6 +2,8 @@
 //TEST:SIMPLE: -experimental-feature -target spirv -no-codegen
 //TEST:SIMPLE: -experimental-feature -target cuda -no-codegen
 //TEST:SIMPLE: -experimental-feature -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry TriangleClosestHit -stage closesthit -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry TriangleAnyHit -stage anyhit -target metal -no-codegen
 
 import slang.raytracing;
 

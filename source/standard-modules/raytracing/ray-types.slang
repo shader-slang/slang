@@ -116,13 +116,14 @@ public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
 /// ABI parameter.
 public struct TriangleData
 {
-    [require(raytracing_anyhit_closesthit)]
+    // TODO: A following PR must connect this getter to native hit attributes or Metal stage state.
+    [require(structural_raytracing_anyhit_closesthit)]
     public property float2 barycentricCoord
     {
         get;
     }
 
-    [require(raytracing_anyhit_closesthit)]
+    [require(structural_raytracing_anyhit_closesthit)]
     public property bool frontFacing
     {
         get
@@ -134,8 +135,13 @@ public struct TriangleData
             case spirv:
             case cuda:
                 return HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-            default:
-                return false;
+            case metal:
+                // TODO: A following PR must synthesize the candidate's [[front_facing]] input or
+                // the committed intersection result's triangle_front_facing value.
+                static_assert(
+                    false,
+                    "Metal structural ray-tracing frontFacing requires compiler synthesis");
+                return false; // Unreachable; required by return checking.
             }
         }
     }
@@ -145,6 +151,8 @@ public struct TriangleData
 [require(metallib_3_1)]
 public struct CurveData
 {
+    // TODO: A following PR must synthesize this getter from Metal's candidate or committed curve
+    // data.
     public property float parameter
     {
         get;
