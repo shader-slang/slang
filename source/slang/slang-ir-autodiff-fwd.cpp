@@ -1373,7 +1373,9 @@ struct ForwardDiffTranslationContext
             }
         }
 
-        if (as<IRVoidLit>(diffCallee))
+        // A forward derivative with no derivative of its own, absent or void, has none to fall
+        // back on.
+        if (as<IRVoidLit>(diffCallee) || (!diffCallee && isForwardDerivativeCallee(primalCallee)))
         {
             // Diagnose.
             getSink()->diagnose(
