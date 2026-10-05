@@ -5,7 +5,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-//TEST_INPUT:ubuffer(data=[1 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
+//TEST_INPUT:ubuffer(data=[1 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<int> buf;
 
 typedef int T;
@@ -53,6 +53,10 @@ void computeMain()
 
     struct S { int x; } s0 = { buf[1] }, s1 = { s0.x < 6 };
 
+    // A type declared by the type specifier is visible to the first
+    // declarator's initializer.
+    struct R { static const int N = 1; int v; } r0 = { R::N < 2 }, r1 = { R::N + r0.v };
+
     int e = 0;
     for (int i = buf[0], f = i < 2; i < 2; i++)
         e = f;
@@ -73,6 +77,7 @@ void computeMain()
     buf[13] = readGlobalBeforeGroup();
     buf[14] = NS::m * 10 + NS::n;
     buf[15] = Q::m * 10 + Q::n;
+    buf[16] = r0.v * 10 + r1.v;
 }
 
 // CHECK: 1
@@ -91,3 +96,4 @@ void computeMain()
 // CHECK-NEXT: 8
 // CHECK-NEXT: 30
 // CHECK-NEXT: 30
+// CHECK-NEXT: 12

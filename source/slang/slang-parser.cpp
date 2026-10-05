@@ -3840,6 +3840,11 @@ static DeclBase* ParseDeclaratorDecl(
     }
 
 
+    // A type declared by the type specifier is visible to the initializer of
+    // the first declarator, as in `struct S { ... } s = { S::N < 2 };`.
+    if (typeSpec.decl)
+        declGroupBuilder.beginGroup();
+
     InitDeclarator initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
 
     DeclaratorInfo declaratorInfo;
