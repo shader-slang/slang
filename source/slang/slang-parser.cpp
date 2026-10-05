@@ -314,6 +314,13 @@ static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl);
 
 static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl);
 
+static void CompleteDecl(
+    Parser* parser,
+    Decl* decl,
+    ContainerDecl* containerDecl,
+    Modifiers modifiers,
+    Scope* modifierScope);
+
 static void parseModernParamList(Parser* parser, CallableDecl* decl);
 
 static TokenType peekTokenType(Parser* parser);
@@ -2853,13 +2860,31 @@ static void UnwrapDeclarator(
     ioInfo->initializer = initDeclarator.initializer;
 }
 
-// Either a single declaration, or a group of them
+// Either a single declaration, or a group of them.
+//
+// A single declaration is left for the caller to complete. Each member of a
+// group is completed as soon as it joins the group, so that it is visible to
+// the declarators parsed after it, as in `int j = buf[0], k = j < 2;`.
 struct DeclGroupBuilder
 {
+    DeclGroupBuilder(
+        Parser* parser,
+        ContainerDecl* containerDecl,
+        Modifiers modifiers,
+        SourceLoc startPosition)
+        : parser(parser)
+        , containerDecl(containerDecl)
+        , modifiers(modifiers)
+        , startPosition(startPosition)
+    {
+    }
+
+    Parser* parser;
+    ContainerDecl* containerDecl;
+    Modifiers modifiers;
     SourceLoc startPosition;
     Decl* decl = nullptr;
     DeclGroup* group = nullptr;
-    ASTBuilder* astBuilder = nullptr;
 
     // Add a new declaration to the potential group
     void addDecl(Decl* newDecl)
@@ -2867,21 +2892,33 @@ struct DeclGroupBuilder
         SLANG_ASSERT(newDecl);
 
         if (decl)
-        {
-            group = astBuilder->create<DeclGroup>();
-            group->loc = startPosition;
-            group->decls.add(decl);
-            decl = nullptr;
-        }
+            beginGroup();
 
         if (group)
-        {
-            group->decls.add(newDecl);
-        }
+            addToGroup(newDecl);
         else
-        {
             decl = newDecl;
-        }
+    }
+
+    // Turn the single declaration added so far into a group, completing it.
+    void beginGroup()
+    {
+        if (group)
+            return;
+        SLANG_ASSERT(decl);
+
+        group = parser->astBuilder->create<DeclGroup>();
+        group->loc = startPosition;
+
+        // Every member of the group gets the same modifiers, so we mark where
+        // the shared modifiers start, letting later passes tell them apart
+        // from the modifiers specific to a single declaration.
+        auto sharedModifiers = parser->astBuilder->create<SharedModifiers>();
+        sharedModifiers->next = modifiers.first;
+        modifiers.first = sharedModifiers;
+
+        addToGroup(decl);
+        decl = nullptr;
     }
 
     DeclBase* getResult()
@@ -2889,6 +2926,13 @@ struct DeclGroupBuilder
         if (group)
             return group;
         return decl;
+    }
+
+private:
+    void addToGroup(Decl* newDecl)
+    {
+        group->decls.add(newDecl);
+        CompleteDecl(parser, newDecl, containerDecl, modifiers, nullptr);
     }
 };
 
@@ -3701,7 +3745,11 @@ static TypeSpec _parseTypeSpec(Parser* parser)
     return typeSpec;
 }
 
-
+/// Parse a declarator-based declaration, such as `int a = 1, b = a < 2;`.
+///
+/// A single declaration is returned without being completed, and the caller
+/// completes it with `CompleteDecl`. A `DeclGroup` is returned with all of its
+/// members already completed, and must not be completed again.
 static DeclBase* ParseDeclaratorDecl(
     Parser* parser,
     ContainerDecl* containerDecl,
@@ -3720,9 +3768,7 @@ static DeclBase* ParseDeclaratorDecl(
     // We may need to build up multiple declarations in a group,
     // but the common case will be when we have just a single
     // declaration
-    DeclGroupBuilder declGroupBuilder;
-    declGroupBuilder.startPosition = startPosition;
-    declGroupBuilder.astBuilder = parser->astBuilder;
+    DeclGroupBuilder declGroupBuilder(parser, containerDecl, modifiers, startPosition);
 
     // The type specifier may include a declaration. E.g.,
     // it might declare a `struct` type.
@@ -3898,6 +3944,7 @@ static DeclBase* ParseDeclaratorDecl(
         }
 
         // expect another variable declaration...
+        declGroupBuilder.beginGroup();
         initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
     }
 }
@@ -6057,27 +6104,11 @@ static DeclBase* ParseDeclWithModifiers(
         break;
     }
 
-    if (decl)
+    // A `DeclGroup` comes from `ParseDeclaratorDecl`, which has already
+    // completed its members.
+    if (auto dd = as<Decl>(decl))
     {
-        if (auto dd = as<Decl>(decl))
-        {
-            CompleteDecl(parser, dd, containerDecl, modifiers, modifierScope);
-        }
-        else if (auto declGroup = as<DeclGroup>(decl))
-        {
-            // We are going to add the same modifiers to *all* of these declarations,
-            // so we want to give later passes a way to detect which modifiers
-            // were shared, vs. which ones are specific to a single declaration.
-
-            auto sharedModifiers = parser->astBuilder->create<SharedModifiers>();
-            sharedModifiers->next = modifiers.first;
-            modifiers.first = sharedModifiers;
-
-            for (auto subDecl : declGroup->decls)
-            {
-                CompleteDecl(parser, subDecl, containerDecl, modifiers, nullptr);
-            }
-        }
+        CompleteDecl(parser, dd, containerDecl, modifiers, modifierScope);
     }
     return decl;
 }
