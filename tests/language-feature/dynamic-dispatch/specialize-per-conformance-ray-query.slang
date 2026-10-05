@@ -58,8 +58,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // DXIL: call void @dx.op.rayQuery_CommitProceduralPrimitiveHit
 // DXIL: call void @dx.op.rayQuery_CommitProceduralPrimitiveHit
 // DXIL-NOT: call void @dx.op.rayQuery_CommitProceduralPrimitiveHit
+// SPIRV-NOT: OpRayQueryGenerateIntersectionKHR
 // SPIRV: OpRayQueryGetIntersectionObjectRayOriginKHR
+// SPIRV-NOT: OpRayQueryGenerateIntersectionKHR
 // SPIRV: OpRayQueryGenerateIntersectionKHR
+// SPIRV-NOT: OpRayQueryGenerateIntersectionKHR
 // SPIRV: OpRayQueryGetIntersectionObjectRayOriginKHR
+// SPIRV-NOT: OpRayQueryGenerateIntersectionKHR
 // SPIRV: OpRayQueryGenerateIntersectionKHR
 // SPIRV-NOT: OpRayQueryGenerateIntersectionKHR

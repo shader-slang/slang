@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=EIGHT):-target hlsl -entry computeMain -conformance N0:ICode=0 -conformance N1:ICode=1 -conformance N2:ICode=2 -conformance N3:ICode=3 -conformance N4:ICode=4 -conformance N5:ICode=5 -conformance N6:ICode=6 -conformance N7:ICode=7 -warnings-as-errors 55219
-//DIAGNOSTIC_TEST:SIMPLE(diag=NINE,non-exhaustive):-target hlsl -entry computeMain -conformance N0:ICode=0 -conformance N1:ICode=1 -conformance N2:ICode=2 -conformance N3:ICode=3 -conformance N4:ICode=4 -conformance N5:ICode=5 -conformance N6:ICode=6 -conformance N7:ICode=7 -conformance N8:ICode=8
-//DIAGNOSTIC_TEST:SIMPLE(diag=NINE,non-exhaustive):-target hlsl -entry computeMain -conformance N0:ICode=0 -conformance N1:ICode=1 -conformance N2:ICode=2 -conformance N3:ICode=3 -conformance N4:ICode=4 -conformance N5:ICode=5 -conformance N6:ICode=6 -conformance N7:ICode=7 -conformance N8:ICode=8 -warnings-as-errors 55219
+//DIAGNOSTIC_TEST:SIMPLE(diag=NINE_WARNING):-target hlsl -entry computeMain -conformance N0:ICode=0 -conformance N1:ICode=1 -conformance N2:ICode=2 -conformance N3:ICode=3 -conformance N4:ICode=4 -conformance N5:ICode=5 -conformance N6:ICode=6 -conformance N7:ICode=7 -conformance N8:ICode=8
+//DIAGNOSTIC_TEST:SIMPLE(diag=NINE_ERROR):-target hlsl -entry computeMain -conformance N0:ICode=0 -conformance N1:ICode=1 -conformance N2:ICode=2 -conformance N3:ICode=3 -conformance N4:ICode=4 -conformance N5:ICode=5 -conformance N6:ICode=6 -conformance N7:ICode=7 -conformance N8:ICode=8 -warnings-as-errors 55219
 // Diagnostic coverage below checks the same resource limit separately.
 
 
@@ -46,4 +46,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 
 // EIGHT-COUNT-8: = readMarker
-// NINE: exceeds the current resource limit of 8 concrete copies
+//NINE_WARNING: warning E55219
+//NINE_WARNING: exceeds the current resource limit of 8 concrete copies
+//NINE_ERROR: error E55219
+//NINE_ERROR: exceeds the current resource limit of 8 concrete copies

@@ -3877,8 +3877,23 @@ static IRFunc* trySpecializeHelperPerConformance(
         args[typeArgIndex] = concreteType;
         for (Index j = 0; j < witnessSets.getCount(); ++j)
             args[witnessArgIndices[j]] = witnessesByType[j].getValue(concreteType);
+        // In combine<A>(value), both the function and its type must use A and
+        // its witnesses. The incoming specialization still has the dynamic
+        // signature, so specialize the generic's type with the same arguments
+        // before constructing the concrete function specialization.
+        auto concreteTypeSpec = cast<IRSpecialize>(
+            builder.emitSpecializeInst(builder.getTypeKind(), generic->getDataType(), args));
+        if (context)
+            context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                concreteTypeSpec,
+                specializationDepth);
+        failureReason = "concrete generic specialization could not be completed";
+        auto concreteSpecializedType = context ? specializeGeneric(context, concreteTypeSpec)
+                                               : specializeGeneric(concreteTypeSpec);
+        if (!concreteSpecializedType)
+            return nullptr;
         auto concreteSpec = cast<IRSpecialize>(
-            builder.emitSpecializeInst(specializeInst->getFullType(), generic, args));
+            builder.emitSpecializeInst(cast<IRType>(concreteSpecializedType), generic, args));
         if (context)
             context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
                 concreteSpec,
@@ -3889,6 +3904,7 @@ static IRFunc* trySpecializeHelperPerConformance(
         if (!concreteFunc)
             return nullptr;
         auto concreteFuncType = cast<IRFuncType>(concreteFunc->getDataType());
+        SLANG_RELEASE_ASSERT(concreteSpec->getFullType() == concreteFuncType);
 
         // Fixed concrete results need no conversion. Dynamic results would require
         // choosing a common representation and possibly reconstructing a result tag.
