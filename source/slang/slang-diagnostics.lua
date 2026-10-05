@@ -1444,7 +1444,7 @@ err(
 
 err(
     "invalid-ref-param-access",
-    30032,
+    30034,
     "invalid access for a reference parameter type",
     span { loc = "typeExp:Expr", message = "'~access:Int' is not a valid access for '~type:Type'; expected 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'." }
 )
