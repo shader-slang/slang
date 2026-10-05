@@ -10,6 +10,20 @@ RWStructuredBuffer<int> buf;
 
 typedef int T;
 int g<let N : int>() { return N; }
+static int j5 = 5;
+
+// Groups at namespace and struct scope are parsed eagerly, before any semantic
+// checking, and also see their earlier declarators.
+namespace NS
+{
+static const int T = 4, m = (T) - 1;
+static const int g = 1, n = g < 0;
+}
+struct Q
+{
+    static const int T = 4, m = (T) - 1;
+    static const int g = 1, n = g < 0;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -34,6 +48,11 @@ void computeMain()
     for (int i = buf[0], f = i < 2; i < 2; i++)
         e = f;
 
+    // A use of a name before the statement that declares it in a group still
+    // refers to the outer declaration.
+    int y = j5;
+    int j5 = 1, k5 = 2;
+
     buf[0] = k;
     buf[1] = j1;
     buf[2] = k2;
@@ -47,6 +66,9 @@ void computeMain()
     buf[10] = n;
     buf[11] = s1.x;
     buf[12] = e;
+    buf[13] = y + j5 + k5;
+    buf[14] = NS::m * 10 + NS::n;
+    buf[15] = Q::m * 10 + Q::n;
 }
 
 // CHECK: 1
@@ -62,3 +84,6 @@ void computeMain()
 // CHECK-NEXT: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
+// CHECK-NEXT: 8
+// CHECK-NEXT: 30
+// CHECK-NEXT: 30

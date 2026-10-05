@@ -67,6 +67,19 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     // local `struct` declaration, where it would have members
     // that need to be recursively checked.
     //
+    if (auto declGroup = as<DeclGroup>(stmt->decl))
+    {
+        // Each member of a group becomes visible as soon as it is checked,
+        // so that a later initializer can refer to an earlier member, as in
+        // `int a = 1, b = a;`.
+        for (auto decl : declGroup->decls)
+        {
+            ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
+            decl->hiddenFromLookup = false;
+        }
+        return;
+    }
+
     ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
     if (auto decl = as<Decl>(stmt->decl))
     {
@@ -119,7 +132,14 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 if (auto declStmt = as<DeclStmt>(subStmt))
                 {
                     if (auto decl = as<Decl>(declStmt->decl))
+                    {
                         decl->hiddenFromLookup = true;
+                    }
+                    else if (auto declGroup = as<DeclGroup>(declStmt->decl))
+                    {
+                        for (auto dd : declGroup->decls)
+                            dd->hiddenFromLookup = true;
+                    }
                 }
             }
         }
