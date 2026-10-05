@@ -4460,8 +4460,9 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
-    /// Check `decl`, a local declaration whose statement has been reached, and
-    /// make it visible to the code that follows its declarator.
+    /// Check `decl`, a local declaration whose statement has been reached, make it
+    /// visible to the code that follows its declarator, and register the lambda
+    /// captures in its initializer.
     void checkDeclAtDeclarationPoint(Decl* decl);
 
     void visitBlockStmt(BlockStmt* stmt);

@@ -57,7 +57,7 @@ void computeMain()
     // declarator's initializer.
     struct R { static const int N = 1; int v; } r0 = { R::N < 2 }, r1 = { R::N + r0.v };
 
-    // Grouped locals in a lambda must register captures as single locals do.
+    // Grouped locals in a lambda body that capture an outer local.
     int lc = buf[1];
     let lf = (int x) => { int la = lc, lb = la < x; return lb * 10 + la; };
 

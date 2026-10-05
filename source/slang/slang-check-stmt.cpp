@@ -57,15 +57,6 @@ CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
 
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
-    // When we encounter a declaration during statement checking,
-    // it may already be partly checked, for example by a parser-time
-    // lookup that decides what `a <` means, so we bottleneck through
-    // the `ensureDecl()` path to unify with the rest of semantic checking.
-    //
-    // TODO: This logic might not suffice for something like a
-    // local `struct` declaration, where it would have members
-    // that need to be recursively checked.
-    //
     if (auto declGroup = as<DeclGroup>(stmt->decl))
     {
         // The members of a group reach their declaration points in order, so
@@ -83,6 +74,15 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 
 void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
 {
+    // When we encounter a declaration during statement checking,
+    // it may already be partly checked, for example by a parser-time
+    // lookup that decides what `a <` means, so we bottleneck through
+    // the `ensureDecl()` path to unify with the rest of semantic checking.
+    //
+    // TODO: This logic might not suffice for something like a
+    // local `struct` declaration, where it would have members
+    // that need to be recursively checked.
+    //
     ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
     decl->hiddenFromLookup = false;
     if (auto varDecl = as<VarDeclBase>(decl))

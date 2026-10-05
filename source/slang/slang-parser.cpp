@@ -3871,7 +3871,8 @@ static DeclBase* ParseDeclaratorDecl(
         UnwrapDeclarator(parser, initDeclarator, &declaratorInfo, /*allowOperatorName*/ true);
 
         // diagnose new type declaration, which is not allowed in function
-        // return type expression
+        // return type expression. The type was already completed above, so it
+        // stays a member of the container and later uses of it still resolve.
         if (typeSpec.decl)
         {
             StringBuilder sb;
@@ -3953,7 +3954,9 @@ static DeclBase* ParseDeclaratorDecl(
         // expect another variable declaration...
         //
         // The declarator just parsed is visible to the initializer of the
-        // next one, so it is completed before the next one is parsed.
+        // next one. After the first `,` the group exists, and `addDecl` has
+        // already completed each declarator, so only the first call here
+        // completes anything.
         declGroupBuilder.beginGroup();
         initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
     }
