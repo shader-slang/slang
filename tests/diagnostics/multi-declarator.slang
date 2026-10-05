@@ -17,9 +17,9 @@ void computeMain()
 //CHECK:                ^ undefined identifier
 //CHECK:                ^ undefined identifier 'b'.
 
-    // Modifiers written before a type specifier that declares a type apply to
-    // the declarators, so they are not diagnosed on the type when at least one
-    // declarator follows.
+    // A type specifier with at least one declarator forms a group, and the
+    // group's shared modifiers are not diagnosed on the type. This pins the
+    // `SharedModifiers` marker that `DeclGroupBuilder::beginGroup` adds.
     static struct L { int x; };
 /*CHECK:
     ^^^^^^ modifier not allowed

@@ -2862,9 +2862,12 @@ static void UnwrapDeclarator(
 
 // Either a single declaration, or a group of them.
 //
-// A single declaration is left for the caller to complete. Each member of a
-// group is completed as soon as it joins the group, so that it is visible to
-// the declarators parsed after it, as in `int j = buf[0], k = j < 2;`.
+// Completing a declaration (`CompleteDecl`) attaches its modifiers and adds it
+// to its container, which makes it visible to parser-time lookups such as the
+// one that decides what `j <` means, in both parsing stages. A single
+// declaration is left for the caller to complete. Each member of a group is
+// completed as soon as it joins the group, so that it is visible to the
+// declarators parsed after it, as in `int j = buf[0], k = j < 2;`.
 struct DeclGroupBuilder
 {
     DeclGroupBuilder(
@@ -3948,6 +3951,9 @@ static DeclBase* ParseDeclaratorDecl(
         }
 
         // expect another variable declaration...
+        //
+        // The declarator just parsed is visible to the initializer of the
+        // next one, so it is completed before the next one is parsed.
         declGroupBuilder.beginGroup();
         initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
     }

@@ -4460,6 +4460,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
+    /// Check `decl`, a local declaration whose statement has been reached, and
+    /// make it visible to the code that follows its declarator.
+    void checkDeclAtDeclarationPoint(Decl* decl);
+
     void visitBlockStmt(BlockStmt* stmt);
 
     void visitSeqStmt(SeqStmt* stmt);
