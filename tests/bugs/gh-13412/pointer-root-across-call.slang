@@ -43,7 +43,6 @@ uint f(uint* q)
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // The pointer is a value loaded inside this function.
     uint* q = cb.p;
     *q = 1;
     w();

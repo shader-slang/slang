@@ -51,8 +51,8 @@ uint storedBeforeInit()
     return x;
 }
 
-// The address is stored to global memory after `x = 1`, so the store itself stops the
-// forwarding; this one was already correct.
+// Control: the address is stored to global memory after `x = 1`, and that store through a
+// user pointer already orders the later load of `x`.
 [noinline]
 uint storedAfterInit()
 {
