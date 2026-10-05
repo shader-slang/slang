@@ -1,5 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
 
 // A user-written forward derivative can be differentiated directly in backward mode.
 // For x^3, seeding the tangent result gives 6*x*dx for x and 3*x^2 for dx.
@@ -10,6 +10,18 @@ float cube(float x) { return x * x * x; }
 DifferentialPair<float> cubeFwd(DifferentialPair<float> x)
 {
     return diffPair(x.p * x.p * x.p, 3.0 * x.p * x.p * x.d);
+}
+
+[ForwardDerivative(genericCubeFwd)]
+float genericCube<let Scale : int>(float x)
+{
+    return float(Scale) * x * x * x;
+}
+
+[Differentiable]
+DifferentialPair<float> genericCubeFwd<let Scale : int>(DifferentialPair<float> x)
+{
+    return diffPair(float(Scale) * x.p * x.p * x.p, float(Scale) * 3.0 * x.p * x.p * x.d);
 }
 
 struct Cubic
@@ -45,4 +57,11 @@ void computeMain()
     outputBuffer[2] = y.d.p;
     // CHECK: 6.0
     outputBuffer[3] = y.d.d;
+
+    var z = diffPair(diffPair(4.0, 0.5));
+    __bwd_diff(__fwd_diff(genericCube<2>))(z, diffPair(0.0, 2.0));
+    // CHECK: 48.0
+    outputBuffer[4] = z.d.p;
+    // CHECK: 192.0
+    outputBuffer[5] = z.d.d;
 }

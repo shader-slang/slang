@@ -4043,12 +4043,19 @@ static Expr* convertHigherOrderExprToLookup(
         // derivative: a user-written forward derivative can itself be differentiable.
         if (derivativeOperand && as<BackwardDifferentiateExpr>(resultExpr))
         {
-            if (callableDeclRef.as<SynthesizedFuncDecl>())
+            if (auto synthesizedFunc = callableDeclRef.as<SynthesizedFuncDecl>())
             {
-                visitor->getSink()->diagnose(
-                    Diagnostics::CannotBackwardDifferentiateDerivativeDirectly{
-                        .expr = derivativeOperand});
-                return visitor->CreateErrorExpr(resultExpr);
+                switch (synthesizedFunc.getDecl()->irOp)
+                {
+                case kIROp_ForwardDifferentiate:
+                case kIROp_TrivialForwardDifferentiate:
+                    visitor->getSink()->diagnose(
+                        Diagnostics::CannotBackwardDifferentiateDerivativeDirectly{
+                            .expr = derivativeOperand});
+                    return visitor->CreateErrorExpr(resultExpr);
+                default:
+                    break;
+                }
             }
         }
 
