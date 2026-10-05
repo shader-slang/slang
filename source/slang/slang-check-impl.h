@@ -4129,6 +4129,26 @@ public:
         QualType const& baseType,
         bool supressDiagnostic = false);
 
+    /// Called after member lookup on `expr` has failed with `baseType` as the base. If the base is
+    /// a user-declared generic type parameter (directly, or as `T.m` / `v::m`), emit a note for
+    /// each interface that: is visible from the failed access and not from the core module;
+    /// directly declares a visible requirement of the failed name, static when the access is
+    /// static; and, by its unqualified name, resolves to itself at the generic declaration that
+    /// owns the parameter. A non-generic interface gets `where T : IFoo`; a generic one gets
+    /// "consider constraining 'T' to interface 'IFoo'", since its type arguments cannot be
+    /// inferred.
+    void maybeSuggestMissingGenericConstraintForMemberLookup(
+        DeclRefExpr* expr,
+        QualType const& baseType);
+
+    /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
+    /// visible from `scope`) finds exactly one distinct declaration and it is `decl`. A diagnostic
+    /// that prints an unqualified name for the user to write at `scope` uses this to check the name
+    /// will mean `decl` there; for a generic declaration, `decl` is the `GenericDecl`, which is
+    /// what lookup returns for its name. The default mask also finds non-type declarations, so a
+    /// same-named function makes this conservatively return false.
+    bool doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl);
+
     SharedSemanticsContext& operator=(const SharedSemanticsContext&) = delete;
 
 

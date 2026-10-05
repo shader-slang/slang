@@ -8939,6 +8939,196 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     return _lookupStaticMember(expr, expr->baseExpression);
 }
 
+// Return true if `interfaceDecl` directly declares a requirement named `requirementName` that is
+// visible from `scope` and, when `isStaticAccess`, usable as a static member. A value access `v.m`
+// reaches an instance, static, or associated-type requirement (Slang projects an associated type
+// through a value, e.g. `v.Element`), so it accepts any of them. A generic requirement such as
+// `static int makeGen<U>(U)` is a `GenericDecl` whose `static` modifier is on the inner decl;
+// `isDeclUsableAsStaticMember` looks through the wrapper.
+static bool doesInterfaceDeclareUsableRequirement(
+    SemanticsVisitor* semantics,
+    InterfaceDecl* interfaceDecl,
+    Name* requirementName,
+    bool isStaticAccess,
+    Scope* scope)
+{
+    for (auto requirement : interfaceDecl->getDirectMemberDeclsOfName(requirementName))
+    {
+        if (isStaticAccess && !semantics->isDeclUsableAsStaticMember(requirement))
+            continue;
+        if (semantics->isDeclVisibleFromScope(makeDeclRef(requirement), scope))
+            return true;
+    }
+    return false;
+}
+
+// Collect the interfaces declared directly in the containers on `scope`'s parent and sibling
+// chains (excluding the core module) that are visible from `scope` and directly declare a
+// requirement named `requirementName` satisfying `doesInterfaceDeclareUsableRequirement`,
+// appending each one once to `outInterfaces`. Each entry is the declaration the interface's name
+// refers to: the `GenericDecl` for a generic interface, the `InterfaceDecl` otherwise.
+//
+// The core module is skipped (as `findClosestInScopeName` does) because it is implicitly in scope
+// for every program, so its common requirement names (`equals`, `lessThan`, ...) would follow
+// almost any typo. Interfaces from the module being checked and from modules it imports, including
+// a standard module such as `slang.numerics`, are kept.
+//
+// Requirements inherited from a base interface are not matched: a base interface is usually
+// visible wherever a derived one is, so naming the interface that declares the member directly is
+// enough.
+static void collectVisibleInterfacesDeclaringRequirement(
+    SemanticsVisitor* semantics,
+    Name* requirementName,
+    bool isStaticAccess,
+    Scope* scope,
+    List<Decl*>& outInterfaces)
+{
+    // A member access whose identifier is missing (e.g. `v.` while typing in the language server)
+    // has no name to search for.
+    if (!requirementName)
+        return;
+
+    // An interface is reached twice when its container is linked into the walk twice, e.g. a
+    // namespace that encloses `scope` and is also brought in by `using namespace`.
+    HashSet<Decl*> seen;
+    for (Scope* s = scope; s; s = s->parent)
+    {
+        for (Scope* sib = s; sib; sib = sib->nextSibling)
+        {
+            auto containerDecl = sib->containerDecl;
+            if (!containerDecl)
+                continue;
+            if (isFromCoreModule(containerDecl))
+                continue;
+
+            for (auto decl : containerDecl->getDirectMemberDecls())
+            {
+                auto interfaceDecl = as<InterfaceDecl>(maybeGetInner(decl));
+                // An `interface` keyword with no name (e.g. `interface { ... }`) still parses into
+                // a nameless `InterfaceDecl`, which the language server keeps checking.
+                if (!interfaceDecl || !decl->getName())
+                    continue;
+                if (!semantics->isDeclVisibleFromScope(makeDeclRef(decl), scope))
+                    continue;
+                if (!doesInterfaceDeclareUsableRequirement(
+                        semantics,
+                        interfaceDecl,
+                        requirementName,
+                        isStaticAccess,
+                        scope))
+                    continue;
+                if (seen.add(decl))
+                    outInterfaces.add(decl);
+            }
+        }
+    }
+}
+
+bool SemanticsVisitor::doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl)
+{
+    Decl* resolvedDecl = nullptr;
+    for (auto item : lookUp(m_astBuilder, this, name, scope))
+    {
+        if (!isDeclVisibleFromScope(item.declRef, scope))
+            continue;
+        auto itemDecl = item.declRef.getDecl();
+        if (resolvedDecl && resolvedDecl != itemDecl)
+            return false;
+        resolvedDecl = itemDecl;
+    }
+    return resolvedDecl == decl;
+}
+
+void SemanticsVisitor::maybeSuggestMissingGenericConstraintForMemberLookup(
+    DeclRefExpr* expr,
+    QualType const& baseType)
+{
+    // A `::` access is always a static lookup, even on a value (`v::m`, whose `baseType` is the
+    // value's type). A `.` access is static when its base is a type (`T.m`, a `TypeType`).
+    bool isStaticAccess = as<StaticMemberExpr>(expr) != nullptr;
+    Type* type = baseType.type;
+    if (auto typeType = as<TypeType>(type))
+    {
+        type = typeType->getType();
+        isStaticAccess = true;
+    }
+
+    // The note proposes `where <Param> : <Interface>`, so the base must be a generic type
+    // parameter the user declared and can constrain. Other constrainable bases (an associated type
+    // `T.Assoc`, a global `type_param`) would need different wording.
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+    auto genericParamDeclRef = declRefType->getDeclRef().as<GenericTypeParamDecl>();
+    if (!genericParamDeclRef)
+        return;
+    auto genericParamDecl = genericParamDeclRef.getDecl();
+
+    // In an interface method with a default body, `this` has the type of the `This` parameter of
+    // the synthesized `InterfaceDefaultImplDecl`. The user cannot write a `where` clause for it;
+    // the fix there is to make the interface inherit the other one.
+    if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(genericParamDecl->parentDecl);
+        defaultImplDecl && defaultImplDecl->thisTypeDecl == genericParamDecl)
+        return;
+
+    // Candidates are found and their requirements checked for visibility from the failed access
+    // (`m_outerScope`, the scope member lookup used), which is nested inside the generic that owns
+    // the parameter. Whether a candidate can be *named* is a separate question, answered below at
+    // the constraint site.
+    List<Decl*> candidates;
+    collectVisibleInterfacesDeclaringRequirement(
+        this,
+        expr->name,
+        isStaticAccess,
+        m_outerScope,
+        candidates);
+    if (candidates.getCount() == 0)
+        return;
+
+    // A constraint is written on the generic declaration that owns the parameter, so we only
+    // suggest an interface whose unqualified name, looked up from there, resolves to exactly that
+    // interface. Consider `float3 read<IHasNormal, T>(T value) { return value.getNormal(); }`: the
+    // interface `IHasNormal` declares `getNormal`, but inside `read` that name means the first
+    // generic parameter, so suggesting `where T : IHasNormal` would not help. Two same-named
+    // interfaces at the same lookup level (e.g. one imported by `using namespace`) make the name
+    // ambiguous, and neither is suggested.
+    Scope* constraintScope = getScope(genericParamDecl);
+    List<Decl*> interfaceDecls;
+    for (auto candidate : candidates)
+    {
+        if (doesNameResolveToDecl(candidate->getName(), constraintScope, candidate))
+            interfaceDecls.add(candidate);
+    }
+
+    // Each surviving name resolves to its own interface, so the names are distinct and sorting by
+    // them gives an order that does not depend on the scope walk.
+    interfaceDecls.sort([](Decl* left, Decl* right)
+                        { return left->getName()->text < right->getName()->text; });
+
+    auto genericParamName = genericParamDecl->getName();
+    for (auto interfaceDecl : interfaceDecls)
+    {
+        // A generic interface needs type arguments we cannot infer here, so it gets advisory
+        // wording rather than a `where` clause that would not compile as printed.
+        if (as<GenericDecl>(interfaceDecl))
+        {
+            getSink()->diagnose(Diagnostics::SuggestGenericInterfaceConstraintForMissingMember{
+                .genericParam = genericParamName,
+                .interfaceName = interfaceDecl->getName(),
+                .member = expr->name,
+                .location = expr->loc});
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::SuggestConstraintForMissingMember{
+                .genericParam = genericParamName,
+                .interfaceName = interfaceDecl->getName(),
+                .member = expr->name,
+                .location = expr->loc});
+        }
+    }
+}
+
 Expr* SemanticsVisitor::lookupMemberResultFailure(
     DeclRefExpr* expr,
     QualType const& baseType,
@@ -8951,10 +9141,13 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+        {
             getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
                 .name = expr->name,
                 .type = baseType.type,
                 .expr = expr});
+            maybeSuggestMissingGenericConstraintForMemberLookup(expr, baseType);
+        }
     }
     return expr;
 }
