@@ -19,3 +19,5 @@ tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
+# CUDA dynamic __device__ initialization of a module-scope layout-converted matrix array, shader-slang/slang#13444
+tests/language-feature/types/matrix-layout-array-coerce.slang.7 syn (cuda)
