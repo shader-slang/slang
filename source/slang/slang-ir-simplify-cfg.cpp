@@ -354,6 +354,10 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
             switch (inst->getOp())
             {
             case kIROp_DebugLine:
+            case kIROp_DebugScope:
+            case kIROp_DebugNoScope:
+                // These are attribution-only markers, with no runtime or control-flow effect.
+                // As in switch forwarding below, the destination retains its own scope marker.
                 continue;
 
             case kIROp_UnconditionalBranch:
@@ -449,6 +453,8 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
             switch (inst->getOp())
             {
             case kIROp_DebugLine:
+            case kIROp_DebugScope:
+            case kIROp_DebugNoScope:
                 continue;
 
             case kIROp_UnconditionalBranch:
@@ -590,6 +596,8 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
                 switch (inst->getOp())
                 {
                 case kIROp_DebugLine:
+                case kIROp_DebugScope:
+                case kIROp_DebugNoScope:
                     continue;
                 case kIROp_UnconditionalBranch:
                     branch = as<IRUnconditionalBranch>(inst);

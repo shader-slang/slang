@@ -4,8 +4,12 @@
 #include "compiler-core/slang-source-loc.h"
 #include "core/slang-list.h"
 #include "core/slang-string.h"
+#if SLANG_USE_SYSTEM_LUA
+#include <lua.hpp>
+#else
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
+#endif
 #include "slang-fiddle-diagnostics.h"
 #include "slang-fiddle-scrape.h"
 
