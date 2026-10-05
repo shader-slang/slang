@@ -11562,6 +11562,44 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return loweredValue;
     }
 
+    // Lower a compatibility declaration to mutable storage or directly to its immutable input.
+    // We emit the input through normal parameter lowering so that reflection and bindings do not
+    // depend on the storage choice. A mutable copy uses ordinary IRGlobalVar initializer blocks,
+    // which the existing target pipeline can move into each entry point.
+    LoweredValInfo visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl)
+    {
+        auto parameter = decl->uniformParameter;
+        auto input = ensureDecl(context, parameter);
+        if (!decl->hasMutableStorage)
+        {
+            context->setGlobalValue(decl, input);
+            return input;
+        }
+
+        NestedContext nested(this);
+        auto builder = nested.getBuilder();
+        auto subContext = nested.getContext();
+        auto valueType = lowerType(subContext, decl->getType());
+        auto storage = builder->createGlobalVar(valueType);
+        addLinkageDecoration(subContext, storage, decl);
+        addNameHint(subContext, storage, decl);
+        builder->addHighLevelDeclDecoration(storage, decl);
+
+        // Bare data parameters already supply a value. A legacy ConstantBuffer supplies a
+        // pointer-like value, so its initializer loads the element struct into private storage.
+        builder->setInsertInto(storage);
+        auto block = builder->emitBlock();
+        builder->setInsertInto(block);
+        auto initialValue = getSimpleVal(subContext, input);
+        if (as<ConstantBufferType>(parameter->getType()))
+            initialValue = builder->emitLoad(valueType, initialValue);
+        builder->emitReturn(initialValue);
+
+        auto result = LoweredValInfo::ptr(storage);
+        context->setGlobalValue(decl, result);
+        return result;
+    }
+
     LoweredValInfo lowerFunctionStaticConstVarDecl(VarDeclBase* decl)
     {
         return lowerConstantDeclCommon(decl);

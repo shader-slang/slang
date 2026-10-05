@@ -1359,6 +1359,10 @@ typedef uint32_t SlangSizeT;
 
         DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
 
+        // bool: Allow mutable copies of ordinary uniform data parameters in HLSL inputs.
+        // Resource parameters remain read-only. Has no effect on Slang or GLSL inputs.
+        HLSLCompatibility = 163,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

@@ -184,6 +184,17 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
         sb << "init";
         return;
     }
+    // A shader parameter can have an internal lookup name, for example after legacy cbuffer
+    // parsing or HLSL compatibility desugaring. Diagnostics use its original reflection name
+    // so that the user can identify the source declaration rather than a generated identifier.
+    if (auto parameter = as<VarDecl>(decl))
+    {
+        if (auto reflectionName = parameter->findModifier<ParameterGroupReflectionName>())
+        {
+            sb << getText(reflectionName->nameAndLoc.name);
+            return;
+        }
+    }
     if (decl->getName() && decl->getName()->text.getLength())
         sb << getText(decl->getName());
     else

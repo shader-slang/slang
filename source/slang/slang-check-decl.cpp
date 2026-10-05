@@ -687,6 +687,9 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
+    // Determine the compatibility declaration's value type and whether it owns mutable storage.
+    void visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl);
+
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
     void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
@@ -948,6 +951,10 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    // The retained input is checked normally. A compatibility declaration has no independent
+    // source initializer; lowering constructs its copy from the checked input, when supported.
+    void visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl*) {}
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -1594,6 +1601,10 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 /// Is `decl` a global shader parameter declaration?
 bool isGlobalShaderParameter(VarDeclBase* decl)
 {
+    // A compatibility declaration references an input but is not a second shader parameter.
+    if (as<HLSLCompatibilityVarDecl>(decl))
+        return false;
+
     // If it's an *actual* global it is not a global shader parameter
     if (decl->hasModifier<ActualGlobalModifier>())
     {
@@ -1673,6 +1684,8 @@ QualType getTypeForDeclRef(
         qualType.type = getType(astBuilder, varDeclRef);
 
         bool isLValue = true;
+        if (auto compatibilityVar = as<HLSLCompatibilityVarDecl>(varDeclRef.getDecl()))
+            isLValue = compatibilityVar->hasMutableStorage;
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
@@ -2648,6 +2661,121 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 
     varDecl->setCheckState(DeclCheckState::DefinitionChecked);
     _validateCircularVarDefinition(varDecl);
+}
+
+// Determine whether a checked type can be copied into ordinary per-invocation data storage.
+// We recognize scalars, vectors, matrices, enums, sized arrays, and structs whose fields and
+// bases satisfy the same contract. We inspect field signatures because aggregate TypeTag values
+// are populated during definition checking, after a compatibility declaration needs its type.
+// The active set stops invalid recursive structs from making this classification recurse forever;
+// their ordinary declaration checks remain responsible for the recursive-type diagnostic.
+static bool isHLSLUniformDataType(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Type*>& activeTypes)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+        return isHLSLUniformDataType(visitor, modifiedType->getBase(), activeTypes);
+    if (as<BasicExpressionType>(type))
+        return true;
+    if (auto vectorType = as<VectorExpressionType>(type))
+        return isHLSLUniformDataType(visitor, vectorType->getElementType(), activeTypes);
+    if (auto matrixType = as<MatrixExpressionType>(type))
+        return isHLSLUniformDataType(visitor, matrixType->getElementType(), activeTypes);
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        // An unbounded parameter array cannot become an ordinary variable. getTypeTags handles
+        // both an absent element count and the internal unsized-array sentinel.
+        if ((int)visitor->getTypeTags(type) & (int)TypeTag::Unsized)
+            return false;
+        return isHLSLUniformDataType(visitor, arrayType->getElementType(), activeTypes);
+    }
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto declRef = declRefType->getDeclRef();
+    if (as<EnumDecl>(declRef))
+        return true;
+    auto structDecl = as<StructDecl>(declRef);
+    if (!structDecl)
+        return false;
+    // Builtin resource types also reference struct declarations. Their source fields do not
+    // describe the runtime value, so an empty builtin struct is not proof of ordinary data.
+    // The supported builtin data types were handled above by their semantic type classes.
+    if (structDecl.getDecl()->hasModifier<MagicTypeModifier>())
+        return false;
+    // A link-time type alias can acquire a resource-bearing definition after checking.
+    // We cannot promise ordinary data storage from its local declaration alone.
+    if (structDecl.getDecl()->aliasedType.type)
+        return false;
+
+    // Field and base types use the existing declaration-reference substitution path. For
+    // example, Data<Texture2D> must stay read-only even if Data<float> can be copied.
+    if (!activeTypes.add(type))
+        return false;
+    bool isDataType = true;
+    for (auto field : structDecl.getDecl()->getFields())
+    {
+        if (isEffectivelyStatic(field))
+            continue;
+        visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
+        auto fieldRef =
+            visitor->getASTBuilder()->getMemberDeclRef(declRef, field).as<VarDeclBase>();
+        if (!isHLSLUniformDataType(
+                visitor,
+                getType(visitor->getASTBuilder(), fieldRef),
+                activeTypes))
+        {
+            isDataType = false;
+            break;
+        }
+    }
+    for (auto base : structDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+    {
+        visitor->ensureDecl(base, DeclCheckState::CanUseBaseOfInheritanceDecl);
+        auto baseRef =
+            visitor->getASTBuilder()->getMemberDeclRef(declRef, base).as<InheritanceDecl>();
+        auto baseType = getBaseType(visitor->getASTBuilder(), baseRef);
+        if (auto baseDeclRefType = as<DeclRefType>(baseType))
+        {
+            // Interface conformance contributes no stored fields to a struct value.
+            if (as<InterfaceDecl>(baseDeclRefType->getDeclRef()))
+                continue;
+        }
+        if (!isHLSLUniformDataType(visitor, baseType, activeTypes))
+        {
+            isDataType = false;
+            break;
+        }
+    }
+    activeTypes.remove(type);
+    return isDataType;
+}
+
+// Select the source value exposed by a compatibility declaration, then decide its storage.
+// Consider `cbuffer CB { float x; }`: the input has type ConstantBuffer<T>, but a mutable copy
+// has type T. Only an implicit legacy cbuffer exposes that element struct directly. Explicit
+// ConstantBuffer<T> parameters retain their wrapper type and remain read-only aliases.
+void SemanticsDeclHeaderVisitor::visitHLSLCompatibilityVarDecl(HLSLCompatibilityVarDecl* decl)
+{
+    auto parameter = decl->uniformParameter;
+    SLANG_RELEASE_ASSERT(parameter);
+    ensureDecl(parameter, DeclCheckState::CanUseTypeOfValueDecl);
+    Type* valueType = parameter->getType();
+    if (parameter->hasModifier<ImplicitParameterGroupVariableModifier>())
+    {
+        if (auto elementType = getConstantBufferElementType(valueType))
+            valueType = elementType;
+    }
+
+    // We require a positive proof that the value is supported ordinary data. All other types
+    // stay aliases, so resource reads do not depend on static resource storage support.
+    // Specialization constants also stay inputs rather than runtime mutable storage.
+    HashSet<Type*> activeTypes;
+    decl->hasMutableStorage =
+        !isSpecializationConstant(parameter) && isHLSLUniformDataType(this, valueType, activeTypes);
+    decl->type.type = decl->hasMutableStorage ? valueType : parameter->getType();
 }
 
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)

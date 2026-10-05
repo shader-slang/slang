@@ -1096,6 +1096,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
+| HLSLCompatibility  | Enables [HLSL uniform parameter temporaries](#hlsl-uniform-parameter-temporaries). `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1150,6 +1151,34 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+
+### HLSL Uniform Parameter Temporaries
+
+For HLSL inputs, `-Gec` enables per-invocation mutable copies of uniform data parameters.
+The equivalent API option is `CompilerOptionName::HLSLCompatibility`.
+For example:
+
+```hlsl
+uint x;
+cbuffer Settings { uint y; };
+
+void setValues(uint value)
+{
+    x = value;
+    y = value + 1;
+}
+```
+
+Each copy starts with the corresponding shader input's value for every entry-point invocation.
+Assignments and `out`/`inout` arguments update that private copy; they do not modify the constant buffer.
+Reflection continues to describe the original shader inputs and their bindings.
+
+The supported data types are scalars, vectors, matrices, enums, sized arrays, and structs composed of supported data types.
+An implicit legacy `cbuffer` is copied as one struct when all its stored fields are supported data types.
+Resource parameters, explicit parameter groups such as `ConstantBuffer<T>`, unbounded arrays, link-time type aliases, and structs containing resources remain read-only.
+In particular, a legacy buffer containing a resource remains read-only as a whole.
+Supporting mutable resource parameters requires additional resource-storage legalization.
+The option does not affect Slang or GLSL inputs, specialization constants, or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
 

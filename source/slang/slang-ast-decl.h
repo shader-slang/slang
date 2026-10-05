@@ -341,6 +341,26 @@ class VarDecl : public VarDeclBase
     FIDDLE(...)
 };
 
+// An HLSL compatibility declaration gives the source name of a uniform parameter either
+// mutable per-invocation storage or a read-only alias to the parameter. The parser keeps the
+// parameter as a separate declaration so that its binding and reflection metadata remain intact.
+//
+// Header checking determines the storage behavior and the exposed value type. A copied legacy
+// cbuffer exposes its element struct; an alias retains the input's type. Lowering emits ordinary
+// global-variable initialization only for mutable copies. Resource aliases lower to the input.
+FIDDLE()
+class HLSLCompatibilityVarDecl : public VarDecl
+{
+    FIDDLE(...)
+
+    // The immutable input supplying this declaration's value. Both declarations are created
+    // at non-generic file or namespace scope, so the association needs no generic substitutions.
+    FIDDLE() VarDecl* uniformParameter = nullptr;
+
+    // True after header checking selects a mutable copy rather than a read-only alias.
+    FIDDLE() bool hasMutableStorage = false;
+};
+
 // A variable declaration that is always immutable (whether local, global, or member variable)
 FIDDLE()
 class LetDecl : public VarDecl

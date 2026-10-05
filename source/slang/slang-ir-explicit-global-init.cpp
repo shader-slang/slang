@@ -117,21 +117,16 @@ struct MoveGlobalVarInitializationToEntryPointsPass
 
     bool shouldMoveGlobalVarInitialization(IRGlobalVar* globalVar)
     {
-        // Currently CoopVector for DXC cannot be created from
-        // constructors with arguments. When CoopVector is used as a
-        // global variable, its initialization has to happen at the
-        // beginning of the entry point.
-        //
-        // At the same time, we don't want to apply
-        // "moveGlobalVarInitializationToEntryPoints" to the rest of
-        // the global variables when targeting HLSL.
-        //
+        // HLSL can retain most global initializers. Arrays must instead become explicit
+        // initialization functions before legalizeArrayReturnType runs: the HLSL emitter's
+        // initializer helper would otherwise return an array after that legalization is over.
+        // For example, `static uint copy[2] = input;` needs a legal function with an out
+        // parameter, called at the start of each entry point. CoopVector also requires explicit
+        // initialization because DXC cannot construct it from arguments in a global initializer.
         if (isD3DTarget(m_targetProgram->getTargetReq()))
         {
             auto valueType = globalVar->getDataType()->getValueType();
-            if (as<IRCoopVectorType>(valueType))
-                return true;
-            return false;
+            return as<IRArrayType>(valueType) || as<IRCoopVectorType>(valueType);
         }
         return true;
     }

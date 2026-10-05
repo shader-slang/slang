@@ -5845,7 +5845,57 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-// Finish up work on a declaration that was parsed
+// Create the declaration that source expressions will reference in HLSL compatibility mode.
+// Consider `float x;`: we retain an immutable parameter with x's reflection name and add a
+// compatibility declaration named x. For a legacy cbuffer, we move transparent lookup to that
+// declaration. Header checking can then choose a copy of the buffer's element struct or a
+// read-only alias without changing which declarations lookup finds.
+static HLSLCompatibilityVarDecl* createHLSLCompatibilityVarIfNeeded(Parser* parser, Decl* decl)
+{
+    if (parser->getSourceLanguage() != SourceLanguage::HLSL ||
+        !parser->options.optionSet.getBoolOption(CompilerOptionName::HLSLCompatibility))
+        return nullptr;
+
+    auto parameter = as<VarDecl>(decl);
+    // We split only ordinary, non-constant parameters. CompleteDecl has assigned the lexical
+    // parent, and skips this transformation for generic declarations and generic containers.
+    if (!parameter || !isGlobalShaderParameter(parameter) ||
+        parameter->hasModifier<ConstModifier>() || as<LetDecl>(parameter))
+        return nullptr;
+
+    auto compatibilityVar = parser->astBuilder->create<HLSLCompatibilityVarDecl>();
+    compatibilityVar->loc = parameter->loc;
+    compatibilityVar->nameAndLoc = parameter->nameAndLoc;
+    compatibilityVar->uniformParameter = parameter;
+
+    // Bindings and layout modifiers belong to the input. Only visibility and transparent
+    // member lookup also describe the declaration that source expressions reference.
+    if (auto visibility = parameter->findModifier<VisibilityModifier>())
+    {
+        addModifier(
+            compatibilityVar,
+            as<VisibilityModifier>(parser->astBuilder->createByNodeType(visibility->astNodeType)));
+    }
+    if (auto transparent = parameter->findModifier<TransparentModifier>())
+    {
+        removeModifier(parameter, transparent);
+        addModifier(compatibilityVar, transparent);
+    }
+
+    // Legacy buffers already have a separate reflection name. We give bare parameters the
+    // same separation before assigning an internal lookup name to the retained input.
+    if (!parameter->hasModifier<ParameterGroupReflectionName>())
+    {
+        auto reflectionName = parser->astBuilder->create<ParameterGroupReflectionName>();
+        reflectionName->nameAndLoc = parameter->nameAndLoc;
+        addModifier(parameter, reflectionName);
+    }
+    parameter->nameAndLoc.name =
+        generateName(parser, "uniformParameter_" + getText(parameter->getName()));
+    return compatibilityVar;
+}
+
+// Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
     Decl* decl,
@@ -5936,8 +5986,16 @@ static void CompleteDecl(
 
         if (!as<GenericDecl>(containerDecl))
         {
+            // We split compatibility declarations before inserting either name into lookup.
+            // The retained input keeps all parsed metadata; the companion's storage decision
+            // is deferred until semantic checking knows the input type.
+            decl->parentDecl = containerDecl;
+            auto compatibilityVar = createHLSLCompatibilityVarIfNeeded(parser, decl);
+
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
+            if (compatibilityVar)
+                AddMember(containerDecl, compatibilityVar);
 
             // As a special case, if we are adding an unscoped enum to container, we should also
             // create static const decls for each enum case and add them to the container.
