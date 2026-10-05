@@ -5063,7 +5063,7 @@ public property int gl_InstanceCustomIndexEXT
 
 public property int gl_GeometryIndexEXT
 {
-    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();

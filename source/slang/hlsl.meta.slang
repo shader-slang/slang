@@ -21711,17 +21711,20 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
 /// @return Zero-based index of the geometry in the current instance
-/// @remarks Available in intersection, any-hit, and closest-hit shaders
+/// @remarks Available in intersection, any-hit, and closest-hit shaders. On CUDA/OptiX this returns
+/// the SBT GAS index (`optixGetSbtGASIndex`), which equals the geometry index when every build input
+/// has one SBT record and no per-primitive SBT index offset; see docs/cuda-target.md.
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };

@@ -339,6 +339,33 @@ If this fails, the default OptiX SDK install locations are searched. On Windows 
 
 If OptiX headers cannot be found, compilation will fail.
 
+## Geometry index
+
+OptiX has no device-side query for the zero-based index of a build input (geometry) within an acceleration structure.
+Slang therefore maps the geometry-index operations to the OptiX SBT GAS index:
+
+- `GeometryIndex()` (and `gl_GeometryIndexEXT`) lowers to `optixGetSbtGASIndex()`.
+- `HitObject.GetGeometryIndex()` lowers to `optixHitObjectGetSbtGASIndex()`.
+- With OptiX 8.1, `HitObject.MakeHit` and `HitObject.MakeMotionHit` pass their `GeometryIndex` argument as the
+  `sbtGASIdx` argument of `optixMakeHitObject` / `optixMakeHitObjectWithRecord`. With OptiX 9.0 and later, these
+  functions build the hit object from the current traverse data (`optixHitObjectGetTraverseData`), so the
+  `InstanceIndex`, `GeometryIndex`, `PrimitiveIndex`, `HitKind` and shader-table arguments are not used.
+
+The SBT GAS index of a primitive is the sum of `numSbtRecords` over the earlier build inputs, plus the primitive's
+entry in `sbtIndexOffsetBuffer`, if one is set. It equals the D3D12/Vulkan geometry index when the host builds
+acceleration structures with:
+
+- exactly one SBT record per build input (`numSbtRecords = 1`; curve build inputs always have one record), and
+- no per-primitive SBT index offset (`sbtIndexOffsetBuffer` unset).
+
+Cluster acceleration structures have no per-build-input SBT records; their SBT GAS index comes from the `sbtIndex`
+values supplied when the clusters are built.
+
+[slang-rhi](https://github.com/shader-slang/slang-rhi) builds OptiX acceleration structures with one SBT record per
+build input and no per-primitive offset, and documents its cluster geometry index as the OptiX `sbtIndex`.
+Applications that build acceleration structures with the OptiX API directly, and that use several SBT records per
+build input or per-primitive SBT offsets, get the SBT GAS index from these operations, not the geometry index.
+
 Limitations
 ===========
 
