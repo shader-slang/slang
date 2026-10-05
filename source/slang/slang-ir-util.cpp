@@ -1415,10 +1415,9 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-// Return true if `paramType` is an `out`, `inout` or `__constref` parameter type. These modes
-// have copy-in/copy-out or borrow semantics, and the language lets an implementation assume
-// their arguments never alias (docs/language-reference/declarations.md), so the address behind
-// such a parameter is only lent to the callee for the duration of one call.
+// Return true if `paramType` is an `out`, `inout` or `__constref` parameter type. `out` and
+// `inout` have copy-out and copy-in/copy-out semantics, and `__constref` is a read-only borrow, so
+// in each mode the callee is given the address only for the duration of one call.
 static bool isLentParamType(IRInst* paramType)
 {
     paramType = unwrapAttributedType(paramType);
@@ -1515,14 +1514,17 @@ static bool doesAddressEscape(IRInst* addr)
 // Any other root, such as a pointer value, a pointer or `__ref` parameter, or a buffer element
 // address, can point at memory any call may write.
 //
-// The rule for lent parameters relies on the no-alias assumption for their arguments. When
-// `undoParameterCopy` binds an `inout` parameter directly to storage that another invocation also
-// writes, that assumption does not hold.
+// A lent parameter counts as private because of its copy or read-only borrow semantics. The
+// language's no-alias allowance for `out`/`inout` arguments is per call site and says nothing
+// about other invocations. When `undoParameterCopy` binds an `inout` parameter directly to storage
+// that another invocation writes, forwarding still gives the copy semantics' value, but the
+// storage itself sees the callee's writes before the call returns.
 static bool isCallerPrivateRoot(IRInst* root, IRGlobalValueWithCode* func)
 {
     if (auto var = as<IRVar>(root))
     {
-        SLANG_ASSERT(isChildInstOf(var, func));
+        if (!isChildInstOf(var, func))
+            return false;
         if (as<IRGroupSharedRate>(var->getRate()))
             return false;
         switch (var->getDataType()->getAddressSpace())

@@ -103,7 +103,7 @@ uint inoutAddressEscapes(inout uint x)
     return x;
 }
 
-// The address of an array element escapes; the array itself is never named again.
+// An escaping element address makes the whole array non-private.
 [noinline]
 uint elementAddressEscapes()
 {
@@ -122,7 +122,7 @@ struct F
     uint f;
 }
 
-// The address of a struct field escapes.
+// An escaping field address makes the whole struct non-private.
 [noinline]
 uint fieldAddressEscapes()
 {
