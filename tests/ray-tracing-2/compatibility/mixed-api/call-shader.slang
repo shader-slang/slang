@@ -1,5 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry StructuralClosestHit -stage closesthit -no-codegen
 
+// Implementing IClosestHitShader selects the structural API for this module. Calling the core
+// CallShader function selects the legacy API, so the two uses conflict even though the selected
+// stage never calls legacyCallableDispatch. Importing slang.raytracing alone would not conflict.
 import slang.raytracing;
 
 struct Payload

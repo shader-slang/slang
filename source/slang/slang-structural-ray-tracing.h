@@ -325,17 +325,6 @@ public:
         Decl* decl,
         Decl** outOtherDecl);
 
-    /// Records one checked call edge and remembers direct calls to trusted `callShader` methods.
-    void registerFunctionCall(
-        FunctionDeclBase* caller,
-        FunctionDeclBase* callee,
-        SourceLoc callLoc);
-
-    /// Finds a `callShader` invocation reachable from `function` in the checked source call graph.
-    ///
-    /// On success, `outCallLoc` identifies the direct call site that made the operation reachable.
-    bool findReachableCallShader(FunctionDeclBase* function, SourceLoc& outCallLoc) const;
-
 private:
     // These declarations give every compiler-owned source role one authenticated AST identity.
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
@@ -364,11 +353,6 @@ private:
     HashSet<AggTypeDecl*> m_stageDeclarationsWithCheckedRepresentation;
     HashSet<Type*> m_stageTypesWithCheckedRepresentation;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
-
-    // The checked source call graph is retained only for stage restrictions that must see through
-    // ordinary helper functions, such as the prohibition on callable dispatch from any-hit.
-    Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
-    Dictionary<FunctionDeclBase*, SourceLoc> m_callShaderCallers;
 };
 
 /// Returns the public source name of the trusted stage interface for diagnostics and registration.

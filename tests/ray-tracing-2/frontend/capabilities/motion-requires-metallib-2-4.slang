@@ -1,5 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -entry main -stage raygeneration -target metal -profile metallib_2_3 -restrictive-capability-check -no-codegen
 
+// Selecting PrimitiveMotion makes the trace operation require metallib_2_4. Compiling its caller
+// for metallib_2_3 must fail capability checking even though the schema contains no hit groups.
 import slang.raytracing;
 
 struct TestPayload

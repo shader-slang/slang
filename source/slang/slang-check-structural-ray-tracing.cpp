@@ -190,11 +190,9 @@ void registerRayTracingAPICall(
     Linkage* linkage,
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
-    SourceLoc callLoc,
     DiagnosticSink* sink)
 {
     auto& registry = linkage->getStructuralRayTracingDeclRegistry();
-    registry.registerFunctionCall(caller, callee, callLoc);
     if (!registry.isInitialized() || !caller || !callee)
         return;
 
@@ -400,45 +398,6 @@ static void _registerAttributedLegacyEntryPoints(
     }
 }
 
-static void _diagnoseInvalidCallableDispatchStages(
-    StructuralRayTracingDeclRegistry& registry,
-    ContainerDecl* containerDecl,
-    DiagnosticSink* sink)
-{
-    // Callable dispatch is legal from some ray-tracing stages but not from any-hit or
-    // intersection. The source operation may be hidden behind ordinary helpers, so query the
-    // registry's checked call graph from each structural stage implementation instead of checking
-    // only the stage's `invoke` body.
-    for (auto member : containerDecl->getDirectMemberDecls())
-    {
-        auto innerMember = member;
-        if (auto genericDecl = as<GenericDecl>(innerMember))
-            innerMember = genericDecl->inner;
-
-        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
-        {
-            auto stageKind = registry.getStageKind(functionDecl);
-            if (stageKind == StructuralRayTracingStageKind::AnyHit ||
-                stageKind == StructuralRayTracingStageKind::Intersection)
-            {
-                SourceLoc callLoc;
-                if (registry.findReachableCallShader(functionDecl, callLoc))
-                {
-                    auto stageName = stageKind == StructuralRayTracingStageKind::AnyHit
-                                         ? "any-hit"
-                                         : "intersection";
-                    sink->diagnose(Diagnostics::StructuralRayTracingCallableStageMismatch{
-                        .stage = stageName,
-                        .location = callLoc});
-                }
-            }
-        }
-
-        if (auto childContainer = as<ContainerDecl>(innerMember))
-            _diagnoseInvalidCallableDispatchStages(registry, childContainer, sink);
-    }
-}
-
 static void _diagnoseInvalidStructuralStageCapabilities(
     StructuralRayTracingDeclRegistry& registry,
     ContainerDecl* containerDecl,
@@ -459,12 +418,7 @@ static void _diagnoseInvalidStructuralStageCapabilities(
             auto stageKind = registry.getStageKind(functionDecl);
             auto stage = _getNativeStage(stageKind);
             auto capabilities = functionDecl->inferredCapabilityRequirements;
-            SourceLoc callShaderLoc;
-            auto hasSpecificCallableDiagnostic =
-                (stageKind == StructuralRayTracingStageKind::AnyHit ||
-                 stageKind == StructuralRayTracingStageKind::Intersection) &&
-                registry.findReachableCallShader(functionDecl, callShaderLoc);
-            if (!hasSpecificCallableDiagnostic && stage != Stage::Unknown && capabilities &&
+            if (stage != Stage::Unknown && capabilities &&
                 capabilities->isIncompatibleWith(getAtomFromStage(stage)))
             {
                 sink->diagnose(Diagnostics::DeclHasDependenciesNotCompatibleOnStage{
@@ -596,7 +550,6 @@ void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, Diagn
     if (!registry.isInitialized())
         return;
     _registerAttributedLegacyEntryPoints(linkage, module, module->getModuleDecl(), sink);
-    _diagnoseInvalidCallableDispatchStages(registry, module->getModuleDecl(), sink);
     _diagnoseInvalidStructuralStageCapabilities(registry, module->getModuleDecl(), sink);
     _diagnoseInvalidStructuralStageInputParameters(
         linkage,

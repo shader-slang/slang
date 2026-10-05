@@ -1785,46 +1785,4 @@ bool StructuralRayTracingDeclRegistry::registerAPIUse(
     return true;
 }
 
-void StructuralRayTracingDeclRegistry::registerFunctionCall(
-    FunctionDeclBase* caller,
-    FunctionDeclBase* callee,
-    SourceLoc callLoc)
-{
-    if (!caller || !callee || !isInitialized())
-        return;
-
-    m_functionCallees.getOrAddValue(caller, HashSet<FunctionDeclBase*>()).add(callee);
-    if (isCallShaderMethod(callee))
-        m_callShaderCallers[caller] = callLoc;
-}
-
-bool StructuralRayTracingDeclRegistry::findReachableCallShader(
-    FunctionDeclBase* function,
-    SourceLoc& outCallLoc) const
-{
-    if (!function)
-        return false;
-
-    HashSet<FunctionDeclBase*> visited;
-    List<FunctionDeclBase*> workList;
-    workList.add(function);
-    for (Index i = 0; i < workList.getCount(); ++i)
-    {
-        auto current = workList[i];
-        if (!visited.add(current))
-            continue;
-        if (auto callLoc = m_callShaderCallers.tryGetValue(current))
-        {
-            outCallLoc = *callLoc;
-            return true;
-        }
-        if (auto callees = m_functionCallees.tryGetValue(current))
-        {
-            for (auto callee : *callees)
-                workList.add(callee);
-        }
-    }
-    return false;
-}
-
 } // namespace Slang

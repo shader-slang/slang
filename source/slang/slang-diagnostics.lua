@@ -4649,13 +4649,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-callable-stage-mismatch",
-    38063,
-    "callable dispatch is not available from this ray-tracing stage",
-    span { loc = "location", message = "'callShader' cannot be reached from structural ~stage logic" }
-)
-
-err(
     "structural-ray-tracing-stage-implementation-must-be-struct",
     38091,
     "invalid structural ray-tracing stage implementation",

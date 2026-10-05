@@ -4391,7 +4391,6 @@ void registerRayTracingAPICall(
     Linkage* linkage,
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
-    SourceLoc callLoc,
     DiagnosticSink* sink);
 
 

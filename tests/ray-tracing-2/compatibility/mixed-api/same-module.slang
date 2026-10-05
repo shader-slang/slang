@@ -1,6 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry legacyMiss -stage miss -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry StructuralClosestHit -stage closesthit -no-codegen
 
+// StructuralClosestHit implements the structural stage interface, while legacyMiss declares a
+// native [shader("miss")] entry point in the same module. Either selected entry must reject this
+// combination: the module's API family does not depend on which entry the command line selects.
+// Check the primary mixed-API error and the source notes identifying both declarations.
+
 import slang.raytracing;
 
 struct TestPayload {}
