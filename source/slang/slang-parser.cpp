@@ -2900,7 +2900,6 @@ struct DeclGroupBuilder
             decl = newDecl;
     }
 
-    // Turn the single declaration added so far into a group, completing it.
     void beginGroup()
     {
         if (group)
