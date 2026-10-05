@@ -307,14 +307,20 @@ internal float4x3 getStageInputWorldToObject()
 ///
 /// This internal contract shares implementations without introducing an erased public stage-input
 /// type. Concrete input types retain their stage restrictions and context-dependent properties.
+///
+/// The shared property bodies live in the public extension below because Slang currently rejects
+/// default property accessor bodies in interfaces and public members of an internal interface.
+/// For example, putting the public `rayFlags` getter here would violate both rules. The extension
+/// exposes `input.rayFlags` on each concrete input while this implementation-sharing marker remains
+/// internal.
 internal interface ICommonHitInput
 {}
 
 /// Provides the properties available to closest-hit, any-hit, and intersection stages.
 ///
 /// An intersection stage has not reported a hit yet, so `distance` and `hitKind` stay on the
-/// closest-hit and any-hit inputs. Primitive, motion, and instance-specific views likewise remain
-/// on their constrained concrete extensions.
+/// closest-hit and any-hit inputs. Motion and instance-specific properties remain on their
+/// constrained concrete extensions.
 public extension<Input : ICommonHitInput> Input
 {
     public property float minDistance
@@ -380,6 +386,18 @@ public struct ClosestHitInput<Context> : ICommonHitInput
         get;
     }
 
+    /// Reads the committed hit's attributes using the type selected by `Context.Primitive`.
+    ///
+    /// A triangle context exposes `attributes.barycentricCoord` through `TriangleData`; a
+    /// `BoundingBoxPrimitive<MyAttributes>` context exposes the `MyAttributes` value reported by
+    /// its intersection shader. A curve context exposes `CurveData`. Generic callers need ordinary
+    /// type constraints before accessing members of the associated attribute type.
+    /// TODO: Adapter synthesis must return the built-in view or read the procedural hit attributes.
+    public property Context.Primitive.Attributes attributes
+    {
+        get;
+    }
+
     public property float distance
     {
         get { return getStageInputCurrentDistance(); }
@@ -431,38 +449,6 @@ public extension<Context> ClosestHitInput<Context>
     }
 }
 
-public extension<Context> ClosestHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive : ICustomIntersectionPrimitive
-{
-    /// Reads the attributes supplied by the procedural intersection shader's `reportHit` call.
-    /// TODO: The compiler must synthesize this accessor from the stage's hit-attribute parameter.
-    public property Context.Primitive.Attributes attributes
-    {
-        get;
-    }
-}
-
-public extension<Context> ClosestHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive == TrianglePrimitive
-{
-    public property TriangleData triangle
-    {
-        get { return {}; }
-    }
-}
-
-public extension<Context> ClosestHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive == CurvePrimitive
-{
-    public property CurveData curve
-    {
-        get { return {}; }
-    }
-}
-
 /// Provides the candidate payload, record, hit data, and ray state available to an any-hit stage.
 ///
 /// Control methods on this zero-storage view use native any-hit operations where available.
@@ -481,6 +467,16 @@ public struct AnyHitInput<Context> : ICommonHitInput
     /// Reads the host-provided data in the selected shader-binding-table record.
     /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
     public property Context.Record record
+    {
+        get;
+    }
+
+    /// Reads the candidate hit's attributes using the type selected by `Context.Primitive`.
+    ///
+    /// Built-in primitives expose their `TriangleData` or `CurveData` view; procedural primitives
+    /// expose the application-defined value supplied by the intersection shader's `reportHit` call.
+    /// TODO: Adapter synthesis must return the built-in view or read the procedural hit attributes.
+    public property Context.Primitive.Attributes attributes
     {
         get;
     }
@@ -561,38 +557,6 @@ public extension<Context> AnyHitInput<Context>
     public property float4x3 worldToObject
     {
         get { return getStageInputWorldToObject(); }
-    }
-}
-
-public extension<Context> AnyHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive : ICustomIntersectionPrimitive
-{
-    /// Reads the attributes supplied by the procedural intersection shader's `reportHit` call.
-    /// TODO: The compiler must synthesize this accessor from the stage's hit-attribute parameter.
-    public property Context.Primitive.Attributes attributes
-    {
-        get;
-    }
-}
-
-public extension<Context> AnyHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive == TrianglePrimitive
-{
-    public property TriangleData triangle
-    {
-        get { return {}; }
-    }
-}
-
-public extension<Context> AnyHitInput<Context>
-    where Context : IHitContext
-    where Context.Primitive == CurvePrimitive
-{
-    public property CurveData curve
-    {
-        get { return {}; }
     }
 }
 

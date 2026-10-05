@@ -173,10 +173,10 @@ public interface IBuiltinIntersectionPrimitive : IIntersectionPrimitive {}
 
 /// Marks procedural primitives whose intersection stage reports application-defined attributes.
 ///
-/// `IIntersectionShader` requires this category, and the any-hit and closest-hit inputs expose
-/// their `attributes` property only for this category. A `BoundingBoxPrimitive<MyAttributes>`
-/// context satisfies those constraints; a `TrianglePrimitive` context does not. Keeping these
-/// categories distinct lets ordinary generic constraints enforce which operations are available.
+/// `IIntersectionShader` requires this category: a `BoundingBoxPrimitive<MyAttributes>` context
+/// supplies the `MyAttributes` value that its intersection shader reports. The any-hit and
+/// closest-hit inputs read that value through `attributes`; built-in primitives expose their
+/// built-in attribute views through the same property but cannot provide an intersection shader.
 [sealed]
 public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 
