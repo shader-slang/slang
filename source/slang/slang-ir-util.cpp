@@ -1489,9 +1489,9 @@ static bool doesAddressEscape(IRInst* addr)
 // Return true if `root` is storage private to one invocation of `func` that a call cannot
 // reach unless the call is passed its address. That holds for two kinds of root:
 //
-// - A local `var` of `func` in thread-private memory whose address does not escape. The
-//   groupshared exclusion matches `isGroupSharedAddr` in #13421: such a var can be reached
-//   through the kernel context and is ordered by barriers.
+// - A local `var` of `func` in thread-private memory whose address does not escape. A
+//   groupshared var does not qualify: it is reachable through the kernel context and
+//   ordered by barriers.
 // - A parameter of `func` passed `out`, `inout` or `__constref`, whose address does not
 //   escape. These have copy-in/copy-out or borrow semantics, so the caller's storage behind
 //   them is not visible to other code during the call.
