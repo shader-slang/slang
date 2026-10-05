@@ -4746,8 +4746,8 @@ err(
 err(
     "cannot-backward-differentiate-derivative-directly",
     38049,
-    "cannot apply 'bwd_diff' directly to a derivative",
-    span { loc = "expr:Expr", message = "'bwd_diff' of a derivative is not supported; apply 'bwd_diff' to a function that uses 'fwd_diff' instead." }
+    "cannot apply 'bwd_diff' directly to a generated derivative",
+    span { loc = "expr:Expr", message = "'bwd_diff' of a generated derivative is not supported; apply 'bwd_diff' to a function that uses 'fwd_diff' instead." }
 )
 
 --

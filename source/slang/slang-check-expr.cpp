@@ -4024,6 +4024,7 @@ static Expr* convertHigherOrderExprToLookup(
     }
 
 
+    auto derivativeOperand = as<DifferentiateExpr>(resultExpr->baseFunction);
     if (auto hofExpr = as<HigherOrderInvokeExpr>(resultExpr->baseFunction))
     {
         resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
@@ -4037,6 +4038,19 @@ static Expr* convertHigherOrderExprToLookup(
         auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
                                    ? getResolvedFunc(declRefExpr->declRef.as<CallableDecl>())
                                    : declRefExpr->declRef;
+
+        // Resolve custom derivatives before rejecting backward differentiation of a generated
+        // derivative: a user-written forward derivative can itself be differentiable.
+        if (derivativeOperand && as<BackwardDifferentiateExpr>(resultExpr))
+        {
+            if (callableDeclRef.as<SynthesizedFuncDecl>())
+            {
+                visitor->getSink()->diagnose(
+                    Diagnostics::CannotBackwardDifferentiateDerivativeDirectly{
+                        .expr = derivativeOperand});
+                return visitor->CreateErrorExpr(resultExpr);
+            }
+        }
 
         auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), callableDeclRef);
 
@@ -6101,13 +6115,6 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         Expr* funcExpr) override
     {
         resultDiffExpr->baseFunction = funcExpr;
-        if (as<DifferentiateExpr>(funcExpr))
-        {
-            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
-            semantics->getSink()->diagnose(
-                Diagnostics::CannotBackwardDifferentiateDerivativeDirectly{.expr = funcExpr});
-            return;
-        }
         auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
         if (!baseFuncType)
         {
