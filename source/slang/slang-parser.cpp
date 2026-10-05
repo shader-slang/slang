@@ -3030,17 +3030,20 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         }
         else if (as<DeclRefType>(checkedBase->type.type))
         {
-            // A swizzle (`uv.y`, `m._m00`), a tuple element (`t._0`) or a member of an
-            // opened existential (a `LetExpr`) is a value of a `DeclRefType`, and a value
-            // cannot take generic arguments. Expressions that name a type, function or
-            // generic have a `TypeType`, `FuncType` or `GenericDeclRefType` instead.
+            // An expression whose checked type is a `DeclRefType` is a value, such as a swizzle
+            // (`uv.y`) or tuple element (`t._0`), and a value takes no generic arguments. An
+            // expression that names a type, namespace, function, generic or overload set has a
+            // kind-like type that is not a `DeclRefType`, and a wrapper such as the `LetExpr`
+            // that `_CheckTerm` adds for temporaries takes the type of its body.
             baseKind = BaseGenericKind::NonGeneric;
         }
 
-        // Checking a `MemberExpr` rewrites its base in place, so the unchecked node cannot
-        // always be checked again (`p->y` with `float2* p` would report that `p` cannot be
-        // dereferenced). An `Unknown` checked node may be a wrapper that generic application
-        // does not accept, such as the `LetExpr` opening the existential in `h.o.get<3>()`.
+        // Checking a `MemberExpr` stores its dereferenced or opened base back into the node,
+        // so checking the unchecked node again can apply `->` to a non-pointer (`p->y` with
+        // `float2* p` would report that `vector<float,2>` cannot be dereferenced). We reuse the
+        // checked node once the kind is decided: `Generic` is only set for a `DeclRefExpr` or
+        // `OverloadedExpr`, which `AddGenericOverloadCandidates` accepts, while an `Unknown`
+        // node may be a `LetExpr` that it rejects, as in `h.o.get<4>()` with an interface `o`.
         if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
         {
             base = checkedBase;

@@ -3,8 +3,15 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13426
 //
 // A `<` after a value that does not check to a DeclRefExpr (a swizzle, a tuple
-// element, a member of an opened existential) must parse as less-than, even when
-// a later `>` is followed by `(`.
+// element, a member reached through a temporary) must parse as less-than, even when
+// a later `>` is followed by `(`. The file also guards two details of the fix:
+// - rows 8-9 (`p->y`, `p->x`): the checked base is reused, so the `DerefMemberExpr`
+//   is not checked a second time (which reported a false "cannot dereference");
+// - row 18 (`h.o.get<4>()`): a base of unknown kind is not reused, because generic
+//   application rejects the `LetExpr` it checks to.
+//
+// Inputs: uv = (0.25, 0.75), x = 0.75, a = 0.5 lies between uv.x and uv.y, and b = 0.75
+// equals uv.y and x, so a strict comparison of those against b never holds.
 
 //TEST_INPUT:ubuffer(data=[0.25 0.75 0.5 0.75], stride=4):name=inputs
 RWStructuredBuffer<float> inputs;
