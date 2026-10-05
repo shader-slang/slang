@@ -6389,6 +6389,14 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
 
 static void parseDeclBody(Parser* parser, ContainerDecl* parent)
 {
+    // The members of a type declared inside a function body are parsed the
+    // same way as those of a global type, without semantic lookup: such a
+    // lookup could reach `parent` itself, which is not yet ready to be checked
+    // while its body is being parsed.
+    SemanticsVisitor* semanticsVisitor = parser->semanticsVisitor;
+    parser->semanticsVisitor = nullptr;
+    SLANG_DEFER(parser->semanticsVisitor = semanticsVisitor);
+
     parser->PushScope(parent);
 
     parser->ReadToken(TokenType::LBrace);
