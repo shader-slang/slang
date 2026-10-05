@@ -73,12 +73,16 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - id: set-matrix
+        env:
+          BUILD_OS: ${{ inputs.os }}
         run: |
           {
             echo "matrix<<MATRIX_EOF"
-            cat .github/cmake-options-matrix.json
+            jq --arg os "$BUILD_OS" \
+              '{include: [.include[] | select(.macos_only != "true" or $os == "macos")]}' \
+              .github/cmake-options-matrix.json
             echo "MATRIX_EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
@@ -166,6 +170,14 @@ jobs:
       - name: Install system apt packages
         if: matrix.apt_packages != '' && inputs.os == 'linux'
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Install system Homebrew packages
+        if: matrix.brew_packages != '' && inputs.os == 'macos'
+        env:
+          BREW_PACKAGES: ${{ matrix.brew_packages }}
+        run: |
+          read -r -a packages <<< "$BREW_PACKAGES"
+          brew install "${packages[@]}"
 
       - name: Configure CMake (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')

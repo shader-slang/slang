@@ -1,4 +1,4 @@
-// Implementation of vk_compute_demo.h's `vkdemo::Context` class.
+// Shared implementation of vk_compute_demo.h's `vkdemo::Context` class.
 // See vk_compute_demo.h for the rationale and the slang-rhi-PR-739
 // migration path.
 

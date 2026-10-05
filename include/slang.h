@@ -1016,6 +1016,14 @@ typedef uint32_t SlangSizeT;
         SLANG_DIAGNOSTIC_COLOR_NEVER = 2,  // Never use color
     };
 
+    // Selects the presentation of human-readable diagnostics. Machine-readable diagnostics
+    // take precedence over this setting.
+    enum SlangDiagnosticFormat
+    {
+        SLANG_DIAGNOSTIC_FORMAT_DEFAULT = 0,
+        SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO = 1,
+    };
+
     // All compiler option names supported by Slang.
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
@@ -1349,11 +1357,13 @@ typedef uint32_t SlangSizeT;
 
         DisableNotes = 161, // stringValue0: comma-separated note codes or names.
 
+        DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
+
         // New options are always appended immediately before the `CountOf` sentinel below, to
         // preserve this enum's append-only ABI contract: inserting a value earlier would shift
         // every later enumerator's integer for code already compiled against an older header.
-        SaveAutodiffModule = 162,
-        SaveAutodiffModuleBinSource = 163,
+        SaveAutodiffModule = 163,
+        SaveAutodiffModuleBinSource = 164,
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

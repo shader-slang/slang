@@ -176,13 +176,13 @@ of the four operator branches from red to green.
 
 The five stages `main.cpp` walks through for each run:
 
-| Stage | What happens | Key API |
-|---|---|---|
-| **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
-| **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`. | `IMetadata::castAs<ISyntheticResourceMetadata>` |
-| **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit 128-row tiles in full mode or a whole image in smoke mode; `--tile-rows=N` overrides this. The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
-| **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
+| Stage                   | What happens                                                                                                                                                                                                                                                                             | Key API                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **1. Compile**          | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode`  |
+| **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`.                                                                                                    | `IMetadata::castAs<ISyntheticResourceMetadata>`                             |
+| **3. Allocate & bind**  | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`.                                                                                           | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets`                     |
+| **4. Dispatch**         | Submit 128-row tiles in full mode or a whole image in smoke mode; `--tile-rows=N` overrides this. The shader atomically increments counters as branches/lines execute.                                                                                                                   | `vkCmdDispatch`                                                             |
+| **5. Readback**         | Download the raw counter bytes, call `decodeCoverageCounters()` to widen the slots, then iterate metadata entries and read `hits[entry.counterIndex]` to write manifest + LCOV + binary.                                                                                                 | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host
 
@@ -194,10 +194,13 @@ reflection-driven, so it cannot bind the buffer without extra support
 (slang-rhi PR #739). Raw Vulkan lets us bind it directly once we know
 its location.
 
-All raw-Vulkan code is isolated in `vk_compute_demo.h`. When slang-rhi
-PR #739 merges and the submodule is bumped, the migration replaces that
-header and its callers in `main.cpp`; the Slang shader sources stay
-unchanged.
+Vulkan runtime plumbing is shared in
+[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
+and [its implementation](../shader-coverage-common/vk_compute_demo.cpp), also used
+by the BVH and selectable-backend examples. `main.cpp` still describes this
+example's resources and dispatches. When slang-rhi PR #739 merges and the
+submodule is bumped, those callers can migrate to slang-rhi; the Slang shader
+sources stay unchanged.
 
 ### Metadata-derived binding
 
@@ -225,6 +228,30 @@ demonstrates the **explicit / raw-binding** approach instead.
 
 ### Counter readback and LCOV
 
+The readback section in [`main.cpp`](main.cpp) separates three host-side steps:
+
+```cpp
+// 1. Read back after dispatch has finished (ctx.dispatch() waits for completion).
+std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
+ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
+
+// 2. Decode the effective 32- or 64-bit slots into uint64_t values.
+auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
+
+// 3. Attribute those slots to source locations and write the LCOV report.
+writeLcov(shader.coverageMetadata, hits, outDir / (mode + ".lcov"),
+          ("image-pipeline-" + mode).c_str());
+```
+
+[`decodeCoverageCounters()`](../shader-coverage-common/coverage-counters.h) is an
+example helper, not a Slang API. It decodes little-endian bytes using the effective
+`CoverageBufferInfo::elementByteWidth`, without requiring an aligned pointer.
+It does not perform GPU synchronization, readback, or source attribution.
+`writeLcov()` iterates `getEntryCount()` metadata entries and looks up each entry's
+`hits[entry.counterIndex]`; multiple entries can share one counter slot, so an
+entry index is not a counter index. Keep `rawBytes` for `writeCountersBinary()`:
+writing the widened `hits` instead would change the binary layout for 32-bit counters.
+
 After dispatch the host downloads the raw counter buffer and uses
 `ICoverageTracingMetadata::getEntryInfo()` to convert it directly to a
 **full LCOV** file — with line (`DA`), function (`FN`/`FNDA`), and branch
@@ -233,6 +260,9 @@ After dispatch the host downloads the raw counter buffer and uses
 ```
 GPU counter buffer (uint32/uint64 × N slots)
     │  ctx.download()
+    ▼
+host: std::vector<uint8_t> rawBytes   ← retained for counters.bin
+    │  decodeCoverageCounters()
     ▼
 host: std::vector<uint64_t> hits   ← one entry per counter slot
     │  ICoverageTracingMetadata::getEntryInfo(i, &entry)
