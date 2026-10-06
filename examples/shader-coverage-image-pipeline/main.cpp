@@ -667,10 +667,12 @@ CoverageSummary summarize(
         lines[lineKey] = lines[lineKey] || covered;
         if (entry.kind == slang::CoverageEntryKind::Function)
         {
-            auto key = std::make_pair(
-                std::string(entry.file),
-                std::string(entry.functionName ? entry.functionName : ""));
-            functions[key] = functions[key] || covered;
+            const char* name = entry.functionName ? entry.functionName : entry.functionMangledName;
+            if (name && *name)
+            {
+                auto key = std::make_pair(std::string(entry.file), std::string(name));
+                functions[key] = functions[key] || covered;
+            }
         }
         else if (entry.kind == slang::CoverageEntryKind::Branch)
         {
