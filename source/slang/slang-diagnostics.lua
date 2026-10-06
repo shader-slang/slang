@@ -5197,6 +5197,13 @@ err(
     span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
 )
 
+err(
+    "missing-return-error-by-source",
+    40025,
+    "non-void function must return",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c." }
+)
+
 warning(
     "missing-return",
     41010,

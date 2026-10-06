@@ -28,10 +28,15 @@ static bool doesTargetAllowMissingReturns(CodeGenTarget target)
 static void diagnoseMissingReturnForTarget(
     IRMissingReturn* missingReturn,
     DiagnosticSink* sink,
+    SlangLanguageVersion languageVersion,
     CodeGenTarget target,
     bool diagnoseWarning)
 {
-    if (doesTargetAllowMissingReturns(target))
+    if (languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
+    {
+        sink->diagnose(Diagnostics::MissingReturnErrorBySource{.location = missingReturn->sourceLoc});
+    }
+    else if (doesTargetAllowMissingReturns(target))
     {
         if (diagnoseWarning)
         {
@@ -50,6 +55,7 @@ static void diagnoseMissingReturnForTarget(
 void checkForMissingReturnsRec(
     IRInst* inst,
     DiagnosticSink* sink,
+    SlangLanguageVersion languageVersion,
     CodeGenTarget target,
     bool diagnoseWarning)
 {
@@ -61,25 +67,31 @@ void checkForMissingReturnsRec(
 
             if (auto missingReturn = as<IRMissingReturn>(terminator))
             {
-                diagnoseMissingReturnForTarget(missingReturn, sink, target, diagnoseWarning);
+                diagnoseMissingReturnForTarget(
+                    missingReturn,
+                    sink,
+                    languageVersion,
+                    target,
+                    diagnoseWarning);
             }
         }
     }
 
     for (auto childInst : inst->getDecorationsAndChildren())
     {
-        checkForMissingReturnsRec(childInst, sink, target, diagnoseWarning);
+        checkForMissingReturnsRec(childInst, sink, languageVersion, target, diagnoseWarning);
     }
 }
 
 void checkForMissingReturns(
     IRModule* module,
     DiagnosticSink* sink,
+    SlangLanguageVersion languageVersion,
     CodeGenTarget target,
     bool diagnoseWarning)
 {
     // Look for any `missingReturn` instructions
-    checkForMissingReturnsRec(module->getModuleInst(), sink, target, diagnoseWarning);
+    checkForMissingReturnsRec(module->getModuleInst(), sink, languageVersion, target, diagnoseWarning);
 }
 
 } // namespace Slang
