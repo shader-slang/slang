@@ -1,7 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -Gec -no-codegen
 
-// Substituting the field type creates a different Box specialization at every level.
-// Copy classification must stop so that ordinary checking can diagnose excessive nesting.
+// Substitution of the field type creates a different `Box` specialization at every level.
+// Type-tag computation must stop inspecting this graph before exhausting the compiler stack.
+// Ordinary type validation must still report the excessive nesting.
 struct Box<T> { Box<Box<T> > next; };
 uniform Box<uint> value;
 

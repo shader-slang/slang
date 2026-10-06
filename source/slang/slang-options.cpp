@@ -1268,7 +1268,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EnableExtendedHLSLBackwardsCompatibility,
          "-Gec",
          nullptr,
-         "Enable additional backwards-compatibility features for legacy HLSL inputs."},
+         "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
+         "user guide's HLSL backwards compatibility section for the supported behavior."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,

@@ -7,9 +7,9 @@
 //TEST:COMPILE: tests/bugs/13306/data.hlsl -Gec -no-codegen -o tests/bugs/13306/data.slang-module -verify-debug-serial-ir
 //TEST:COMPILE: tests/bugs/13306/data.slang-module -target dxil -profile cs_6_0 -entry main -validate-ir
 
-// The input values must survive the path that does not call replaceValues. Both direct
-// assignment and inout arguments refer to private copies, including transparent cbuffer fields.
-// The module round trip must preserve the checked copies without requiring the flag on reload.
+// We check reads along the path that does not call `replaceValues`, as well as writes to
+// private copies through assignment and `inout` arguments, including legacy `cbuffer` fields.
+// Reloading the saved module must retain this behavior without requiring `-Gec` again.
 uniform uint x;
 uniform uint values[2];
 uniform uint a, b;

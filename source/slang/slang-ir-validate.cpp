@@ -766,6 +766,63 @@ void validateVectorsAndMatrices(
     }
 }
 
+/// Reject mutable globals whose linked types require unsupported storage.
+///
+/// Requires a linked `module` at the pipeline checkpoint after `specializeModule` and before
+/// `legalizeResourceTypes`. Checks file- or namespace-scope `static` variables and uniform
+/// shadows marked with `IRFileOrNamespaceScopeStaticVarDecoration`. Returns `false` after
+/// diagnosing any such variable that contains opaque values or unsized arrays by value.
+bool validateMutableGlobalVariableTypes(IRModule* module, DiagnosticSink* sink)
+{
+    // When checking `extern struct Thing {}; uniform Thing input;`, semantic checking cannot
+    // know whether the linked definition of `Thing` contains a texture or an unsized array.
+    // AST-to-IR lowering emits mutable storage for both `static Thing temp = input;` and a
+    // compatibility shadow. After specialization, IR type queries can examine the linked fields.
+    bool hasErrors = false;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        // Only `IRGlobalVar` instructions represent mutable module-scope storage. Shader
+        // parameters and constants do not require that storage and are checked elsewhere.
+        auto globalVar = as<IRGlobalVar>(globalInst);
+        if (!globalVar)
+            continue;
+
+        // A `static` data member also lowers to `IRGlobalVar`. This function uses the decoration
+        // to select file- or namespace-scope `static` variables and synthesized shadows with
+        // the same storage semantics.
+        if (!globalVar->findDecoration<IRFileOrNamespaceScopeStaticVarDecoration>())
+            continue;
+
+        // `isOpaqueType` examines fields and array elements recursively. The IR implementation
+        // of global variables does not currently support mutable storage for those opaque values.
+        auto valueType = globalVar->getDataType()->getValueType();
+        IRType* opaqueType = nullptr;
+        if (isOpaqueType(valueType, &opaqueType))
+        {
+            // The diagnostic belongs at the variable declaration. Reporting it before resource
+            // legalization prevents an unsupported global initializer from being split as if it
+            // were a function returning its resource fields through generated `out` parameters.
+            sink->diagnose(Diagnostics::OpaqueTypeInMutableGlobal{
+                .type = opaqueType,
+                .location = globalVar->sourceLoc});
+            hasErrors = true;
+            continue;
+        }
+
+        // The linker can select a definition with a trailing unsized array. Such a type may be
+        // valid as a buffer element, but we cannot independently allocate a private variable
+        // of that type. This applies to ordinary `static` variables and shadows alike.
+        if (isUnsizedType(valueType))
+        {
+            sink->diagnose(Diagnostics::UnsizedTypeInMutableGlobal{
+                .type = valueType,
+                .location = globalVar->sourceLoc});
+            hasErrors = true;
+        }
+    }
+    return !hasErrors;
+}
+
 //
 // Structure buffer resource types
 //

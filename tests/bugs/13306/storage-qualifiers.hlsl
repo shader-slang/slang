@@ -7,6 +7,7 @@ static uint counter = 1;
 static const uint size = 2;
 groupshared uint sharedValue;
 [[vk::constant_id(0)]] const uint specialization = 3;
+[[vk::constant_id(1)]] uint nonConstSpecialization = 5;
 Texture2D<float4> textures[];
 RWStructuredBuffer<float4> output;
 
@@ -16,5 +17,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     counter++;
     sharedValue = tid.x;
-    output[tid.x] = textures[0].Load(int3(0)) + float4(counter + size + specialization + sharedValue);
+    output[tid.x] = textures[0].Load(int3(0)) +
+                    float4(counter + size + specialization + nonConstSpecialization + sharedValue);
 }

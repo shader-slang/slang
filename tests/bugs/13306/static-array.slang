@@ -1,7 +1,7 @@
 //TEST:COMPILE: tests/bugs/13306/static-array.slang -target dxil -profile cs_6_0 -entry main -validate-ir
 
-// The initializer mover must expose array-valued initialization to array-return legalization
-// before HLSL emission. This is also necessary for ordinary static arrays, without compatibility.
+// `MoveGlobalVarInitializationToEntryPointsPass` must expose array-valued initialization to
+// `legalizeArrayReturnType` before HLSL emission. This also applies to ordinary `static` arrays.
 uniform uint input[2];
 static uint copy[2] = input;
 RWStructuredBuffer<uint> output;

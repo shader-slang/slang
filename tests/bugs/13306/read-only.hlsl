@@ -1,7 +1,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/read-only.hlsl -Gec -target hlsl -entry main
 
-// Unsupported parameter copies remain aliases. We reject writes to the input rather than
-// accepting the assignment and silently discarding it during lowering.
+// We check that semantic checking rejects writes to resource parameters and buffer contents
+// when their types cannot be stored in mutable globals. Reading these aliases is still allowed.
 Texture2D<float4> gTex;
 Texture2D<float4> other;
 struct Data { uint value; };

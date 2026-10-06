@@ -1557,6 +1557,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // The linker can resolve an external type to a definition containing resources or an unsized
+    // array. We need to validate mutable storage after those fields become available.
+    // `specializeModule` has resolved those fields, so this check sees the linked definition
+    // before resource legalization assumes that each mutable global has a supported type.
+    if (!validateMutableGlobalVariableTypes(irModule, sink))
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);

@@ -1009,7 +1009,7 @@ Enable experimental compiler passes
 
 <a id="gec"></a>
 ### -Gec
-Enable additional backwards-compatibility features for legacy HLSL inputs. 
+Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
 
 
 <a id="enable-experimental-dynamic-dispatch"></a>

@@ -1702,6 +1702,27 @@ err(
 )
 
 err(
+    "mutable-global-requires-addressable-type",
+    30088,
+    "mutable global variable requires an addressable type",
+    span { loc = "decl:Decl", message = "a mutable static global variable requires an addressable type." }
+)
+
+err(
+    "opaque-type-in-mutable-global",
+    30089,
+    "mutable global variable has an opaque type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot contain an opaque value of type '~type:IRInst'." }
+)
+
+err(
+    "unsized-type-in-mutable-global",
+    30074,
+    "mutable global variable has an unsized type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot have unsized type '~type:IRInst'." }
+)
+
+err(
     "concrete-argument-to-output-interface",
     30077,
     "concrete type passed to interface-typed output parameter",
@@ -3169,7 +3190,7 @@ warning(
     "deprecated-usage",
     31200,
     "use of deprecated declaration",
-    span { loc = "location", message = "~declName:Name has been deprecated: ~message" }
+    span { loc = "location", message = "~decl:Decl has been deprecated: ~message" }
 )
 
 err(
@@ -3218,7 +3239,7 @@ err(
     "removed-usage",
     31207,
     "use of removed declaration",
-    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+    span { loc = "location", message = "~decl:Decl has been removed since language version '~sinceVersion:Int': ~message" }
 )
 
 err(

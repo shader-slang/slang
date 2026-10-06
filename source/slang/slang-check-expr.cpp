@@ -356,70 +356,78 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
+// Diagnose use of a deprecated or removed declaration at `loc`.
+//
+// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language version
+// to decide whether removal applies; reports nothing when no module is available. Inspects
+// `originalExpr`, when non-null, to suppress repeats and uses at the declaration's name location.
 void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Resolve the module for the context
+    // Usage attributes depend on the language version of the module being checked.
+    // We first look for that module in the current lexical scope.
     ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
 
-    // If we don't get the module declaration from the outer scope, we'll
-    // try the visitor context
-    if (!moduleDecl && getShared() && getShared()->getModule())
-        moduleDecl = getShared()->getModule()->getModuleDecl();
+    // Some semantic queries run outside a lexical module scope. We then try the module
+    // recorded in the visitor's shared context.
+    if (!moduleDecl)
+    {
+        auto shared = getShared();
+        // Without a shared context, we have no module language version for this check.
+        if (!shared)
+            return;
 
-    // And if we can't figure out a module, we're called in a context where we
-    // don't care about the deprecation attributes
+        auto module = shared->getModule();
+        // A shared context without a module likewise has no language version to apply.
+        if (!module)
+            return;
+        moduleDecl = module->getModuleDecl();
+    }
+
+    // If neither context provides a module declaration, this query has no language version
+    // against which to check usage attributes.
     if (!moduleDecl)
         return;
 
-    // This is slightly subtle, because we don't want to warn more than
-    // once for the same occurrence, however in some cases this function is
-    // called more than once for the same declref (specifically in the case
-    // of a non-overloaded function, once when the function is identified at
-    // first, and again when it's checked from
-    // CheckInvokeExprWithCheckedOperands).
-    //
-    // The correct fix is probably to make
-    // CheckInvokeExprWithCheckedOperands reuse the original declref,
-    // however that doesn't appear to be a simple change.
-    //
-    // What we do instead is see if there's already been a declRef
-    // constructed for this expression and rest assured that it's already
-    // had a diagnostic emitted.
-    //
-    // The already-resolved declRef must refer to the *same* declaration we are
-    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
-    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
-    // carries a declRef (to the type, not the constructor). Without the
-    // same-decl check we would treat the type reference as "already diagnosed"
-    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
-    // diagnostic.
+    // We can check a function use once during lookup and again in
+    // `CheckInvokeExprWithCheckedOperands`. We avoid a repeated diagnostic only if that
+    // invocation's checked function expression refers to the same declaration.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef &&
-        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
+    if (originalAppFunDecl)
     {
-        return;
+        auto originalDeclRef = originalAppFunDecl->declRef;
+        if (originalDeclRef)
+        {
+            // For `int4(int2(1, 2), 3)`, the function expression refers to the type `int4`,
+            // not its constructor. A type-use check does not diagnose constructor attributes.
+            // We suppress a repeat only when the actual declarations are identical.
+            if (originalDeclRef.getDecl() == declRef.getDecl())
+                return;
+        }
     }
 
-    // If the expression location is the same as the declaration location, don't
-    // diagnose. This avoids diagnosing struct member fields which get
-    // referenced by synthesized constructors etc.
-    if (declRef.getDecl() && originalExpr && (declRef.getDecl()->getNameLoc() == originalExpr->loc))
+    // We suppress declaration-use diagnostics at the declaration's name location.
+    // Synthesized constructors refer to fields at those locations, so this rule avoids
+    // reporting their generated field accesses.
+    if (originalExpr)
     {
-        return;
+        if (declRef.getDecl()->getNameLoc() == originalExpr->loc)
+            return;
     }
 
-    // Check whether we're using a removed declaration
+    // We check removal first because a removed declaration requires an error, even if it is
+    // also deprecated. Diagnostics receive the declaration instead of its internal identifier
+    // so `printDiagnosticArg` can use the original name of a renamed shader parameter.
     if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
     {
         if (moduleDecl->languageVersion >= removedSinceAttr->sinceVersion)
         {
             getSink()->diagnose(Diagnostics::RemovedUsage{
-                .declName = declRef.getName(),
+                .decl = declRef.getDecl(),
                 .sinceVersion = removedSinceAttr->sinceVersion,
                 .message = removedSinceAttr->message,
                 .location = loc});
@@ -428,11 +436,12 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
         }
     }
 
-    // Check whether we're using a deprecated declaration
+    // If the declaration has not been removed in this language version, we report deprecation
+    // as a warning. The declaration formatter supplies its user-visible name here as well.
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
-            .declName = declRef.getName(),
+            .decl = declRef.getDecl(),
             .message = deprecatedAttr->message,
             .location = loc});
     }
@@ -468,6 +477,11 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     return true;
 }
 
+// Construct a checked variable or member expression for `declRef`.
+//
+// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
+// Selects the expression kind from the base and whether the declaration is static. The result
+// includes the declaration's type and the read/write restrictions of any instance-member access.
 DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     DeclRef<Decl> declRef,
     Expr* baseExpr,
@@ -475,27 +489,51 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Compute the type that this declaration reference will have in context.
-    //
+    // We first need the declaration's checked type and read/write qualifiers. The type query
+    // also checks its header before we use declaration-specific semantic information below.
     auto type = GetTypeForDeclRef(declRef, loc);
 
-    // This is the bottleneck for using declarations which might be
-    // deprecated, diagnose here.
-    if (getSink())
-        diagnoseDeprecatedAndRemovedDeclRefUsage(declRef, loc, originalExpr);
+    // Lookup can find a uniform shadow instead of the parameter the programmer declared.
+    // We diagnose deprecated or removed parameter uses from that original declaration, even
+    // when the expression must refer to mutable shadow storage.
+    auto declRefForUsageDiagnostics = declRef;
 
-    // Construct an appropriate expression based on the structured of
-    // the declaration reference.
-    //
+    // We preserve an immutable alias's parameter identity in the checked expression.
+    // Consider `[[vk::constant_id(7)]] uint count = 3;` followed by
+    // `[numthreads(count, 1, 1)] void main() {}`. Attribute checking must receive a
+    // reference to the parameter declaration that carries the specialization attribute.
+    // `GetTypeForDeclRef` has checked the shadow's header before we inspect its alias flag.
+    if (auto shadow = as<UniformParameterShadowVarDecl>(declRef.getDecl()))
+    {
+        auto parameter = shadow->uniformParameter;
+        declRefForUsageDiagnostics = parameter->getDefaultDeclRef();
+
+        // We canonicalize only immutable aliases. Mutable shadows must retain references to
+        // their own declarations so lowering can access their private storage.
+        if (shadow->shouldBeImmutableAlias)
+        {
+            // A legacy `cbuffer` shadow has the element struct type instead of the parameter's
+            // `ConstantBuffer<T>` type. We retain that shadow to represent reads of the contents.
+            // Other immutable aliases have the parameter's type and need no separate identity.
+            if (shadow->getType()->equals(parameter->getType()))
+            {
+                // The parser creates both declarations at non-generic file or namespace scope,
+                // so the parameter's default declaration reference preserves all needed context.
+                declRef = parameter->getDefaultDeclRef();
+            }
+        }
+    }
+
+    // We report deprecation or removal at this use's location before constructing its
+    // checked expression. For a uniform shadow, we check the parameter selected above.
+    if (getSink())
+        diagnoseDeprecatedAndRemovedDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
+
+    // We now choose the expression kind. A reference without a base becomes a `VarExpr`.
+    // With a base, we distinguish static member references from instance member accesses.
     if (baseExpr)
     {
-        // If there was a base expression, we will have some kind of
-        // member expression.
-
-        // We want to check for the case where the base "expression"
-        // actually names a type, because in that case we are doing
-        // a static member reference.
-        //
+        // A type-valued base, such as `Thing` in `Thing.member`, selects a static member.
         if (auto typeType = as<TypeType>(baseExpr->type->getCanonicalType()))
         {
             // Before forming the reference, we will check if the
@@ -534,7 +572,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         }
         else if (isEffectivelyStatic(declRef.getDecl()))
         {
-            // Extract the type of the baseExpr
+            // A static declaration can also be accessed through a value, as in `value.member`.
+            // We represent its base by the value's type so the resulting `StaticMemberExpr`
+            // identifies the static declaration without requiring an instance value.
             auto baseExprType = baseExpr->type.type;
             SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
             baseTypeExpr->base.type = baseExprType;
@@ -551,9 +591,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         }
         else
         {
-            // If the base expression wasn't a type, then this
-            // is a normal member expression.
-            //
+            // The remaining case is an instance member accessed through a value. We combine
+            // the member's qualifiers with the restrictions on that base value.
             auto expr = m_astBuilder->create<MemberExpr>();
             expr->loc = loc;
             expr->type = type;
@@ -562,9 +601,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->declRef = declRef;
             expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
-            // If any member declares the following value is a
-            // write only, we must declare the parent as a write
-            // only to avoid modifying the child
+            // Reading a member of a write-only value would also read that base value. We
+            // propagate the base's write-only restriction to the resulting member expression.
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
             // It's not valid to reference a non-static member with a static
@@ -577,23 +615,19 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
-            // When referring to a member through an expression,
-            // the result is only an l-value if both the base
-            // expression and the member agree that it should be.
-            //
-            // We have already used the `QualType` from the member
-            // above (that is `type`), so we need to take the
-            // l-value status of the base expression into account now.
+            // The member's `QualType` supplies its own l-value status. An ordinary instance
+            // member additionally requires an l-value base. Buffer accesses and property
+            // accessors have the separate rules below when the base is not an l-value.
             if (!baseExpr->type.isLeftValue)
             {
-                // One exception to this is if we're reading the contents
-                // of a GLSL buffer interface block which isn't marked as
-                // read_only
+                // A GLSL buffer interface block provides mutable storage even though its
+                // parameter expression is not an l-value. The member is writable only when
+                // the block is mutable and the member is not read-only on this target.
                 expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) &&
                                          (expr->type.hasReadOnlyOnTarget == false);
 
-                // Another exception is if we are accessing a property through an accessor that
-                // does not require writable receiver storage.
+                // A property may be writable without a writable base. We inspect its first
+                // setter or ref accessor to determine whether it requires writable receiver storage.
                 if (!expr->type.isLeftValue)
                 {
                     if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
@@ -620,8 +654,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             }
             else
             {
-                // If we are accessing a readonly property, then the result
-                // is not an l-value.
+                // A writable base alone is insufficient for a property: assigning the
+                // property requires a setter or ref accessor. A getter-only property is read-only.
                 if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                 {
                     bool isLValue = false;
@@ -641,16 +675,15 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     }
     else
     {
-        // If there is no base expression, then the result must
-        // be an ordinary variable expression.
-        //
+        // With no base, we construct a `VarExpr` using the checked declaration's qualifiers.
         auto expr = m_astBuilder->create<VarExpr>();
         expr->loc = loc;
         expr->name = name;
         expr->type = type;
         expr->declRef = declRef;
-        // Keep a reference to the original expr if it was a genericApp/member.
-        // This is needed by the language server to locate the original tokens.
+        // Generic applications and member expressions include tokens that are absent from
+        // the resulting `VarExpr`. We retain `originalExpr` for the language server to locate
+        // those tokens in the expression written by the programmer.
         if (as<GenericAppExpr>(originalExpr) || as<MemberExpr>(originalExpr) ||
             as<StaticMemberExpr>(originalExpr))
         {

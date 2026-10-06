@@ -200,64 +200,120 @@ bool isResourceType(IRType* type)
 }
 
 
-bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafOpaqueHandleType)
+// The queries below inspect the values stored in an aggregate. The compiler represents a
+// native pointer as an address, with separate storage for the pointed-to value. These queries
+// treat parameter-group types as leaves because `isResourceType` classifies them as opaque.
+enum class ContainedTypeProperty
 {
+    Opaque,
+    Unsized,
+};
+
+/// Find the first by-value type, including `type`, with the requested `property`.
+///
+/// Examines canonical struct fields, array elements, and tuple elements. Requires `visited`
+/// to contain the struct types on the current traversal path. Returns `nullptr` when no
+/// matching type occurs. For the opaque query, a recursive aggregate remains an opaque match,
+/// preserving the existing conservative classification of invalid recursive storage.
+static IRType* findContainedTypeWithProperty(
+    IRType* type,
+    ContainedTypeProperty property,
+    HashSet<IRType*>& visited)
+{
+    // A recursive by-value aggregate cannot have finite storage. `isOpaqueType` reports that
+    // aggregate as an opaque match. Recursion alone does not establish that the aggregate
+    // contains an `IRUnsizedArrayType`.
     if (visited.contains(type))
     {
-        if (outLeafOpaqueHandleType)
-            *outLeafOpaqueHandleType = type;
-        return true;
+        if (property == ContainedTypeProperty::Opaque)
+            return type;
+        return nullptr;
     }
 
-    if (isResourceType(type))
+    // Each query recognizes its own kind of leaf before considering aggregate contents.
+    // In particular, `isResourceType` also recognizes arrays of resources; returning `type`
+    // here preserves the type reported by the existing `isOpaqueType` query.
+    switch (property)
     {
-        if (outLeafOpaqueHandleType)
-            *outLeafOpaqueHandleType = type;
-        return true;
+    case ContainedTypeProperty::Opaque:
+        if (isResourceType(type))
+            return type;
+        break;
+    case ContainedTypeProperty::Unsized:
+        if (as<IRUnsizedArrayType>(type))
+            return type;
+        break;
     }
 
+    // Struct fields occupy storage inside the struct value. Base types also appear as
+    // fields after AST-to-IR lowering, so this traversal covers inherited contents.
     if (auto structType = as<IRStructType>(type))
     {
         visited.add(type);
         for (auto field : structType->getFields())
         {
-            if (isOpaqueTypeImpl(field->getFieldType(), visited, outLeafOpaqueHandleType))
+            auto matchingType =
+                findContainedTypeWithProperty(field->getFieldType(), property, visited);
+            if (matchingType)
             {
-                return true;
+                return matchingType;
             }
         }
         visited.remove(type);
     }
 
+    // Array elements contribute to the array's by-value representation. We inspect their
+    // types even when the containing array has a fixed element count.
     if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        if (isOpaqueTypeImpl(arrayType->getElementType(), visited, outLeafOpaqueHandleType))
-        {
-            return true;
-        }
+        return findContainedTypeWithProperty(arrayType->getElementType(), property, visited);
     }
 
+    // The tuple's stored values have the types denoted by its type operands. The queries
+    // inspect those types; other operands do not correspond to additional stored values.
     if (auto tupleType = as<IRTupleTypeBase>(type))
     {
         for (UInt i = 0; i < tupleType->getOperandCount(); i++)
         {
             if (auto elementType = as<IRType>(tupleType->getOperand(i)))
             {
-                if (isOpaqueTypeImpl(elementType, visited, outLeafOpaqueHandleType))
+                auto matchingType = findContainedTypeWithProperty(elementType, property, visited);
+                if (matchingType)
                 {
-                    return true;
+                    return matchingType;
                 }
             }
         }
     }
 
-    return false;
+    return nullptr;
 }
 
+/// Test for opaque values or invalid recursion in the by-value storage of `type`.
+///
+/// Assigns the matching type to `outLeafOpaqueHandleType`, if supplied, only on a match.
+/// The shared traversal inspects struct fields, array elements, and tuple elements.
+/// Conservatively returns true for invalid by-value recursion, assigning the recursive
+/// aggregate type to `outLeafOpaqueHandleType` even if that aggregate contains no resource.
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
 {
     HashSet<IRType*> visited;
-    return isOpaqueTypeImpl(type, visited, outLeafOpaqueHandleType);
+    auto matchingType = findContainedTypeWithProperty(type, ContainedTypeProperty::Opaque, visited);
+    if (!matchingType)
+        return false;
+    if (outLeafOpaqueHandleType)
+        *outLeafOpaqueHandleType = matchingType;
+    return true;
+}
+
+/// Test whether by-value storage for `type` contains an unsized array.
+///
+/// Uses the same traversal as `isOpaqueType` while selecting `IRUnsizedArrayType`.
+/// Native pointer pointees and parameter-group contents are outside this by-value inspection.
+bool isUnsizedType(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return findContainedTypeWithProperty(type, ContainedTypeProperty::Unsized, visited) != nullptr;
 }
 
 SourceLoc findBestSourceLocFromUses(IRInst* inst)

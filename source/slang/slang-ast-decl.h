@@ -341,29 +341,36 @@ class VarDecl : public VarDeclBase
     FIDDLE(...)
 };
 
-// A uniform parameter shadow is a temporary that stands in for a shader input during source
-// lookup. Legacy HLSL permits assignments to uniform parameters; a shadow supplies private
-// storage for those assignments without changing the externally supplied input or its metadata.
-// When the input type cannot be stored in a supported private variable, the shadow instead
-// provides a read-only alias to the input.
+// A variable introduced by the parser to implement uniform parameter temporaries in legacy HLSL.
 //
-// Header checking determines the storage behavior and the exposed value type. A copied legacy
-// cbuffer exposes its element struct; an alias retains the input's type. Lowering emits ordinary
-// global-variable initialization only for mutable copies. Resource aliases lower to the input.
-// Unlike a source VarDecl, a shadow has no written type or initializer expression: both come
-// from its associated parameter. The distinct declaration kind dispatches those checking and
-// lowering tasks without treating the shadow as an ordinary source variable declaration.
+// Consider `uint x; void setX() { x = 1; }`. With HLSL compatibility enabled, the parser renames
+// the parameter and introduces a shadow under the name `x`. Semantic checking allows writes
+// to a mutable shadow. The compiler initializes its storage from the parameter for each
+// shader entry-point invocation.
+// The parameter's binding and layout modifiers remain on the parameter declaration.
+//
+// Header checking sets the shadow's type from the parameter; for a legacy `cbuffer`, it uses
+// the buffer's element struct. The same type restriction as for mutable `static` globals applies.
+// For an unsupported type, the compiler preserves read access through an immutable alias
+// without allocating unsupported mutable storage. Semantic checking rejects writes through
+// that alias. The shadow retains its computed type on both the mutable and immutable paths.
+// Specialization constants also require immutable aliases so checking can retain their identity.
+//
+// A shadow has no written type or initializer expression. Checking reads the parameter's type,
+// and lowering constructs initialization from its value. Both phases dispatch separately
+// from ordinary `VarDecl` handling.
 FIDDLE()
 class UniformParameterShadowVarDecl : public VarDecl
 {
     FIDDLE(...)
 
-    // The immutable input supplying this declaration's value. Both declarations are created
-    // at non-generic file or namespace scope, so the association needs no generic substitutions.
+    // The parameter from which lowering initializes the shadow. The parser assigns this
+    // non-null pointer before checking. It creates both declarations at non-generic file or
+    // namespace scope, so no substitutions are needed.
     FIDDLE() VarDecl* uniformParameter = nullptr;
 
-    // True after header checking selects a mutable copy rather than a read-only alias.
-    FIDDLE() bool hasMutableStorage = false;
+    // Whether header checking requires an immutable alias instead of mutable global storage.
+    FIDDLE() bool shouldBeImmutableAlias = false;
 };
 
 // A variable declaration that is always immutable (whether local, global, or member variable)
@@ -396,13 +403,21 @@ class ExtensionDecl : public AggTypeDeclBase
 };
 
 
+// Properties of a checked type used to validate storage and parameter declarations.
+// `SemanticsVisitor::getTypeTags` combines these flags for instantiated fields and base types.
 enum class TypeTag
 {
+    // No property has been established. This is not a proof that every specialization is valid.
     None = 0,
+    // The type includes an array whose element count is absent or explicitly unbounded.
     Unsized = 1,
+    // The definition or recursive inspection of the type is incomplete.
     Incomplete = 2,
+    // An array count must be resolved by linking or specialization before layout is fixed.
     LinkTimeSized = 4,
+    // The type includes a resource value whose representation depends on the target.
     Opaque = 8,
+    // The type cannot be represented as an ordinary addressable value.
     NonAddressable = 16,
 };
 
@@ -425,7 +440,6 @@ class AggTypeDecl : public AggTypeDeclBase
 
     bool hasBody = true;
 
-    void unionTagsWith(TypeTag other);
     void addTag(TypeTag tag);
     bool hasTag(TypeTag tag);
 

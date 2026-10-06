@@ -1161,7 +1161,7 @@ It has no effect on Slang or GLSL inputs.
 
 #### Uniform Parameter Temporaries
 
-With `-Gec`, uniform data parameters can be used as mutable temporaries within each shader invocation.
+With `-Gec`, file and namespace uniform parameters can be used as mutable temporaries within each shader invocation, subject to the same type restrictions as mutable `static` globals.
 For example:
 
 ```hlsl
@@ -1178,12 +1178,18 @@ void setValues(uint value)
 Each copy starts with the corresponding shader input's value for every entry-point invocation.
 Assignments and `out`/`inout` arguments update that private copy; they do not modify the constant buffer.
 Reflection continues to describe the original shader inputs and their bindings.
+Semantic checking enforces explicit `readonly` and `writeonly` qualifiers on the temporary or alias.
 
-The supported data types are scalars, vectors, matrices, enums, sized arrays, and structs composed of supported data types.
-An implicit legacy `cbuffer` is copied as one struct when all its stored fields are supported data types.
-Resource parameters, explicit parameter groups such as `ConstantBuffer<T>`, unbounded arrays, link-time type aliases, externally replaceable structs, and structs containing resources remain read-only.
-In particular, a legacy buffer containing a resource remains read-only as a whole.
-Supporting mutable resource parameters requires additional resource-storage legalization.
+The temporary has the parameter's type.
+For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
+This type selection also applies when the struct contains a resource.
+
+Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
+Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
+Reading these parameters with `-Gec` does not allocate mutable resource storage.
+A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
+If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
 Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
