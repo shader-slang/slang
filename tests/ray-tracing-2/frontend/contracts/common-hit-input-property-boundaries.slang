@@ -43,6 +43,10 @@ struct Miss : rt::IMissShader
     {
         let primitiveIndex = input.primitiveIndex;
 //CHECK-DAG: 'primitiveIndex' is not a member of 'rt.MissInput<HitContext>'.
+        let objectToWorld = input.objectToWorld;
+//CHECK-DAG: 'objectToWorld' is not a member of 'rt.MissInput<HitContext>'.
+        let worldToObject = input.worldToObject;
+//CHECK-DAG: 'worldToObject' is not a member of 'rt.MissInput<HitContext>'.
     }
 }
 

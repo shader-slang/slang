@@ -2,9 +2,14 @@
 //TEST:SIMPLE: -experimental-feature -target spirv -no-codegen
 //TEST:SIMPLE: -experimental-feature -target cuda -no-codegen
 //TEST:SIMPLE: -experimental-feature -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -target metal -no-codegen -DTEST_MULTILEVEL_DEPTH=1
+//TEST:SIMPLE: -experimental-feature -target metal -no-codegen -DTEST_MULTILEVEL_DEPTH=2
+//TEST:SIMPLE: -experimental-feature -target metal -no-codegen -DTEST_MULTILEVEL_DEPTH=3
 
 // Check lookup of the shared property implementation after importing the packaged module.
 // Each concrete view must keep its native stage contract when using the generic extension.
+// Object/world transforms must also be available with direct primitive-AS traversal and with
+// multilevel instancing. These frontend checks do not exercise Metal's pending adapter synthesis.
 import slang.raytracing;
 
 struct Payload
@@ -14,7 +19,11 @@ struct Payload
 
 struct TraceContext : rt::ITraceContext
 {
+#ifdef TEST_MULTILEVEL_DEPTH
+    typealias AccelerationStructure = rt::MultiLevelAccelerationStructure<TEST_MULTILEVEL_DEPTH>;
+#else
     typealias AccelerationStructure = rt::AccelerationStructure;
+#endif
     typealias Motion = rt::NoMotion;
 }
 
@@ -35,7 +44,8 @@ struct ClosestHit : rt::IClosestHitShader
         input.payload.value = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x
             + input.dispatchRaysIndex.x + input.dispatchRaysDimensions.x
-            + input.distance + input.hitKind;
+            + input.distance + input.hitKind
+            + input.objectToWorld[0][0] + input.worldToObject[0][0];
     }
 }
 
@@ -48,7 +58,8 @@ struct AnyHit : rt::IAnyHitShader
         input.payload.value = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x
             + input.dispatchRaysIndex.x + input.dispatchRaysDimensions.x
-            + input.distance + input.hitKind;
+            + input.distance + input.hitKind
+            + input.objectToWorld[0][0] + input.worldToObject[0][0];
     }
 }
 
@@ -60,7 +71,8 @@ struct Intersection : rt::IIntersectionShader
     {
         float candidateDistance = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x
-            + input.dispatchRaysIndex.x + input.dispatchRaysDimensions.x;
+            + input.dispatchRaysIndex.x + input.dispatchRaysDimensions.x
+            + input.objectToWorld[0][0] + input.worldToObject[0][0];
         input.reportHit(candidateDistance, float2(0.0));
     }
 }

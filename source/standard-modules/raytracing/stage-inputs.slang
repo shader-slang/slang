@@ -339,7 +339,7 @@ internal RayDesc getStageInputClosestHitObjectSpaceRay()
     return result;
 }
 
-/// Returns the transform from the current instance's object space to world space.
+/// Returns the transform from the hit geometry's object space to the traversal's world space.
 [ForceInline]
 internal float4x3 getStageInputObjectToWorld()
 {
@@ -351,8 +351,8 @@ internal float4x3 getStageInputObjectToWorld()
     case cuda:
         return ObjectToWorld4x3();
     case metal:
-        // TODO: A following PR must synthesize the object-to-world transform from Metal stage
-        // state.
+        // TODO: A following PR must synthesize the complete object-to-world transform from Metal
+        // stage state, or an identity matrix for direct primitive-AS traversal without instancing.
         static_assert(
             false,
             "Metal structural ray-tracing objectToWorld requires compiler synthesis");
@@ -360,7 +360,7 @@ internal float4x3 getStageInputObjectToWorld()
     }
 }
 
-/// Returns the transform from world space to the current instance's object space.
+/// Returns the transform from the traversal's world space to the hit geometry's object space.
 [ForceInline]
 internal float4x3 getStageInputWorldToObject()
 {
@@ -372,8 +372,8 @@ internal float4x3 getStageInputWorldToObject()
     case cuda:
         return WorldToObject4x3();
     case metal:
-        // TODO: A following PR must synthesize the world-to-object transform from Metal stage
-        // state.
+        // TODO: A following PR must synthesize the complete world-to-object transform from Metal
+        // stage state, or an identity matrix for direct primitive-AS traversal without instancing.
         static_assert(
             false,
             "Metal structural ray-tracing worldToObject requires compiler synthesis");
@@ -397,7 +397,7 @@ internal interface ICommonHitInput
 /// Provides the properties available to closest-hit, any-hit, and intersection stages.
 ///
 /// An intersection stage has not reported a hit yet, so `distance` and `hitKind` stay on the
-/// closest-hit and any-hit inputs. Motion and instance-specific properties remain on their
+/// closest-hit and any-hit inputs. Motion and scalar instance identifiers remain on their
 /// constrained concrete extensions.
 public extension<Input : ICommonHitInput> Input
 {
@@ -429,6 +429,25 @@ public extension<Input : ICommonHitInput> Input
     public property float3 worldSpaceDirection
     {
         get { return getStageInputWorldSpaceDirection(); }
+    }
+
+    /// Transforms the hit geometry's object-space coordinates into the traversal's world space.
+    ///
+    /// This includes every instance transform along the hit path. For example, an inner instance
+    /// translating by two units and an outer instance translating by ten units on the same axis
+    /// produce a combined translation of twelve units. Without instancing, this is the identity.
+    public property float4x3 objectToWorld
+    {
+        get { return getStageInputObjectToWorld(); }
+    }
+
+    /// Transforms world-space coordinates into the hit geometry's object space.
+    ///
+    /// This is the inverse of the complete `objectToWorld` transform, including all instance
+    /// levels. Without instancing, this is the identity.
+    public property float4x3 worldToObject
+    {
+        get { return getStageInputWorldToObject(); }
     }
 
     public property uint3 dispatchRaysIndex
@@ -514,16 +533,6 @@ public extension<Context> ClosestHitInput<Context>
     public property RayDesc objectSpaceRay
     {
         get { return getStageInputClosestHitObjectSpaceRay(); }
-    }
-
-    public property float4x3 objectToWorld
-    {
-        get { return getStageInputObjectToWorld(); }
-    }
-
-    public property float4x3 worldToObject
-    {
-        get { return getStageInputWorldToObject(); }
     }
 }
 
@@ -635,16 +644,6 @@ public extension<Context> AnyHitInput<Context>
     {
         get { return getStageInputCandidateObjectSpaceRay(); }
     }
-
-    public property float4x3 objectToWorld
-    {
-        get { return getStageInputObjectToWorld(); }
-    }
-
-    public property float4x3 worldToObject
-    {
-        get { return getStageInputWorldToObject(); }
-    }
 }
 
 /// Provides the record and ray state used by a procedural intersection stage.
@@ -733,16 +732,6 @@ public extension<Context> IntersectionInput<Context>
     public property uint instanceID
     {
         get { return getStageInputInstanceID(); }
-    }
-
-    public property float4x3 objectToWorld
-    {
-        get { return getStageInputObjectToWorld(); }
-    }
-
-    public property float4x3 worldToObject
-    {
-        get { return getStageInputWorldToObject(); }
     }
 }
 
