@@ -32,6 +32,7 @@ from ci_priority_common import (
 GATE_JOB_NAME = "wait-for-human-priority"
 YIELDED_STEP_NAME = "Stop yielded bot CI"
 CHECK_CI_JOB_NAME = "check-ci"
+APPROVAL_GATE_JOB_NAME = "falcor-build-approval-gate"
 RERUNNABLE_CONCLUSIONS = {"failure", "cancelled"}
 
 # Only the bot's workflow_dispatch runs can yield (see the wait-for-human-priority
@@ -98,6 +99,10 @@ def failed_only_because_priority_gate(jobs):
             found_yielded_marker = True
             continue
         if name == CHECK_CI_JOB_NAME and conclusion in RERUNNABLE_CONCLUSIONS:
+            continue
+        # A cancelled approval request does not represent executed CI work.
+        # Keep a verified yielded run eligible for retry after that cancellation.
+        if name == APPROVAL_GATE_JOB_NAME and conclusion == "cancelled":
             continue
         if conclusion in RERUNNABLE_CONCLUSIONS:
             return False

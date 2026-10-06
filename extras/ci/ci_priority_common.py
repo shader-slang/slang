@@ -11,6 +11,7 @@ without the other.
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,8 +26,24 @@ DEFAULT_BOT_LOGINS = {
     "nv-slang-bot[bot]",
 }
 
-# Run statuses that mean a run still holds, or is waiting for, runner capacity.
+# Candidate statuses. Waiting runs need a job-level capacity check below.
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+def waiting_run_uses_runner_capacity(repo, run):
+    """Check jobs before treating an approval-waiting run as a blocker.
+
+    For example, a run can have all its build/test jobs completed while its
+    Falcor gate still awaits approval. It consumes no runner capacity and
+    must not prevent bot CI or retries. A waiting run with a queued/running
+    sibling still blocks. Empty or unknown job state is kept conservatively.
+    """
+    jobs, err = gh_api_list(
+        f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100", "jobs"
+    )
+    if err:
+        raise RuntimeError(f"Failed to list jobs for waiting run {run['id']}: {err}")
+    return not jobs or any(
+        job.get("status") not in {"completed", "waiting"} for job in jobs
+    )
 
 
 def normalize_bot_logins(extra_logins=None):
@@ -60,7 +77,8 @@ def fetch_active_runs(repo, workflow):
 
     Queries every status in ACTIVE_STATUSES and paginates each query, so a
     higher-priority run is never missed because it sits in a less-common state
-    or on a later page.
+    or on a later page. Waiting runs block only if their jobs still need runner
+    capacity; environment approval alone is not runner contention.
     """
     runs = {}
     for status in sorted(ACTIVE_STATUSES):
@@ -73,7 +91,19 @@ def fetch_active_runs(repo, workflow):
             raise RuntimeError(f"Failed to list {status} runs: {err}")
         for run in items or []:
             runs[run["id"]] = run
-    return list(runs.values())
+    active = [run for run in runs.values() if run.get("status") != "waiting"]
+    waiting = [run for run in runs.values() if run.get("status") == "waiting"]
+    # Old approval requests can accumulate. Bound concurrency so inspecting
+    # them fits the short-lived retry workflow without flooding the API.
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        checks = [
+            (run, executor.submit(waiting_run_uses_runner_capacity, repo, run))
+            for run in waiting
+        ]
+        for run, check in checks:
+            if check.result():
+                active.append(run)
+    return active
 
 
 def parse_github_time(value):
