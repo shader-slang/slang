@@ -100,14 +100,24 @@ public extension RaytracingAccelerationStructure : IAccelerationStructure {}
 /// Names the portable two-level acceleration-structure handle.
 public typealias AccelerationStructure = RaytracingAccelerationStructure;
 
+/// Identifies depth-parameterized handles for the multilevel stage-input extensions.
+///
+/// Extension lookup cannot infer a depth appearing only in a nested associated-type equality.
+/// This internal marker lets those extensions select the whole handle family without requiring
+/// shader code to supply a second depth argument when reading an instance path.
+[sealed]
+internal interface IMultiLevelAccelerationStructure {}
+
 /// Represents Metal traversal with an explicit maximum acceleration-structure depth.
 ///
-/// `maxLevelCount` includes every instance level on the path to the primitive. A value of one
-/// represents direct primitive-AS traversal; larger values enable Metal's multi-level traversal.
+/// `maxLevelCount` includes the primitive acceleration structure and every instance level on the
+/// path to it. A value of one represents direct primitive-AS traversal; larger values enable
+/// Metal's multi-level traversal. A hit path therefore contains at most `maxLevelCount - 1`
+/// instances.
 [require(metal)]
 __intrinsic_type(RaytracingAccelerationStructure)
 public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
-    : IAccelerationStructure
+    : IAccelerationStructure, IMultiLevelAccelerationStructure
 {}
 
 /// Exposes the built-in attributes of a triangle hit as a zero-storage property view.

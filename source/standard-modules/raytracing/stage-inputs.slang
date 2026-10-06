@@ -277,6 +277,42 @@ internal uint getStageInputInstanceID()
     }
 }
 
+/// Returns the actual number of instances on the current multilevel primitive path.
+[require(metal)]
+[ForceInline]
+internal uint getStageInputInstanceCount()
+{
+    // TODO: A following PR must synthesize the candidate array length or committed instance_count.
+    // Direct primitive-AS traversal has no instance path and must synthesize a count of zero.
+    static_assert(false, "Metal structural ray-tracing instanceCount requires compiler synthesis");
+    return 0;
+}
+
+/// Returns the instance index at a valid level of the current multilevel primitive path.
+[require(metal)]
+[ForceInline]
+internal uint getStageInputInstanceIndexAtLevel(uint level)
+{
+    // TODO: A following PR must read the candidate [[instance_id]] path or committed instance_id
+    // array at this level. Preserve the caller's level; selecting only the innermost entry loses
+    // the enclosing instances that distinguish paths such as [3, 7] and [4, 7].
+    static_assert(
+        false,
+        "Metal structural ray-tracing getInstanceIndex requires compiler synthesis");
+    return 0;
+}
+
+/// Returns the application-defined ID at a valid level of the current multilevel primitive path.
+[require(metal)]
+[ForceInline]
+internal uint getStageInputInstanceIDAtLevel(uint level)
+{
+    // TODO: A following PR must read the candidate [[user_instance_id]] path or committed
+    // user_instance_id array at this level.
+    static_assert(false, "Metal structural ray-tracing getInstanceID requires compiler synthesis");
+    return 0;
+}
+
 /// Returns the current candidate ray transformed into object space.
 ///
 /// Any-hit and intersection stages have direct object-ray intrinsics on every portable target.
@@ -536,6 +572,42 @@ public extension<Context> ClosestHitInput<Context>
     }
 }
 
+/// Exposes the instance path for a multilevel committed hit.
+[require(metal)]
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
+{
+    /// Counts the instances on the current primitive's path.
+    ///
+    /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.
+    /// It is the actual path length, which can be shorter than that maximum. Direct primitive-AS
+    /// traversal with `MultiLevelAccelerationStructure<1>` has no instances, so its count is zero.
+    public property uint instanceCount
+    {
+        get { return getStageInputInstanceCount(); }
+    }
+
+    /// Returns the instance index within the containing acceleration structure at the given level.
+    ///
+    /// Level zero is the outermost instance; increasing levels move toward the primitive.
+    /// For a path [3, 7], level zero selects instance 3 and level one selects instance 7 inside it.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceIndex(uint level)
+    {
+        return getStageInputInstanceIndexAtLevel(level);
+    }
+
+    /// Returns the application-defined instance ID at the given level of the current path.
+    ///
+    /// Levels use the same outermost-to-innermost order as `getInstanceIndex`.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceID(uint level)
+    {
+        return getStageInputInstanceIDAtLevel(level);
+    }
+}
+
 /// Provides the candidate payload, record, hit data, and ray state available to an any-hit stage.
 ///
 /// Control methods on this zero-storage view use native any-hit operations where available.
@@ -646,6 +718,42 @@ public extension<Context> AnyHitInput<Context>
     }
 }
 
+/// Exposes the instance path for a multilevel candidate primitive.
+[require(metal)]
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
+{
+    /// Counts the instances on the current primitive's path.
+    ///
+    /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.
+    /// It is the actual path length, which can be shorter than that maximum. Direct primitive-AS
+    /// traversal with `MultiLevelAccelerationStructure<1>` has no instances, so its count is zero.
+    public property uint instanceCount
+    {
+        get { return getStageInputInstanceCount(); }
+    }
+
+    /// Returns the instance index within the containing acceleration structure at the given level.
+    ///
+    /// Level zero is the outermost instance; increasing levels move toward the primitive.
+    /// For a path [3, 7], level zero selects instance 3 and level one selects instance 7 inside it.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceIndex(uint level)
+    {
+        return getStageInputInstanceIndexAtLevel(level);
+    }
+
+    /// Returns the application-defined instance ID at the given level of the current path.
+    ///
+    /// Levels use the same outermost-to-innermost order as `getInstanceIndex`.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceID(uint level)
+    {
+        return getStageInputInstanceIDAtLevel(level);
+    }
+}
+
 /// Provides the record and ray state used by a procedural intersection stage.
 ///
 /// `reportHit` submits each candidate and its `Context.Primitive.Attributes` value. On D3D,
@@ -732,6 +840,42 @@ public extension<Context> IntersectionInput<Context>
     public property uint instanceID
     {
         get { return getStageInputInstanceID(); }
+    }
+}
+
+/// Exposes the instance path for a multilevel candidate primitive.
+[require(metal)]
+public extension<Context> IntersectionInput<Context>
+    where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
+{
+    /// Counts the instances on the current primitive's path.
+    ///
+    /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.
+    /// It is the actual path length, which can be shorter than that maximum. Direct primitive-AS
+    /// traversal with `MultiLevelAccelerationStructure<1>` has no instances, so its count is zero.
+    public property uint instanceCount
+    {
+        get { return getStageInputInstanceCount(); }
+    }
+
+    /// Returns the instance index within the containing acceleration structure at the given level.
+    ///
+    /// Level zero is the outermost instance; increasing levels move toward the primitive.
+    /// For a path [3, 7], level zero selects instance 3 and level one selects instance 7 inside it.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceIndex(uint level)
+    {
+        return getStageInputInstanceIndexAtLevel(level);
+    }
+
+    /// Returns the application-defined instance ID at the given level of the current path.
+    ///
+    /// Levels use the same outermost-to-innermost order as `getInstanceIndex`.
+    /// The caller must provide `level < instanceCount`.
+    public uint getInstanceID(uint level)
+    {
+        return getStageInputInstanceIDAtLevel(level);
     }
 }
 
