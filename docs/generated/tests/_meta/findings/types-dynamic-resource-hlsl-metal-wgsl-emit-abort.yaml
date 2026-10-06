@@ -1,0 +1,40 @@
+schema_version: 1
+id: types-dynamic-resource-hlsl-metal-wgsl-emit-abort
+bundle: design/ast-reference/types
+suspected_kind: wrong-codegen
+title: "`__DynamicResource` emit aborts on HLSL/Metal/WGSL (internal error)"
+observed_at: "2026-06-11T00:00:00+00:00"
+scope: hlsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc -target hlsl -stage fragment -entry main docs/generated/tests/design/ast-reference/types/dynamic-resource-spirv-emit.slang"
+  source_slang: docs/generated/tests/design/ast-reference/types/dynamic-resource-spirv-emit.slang
+  observed_summary: |
+    A `__DynamicResource` (bindless DynamicResourceType) handle resolved via
+    `.as<Texture2D<float4>>()` aborts at emit on three backends (exit 255):
+      HLSL:  "internal error[E99999]: unexpected condition encountered in
+              Slang compiler: unhandled HLSL register type"
+      Metal: "internal error[E99999]: unimplemented feature in Slang compiler:
+              unexpected IR opcode during code emit"
+      WGSL:  "internal error[E99999]: unimplemented feature in Slang compiler:
+              unexpected IR opcode during code emit"
+
+    SPIR-V emits the same shader cleanly (`%handle = OpVariable
+    %_ptr_UniformConstant_6 UniformConstant`). The bindless dynamic-resource
+    surface should either emit a valid binding on HLSL/Metal/WGSL or a clean
+    unsupported-feature diagnostic, not an unhandled-inst / unhandled-register
+    internal error.
+expected:
+  claim: |
+    Emitting a `__DynamicResource` handle to a target that does not support
+    bindless dynamic resources should produce a graceful unsupported-feature
+    diagnostic, not an internal-error abort (E99999).
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/types.md
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: 1ee81dae21143fb69ccb9999f0fd013b4db2d922
+  doc_anchor: docs/generated/design/ast-reference/types.md#resource--texture--sampler-types
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test-shape error: ruled out — SPIR-V emits the identical shader cleanly, so the input is a valid dynamic-resource program; the abort is target-emit-specific."

@@ -1,44 +1,45 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:31:00+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:18:14+00:00
 target_doc: syntax-reference/keywords-and-builtins.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: f75116b2323ea549005589e147bdc7c2b79a63ace127358d8904fccc95cf2272
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 16f77d4f6aaedcbfaa66fc7d04979d22e0ea47e46b6259a533f617fa9ec29f68
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 1
+finding_count: 6
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 0
+  major: 3
+  minor: 3
   nit: 0
 ---
 
 # Review report for syntax-reference/keywords-and-builtins.md
 
 ## Summary
-The page is mostly source-aligned, but the keyword inventory is incomplete. The main issue is that the hardcoded parser vocabulary includes internal statement keywords and type-specifier keywords that are not mentioned in the document, even though the prompt asks for an inventory of syntactic keywords and built-in syntax declarations.
+The page is broadly useful and all line-number citations are accurate, but its inventory omits one hardcoded statement keyword and its core-module discussion names declarations that do not exist. It also overstates how ordinary meta-module declarations participate in keyword parsing. The remaining findings are smaller wording and contract-conformance issues.
 
 ## Items checked
-- Ran `regenerate.py show syntax-reference/keywords-and-builtins.md` and reviewed the target document, `_common.md`, the per-document prompt, the dependency document `syntax-reference/tokens.md`, and the resolved watched-file set.
-- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
-- Resolved the relative markdown links in the body to source files or generated peer documents.
-- Spot-checked source-backed claims against watched files, including `TokenType::Identifier`, `SyntaxDecl`, `LookAheadToken("if")`, `LookAheadToken("for")`, `parseCompileTimeForStmt`, `parseIfStatement`, `g_parseSyntaxEntries[]`, `_makeParseDecl`, `_makeParseModifier`, `_makeParseExpr`, `getSyntaxParseInfos()`, `struct`/`class`/`enum` special-casing, `new`, `Optional`, `Tuple`, `Texture2D`, `WaveGetWaveIndex`, `vec3`, `mat4`, `gl_Position`, and `DifferentialPair`.
-- Checked the document's required sections against `syntax-keywords-and-builtins.md` and the universal generated-doc contract.
+- Reviewed the target, `_common.md`, the per-document prompt, the `syntax-reference/tokens.md` dependency, and every resolved watched file from `regenerate.py show`.
+- Verified all 46 line or line-range citations against `source/slang/slang-parser.cpp` at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`; every cited line matched.
+- Audited every row in the declaration, statement, modifier, and expression inventories against `g_parseSyntaxEntries[]` or the corresponding direct parser branch.
+- Checked more than ten additional claims, including syntax-declaration lookup, compile-time `for`, chained `catch`, `functype`, `new`, `Optional`, `Tuple`, descriptor heaps, wave-index builtins, `vec3`, `mat4`, `gl_Position`, and `DifferentialPair`.
+- Resolved all relative links at the recorded commit and confirmed every generated peer reference is present in the manifest.
+- Recomputed the watched-path digest, confirmed it matches the front matter, and ran the document linter successfully.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Parser-registered syntax keywords`, statement/type-specifier inventory | The inventory omits several hardcoded parser keywords. The statement table lists ordinary control-flow keywords but not internal statement forms such as `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; the decl/type discussion calls out `struct`, `class`, and `enum` but not the hardcoded type-specifier forms `expand` and `each`. | `source/slang/slang-parser.cpp:6939`-`source/slang/slang-parser.cpp:6953` directly dispatches `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; `source/slang/slang-parser.cpp:3435`-`source/slang/slang-parser.cpp:3441` directly recognizes `expand` and `each` alongside the shape expression forms. | Add these hardcoded parser keywords to the appropriate parser-keyword discussion, marking the double-underscore / GPU forms as internal or experimental where appropriate. |
-
-## No-issues notes
-- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
-- The page stays within the documented scope for its family and does not copy handwritten documentation prose.
-- The source citations are concentrated in the watched paths listed by the manifest entry.
+| F-001 | major | `### Statement keywords`, lines 71-90 | The hardcoded statement inventory omits `__requireCapability`, despite listing the other compiler-internal branches in `Parser::ParseStatement`. | `source/slang/slang-parser.cpp:6981-6983` dispatches `LookAheadToken("__requireCapability")` to `ParseRequireCapabilityStatement`; its grammar and consumer are at `source/slang/slang-parser.cpp:7600-7605`. | Add a statement-table row for `__requireCapability`, identify `ParseRequireCapabilityStatement`, and mark it compiler-internal. |
+| F-002 | major | `## Core-module syntax declarations`, lines 273-275 | The claim that `core.meta.slang` declares `Result`, ranges, and iterators is unsupported: none of `Result`, `Range`, or an iterator declaration exists in any resolved `*.meta.slang` watched file. | `source/slang/core.meta.slang:1810-1825` declares `Optional`, and `source/slang/core.meta.slang:1927-1945` declares `Tuple`; searches across all four watched meta-modules find no declaration for the other three claimed names. | Remove `Result`, ranges, and iterators from this bullet, or replace them with concrete declarations that actually occur in `core.meta.slang`. |
+| F-003 | major | `## Where keywords come from`, lines 37-45; `## Core-module syntax declarations`, lines 266-271 | The page says ordinary types, functions, and operators from meta-modules “behave like keywords” because the parser consults the environment. Parser-driven syntax lookup actually accepts only `SyntaxDecl`; type-name lookup has a separate, limited cast-disambiguation use, and ordinary function/operator declarations do not become parsing keywords. | `source/slang/slang-parser.cpp:1115-1143` returns only a declaration that casts to `SyntaxDecl`, and `source/slang/slang-parser.cpp:1202-1218` uses that result for syntax parsing. `source/slang/slang-parser.cpp:6835-6851` separately recognizes type declarations, with the shown use at `source/slang/slang-parser.cpp:8813-8819`. | Describe the meta-module entries as built-in environment vocabulary rather than keywords. State that only `SyntaxDecl` bindings drive parser callbacks, while known type names participate in limited disambiguation. |
+| F-004 | minor | `## Where keywords come from`, lines 32-36 | The table is described as “populated by `getSyntaxParseInfos()`,” but that function only returns a view of the statically initialized array; `populateBaseLanguageModule()` performs the registration. | `source/slang/slang-parser.cpp:10699-10703` initializes `g_parseSyntaxEntries[]`; `source/slang/slang-parser.cpp:10869-10890` returns the view and then registers its entries. | Change the sentence to say `getSyntaxParseInfos()` exposes the table and `populateBaseLanguageModule()` registers its entries. |
+| F-005 | minor | `#### Complex modifiers (take arguments)`, lines 211-220 | The heading asserts every callback-based modifier takes arguments, but `shared`, `volatile`, `coherent`, `restrict`, `readonly`, and `writeonly` do not consume modifier arguments; their callbacks select or construct AST modifier nodes. | `source/slang/slang-parser.cpp:10262-10278` implements context-sensitive `shared` without arguments, and `source/slang/slang-parser.cpp:10281-10362` shows the other listed callbacks constructing modifiers without parsing arguments. | Rename this group to “Callback-parsed modifiers” (or equivalent), and reserve “takes arguments” for rows whose callbacks actually parse trailing syntax. |
+| F-006 | minor | Opening paragraphs, lines 12-21 | The universal contract requires the first body paragraph to state both coverage and intended reader, but the audience appears in a separate second paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires both facts in the first paragraph. | Merge the intended-reader sentence into the opening paragraph. |

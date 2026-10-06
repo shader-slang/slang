@@ -340,16 +340,19 @@ struct PeepholeContext : InstPassBase
                 // target-dependent
                 if (as<IRDescriptorHandleType>(baseType))
                 {
-                    bool useUint64 = targetProgram->getTargetReq()->getTargetCaps().implies(
-                        CapabilityAtom::spvBindlessTextureNV);
+                    bool hasBindlessTextureNV =
+                        targetProgram->getTargetReq()->getTargetCaps().implies(
+                            CapabilityAtom::spvBindlessTextureNV);
+                    bool useUint64 =
+                        isDescriptorHandleRepresentedAsUInt64(baseType, hasBindlessTextureNV);
 
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
 
-                    // Get the underlying type based on capability:
-                    // - With spvBindlessTextureNV: uint64_t
-                    // - Without: uint2
+                    // Get the underlying type based on the handle's representation:
+                    // - uint64_t for texture/sampler kinds under spvBindlessTextureNV
+                    // - uint2 otherwise
                     IRType* underlyingType;
                     if (useUint64)
                     {
@@ -361,9 +364,13 @@ struct PeepholeContext : InstPassBase
                         underlyingType = builder.getVectorType(uintType, 2);
                     }
 
+                    // A handle's size/alignment must match its underlying representation under the
+                    // requested layout rule, not always the natural rule: a `uint2` handle has
+                    // std430/std140 alignment 8 but natural alignment 4.
                     IRSizeAndAlignment sizeAlign;
-                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    if (SLANG_FAILED(getSizeAndAlignment(
                             targetProgram->getTargetReq(),
+                            layoutRules,
                             underlyingType,
                             &sizeAlign)))
                         break;
@@ -1239,12 +1246,6 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_CastDescriptorHandleToUInt2:
             {
-                // Besides removing a redundant representation round-trip, this fold is what
-                // exposes the underlying makeVector to the swizzle(makeVector(a, b), 0) -> a
-                // fold below. Together they reduce a descriptor-heap subscript to a plain
-                // getElement(heap, index), so the NonUniform float pass reaches it through its
-                // existing getElement handling and needs no round-trip-specific logic of its
-                // own (see the note in slang-ir-float-non-uniform-resource-index.cpp).
                 if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
                 {
                     inst->replaceUsesWith(wrap->getValue());
@@ -1880,13 +1881,19 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsSignedInt:
         case kIROp_IsBool:
         case kIROp_IsVector:
+        case kIROp_IsBindlessTextureNVEncodable:
             {
-                auto type = inst->getOperand(0)->getDataType();
-                if (auto vectorType = as<IRVectorType>(type))
-                    type = vectorType->getElementType();
-                if (auto matType = as<IRMatrixType>(type))
-                    type = matType->getElementType();
-                if (isConcreteType(type))
+                // `IsVector` classifies the operand type itself: only a builtin `vector<E, N>` is a
+                // vector, so a scalar or a matrix folds to false. The other predicates look through
+                // one vector or matrix layer and classify the element type. Every predicate waits
+                // until the element type is concrete, which keeps a still-generic `T` from folding.
+                auto operandType = inst->getOperand(0)->getDataType();
+                auto elementType = operandType;
+                if (auto vectorType = as<IRVectorType>(elementType))
+                    elementType = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(elementType))
+                    elementType = matType->getElementType();
+                if (isConcreteType(elementType))
                 {
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -1896,25 +1903,28 @@ struct PeepholeContext : InstPassBase
                     switch (inst->getOp())
                     {
                     case kIROp_IsInt:
-                        result = isIntegralType(type);
+                        result = isIntegralType(elementType);
                         break;
                     case kIROp_IsBool:
-                        result = type->getOp() == kIROp_BoolType;
+                        result = elementType->getOp() == kIROp_BoolType;
                         break;
                     case kIROp_IsFloat:
-                        result = isFloatingType(type);
+                        result = isFloatingType(elementType);
                         break;
                     case kIROp_IsHalf:
-                        result = type->getOp() == kIROp_HalfType;
+                        result = elementType->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeSigned(type);
+                        result = isIntegralType(elementType) && !getIntTypeSigned(elementType);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeSigned(type);
+                        result = isIntegralType(elementType) && getIntTypeSigned(elementType);
                         break;
                     case kIROp_IsVector:
-                        result = as<IRVectorType>(type);
+                        result = as<IRVectorType>(operandType) != nullptr;
+                        break;
+                    case kIROp_IsBindlessTextureNVEncodable:
+                        result = isBindlessTextureNVEncodableResourceType(elementType);
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));

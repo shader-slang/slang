@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=71896719b3573817a4b58ba1eeb0e1fcdb264f9d6e56e11591be299ed37c9225
+//META: doc_section_digest=2b0f0927d96d28035499c92ee21219fe722953f68024b3ddf918daba6452d869
 //META: purpose=Fires diagnostic E30622 (ambiguous-default-initializer-for-type) -- more than one default initializer was found for type '~type:Type'
 //META: intent=negative
 //META: pipeline_stage=check
@@ -11,7 +11,7 @@
 //META: catalog_name=ambiguous-default-initializer-for-type
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct S {
     __init() {}
@@ -23,4 +23,4 @@ void main() {
 }
 
 
-// CHECK: E30622
+//CHECK: E30622

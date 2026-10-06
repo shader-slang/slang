@@ -52,7 +52,7 @@ Result RenderPassLayoutImpl::init(DeviceImpl* device, const IRenderPassLayout::D
 
     FramebufferLayoutImpl* framebufferLayout =
         static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
-    assert(framebufferLayout);
+    SLANG_ASSERT(framebufferLayout);
 
     // Initialize render pass descriptor, filling in attachment metadata, but leaving texture data
     // unbound.

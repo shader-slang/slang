@@ -1044,22 +1044,35 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    // Traverse the entire access chain for the current leaf var and see if
-    // there are interpolation mode decorations along the way.
-    // Make sure we respect the decoration on the inner most node.
-    // So that the decoration on a struct field overrides the outer decoration
-    // on a parameter of the struct type.
+    // Use the innermost interpolation mode, but scan the entire declaration
+    // chain for precise. A field may specify nointerpolation while its enclosing
+    // output parameter specifies precise; both qualifiers apply to the field.
+    bool foundInterpolationMode = false;
     for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
         auto paramInfo = outerParamInfo->outerParam;
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
-        if (auto interpolationModeDecor =
-                decorParent->findDecoration<IRInterpolationModeDecoration>())
+        // A precise output field or parameter remains precise after scalarization.
+        // Keep that qualifier on the resulting output address so the SPIR-V backend
+        // can trace the values stored into it after the original declaration is gone.
+        if (kind == LayoutResourceKind::VaryingOutput &&
+            decorParent->findDecoration<IRPreciseDecoration>() &&
+            !globalParam->findDecoration<IRPreciseDecoration>())
         {
-            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
-            break;
+            builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
+        }
+        if (!foundInterpolationMode)
+        {
+            if (auto interpolationModeDecor =
+                    decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                builder->addInterpolationModeDecoration(
+                    globalParam,
+                    interpolationModeDecor->getMode());
+                foundInterpolationMode = true;
+            }
         }
     }
 
@@ -4043,14 +4056,17 @@ void legalizeEntryPointParameterForGLSL(
     // which is what current emit code assumes, but may not be more generally applicable.
     if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        // The topology is normally on the function already (recorded at lowering); a parameter
+        // that still carries it must agree. Linked or deserialized IR may carry it only on the
+        // parameter, so lift it in that case. Mirrors the IRStreamOutputTypeDecoration handling
+        // below.
+        if (auto existing = func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, geomDecor->getOp());
+            SLANG_ASSERT(existing->getOp() == geomDecor->getOp());
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have "
-                             "IRGeometryInputPrimitiveTypeDecoration decoration");
+            builder->addDecoration(func, geomDecor->getOp());
         }
     }
 
@@ -5098,12 +5114,9 @@ void legalizeEntryPointsForGLSL(
 // cast the condition bool->int (Khronos emitters lower this to an OpSelect) and replace
 // each case value with the matching `IRIntLit` (`true`->1, `false`->0).
 //
-// A case value on a bool-conditioned switch is a bool-typed compile-time constant, but it
-// may be spelled as either an `IRBoolLit` (a literal `case true:`/`case false:`) or an
-// `IRIntLit` of bool type: a switch on an `enum : bool` lowers its case labels at the enum
-// type, and the enum-type-erasing `lowerEnumType` pass rewrites only the type, leaving an
-// `IRIntLit` of bool type. Both store the value in `IRConstant::value.intVal`, so the value
-// is read from there once the invariant below is checked.
+// A case value on a bool-conditioned switch is a canonical `IRBoolLit`, whether written
+// literally (`case true:`/`case false:`) or produced by a `switch` on an `enum : bool` (whose
+// labels `lowerEnumType` canonicalizes from the enum type to `IRBoolLit`).
 static void legalizeBoolSwitch(IRSwitch* switchInst)
 {
     if (!as<IRBoolType>(switchInst->getCondition()->getDataType()))
@@ -5118,15 +5131,8 @@ static void legalizeBoolSwitch(IRSwitch* switchInst)
 
     for (UInt i = 0; i < switchInst->getCaseCount(); i++)
     {
-        // Invariant: matching the bool condition, the case value is a bool-typed `IRBoolLit`
-        // or `IRIntLit`. The bool-type check rejects an int-typed literal (whose value would
-        // not be a 0/1 boolean), and the opcode check confirms `value.intVal` is the live
-        // union member (not, say, a float or string constant).
-        auto caseValue = switchInst->getCaseValue(i);
-        auto caseConstant = as<IRConstant>(caseValue);
-        SLANG_RELEASE_ASSERT(
-            caseConstant && as<IRBoolType>(caseValue->getDataType()) &&
-            (caseConstant->getOp() == kIROp_BoolLit || caseConstant->getOp() == kIROp_IntLit));
+        auto caseConstant = as<IRBoolLit>(switchInst->getCaseValue(i));
+        SLANG_RELEASE_ASSERT(caseConstant);
         auto intLit = builder.getIntValue(intType, caseConstant->value.intVal != 0 ? 1 : 0);
         switchInst->getCaseValueUse(i)->set(intLit);
     }

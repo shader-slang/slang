@@ -2749,11 +2749,14 @@ struct IRDebugVar : IRInst
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
-    IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    IRInst* getScope() { return getOperand(3); }
+    IRInst* getArgIndex() { return getOperandCount() > 4 ? getOperand(4) : nullptr; }
+
+    // Update an existing optional argument index; this does not append one to a local variable.
     void setArgIndex(IRInst* argIndex)
     {
-        if (getOperandCount() >= 4)
-            setOperand(3, argIndex);
+        if (getOperandCount() > 4)
+            setOperand(4, argIndex);
     }
 };
 
@@ -2772,15 +2775,21 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getLine() { return getOperand(0); }
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
-    IRInst* getDebugFunc() { return getOperand(3); }
+    IRInst* getScope() { return getOperand(3); }
     IRInst* getOuterInlinedAt()
     {
         if (operandCount == 5)
             return getOperand(4);
         return nullptr;
     }
-    void setDebugFunc(IRInst* func) { setOperand(3, func); }
+    void setScope(IRInst* scope) { setOperand(3, scope); }
     bool isOuterInlinedPresent() { return operandCount == 5; }
+};
+
+FIDDLE()
+struct IRDebugLexicalBlock : IRInst
+{
+    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -2788,15 +2797,14 @@ struct IRDebugScope : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
-    IRInst* getInlinedAt() { return getOperand(1); }
-    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
+    // An absent inline chain denotes a non-inlined function or lexical scope.
+    IRInst* getInlinedAt() { return operandCount == 2 ? getOperand(1) : nullptr; }
 };
 
 FIDDLE()
 struct IRDebugNoScope : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getScope() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -2816,6 +2824,14 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+
+    // The function's lexical parent scope, or null when its source has no compilation unit (an
+    // #include'd/#line-remapped source), or for a function from an IR blob that predates this
+    // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
+    // function is defined in, so an imported function resolves to its own module's compilation unit
+    // rather than the entry point's. The operand type is a general parent scope, not specifically a
+    // compilation unit, so a lexical scope can occupy it without changing the operand's meaning.
+    IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
 FIDDLE()
@@ -3648,6 +3664,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* source,
         IRInst* line,
         IRInst* col,
+        IRInst* scope,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
     // Emit coverage marker ops. The coverage instrumentation IR pass
@@ -3671,6 +3688,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* debugFunc,
         IRInst* outerInlinedAt);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
+    IRInst* emitDebugLexicalBlock(IRInst* source, IRInst* line, IRInst* col, IRInst* parentScope);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();
     IRInst* emitDebugFunction(
@@ -3678,7 +3696,8 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* line,
         IRInst* col,
         IRInst* file,
-        IRInst* debugType);
+        IRInst* debugType,
+        IRInst* parentScope = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
@@ -5040,14 +5059,12 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* value,
         IRInst* debugSource,
         IRIntegerValue line,
-        IRIntegerValue col)
+        IRIntegerValue col,
+        IRInst* scope = nullptr)
     {
-        addDecoration(
-            value,
-            kIROp_DebugLocationDecoration,
-            debugSource,
-            getIntValue(getUIntType(), line),
-            getIntValue(getUIntType(), col));
+        IRInst* args[] =
+            {debugSource, getIntValue(getUIntType(), line), getIntValue(getUIntType(), col), scope};
+        addDecoration(value, kIROp_DebugLocationDecoration, args, scope ? 4 : 3);
     }
 
     void addDebugFunctionDecoration(IRInst* value, IRInst* debugFunction)
@@ -5436,6 +5453,14 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
 
+    /// Build a set inst from elements that are *already* in canonical form.
+    ///
+    /// Same result as `getSet`, without the intermediate hash set and sort.
+    /// The caller must supply `sortedElements` strictly increasing by
+    /// `getUniqueID`, duplicate-free, and all global; a non-canonical list
+    /// yields a set that hash-consing cannot dedupe against its structural
+    /// equals. The definition checks what it can — see the comment there.
+    IRSetBase* getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements);
     IRSetBase* getSingletonSet(IROp op, IRInst* element);
 
     UInt getUniqueID(IRInst* inst);

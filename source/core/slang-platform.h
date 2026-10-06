@@ -92,7 +92,23 @@ struct SharedLibrary
 
     /// Unload the library that was returned from load as handle
     /// @param The valid handle returned from load
+    ///
+    /// Note that for a library reported by `isUnclosable` this releases our own reference but
+    /// deliberately leaves the library mapped.
     static void unload(Handle handle);
+
+    /// Returns true if the shared library at `platformPath` must stay mapped for the lifetime of
+    /// the process once it has been loaded, so that a later `unload` does not actually unmap it.
+    ///
+    /// A shared library can register callbacks with the OS or the C runtime that the system keeps
+    /// in process-global state and invokes long after the owning module has been unmapped.
+    /// Unloading such a module leaves a dangling function pointer behind, and the process then
+    /// jumps to an address that is no longer mapped. `loadWithPlatformPath` keeps the libraries
+    /// this reports resident, using `RTLD_NODELETE` on POSIX and a pinned module handle on
+    /// Windows. See the implementation for which libraries are affected and why.
+    ///
+    /// @param platformPath the platform specific file name, or a path ending in one
+    static bool isUnclosable(const UnownedStringSlice& platformPath);
 
     /// Given a shared library handle and a name, return the associated object
     /// Return nullptr if object is not found

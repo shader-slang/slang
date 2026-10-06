@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "feedbackMinMip",
@@ -116,10 +117,132 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "feedbackMinMip",
+                "binding": {"kind": "unorderedAccess", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "feedback": true,
+                    "access": "feedback",
+                    "resultType": {
+                        "kind": "Feedback",
+                        "name": "SAMPLER_FEEDBACK_MIN_MIP"
+                    },
+                    "sizes": [
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "feedbackMipRegionUsed",
+                "binding": {"kind": "unorderedAccess", "index": 1},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "feedback": true,
+                    "access": "feedback",
+                    "resultType": {
+                        "kind": "Feedback",
+                        "name": "SAMPLER_FEEDBACK_MIP_REGION_USED"
+                    },
+                    "sizes": [
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "feedbackMinMipArray",
+                "binding": {"kind": "unorderedAccess", "index": 2},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "array": true,
+                    "feedback": true,
+                    "access": "feedback",
+                    "resultType": {
+                        "kind": "Feedback",
+                        "name": "SAMPLER_FEEDBACK_MIN_MIP"
+                    },
+                    "sizes": [
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "feebackMipRegionUsedArray",
+                "binding": {"kind": "unorderedAccess", "index": 3},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "array": true,
+                    "feedback": true,
+                    "access": "feedback",
+                    "resultType": {
+                        "kind": "Feedback",
+                        "name": "SAMPLER_FEEDBACK_MIP_REGION_USED"
+                    },
+                    "sizes": [
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "tex2D",
+                "binding": {"kind": "shaderResource", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "tex2DArray",
+                "binding": {"kind": "shaderResource", "index": 1},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "array": true,
+                    "resultType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "samp",
+                "binding": {"kind": "samplerState", "index": 0},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

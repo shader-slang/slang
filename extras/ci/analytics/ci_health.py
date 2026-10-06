@@ -307,6 +307,87 @@ def fetch_queue_status(repo):
         return None
 
 
+def fetch_pending_approvals(repo):
+    """Fetch workflow runs paused waiting for a deployment approval.
+
+    `status=waiting` has to be a request parameter: the default run listing
+    excludes waiting runs entirely, so filtering client-side finds nothing.
+
+    These runs are invisible in the usual CI views -- nothing has failed and
+    nothing is running, so a stalled approval looks exactly like a quiet
+    afternoon. That is why they get their own section: the cost of missing one
+    is a PR that sits until its job timeout and then reports as a test failure.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from gh_api import find_pr_number_by_head, get_pr_title, gh_api_list, parse_merge_queue_pr_number
+
+    runs, err = gh_api_list(
+        f"repos/{repo}/actions/runs?status=waiting&per_page=100",
+        "workflow_runs",
+    )
+    if err:
+        return {"pending": [], "partial": True, "errors": [err]}
+
+    now = datetime.now(timezone.utc)
+    pending = []
+    # Several waiting runs can share one PR (a workflow_dispatch rerun plus a
+    # merge_group run of the same PR, say), so cache title lookups by
+    # pr_number instead of re-fetching per run. Cap the number of distinct
+    # PRs looked up, matching the JS path's MAX_TITLE_LOOKUPS, so a burst of
+    # unresolved titles cannot fire more requests than the retry budget in
+    # gh_api's _run_gh_command can absorb without stalling the report.
+    MAX_TITLE_LOOKUPS = 20
+    title_cache = {}
+    for run in runs:
+        created = run.get("created_at") or ""
+        try:
+            waited_min = int(
+                (now - datetime.fromisoformat(created.replace("Z", "+00:00"))).total_seconds() / 60
+            )
+        except ValueError:
+            waited_min = 0
+        event = run.get("event", "")
+        branch = run.get("head_branch", "")
+        prs = run.get("pull_requests") or []
+        pr_number = prs[0].get("number") if prs else None
+        if pr_number is None and event == "pull_request":
+            # A run triggered from a fork branch has an empty `pull_requests`
+            # field (GitHub only populates it for same-repo branches), so the
+            # PR has to be looked up by head owner/branch instead.
+            head_owner = ((run.get("head_repository") or {}).get("owner") or {}).get("login")
+            pr_number = find_pr_number_by_head(repo, head_owner, branch)
+        elif pr_number is None and event == "merge_group":
+            # A merge-queue run's `pull_requests` field is never populated by
+            # GitHub, but the branch name itself encodes the PR number.
+            merge_pr = parse_merge_queue_pr_number(branch)
+            pr_number = int(merge_pr) if merge_pr else None
+        title = run.get("display_title", "")
+        if pr_number and title == run.get("name", ""):
+            # `display_title` is only the PR subject line for the run
+            # triggered directly by the `pull_request` event. A
+            # `workflow_dispatch` rerun or a `merge_group` run of the same PR
+            # carries no PR-title context at trigger time, so GitHub falls
+            # back to the workflow's `name:` field (e.g. "CI") even though
+            # `pr_number` above proves the run is still tied to that PR.
+            if pr_number not in title_cache and len(title_cache) < MAX_TITLE_LOOKUPS:
+                title_cache[pr_number] = get_pr_title(repo, pr_number)
+            title = title_cache.get(pr_number) or title
+        pending.append(
+            {
+                "run_id": run.get("id"),
+                "url": run.get("html_url", ""),
+                "actor": (run.get("actor") or {}).get("login", "?"),
+                "event": event,
+                "branch": branch,
+                "title": title,
+                "waited_min": waited_min,
+                "pr_number": pr_number,
+            }
+        )
+    pending.sort(key=lambda p: p["waited_min"], reverse=True)
+    return {"pending": pending, "partial": False, "errors": []}
+
+
 def fetch_recent_failures(repo):
     """Fetch recent CI workflow failures (last 3 hours)."""
     # Use gh CLI directly for a quick query
@@ -1146,6 +1227,78 @@ buildCharts(24);
 """
 
 
+def render_pending_approvals(data):
+    """Render runs paused on a deployment approval, oldest first.
+
+    Most of these gate the Falcor bridge, which is approved by hand rather
+    than on a bot SLA, so a nonempty queue is the normal state, not an
+    incident -- it just means nobody has vetted the run yet. The indicator
+    only distinguishes "some runs are waiting" (informational) from "the
+    fetch itself failed" (a real problem); it does not escalate on wait time.
+    """
+    if not data:
+        return "<p>Pending approvals unavailable.</p>"
+
+    pending = data.get("pending", [])
+    partial = data.get("partial", False)
+    oldest = max((p["waited_min"] for p in pending), default=0)
+
+    if partial:
+        fg, bg, label = "#6c757d", "#e2e3e5", "PARTIAL"
+        summary = "Could not read pending approvals"
+    elif not pending:
+        fg, bg, label = "#198754", "#d1e7dd", "OK"
+        summary = "Nothing waiting for approval"
+    else:
+        fg, bg, label = "#0d6efd", "#cfe2ff", "WAITING"
+        summary = f"{len(pending)} waiting, oldest {oldest} min"
+
+    html = f"""
+<div style="border-left:4px solid {fg};background:{bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
+  <span style="background:{fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{label}</span>
+  <strong style="margin-left:8px">{_esc(summary)}</strong>
+</div>
+"""
+    if partial:
+        for err in data.get("errors", []):
+            html += f"<p style='color:#6c757d'>{_esc(str(err))}</p>"
+        return html
+
+    if not pending:
+        return html
+
+    html += """
+<table>
+  <tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
+"""
+    for p in pending:
+        # A merge-queue run holds up the whole queue, not just its own PR.
+        event = p["event"]
+        event_cell = (
+            f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
+        )
+        pr_number = p.get("pr_number")
+        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}/changes", f"#{pr_number}") if pr_number else ""
+        html += (
+            "  <tr>"
+            f"<td>{p['waited_min']} min</td>"
+            f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
+            f"<td>{pr_cell}</td>"
+            f"<td>{_esc(p['actor'])}</td>"
+            f"<td>{event_cell}</td>"
+            f"<td>{_esc(p['branch'])}</td>"
+            "</tr>\n"
+        )
+    html += "</table>\n"
+    html += (
+        "<p style='color:#6c757d;font-size:0.9em'>Approve from the run page: "
+        "<em>Review deployments</em> &rarr; tick the environment &rarr; "
+        "<em>Approve and deploy</em>. Most runs are approved automatically; "
+        "anything listed here needs a person.</p>\n"
+    )
+    return html
+
+
 def render_hosted_runner_usage(hosted_runner_usage):
     """Render the GitHub-hosted runner quota section."""
     if not hosted_runner_usage:
@@ -1232,7 +1385,169 @@ def render_hosted_runner_usage(hosted_runner_usage):
     return html
 
 
-def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None):
+PENDING_APPROVALS_JS = """
+<div id="pending-approvals-section" data-repo="{repo}">
+  <p style="color:#6c757d">Loading&hellip;</p>
+</div>
+<script>
+(function () {
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  var repo = document.getElementById("pending-approvals-section").dataset.repo;
+  var url = "https://api.github.com/repos/" + repo + "/actions/runs?status=waiting&per_page=100";
+  fetch(url)
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (data) {
+      var runs = data.workflow_runs || [];
+      var now = Date.now();
+      var pending = runs.map(function (r) {
+        var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
+        var prs = r.pull_requests || [];
+        var prNumber = prs.length ? prs[0].number : null;
+        if (prNumber === null && r.event === "merge_group") {
+          // A merge-queue run's `pull_requests` field is never populated by
+          // GitHub, but the branch name encodes the PR number:
+          // gh-readonly-queue/master/pr-NNNN-SHA.
+          var m = /^gh-readonly-queue\/[^/]+\/pr-(\d+)-/.exec(r.head_branch || "");
+          if (m) prNumber = parseInt(m[1], 10);
+        }
+        return {
+          run_id: r.id,
+          url: r.html_url,
+          actor: (r.actor || {}).login || "?",
+          event: r.event || "",
+          branch: r.head_branch || "",
+          head_owner: ((r.head_repository || {}).owner || {}).login || "",
+          name: r.name || "",
+          title: r.display_title || String(r.id),
+          waited: waited,
+          pr_number: prNumber,
+        };
+      }).sort(function (a, b) { return b.waited - a.waited; });
+
+      // A run triggered from a fork branch has an empty `pull_requests`
+      // field (GitHub only populates it for same-repo branches), so the PR
+      // has to be looked up separately by head owner/branch. Dedup by
+      // owner/branch (several waiting runs can share one PR) and cap the
+      // number of lookups so a burst of unresolved fork runs cannot fire
+      // more requests than an unauthenticated client's rate limit allows.
+      var MAX_HEAD_LOOKUPS = 20;
+      var seenKeys = {};
+      var uniqueTargets = [];
+      pending.forEach(function (p) {
+        if (p.pr_number !== null || p.event !== "pull_request" || !p.head_owner) return;
+        var key = p.head_owner + ":" + p.branch;
+        if (seenKeys[key]) return;
+        seenKeys[key] = true;
+        if (uniqueTargets.length < MAX_HEAD_LOOKUPS) uniqueTargets.push(key);
+      });
+
+      var lookups = uniqueTargets.map(function (key) {
+        var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
+          encodeURIComponent(key.split(":")[0]) + ":" + encodeURIComponent(key.split(":").slice(1).join(":")) +
+          "&state=open";
+        return fetch(lookupUrl)
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (prs) {
+            if (!prs.length) return;
+            pending.forEach(function (p) {
+              if (p.pr_number === null && (p.head_owner + ":" + p.branch) === key) {
+                p.pr_number = prs[0].number;
+              }
+            });
+          })
+          .catch(function () {});
+      });
+
+      return Promise.all(lookups).then(function () {
+        // `display_title` is only the PR subject line for the run
+        // triggered directly by the `pull_request` event. A
+        // `workflow_dispatch` rerun or a `merge_group` run of the same PR
+        // carries no PR-title context at trigger time, so GitHub falls
+        // back to the workflow's `name:` field (e.g. "CI") even though
+        // `pr_number` above proves the run is still tied to that PR. Look
+        // the real title up from the PR itself, deduped and capped the
+        // same way as the head-branch lookups above.
+        var MAX_TITLE_LOOKUPS = 20;
+        var seenPrs = {};
+        var titleTargets = [];
+        pending.forEach(function (p) {
+          if (!p.pr_number || p.title !== p.name || seenPrs[p.pr_number]) return;
+          seenPrs[p.pr_number] = true;
+          if (titleTargets.length < MAX_TITLE_LOOKUPS) titleTargets.push(p.pr_number);
+        });
+        var titleLookups = titleTargets.map(function (prNumber) {
+          return fetch("https://api.github.com/repos/" + repo + "/pulls/" + prNumber)
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (pr) {
+              if (!pr || !pr.title) return;
+              pending.forEach(function (p) {
+                if (p.pr_number === prNumber && p.title === p.name) p.title = pr.title;
+              });
+            })
+            .catch(function () {});
+        });
+        return Promise.all(titleLookups).then(function () { return pending; });
+      });
+    })
+    .then(function (pending) {
+      var oldest = pending.length ? pending[0].waited : 0;
+      var fg, bg, label, summary;
+      if (!pending.length) {
+        fg = "#198754"; bg = "#d1e7dd"; label = "OK"; summary = "Nothing waiting for approval";
+      } else {
+        // Most of these gate the Falcor bridge, which is approved by hand
+        // rather than on a bot SLA, so a nonempty queue is normal, not an
+        // incident -- this stays informational regardless of wait time.
+        fg = "#0d6efd"; bg = "#cfe2ff"; label = "WAITING";
+        summary = pending.length + " waiting, oldest " + oldest + " min";
+      }
+
+      var html = '<div style="border-left:4px solid ' + fg + ';background:' + bg +
+        ';padding:12px 18px;margin-bottom:14px;border-radius:4px">' +
+        '<span style="background:' + fg + ';color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">' +
+        label + '</span><strong style="margin-left:8px">' + esc(summary) + '</strong></div>';
+
+      if (pending.length) {
+        html += '<table><tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
+        pending.forEach(function (p) {
+          var event = p.event === "merge_group"
+            ? "<strong>merge_group</strong>" : esc(p.event);
+          var pr = p.pr_number
+            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '/changes">#' + p.pr_number + '</a>'
+            : '';
+          html += '<tr>' +
+            '<td>' + p.waited + ' min</td>' +
+            '<td><a href="' + esc(p.url) + '">' + esc(p.title) + '</a></td>' +
+            '<td>' + pr + '</td>' +
+            '<td>' + esc(p.actor) + '</td>' +
+            '<td>' + event + '</td>' +
+            '<td>' + esc(p.branch) + '</td>' +
+            '</tr>';
+        });
+        html += '</table>';
+        html += '<p style="color:#6c757d;font-size:0.9em">Approve from the run page: ' +
+          '<em>Review deployments</em> &rarr; tick the environment &rarr; ' +
+          '<em>Approve and deploy</em>. Most runs are approved automatically; ' +
+          'anything listed here needs a person.</p>';
+      }
+
+      document.getElementById("pending-approvals-section").innerHTML = html;
+    })
+    .catch(function (err) {
+      document.getElementById("pending-approvals-section").innerHTML =
+        '<p style="color:#6c757d">Could not load pending approvals (' + esc(String(err)) + ').</p>';
+    });
+}());
+</script>
+"""
+
+
+def generate_health_html(
+    queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None,
+    pending_approvals=None, repo="shader-slang/slang",
+):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -1450,6 +1765,7 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
     history_html = build_history_chart(snapshots)
 
     hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
+    pending_approvals_live = PENDING_APPROVALS_JS.replace("{repo}", _esc(repo))
 
     body = f"""
 <h1>CI System Health</h1>
@@ -1457,6 +1773,9 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>Pending Approvals</h2>
+{pending_approvals_live}
 
 <h2>GitHub-Hosted Runner Quota</h2>
 {hosted_runner_html}
@@ -1555,6 +1874,7 @@ def main():
         args.output,
         mq_data=mq_data,
         hosted_runner_usage=hosted_runner_usage,
+        repo=args.repo,
     )
 
     print("Done.")

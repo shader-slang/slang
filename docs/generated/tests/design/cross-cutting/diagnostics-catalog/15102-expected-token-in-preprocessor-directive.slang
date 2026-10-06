@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=90e08e718ef3c42629a46041937d0ea97ce192cb87a0b3e414306237480cd0b9
+//META: doc_section_digest=600ae451a71327a66f79f4c6ca4c7e68aa7e6f1c4d085bbb2fa445a7e26f9e58
 //META: purpose=Fires diagnostic E15102 (expected-token-in-preprocessor-directive) from a minimum-reproduction input.
 //META: intent=negative
 //META: pipeline_stage=preprocess

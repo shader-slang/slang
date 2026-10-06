@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 Texture2D<float4>  myTexture;
 SamplerState       mySampler;
@@ -32,3 +34,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float4> out
 // METAL: texture2d<float, access::sample> myTexture_
 // WGSL emits Texture2D as a texture_2d<f32> variable.
 // WGSL: var myTexture_{{.*}} : texture_2d<
+// GLSL emits the Image-address-space texture as a `uniform texture2D` (separate-texture form).
+// GLSL: uniform texture2D myTexture_
+// HLSL emits it as a Texture2D bound to a `t` register (SRV).
+// HLSL: Texture2D<float4{{.*}}> myTexture_{{.*}} : register(t

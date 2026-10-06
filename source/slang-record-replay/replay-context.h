@@ -605,14 +605,40 @@ public:
         unregisterProxyImpl(proxyIdentity);
     }
 
-    /// Register an interface object and get its handle.
-    /// Used when creating proxy objects to register them for handle tracking.
+    /// Registers `obj` in the handle registry and returns its handle, for tests.
+    ///
+    /// A production proxy is registered by wrapObject() as part of being
+    /// created; a test that needs a proxy the orphan bookkeeping will treat as
+    /// live has to register it explicitly, because
+    /// releaseOrphanedPlaybackProxies() skips anything absent from the registry.
     template<typename ProxyT>
     inline uint64_t testsOnlyRegisterProxy(ProxyT* obj)
     {
         ISlangUnknown* objUnknown = toSlangUnknown(obj);
         return testOnlyRegisterProxyImpl(objUnknown);
     }
+
+    /// Notes an orphaned playback reference for `proxy`, for tests.
+    ///
+    /// The production caller is the replay dispatcher, which a unit test cannot
+    /// drive, so without these wrappers the bookkeeping is only observable as a
+    /// sanitizer leak or double-free on a path no test reaches.
+    inline void testsOnlyNoteOrphanedProxy(ISlangUnknown* proxy)
+    {
+        notePlaybackOrphanedProxy(proxy);
+    }
+
+    /// Returns how many orphaned playback references are noted for `proxy`, for
+    /// tests. Zero when the proxy is not tracked at all.
+    inline uint32_t testsOnlyGetOrphanedRefCount(ISlangUnknown* proxy) const
+    {
+        return testOnlyGetOrphanedRefCountImpl(proxy);
+    }
+
+    /// Runs the playback-teardown sweep that releases every noted orphaned
+    /// reference, for tests. Production runs it from reset(), switchTo*(), and
+    /// destroySingleton().
+    inline void testsOnlyReleaseOrphanedProxies() { releaseOrphanedPlaybackProxies(); }
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
@@ -747,9 +773,31 @@ private:
     // Internal registeration using canonical ISlangUnknown* identities
     SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
     SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
+
+    /// Remember that the playback dispatcher created `proxy` for an output/return
+    /// value and dropped its owning creation reference into a discarded
+    /// temporary. Called only during playback; releaseOrphanedPlaybackProxies()
+    /// later releases the reference unless the replayed release stream already
+    /// destroyed the proxy first (issue #11936).
+    SLANG_API void notePlaybackOrphanedProxy(ISlangUnknown* proxy);
+
+    /// Release the still-live orphaned playback proxies recorded by
+    /// notePlaybackOrphanedProxy. Proxies whose recorded release stream already
+    /// balanced their creation reference destroyed themselves during replay and
+    /// were removed by unregisterProxyImpl, so only genuine leaks remain here.
+    /// Called at playback teardown (reset/switch/destroy).
+    SLANG_API void releaseOrphanedPlaybackProxies();
     SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
     SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
     SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
+
+    /// Number of orphaned playback references currently tracked for `proxy`, or
+    /// 0 if none. Exists so a test can assert the note/unnote balancing
+    /// directly: the alternative is inferring it from a sanitizer leak or
+    /// double-free report, which only fires on a path some test happens to
+    /// drive, and the entry-point wrapping that motivates the `unnote` is not
+    /// driven by any of them.
+    SLANG_API uint32_t testOnlyGetOrphanedRefCountImpl(ISlangUnknown* proxy) const;
     SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
     SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
 
@@ -786,6 +834,15 @@ private:
     // Proxy tracking: maps proxies to implementations and back
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // Proxies created by the playback dispatcher for an output/return value.
+    // During playback the wrapped object is handed back into a discarded
+    // temporary (callWithDefaults passes null outputs), so its owning creation
+    // reference has no owner. Keyed by canonical ISlangUnknown* identity -> the
+    // number of such orphaned references. releaseOrphanedPlaybackProxies()
+    // releases any that the recorded addRef/release stream did not already
+    // balance, at playback teardown (issue #11936). Empty outside playback.
+    Dictionary<ISlangUnknown*, uint32_t> m_playbackOrphanedProxies;
 
     // Replay directory management
     String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
@@ -970,6 +1027,13 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
+
+            // The wrapped proxy's owning reference flows back into a discarded
+            // output temporary (callWithDefaults passes null outputs on replay),
+            // so nothing releases it. Remember it so playback teardown can
+            // release the reference if the recorded release stream did not
+            // already balance it (issue #11936).
+            notePlaybackOrphanedProxy(toSlangUnknown(obj));
         }
     }
 }

@@ -1,51 +1,55 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:24:00+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:41:52+00:00
 target_doc: ast-reference/declarations.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: 4edc6b90abd358684a288a1139580cde8c06f54b81ac587b2fb00f57fb475a83
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 40846d6323a4545ce1013f919b025bb0a96aea7d0df6f90a941d573b1467ac6d
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 6
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 2
-  nit: 0
+  major: 2
+  minor: 3
+  nit: 1
 ---
 
 # Review report for ast-reference/declarations.md
 
 ## Summary
 
-The declarations reference is mostly source-aligned: the `## Nodes` table covers every concrete `FIDDLE()` declaration I found in `slang-ast-decl.h`, and the grammar links resolve. The most important issue is that the `FuncExtensionDecl` callout includes IR-lowering behavior, which the per-doc prompt explicitly forbids for this page. I also found two smaller factual mismatches: the parser entry point is mis-capitalized, and implicit getter creation is attributed to the parser even though parsing only records the storage declaration/accessor syntax.
+The declaration catalog is structurally strong: all concrete classes are covered and all links resolve. The most important issue is that much of `## Notable nodes` documents semantic-checking behavior that the page prompt explicitly forbids. The page also omits the required `AssocTypeDecl` callout and contains two source-level inaccuracies.
 
 ## Items checked
 
-- Verified the target front matter contains all required generated-doc keys and preserves the target source commit and watched-path digest.
-- Compared the `## Nodes` table against the concrete `FIDDLE()` classes in `source/slang/slang-ast-decl.h`; all 61 concrete classes I found are represented, while abstract `FIDDLE(abstract)` bases are omitted from the table.
-- Spot-checked inheritance and field claims for `DeclGroup`, `VarDeclBase`, `ExtensionDecl`, `StructDecl`, `SynthesizedStructDecl`, `EnumDecl`, `EnumCaseDecl`, `ConstructorDecl`, `FuncExtensionDecl`, `ModuleDecl`, `FileReferenceDeclBase`, `GenericDecl`, `GenericTypeConstraintDecl`, `GenericValueParamDecl`, `SyntaxDecl`, and `AttributeDecl`.
-- Checked parser claims around `ParseDecl`, `parseGenericDecl`, `parseFuncExtensionDecl`, `parseAssocType`, `parseInterfaceConstraintDecl`, `parsePropertyDecl`, `parseAccessorDecl`, `isDeclAllowed`, and `g_parseSyntaxEntries`.
-- Verified the grammar anchors used by the table resolve in `docs/generated/design/syntax-reference/grammar.md`.
-- Checked relative links to dependency docs and cited source files for existence.
+- Compared the table with `source/slang/slang-ast-decl.h` at the recorded commit: all 62 concrete `FIDDLE()` classes are present, and all 12 `FIDDLE(abstract)` classes are excluded.
+- Spot-checked more than 10 claims, including parents and fields for `DeclGroup`, `VarDecl`, `ExtensionDecl`, `StructDecl`, `SynthesizedStructDecl`, `EnumDecl`, `EnumCaseDecl`, `InheritanceDecl`, `ConstructorDecl`, `LambdaDecl`, `ModuleDecl`, `GenericDecl`, `InterfaceDefaultImplDecl`, `GenericTypeConstraintDecl`, `FuncConstraintDecl`, `SyntaxDecl`, and `AttributeDecl`.
+- Checked parser behavior around `ParseDecl`, `parseEnumDecl`, `parseNamespaceDecl`, `parseGenericDecl`, `parseFuncExtensionDecl`, `parseAccessorDecl`, `parseAssocType`, `parseInterfaceConstraintDecl`, `maybeParseGenericConstraints`, `isDeclAllowed`, and `populateBaseLanguageModule`.
+- Validated all 82 relative links and grammar anchors at the recorded commit; none are dangling.
+- Swept 175 identifier-like backtick citations against `source/`; all cited identifiers exist.
+- Verified that the body contains no line-number citations, so there were no numeric citations to re-derive.
+- Recomputed the watched-path digest as `40846d6323a4545ce1013f919b025bb0a96aea7d0df6f90a941d573b1467ac6d`, matching the front matter.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### FuncExtensionDecl`, lines 168-172 | The callout includes forbidden IR-level declaration-lowering detail: `The IR lowering visitor treats the FuncExtensionDecl itself as ignored (IGNORED_CASE in slang-lower-to-ir.cpp)`. The per-doc prompt says IR-level declaration lowering belongs in the IR/cross-cutting docs, not this AST reference page. | `docs/generated/design/_meta/prompts/ast-reference-declarations.md` lines 59-64 forbid IR-level declaration lowering and type-checking semantics. The offending link targets `source/slang/slang-lower-to-ir.cpp`, which is not one of this page's watched source files. | Delete the IR-lowering sentence and the `slang-lower-to-ir.cpp` link from this callout. Keep the callout focused on the AST shape declared in `slang-ast-decl.h` and the parser shape in `parseFuncExtensionDecl`. |
-| F-002 | minor | `## Source`, lines 24-27 and `## See also`, lines 285-287 | The page names the top-level declaration dispatcher as `parseDecl()`, but the parser function is `ParseDecl` with a capital `P`. This is a concrete symbol-name mismatch. | `source/slang/slang-parser.cpp` lines 298 and 5967 declare/define `static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl)`. | Change both `parseDecl` references to `ParseDecl`, or phrase the text as "the declaration parser dispatch" if the exact static helper name is not important. |
-| F-003 | minor | `### AccessorDecl family`, lines 226-232 | The page says `The parser will synthesize a default GetterDecl for PropertyDecls that have an initializer but no explicit accessor block.` The watched parser code parses explicit `get`/`set`/`ref` accessors and records an empty storage body as a case to treat like `{ get; }`; the actual creation is not done by the parser. | `source/slang/slang-parser.cpp` lines 4685-4772 show `parseAccessorDecl` creates accessors only when the accessor keyword is present and `parseStorageDeclBody` leaves the empty-body case as a comment. `source/slang/slang-check-decl.cpp` lines 16228-16254 creates the implicit `GetterDecl` during semantic header checking. | Reword the sentence to avoid attributing synthesis to the parser, for example: "An empty property or subscript body is later treated as an implicit `get`; semantic checking materializes the `GetterDecl`." |
+| F-001 | major | `## Notable nodes`, especially lines 189-202, 216-228, 258-265, and 285-377 | Large portions explain semantic-checking behavior, including feature gating, desugaring, witness construction, visibility inheritance, and synthesized differentiability constraints. The per-doc contract explicitly forbids type-checking semantics on this page. | `docs/generated/design/_meta/prompts/ast-reference-declarations.md` lines 59-64. Examples include `semantic checking desugars` at target lines 200-202 and the checker/witness discussion at lines 360-377. | Remove checker-specific behavior and keep each callout focused on the node's AST shape and parser production. Retain links to `pipeline/03-semantic-check.md` for the omitted semantic details. |
+| F-002 | major | `## Notable nodes`, lines 285-357 | The required `RequirementDecl` / `AssocTypeDecl` callout is not supplied. The page explains that no `RequirementDecl` class exists, but `AssocTypeDecl` only appears incidentally in longer constraint prose rather than receiving the required 2-5 sentence callout. | `docs/generated/design/_meta/prompts/ast-reference-declarations.md` lines 33-54 requires this callout; `source/slang/slang-ast-decl.h` lines 567-571 declares `AssocTypeDecl`. | Add a concise `AssocTypeDecl` callout in the required order, explaining its AST role and parser production without checker semantics; keep the note that `RequirementDecl` is not a current class. |
+| F-003 | minor | `### GenericTypeConstraintDecl as an interface requirement`, lines 321-322 | `Every spelling except __hasDiffTypeInfo ... attaches an OptionalConstraintModifier` is false for `TypeCoercionConstraintDecl`: the parser consumes leading `optional` but never attaches that modifier in the coercion branch. | `source/slang/slang-parser.cpp` lines 1937-1939 reads `optional`; lines 2046-2058 constructs `TypeCoercionConstraintDecl` and only handles `ImplicitConversionModifier`. | Exclude coercion constraints from the modifier claim, or state precisely which constraint branches attach `OptionalConstraintModifier`. |
+| F-004 | minor | `### AggTypeDecl, StructDecl, ClassDecl, EnumDecl`, lines 206-210 | Calling `EnumDecl` the `tagged-union form` is misleading. The AST stores ordinary enum cases with optional tag expressions and values; it has no variant payload shape. | `source/slang/slang-ast-decl.h` lines 445-473 and `source/slang/slang-parser.cpp` lines 6467-6564. | Replace `tagged-union form` with `enumeration form` and describe its `EnumCaseDecl` children without implying sum-type payloads. |
+| F-005 | minor | `## Family hierarchy`, lines 41-79 | The hierarchy does not show the concrete branches under `VarDeclBase`, although the per-doc prompt explicitly requires that part of the diagram. | `docs/generated/design/_meta/prompts/ast-reference-declarations.md` lines 14-20; `source/slang/slang-ast-decl.h` lines 321-359, 583-607, and 1081-1093 declare the relevant subclasses. | Add grouped edges from `VarDeclBase` to its variable, parameter, global generic value, and generic value parameter subclasses. |
+| F-006 | nit | Introductory paragraphs, lines 12-21 | The first paragraph explains coverage but defers the intended reader to a separate `Audience:` paragraph, contrary to the universal requirement that the first paragraph state both. | `docs/generated/design/_meta/prompts/_common.md` lines 60-66. | Merge the audience sentence into the first paragraph. |
 
 ## No-issues notes
 
-- The table's concrete-class coverage matches the watched declaration header, including easy-to-miss nodes such as `FileReferenceDeclBase`, `InterfaceDefaultImplDecl`, `GenericValuePackParamDecl`, `SemanticGetterDecl`, and `AttributeDecl`.
-- The associated-type constraint callout matches the watched parser flow through `parseAssocType`, `parseOptionalGenericConstraints`, `maybeParseGenericConstraints`, and `isDeclAllowed`.
-- The field summaries I checked for synthesized structs/functions, generic constraints, module declarations, and syntax declarations match `slang-ast-decl.h`.
+- The table includes easy-to-miss concrete nodes such as `FileReferenceDeclBase`, `InterfaceDefaultImplDecl`, `FuncConstraintDecl`, `GenericValuePackParamDecl`, and both semantic accessor declarations.
+- Every grammar anchor and peer/source link resolves at the target source commit.
+- The generated-doc front matter is complete, and its recorded digest matches the resolved watched files.

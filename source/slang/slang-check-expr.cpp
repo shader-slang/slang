@@ -13,6 +13,7 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-math.h"
+#include "core/slang-short-dictionary.h"
 #include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -1059,7 +1060,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
     }
 
-    return ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    // A property reference does not produce an `InvokeExpr` during semantic checking. Register
+    // its accessors here so that lowering can later select the getter or setter without losing
+    // the derivative associations needed by the enclosing differentiable function.
+    if (m_parentDifferentiableAttr && item.declRef.as<PropertyDecl>())
+    {
+        registerAssociatedMethods(this, item.declRef);
+    }
+    return resultExpr;
 }
 
 void SemanticsVisitor::suggestCompletionItems(
@@ -1102,7 +1111,7 @@ Expr* SemanticsVisitor::createLookupResultExpr(
 
 static DeclVisibility _getTypeVisibility(
     Type* type,
-    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
+    ShortDictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
     if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
         return *cachedVisibility;
@@ -1129,7 +1138,10 @@ static DeclVisibility _getTypeVisibility(
 
 DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
 {
-    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    // ShortDictionary rather than Dictionary: most types checked here have little or no shared
+    // structure, so the cache typically ends up with only a handful of entries. See the
+    // ShortDictionary doc comment and #12139.
+    ShortDictionary<Type*, DeclVisibility> typeVisibilityCache;
     return _getTypeVisibility(type, typeVisibilityCache);
 }
 
@@ -2578,7 +2590,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         auto opName = funcDeclRef.getName();
 
-        // handle binary operators
+        // handle unary and binary operators
         if (opName == getName("-"))
         {
             if (argCount == 1)
@@ -2588,6 +2600,19 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             else if (argCount == 2)
             {
                 resultValue = constArgVals[0] - constArgVals[1];
+            }
+        }
+        else if (opName == getName("+"))
+        {
+            if (argCount == 1)
+            {
+                resultValue = constArgVals[0];
+            }
+            else if (argCount == 2)
+            {
+                resultValue = static_cast<IntegerLiteralValue>(
+                    static_cast<uint64_t>(constArgVals[0]) +
+                    static_cast<uint64_t>(constArgVals[1]));
             }
         }
         else if (opName == getName("!"))
@@ -2622,7 +2647,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }                                                                                         \
     while (0)
 
-        CASE_UINT(+); // TODO: this can also be unary...
         CASE_UINT(*);
         CASE_UINT(&);
         CASE_UINT(|);
@@ -3445,6 +3469,19 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 {
+    // A subscript or property denotes storage, while its accessors are the functions that are
+    // actually called. Register every accessor because the getter-versus-setter decision is
+    // intentionally deferred until lowering materializes the storage reference.
+    if (declRef.as<SubscriptDecl>() || declRef.as<PropertyDecl>())
+    {
+        for (auto accessorDeclRef :
+             getMembersOfType<AccessorDecl>(context->getASTBuilder(), declRef.as<ContainerDecl>()))
+        {
+            registerAssociatedMethods(context, accessorDeclRef);
+        }
+        return;
+    }
+
     // Lower witness for ForwardDifferentiable for this function.
     // First we'll turn it into a func-as-type-expr, then check that
     // to get the function reference as a type, and then get the witness
@@ -3673,14 +3710,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                if (auto subscriptDeclRef = fnExpr->declRef.as<SubscriptDecl>())
-                {
-                    for (auto accessorDeclRef :
-                         getMembersOfType<AccessorDecl>(m_astBuilder, subscriptDeclRef))
-                        registerAssociatedMethods(this, accessorDeclRef);
-                }
-                else
-                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
     }
@@ -4667,6 +4697,64 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     return commonType;
 }
 
+SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
+    classifyBuiltinArithmeticElementType(Type* elementType)
+{
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        auto baseType = basicType->getBaseType();
+        auto flags = BaseTypeInfo::getInfo(baseType).flags;
+        BuiltinArithmeticElementFamily family;
+        family.isInteger = (flags & BaseTypeInfo::Flag::Integer) != 0;
+        family.isFloat = (flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        family.isBool = (baseType == BaseType::Bool);
+        return family;
+    }
+
+    // Not a concrete builtin scalar. Check whether a generic parameter's declared constraint
+    // (or, in principle, any other type) conforms to one of the sealed builtin marker
+    // interfaces; see the declaration comment on `BuiltinArithmeticElementFamily` for why that
+    // is a sound basis for the fast path. `tryGetInterfaceConformanceWitness` goes through
+    // `SharedSemanticsContext::tryGetSubtypeWitnessFromCache`, so repeated calls for the same
+    // `elementType` -- exactly what a generic type parameter reused across many call sites
+    // produces -- are cache hits after the first.
+    //
+    // A constraint declared `where optional T : I` (`OptionalConstraintModifier`) is not proof
+    // that `T` conforms to `I`: the whole point of an optional constraint is that a given
+    // instantiation of `T` may or may not satisfy it, and code outside a `if (T is I)` guard
+    // must not assume it does (see `isWitnessUncheckedOptional`, which the same "is this
+    // conformance actually established here" question already relies on for member lookup).
+    // Treating an unchecked optional witness as sufficient here would let a generic function
+    // like `compute<T>(T a, T b) where optional T : __BuiltinFloatingPointType { return a + b;
+    // }` take the builtin fast path and emit `a + b` verbatim for a `T` that never proved it
+    // supports `+`, instead of falling through to overload resolution the way it must.
+    auto isProvenConformance = [this](SubtypeWitness* witness)
+    { return witness && !isWitnessUncheckedOptional(witness); };
+
+    // Each accessor returns null before the core module is available to search (see
+    // `SharedASTBuilder::getBuiltinIntegerInterfaceType` and its siblings); the classification for
+    // that family is then left unknown rather than querying conformance against a null interface
+    // type.
+    auto astBuilder = getASTBuilder();
+    BuiltinArithmeticElementFamily family;
+    if (auto integerInterface = astBuilder->getBuiltinIntegerInterfaceType())
+        family.isInteger =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, integerInterface));
+    if (auto floatInterface = astBuilder->getBuiltinFloatingPointInterfaceType())
+        family.isFloat =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, floatInterface));
+    // `__BuiltinLogicalType` is implemented by `bool` AND every builtin integer type (it also
+    // backs bitwise-operator codegen elsewhere), so proving conformance to it does not prove the
+    // element is `bool` -- only `family.isLogical`, not `family.isBool`, may be set here. A
+    // generic parameter can never prove `isBool`: there is no sealed marker interface `bool`
+    // alone implements, so only the concrete-type branch above (`baseType == BaseType::Bool`)
+    // ever sets it.
+    if (auto logicalInterface = astBuilder->getBuiltinLogicalInterfaceType())
+        family.isLogical =
+            isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
+    return family;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
@@ -4676,6 +4764,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // lowering / constant folding, skipping generic `operator OP` overload resolution. Returns
     // null to leave the expression for normal resolution. The operator-name is mapped to a
     // `BuiltinOperationKind` once (here), and everything downstream keys off the kind.
+    //
+    // "Builtin" element type is not limited to a concrete `BasicExpressionType`:
+    // `classifyBuiltinArithmeticElementType` also recognizes a generic type parameter
+    // constrained to a sealed builtin marker interface (`T : __BuiltinFloatingPointType`, as in
+    // issue #12458's reproducer), because every legal instantiation of such a parameter is
+    // guaranteed to be a concrete builtin scalar too. Without that, an operator on a
+    // generic-typed operand falls through to full generic overload resolution on every visible
+    // `operator OP` overload -- measured at ~83% of semantic-checking time on that reproducer,
+    // because the wrong candidates it rejects each still pay for generic argument inference.
 
     // Unary prefix operators: `-x` (negate), `!x` (logical-not, bool), `~x` (bitwise-not, int).
     if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
@@ -4705,14 +4802,17 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             uElementType = v->getElementType();
         else if (auto m = as<MatrixExpressionType>(uOperandType))
             uElementType = m->getElementType();
-        auto uBasic = as<BasicExpressionType>(uElementType);
-        if (!uBasic)
+        auto uFamily = classifyBuiltinArithmeticElementType(uElementType);
+        if (!uFamily.isKnown())
             return nullptr;
-        auto uBaseType = uBasic->getBaseType();
-        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
-        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
-        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-        bool uBool = (uBaseType == BaseType::Bool);
+        bool uInt = uFamily.isInteger;
+        bool uFloat = uFamily.isFloat;
+        // Deliberately `isBool` (strict: concrete `bool` only), not `isLogical`: `!` must
+        // produce a `bool`-shaped result, and a generic parameter constrained only to
+        // `__BuiltinLogicalType` may be instantiated with an integer, for which `isBool` is
+        // false (see `BuiltinArithmeticElementFamily`'s field comments) -- correctly declining
+        // the fast path here, the same way a concrete non-bool operand already does.
+        bool uBool = uFamily.isBool;
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
         if (!uEligible)
@@ -4835,14 +4935,31 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         elementType = vecType->getElementType();
     else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
-    auto basicElementType = as<BasicExpressionType>(elementType);
-    if (!basicElementType)
+
+    // `vector<T,N> == vector<T,N>` / `!=` has a stdlib overload
+    // (`glsl.meta.slang`'s `operator==<T:__BuiltinArithmeticType/__BuiltinLogicalType,N>`,
+    // `[OverloadRank(15/14)]`) that reduces the per-component comparison to a single `bool`
+    // via `all(equal(...))`/`any(notEqual(...))`. Its `[require(...)]` list spans every target
+    // Slang emits to, so it is visible to overload resolution regardless of
+    // `isGLSLOperatorScope()` -- unlike the matrix-operator and concrete-vector-equality cases
+    // handled by the `isGLSLOperatorScope()` check above, which really are GLSL-scope-specific.
+    // For a GENERIC element type there is no competing builtin form to prefer instead: the raw
+    // per-component comparison this fast path would otherwise produce is only ever reachable by
+    // constructing a `BuiltinOperatorExpr` directly, never through a declarable stdlib overload,
+    // so before this function recognized generic element types, `vector<T,N> == vector<T,N>`
+    // for an abstract `T` had nowhere else to resolve to and always went through that stdlib
+    // overload. Decline here so it still does -- only a *concrete* element type keeps this
+    // function's pre-existing (GLSL-scope-gated) `==`/`!=` behavior on vectors unchanged.
+    if (isEquality && vecType && !as<BasicExpressionType>(elementType))
         return nullptr;
-    auto baseType = basicElementType->getBaseType();
-    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
-    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
-    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool isBoolBase = (baseType == BaseType::Bool);
+
+    auto family = classifyBuiltinArithmeticElementType(elementType);
+    if (!family.isKnown())
+        return nullptr;
+    bool isIntegerBase = family.isInteger;
+    bool isFloatBase = family.isFloat;
+    bool isBoolBase = family.isBool;
+    bool isLogicalBase = family.isLogical;
     // Some operators do not apply to every element type. For example, it is invalid to apply a
     // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
     // the element type is not valid for the operator family we return null, so the expression
@@ -4851,13 +4968,17 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
     // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
     //   - bitwise/shift (`& | ^ << >> ~`): integer only;
-    //   - equality (`== !=`): integer, floating-point, or bool;
+    //   - equality (`== !=`): integer, floating-point, bool, or (for a generic element type)
+    //     anything conforming to `__BuiltinLogicalType` -- `isLogicalBase` is checked here, not
+    //     just `isBoolBase`, because `kIROp_Eql`/`kIROp_Neq` are valid on that whole family
+    //     uniformly, unlike unary logical-not (see `uBool` above, which deliberately does NOT
+    //     accept `isLogical`);
     //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
     bool eligible;
     if (isBitwise)
         eligible = isIntegerBase;
     else if (isEquality)
-        eligible = isIntegerBase || isFloatBase || isBoolBase;
+        eligible = isIntegerBase || isFloatBase || isBoolBase || isLogicalBase;
     else
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
@@ -4897,6 +5018,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     node->arguments.add(rightArg);
     node->type = resultType;
     node->loc = expr->loc;
+    // Only `Mod` reads this (to choose `FRem` over `IRem`), but it is resolved here regardless of
+    // `kind`: `elementType` may be an abstract generic parameter by the time IR lowering runs,
+    // which no longer carries a concrete `BaseType` to classify.
+    node->elementTypeIsFloatingPoint = isFloatBase;
 
     // Register the operand/result types in a differentiable scope, regardless of the operator
     // family, matching the breadth of the pre-fast-path `visitInvokeExpr` (which walked all
@@ -5424,7 +5549,26 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
         if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
         {
             capturedVarDecl = astBuilder->create<VarDecl>();
-            capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            // A captured local variable keeps its own name. A captured `this` instead
+            // has a *type* as its source decl (a struct, or an interface's `This`
+            // generic parameter), so its closure field gets a synthesized name rather
+            // than the type's name. The interface `This` parameter is literally named
+            // "This", and a closure field named "This" is hijacked by the reserved-name
+            // member lookup when the synthesized `$init` re-checks `this.<field> = ...`,
+            // breaking constructor synthesis (issue #12923).
+            if (as<VarDeclBase>(srcDecl))
+            {
+                capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            }
+            else
+            {
+                // The only non-VarDeclBase capture is a `this`: visitVarExpr passes a VarDeclBase,
+                // and visitThisExpr passes the this-type decl for a ThisExpr. Assert that contract
+                // so a future caller passing another Decl kind is caught rather than mis-named.
+                SLANG_RELEASE_ASSERT(as<ThisExpr>(exprIn));
+                capturedVarDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
+                capturedVarDecl->nameAndLoc.loc = exprIn->loc;
+            }
             SLANG_ASSERT(exprIn->type.type);
             capturedVarDecl->type.type = exprIn->type.type;
             mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
@@ -6298,6 +6442,16 @@ static bool _isSizeOfType(Type* type)
         return false;
     }
 
+    // A `ModifiedType`'s modifiers are layout-transparent, so whether a type has
+    // a size is decided entirely by its base: `sizeof(unorm float4)` is just
+    // `sizeof(float4)`. This matters because the modifier survives into the type
+    // of an ordinary value — loading from a `RWTexture2D<unorm float4>` yields a
+    // `unorm float4` — so rejecting the wrapper here would reject `sizeof` on a
+    // value the user never spelled a modifier on. Unwrapping keeps the list
+    // below about *kinds* of type rather than repeating each kind in a modified
+    // form.
+    type = unwrapModifiedType(type);
+
     if (as<ArithmeticExpressionType>(type) || as<ArrayExpressionType>(type) ||
         as<PtrTypeBase>(type) || as<TupleType>(type) || as<GenericDeclRefType>(type))
     {
@@ -6329,9 +6483,13 @@ static bool _isTypeOrValValidForCountOf(Type* type)
         return true;
     }
 
-    if (as<ArrayExpressionType>(type))
+    if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return true;
+        // Only a fixed-size array has a statically known element count. An
+        // unsized array has none, so `countof` on it is not a compile-time
+        // constant and must be diagnosed here rather than lowered to a
+        // `kIROp_CountOf` that no pass can fold and no backend can emit.
+        return !arrayType->isUnsized();
     }
 
     if (as<ValuePackType>(type))
@@ -7349,8 +7507,10 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
     {
-        // We only want to allow function calls if we are getting the address
-        // of a `GetOffsetPtr` to a pointer-variable
+        // A subscript such as `buf[i]` desugars to an `InvokeExpr` of the subscript's
+        // `ref` accessor. We allow taking its address only for accessors whose intrinsic
+        // op names an addressable location: a pointer's `GetOffsetPtr`, or a mutable
+        // structured buffer's `RWStructuredBufferGetElementPtr`.
         auto functionMemberExpr = as<MemberExpr>(invokeExpr->functionExpr);
         if (!functionMemberExpr)
             return nullptr;
@@ -7358,19 +7518,66 @@ static PtrType* getValidTypeForAddressOf(
         if (!subscriptDecl)
             return nullptr;
         bool isOffsetIntrinsicOp = false;
+        bool isStructuredBufferElementPtrOp = false;
         for (auto refAccessor : subscriptDecl->getMembersOfType<RefAccessorDecl>())
         {
             auto intrinsicOp = refAccessor->findModifier<IntrinsicOpModifier>();
             if (!intrinsicOp)
                 continue;
-            if (intrinsicOp->op != kIROp_GetOffsetPtr)
-                continue;
-            isOffsetIntrinsicOp = true;
+            if (intrinsicOp->op == kIROp_GetOffsetPtr)
+                isOffsetIntrinsicOp = true;
+            else if (intrinsicOp->op == kIROp_RWStructuredBufferGetElementPtr)
+                isStructuredBufferElementPtrOp = true;
         }
-        if (!isOffsetIntrinsicOp)
-            return nullptr;
 
-        return getPtrTypeFromBaseOfDerefLikeOperation(functionMemberExpr->baseExpression);
+        // A subscript declares at most one of these two ref-accessor intrinsic ops: a
+        // `Ptr<T>`-like subscript uses `GetOffsetPtr`, a mutable structured buffer's uses
+        // `RWStructuredBufferGetElementPtr`, and those accessors live on different, unrelated
+        // types. Assert they are mutually exclusive so the ordered checks below read as
+        // exhaustive rather than priority-dependent — if both were somehow set, the
+        // `GetOffsetPtr` branch would silently win and the structured-buffer branch (with its
+        // release-assert) would never run.
+        SLANG_ASSERT(!(isOffsetIntrinsicOp && isStructuredBufferElementPtrOp));
+
+        // Address of a pointer element: `ptr[i]` where `ptr` is a `Ptr<T>`-like value. The
+        // base is a pointer-typed variable, so `getPtrTypeFromBaseOfDerefLikeOperation`
+        // recovers its pointer type; that helper does not apply to the buffer case below
+        // because a structured buffer is not itself a `Ptr`-typed value.
+        if (isOffsetIntrinsicOp)
+            return getPtrTypeFromBaseOfDerefLikeOperation(functionMemberExpr->baseExpression);
+
+        // Address of a mutable structured-buffer element: `buf[i]` where `buf` is an
+        // `RWStructuredBuffer` or `RasterizerOrderedStructuredBuffer`. These two types are also
+        // addressable via `&buf[i]` through `operator&`, and `__getAddress(buf[i])` must be
+        // equivalent to `&buf[i]`, so it produces the same pointer type here. The AST pointer is
+        // typed `UserPointer` (== `AddressSpace.Device`) to match how `&buf[i]` is typed at the
+        // AST level; the SPIR-V address-space specialization pass later reconciles the surviving
+        // slot to the element's real logical `StorageBuffer` space. The layout is
+        // `DefaultDataLayout` to match
+        // `&buf[i]` (the element offset is resolved from the buffer type's own layout at IR
+        // generation, so this pointer's layout argument does not affect stride).
+        if (isStructuredBufferElementPtrOp)
+        {
+            // The `kIROp_RWStructuredBufferGetElementPtr` ref accessor is generated by only
+            // one place in the core module — the `kMutableStructuredBufferCases` template
+            // (`hlsl.meta.slang`), which emits it for exactly `RWStructuredBuffer` and
+            // `RasterizerOrderedStructuredBuffer`. Read-only `StructuredBuffer` has a
+            // `get`-only subscript (no `ref`), so it never reaches here. The base type is
+            // therefore always one of the two mutable structured-buffer types; assert that
+            // invariant so a future accessor reusing this op surfaces rather than silently
+            // producing a spurious E31160.
+            auto baseType = unwrapModifiedType(functionMemberExpr->baseExpression->type.type);
+            SLANG_RELEASE_ASSERT(
+                as<HLSLRWStructuredBufferType>(baseType) ||
+                as<HLSLRasterizerOrderedStructuredBufferType>(baseType));
+            return m_astBuilder->getPtrType(
+                targetType,
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                m_astBuilder->getDefaultLayoutType());
+        }
+
+        return nullptr;
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
     {
@@ -7431,10 +7638,15 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    if (auto declRefType = as<DeclRefType>(typeExp.type))
+    if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
     {
-        // LEGACY FEATURE: As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // SLANG <=2026 LEGACY FEATURE:
+        //
+        // As a backwards-compatibility feature for HLSL, we will allow for a cast
         // to a `struct` type from a literal zero, with the semantics of default initialization.
+        //
+        // In Slang 2026, a warning is issued to encourage migrating away from
+        // this feature.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)
@@ -7489,6 +7701,17 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
+                        // In Slang 2026 mode, warn that a cast from literal 0
+                        // changes semantics for regular structs (i.e., anything
+                        // that the user defines).
+                        //
+                        // We don't warn about casts from literal 0 to core
+                        // module types (e.g., float, vector, etc). The default
+                        // initializers of these types have the zeroing
+                        // semantics.
+                        if (isSlang2026OrLater(this) && !isFromCoreModule(structDeclRef.getDecl()))
+                            getSink()->diagnose(
+                                Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
                         return coerce(
                             CoercionSite::General,
@@ -8716,6 +8939,196 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     return _lookupStaticMember(expr, expr->baseExpression);
 }
 
+// Return true if `interfaceDecl` directly declares a requirement named `requirementName` that is
+// visible from `scope` and, when `isStaticAccess`, usable as a static member. A value access `v.m`
+// reaches an instance, static, or associated-type requirement (Slang projects an associated type
+// through a value, e.g. `v.Element`), so it accepts any of them. A generic requirement such as
+// `static int makeGen<U>(U)` is a `GenericDecl` whose `static` modifier is on the inner decl;
+// `isDeclUsableAsStaticMember` looks through the wrapper.
+static bool doesInterfaceDeclareUsableRequirement(
+    SemanticsVisitor* semantics,
+    InterfaceDecl* interfaceDecl,
+    Name* requirementName,
+    bool isStaticAccess,
+    Scope* scope)
+{
+    for (auto requirement : interfaceDecl->getDirectMemberDeclsOfName(requirementName))
+    {
+        if (isStaticAccess && !semantics->isDeclUsableAsStaticMember(requirement))
+            continue;
+        if (semantics->isDeclVisibleFromScope(makeDeclRef(requirement), scope))
+            return true;
+    }
+    return false;
+}
+
+// Collect the interfaces declared directly in the containers on `scope`'s parent and sibling
+// chains (excluding the core module) that are visible from `scope` and directly declare a
+// requirement named `requirementName` satisfying `doesInterfaceDeclareUsableRequirement`,
+// appending each one once to `outInterfaces`. Each entry is the declaration the interface's name
+// refers to: the `GenericDecl` for a generic interface, the `InterfaceDecl` otherwise.
+//
+// The core module is skipped (as `findClosestInScopeName` does) because it is implicitly in scope
+// for every program, so its common requirement names (`equals`, `lessThan`, ...) would follow
+// almost any typo. Interfaces from the module being checked and from modules it imports, including
+// a standard module such as `slang.numerics`, are kept.
+//
+// Requirements inherited from a base interface are not matched: a base interface is usually
+// visible wherever a derived one is, so naming the interface that declares the member directly is
+// enough.
+static void collectVisibleInterfacesDeclaringRequirement(
+    SemanticsVisitor* semantics,
+    Name* requirementName,
+    bool isStaticAccess,
+    Scope* scope,
+    List<Decl*>& outInterfaces)
+{
+    // A member access whose identifier is missing (e.g. `v.` while typing in the language server)
+    // has no name to search for.
+    if (!requirementName)
+        return;
+
+    // An interface is reached twice when its container is linked into the walk twice, e.g. a
+    // namespace that encloses `scope` and is also brought in by `using namespace`.
+    HashSet<Decl*> seen;
+    for (Scope* s = scope; s; s = s->parent)
+    {
+        for (Scope* sib = s; sib; sib = sib->nextSibling)
+        {
+            auto containerDecl = sib->containerDecl;
+            if (!containerDecl)
+                continue;
+            if (isFromCoreModule(containerDecl))
+                continue;
+
+            for (auto decl : containerDecl->getDirectMemberDecls())
+            {
+                auto interfaceDecl = as<InterfaceDecl>(maybeGetInner(decl));
+                // An `interface` keyword with no name (e.g. `interface { ... }`) still parses into
+                // a nameless `InterfaceDecl`, which the language server keeps checking.
+                if (!interfaceDecl || !decl->getName())
+                    continue;
+                if (!semantics->isDeclVisibleFromScope(makeDeclRef(decl), scope))
+                    continue;
+                if (!doesInterfaceDeclareUsableRequirement(
+                        semantics,
+                        interfaceDecl,
+                        requirementName,
+                        isStaticAccess,
+                        scope))
+                    continue;
+                if (seen.add(decl))
+                    outInterfaces.add(decl);
+            }
+        }
+    }
+}
+
+bool SemanticsVisitor::doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl)
+{
+    Decl* resolvedDecl = nullptr;
+    for (auto item : lookUp(m_astBuilder, this, name, scope))
+    {
+        if (!isDeclVisibleFromScope(item.declRef, scope))
+            continue;
+        auto itemDecl = item.declRef.getDecl();
+        if (resolvedDecl && resolvedDecl != itemDecl)
+            return false;
+        resolvedDecl = itemDecl;
+    }
+    return resolvedDecl == decl;
+}
+
+void SemanticsVisitor::maybeSuggestMissingGenericConstraintForMemberLookup(
+    DeclRefExpr* expr,
+    QualType const& baseType)
+{
+    // A `::` access is always a static lookup, even on a value (`v::m`, whose `baseType` is the
+    // value's type). A `.` access is static when its base is a type (`T.m`, a `TypeType`).
+    bool isStaticAccess = as<StaticMemberExpr>(expr) != nullptr;
+    Type* type = baseType.type;
+    if (auto typeType = as<TypeType>(type))
+    {
+        type = typeType->getType();
+        isStaticAccess = true;
+    }
+
+    // The note proposes `where <Param> : <Interface>`, so the base must be a generic type
+    // parameter the user declared and can constrain. Other constrainable bases (an associated type
+    // `T.Assoc`, a global `type_param`) would need different wording.
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+    auto genericParamDeclRef = declRefType->getDeclRef().as<GenericTypeParamDecl>();
+    if (!genericParamDeclRef)
+        return;
+    auto genericParamDecl = genericParamDeclRef.getDecl();
+
+    // In an interface method with a default body, `this` has the type of the `This` parameter of
+    // the synthesized `InterfaceDefaultImplDecl`. The user cannot write a `where` clause for it;
+    // the fix there is to make the interface inherit the other one.
+    if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(genericParamDecl->parentDecl);
+        defaultImplDecl && defaultImplDecl->thisTypeDecl == genericParamDecl)
+        return;
+
+    // Candidates are found and their requirements checked for visibility from the failed access
+    // (`m_outerScope`, the scope member lookup used), which is nested inside the generic that owns
+    // the parameter. Whether a candidate can be *named* is a separate question, answered below at
+    // the constraint site.
+    List<Decl*> candidates;
+    collectVisibleInterfacesDeclaringRequirement(
+        this,
+        expr->name,
+        isStaticAccess,
+        m_outerScope,
+        candidates);
+    if (candidates.getCount() == 0)
+        return;
+
+    // A constraint is written on the generic declaration that owns the parameter, so we only
+    // suggest an interface whose unqualified name, looked up from there, resolves to exactly that
+    // interface. Consider `float3 read<IHasNormal, T>(T value) { return value.getNormal(); }`: the
+    // interface `IHasNormal` declares `getNormal`, but inside `read` that name means the first
+    // generic parameter, so suggesting `where T : IHasNormal` would not help. Two same-named
+    // interfaces at the same lookup level (e.g. one imported by `using namespace`) make the name
+    // ambiguous, and neither is suggested.
+    Scope* constraintScope = getScope(genericParamDecl);
+    List<Decl*> interfaceDecls;
+    for (auto candidate : candidates)
+    {
+        if (doesNameResolveToDecl(candidate->getName(), constraintScope, candidate))
+            interfaceDecls.add(candidate);
+    }
+
+    // Each surviving name resolves to its own interface, so the names are distinct and sorting by
+    // them gives an order that does not depend on the scope walk.
+    interfaceDecls.sort([](Decl* left, Decl* right)
+                        { return left->getName()->text < right->getName()->text; });
+
+    auto genericParamName = genericParamDecl->getName();
+    for (auto interfaceDecl : interfaceDecls)
+    {
+        // A generic interface needs type arguments we cannot infer here, so it gets advisory
+        // wording rather than a `where` clause that would not compile as printed.
+        if (as<GenericDecl>(interfaceDecl))
+        {
+            getSink()->diagnose(Diagnostics::SuggestGenericInterfaceConstraintForMissingMember{
+                .genericParam = genericParamName,
+                .interfaceName = interfaceDecl->getName(),
+                .member = expr->name,
+                .location = expr->loc});
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::SuggestConstraintForMissingMember{
+                .genericParam = genericParamName,
+                .interfaceName = interfaceDecl->getName(),
+                .member = expr->name,
+                .location = expr->loc});
+        }
+    }
+}
+
 Expr* SemanticsVisitor::lookupMemberResultFailure(
     DeclRefExpr* expr,
     QualType const& baseType,
@@ -8728,10 +9141,13 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
+        {
             getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
                 .name = expr->name,
                 .type = baseType.type,
                 .expr = expr});
+            maybeSuggestMissingGenericConstraintForMemberLookup(expr, baseType);
+        }
     }
     return expr;
 }
@@ -9022,7 +9438,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         }
         else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
         {
-            expr->type.isLeftValue = true;
+            // An ordinary setter can mutate its receiver, but `[nonmutating]` promises that the
+            // receiver storage itself is not writable. Recompute the same rule when a synthesized
+            // accessor body is checked instead of relying on the type initially assigned to its
+            // `ThisExpr` by the synthesis path.
+            expr->type.isLeftValue = !setterDecl->hasModifier<NonmutatingAttribute>();
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
@@ -9089,6 +9509,13 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+            // A `this` referenced from a lambda body must be registered as a closure
+            // capture, mirroring the AggTypeDeclBase branch above; otherwise the
+            // synthesized closure struct has no field for it (issue #12923).
+            if (m_parentLambdaExpr)
+            {
+                return maybeRegisterLambdaCapture(expr);
+            }
             return expr;
         }
 #if 0
@@ -9277,7 +9704,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_ColumnMajor));
                 }
                 else
@@ -9287,7 +9714,7 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
                         matrixType->getRowCount(),
                         matrixType->getColumnCount(),
                         m_astBuilder->getIntVal(
-                            m_astBuilder->getIntType(),
+                            matrixType->getLayout()->getType(),
                             kMatrixLayoutMode_RowMajor));
                 }
                 expr->type = m_astBuilder->getTypeType(baseType);
@@ -9359,10 +9786,7 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     }
     else
     {
-        // TODO: more complete error message here
-        getSink()->diagnose(Diagnostics::Unexpected{
-            .message = "unknown type modifier in semantic checking",
-            .location = modifier->loc});
+        getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
         return nullptr;
     }
 }
@@ -9505,7 +9929,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
-    // them
+    // them. Setting `failed` makes us return an error-typed expression via
+    // `CreateErrorExpr` at the end of this function; a caller only keeps that
+    // expression away from IR lowering (which aborts on an ErrorType) when the
+    // sink's error count is non-zero. So every site that sets `failed` must
+    // diagnose an *error*, never a warning — a warning-severity `failed` path
+    // is what caused the abort in #12497. (The lone warning in this function,
+    // SpirvLayoutSensitiveTypeInAsm, deliberately does not set `failed`.)
     bool failed = false;
 
     // Track %id's that have been defined in this asm block.
@@ -9520,10 +9950,12 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
+            // Per the `failed` invariant above, this diagnoses an error (not
+            // the parser's E29106 semicolon-hint warning): the opcode takes no
+            // operands, so this is a definite error rather than a recovery guess.
             failed = true;
-            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+            getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }

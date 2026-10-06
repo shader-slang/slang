@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:01:06Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#labelstmt-breakstmt-continuestmt-and-discardstmt
-//META: doc_section_digest=783ca4610d04324a19528b2ebb2e46ebb414a710625751b56159692db3954604
+//META: doc_section_digest=56973ad8752f95b6b4fe0b0a37cc16997d4bb7b6f6cfc8bddd18361e81252484
 //META: purpose=A ContinueStmt restarts the nearest enclosing loop; a `continue` in an inner loop skips only the inner iteration's remainder while the outer loop still completes all of its iterations.
 //META: intent=functional
 //META: pipeline_stage=check

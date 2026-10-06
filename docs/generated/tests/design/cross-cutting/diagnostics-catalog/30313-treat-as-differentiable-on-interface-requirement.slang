@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T11:10:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=3d3cfaab0521dad30fde00c21e4e2830740609e269e110699f6b04543ae3ca8d
 //META: purpose=Fires diagnostic E30313 (treat-as-differentiable-on-interface-requirement) - [TreatAsDifferentiable] cannot be applied to interface requirement
 //META: intent=negative
 //META: pipeline_stage=check
@@ -23,4 +23,4 @@ interface IDoer
 
 void main() {}
 
-// CHECK: 30313
+//CHECK: 30313

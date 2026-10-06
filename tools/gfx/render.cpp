@@ -486,7 +486,7 @@ extern "C"
             }
         default:
             {
-                assert(!"Not handled");
+                SLANG_ASSERT_FAILURE("Not handled");
             }
         }
     }

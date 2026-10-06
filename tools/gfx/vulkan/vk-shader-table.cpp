@@ -56,7 +56,7 @@ RefPtr<BufferResource> ShaderTableImpl::createDeviceBuffer(
     transientHeapImpl
         ->allocateStagingBuffer(tableSize, stagingBuffer, stagingBufferOffset, MemoryType::Upload);
 
-    assert(stagingBuffer);
+    SLANG_ASSERT(stagingBuffer);
     void* stagingPtr = nullptr;
     stagingBuffer->map(nullptr, &stagingPtr);
 

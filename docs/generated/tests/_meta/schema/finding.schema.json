@@ -16,7 +16,10 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "type": "integer", "const": 1 },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$",
@@ -63,7 +66,7 @@
         },
         "source_slang": {
           "type": "string",
-          "description": "Workspace-relative path to the .slang test file the agent was writing when it noticed the failure."
+          "description": "Workspace-relative path to the .slang test file the agent was writing when it noticed the failure. If the failing input was a scratch variant rather than this file, `command` will name that scratch path -- in which case inline the real input in `repro_source`, because this path alone will not reproduce it."
         },
         "observed_summary": {
           "type": "string",
@@ -80,6 +83,10 @@
         "minimized_repro": {
           "type": "string",
           "description": "Operator-supplied minimized version of the .slang source. When set, takes precedence over reading source_slang for the issue body. Empty by default."
+        },
+        "repro_source": {
+          "type": "string",
+          "description": "The exact .slang source that triggers the failure, inlined. Required when `command` names a path that is not committed to the repository -- a /tmp scratch file, or a placeholder such as <file>. Those paths do not survive the session, so without this field the finding cannot be re-run later and cannot be confirmed still-reproducing before it is filed. Some inputs (a compiler crash, for instance) cannot ship as a test, which is exactly the case this field exists for."
         }
       }
     },
@@ -126,10 +133,14 @@
       "additionalProperties": false,
       "description": "Optional. Agent's own confidence and what it considered. Not used by triage gating; useful for operator review.",
       "properties": {
-        "confidence": { "enum": ["low", "medium", "high"] },
+        "confidence": {
+          "enum": ["low", "medium", "high"]
+        },
         "alternatives_considered": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

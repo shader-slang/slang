@@ -84,7 +84,15 @@ A second level-2 section `## Partial generic application` covering:
 
 A third level-2 section `## Operator overloading` covering:
 
-- The `ResolvedOperatorOverload` cache (cite its declaration).
+- The builtin-operator fast path. Note that the `ResolvedOperatorOverload`
+  cache this prompt used to ask for **no longer exists** — it was removed
+  and replaced by `convertToBuiltinArithmeticOp` and its helpers, declared
+  in [slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
+  (lines 3927-3982) and defined in
+  [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp).
+  The fast path lets builtin scalar/vector/matrix operators bypass general
+  overload resolution, producing a `BuiltinOperatorExpr` that carries a
+  `BuiltinOperationKind`. Do not describe a memoization cache.
 - How operator lookup specializes from the general algorithm.
 - The implicit `this` argument for binary / unary operator overloads.
 
