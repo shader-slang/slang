@@ -1,12 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 
 // A `%name` operand referencing an instruction the snippet never defines is malformed user input
-// and must be reported as snippet-parsing-failed (E29000), not abort the compiler.
+// and must be reported as spirv-snippet-undefined-id (E29001), not abort the compiler.
 
 RWStructuredBuffer<float> outBuf;
 
-//CHECK: E29000
-//CHECK: snippet
+//CHECK: error E29001
+//CHECK: undefined SPIR-V id '%missing' in target intrinsic snippet: OpNop %missing
 __target_intrinsic(spirv, "OpNop %missing")
 float undefinedRef(float a);
 

@@ -5,6 +5,7 @@
 #include "compiler-core/slang-spirv-core-grammar.h"
 #include "core/slang-token-reader.h"
 #include "slang-lookup-spirv.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -91,7 +92,9 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
 
 RefPtr<SpvSnippet> SpvSnippet::parse(
     const SPIRVCoreGrammarInfo& spirvGrammar,
-    UnownedStringSlice definition)
+    UnownedStringSlice definition,
+    SourceLoc sourceLoc,
+    DiagnosticSink* sink)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
     try
@@ -189,10 +192,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
-                            Misc::throwTextFormatException(
-                                "Text parsing error: SPIR-V snippet references an undefined "
-                                "instruction: %" +
-                                refName);
+                            sink->diagnose(Diagnostics::SpirvSnippetUndefinedId{
+                                .id = refName,
+                                .snippet = definition,
+                                .location = sourceLoc});
+                            return nullptr;
                         }
                         inst.operands.add(operand);
                     }
@@ -306,9 +310,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            Misc::throwTextFormatException(
-                                "Text parsing error: Invalid SPIR-V ASM operand: \"" + identifier +
-                                "\"");
+                            sink->diagnose(Diagnostics::SpirvSnippetUnknownOperand{
+                                .operand = identifier,
+                                .snippet = definition,
+                                .location = sourceLoc});
+                            return nullptr;
                         }
                     }
                     break;
@@ -322,6 +328,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
     }
     catch (const Slang::Misc::TextFormatException&)
     {
+        sink->diagnose(
+            Diagnostics::SnippetParsingFailed{.snippet = definition, .location = sourceLoc});
         return nullptr;
     }
     return snippet;

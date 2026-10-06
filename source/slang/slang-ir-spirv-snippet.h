@@ -7,6 +7,8 @@ namespace Slang
 {
 
 struct SPIRVCoreGrammarInfo;
+class DiagnosticSink;
+class SourceLoc;
 
 //
 // [2.2: Terms]
@@ -144,7 +146,9 @@ struct SpvSnippet : public RefObject
 
     static RefPtr<SpvSnippet> parse(
         const SPIRVCoreGrammarInfo& spirvGrammar,
-        UnownedStringSlice definition);
+        UnownedStringSlice definition,
+        SourceLoc sourceLoc,
+        DiagnosticSink* sink);
 };
 
 

@@ -3107,13 +3107,8 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     {
         return snippet.Ptr();
     }
-    snippet = SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition());
-    if (!snippet)
-    {
-        m_sink->diagnose(Diagnostics::SnippetParsingFailed{
-            .snippet = intrinsic->getDefinition(),
-            .location = intrinsic->sourceLoc});
-    }
+    snippet =
+        SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition(), intrinsic->sourceLoc, m_sink);
     m_parsedSpvSnippets[intrinsic] = snippet;
     return snippet;
 }
