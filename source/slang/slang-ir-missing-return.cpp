@@ -34,7 +34,7 @@ static void diagnoseMissingReturnForTarget(
 {
     if (languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
     {
-        sink->diagnose(Diagnostics::MissingReturnErrorBySource{.location = missingReturn->sourceLoc});
+        sink->diagnose(Diagnostics::MissingReturnNotAllowedInSlang202c{.location = missingReturn->sourceLoc});
     }
     else if (doesTargetAllowMissingReturns(target))
     {

@@ -7,14 +7,13 @@ class DiagnosticSink;
 struct IRModule;
 enum class CodeGenTarget;
 
-/// @brief Checks for missing returns
+/// @brief This function checks for missing returns.
 ///
 /// @param[in]  module           IR module
-/// @param[out] sink             Diagnostics sink
-/// @param[in]  languageVersion  Source language version. If the language is not Slang or not known,
-///                              set SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN
+/// @param[in]  sink             Diagnostics sink
+/// @param[in]  languageVersion  Source language version
 /// @param[in]  target           Compilation target
-/// @param[in]  diagnoseWarning  Whether warnings should be diagnose
+/// @param[in]  diagnoseWarning  Whether warnings should be diagnosed
 ///
 /// This IR check pass is performed twice:
 /// - once during IR lowering with source language version set and code gen
@@ -23,7 +22,7 @@ enum class CodeGenTarget;
 ///   SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN and code gen target
 ///   specified.
 ///
-/// Slang language version 202C and above makes missing returns an unconditional
+/// Slang language version 202c and above makes missing returns an unconditional
 /// error. (GitHub issue #12264)
 ///
 /// Some code gen targets allow missing returns while some do not. When the
@@ -34,7 +33,6 @@ enum class CodeGenTarget;
 ///
 /// On the second pass, `diagnoseWarning` is set to false to suppress warnings, ensuring that only
 /// errors are emitted. This prevents duplicate warnings from appearing in both passes.
-///
 void checkForMissingReturns(
     IRModule* module,
     DiagnosticSink* sink,

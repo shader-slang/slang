@@ -5198,10 +5198,10 @@ err(
 )
 
 err(
-    "missing-return-error-by-source",
+    "missing-return-not-allowed-in-slang-202c",
     40025,
-    "non-void function must return",
-    span { loc = "location", message = "non-void function must return in all cases in Slang 202c." }
+    "non-void function must return in Slang 202c and later",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c and later" }
 )
 
 warning(

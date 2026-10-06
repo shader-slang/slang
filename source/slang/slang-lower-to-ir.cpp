@@ -16286,6 +16286,21 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Reading from mesh shader outputs is not allowed.
         checkForMeshOutputReads(module, compileRequest->getSink());
     }
+    else
+    {
+        // Missing returns are an unconditional error in Slang 202c, so we'll
+        // check them even if non-essential validation has been turned off.
+        if (translationUnit->getModuleDecl()->languageVersion >=
+            SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
+        {
+            checkForMissingReturns(
+                module,
+                compileRequest->getSink(),
+                translationUnit->getModuleDecl()->languageVersion,
+                CodeGenTarget::None,
+                true);
+        }
+    }
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
