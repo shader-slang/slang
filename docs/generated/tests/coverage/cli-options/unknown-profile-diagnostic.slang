@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles
-//META: doc_section_digest=361982396d14162463bb7166495cd21519eb9cb1d01efc328bee518cbc136ce3
+//META: doc_section_digest=469973558ae9131458179def57cec815ce506922c2ef82e0e161360ad76f32c5
 //META: purpose=Verifies an unrecognized -profile operand is rejected with E00014 naming the unknown profile.
 //META: intent=characterization
 //META: covers=source/slang/slang-options.cpp

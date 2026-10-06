@@ -953,6 +953,7 @@ static LegalVal legalizeDebugVar(
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
+                originalInst->getScope(),
                 originalInst->getArgIndex());
             copyNameHintAndDebugDecorations(legalVal, originalInst);
             return LegalVal::simple(legalVal);

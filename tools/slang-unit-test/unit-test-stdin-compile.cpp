@@ -2092,6 +2092,178 @@ static SlangResult _testCompilerOptionHashIsInsertionOrderIndependent()
     return SLANG_OK;
 }
 
+// Fixture for the link-time-option hashing test. It has a float multiply-add so nvrtc `--fmad`
+// (fused-multiply-add contraction) actually changes the emitted PTX, and a data-dependent branch so
+// dxc `-Gfa`/`-Gfp` (flow-control strategy) actually changes the emitted DXIL; the global
+// `RWStructuredBuffer` is a resource parameter whose binding `VulkanBindGlobals` affects on SPIR-V.
+// So each option the test toggles is a genuine code-generation input for its target, not merely a
+// string that differs in the hash.
+static const char* kLinkTimeOptionShader = R"(
+RWStructuredBuffer<float> outputBuffer;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    float a = outputBuffer[0];
+    float b = outputBuffer[1];
+    float r = a * b + outputBuffer[2];
+    if (tid.x > 0u)
+        r = r * b + a;
+    outputBuffer[tid.x] = r;
+}
+)";
+
+// Return the entry-point hash for a program built from kLinkTimeOptionShader and linked via
+// linkWithOptions with the given link-time options, which are stored in the linked component's own
+// option set. `target` selects which options are codegen-relevant. getEntryPointHash only builds
+// the digest, so no GPU or target-code compilation runs (building the digest may load the target's
+// downstream compiler to query its version, but that is constant across calls here).
+static SlangResult _getLinkTimeOptionEntryPointHash(
+    SlangCompileTarget target,
+    const slang::CompilerOptionEntry* linkOptions,
+    SlangInt linkOptionCount,
+    ComPtr<ISlangBlob>& outHash)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()));
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = target;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, session.writeRef()));
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module;
+    module = session->loadModuleFromSourceString(
+        "linkTimeOptionHash",
+        "link-time-option-hash.slang",
+        kLinkTimeOptionShader,
+        diagnostics.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_RETURN_ON_FAIL(module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef()));
+
+    slang::IComponentType* components[] = {module.get(), entryPoint.get()};
+    ComPtr<slang::IComponentType> compositeProgram;
+    SLANG_RETURN_ON_FAIL(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        compositeProgram.writeRef(),
+        diagnostics.writeRef()));
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_RETURN_ON_FAIL(compositeProgram->linkWithOptions(
+        linkedProgram.writeRef(),
+        (uint32_t)linkOptionCount,
+        linkOptions,
+        diagnostics.writeRef()));
+
+    linkedProgram->getEntryPointHash(0, 0, outHash.writeRef());
+    return outHash ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _getLinkTimeDownstreamArgHash(
+    SlangCompileTarget target,
+    const char* tool,
+    const char* arg,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeString2CompilerOption(slang::CompilerOptionName::DownstreamArgs, tool, arg),
+    };
+    return _getLinkTimeOptionEntryPointHash(target, options, SLANG_COUNT_OF(options), outHash);
+}
+
+// getEntryPointHash is a shader-cache key that includes the linked component's own option set, so a
+// link-time option that affects code generation must change it. Three independent slices of that
+// contract are checked, each using an option that genuinely affects codegen for its target (so a
+// differing hash reflects a real codegen difference, not a spurious miss): a CUDA downstream
+// argument and a DXC/DXIL downstream argument (a second backend) -- both passed through to the
+// downstream compiler unchanged -- and a non-DownstreamArgs option (VulkanBindGlobals on SPIR-V,
+// reached via linkWithOptions), which Slang's own SPIR-V layout consumes rather than forwarding.
+static SlangResult _testLinkTimeOptionsAffectCompilerOptionHash()
+{
+    // 1) CUDA/PTX downstream args: --fmad toggles fused multiply-add contraction, a PTX codegen
+    // input nvrtc honors and that Slang does not inject in the default floating-point mode, so the
+    // two values must hash differently; the same argument twice must match (isolating it as the
+    // cause).
+    ComPtr<ISlangBlob> fmadOffHash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgHash(SLANG_PTX, "nvrtc", "--fmad=false", fmadOffHash));
+
+    ComPtr<ISlangBlob> fmadOnHash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgHash(SLANG_PTX, "nvrtc", "--fmad=true", fmadOnHash));
+
+    if (_blobContentEquals(fmadOffHash, fmadOnHash))
+        return SLANG_FAIL;
+
+    ComPtr<ISlangBlob> fmadOffHashRepeat;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgHash(SLANG_PTX, "nvrtc", "--fmad=false", fmadOffHashRepeat));
+
+    if (!_blobContentEquals(fmadOffHash, fmadOffHashRepeat))
+        return SLANG_FAIL;
+
+    // 2) A second downstream backend (DXC/DXIL): -Gfa and -Gfp select opposing flow-control codegen
+    // strategies that dxc honors and that Slang does not override, so they must hash differently --
+    // the contract is not specific to NVRTC. -all_resources_bound is kept common to both to satisfy
+    // dxc's requirement for -Gfa on SM 5.1+; the argline is newline-delimited because a
+    // DownstreamArgs argline deserializes one dxc argument per line (CommandLineArgs::deserialize
+    // splits on '\n').
+    ComPtr<ISlangBlob> gfaHash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfa\n-all_resources_bound", gfaHash));
+
+    ComPtr<ISlangBlob> gfpHash;
+    SLANG_RETURN_ON_FAIL(
+        _getLinkTimeDownstreamArgHash(SLANG_DXIL, "dxc", "-Gfp\n-all_resources_bound", gfpHash));
+
+    if (_blobContentEquals(gfaHash, gfpHash))
+        return SLANG_FAIL;
+
+    // 3) A non-DownstreamArgs link-time option: VulkanBindGlobals goes through the same
+    // CompilerOptionSet::buildHash path as downstream args, so two different binding sets on SPIR-V
+    // must hash differently.
+    slang::CompilerOptionEntry bindSet0[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, 0, 0),
+    };
+    slang::CompilerOptionEntry bindSet1[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, 0, 1),
+    };
+
+    ComPtr<ISlangBlob> bindSet0Hash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeOptionEntryPointHash(
+        SLANG_SPIRV,
+        bindSet0,
+        SLANG_COUNT_OF(bindSet0),
+        bindSet0Hash));
+
+    ComPtr<ISlangBlob> bindSet1Hash;
+    SLANG_RETURN_ON_FAIL(_getLinkTimeOptionEntryPointHash(
+        SLANG_SPIRV,
+        bindSet1,
+        SLANG_COUNT_OF(bindSet1),
+        bindSet1Hash));
+
+    if (_blobContentEquals(bindSet0Hash, bindSet1Hash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -2118,6 +2290,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testDuplicateIntOptionReplacesSecondOperand()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testMultiStringOptionHashIsDelimited()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCompilerOptionHashIsInsertionOrderIndependent()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testLinkTimeOptionsAffectCompilerOptionHash()));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)

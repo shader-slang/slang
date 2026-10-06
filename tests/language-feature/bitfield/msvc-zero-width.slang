@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compile-arg -msvc-style-bitfield-packing
 
-// MSVC packing with zero-width bitfields
+// Legacy MSB-first packing with zero-width bitfields.
 // CHECK:      123
 // CHECK-NEXT: 4567
 // CHECK-NEXT: 1

@@ -650,6 +650,12 @@ struct IRGenContext
     FunctionDeclBase* funcDecl = nullptr;
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
+    // Declaration scope is independent of the basic block where a variable is eventually stored.
+    IRInst* currentDebugScope = nullptr;
+    // Insert lexical metadata before this function so its enclosing generic owns it.
+    IRInst* debugScopeOwner = nullptr;
+    // The function scope already covers this body; it needs no additional lexical block.
+    Stmt* debugFunctionBody = nullptr;
 
     // Shader-coverage instrumentation. Line, function, and branch modes
     // emit distinct semantic marker ops; a later IR pass rewrites all
@@ -710,6 +716,20 @@ struct IRGenContext
         return nullptr;
     }
 };
+
+// Scope markers assign state; a newly entered block cannot inherit the lexical state of the
+// block that happened to be emitted before it. This also preserves scope across CFG folding.
+// After entering a new block, lowering must emit the active scope before its instructions.
+// This stays in lowering because the IR builder does not own the AST declaration-scope state.
+static void emitCurrentDebugScope(IRGenContext* context)
+{
+    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope)
+        return;
+    auto builder = context->irBuilder;
+    auto block = builder->getBlock();
+    if (block && !block->getTerminator())
+        builder->emitDebugScope(context->currentDebugScope, nullptr);
+}
 
 ModuleDecl* findModuleDecl(Decl* decl)
 {
@@ -909,12 +929,14 @@ LoweredValInfo emitCallToVal(
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
+                emitCurrentDebugScope(context);
 
                 if (!handler.errorHandler)
                 {
                     // We have to create a default fail block, which just re-throws.
                     builder->insertBlock(failBlock);
                     auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    emitCurrentDebugScope(context);
                     builder->emitThrow(errParam);
                     builder->setInsertInto(succBlock);
                 }
@@ -4081,12 +4103,44 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
 
 struct StmtLoweringVisitor;
 
+static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt);
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
     Stmt* stmt,
     SourceLoc loc = SourceLoc(),
     bool allowNullStmt = false);
+
+// Allocate an ID for one branch-coverage site: a source construct whose arms each get a
+// branch-coverage marker. The IDs are unique only within this lowering context; the coverage IR
+// pass remaps them into one metadata-local namespace after linking.
+static uint32_t allocateCoverageBranchSiteID(IRGenContext* context)
+{
+    return context->shared->nextCoverageBranchSiteID++;
+}
+
+// Emit the branch-coverage marker for one arm of a branch site at the current insert location.
+// Statement and expression lowering share this helper so every branch site produces markers of
+// the same shape, attributed to `loc`. A `branchSiteID` of 0 means the construct has no site,
+// either because branch coverage is off or because the construct is not being lowered into a
+// function body, and no marker is emitted for it.
+static void emitBranchCoverageMarker(
+    IRGenContext* context,
+    SourceLoc loc,
+    uint32_t branchSiteID,
+    uint32_t branchArmID,
+    slang::CoverageBranchArmKind branchArmKind)
+{
+    if (branchSiteID == 0)
+        return;
+
+    IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, loc);
+    context->irBuilder->emitIncrementBranchCoverageCounter(
+        IRIntegerValue(branchSiteID),
+        IRIntegerValue(branchArmID),
+        IRIntegerValue(uint32_t(branchArmKind)));
+}
 
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
@@ -5421,19 +5475,12 @@ struct ExprLoweringContext
         for (Index i = 0; i < argCount; ++i)
             args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
 
-        // Determine whether the operand element type is floating-point (selects FRem vs
-        // IRem for `%`).
-        bool isFloatingPoint = false;
-        {
-            Type* elementType = expr->arguments[0]->type.type;
-            if (auto vecType = as<VectorExpressionType>(elementType))
-                elementType = vecType->getElementType();
-            else if (auto matType = as<MatrixExpressionType>(elementType))
-                elementType = matType->getElementType();
-            if (auto basicType = as<BasicExpressionType>(elementType))
-                isFloatingPoint = (BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
-                                   BaseTypeInfo::Flag::FloatingPoint) != 0;
-        }
+        // Selects FRem vs IRem for `%`, resolved by `convertToBuiltinArithmeticOp` at check time
+        // and stored on the node rather than re-derived here: the operand element type can still
+        // be an abstract, unspecialized generic parameter at this point (see
+        // `elementTypeIsFloatingPoint`'s declaration comment), which carries no concrete
+        // `BaseType` to inspect.
+        bool isFloatingPoint = expr->elementTypeIsFloatingPoint;
 
         IROp op = kIROp_Add;
         switch (expr->op)
@@ -6011,8 +6058,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
 
         NaturalSize size{0, NaturalSize::kInvalidAlignment};
-        if (!sizeOfLikeExpr->dataLayoutType ||
-            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        // `countof` asks for an element count, which is unrelated to the byte
+        // size/alignment that `NaturalSize` computes, so it must never take the
+        // `calcSize` shortcut: for `countof(int[5])` that shortcut would fold to
+        // `size.alignment` (4) below instead of the element count (5). Always
+        // emit `kIROp_CountOf` and let `maybeSpecializeCountOf` fold it.
+        if (!as<CountOfExpr>(sizeOfLikeExpr) &&
+            (!sizeOfLikeExpr->dataLayoutType ||
+             as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType)))
         {
             // The layout should be the scalar data layout, so lets try and
             // lower to a constant already.
@@ -7091,6 +7144,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // True branch: extract inner value, coerce to U, wrap in Optional<U>.
         builder->setInsertInto(trueBlock);
+        emitCurrentDebugScope(context);
         {
             auto extractedInner = builder->emitGetOptionalValue(srcOptIR);
 
@@ -7107,6 +7161,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // False branch: source is none, propagate none.
         builder->setInsertInto(falseBlock);
+        emitCurrentDebugScope(context);
         {
             auto noneVal = builder->emitMakeOptionalNone(toOptType);
             builder->emitStore(var, noneVal);
@@ -7114,6 +7169,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
 
         builder->setInsertInto(afterBlock);
+        emitCurrentDebugScope(context);
         auto result = builder->emitLoad(var);
         return LoweredValInfo::simple(result);
     }
@@ -7122,6 +7178,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    // Allocate a branch-coverage site for an expression that lowers to a two-way branch, or
+    // return 0 when the branch gets no site. Expressions are not always lowered into a function
+    // body: in `static bool g = a && b;` the short-circuit branch is built inside the global's
+    // initializer, and the coverage IR pass can only attribute a marker that sits in a function.
+    uint32_t allocateExprBranchCoverageSiteID()
+    {
+        if (!context->traceBranchCoverage)
+            return 0;
+        if (!getParentFunc(context->irBuilder->getInsertLoc().getInst()))
+            return 0;
+        return allocateCoverageBranchSiteID(context);
     }
 
     LoweredValInfo visitSelectExpr(SelectExpr* expr)
@@ -7139,23 +7208,40 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
 
         // A scalar typed `select` expr will turn into an if-else to implement short circuiting
-        // semantics.
+        // semantics. Under branch coverage, the two arms carry true/false markers for the
+        // condition, exactly as the arms of an `if` statement do.
         auto builder = context->irBuilder;
         auto thenBlock = builder->createBlock();
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+        uint32_t coverageBranchSiteID = allocateExprBranchCoverageSiteID();
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
+        emitCurrentDebugScope(context);
+        emitBranchCoverageMarker(
+            context,
+            expr->loc,
+            coverageBranchSiteID,
+            1,
+            slang::CoverageBranchArmKind::TrueArm);
         auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
         builder->emitBranch(afterBlock, 1, &trueVal);
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
+        emitCurrentDebugScope(context);
+        emitBranchCoverageMarker(
+            context,
+            expr->loc,
+            coverageBranchSiteID,
+            2,
+            slang::CoverageBranchArmKind::FalseArm);
         auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
         builder->emitBranch(afterBlock, 1, &falseVal);
         builder->insertBlock(afterBlock);
         builder->setInsertInto(afterBlock);
+        emitCurrentDebugScope(context);
         auto paramType = lowerType(context, expr->type.type);
         auto result = builder->emitParam(paramType);
         return LoweredValInfo::simple(result);
@@ -7168,17 +7254,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
         auto irCond = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[0]));
+        uint32_t coverageBranchSiteID = allocateExprBranchCoverageSiteID();
 
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
 
         // ifElse(<first param>, %true-block, %false-block, %after-block)
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
+        // Under branch coverage, the true/false markers record the value of the first operand,
+        // which is the decision the operator makes: for `&&` the true arm evaluates the second
+        // operand and the false arm short-circuits, and for `||` it is the other way around.
+
         // true-block: nonconditionalBranch(%after-block, <second param> : Bool)
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
+        emitCurrentDebugScope(context);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+        emitBranchCoverageMarker(
+            context,
+            expr->loc,
+            coverageBranchSiteID,
+            1,
+            slang::CoverageBranchArmKind::TrueArm);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                            ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
                            : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
@@ -7189,7 +7287,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
+        emitCurrentDebugScope(context);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+        emitBranchCoverageMarker(
+            context,
+            expr->loc,
+            coverageBranchSiteID,
+            2,
+            slang::CoverageBranchArmKind::FalseArm);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                             ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
                             : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
@@ -7199,6 +7304,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // after-block: return input parameter
         builder->insertBlock(afterBlock);
         builder->setInsertInto(afterBlock);
+        emitCurrentDebugScope(context);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto paramType = lowerType(context, expr->type.type);
         auto result = builder->emitParam(paramType);
@@ -7238,9 +7344,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
     ///
-    /// The `subTypeWitness` is expected to witness the sub-type relationship
-    /// by naming a field (or chain of fields) that leads from the type of
-    /// `value` to the field that stores its members for `superType`.
+    /// `subTypeWitness` must be one of a closed set of witness shapes: a
+    /// `DeclaredSubtypeWitness` or `TransitiveSubtypeWitness` (which name the
+    /// field, or chain of fields, that stores `superType`'s members inside
+    /// `value`), or a `First`/`LastSubtypeWitness` pack-projection witness
+    /// (which is unwrapped to its pattern witness — see the cases below).
+    /// Any other shape is out of contract and aborts.
     ///
     LoweredValInfo emitCastToConcreteSuperTypeRec(
         LoweredValInfo const& value,
@@ -7266,22 +7375,53 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     witness);
             else
             {
-                SLANG_ASSERT(!"unhandled");
-                return nullptr;
+                SLANG_UNEXPECTED("transitive sub-to-mid is not a subtype witness");
+                UNREACHABLE_RETURN(nullptr);
             }
 
             if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getMidToSup()))
                 return emitCastToConcreteSuperTypeRec(subToMid, superType, witness);
             else
             {
-                SLANG_ASSERT(!"unhandled");
-                return nullptr;
+                SLANG_UNEXPECTED("transitive mid-to-sup is not a subtype witness");
+                UNREACHABLE_RETURN(nullptr);
             }
+        }
+        else if (auto firstSubtypeWitness = as<FirstSubtypeWitness>(subTypeWitness))
+        {
+            // `__first`/`__last` select a single element of a value pack before this cast runs
+            // (the element is materialized by `kIROp_ExtractFirstFromPack`/`ExtractLastFromPack`),
+            // so the projection to a concrete `superType` is governed by the pattern witness that
+            // relates that element type to `superType`. The wrapper's super-type is its pattern
+            // witness's super-type. `getInheritanceInfo` builds the wrapper with its pattern
+            // witness's super-type (the `FirstPackElementType` projection in
+            // slang-check-inheritance.cpp), so `superType` passes through the recursion unchanged
+            // and the downstream `extractField(superType, ...)` on the pattern witness relies on
+            // that equality.
+            auto loweredSup = lowerType(context, firstSubtypeWitness->getSup());
+            SLANG_ASSERT(loweredSup == superType);
+            return emitCastToConcreteSuperTypeRec(
+                value,
+                superType,
+                firstSubtypeWitness->getPatternTypeWitness());
+        }
+        else if (auto lastSubtypeWitness = as<LastSubtypeWitness>(subTypeWitness))
+        {
+            // Same reasoning as the `First` arm above, mirrored for `__last`.
+            auto loweredSup = lowerType(context, lastSubtypeWitness->getSup());
+            SLANG_ASSERT(loweredSup == superType);
+            return emitCastToConcreteSuperTypeRec(
+                value,
+                superType,
+                lastSubtypeWitness->getPatternTypeWitness());
         }
         else
         {
-            SLANG_ASSERT(!"unhandled");
-            return nullptr;
+            // The witness shapes above are the only ones that can reach a concrete-`struct` cast;
+            // any other shape is a front-end/lowering invariant violation, so abort rather than
+            // return a null that a caller would dereference.
+            SLANG_UNEXPECTED("unsupported witness shape for concrete-struct upcast");
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
@@ -7438,6 +7578,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IRBlock* afterBlock;
         builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
         builder->setInsertInto(trueBlock);
+        emitCurrentDebugScope(context);
         auto irVal = builder->emitReinterpret(
             targetType,
             existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
@@ -7445,11 +7586,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(falseBlock);
+        emitCurrentDebugScope(context);
         // See `visitMakeOptionalExpr`: no longer need to pass a defaultVal.
         auto noneVal = builder->emitMakeOptionalNone(optType);
         builder->emitStore(var, noneVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(afterBlock);
+        emitCurrentDebugScope(context);
         auto result = builder->emitLoad(var);
         return LoweredValInfo::simple(result);
     }
@@ -7628,6 +7771,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitThisTypeExpr(ThisTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("this-type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("HLSL unsigned type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -8167,24 +8316,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so that it can be used for a label.
     IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
-    uint32_t allocateCoverageBranchSiteID() { return context->shared->nextCoverageBranchSiteID++; }
-
-    void emitBranchCoverageMarker(
-        SourceLoc loc,
-        uint32_t branchSiteID,
-        uint32_t branchArmID,
-        slang::CoverageBranchArmKind branchArmKind)
-    {
-        if (!context->traceBranchCoverage)
-            return;
-
-        IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, loc);
-        context->irBuilder->emitIncrementBranchCoverageCounter(
-            IRIntegerValue(branchSiteID),
-            IRIntegerValue(branchArmID),
-            IRIntegerValue(uint32_t(branchArmKind)));
-    }
-
     /// Does the given block have a terminator?
     bool isBlockTerminated(IRBlock* block) { return block->getTerminator() != nullptr; }
 
@@ -8227,6 +8358,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // and setit as the block we will be inserting into.
         parentFunc->addBlock(block);
         builder->setInsertInto(block);
+        emitCurrentDebugScope(context);
     }
 
     // Start a new block at the current location.
@@ -8307,6 +8439,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 // Move the terminator to the scope end block.
                 emitBranchIfNeeded(context->scopeEndBlock);
                 builder->insertBlock(context->scopeEndBlock);
+                emitCurrentDebugScope(context);
                 builder->setInsertInto(context->scopeEndBlock);
             }
             else
@@ -8334,7 +8467,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         IRInst* ifInst = nullptr;
         uint32_t coverageBranchSiteID =
-            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
         if (elseStmt)
         {
@@ -8347,6 +8480,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(thenBlock);
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
+                context,
                 condExpr->loc,
                 coverageBranchSiteID,
                 1,
@@ -8355,6 +8489,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             emitBranchIfNeeded(afterBlock);
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
+                context,
                 condExpr->loc,
                 coverageBranchSiteID,
                 2,
@@ -8376,6 +8511,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
+                context,
                 condExpr->loc,
                 coverageBranchSiteID,
                 1,
@@ -8386,6 +8522,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
+                context,
                 condExpr->loc,
                 coverageBranchSiteID,
                 2,
@@ -8495,7 +8632,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             coverageBranchLoc = condExpr->loc;
             coverageBranchSiteID =
-                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
             // Now we want to `break` if the loop condition is false.
             auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
@@ -8505,6 +8642,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             {
                 insertBlock(conditionFalseLabel);
                 emitBranchCoverageMarker(
+                    context,
                     coverageBranchLoc,
                     coverageBranchSiteID,
                     2,
@@ -8518,6 +8656,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (coverageBranchSiteID != 0)
         {
             emitBranchCoverageMarker(
+                context,
                 coverageBranchLoc,
                 coverageBranchSiteID,
                 1,
@@ -8629,7 +8768,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             coverageBranchLoc = condExpr->loc;
             coverageBranchSiteID =
-                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
             // Now we want to `break` if the loop condition is false.
             auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
@@ -8639,6 +8778,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             {
                 insertBlock(conditionFalseLabel);
                 emitBranchCoverageMarker(
+                    context,
                     coverageBranchLoc,
                     coverageBranchSiteID,
                     2,
@@ -8652,6 +8792,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (coverageBranchSiteID != 0)
         {
             emitBranchCoverageMarker(
+                context,
                 coverageBranchLoc,
                 coverageBranchSiteID,
                 1,
@@ -8742,7 +8883,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto mergeBlock = builder->createBlock();
             if (context->traceBranchCoverage)
             {
-                auto coverageBranchSiteID = allocateCoverageBranchSiteID();
+                auto coverageBranchSiteID = allocateCoverageBranchSiteID(context);
                 auto loopExitBlock = builder->createBlock();
                 // `invCondition` is the loop-exit test. Its true arm is the
                 // original condition's false branch, so it receives the
@@ -8751,6 +8892,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
                 insertBlock(loopExitBlock);
                 emitBranchCoverageMarker(
+                    context,
                     condExpr->loc,
                     coverageBranchSiteID,
                     2,
@@ -8759,6 +8901,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
                 insertBlock(mergeBlock);
                 emitBranchCoverageMarker(
+                    context,
                     condExpr->loc,
                     coverageBranchSiteID,
                     1,
@@ -8970,6 +9113,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         builder->insertBlock(deferBlock);
         builder->setInsertInto(deferBlock);
+        emitCurrentDebugScope(context);
 
         IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
         lowerStmt(context, stmt->statement);
@@ -8979,6 +9123,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         builder->insertBlock(mergeBlock);
         builder->setInsertInto(mergeBlock);
+        emitCurrentDebugScope(context);
     }
 
     void visitThrowStmt(ThrowStmt* stmt)
@@ -9213,9 +9358,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto dispatchLabel = createBlock();
         info->initialBlock->getParent()->addBlock(dispatchLabel);
         builder->setInsertInto(dispatchLabel);
+        emitCurrentDebugScope(context);
 
         SourceLoc markerLoc = armLoc.isValid() ? armLoc : info->coverageBranchFallbackLoc;
         emitBranchCoverageMarker(
+            context,
             markerLoc,
             info->coverageBranchSiteID,
             info->nextCoverageBranchArmID++,
@@ -9308,12 +9455,21 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         Stmt* stmt = inStmt;
 
-        // Unwrap any surrounding `{ ... }` so we can look
-        // at the statement inside.
-        while (auto blockStmt = as<BlockStmt>(stmt))
+        if (auto blockStmt = as<BlockStmt>(stmt))
         {
-            stmt = blockStmt->body;
-            continue;
+            auto previousScope = context->currentDebugScope;
+            // Restore the context if recursive lowering unwinds with an exception. The normal
+            // path below also emits a scope marker after restoring the enclosing scope.
+            SLANG_DEFER(context->currentDebugScope = previousScope);
+            if (auto scope = maybeEmitDebugLexicalBlock(context, blockStmt))
+            {
+                context->currentDebugScope = scope;
+                emitCurrentDebugScope(context);
+            }
+            lowerSwitchCases(blockStmt->body, info);
+            context->currentDebugScope = previousScope;
+            emitCurrentDebugScope(context);
+            return;
         }
 
         if (auto seqStmt = as<SeqStmt>(stmt))
@@ -9437,6 +9593,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
+                emitCurrentDebugScope(context);
                 if (targetCase->body != nullptr)
                 {
                     lowerStmt(context, targetCase->body);
@@ -9517,6 +9674,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
+                emitCurrentDebugScope(context);
                 if (targetCase->body != nullptr)
                 {
                     lowerStmt(context, targetCase->body);
@@ -9541,6 +9699,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             args.getBuffer());
 
         builder->setInsertInto(breakLabel);
+        emitCurrentDebugScope(context);
     }
 
     void visitTargetCaseStmt(TargetCaseStmt*) { SLANG_UNREACHABLE("lowering target case"); }
@@ -9560,7 +9719,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             else
             {
                 auto argVal = lowerRValueExpr(context, argExpr);
-                args.add(argVal.val);
+                args.add(getSimpleVal(context, argVal));
             }
         }
         builder->emitIntrinsicInst(
@@ -9644,7 +9803,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
         info.coverageBranchSiteID =
-            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
         info.coverageBranchFallbackLoc = stmt->condition->loc;
 
         lowerSwitchCases(stmt->body, &info);
@@ -10047,8 +10206,101 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 
     auto humaneLoc = _getDebugHumaneLoc(context, debugSourceInst, inst->sourceLoc);
 
-    context->irBuilder
-        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
+    auto debugScope = as<IRVar>(inst) || as<IRParam>(inst) ? context->currentDebugScope : nullptr;
+    context->irBuilder->addDebugLocationDecoration(
+        inst,
+        debugSourceInst,
+        humaneLoc.line,
+        humaneLoc.column,
+        debugScope);
+}
+
+// Establish the function scope before lowering declarations that refer to it.
+static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
+{
+    IRBuilder builder(*context->irBuilder);
+    auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+    IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+
+    // Consider a custom backward derivative written as
+    // `__func_extension bwd_diff(foo)(...) { ... }`. Its user-written implementation is
+    // intentionally unnamed because the generated extension also contains the public
+    // `bwd_diff` function that copies it. The implementation still has source-level debug
+    // locations and a linkage name, so use that linkage name as its debug name. This keeps
+    // every function with an IRDebugLocationDecoration paired with the IRDebugFuncDecoration
+    // that the inliner and debug-info emitters expect.
+    if (!nameOperand)
+    {
+        auto linkageInst = findOuterMostGeneric(irFunc);
+        if (auto linkage = linkageInst->findDecoration<IRLinkageDecoration>())
+            nameOperand = linkage->getMangledNameOperand();
+    }
+
+    if (nameOperand)
+    {
+        builder.setInsertBefore(irFunc);
+
+        auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+        IRInst* debugType = irFunc->getDataType();
+
+        if (locationDecor && debugType)
+        {
+            // Parent the function to the compilation unit of its own source file. Only
+            // non-included files have a compilation unit, so this is null for a function whose
+            // source is an #include'd/__include'd file or a #line-remapped source.
+            IRDebugCompilationUnit* parentScope = nullptr;
+            if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+            {
+                context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                    debugSource,
+                    parentScope);
+            }
+
+            auto debugFuncCallee = builder.emitDebugFunction(
+                nameOperand,
+                locationDecor->getLine(),
+                locationDecor->getCol(),
+                locationDecor->getSource(),
+                debugType,
+                parentScope);
+
+            // Add a decoration to link the function to its debug function
+            builder.addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
+            return debugFuncCallee;
+        }
+    }
+
+    return nullptr;
+}
+
+// Source braces and scoped loop initializers introduce declaration scopes. HLSL's unscoped
+// for initializer remains in the enclosing scope, matching semantic lookup.
+// Other control-flow statements get lexical blocks from their braced bodies, not the statement.
+static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
+{
+    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
+        stmt == context->debugFunctionBody)
+        return nullptr;
+    auto scopedStmt = as<ScopeStmt>(stmt);
+    if (!scopedStmt || !scopedStmt->scopeDecl)
+        return nullptr;
+    if (as<UnscopedForStmt>(stmt))
+        return nullptr;
+    if (!as<BlockStmt>(stmt) && !as<ForStmt>(stmt))
+        return nullptr;
+    auto source = getOrEmitDebugSource(context, stmt->loc);
+    if (!source)
+        return nullptr;
+    auto loc = _getDebugHumaneLoc(context, source, stmt->loc);
+    IRBuilder builder(*context->irBuilder);
+    // Keep metadata inside the generic that owns the function. Its normal clone environment
+    // then remaps lexical parents and declaration scopes together with the function body.
+    builder.setInsertBefore(context->debugScopeOwner);
+    return builder.emitDebugLexicalBlock(
+        source,
+        builder.getIntValue(builder.getUIntType(), loc.line),
+        builder.getIntValue(builder.getUIntType(), loc.column),
+        context->currentDebugScope);
 }
 
 void lowerStmt(IRGenContext* context, Stmt* stmt)
@@ -10058,8 +10310,23 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     StmtLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
+        auto previousScope = context->currentDebugScope;
+        auto lexicalScope = maybeEmitDebugLexicalBlock(context, stmt);
+        // Restore the context if lowering unwinds with an exception. The normal path
+        // below also emits a scope marker after restoring the enclosing scope.
+        SLANG_DEFER(context->currentDebugScope = previousScope);
+        if (lexicalScope)
+        {
+            context->currentDebugScope = lexicalScope;
+            visitor.startBlockIfNeeded(stmt);
+            emitCurrentDebugScope(context);
+        }
+        else if (stmt == context->debugFunctionBody)
+        {
+            emitCurrentDebugScope(context);
+        }
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
         // Under `-trace-coverage`, emit a line marker before each executable
@@ -10072,7 +10339,13 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         }
 
         visitor.dispatch(stmt);
+        if (lexicalScope)
+        {
+            context->currentDebugScope = previousScope;
+            emitCurrentDebugScope(context);
+        }
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -10084,6 +10357,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         context->getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
     }
+#endif
 }
 
 /// Create and return a mutable temporary initialized with `val`
@@ -11176,6 +11450,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
+        // Front-end conformance checking must have filled the witness table before
+        // lowering reaches it, the loop below dereferences it. Assert that invariant.
+        SLANG_RELEASE_ASSERT(astWitnessTable);
+
         SubstitutionSet witnessTableSubstitution(witnessTableBaseDeclRef);
 
         for (auto entry : astWitnessTable->getRequirementDictionary())
@@ -11657,6 +11935,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.catchHandler = nullptr;
             subContextStorage.funcDecl = nullptr;
+            subContextStorage.currentDebugScope = nullptr;
+            subContextStorage.debugScopeOwner = nullptr;
+            subContextStorage.debugFunctionBody = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -11987,12 +12268,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             builder->emitIfElse(getSimpleVal(context, boolVal), afterBlock, initBlock, afterBlock);
 
             builder->insertBlock(initBlock);
+            emitCurrentDebugScope(context);
             LoweredValInfo initVal = lowerLValueExpr(context, initExpr);
             assign(context, globalVal, initVal);
             assign(context, boolVal, LoweredValInfo::simple(builder->getBoolValue(true)));
             builder->emitBranch(afterBlock);
 
             builder->insertBlock(afterBlock);
+            emitCurrentDebugScope(context);
         }
 
         return globalVal;
@@ -12043,11 +12326,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
 
-                // For debug builds, still create debug information for let variables
-                // even though we're not creating an actual variable
-                // Requires Standard level or higher for variable debug info
+                // An immutable `let` lowers to the initializer's SSA value with no backing IRVar,
+                // so this is the only site that can attach debug info to it.
                 if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
+                    context->shared->debugValueContext.isDebugVarTypeSupported(
+                        initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -12061,6 +12344,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             debugSourceInst,
                             builder->getIntValue(builder->getUIntType(), humaneLoc.line),
                             builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                            context->currentDebugScope,
                             nullptr);
 
                         // Copy name hint from the declaration
@@ -14244,6 +14528,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         irFunc->setFullType(irFuncType);
 
+        subContext->currentDebugScope = maybeEmitDebugFunction(subContext, irFunc);
+        subContext->debugScopeOwner = irFunc;
+        subContext->debugFunctionBody = decl->body;
         subBuilder->setInsertInto(irFunc);
 
         if (emitBody && decl->body && !isFromDifferentModule)
@@ -14832,6 +15119,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
             }
+            else if (auto postDepthCoverageAttr = as<PostDepthCoverageAttribute>(modifier))
+            {
+                // Preserve the attribute's location on the decoration so a later
+                // unsupported-target diagnostic can point at `[postdepthcoverage]` itself.
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRPostDepthCoverageDecoration>(irFunc);
+                decoration->sourceLoc = postDepthCoverageAttr->loc;
+            }
             else if (auto domainAttr = as<DomainAttribute>(modifier))
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), domainAttr);
@@ -14943,6 +15238,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
+        // Explicitly add a geometry input primitive topology decoration to handle the case where
+        // the input struct is empty.
+        if (auto firstBlock = irFunc->getFirstBlock();
+            firstBlock && !irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        {
+            for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+            {
+                if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+                {
+                    getBuilder()->addDecoration(irFunc, geomDecor->getOp());
+                    break;
+                }
+            }
+        }
+
         verifyComputeDerivativeGroupModifiers(
             getSink(),
             decl->loc,
@@ -14962,60 +15272,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
-            }
-        }
-
-        // Add debugfunction decoration and emit debug function. This
-        // is needed for emitting debug information
-        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
-        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
-
-        // Consider a custom backward derivative written as
-        // `__func_extension bwd_diff(foo)(...) { ... }`. Its user-written implementation is
-        // intentionally unnamed because the generated extension also contains the public
-        // `bwd_diff` function that copies it. The implementation still has source-level debug
-        // locations and a linkage name, so use that linkage name as its debug name. This keeps
-        // every function with an IRDebugLocationDecoration paired with the IRDebugFuncDecoration
-        // that the inliner and debug-info emitters expect.
-        if (!nameOperand)
-        {
-            auto linkageInst = findOuterMostGeneric(irFunc);
-            if (auto linkage = linkageInst->findDecoration<IRLinkageDecoration>())
-                nameOperand = linkage->getMangledNameOperand();
-        }
-
-        if (nameOperand)
-        {
-            getBuilder()->setInsertBefore(irFunc);
-
-            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
-            IRInst* debugType = irFunc->getDataType();
-
-            if (locationDecor && debugType)
-            {
-                // Parent the function to the compilation unit of its own source file. Only
-                // non-included files have a compilation unit, so this is null for a function whose
-                // source is an #include'd/__include'd file or a #line-remapped source, and for
-                // every function at Minimal debug level (where no compilation unit is built at
-                // all).
-                IRDebugCompilationUnit* parentScope = nullptr;
-                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
-                {
-                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
-                        debugSource,
-                        parentScope);
-                }
-
-                auto debugFuncCallee = getBuilder()->emitDebugFunction(
-                    nameOperand,
-                    locationDecor->getLine(),
-                    locationDecor->getCol(),
-                    locationDecor->getSource(),
-                    debugType,
-                    parentScope);
-
-                // Add a decoration to link the function to its debug function
-                getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
             }
         }
 
@@ -15104,10 +15360,11 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
     DeclLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         return visitor.dispatch(decl);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -15119,6 +15376,7 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
         context->getSink()->noteInternalErrorLoc(decl->loc);
         throw;
     }
+#endif
 }
 
 // We will probably want to put the
@@ -15746,6 +16004,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->traceBranchCoverage =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
+    // Import validation in this compiler uses the checked AST attribute. Keep emitting the derived
+    // IR marker because this refactor leaves `IRModule::k_maxSupportedModuleVersion` unchanged:
+    // compatible pre-refactor binaries still read newly serialized modules, and their
+    // packaged-standard-module path relies on this marker to emit E00104.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
@@ -15774,11 +16036,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
-            // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
-            // non-included source file. This makes the IR the source of truth for which
-            // source files are compilation units, removing the need for heuristics during
-            // SPIR-V emission.
-            if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
+            // Minimal IR already contains DebugFunction records. Retain their compilation-unit
+            // ownership too: a module serialized at -g1 can later be compiled at -g2, where
+            // inline scopes need that parent. The emitter still omits extended debug info at -g1.
+            if (!source->isIncludedFile())
             {
                 auto compilationUnit =
                     cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));

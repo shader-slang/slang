@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#modifier-syntaxnode
-//META: doc_section_digest=ce8e569744478afff097f76c56095e0d6452e8ce6193cb8b0f043fa21c0270e5
+//META: doc_section_digest=05d9cfad5473a065aaa83e29e6178997de6135f5758e019d0c5ca69ba01f0d59
 //META: purpose=A Modifier is itself a syntax node with its own source location, so a misplaced attribute is diagnosed at the attribute's column rather than at the declaration it adorns.
 //META: intent=negative
 //META: pipeline_stage=check

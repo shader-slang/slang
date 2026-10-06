@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: doc_section_digest=0cc99cb5e0e3d3377473e83d6b3cf2854bebe79ada87f0ce4ea42180738db9ee
 //META: purpose=An 8-type-parameter generic call still lowers to specialize(%base, T1..T8) with eight argument operands.
 //META: intent=stress
 //META: pipeline_stage=lower

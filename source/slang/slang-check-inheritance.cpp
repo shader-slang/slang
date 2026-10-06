@@ -672,6 +672,31 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto astBuilder = _getASTBuilder();
     auto& arena = astBuilder->getArena();
     SemanticsVisitor visitor(this);
+
+    // An enum's `__EnumType` conformance is not written in source; it is synthesized in
+    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its base
+    // list is therefore incomplete until then, so force that state before linearizing to avoid
+    // caching a spurious non-conforming result.
+    //
+    // Restricted to enums, and skipped while the enum is itself being checked:
+    //   * Enum-only because driving a general aggregate here could re-enter this same
+    //     computation. `visitEnumDecl`'s one subtype query, `tryGetSubtypeWitness(tagType, ...)`,
+    //     is on the enum's *tag* type, never on the enum, so it does not query the enum's own
+    //     inheritance; a struct, by contrast, does (its `IDefaultInitializable` synthesis under
+    //     `-zero-initialize` queries `isSubtype(self, ...)`).
+    //   * The `isBeingChecked` guard avoids `ensureDecl` diagnosing a `CyclicReference` on the
+    //     enum and returning without advancing. That happens when the enum's inheritance is
+    //     linearized while the enum is itself mid-check -- e.g. a self-referential base
+    //     `enum E : IFoo<E>` with `IFoo<T : __EnumType>`, a genuine cycle -- so we defer to the
+    //     inheritance machinery's own cyclic-reference reporting (which points at the offending
+    //     base) rather than emit a worse diagnostic on `E`.
+    if (auto enumDeclRef = declRef.as<EnumDecl>())
+    {
+        auto* enumDecl = enumDeclRef.getDecl();
+        if (!enumDecl->checkState.isBeingChecked())
+            visitor.ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+    }
+
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
         auto extendedType = getTargetType(astBuilder, extensionDeclRef);

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=2f10610b6a8497f9b2cec62d411162a4585b32e9698a95e5288845967ffba16d
+//META: doc_section_digest=ad41019b62f65b8926fb421c96faf20ade0eadeccc6562a5b0ee3bfcf86755bd
 //META: purpose=AnyValue marshalling synthesizes one packAnyValue<N> / unpackAnyValue<N> function per inferred size and replaces every pack / unpack inst with a call to it, so those two names appear in a dynamic-dispatch shader's emit.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

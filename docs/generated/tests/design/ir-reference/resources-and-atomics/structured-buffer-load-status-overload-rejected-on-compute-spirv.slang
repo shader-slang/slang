@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#buffer-load-and-store
-//META: doc_section_digest=26d469b87d05f8d3b2e0539d080d7839ae84df294d66110dd1541682d63c62d1
+//META: doc_section_digest=d777e7e545183b84ac14d2cc8d732d7c0b1b01910e752fb92143872dd884e3ce
 //META: purpose=`StructuredBuffer::Load(idx, out status)` (the documented status-overload that would surface `structuredBufferLoadStatus`) is rejected with `E36107` on the `compute` stage for `spirv` per the existing doc-gap finding.
 //META: intent=negative
 //META: pipeline_stage=check

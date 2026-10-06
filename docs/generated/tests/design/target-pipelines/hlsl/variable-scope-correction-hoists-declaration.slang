@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#applyvariablescopecorrection
-//META: doc_section_digest=e0c73172b7f0a7ebae58bc830e5fed61bdf7ce15ce95d1b6c823a081828527f3
+//META: doc_section_digest=667bcb29fe9fd1cabd43b835844da570f58e1f229c9a8359e2bcc49e1cf326b3
 //META: purpose=A value defined inside a loop and used after it surfaces in emitted HLSL as a local declaration lifted to the top of the function body, ahead of the loop that computes it.
 //META: intent=functional
 //META: pipeline_stage=legalize

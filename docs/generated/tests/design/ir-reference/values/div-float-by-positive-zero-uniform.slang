@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=19b077f47f71a1feb81adb9dea6ff4919edb188c235b3634dce08c45cf359e3c
+//META: doc_section_digest=9e56dc6fbb032bd27e7464356d0ae573f83ef6e509f182c79ec8316e29e88dc0
 //META: purpose=Boundary: float divide by positive-zero literal (`fa / 0.0`) lowers to `div(%a, 0 : Float)` — the `div` opcode survives even when the divisor is the IEEE-754 +zero, where integer divide-by-zero is rejected as a diagnostic.
 //META: intent=boundary
 //META: pipeline_stage=lower

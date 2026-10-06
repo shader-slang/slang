@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#requirement-keys
-//META: doc_section_digest=e9382240af63f219a58e7c63fe673b0ab63a2f07e00bd9fea6cb148728ad0738
+//META: doc_section_digest=a5862b3b3ab2f038750547fe7714b55170f4a3bee384bf333a0a82f9a2572f8e
 //META: purpose=Each ordinary interface method requirement gets its own per-decl `IRStructKey` (`= key` in the dump) carrying a `key_`-prefixed mangled linkage name that unifies the key across modules.
 //META: intent=functional
 //META: pipeline_stage=lower

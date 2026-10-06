@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugvar
-//META: doc_section_digest=c618286f222917160f4fd6b587c35c8e881c2d35f85713788e1e7cc4f09c2f07
+//META: doc_section_digest=36d7febd0fe69b032d87ba181b780aaaa9c174da2ac29fb3b6a974c00865dc14
 //META: purpose=A DebugVar for an entry-point parameter carries the optional argument-index operand after source, line and column.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
