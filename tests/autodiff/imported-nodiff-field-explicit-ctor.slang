@@ -40,7 +40,7 @@ void main()
     printf("%f %f\n", r.p, r.d);
     // CHECK: 0.000000 2.000000
 
-    PlainValue pv;                 // x = 0
+    PlainValue pv = {};            // x = 0
     var dpP = diffPair(pv, {1.0}); // tangent dx = 1
     var rP = fwd_diff(metricP)(dpP);
 
