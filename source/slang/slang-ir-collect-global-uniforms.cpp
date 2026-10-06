@@ -65,6 +65,18 @@ struct CollectGlobalUniformParametersContext
         }
     }
 
+    /// Is `key` a GLSL-style global `in` or `out` variable?
+    ///
+    /// Such a variable is a varying, not a uniform parameter, even on targets (CPU, CUDA) whose
+    /// varying layout rules give it uniform size. `translateGlobalVaryingVar` handles it later.
+    static bool _isGlobalVaryingVar(IRInst* key)
+    {
+        if (!as<IRGlobalVar>(key))
+            return false;
+        return key->findDecoration<IRGlobalInputDecoration>() ||
+               key->findDecoration<IRGlobalOutputDecoration>();
+    }
+
     // This is a relatively simple pass, and it is all driven
     // by a single subroutine.
     //
@@ -227,7 +239,7 @@ struct CollectGlobalUniformParametersContext
         {
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
-            // global shader parameter.
+            // global shader parameter, or a GLSL-style global varying variable.
 
             // Save the original global param before replacement.
             auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
@@ -242,6 +254,23 @@ struct CollectGlobalUniformParametersContext
             // parameter structure type, and that field will need a key.
             //
             auto fieldKey = builder->createStructKey();
+
+            // A global varying is not collected. Both the element layout and the
+            // offset-element layout of the global-scope parameter group name it, so we
+            // re-key every layout that does, leaving no module-scope use of the variable.
+            //
+            auto originalKey = fieldLayoutAttr->getFieldKey();
+            if (_isGlobalVaryingVar(originalKey))
+            {
+                traverseUses(
+                    originalKey,
+                    [&](IRUse* use)
+                    {
+                        if (as<IRStructFieldLayoutAttr>(use->getUser()))
+                            builder->replaceOperand(use, fieldKey);
+                    });
+                continue;
+            }
 
             // In order to make sure that the existing IR layout information for
             // the global scope remains valid, we will swap out the key in the

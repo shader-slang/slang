@@ -16747,7 +16747,11 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             }
             else if (fieldDecl.getDecl())
             {
-                irFieldKey = getSimpleVal(context, ensureDecl(context, fieldDecl.getDecl()));
+                // The key names the declaration rather than evaluating it: a global variable
+                // (such as a GLSL `out` global) lowers to a pointer, and `getSimpleVal` would
+                // emit a module-scope load of it. `createIRModuleForLayout` keys the
+                // global-scope layout the same way.
+                irFieldKey = materialize(context, ensureDecl(context, fieldDecl.getDecl())).val;
             }
             else
             {
