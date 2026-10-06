@@ -7295,6 +7295,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    // Builtin variables that require volatile semantics; see
+    // `maybeRequireVolatileSemanticsForBuiltinVar`.
+    HashSet<SpvInst*> m_volatileBuiltinVars;
     struct DescriptorRuntimeArrayKey
     {
         SpvInst* descriptorElementType = nullptr;
@@ -7380,6 +7383,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, ptrType->getValueType());
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
+            // The variable is shared by every IR inst with the same key, so a later inst
+            // used in a ray-tracing stage can require volatile semantics that an earlier
+            // inst did not.
+            maybeRequireVolatileSemanticsForBuiltinVar(result, builtinVal, irInst);
             return result;
         }
         IRBuilder builder(m_irModule);
@@ -7413,8 +7420,58 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRInterpolationMode::NoInterpolation,
                 getID(varInst));
         }
+        maybeRequireVolatileSemanticsForBuiltinVar(varInst, builtinVal, irInst);
 
         return varInst;
+    }
+
+    // Record that the builtin variable `varInst` requires volatile semantics if `irInst`, an
+    // IR inst referring to it, is used in a ray-tracing stage where the builtin's value can
+    // change during the invocation. For example, `RayTmaxKHR` changes after each
+    // `OpReportIntersectionKHR` in an intersection shader, and the subgroup builtins can
+    // change after the invocation is repacked. Vulkan requires such variables to be decorated
+    // `Volatile` (VUID-StandaloneSpirv-VulkanMemoryModel-04678), or, under the Vulkan memory
+    // model where that decoration is disallowed, to be loaded with a `Volatile` memory access
+    // (VUID-04679); `emitSPIRVAsm` adds that access for loads from `m_volatileBuiltinVars`.
+    void maybeRequireVolatileSemanticsForBuiltinVar(
+        SpvInst* varInst,
+        SpvBuiltIn builtinVal,
+        IRInst* irInst)
+    {
+        bool needVolatile = false;
+        switch (builtinVal)
+        {
+        case SpvBuiltInRayTmaxKHR:
+            needVolatile = isInstUsedInStage(irInst, Stage::Intersection);
+            break;
+        case SpvBuiltInSMIDNV:
+        case SpvBuiltInWarpIDNV:
+        case SpvBuiltInSubgroupSize:
+        case SpvBuiltInSubgroupLocalInvocationId:
+        case SpvBuiltInSubgroupEqMask:
+        case SpvBuiltInSubgroupGeMask:
+        case SpvBuiltInSubgroupGtMask:
+        case SpvBuiltInSubgroupLeMask:
+        case SpvBuiltInSubgroupLtMask:
+            needVolatile = isInstUsedInStage(irInst, Stage::RayGeneration) ||
+                           isInstUsedInStage(irInst, Stage::ClosestHit) ||
+                           isInstUsedInStage(irInst, Stage::Miss) ||
+                           isInstUsedInStage(irInst, Stage::Intersection) ||
+                           isInstUsedInStage(irInst, Stage::Callable);
+            break;
+        default:
+            break;
+        }
+        if (!needVolatile || !m_volatileBuiltinVars.add(varInst))
+            return;
+        if (m_memoryModel != SpvMemoryModelVulkan)
+        {
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                SpvDecorationVolatile);
+        }
     }
 
     SpvInst* emitDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
@@ -12059,6 +12116,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     }
 
+                    // Under the Vulkan memory model, a builtin that needs volatile semantics
+                    // (see `maybeRequireVolatileSemanticsForBuiltinVar`) must be loaded with a
+                    // `Volatile` memory access. The core module reads these builtins as
+                    // `result:$$float = OpLoad builtin(RayTmaxKHR:float)`, whose operands are
+                    // the result type, the result id, and the pointer. We leave a load whose
+                    // author wrote explicit memory operands as written.
+                    bool needVolatileLoad = false;
+                    if (opcode == SpvOpLoad && m_memoryModel == SpvMemoryModelVulkan)
+                    {
+                        auto operands = spvInst->getSPIRVOperands();
+                        needVolatileLoad =
+                            operands.getCount() == 3 &&
+                            operands[2]->getOp() == kIROp_SPIRVAsmOperandBuiltinVar &&
+                            m_volatileBuiltinVars.contains(ensureInst(operands[2]));
+                    }
+
                     last = emitInstCustomOperandFunc(
                         opParent,
                         assignedInst,
@@ -12067,6 +12140,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             for (const auto operand : spvInst->getSPIRVOperands())
                                 emitSpvAsmOperand(operand);
+                            if (needVolatileLoad)
+                                emitOperand(SpvLiteralInteger::from32(SpvMemoryAccessVolatileMask));
 
                             if (needToUseCoherentLoadOrStore)
                             {
