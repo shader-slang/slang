@@ -18,7 +18,10 @@
 // `s_bwdProp_myfunc_<n>`; asserting the struct as `struct s_bwdCallableCtx...`
 // rather than as a bare substring keeps it from being satisfied by the
 // per-parameter `s_paramCtx_s_bwdCallableCtx_...` wrapper the emitter also
-// produces, which would leave the actual context struct unchecked.
+// produces, which would leave the actual context struct unchecked. The Metal
+// and CUDA pipelines expand the captured context into separate arguments of
+// the propagate function, so no context struct is emitted for those two
+// targets and only the propagate function name is checked there.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
@@ -48,11 +51,9 @@ void main()
 //HLSL: s_bwdProp_myfunc_{{[0-9]+}}(
 //GLSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //GLSL: s_bwdProp_myfunc_{{[0-9]+}}(
-//METAL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //METAL: s_bwdProp_myfunc_{{[0-9]+}}(
 //WGSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //WGSL: s_bwdProp_myfunc_{{[0-9]+}}(
-//CUDA: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //CUDA: s_bwdProp_myfunc_{{[0-9]+}}(
 //CPP: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //CPP: s_bwdProp_myfunc_{{[0-9]+}}(
