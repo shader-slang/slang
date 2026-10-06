@@ -3898,13 +3898,14 @@ static IRFunc* trySpecializeHelperPerConformance(
             context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
                 concreteSpec,
                 specializationDepth);
-        failureReason = "concrete generic specialization could not be completed";
         auto concreteFunc =
             context ? specializeGeneric(context, concreteSpec) : specializeGeneric(concreteSpec);
         if (!concreteFunc)
             return nullptr;
+        // Specializing the body can expand parameter packs and rewrite its type.
+        // Check the resulting signature against the dispatcher below; equality
+        // with the pre-expansion specialization type is not a postcondition.
         auto concreteFuncType = cast<IRFuncType>(concreteFunc->getDataType());
-        SLANG_RELEASE_ASSERT(concreteSpec->getFullType() == concreteFuncType);
 
         // Fixed concrete results need no conversion. Dynamic results would require
         // choosing a common representation and possibly reconstructing a result tag.

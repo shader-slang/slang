@@ -115,21 +115,30 @@ of all existential conversions remain separate work.
 
 ## Validation
 
-The broadened implementation was built on master `feb2452bf` with Windows Release
-tools. On RTX 4090 / driver 591.86:
+The review fixes were validated on 2026-10-06 after merging master `e6be8dcdd`,
+using Windows Release tools. The dynamic-dispatch, interface, generic, and focused
+diagnostic suites passed 892/892 tests, with 452 unsupported/excluded checks skipped.
+The checked-in regressions now include:
 
-- Dynamic-dispatch suite: 539/539 passed; 318 unsupported/excluded checks skipped.
-- Interface suite: 78/78 passed; 34 skipped.
-- Generic suite: 229/229 passed; 87 skipped.
-- Six focused diagnostic/budget checks pass, including warning-to-error promotion,
-  eight versus nine concrete copies, unsupported signatures, and early inlining.
-- Concrete scalar/struct return and multiple-constraint tests check D3D12/Vulkan
-  results and emitted structure. Detailed IR validation passes the multiple-constraint case.
-- A generated 600-call helper diagnoses the instruction budget; promoting the
-  named warning to an error rejects compilation.
-- Both original repros compile in five modes for HLSL, DXIL, and SPIR-V (30 controls).
-  GPU correctness checks pass for both repros on D3D12/Vulkan, with five modes,
-  two independently linked copies, 65,536 rays, and 512 CPU-reference rays.
+- Warning and warning-as-error checks for both resource limits, unsupported results
+  and references, independent types, early inlining, associated-type witness
+  ownership, and empty/singleton parameter packs. Diagnostic matching is exhaustive.
+- A small helper below the instruction budget and a 600-call helper above it, with
+  three conformers to exercise a copy count that does not divide 1024.
+- D3D12/Vulkan result checks and HLSL/SPIR-V structure checks for the general helpers.
+  CPU directives also cover the main, multiple-constraint, and fixed-result tests.
+
+The local C++ CPU backend is unavailable, so its test directives are skipped here.
+Direct LLVM host execution of those three cases produced the expected output
+buffers without a GPU. This is separate from a passing CPU test-harness run.
+Restoring the removed type-equality assertion makes the empty-pack regression
+abort; the final code instead emits the requested warning and compiles the fallback.
+
+Earlier validation of the broadened implementation included separately compiled
+helper-module imports, 30 compile controls for the original repros, and GPU
+correctness checks for both repros on D3D12/Vulkan (RTX 4090 / driver 591.86), with
+five modes, two independently linked copies, 65,536 rays, and 512 CPU-reference
+rays. These are manual experiments rather than additional checked-in test cases.
 
 Earlier compact timing experiments on `e57a377b3` plus the initial prototype found
 no measurable helper/callback difference. Those are historical measurements, not
