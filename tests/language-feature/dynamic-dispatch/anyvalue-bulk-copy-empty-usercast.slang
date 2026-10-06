@@ -1,11 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -stage compute -entry computeMain
 
 // A user-authored `bit_cast` from an empty struct to a nonempty one is a size mismatch (0 payload
-// bytes into 4). Empty-type legalization lowers the empty source to `none`, so the cast reaches
-// type legalization with a non-simple operand and must fail loudly rather than compile. The
-// AnyValue bulk-copy empty-source zero-fill only applies when the cast's result is the concrete
-// `AnyValueN` storage struct (marked with `IRAnyValueSizeDecoration` by the marshalling pass), so
-// this cast to a plain user `Word` is never silently rewritten to `Word{0}`.
+// bytes into 4). Empty-type legalization removes `Empty` before `lowerBitCast` runs, so the
+// mismatch is reported during type legalization instead, at the `bit_cast` expression. The AnyValue
+// bulk-copy zero-fill applies only when the result is the generated `AnyValueN` storage struct
+// (marked with `IRAnyValueSizeDecoration`), so this cast to a plain `Word` is never silently
+// rewritten to `Word{0}`.
 
 struct Empty
 {
@@ -23,7 +23,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     Empty e;
     Word w = bit_cast<Word>(e);
+//CHECK:                   ^ E41202
+//CHECK:                   ^ 'Empty' with size '0' casted into 'Word' with size '4'
     outputBuffer[0] = w.u;
 }
-
-// CHECK: E99997{{.*}}non-simple operand
