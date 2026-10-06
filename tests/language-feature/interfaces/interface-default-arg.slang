@@ -1,5 +1,6 @@
-// A default argument declared on an interface requirement is used when a call omits the
-// argument, even if the satisfying method does not redeclare the default (issue #12640).
+// A call that omits an argument uses the default declared on the
+// interface requirement, even when the implementation does not
+// redeclare it (issue #12640).
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
@@ -12,14 +13,13 @@ interface IFoo
     float func(float a = 1.0);
 }
 
-// Default only on the requirement: the call resolves to the requirement, whose default is used.
+// Default only on the requirement.
 struct Foo : IFoo
 {
     float func(float a) { return a; }
 }
 
-// Default also on the implementation: the call resolves to `Bar::func` (the concrete-preferred
-// candidate), whose own default is used.
+// Default also on the implementation, which overload resolution prefers.
 struct Bar : IFoo
 {
     float func(float a = 2.0) { return a; }
@@ -30,17 +30,15 @@ interface IMixed
     float g(float a = 1.0, float b = 2.0);
 }
 
-// Impl redeclares only the second default. The call resolves to the requirement, so BOTH omitted
-// arguments take the requirement's defaults (1.0, 2.0) — not the implementation's (_, 20.0).
+// Only the second default is redeclared; both omitted arguments still
+// take the requirement's defaults.
 struct Mixed : IMixed
 {
     float g(float a, float b = 20.0) { return a - b; }
 }
 
-// Generic interface whose requirement default *expression* references the generic value
-// parameter `K`. The implementation omits the default, so lowering must substitute `K` into the
-// requirement's default through the `GenImpl<K>` specialization (the generic-argument
-// substitution path that `_lowerSubstitutionEnv` handles).
+// The default keeps `K`'s substitution when the call resolves to an
+// implementation that does not declare a default.
 interface IGen<let K : int>
 {
     float scaled(float a = K);
@@ -56,8 +54,7 @@ interface ISub
     __subscript(int i = 3) -> float { get; }
 }
 
-// Interface subscript requirement with a defaulted index the implementation omits: exercises the
-// subscript lowering branch, which resolves the requirement through the witness the same way.
+// Subscripts take the same path through a witness as method calls.
 struct Sub : ISub
 {
     __subscript(int i) -> float { get { return float(i); } }
@@ -79,7 +76,6 @@ void computeMain()
     outputBuffer[2] = f.func(5.0);
     // CHECK: -1.0
     outputBuffer[3] = m.g();
-    // K=5 substituted into the requirement's default expression `a = K`.
     // CHECK: 5.0
     outputBuffer[4] = gen.scaled();
     // CHECK: 3.0

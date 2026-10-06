@@ -5217,8 +5217,7 @@ struct ExprLoweringContext
         ParamPassingMode actualParamPassingMode,
         DeclRef<ParamDecl> paramDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups,
-        DeclRef<ParamDecl> defaultArgSourceParamDeclRef = DeclRef<ParamDecl>())
+        List<OutArgumentFixup>* ioFixups)
     {
         Count argCount = expr->arguments.getCount();
         if (argIndex < argCount)
@@ -5233,21 +5232,16 @@ struct ExprLoweringContext
             // that these parameters have default argument expressions
             // associated with them.
             //
-            // We extract the initial-value expression from the parameter declaration and lower it
-            // in the context of the caller. The expression can depend on the generic parameters
-            // that specialize the callee; its substitutions are carried on the `SubstExpr` and
-            // applied by `_lowerSubstitutionEnv` below. (A default that references a member of
-            // `This` is still not resolved to the concrete implementation — see #12700.)
+            // Currently we simply extract the initial-value expression
+            // from the parameter declaration and then lower it in
+            // the context of the caller.
             //
-            // `defaultArgSourceParamDeclRef`, when set, is the parameter at this position of the
-            // declaration overload resolution selected; the omitted argument was checked against
-            // it, so it — not the witness-resolved callee's parameter — is the default source
-            // (see the doc comment on the `DeclRef<CallableDecl>` overload).
-            DeclRef<ParamDecl> defaultParamDeclRef =
-                defaultArgSourceParamDeclRef ? defaultArgSourceParamDeclRef : paramDeclRef;
-            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), defaultParamDeclRef);
-            // A missing checked default is an upstream bug; keep it fatal in release rather
-            // than letting SLANG_ASSUME silently emit empty output.
+            // Note that the expression could involve subsitutions because
+            // in the general case it could depend on the generic parameters
+            // used the specialize the callee. For now we do not handle that
+            // case, and simply ignore generic arguments.
+            //
+            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
             SLANG_RELEASE_ASSERT(argExpr);
 
             IRGenEnv subEnvStorage;
@@ -5283,6 +5277,8 @@ struct ExprLoweringContext
             //
             // Each of these options involves trade-offs, and we need to
             // make a conscious decision at some point.
+
+            // Assert that such an expression must have been present.
         }
     }
 
@@ -5302,29 +5298,16 @@ struct ExprLoweringContext
         }
     }
 
-    // Lower the arguments of a call to `funcDeclRef`. When overload resolution selected a
-    // different declaration than the callee (e.g. an interface requirement whose default a
-    // witness-resolved implementation does not redeclare, issue #12640), pass that selected
-    // declaration as `defaultArgSource`: an omitted argument at position `i` then takes its
-    // default from `defaultArgSource`'s parameter `i` rather than the callee's, so the whole
-    // call is defaulted consistently with the signature it was type-checked against. A parameter
-    // is only overridden when `defaultArgSource` actually has one at that position; the two lists
-    // are not required to have equal length (some witness redirects, e.g. autodiff intrinsics,
-    // relate declarations of different arity), and any position `defaultArgSource` does not cover
-    // falls back to the callee's own default. Only the default's generic-argument substitutions
-    // are applied, so a default that references a member of `This` is not resolved to the concrete
-    // implementation and fails in later lowering; that is a separate, pre-existing checker-side
-    // gap tracked by #12700.
+    /// Default values for omitted arguments come from `defaultArgsDeclRef`,
+    /// the declaration that the call was checked against.
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<CallableDecl> funcDeclRef,
+        DeclRef<CallableDecl> defaultArgsDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups,
-        DeclRef<CallableDecl> defaultArgSource = DeclRef<CallableDecl>())
+        List<OutArgumentFixup>* ioFixups)
     {
-        List<DeclRef<ParamDecl>> defaultArgSourceParams;
-        if (defaultArgSource)
-            defaultArgSourceParams = getParameters(getASTBuilder(), defaultArgSource).toArray();
+        Count argCount = expr->arguments.getCount();
         Count argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
@@ -5332,17 +5315,13 @@ struct ExprLoweringContext
             auto paramDirection = getParamPassingMode(paramDecl);
 
             Index argIndex = argCounter++;
-            DeclRef<ParamDecl> defaultArgSourceParam;
-            if (argIndex < defaultArgSourceParams.getCount())
-                defaultArgSourceParam = defaultArgSourceParams[argIndex];
-            addDirectCallArgs(
-                expr,
-                argIndex,
-                paramDirection,
-                paramDeclRef,
-                ioArgs,
-                ioFixups,
-                defaultArgSourceParam);
+            if (argIndex >= argCount)
+            {
+                auto defaultArgsParams = getParameters(getASTBuilder(), defaultArgsDeclRef);
+                SLANG_RELEASE_ASSERT(argIndex < defaultArgsParams.getCount());
+                paramDeclRef = defaultArgsParams[argIndex];
+            }
+            addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
         }
     }
 
@@ -5351,18 +5330,18 @@ struct ExprLoweringContext
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<Decl> funcDeclRef,
+        DeclRef<Decl> defaultArgsDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups,
-        DeclRef<Decl> defaultArgSource = DeclRef<Decl>())
+        List<OutArgumentFixup>* ioFixups)
     {
         if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
         {
             addDirectCallArgs(
                 expr,
                 callableDeclRef,
+                defaultArgsDeclRef.as<CallableDecl>(),
                 ioArgs,
-                ioFixups,
-                defaultArgSource.as<CallableDecl>());
+                ioFixups);
         }
         else
         {
@@ -5652,14 +5631,17 @@ struct ExprLoweringContext
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
 
-            // When witness resolution redirected the callee to a different declaration than
-            // overload resolution selected, the selected declaration (`resolvedInfo.funcDeclRef`)
-            // is the authoritative source for the defaults of omitted arguments (issue #12640);
-            // for an ordinary call the two are the same declaration and the callee's own defaults
-            // are used. This applies equally to the subscript path below and the direct-call path.
-            DeclRef<Decl> defaultArgSource;
+            // Arguments omitted at the call site were checked against the
+            // declaration that overload resolution picked, which can differ
+            // from `funcDeclRef` once a witness is resolved, so that is
+            // where we take their default values from.
+            //
+            // TODO: A default that refers to another member of `This`
+            // is not yet resolved against the implementation (#12700).
+            //
+            DeclRef<Decl> defaultArgsDeclRef = funcDeclRef;
             if (resolvedInfo.funcDeclRef.getDecl() != funcDeclRef.getDecl())
-                defaultArgSource = resolvedInfo.funcDeclRef;
+                defaultArgsDeclRef = resolvedInfo.funcDeclRef;
 
             auto baseExpr = resolvedInfo.baseExpr;
             if (baseExpr)
@@ -5685,7 +5667,7 @@ struct ExprLoweringContext
                 // we must call one of its accessors.
                 //
                 auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups, defaultArgSource);
+                addDirectCallArgs(expr, funcDeclRef, defaultArgsDeclRef, &irArgs, &argFixups);
                 auto result = lowerStorageReference(
                     context,
                     type,
@@ -5803,7 +5785,7 @@ struct ExprLoweringContext
                     funcDeclRef.template as<FunctionDeclBase>(),
                     funcTypeInfo);
                 // Calculate args by inspecting the decl-ref.
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups, defaultArgSource);
+                addDirectCallArgs(expr, funcDeclRef, defaultArgsDeclRef, &irArgs, &argFixups);
             }
 
             validateInvokeExprArgsWithFunctionModifiers(
