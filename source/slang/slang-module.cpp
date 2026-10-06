@@ -57,12 +57,15 @@ SHA1::Digest Module::computeDigest()
 
         // The digest is checked against `Linkage::isBinaryModuleUpToDate`, which hashes the
         // session's options including its `DownstreamArgs`. Those stay part of the digest because
-        // a precompiled module embeds downstream compiler output, so we add them back to the
-        // module's own options, which do not hold them.
-        CompilerOptionSet digestOptions = getOptionSet();
+        // a precompiled module embeds downstream compiler output, but the module's own options do
+        // not hold them, so we hash the session's entries followed by the module's own.
+        CompilerOptionSet digestOptions;
         if (auto sessionDownstreamArgs =
                 getLinkage()->m_optionSet.options.tryGetValue(CompilerOptionName::DownstreamArgs))
-            digestOptions.options[CompilerOptionName::DownstreamArgs] = *sessionDownstreamArgs;
+            digestOptions.appendLevelLocal(
+                CompilerOptionName::DownstreamArgs,
+                *sessionDownstreamArgs);
+        digestOptions.overrideWith(getOptionSet());
         digestOptions.buildHash(digestBuilder);
 
         auto fileDependencies = getFileDependencies();

@@ -1132,7 +1132,7 @@ meanings of their `CompilerOptionValue` encodings.
 | EmitSpirvDirectly | When set will use Slang's direct-to-SPIR-V backend to generate SPIR-V directly from Slang IR. `intValue0` specifies a bool value for the setting. |
 | SPIRVCoreGrammarJSON | When set will use the provided SPIR-V grammar file to parse SPIR-V assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |
 | IncompleteLibrary | When set will not issue an error when the linked program has unresolved extern function symbols. `intValue0` specifies a bool value for the setting. |
-| DownstreamArgs | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line. |
+| DownstreamArgs | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line. Entries given in the session description, in a target description and to `linkWithOptions` are all passed to the downstream compiler, in that order; entries are neither merged nor deduplicated, so an argument given at two levels reaches the compiler twice. |
 | DumpIntermediates | When set will dump the intermediate source output. `intValue0` specifies a bool value for the setting. |
 | DumpIntermediatePrefix | The file name prefix for the intermediate source output. `stringValue0` specifies a string value for the setting. |
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |

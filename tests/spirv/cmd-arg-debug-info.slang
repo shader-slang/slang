@@ -32,8 +32,8 @@
 // CLI bit count (32/64) even though it is stored internally as a byte width.
 //TEST:SIMPLE(filecheck=CHECK_XW): -target spirv -g3 -Xspirv-opt -O -trace-coverage -trace-coverage-counter-width 32 -emit-spirv-directly
 // CHECK_XW:  OpString "-target spirv
-// CHECK_XW-SAME: -trace-coverage-counter-width 32
 // CHECK_XW-SAME: -Xspirv-opt -O
+// CHECK_XW-SAME: -trace-coverage-counter-width 32
 
 // The target's option set is re-inherited from the session several times during slangc option
 // processing, so a `-X` argument must still appear exactly once in the command line reconstructed

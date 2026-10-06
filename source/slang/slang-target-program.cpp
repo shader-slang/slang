@@ -16,23 +16,21 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
     : m_program(componentType), m_targetReq(targetReq)
 {
     m_entryPointResults.setCount(componentType->getEntryPointCount());
+    composeDownstreamArgs();
     m_optionSet.overrideWith(m_program->getOptionSet());
     m_optionSet.inheritFrom(targetReq->getOptionSet());
-    composeDownstreamArgs();
 }
 
 void TargetProgram::composeDownstreamArgs()
 {
-    List<CompilerOptionValue> composed;
-    composed.addRange(
-        m_targetReq->getLinkage()->m_optionSet.getArray(CompilerOptionName::DownstreamArgs));
-    composed.addRange(m_targetReq->getOptionSet().getArray(CompilerOptionName::DownstreamArgs));
-    composed.addRange(m_program->getOptionSet().getArray(CompilerOptionName::DownstreamArgs));
-
-    if (composed.getCount() == 0)
-        m_optionSet.options.remove(CompilerOptionName::DownstreamArgs);
-    else
-        m_optionSet.set(CompilerOptionName::DownstreamArgs, composed);
+    CompilerOptionSet* lowerLevels[] = {
+        &m_targetReq->getLinkage()->m_optionSet,
+        &m_targetReq->getOptionSet()};
+    for (auto level : lowerLevels)
+    {
+        if (auto args = level->options.tryGetValue(CompilerOptionName::DownstreamArgs))
+            m_optionSet.appendLevelLocal(CompilerOptionName::DownstreamArgs, *args);
+    }
 }
 
 IArtifact* TargetProgram::_createWholeProgramResult(

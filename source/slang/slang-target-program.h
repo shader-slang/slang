@@ -118,10 +118,11 @@ public:
 private:
     RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
-    /// Set the `DownstreamArgs` this program passes to downstream tools to the session's, then the
-    /// target's, then the program's own entries, in that order and without merging any of them.
-    /// `DownstreamArgs` is level-local (see `CompilerOptionSet::isLevelLocal`), so this is the one
-    /// place where the levels are combined.
+    /// Seed this program's options with the session's and then the target's `DownstreamArgs`.
+    /// The constructor's `overrideWith` of the program's own options then appends the program's
+    /// entries, so downstream tools see session, target and program arguments in that order,
+    /// without any of them merged. `DownstreamArgs` is level-local (see
+    /// `CompilerOptionSet::isLevelLocal`), so the levels are combined only here.
     void composeDownstreamArgs();
 
     // The program being compiled or laid out

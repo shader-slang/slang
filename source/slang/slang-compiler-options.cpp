@@ -479,13 +479,34 @@ bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
 
 CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
 {
-    CompilerOptionSet result;
+    CompilerOptionSet result = *this;
     for (auto& kv : options)
     {
-        if (!isLevelLocal(kv.key))
-            result.options[kv.key] = kv.value;
+        if (isLevelLocal(kv.key))
+            result.options.remove(kv.key);
     }
     return result;
+}
+
+void CompilerOptionSet::appendLevelLocal(
+    CompilerOptionName name,
+    const List<CompilerOptionValue>& values)
+{
+    SLANG_ASSERT(isLevelLocal(name));
+    auto existing = options.tryGetValue(name);
+    if (!existing)
+    {
+        options[name] = values;
+        return;
+    }
+    if (existing == &values)
+    {
+        // Growing the list would free the buffer we are copying from.
+        List<CompilerOptionValue> copy = values;
+        existing->addRange(copy);
+        return;
+    }
+    existing->addRange(values);
 }
 
 CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name)

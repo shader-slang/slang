@@ -108,6 +108,10 @@ struct CompilerOptionSet
     /// another level from this one.
     CompilerOptionSet copyWithoutLevelLocalOptions() const;
 
+    /// Append `values` to the entries stored for the level-local option `name`. `values` may be
+    /// this set's own list for `name`.
+    void appendLevelLocal(CompilerOptionName name, const List<CompilerOptionValue>& values);
+
     /// Append a CLI-like reconstruction of the stored options to `sb`, for the descriptive command
     /// line embedded in debug info. Only the option kinds it explicitly handles are emitted; it
     /// reports what is stored (which for some options is a default materialized during option
@@ -192,15 +196,7 @@ struct CompilerOptionSet
         for (auto& kv : other.options)
         {
             if (isLevelLocal(kv.key))
-            {
-                // `other` may be `*this`, and growing the destination list would free the source
-                // buffer mid-copy.
-                List<CompilerOptionValue> incoming = kv.value;
-                if (auto existing = options.tryGetValue(kv.key))
-                    existing->addRange(incoming);
-                else
-                    options[kv.key] = incoming;
-            }
+                appendLevelLocal(kv.key, kv.value);
             else if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, true);
             else

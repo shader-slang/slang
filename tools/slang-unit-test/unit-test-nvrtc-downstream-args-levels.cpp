@@ -22,14 +22,14 @@ static const char kFmaKernel[] = R"(
     }
     )";
 
-// NVRTC compiles `FOO + BAR` only when both macros are defined, and folds it to the constant 3 for
-// `FOO=1` and `BAR=2`, so the PTX shows that every `-D` argument arrived.
+// NVRTC compiles `FOO * 100 + BAR` only when both macros are defined, and folds it to the constant
+// 102 for `FOO=1` and `BAR=2`, so the PTX shows that every `-D` argument arrived.
 static const char kMacroKernel[] = R"slang(
     int fooPlusBar()
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm "(FOO + BAR)";
+        case cuda: __intrinsic_asm "(FOO * 100 + BAR)";
         }
     }
     RWStructuredBuffer<int> o;
@@ -201,7 +201,7 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
         noLinkExtra,
         ptx)));
     SLANG_CHECK(contains(ptx, ".target sm_86"));
-    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+    SLANG_CHECK(contains(ptx, " 102;"));
 
     // Repeated flags given one token per entry, at the session level, at the link level, and
     // split across the two.
@@ -213,7 +213,7 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
         {},
         noLinkExtra,
         ptx)));
-    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+    SLANG_CHECK(contains(ptx, " 102;"));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
         globalSession,
@@ -223,7 +223,7 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
         {"-D", "FOO=1", "-D", "BAR=2"},
         noLinkExtra,
         ptx)));
-    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+    SLANG_CHECK(contains(ptx, " 102;"));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
         globalSession,
@@ -233,5 +233,5 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
         {"-D", "BAR=2"},
         noLinkExtra,
         ptx)));
-    SLANG_CHECK(contains(ptx, "%r1, 3;"));
+    SLANG_CHECK(contains(ptx, " 102;"));
 }
