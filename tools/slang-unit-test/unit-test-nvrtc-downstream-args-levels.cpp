@@ -175,7 +175,6 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
         compileToPTX(globalSession, kFmaKernel, {arch}, {}, {}, optimization, ptx)));
     SLANG_CHECK(contains(ptx, ".target sm_86"));
 
-    // Each pair of levels, in both directions.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         compileToPTX(globalSession, kFmaKernel, {arch}, {noFmad}, {}, noLinkExtra, ptx)));
     SLANG_CHECK(contains(ptx, ".target sm_86"));
@@ -191,7 +190,6 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
     SLANG_CHECK(contains(ptx, ".target sm_86"));
     SLANG_CHECK(!contains(ptx, "fma.rn"));
 
-    // All three levels, each with a distinct argument.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
         globalSession,
         kMacroKernel,
@@ -203,8 +201,6 @@ SLANG_UNIT_TEST(nvrtcDownstreamArgsComposeAcrossLevels)
     SLANG_CHECK(contains(ptx, ".target sm_86"));
     SLANG_CHECK(contains(ptx, " 102;"));
 
-    // Repeated flags given one token per entry, at the session level, at the link level, and
-    // split across the two.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileToPTX(
         globalSession,
         kMacroKernel,
