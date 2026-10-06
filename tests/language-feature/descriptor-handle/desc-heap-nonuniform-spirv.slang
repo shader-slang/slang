@@ -1,26 +1,18 @@
-// shader-slang/slang#12110: on the direct SPIR-V backend, a descriptor obtained through
-// `ResourceDescriptorHeap[NonUniformResourceIndex(i)]` / `SamplerDescriptorHeap[...]` (or the
-// equivalent `DescriptorHandle<T>` construction) carried no `NonUniform` decoration, while a plain
-// resource array (`Texture2D texArray[N]; texArray[NonUniformResourceIndex(i)]`) preserved it.
-// Vulkan requires the decoration on the consumed resource operand for a wave-divergent descriptor
-// index (VUID-RuntimeSpirv-None-10148); without it a driver may assume the index is dynamically
-// uniform and return wrong results.
+// shader-slang/slang#12110: on the default SPIR-V heap path (no `spvDescriptorHeapEXT`), a
+// descriptor obtained through `ResourceDescriptorHeap[NonUniformResourceIndex(i)]` /
+// `SamplerDescriptorHeap[...]`, or the equivalent `DescriptorHandle<T>` construction, must carry a
+// `NonUniform` decoration: Vulkan requires it on the consumed resource operand for a wave-divergent
+// descriptor index (VUID-RuntimeSpirv-None-10148).
 //
-// The heap subscript lowers into a DescriptorHandle representation round-trip that buries the
-// `NonUniformResourceIndex` wrapper inside a vector operand --
+// The heap subscript lowers into a DescriptorHandle representation round-trip --
 // `makeVector(NonUniformResourceIndex(i), 0)` -> `CastUInt2ToDescriptorHandle` ->
-// `CastDescriptorHandleToUInt2` -> `swizzle(_, 0)` -> `getElement(heap, _)`. While that round-trip
-// survived, the wrapper stalled at the `makeVector` and never reached the `getElement` index that
-// the decoration machinery consumes. Two peephole rules now fold it away -- the cast-pair fold
-// `CastDescriptorHandleToUIntN(CastUIntNToDescriptorHandle(x)) -> x`
-// (`slang-ir-peephole.cpp`, added by shader-slang/slang#12263) and the pre-existing
-// `swizzle(makeVector(a, b), 0) -> a` -- leaving the plain
-// `getElement(heap, NonUniformResourceIndex(i))` shape that the float pass in
-// `slang-ir-float-non-uniform-resource-index.cpp` already handles, and where the existing
-// `getElement`->`getElementPtr` rewrite and `propagateNonUniformDecorations` attach `NonUniform`.
-//
-// This test pins that resulting behavior so a regression in either fold, or in the float pass's
-// handling of the collapsed shape, is caught here.
+// `CastDescriptorHandleToUInt2` -> `swizzle(_, 0)` -> `getElement(heap, _)` -- that buries the
+// wrapper inside a vector operand. Two peephole rules in `slang-ir-peephole.cpp` fold it away: the
+// cast-pair fold `CastDescriptorHandleToUIntN(CastUIntNToDescriptorHandle(x)) -> x` exposes the
+// vector to `swizzle(makeVector(a, b), 0) -> a`, leaving `getElement(heap,
+// NonUniformResourceIndex(i))`, which `slang-ir-float-non-uniform-resource-index.cpp` decorates.
+// These checks guard that cross-pass dependency: a regression in either fold, or in the float
+// pass's handling of the collapsed shape, drops the decoration.
 
 // Default heap lowering (no spvDescriptorHeapEXT): OpCapability RuntimeDescriptorArray + a
 // `__slang_resource_heap` runtime array indexed via OpAccessChain -- this is the path that requires
@@ -44,7 +36,6 @@
 RWStructuredBuffer<float> outputBuffer;
 SamplerState samp;
 
-// The `ResourceDescriptorHeap[...]` / `SamplerDescriptorHeap[...]` subscript spelling.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
