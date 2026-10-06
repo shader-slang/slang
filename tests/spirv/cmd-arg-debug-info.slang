@@ -44,7 +44,6 @@
 // CHECK_XN-NOT: -Xnvrtc
 // CHECK_XN-SAME: -stage compute
 
-// Arguments given one token per `-X` keep their order and their repeats.
 //TEST:SIMPLE(filecheck=CHECK_XD): -target spirv -g3 -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2 -emit-spirv-directly
 // CHECK_XD:  OpString "-target spirv
 // CHECK_XD-SAME: -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2
