@@ -121,3 +121,76 @@ SLANG_UNIT_TEST(serializedModuleFreshnessCoversSessionDownstreamArgs)
         SLANG_CHECK(!otherArgs->isBinaryModuleUpToDate("m.slang", moduleBlob));
     }
 }
+
+// The command line recorded in SPIR-V debug info lists the arguments the target program passes to
+// downstream tools. With an argument at each of the session, target and link levels, all three
+// appear, in that order. Nothing here runs a downstream tool, so the test needs no NVRTC.
+SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    slang::CompilerOptionEntry targetArg = {};
+    targetArg.name = slang::CompilerOptionName::DownstreamArgs;
+    targetArg.value.kind = slang::CompilerOptionValueKind::String;
+    targetArg.value.stringValue0 = "nvrtc";
+    targetArg.value.stringValue1 = "-DTARGET";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    targetDesc.compilerOptionEntries = &targetArg;
+    targetDesc.compilerOptionEntryCount = 1;
+
+    slang::CompilerOptionEntry sessionOptions[2] = {};
+    sessionOptions[0].name = slang::CompilerOptionName::DownstreamArgs;
+    sessionOptions[0].value.kind = slang::CompilerOptionValueKind::String;
+    sessionOptions[0].value.stringValue0 = "nvrtc";
+    sessionOptions[0].value.stringValue1 = "-DSESSION";
+    sessionOptions[1].name = slang::CompilerOptionName::DebugInformation;
+    sessionOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+    sessionOptions[1].value.intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = sessionOptions;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(sessionOptions);
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    const char* source = R"(
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain() {}
+    )";
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module;
+    module = session->loadModuleFromSourceString("m", "m.slang", source, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(module->findEntryPointByName("computeMain", entryPoint.writeRef())));
+
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    ComPtr<slang::IComponentType> composite;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        components,
+        2,
+        composite.writeRef(),
+        diagnostics.writeRef())));
+
+    slang::CompilerOptionEntry linkArg = targetArg;
+    linkArg.value.stringValue1 = "-DLINK";
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        composite->linkWithOptions(linked.writeRef(), 1, &linkArg, diagnostics.writeRef())));
+
+    ComPtr<slang::IBlob> code;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())));
+
+    UnownedStringSlice spirv((const char*)code->getBufferPointer(), code->getBufferSize());
+    SLANG_CHECK(spirv.indexOf(toSlice("-Xnvrtc -DSESSION -Xnvrtc -DTARGET -Xnvrtc -DLINK")) != -1);
+}
