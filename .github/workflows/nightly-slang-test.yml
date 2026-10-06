@@ -134,12 +134,20 @@ jobs:
           # produced but that don't satisfy the spec — e.g. invalid
           # storage-class combinations).
           SLANG_RUN_SPIRV_VALIDATION: "1"
+          # The -cpu tests run through the slang-llvm JIT, which can emit
+          # AVX-512 instructions that fault with SIGILL on runners that
+          # mis-report AVX-512 support; pin the JIT to baseline x86-64 to
+          # avoid it (#11062).
+          SLANG_DISABLE_AVX512: "1"
           # Intentionally NOT setting SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN:
           # regular CI sets it to pin provenance for tests/ that CHECK
           # `OpSource Unknown`. The agentic suite was generated against
           # default compiler behavior and CHECKs `OpSource Slang`, so
           # inheriting that env var here produces spurious failures.
         run: |
+          # Record the CPU model to correlate runner-dependent recurrences.
+          grep 'model name' /proc/cpuinfo | head -1 || true
+
           # Invoke slang-test directly with -expected-failure-list.
           # slang-test reclassifies failures listed in the file as
           # `failed(expected)` (TestResult::ExpectedFail), keeps them

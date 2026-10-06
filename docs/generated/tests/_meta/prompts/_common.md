@@ -635,10 +635,39 @@ match: ...`, `see declaration of ...`). Rules:
      **not** omit it when unannotated diagnostics remain — exhaustive mode
      then fails.
 
+8. **Pin only what the claim depends on.** Rules 1–7 ask whether a token
+   is _volatile_. This one asks whether it is _relevant_. A token can be
+   perfectly stable and still not belong in the CHECK, and pinning it
+   makes the test fail on unrelated compiler changes that leave the claim
+   true. Before pinning a token, ask: **if this token changed, would the
+   anchored claim be false?** If no, wildcard it or leave it out.
+
+   The recurring offenders are declaration specifiers and qualifiers
+   sitting next to the thing under test — `__device__`, `__global__`,
+   `__noinline__`, `inline`, `static`, `precise` — and decorations the
+   claim never mentions.
+
+   For a claim that `in` parameters are passed **by value**, the CUDA
+   signature line is about the parameter list, not the specifiers:
+
+   - ✅ `// CUDA: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+   - ❌ `// CUDA: __device__ void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})`
+
+   The second broke when `[noinline]` started emitting `__noinline__`
+   between `__device__` and `void`. Every parameter was still passed by
+   value, so the claim was untouched and only the scaffolding moved.
+
+   This is not licence to loosen the token that _carries_ the claim. In
+   that same test the `(int val_...)` shape — no `*`, no `&` — **is** the
+   assertion and must stay tight. Loosen the scaffolding, never the
+   subject. (Rule 6 forbids weakening a CHECK to force green; that is
+   about the subject. This rule is about everything around it.)
+
 **Bottom line:** keep patterns loose (`{{...}}`, `-DAG`, error codes,
-opcodes) and structural. Every time you are tempted to write an exact id,
-name, ordering, or full message string, ask "will codegen or the harness
-render this differently?" — if yes, loosen it.
+opcodes) and structural. Ask two questions of every token you are tempted
+to pin: "will codegen or the harness render this differently?" (rules 1–7)
+and "does the anchored claim actually depend on it?" (rule 8). Loosen it
+if the answer is yes to the first or no to the second.
 
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a
@@ -867,14 +896,18 @@ These are not lint-enforced, but skip them only with a
   printf/atomic. A pure-internal computation is removed before the
   CHECK can see it.
 - **Identifier mangling varies per target.** A Slang local `a` may
-  appear as `a_0` in HLSL, `globalParams_0.a_0` in CUDA via param-
-  block lowering, or `__ldg(&...->a_0)` in CUDA via read-only buffer
-  lowering. Use FileCheck wildcards like `a_{{[0-9]+}}` rather than
-  literal `a_0`.
-- **CUDA factors `__ldg(&uniform)` reads into temporaries**,
-  splitting compound expressions on uniform operands. To observe a
-  binary expression on CUDA, derive operands from thread/dispatch
-  IDs (or locals holding them) rather than from `uniform` globals.
+  appear as `a_0` in HLSL or `globalParams_0->a_0` after CUDA
+  parameter-group lowering. A field loaded from a CUDA read-only
+  buffer may instead appear inside `__ldg(&...->a_0)`. Use FileCheck
+  wildcards like `a_{{[0-9]+}}` rather than literal `a_0`.
+- **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
+  values are fields of `SLANG_globalParams`, which CUDA emits in
+  `__constant__` memory, so the immutable-load pass must leave those
+  reads plain. `__ldg` lowers to `ld.global.nc` and is reserved for
+  eligible global-memory reads such as `StructuredBuffer<T>` or
+  `ConstantBuffer<T>` contents. Use one of those buffer types when a
+  positive test needs to observe `__ldg`; use a top-level `uniform`
+  with `CHECK-NOT: __ldg` when testing the exclusion.
 - **Metal `[[buffer(N)]]` indices are positional**, not driven by
   `vk::binding(...)` or HLSL `register(uN)`. Two struct fields bound
   via `vk::binding(7)` and `vk::binding(3)` may still emit as
@@ -945,10 +978,38 @@ emits …" — HLSL/GLSL/SPIRV-asm/Metal/WGSL/CUDA/CPP/Torch text. This is
 also what users see, so it is the most stable contract.
 
 **Combining `-dump-ir` with target emit** requires both
-`-target <text-target>` and `-o /dev/null`. Without `-target` the
-compile stops early; without `-o /dev/null` the target text mixes
-with IR on stdout and FileCheck fails. With both, IR goes to stdout
-and the target text is discarded.
+`-target <text-target>` and `-o -`. Without `-target` the compile
+stops early, so there is no target-specific IR to observe.
+
+Use `-o -`, never an absolute path. `slang-test` rejects an absolute
+output path in a directive because it cannot be reproduced on the
+other platforms the suite runs on — `/dev/null` has no Windows
+spelling — and a directive that uses one fails to parse at all,
+before the compiler runs. A relative path is allowed, but writes a
+scratch file next to the test, so prefer `-o -` unless the test is
+actually about the written artifact.
+
+`-o -` does not mix the two outputs, because they never share a
+stream: the `-dump-ir` dump is written to **stderr** and the target
+text to **stdout**, and `slang-test` composes the FileCheck input as
+
+```
+result code = <n>
+standard error = {
+  <the IR dump>
+}
+standard output = {
+  <the emitted target text>
+}
+```
+
+so the target text always lands in a block *after* the entire IR
+dump. An ordered `CHECK` / `CHECK-LABEL` / `CHECK-NEXT` anchored in
+the IR dump is therefore unaffected by it. The one thing to keep in
+mind: a `CHECK-NOT` or `CHECK-DAG` whose region runs to the end of
+the input now also scans the emitted target text, so bound such a
+directive with a following `CHECK-LABEL` when it is meant to cover
+only the IR.
 
 **Other -dump-ir hazards** that the agent must guard against:
 
@@ -986,11 +1047,9 @@ emit behavior will often fail because the pass had nothing to do.
   literals, for any value the pass needs to see at runtime.
 - **Sink intermediate values into an `RWStructuredBuffer`** so DCE
   cannot remove them.
-- **Defeat compile-time literal recognition** when the value matters:
-  on CUDA `__ldg(&uniform)` reads, the optimizer can re-fold loads
-  into temporaries (see "CUDA factors `__ldg(&uniform)` reads into
-  temporaries" above). Use thread/dispatch IDs as operands when the
-  CHECK must observe a binary op on the result.
+- **Defeat compile-time literal recognition** when the value matters.
+  Use thread/dispatch IDs or buffer-fed values as operands when the
+  CHECK must observe a binary op rather than a folded constant.
 
 #### Tests must compile cleanly first
 

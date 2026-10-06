@@ -14,7 +14,7 @@
 // mode. The CHECK pins the literal 0, which is the value the dump prints
 // for `[unroll]` and which the `[loop]` sibling test distinguishes from 1.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

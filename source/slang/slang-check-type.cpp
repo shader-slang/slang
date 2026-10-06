@@ -9,7 +9,10 @@ namespace Slang
 {
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
@@ -580,6 +583,14 @@ Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
         expr->base = CheckProperType(expr->base);
         expr->type = expr->base.exp->type;
     }
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+{
+    // This spelling denotes the built-in type directly, so a declaration named `uint` cannot
+    // shadow it through ordinary name lookup.
+    expr->type = m_astBuilder->getTypeType(m_astBuilder->getUIntType());
     return expr;
 }
 

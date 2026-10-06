@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T17:27:07Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 88909e4def1133ca5cd3ccb36f17d01f8bcc633abff88b21acd9208e1a05d1f2
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 48ed11f1bf89d3da1313dbfe29f2b84e0c3209390cd00bb8bb25f63ca5db461a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -14,7 +14,7 @@ in `target-pipelines/`, written for compiler developers who need
 to pick the right per-target page. Each peer page documents one target's
 ordered IR-pass and downstream-tool sequence as a four-phase
 control-flow-graph view of the shared orchestrator
-`linkAndOptimizeIR` (line 970 of
+`linkAndOptimizeIR` (line 1000 of
 [../../../../source/slang/slang-emit.cpp](../../../../source/slang/slang-emit.cpp)).
 For an unordered, topical catalog of every IR pass — grouped by
 category rather than by execution order — see
@@ -118,7 +118,7 @@ is which switch arm each target lands in.
 
 | Target | CodeGenTarget enum values | Phase C entry | Phase D emitter | Downstream tools | Loops |
 | --- | --- | --- | --- | --- | --- |
-| SPIR-V | `SPIRV`, `SPIRVAssembly` | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3347) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3500) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12092) | spirv-link, spirv-val, spirv-opt | **Yes** — the only target with iterative passes: `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR`, both to convergence (see note below). |
+| SPIR-V | `SPIRV`, `SPIRVAssembly` | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3352) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3670) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12161) | spirv-link, spirv-val, spirv-opt | **Yes** — the only target with iterative passes: `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR`, both to convergence (see note below). |
 | HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms, e.g. `legalizeRayPayloadAccessQualifiersForHLSL` and `validateBarrierFlagsForHLSL` in [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
 | Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` ([slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)) | `MetalSourceEmitter` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)) | Apple `metal` compiler (for `MetalLib*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass. |
 | WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` ([slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)) | `WGSLSourceEmitter` ([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)) | Tint (for `WGSLSPIRV*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForWGSL` is single-pass. |
@@ -139,7 +139,7 @@ belongs to Phase D on [spirv.md](spirv.md) rather than Phase C.
 
 **The SPIR-V loop bounds are not enforced.** At
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)
-lines 3124-3145, `simplifyIRForSpirvLegalization` declares
+lines 3129-3145, `simplifyIRForSpirvLegalization` declares
 `kMaxIterations = 8` with `iterationCounter = 0` and
 `kMaxFuncIterations = 16` with `funcIterationCount = 0`, but
 neither counter is ever incremented. The loop conditions
@@ -175,7 +175,7 @@ the CPU / Host / LLVM variants, etc.). A glance at one page does
 **not** show the global ordering of `linkAndOptimizeIR`; it shows
 only the passes reachable for that target. Where two targets
 share an arm (for example, Metal, CUDA, and the CPP targets all hit
-the `undoParameterCopy` arm at line 2340), each page that lists the
+the `undoParameterCopy` arm at line 2345), each page that lists the
 pass also documents the shared arm in its prose.
 
 ### Filtering by IR content: `RequiredLoweringPassSet`
@@ -187,10 +187,10 @@ contains no IR that needs them. The predicate is
 — a record of 34 independent `bool` flags, one per lowering
 concern (`enumType`, `taggedUnion`, `autodiff`,
 `appendConsumeStructuredBuffer`, `reinterpret`, and so on). It is
-filled by `calcRequiredLoweringPassSet` (line 405 of
+filled by `calcRequiredLoweringPassSet` (line 470 of
 [../../../../source/slang/slang-emit.cpp](../../../../source/slang/slang-emit.cpp)),
 which walks the module and sets a flag for every construct it
-finds. `linkAndOptimizeIR` runs that scan twice — at lines 1049 and
+finds. `linkAndOptimizeIR` runs that scan twice — at lines 1394 and
 1520 — so constructs introduced by specialization can still turn a
 gate on. Flags accumulate rather than reset, so the second scan can
 only add.
@@ -213,7 +213,7 @@ easy to get wrong when reading a single page:
   elimination. Stripping those decorations is
   what lets the following `eliminateDeadCode` drop the unused
   builtins.
-- **One flag is mutated mid-pipeline.** At line 1609,
+- **One flag is mutated mid-pipeline.** At line 1733,
   `lowerTaggedUnionTypes` sets
   `requiredLoweringPassSet.reinterpret = true` from inside its own
   `taggedUnion` gate, because lowering a tagged union produces new

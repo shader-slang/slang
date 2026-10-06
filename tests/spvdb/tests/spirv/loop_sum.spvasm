@@ -1,0 +1,78 @@
+; Loop sum shader: output[0] = input[0] + input[1] + input[2] + input[3].
+; Exercises OpPhi, loop control flow (OpLoopMerge, OpBranchConditional), OpIAdd,
+; and OpFunctionCall.
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+
+               OpDecorate %InputBlock Block
+               OpMemberDecorate %InputBlock 0 Offset 0
+               OpDecorate %in_buf DescriptorSet 0
+               OpDecorate %in_buf Binding 0
+               OpDecorate %ra_uint_in ArrayStride 4
+
+               OpDecorate %OutputBlock Block
+               OpMemberDecorate %OutputBlock 0 Offset 0
+               OpDecorate %out_buf DescriptorSet 0
+               OpDecorate %out_buf Binding 1
+               OpDecorate %ra_uint_out ArrayStride 4
+
+       %void = OpTypeVoid
+      %vfunc = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_4 = OpConstant %uint 4
+       %bool = OpTypeBool
+
+  %ra_uint_in = OpTypeRuntimeArray %uint
+  %InputBlock = OpTypeStruct %ra_uint_in
+  %ptr_in_blk = OpTypePointer StorageBuffer %InputBlock
+     %in_buf = OpVariable %ptr_in_blk StorageBuffer
+ %ptr_in_uint = OpTypePointer StorageBuffer %uint
+
+ %ra_uint_out = OpTypeRuntimeArray %uint
+ %OutputBlock = OpTypeStruct %ra_uint_out
+ %ptr_out_blk = OpTypePointer StorageBuffer %OutputBlock
+     %out_buf = OpVariable %ptr_out_blk StorageBuffer
+%ptr_out_uint = OpTypePointer StorageBuffer %uint
+
+; Helper function: load_element(index) -> in_buf[0][index]
+  %load_fn_t = OpTypeFunction %uint %uint
+  %load_elem = OpFunction %uint None %load_fn_t
+      %idx_p = OpFunctionParameter %uint
+   %load_lbl = OpLabel
+     %el_ptr = OpAccessChain %ptr_in_uint %in_buf %uint_0 %idx_p
+     %el_val = OpLoad %uint %el_ptr
+               OpReturnValue %el_val
+               OpFunctionEnd
+
+; Main: sums 4 elements using a loop.
+;   for (uint i = 0, acc = 0; i < 4; i++) acc += load_elem(i);
+;   output[0] = acc;
+       %main = OpFunction %void None %vfunc
+      %entry = OpLabel
+               OpBranch %loop_header
+
+%loop_header = OpLabel
+          %i = OpPhi %uint %uint_0 %entry %i_next %loop_body
+        %acc = OpPhi %uint %uint_0 %entry %acc_next %loop_body
+               OpLoopMerge %loop_exit %loop_body None
+               OpBranch %loop_check
+
+ %loop_check = OpLabel
+       %cond = OpULessThan %bool %i %uint_4
+               OpBranchConditional %cond %loop_body %loop_exit
+
+  %loop_body = OpLabel
+       %elem = OpFunctionCall %uint %load_elem %i
+   %acc_next = OpIAdd %uint %acc %elem
+     %i_next = OpIAdd %uint %i %uint_1
+               OpBranch %loop_header
+
+  %loop_exit = OpLabel
+    %out_ptr = OpAccessChain %ptr_out_uint %out_buf %uint_0 %uint_0
+               OpStore %out_ptr %acc
+               OpReturn
+               OpFunctionEnd

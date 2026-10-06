@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#the-atomic-memory-order-operand
-//META: doc_section_digest=644c7061c24b763fe96ab44c8cef95120acec98260f723b4edecc5a432356e4e
+//META: doc_section_digest=05930fe2d0fb581dc7f1f5da2a6966c5942fddfa2e9dc69e40bf044d0e50b7a5
 //META: purpose=The undeclared trailing memory-order operand is always materialized in lowered IR and defaults to `0 : Int` (`kIRMemoryOrder_Relaxed`), at operand 1 for `atomicLoad` and operand 2 for `atomicStore` and the read-modify-write atomics.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // operands ahead of it: one for `atomicLoad`, two for `atomicStore`
 // and `atomicAdd`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<Atomic<int>> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

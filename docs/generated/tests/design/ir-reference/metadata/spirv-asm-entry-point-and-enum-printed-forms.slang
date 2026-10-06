@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#spirvasmoperand
-//META: doc_section_digest=30d7b2afee044e4800553745578314d872096bca3b9b7d00e70fdc652dd523c8
+//META: doc_section_digest=62af319ac5e856ac8523a9c9222315e0eacdfed1d10c602ea37a607fdc6766d3
 //META: purpose=The __entryPoint token prints bare with no parentheses inside its SPIRVAsmInst, while a named enumerator beside it prints as only its wrapped integer.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // `SPIRVAsmInst` line therefore shows both rules at once, and the CHECK pins
 // the whole operand list so a kind that started naming itself would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<uint> gOut;
 

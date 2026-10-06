@@ -1,21 +1,24 @@
 // BVH-traversal coverage demo — raw-Vulkan host driver.
 //
 // Build a BVH over a procedural mesh on CPU, upload to GPU, trace
-// 4096×4096 rays through it via compute shader, read back coverage.
+// 256x256 rays through it via compute shader, read back coverage.
+// Pass --ray-grid-size=N to select a different NxN ray grid.
 // Smoke mode uses a clean icosphere with one material; full mode adds
 // extra material kinds + degenerate triangles + a packed cluster.
 // Pass `--batch-size=N` to split the dispatch into fixed-size batches
 // to keep each GPU submission short and avoid OS watchdog resets
 // (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
-// All GPU-runtime calls go through `vk_compute_demo.h`. See its
-// file-level comment for the swap procedure when slang-rhi PR #739
+// GPU-runtime calls go through the shared shader-coverage-common/vk_compute_demo.h
+// helper. See its file-level comment for the swap procedure when slang-rhi PR #739
 // lands.
 
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/coverage-counters.h"
+#include "shader-coverage-common/vk_compute_demo.h"
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -31,6 +34,7 @@
 #include <vector>
 
 using Slang::ComPtr;
+using coverageDemo::decodeCoverageCounters;
 
 namespace
 {
@@ -53,8 +57,6 @@ namespace
 // ------------------------------------------------------------------------------
 constexpr uint32_t kCoverageBinding = 0;
 constexpr uint32_t kCoverageSet = 1;
-constexpr uint32_t kRayGridDim = 4096;
-constexpr uint32_t kRayCount = kRayGridDim * kRayGridDim;
 
 struct Vec3
 {
@@ -132,6 +134,16 @@ struct alignas(16) Globals
 {
     std::cerr << "error: " << message << "\n";
     std::exit(1);
+}
+
+// Parse the entire argument so negative, overflowing, or trailing text is rejected.
+uint32_t parseUnsigned(std::string_view value, const char* option)
+{
+    uint32_t result = 0;
+    auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+    if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size())
+        fail(std::string(option) + " requires an unsigned integer");
+    return result;
 }
 
 void checkSlang(SlangResult result, const char* what)
@@ -628,13 +640,21 @@ CoverageSummary summarize(
     const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
-    const uint32_t n = coverage->getCounterCount();
+    // Iterate entries ([0, getEntryCount())), not counters: several
+    // entries can share one counterIndex once line coverage coalesces
+    // markers, so a counter-indexed loop both under-visits (stops at
+    // getCounterCount() < getEntryCount()) and misattributes hits (entry
+    // i's counter is not generally counter i). Look each entry's counter
+    // up by its own counterIndex instead.
+    const uint32_t n = coverage->getEntryCount();
     for (uint32_t i = 0; i < n; ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
-        const bool covered = hits[i] > 0;
+        const bool covered = entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                             entry.counterIndex < (uint32_t)hits.size() &&
+                             hits[entry.counterIndex] > 0;
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
@@ -679,6 +699,8 @@ int main(int argc, char** argv)
     try
     {
         std::string mode = "smoke";
+        // Preserve scene complexity while keeping coverage collection interactive.
+        uint32_t rayGridDim = 256;
         bool enableCoverage = true;
         // This demo intentionally defaults to 32-bit counters even though
         // the compiler default is 64-bit (see
@@ -716,9 +738,9 @@ int main(int argc, char** argv)
         // each dispatched as a separate GPU submission. Keeps individual
         // submissions short to avoid OS watchdog resets (Windows TDR /
         // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Full mode
-        // defaults to 262144 rays (512×512) per batch — a safe value on
-        // any GPU — because its denser mesh makes a single 16M-ray
-        // coverage-instrumented dispatch long enough to trip the watchdog.
+        // defaults to at most 262144 rays per batch. This mainly matters
+        // with large grids, where a single 16M-ray instrumented dispatch
+        // can run long enough to trip the watchdog.
         // Smoke mode is quick and defaults to a single dispatch. Pass an
         // explicit value to tune (smaller if you still observe TDR, larger
         // for fewer submissions on fast hardware), or `--batch-size=0` to
@@ -736,6 +758,8 @@ int main(int argc, char** argv)
                 mode = "smoke";
             else if (a == "--mode=full")
                 mode = "full";
+            else if (a.substr(0, 16) == "--ray-grid-size=")
+                rayGridDim = parseUnsigned(a.substr(16), "--ray-grid-size");
             else if (a == "--no-coverage")
                 enableCoverage = false;
             else if (a == "--coverage")
@@ -753,13 +777,21 @@ int main(int argc, char** argv)
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
                 demoDir = std::string(a.substr(kDemoDirFlag.size()));
             else if (a.substr(0, kBatchSizeFlag.size()) == kBatchSizeFlag)
-                batchSize = (uint32_t)std::stoul(std::string(a.substr(kBatchSizeFlag.size())));
+            {
+                batchSize = parseUnsigned(a.substr(kBatchSizeFlag.size()), "--batch-size");
+                if (batchSize % 64 != 0)
+                    fail("--batch-size must be 0 or a multiple of 64 to avoid overlapping batches");
+            }
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
                 return 1;
             }
         }
+
+        // The grid uses endpoints (gridDim - 1); squared indices must fit in uint32_t.
+        if (rayGridDim < 2 || rayGridDim > 65535)
+            fail("--ray-grid-size must be in [2, 65535]");
 
         // Resolve the batch-size default per mode (see the flag comment
         // above): full mode batches by default, smoke mode does not. An
@@ -813,8 +845,8 @@ int main(int argc, char** argv)
         std::cout << "mesh: " << tris.size() << " triangles (" << mode << ")\n";
         auto nodes = buildBVH(tris);
         std::cout << "BVH: " << nodes.size() << " nodes\n";
-        auto rays = generateRays(kRayGridDim);
-        std::cout << "rays: " << rays.size() << " (" << kRayGridDim << "x" << kRayGridDim << ")\n";
+        auto rays = generateRays(rayGridDim);
+        std::cout << "rays: " << rays.size() << " (" << rayGridDim << "x" << rayGridDim << ")\n";
 
         Globals globalsData = {};
         globalsData.rayCount = (uint32_t)rays.size();
@@ -927,14 +959,15 @@ int main(int argc, char** argv)
         const uint32_t totalRays = (uint32_t)rays.size();
         // Resolve 0 (single dispatch) to the full ray count so the loop
         // always runs exactly one iteration in that case.
-        const uint32_t effectiveBatchSize = (batchSize == 0) ? totalRays : batchSize;
+        const uint32_t effectiveBatchSize =
+            (batchSize == 0) ? totalRays : std::min(batchSize, totalRays);
         uint32_t batchCount = 0;
         std::cout << "dispatching " << totalRays << " rays";
         if (effectiveBatchSize < totalRays)
             std::cout << " in batches of " << effectiveBatchSize;
         std::cout << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
         const auto renderStart = std::chrono::steady_clock::now();
-        for (uint32_t offset = 0; offset < totalRays; offset += effectiveBatchSize)
+        for (uint32_t offset = 0; offset < totalRays;)
         {
             globalsData.rayBatchOffset = offset;
             ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
@@ -942,6 +975,7 @@ int main(int argc, char** argv)
             const uint32_t groups = (batchRays + 63) / 64;
             ctx.dispatch(pipe, sets, groups, 1, 1);
             ++batchCount;
+            offset += batchRays;
         }
         const auto renderEnd = std::chrono::steady_clock::now();
         const double renderMs =
@@ -961,15 +995,7 @@ int main(int argc, char** argv)
             // a consistent layout (matches image-pipeline's readback convention).
             std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
             ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-            std::vector<uint64_t> hits(counterCount, 0);
-            for (uint32_t i = 0; i < counterCount; ++i)
-            {
-                uint64_t value = 0;
-                const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-                for (uint32_t b = 0; b < counterByteWidth; ++b)
-                    value |= (uint64_t)slot[b] << (b * 8); // little-endian reassembly
-                hits[i] = value;
-            }
+            auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
 
             auto summary = summarize(shader.coverageMetadata, hits);
             printSummary(mode.c_str(), summary);

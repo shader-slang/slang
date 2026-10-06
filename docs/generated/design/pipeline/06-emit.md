@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:48:00Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 8de686864f8c89a689087094669d66b19be061b10c489eb3d49177dc519b34b4
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 09826ab3883531263404d0d3769158cd345a84eaedc0a42981f3d3714a0dbd4b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -19,7 +19,7 @@ modifying a target backend.
 
 - **Input**: a linked, specialized, and target-lowered `IRModule`
   produced by `linkAndOptimizeIR`
-  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 970)
+  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1000)
   for one `TargetRequest`. Note that direct SPIR-V is not fully
   legalized at this boundary: `linkAndOptimizeIR` returns first, and
   `emitSPIRVFromIR` then runs `legalizeIRForSPIRV` itself immediately
@@ -55,14 +55,14 @@ downstream disassembly, and everything else to
 `emitWithDownstreamForEntryPoints` — which itself emits source first,
 via `emitEntryPointsSource`, and then hands it to DXC / FXC / glslang /
 the Metal toolchain. The three direct entry points are defined in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) at lines 3500,
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) at lines 3670,
 3587, and 3544 respectively; each calls `linkAndOptimizeIR` itself.
 
 The **inner** level picks the source emitter for textual output.
 `emitEntryPointsSource` either passes user source straight through (for
 pass-through compilation) or calls
 `CodeGenContext::emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2746 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2889 at
 `source_commit`). That function:
 
 1. Resolves `LineDirectiveMode` (GLSL targets default to
@@ -98,7 +98,7 @@ The `#include`s at the top of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) pull in the
 header-backed emit helpers used by this file (C-like subclasses, LLVM,
 VM, Torch, Slang round-trip). Direct SPIR-V is not header-included here;
-it is wired via the `emitSPIRVFromIR` forward declaration (line 2993)
+it is wired via the `emitSPIRVFromIR` forward declaration (line 3136)
 and implemented in
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
 
@@ -165,7 +165,7 @@ and
 
 The natively emitted blob is already a complete module, so
 `createArtifactFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3292)
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3436)
 decides up front whether any downstream (`slang-glslang` /
 SPIRV-Tools) work is needed at all, and only loads that compiler when
 it is. The four conditions are: an optimization level above
@@ -225,8 +225,8 @@ itself becomes an internal workhorse emitted under a `_`-prefixed name
 (`_main_N`), because its signature cannot service a general-purpose
 call
 ([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
-line 1004). After the module body, three `SLANG_PRELUDE_EXPORT` shims
-are emitted around it (line 2416), all sharing the signature
+line 1003). After the module body, three `SLANG_PRELUDE_EXPORT` shims
+are emitted around it (line 2428), all sharing the signature
 `(varyingInput, void* entryPointParams, void* globalParams)`:
 `main_N_Thread` runs one thread, `main_N_Group` runs one thread group,
 and `main_N` runs a whole dispatch range. That triple is the surface a
@@ -244,7 +244,7 @@ Emits CUDA source. Prelude:
 Module-scope shader parameters do not survive as CUDA globals. On the
 targets that pack ordinary uniforms — CPU and CUDA — they are
 collected into a single `GlobalParams` struct before emission
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1101;
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1132;
 the pass is `collectGlobalUniformParameters`, see
 [05-ir-passes.md](05-ir-passes.md)), and
 `CUDASourceEmitter::emitParameterGroupImpl` writes that struct out as
@@ -252,9 +252,9 @@ the pass is `collectGlobalUniformParameters`, see
 by a `#define` redirecting the original parameter name to
 `(&SLANG_globalParams)`
 ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
-line 414). A `RWStructuredBuffer` global therefore appears in the
+line 413). A `RWStructuredBuffer` global therefore appears in the
 emitted CUDA as a field of `SLANG_globalParams`, not as a variable of
-its own. `emitFunctionPreambleImpl` (line 432) qualifies an entry
+its own. `emitFunctionPreambleImpl` (line 455) qualifies an entry
 point `extern "C" __global__` and every ordinary function
 `__device__`.
 
@@ -298,7 +298,7 @@ Both command-line surfaces reach that check the same way:
 `-target slangvm` maps to `CodeGenTarget::HostVM`, whose arm of
 `CodeGenContext::_emitEntryPoints` calls `emitHostVMCode`
 ([slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)
-line 1216), and `slangi` compiles through that same target. What
+line 1201), and `slangi` compiles through that same target. What
 differs is the entry point reaching the emitter:
 `ByteCodeEmitter::emitEntryPoints` emits only entry points whose stage
 is `Stage::Dispatch` — the host stage `slangi` asks for — and skips
@@ -392,7 +392,7 @@ binary or unary operator.
 
 The forcing looks at both sides of the pair
 ([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
-line 760): an operand whose own operator is in that set is
+line 759): an operand whose own operator is in that set is
 parenthesized whenever the outer context binds tighter than
 assignment, and *every* operand of an outer operator in that set is
 parenthesized whatever its own precedence. Combinations outside the
@@ -450,7 +450,7 @@ prelude arrives as text, and that text is only an
 `#pragma pack_matrix(...)` a reader sees at the top of it comes from
 `HLSLSourceEmitter::emitFrontMatterImpl`
 ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
-line 2534), not from the prelude.
+line 2533), not from the prelude.
 
 GLSL, Metal, WGSL, and SPIR-V have no `prelude/` header; the built-in
 vocabulary they rely on is emitted from their own backend files, as with

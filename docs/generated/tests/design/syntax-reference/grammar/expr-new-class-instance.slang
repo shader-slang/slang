@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#expressions
-//META: doc_section_digest=4e9de34fbc8a8877c6b73c6110db4d1ebef2d0ddd10da2bdfd2742413c1d6015
+//META: doc_section_digest=dc101149ff9b445d781bc38dc82164f3a5d08e36d3931fcf7594b780eca06062
 //META: purpose=`NewExpr` parses as `'new' Type ('(' ArgList? ')')?` and yields an object whose members are then assignable.
 //META: intent=functional
 //META: pipeline_stage=parse

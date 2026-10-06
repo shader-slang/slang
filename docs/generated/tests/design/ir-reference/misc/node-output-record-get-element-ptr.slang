@@ -16,7 +16,7 @@
 // form to be the `.Get(...)` accessor, which is HLSL's own l-value spelling
 // for the same thing.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage node -entry main -profile lib_6_8 -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature
 import experimental.workgraph;
 

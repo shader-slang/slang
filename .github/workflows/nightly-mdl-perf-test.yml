@@ -147,7 +147,7 @@ jobs:
           repository: "shader-slang/MDL-SDK"
           # Pin to a known-good commit so corpus drift doesn't silently shift
           # mdl_dxr timings. Update this pin intentionally when refreshing the
-          # corpus, then resync history (compile-perf-release-sweep force=true).
+          # corpus, then resync history (perf-compile-release-sweep force=true).
           ref: "446562493bed1b175e7cf105425ca3596764652f"
           path: "external/MDL-SDK"
           persist-credentials: false
@@ -230,6 +230,27 @@ jobs:
               --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA" \
               --commit-time "$COMMIT_TIME"
           fi
+
+      # Confirmation must reuse this host and compiler, before publishing. A
+      # failed confirmation still needs to be archived and pushed; the analyze
+      # job reports it as an evaluation failure, never as a cleared regression.
+      - name: Confirm warning and regression candidates
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SUITE"
+          python3 confirm.py measure --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
+
+      - name: Archive original and confirmation measurements
+        if: always() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: perf-confirmation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: perf-results/daily/${{ steps.sweep.outputs.perf_label }}/
+          if-no-files-found: warn
 
       - name: Upload results artifact (publish=false)
         if: always() && env.PUBLISH != 'true'
@@ -423,31 +444,15 @@ jobs:
           path: "perf-results"
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
-      # Runs AFTER the push so the data is stored even when this step fails the
-      # job. trend.py exits non-zero (job red + ::error:: annotations) when a
-      # primary timer drifts past threshold vs the trailing median. --label
-      # pins the judgement to the point THIS run registered: daily labels are
-      # keyed by the swept commit's date, so several points can share a date
-      # and the series' last point may be a sibling, not this run's.
-      - name: Check trend (fail on regression)
+      # Read the archived confirmation against its frozen baseline. Only a
+      # counter that crosses the threshold in both batches can raise an alarm.
+      # Missing, failed or stale confirmation is an evaluation failure.
+      - name: Report confirmed trend (fail on confirmed regression)
         id: trend
-        # The label gate is load-bearing, not belt-and-braces. A step `if`
-        # carries an implicit success() over the steps BEFORE it IN THIS JOB —
-        # which are only the checkouts here, so it no longer means "the sweep
-        # succeeded" the way it did when this step lived in the nightly job.
-        # Without the gate, a night that fails before the sweep reaches
-        # `trend.py --label ""`, which aborts on the empty value; that makes
-        # steps.trend.outcome 'failure'.
-        #
-        # The gate covers a MISSING label, not an unusable one: a sweep can
-        # mint a label and still die before registering its point, and this
-        # step then runs and aborts on a label that resolves to nothing. So
-        # the gate cannot be the only thing standing between an operational
-        # failure and a regression alert.
-        #
-        # exit_code below is what carries that distinction. steps.trend.outcome
-        # collapses every non-zero exit to 'failure'; only trend.py's
-        # EXIT_REGRESSION means a comparison ran and a metric moved.
+        # A failed sweep can publish a label without completing confirmation.
+        # Report that as an evaluation failure. Only EXIT_REGRESSION from the
+        # shared renderer means a change was confirmed in both valid batches;
+        # the step outcome alone cannot distinguish it from an operational error.
         if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
@@ -456,7 +461,7 @@ jobs:
           set -uo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
           code=0
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" \
+          python3 confirm.py report --results "$GITHUB_WORKSPACE/perf-results" \
             --label "${PERF_LABEL:?}" || code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit "$code"
@@ -473,6 +478,7 @@ jobs:
           # quiet "trend did not run" line only when the job also succeeded,
           # so the failed-sweep case still reports as a job failure.
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_JUDGED_COUNT: ${{ steps.trend.outputs.judged_count }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           # Empty when the trend step was skipped, or when it died before
           # publishing a code. Only trend.py's EXIT_REGRESSION produces the

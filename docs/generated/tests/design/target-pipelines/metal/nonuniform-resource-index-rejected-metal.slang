@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=5fdd0ac6daa767e15b8f1dad12d2d7a2846fe891f83f100e2466f794797eb465
+//META: doc_section_digest=8c75e285954fdccd137cc39333dbb7fd00df278f649c17f835f709926aac9f94
 //META: purpose=Negative: the HLSL-spelled `NonUniformResourceIndex(index)` cannot feed the Metal pipeline because its capability set excludes Metal, so the entry point is rejected with E36107 at check time.
 //META: intent=negative
 //META: pipeline_stage=check
