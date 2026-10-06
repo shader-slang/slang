@@ -6,10 +6,11 @@
 //
 // The property is asserted on the HLSL backend, where `NonUniformResourceIndex` is the SM6.6
 // surface form and its survival is directly observable. The SPIR-V `NonUniform` decoration on
-// descriptor-heap access is orthogonal to this PR and covered separately: shader-slang/slang#12110
-// makes the default (no `spvDescriptorHeapEXT`) SPIR-V heap lowering carry `NonUniform`, and
-// `desc-heap-nonuniform-spirv.slang` pins that behavior (including that the `spvDescriptorHeapEXT`
-// path stays undecorated, since it is non-uniform by default).
+// descriptor-heap access is orthogonal to this PR and covered separately: the default (no
+// `spvDescriptorHeapEXT`) SPIR-V heap lowering carries `NonUniform` (shader-slang/slang#12110,
+// via the peephole fold from shader-slang/slang#12263), and `desc-heap-nonuniform-spirv.slang`
+// pins that behavior (including that the `spvDescriptorHeapEXT` path stays undecorated, since it
+// is non-uniform by default).
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
