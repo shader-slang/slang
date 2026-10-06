@@ -7,6 +7,8 @@
 #include "slang/slang-serialize.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <limits>
+
 using namespace Slang;
 
 // Tests the value semantics of `SerializedArray<T>`.
@@ -375,4 +377,35 @@ SLANG_UNIT_TEST(serializedArrayBulkScalarPathsAreTakenAtEverySize)
     out.borrowed.makeOwned();
     blob = nullptr;
     SLANG_CHECK(out.borrowed.getCount() == in.borrowed.getCount());
+}
+
+// Boundary counts describe views only; the predicate must not dereference them. This
+// exercises rejection without asking the IR decoder to accept malformed serialized data.
+SLANG_UNIT_TEST(serializedArrayViewContainment)
+{
+    Int64 storage[5] = {};
+    const void* blob = storage + 1;
+    const size_t blobSize = 3 * sizeof(Int64);
+    SerializedArray<Int64> array;
+    SLANG_CHECK(isSerializedArrayViewContained(array, nullptr, 0));
+
+    array.adoptView(storage + 1, 3);
+    SLANG_CHECK(isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 2, 2);
+    SLANG_CHECK(isSerializedArrayViewContained(array, blob, blobSize));
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize - 1));
+    array.adoptView(storage, 1);
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 5, 0);
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 4, 0);
+    SLANG_CHECK(isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 4, 1);
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 1, -1);
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 1, Count(0x20000001));
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
+    array.adoptView(storage + 1, std::numeric_limits<Count>::max());
+    SLANG_CHECK(!isSerializedArrayViewContained(array, blob, blobSize));
 }

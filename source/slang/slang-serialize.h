@@ -870,6 +870,34 @@ private:
     List<T> _owned;
 };
 
+/// Checks whether an array's borrowed bytes lie entirely inside the retained blob.
+/// Owned arrays need no blob and always pass. This checks retention, not serialized-data
+/// validity: an unrelated retained blob can select eager loading, but corrupt counts or
+/// operand indices do not become valid by declining deferral.
+///
+/// Compare integer offsets rather than unrelated pointers, and divide the available byte
+/// count before comparing element counts. For example, 0x20000001 eight-byte elements
+/// must not wrap to eight bytes on wasm32. No array bytes are read by this check.
+template<typename T>
+bool isSerializedArrayViewContained(
+    const SerializedArray<T>& array,
+    const void* blobData,
+    size_t blobSize)
+{
+    if (!array.isView())
+        return true;
+    if (array.getCount() < 0)
+        return false;
+    const uintptr_t base = reinterpret_cast<uintptr_t>(blobData);
+    const uintptr_t data = reinterpret_cast<uintptr_t>(array.getBuffer());
+    if (data < base)
+        return false;
+    const uintptr_t offset = data - base;
+    if (offset > blobSize)
+        return false;
+    return uint64_t(array.getCount()) <= uint64_t((blobSize - offset) / sizeof(T));
+}
+
 template<typename S, typename T>
 SLANG_FORCE_INLINE bool tryReadContiguousScalars(S const& serializer, T* dest, Count count)
 {

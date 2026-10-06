@@ -1290,64 +1290,16 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // pointer, which was harmless until bodies stopped being materialized eagerly.
     if (onDemandIRLoad)
     {
-        const Byte* const blobBegin =
-            (const Byte*)decoder->blobHoldingSerializedData->getBufferPointer();
-        const Byte* const blobEnd = blobBegin + decoder->blobHoldingSerializedData->getBufferSize();
-        const uintptr_t blobLow = (uintptr_t)blobBegin;
-        const uintptr_t blobHigh = (uintptr_t)blobEnd;
-
-        // Integer comparison, not pointer comparison. This runs precisely when a span may
-        // point into a *different* allocation, and there `<`/`>=` is unspecified
-        // ([expr.rel]) and forming `data + size` is undefined ([expr.add]) -- so the
-        // pointer spelling would be reasoning the optimizer may discard, in the one case
-        // the guard exists for. `p <= hi` is established before `hi - p` is evaluated, and
-        // the size is compared against that difference rather than added to `p`, so
-        // nothing overflows.
-        auto spanIsInsideBlob = [&](const Byte* data, uintptr_t sizeInBytes)
-        {
-            const uintptr_t p = (uintptr_t)data;
-            if (p < blobLow || p > blobHigh)
-                return false;
-            return sizeInBytes <= blobHigh - p;
-        };
-
-        // The byte size is computed in 64 bits on every target. On wasm32 `Count` and
-        // `uintptr_t` are both 32 bits, so `count * elementSize` wraps above ~2^29: a
-        // corrupt count of 0x20000001 with an 8-byte stride would wrap to 8 and pass the
-        // containment check below. Nothing validates the count before this point --
-        // `_pushContainerState` takes it verbatim from the container header.
-        //
-        // The element size comes from the array's own element type rather than a
-        // parameter, so a later type change cannot silently invalidate the check.
-        auto arrayIsInsideBlob = [&]<typename T>(SerializedArray<T> const& array)
-        {
-            constexpr uint64_t elementSize = sizeof(T);
-
-            if (!array.isView())
-                return true;
-            const Count count = array.getCount();
-            if (count < 0)
-                return false;
-            const uint64_t elementCount = (uint64_t)count;
-            // Refuse rather than wrap: on a 64-bit target a large count times a stride
-            // can still exceed 64 bits.
-            if (elementCount > UINT64_MAX / elementSize)
-                return false;
-            const uint64_t byteSize = elementCount * elementSize;
-            // A span wider than the address space cannot be inside the blob, and must not
-            // be narrowed on the way into the check.
-            if (byteSize > (uint64_t)UINTPTR_MAX)
-                return false;
-            return spanIsInsideBlob((const Byte*)array.getBuffer(), (uintptr_t)byteSize);
-        };
-
-        // Every view-capable array, not a sample: which ones are views depends on the
-        // backend and on what the module contains, so a subset check passes whenever the
-        // arrays it named happened to be the owned ones.
+        const void* blobData = decoder->blobHoldingSerializedData->getBufferPointer();
+        const size_t blobSize = decoder->blobHoldingSerializedData->getBufferSize();
+        // Check every view-capable array: whether an array borrows storage depends on
+        // the serializer backend and the module contents. Owned arrays need no blob.
         const bool everySpanIsInsideBlob =
-            arrayIsInsideBlob(flat.childCounts) && arrayIsInsideBlob(flat.operandIndices) &&
-            arrayIsInsideBlob(flat.stringLengths) && arrayIsInsideBlob(flat.stringChars) &&
-            arrayIsInsideBlob(flat.literals);
+            isSerializedArrayViewContained(flat.childCounts, blobData, blobSize) &&
+            isSerializedArrayViewContained(flat.operandIndices, blobData, blobSize) &&
+            isSerializedArrayViewContained(flat.stringLengths, blobData, blobSize) &&
+            isSerializedArrayViewContained(flat.stringChars, blobData, blobSize) &&
+            isSerializedArrayViewContained(flat.literals, blobData, blobSize);
 
         if (!everySpanIsInsideBlob)
         {

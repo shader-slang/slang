@@ -13,6 +13,7 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <atomic>
+#include <cstring>
 #include <thread>
 
 using namespace Slang;
@@ -149,14 +150,8 @@ void _roundTripDecorationWithChildren(
 }
 
 
-/// Serializes `module` and reads it back out of a blob, which is the condition that lets
-/// bodies stay encoded. Shared by the two helpers below.
-SlangResult _roundTripModule(
-    IRModule* module,
-    Session* session,
-    ComPtr<ISlangBlob>& outBlob,
-    RefPtr<IRModule>& outModule,
-    BlobMode blobMode = BlobMode::Matching)
+/// Writes a complete module, materializing any deferred bodies through the writer.
+SlangResult _serializeModule(IRModule* module, ComPtr<ISlangBlob>& outBlob)
 {
     OwnedMemoryStream stream(FileAccess::ReadWrite);
     {
@@ -171,7 +166,18 @@ SlangResult _roundTripModule(
     List<uint8_t> bytes;
     bytes.addRange(contents.getBuffer(), contents.getCount());
     outBlob = ListBlob::create(bytes);
+    return SLANG_OK;
+}
 
+/// Serializes `module` and reads it back with the requested byte-retention mode.
+SlangResult _roundTripModule(
+    IRModule* module,
+    Session* session,
+    ComPtr<ISlangBlob>& outBlob,
+    RefPtr<IRModule>& outModule,
+    BlobMode blobMode = BlobMode::Matching)
+{
+    SLANG_RETURN_ON_FAIL(_serializeModule(module, outBlob));
     auto rootChunk =
         RIFF::RootChunk::getFromBlob(outBlob->getBufferPointer(), outBlob->getBufferSize());
     if (!rootChunk)
@@ -194,7 +200,7 @@ SlangResult _roundTripModule(
         // Same bytes, different allocation. Deferral must decline: the chunk pointers and
         // spans refer into `outBlob`, so retaining this one would keep the wrong memory
         // alive and leave the views dangling the moment `outBlob` went away.
-        decoyBlob = ListBlob::create(bytes);
+        decoyBlob = RawBlob::create(outBlob->getBufferPointer(), outBlob->getBufferSize());
         blobForReader = decoyBlob;
         break;
     case BlobMode::Matching:
@@ -204,9 +210,78 @@ SlangResult _roundTripModule(
     return readSerializedModuleIR(irChunk, session, nullptr, blobForReader, outModule);
 }
 
+/// Builds a typed two-block function whose entry branches forward with a literal argument.
+/// The second block adds another literal and returns it. A name hint supplies string data
+/// as well, so serializing this fixture checks edges, types, ordering and scalar payloads.
+RefPtr<IRModule> _createForwardReferenceModule(Session* session)
+{
+    RefPtr<IRModule> module = IRModule::create(session);
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto floatType = builder.getFloatType();
+    auto func = builder.createFunc();
+    func->setFullType(builder.getFuncType(0, nullptr, floatType));
+    builder.addNameHintDecoration(func, UnownedStringSlice("forwardReferenceProbe"));
+    builder.setInsertInto(func);
+    auto entry = builder.emitBlock();
+    auto target = builder.emitBlock();
+    builder.setInsertInto(target);
+    auto param = builder.emitParam(floatType);
+    auto sum = builder.emitAdd(floatType, param, builder.getFloatValue(floatType, 1.5));
+    builder.emitReturn(sum);
+    builder.setInsertInto(entry);
+    IRInst* arg = builder.getFloatValue(floatType, -3.25);
+    builder.emitBranch(target, 1, &arg);
+    return module;
+}
+
+/// Finds the fixture function without traversing its body or triggering materialization.
+IRFunc* _findFixtureFunction(IRModule* module)
+{
+    for (auto global : module->getGlobalInsts())
+        if (auto func = as<IRFunc>(global))
+            return func;
+    return nullptr;
+}
+
+/// Compares the deterministic encoding, including type/operand indices and literal/string
+/// payloads. Module-local pointers are encoded as indices, so fresh allocations compare.
+bool _serializedContentsMatch(ISlangBlob* expected, ISlangBlob* actual)
+{
+    return expected->getBufferSize() == actual->getBufferSize() &&
+           ::memcmp(
+               expected->getBufferPointer(),
+               actual->getBufferPointer(),
+               expected->getBufferSize()) == 0;
+}
+
+/// Checks the nested body contents used by the publication test, not just its block.
+/// Each add must still name the shared float type and the literal values written below.
+bool _matchesConcurrentBody(IRInst* func, Index addCount)
+{
+    IRInst* block = func->getFirstChild();
+    if (!block || block->getOp() != kIROp_Block || block->getNextInst())
+        return false;
+    IRInst* inst = block->getFirstChild();
+    for (Index i = 0; i < addCount; ++i)
+    {
+        if (!inst || inst->getOp() != kIROp_Add || inst->getOperandCount() != 2)
+            return false;
+        auto type = inst->getFullType();
+        auto left = as<IRFloatLit>(inst->getOperand(0));
+        auto right = as<IRFloatLit>(inst->getOperand(1));
+        if (!type || type->getOp() != kIROp_FloatType || !left || !right ||
+            left->getFullType() != type || right->getFullType() != type ||
+            left->value.floatVal != IRFloatingPointValue(i) || right->value.floatVal != 1.0)
+            return false;
+        inst = inst->getNextInst();
+    }
+    return inst && inst->getOp() == kIROp_Return && !inst->getNextInst();
+}
+
 /// Races many threads to first-touch the same deferred bodies. `outMismatches` counts
-/// threads that saw a body with the wrong instruction count -- what a torn or partially
-/// published body looks like. `outDeferredCount` distinguishes a real race from an eager
+/// threads that saw an incomplete body or incorrect operands, types or literal values.
+/// `outDeferredCount` distinguishes an exercise of materialization from an eager
 /// load, which races nothing.
 ///
 /// Scoped to materialization deliberately: running whole compiles concurrently on a shared
@@ -275,17 +350,16 @@ void _materializeBodiesConcurrently(
             outDeferredCount++;
     }
 
-    // Counted from the pre-serialization module, so the expectation does not come from the
-    // path under test.
-    List<Index> expected;
+    // Verify the fixture independently before asking the same content checker to inspect
+    // concurrent readers. A setup failure must not look like zero publication failures.
     for (IRInst* child : original->getModuleInst()->getChildren())
     {
-        if (child->getOp() != kIROp_Func)
-            continue;
-        expected.add(_countChildrenOf(child));
+        if (child->getOp() == kIROp_Func && !_matchesConcurrentBody(child, kBodyInstCount - 2))
+        {
+            outMismatches++;
+            return;
+        }
     }
-    if (expected.getCount() != funcs.getCount())
-        return;
 
     // Released together so every thread arrives at the same untouched body at once. Staggered
     // starts would let each body finish materializing before the next thread reached it,
@@ -339,7 +413,7 @@ void _materializeBodiesConcurrently(
                         // mutex and, on the winning thread, publishes the chain with a
                         // release store.
                         funcs[i]->ensureBodyMaterialized();
-                        if (_countChildrenOf(funcs[i]) != expected[i])
+                        if (!_matchesConcurrentBody(funcs[i], kBodyInstCount - 2))
                             mismatches.fetch_add(1);
                     }
                 }
@@ -907,6 +981,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     ComPtr<slang::IComponentType> linked;
     SLANG_CHECK_ABORT(composed->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
 
+    // Snapshot only global flags: walking their children here would consume the very
+    // work this test must leave for the backend. Some frontend materialization is fine;
+    // at least one of these particular bodies must be first touched by codegen below.
+    List<IRInst*> deferredBeforeCodegen;
+    for (auto& coreModule : asInternal(globalSession.get())->coreModules)
+    {
+        for (auto global : coreModule->getIRModule()->getGlobalInsts())
+        {
+            if (global->m_hasDeferredBody.load(std::memory_order_acquire))
+                deferredBeforeCodegen.add(global);
+        }
+    }
+    SLANG_CHECK_ABORT(deferredBeforeCodegen.getCount() > 0);
+
     // ---- parallel back end: the one concurrent use the API documents as supported ----
     const int kThreadCount = 8;
     List<String> outputs;
@@ -945,6 +1033,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         SLANG_CHECK(outputs[i] == outputs[0]);
     }
     SLANG_CHECK(outputs[0].getLength() > 0);
+    Index materializedDuringCodegen = 0;
+    for (auto global : deferredBeforeCodegen)
+    {
+        if (!global->m_hasDeferredBody.load(std::memory_order_acquire))
+            materializedDuringCodegen++;
+    }
+    SLANG_CHECK(materializedDuringCodegen > 0);
 }
 
 // Checks the two paths that decline deferral, and that declining changes nothing but cost.
@@ -1185,4 +1280,88 @@ SLANG_UNIT_TEST(irDeferredBodySurvivesMutationOfItsParent)
         SLANG_CHECK(result.splicedChildIndex == testCase.expectedSplicedChildIndex);
         SLANG_CHECK(result.decorationCount == testCase.expectedDecorationCount);
     }
+}
+
+SLANG_UNIT_TEST(irDeferredBodyPreservesForwardReferences)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    auto session = static_cast<Session*>(globalSession.get());
+    auto original = _createForwardReferenceModule(session);
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> loaded;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_roundTripModule(original, session, blob, loaded)));
+    auto func = _findFixtureFunction(loaded);
+    SLANG_CHECK_ABORT(func && func->m_hasDeferredBody.load());
+    auto entry = func->getFirstBlock();
+    SLANG_CHECK_ABORT(entry);
+    auto target = entry->getNextBlock();
+    SLANG_CHECK_ABORT(target && !target->getNextBlock());
+    auto branch = entry->getTerminator();
+    SLANG_CHECK_ABORT(branch && branch->getOp() == kIROp_UnconditionalBranch);
+    SLANG_CHECK_ABORT(branch->getOperandCount() == 2);
+    SLANG_CHECK(branch->getOperand(0) == target);
+    auto argument = as<IRFloatLit>(branch->getOperand(1));
+    SLANG_CHECK_ABORT(argument);
+    SLANG_CHECK(argument->value.floatVal == -3.25);
+    auto param = target->getFirstParam();
+    SLANG_CHECK_ABORT(param);
+    auto sum = param->getNextInst();
+    SLANG_CHECK_ABORT(sum && sum->getOp() == kIROp_Add);
+    SLANG_CHECK(sum->getOperand(0) == param);
+    auto returnInst = target->getTerminator();
+    SLANG_CHECK_ABORT(returnInst && returnInst->getOperandCount() == 1);
+    SLANG_CHECK(returnInst->getOperand(0) == sum);
+}
+
+SLANG_UNIT_TEST(irDeferredBodyMatchesEagerContents)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    auto session = static_cast<Session*>(globalSession.get());
+    auto original = _createForwardReferenceModule(session);
+    const BlobMode modes[] = {BlobMode::Matching, BlobMode::Null, BlobMode::Mismatched};
+    for (auto mode : modes)
+    {
+        ComPtr<ISlangBlob> expected;
+        RefPtr<IRModule> loaded;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(_roundTripModule(original, session, expected, loaded, mode)));
+        auto func = _findFixtureFunction(loaded);
+        SLANG_CHECK_ABORT(func);
+        SLANG_CHECK(func->m_hasDeferredBody.load() == (mode == BlobMode::Matching));
+        ComPtr<ISlangBlob> actual;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_serializeModule(loaded, actual)));
+        SLANG_CHECK(_serializedContentsMatch(expected, actual));
+    }
+}
+
+SLANG_UNIT_TEST(irDeferredBodyReserializesWithoutFirstTouch)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    auto session = static_cast<Session*>(globalSession.get());
+    auto original = _createForwardReferenceModule(session);
+    ComPtr<ISlangBlob> firstBlob;
+    RefPtr<IRModule> firstLoad;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_roundTripModule(original, session, firstBlob, firstLoad)));
+    auto func = _findFixtureFunction(firstLoad);
+    SLANG_CHECK_ABORT(func && func->m_hasDeferredBody.load());
+
+    // The writer must be the first body reader. No traversal or content comparison goes
+    // between the deferred-flag assertion and this second serialization.
+    ComPtr<ISlangBlob> secondBlob;
+    RefPtr<IRModule> secondLoad;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_roundTripModule(firstLoad, session, secondBlob, secondLoad)));
+    SLANG_CHECK(!func->m_hasDeferredBody.load());
+    SLANG_CHECK(_serializedContentsMatch(firstBlob, secondBlob));
+    auto secondFunc = _findFixtureFunction(secondLoad);
+    SLANG_CHECK_ABORT(secondFunc && secondFunc->m_hasDeferredBody.load());
+    ComPtr<ISlangBlob> finalBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_serializeModule(secondLoad, finalBlob)));
+    SLANG_CHECK(_serializedContentsMatch(firstBlob, finalBlob));
 }
