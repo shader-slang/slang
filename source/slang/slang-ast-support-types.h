@@ -1913,8 +1913,7 @@ FIDDLE() namespace Slang
         ///
         /// Indicated by using the `ref` modifier on a parameter together
         /// with the `readonly` modifier. The `const` keyword is accepted here
-        /// as a legacy alias for `readonly`. The checker does not accept
-        /// `readonly` on a `ref` parameter yet.
+        /// as a legacy alias for `readonly`.
         ///
         /// The same rules as `RefReadWrite` apply to the argument and to
         /// aliasing access paths; only the callee's access through the

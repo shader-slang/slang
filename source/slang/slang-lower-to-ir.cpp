@@ -3707,12 +3707,12 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
-        // On a `ref` parameter, `const` is accepted as a legacy alias for
-        // `readonly`: it restricts the callee's access to the caller's
-        // memory, so unlike `const` on a by-value parameter it is part of
-        // the mode.
-        return paramDecl->hasModifier<ConstModifier>() ? ParamPassingMode::RefReadOnly
-                                                       : ParamPassingMode::RefReadWrite;
+        // On a `ref` parameter, `readonly` (and `const`, its legacy alias)
+        // restricts the callee's access to the caller's memory, so unlike
+        // `const` on a by-value parameter it is part of the mode.
+        return paramDecl->hasModifier<ReadOnlyModifier>() || paramDecl->hasModifier<ConstModifier>()
+                   ? ParamPassingMode::RefReadOnly
+                   : ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {

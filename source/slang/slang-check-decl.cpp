@@ -683,6 +683,12 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
+
+    /// Replace the GLSL `readonly` memory qualifier on a `__ref` parameter of ordinary data
+    /// with a `ReadOnlyModifier`. The parameter's type must already be checked, because
+    /// `readonly` on an image or buffer stays the GLSL qualifier.
+    void reclassifyReadOnlyOnRefParam(ParamDecl* paramDecl);
+
     void deriveVarTypeFromInitExpr(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
@@ -1673,7 +1679,8 @@ QualType getTypeForDeclRef(
         qualType.type = getType(astBuilder, varDeclRef);
 
         bool isLValue = true;
-        if (varDeclRef.getDecl()->findModifier<ConstModifier>())
+        if (varDeclRef.getDecl()->findModifier<ConstModifier>() ||
+            varDeclRef.getDecl()->findModifier<ReadOnlyModifier>())
             isLValue = false;
 
         // Global-scope shader parameters should not be writable,
@@ -2557,6 +2564,35 @@ ImageFormat inferImageFormatFromTextureType(
         }
     }
     return format;
+}
+
+void SemanticsDeclHeaderVisitor::reclassifyReadOnlyOnRefParam(ParamDecl* paramDecl)
+{
+    if (!paramDecl->hasModifier<RefModifier>() || !paramDecl->type.type ||
+        isOpaqueHandleType(paramDecl->type.type))
+        return;
+
+    auto memoryQualifiers = paramDecl->findModifier<MemoryQualifierSetModifier>();
+    if (!memoryQualifiers)
+        return;
+
+    GLSLReadOnlyModifier* glslReadOnly = nullptr;
+    for (auto mod : memoryQualifiers->getModifiers())
+    {
+        if (auto readOnly = as<GLSLReadOnlyModifier>(mod))
+            glslReadOnly = readOnly;
+    }
+    if (!glslReadOnly)
+        return;
+
+    memoryQualifiers->removeQualifier(glslReadOnly, MemoryQualifierSetModifier::Flags::kReadOnly);
+    if (memoryQualifiers->getModifiers().getCount() == 0)
+        removeModifier(paramDecl, memoryQualifiers);
+
+    auto readOnlyModifier = getASTBuilder()->create<ReadOnlyModifier>();
+    readOnlyModifier->loc = glslReadOnly->loc;
+    readOnlyModifier->keywordName = glslReadOnly->keywordName;
+    addModifier(paramDecl, readOnlyModifier);
 }
 
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
@@ -7328,7 +7364,7 @@ static void addModifiersForParamPassingMode(
         break;
     case ParamPassingMode::RefReadOnly:
         addModifier(paramDecl, astBuilder->create<RefModifier>());
-        addModifier(paramDecl, astBuilder->create<ConstModifier>());
+        addModifier(paramDecl, astBuilder->create<ReadOnlyModifier>());
         break;
     case ParamPassingMode::RefWriteOnly:
         SLANG_UNEXPECTED("no parameter modifier spells a write-only reference");
@@ -14740,6 +14776,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     }
 
     maybeApplyLayoutModifier(paramDecl);
+
+    reclassifyReadOnlyOnRefParam(paramDecl);
 
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
