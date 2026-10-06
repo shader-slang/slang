@@ -2682,6 +2682,12 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
 
+    // Empty-type legalization can introduce new void fields and constructor arguments.
+    // Consider `struct Empty {}; struct Pair { uint value; Empty differential; };`.
+    // Legalization keeps a void placeholder for `differential` to preserve field positions.
+    // The earlier void cleanup has already run, so remove these new placeholders before emit.
+    SLANG_PASS(cleanUpVoidType);
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level
