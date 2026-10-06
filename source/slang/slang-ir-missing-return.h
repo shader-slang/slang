@@ -1,6 +1,8 @@
 // slang-ir-missing-return.h
 #pragma once
 
+#include "slang.h"
+
 namespace Slang
 {
 class DiagnosticSink;
