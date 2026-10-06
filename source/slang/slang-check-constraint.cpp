@@ -1798,6 +1798,26 @@ private:
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
+        // `TryJoinTypes()` is symmetric, so for an interface-typed `sub` it asks
+        // whether `sup` conforms to `sub`. For an equality constraint such as
+        // `T == S` with `T` defaulted to an interface, that answer (`S`) is the
+        // solution. For a subtype constraint it is the converse of what the
+        // constraint states, and it can recurse without bound. Consider:
+        //
+        //     extension<T> T : IRec<T> where T : IOther<T> {}
+        //     struct Z : IOther<Z> {}
+        //
+        // Linearizing `Z` applies the extension to its base `IOther<Z>`, so the
+        // constraint becomes `IOther<Z> : IOther<IOther<Z>>`. The converse query
+        // linearizes the strictly larger `IOther<IOther<Z>>`, which applies the
+        // extension again. An equality with an interface `sup` is already
+        // rejected as an improper equality constraint and has the same shape,
+        // so it is skipped as well. The witness step below still decides
+        // whether the interface subject satisfies the constraint.
+        bool isConcreteEquality = typeConstraintDecl->isEqualityConstraint && !isInterfaceType(sup);
+        if (isInterfaceType(sub) && !isConcreteEquality)
+            return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+
         // `TryJoinTypes()` is the existing path that compares a concrete type
         // against an interface shape and uses facet unification to append
         // ordinary constraints into `m_context.discoveredConstraints`. The
