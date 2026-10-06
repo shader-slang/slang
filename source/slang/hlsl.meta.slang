@@ -22071,18 +22071,22 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 //
 
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
-/// @return Zero-based index of the geometry in the current instance
+/// @return Zero-based index of the geometry in the current instance. On CUDA/OptiX, the SBT GAS index
+/// of the hit primitive, which equals the geometry index when every build input of the geometry
+/// acceleration structure has one shader binding table record (see "Geometry index" in the CUDA target
+/// documentation).
 /// @remarks Available in intersection, any-hit, and closest-hit shaders
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };
@@ -24205,6 +24209,8 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -24391,6 +24397,8 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -25152,6 +25160,7 @@ struct HitObject
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
+        /// On CUDA/OptiX, returns the SBT GAS index of the hit primitive; see `GeometryIndex()`.
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
