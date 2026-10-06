@@ -743,7 +743,11 @@ struct IRInst
         return IROperandList<T>(bb.getCursor(), ee.getCursor());
     }
 
-    // The first use of this value (start of a linked list)
+    // The first use of this value (start of a linked list).
+    // In a module with deferred bodies, this lists only materialized uses. Decoding a
+    // body inserts uses even into eager globals, so shared source-module readers must
+    // not traverse or mutate this list concurrently with materialization. Backend
+    // use-list transformations operate on the separately linked destination module.
     IRUse* firstUse = nullptr;
 
 

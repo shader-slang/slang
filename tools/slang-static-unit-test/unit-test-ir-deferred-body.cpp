@@ -308,8 +308,10 @@ void _materializeBodiesConcurrently(
                 // `getFirstDecoration`, `getNextDecoration` and
                 // `IRDecorationList::Iterator::operator++` load it with acquire. Unless
                 // some thread is walking decorations while another publishes into
-                // `lastDecoration->next`, that race is never run and dropping those
-                // acquires passes every test.
+                // `lastDecoration->next`, the competing access is not exercised. This
+                // checks observed contents under contention; an ordinary x86 run cannot
+                // establish that acquire/release ordering is correct. Run this test under
+                // ThreadSanitizer where supported to check the synchronization as well.
                 const bool walksDecorations = (threadIndex % 2) == 1;
                 for (Index i = 0; i < funcs.getCount(); ++i)
                 {
@@ -763,7 +765,7 @@ CrossRegionResult _roundTripCrossRegion(
 
 // Checks that a decoration's own children survive on-demand loading.
 //
-// This guards the `inEagerDecoration` rule in `_computeEagerSkeleton`. Decorations are kept
+// This guards the `inEagerDecoration` rule in `_computeDeferralRegions`. Decorations are kept
 // eager because the symbol index reads them without materializing anything, and a
 // decoration that is itself a parent means keeping the decoration is not enough: its
 // children are reachable only through it, so nothing on that path would ever trigger the
@@ -1042,11 +1044,11 @@ SLANG_UNIT_TEST(irDeferredBodyLoaderDoesNotRetainItsModule)
 // Checks the suffix rule: a decoration that appears *after* a body instruction belongs to
 // the deferred body, not to the eager skeleton.
 //
-// Two pieces of logic decide the eager/deferred cut and must agree exactly.
-// `_computeEagerSkeleton` marks a depth-2 instruction eager only while no body child has
+// The region map decides the eager/deferred cut for both allocation and decoding.
+// `_computeDeferralRegions` marks a depth-2 instruction eager only while no body child has
 // been seen (`inEagerDecoration = !inBody && isDecoration`), and `decodeInst` records the
-// deferred body as "the last n children" from the first non-eager child onward. Both are
-// suffix-shaped, so a trailing decoration is deferred by both.
+// deferred body as "the last n children" from the first non-eager child in that map.
+// This suffix-shaped rule leaves a trailing decoration in the deferred body.
 //
 // If they ever disagree -- the scan calling a trailing decoration eager while `decodeInst`
 // still counts it inside the body -- the instruction is allocated by the load walk, linked

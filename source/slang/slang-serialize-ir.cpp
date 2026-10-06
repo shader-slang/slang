@@ -649,13 +649,6 @@ static void _computeDeferralRegions(
     }
 }
 
-/// Decoding state for a module's flat instruction table.
-///
-/// The same walk serves two purposes, which is why it lives in an object rather than a
-/// lambda: it runs once over the whole module at load time, and then again over a single
-/// subtree each time a deferred body is asked for. Holding the flat table and the
-/// instruction array keeps the second use possible -- a body's operands are indices into
-/// that array, and may name any module-scope global.
 /// True if no instruction reaches into a deferred body other than its own.
 ///
 /// Deferral rests on this. An eager instruction whose operand names an instruction inside
@@ -703,6 +696,13 @@ static bool _deferralRegionsAreClosed(
     return true;
 }
 
+/// Decoding state for a module's flat instruction table.
+///
+/// The same walk serves two purposes, which is why it lives in an object rather than a
+/// lambda: it runs once over the whole module at load time, and then again over a single
+/// subtree each time a deferred body is asked for. Holding the flat table and the
+/// instruction array keeps the second use possible -- a body's operands are indices into
+/// that array, and may name any module-scope global.
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
@@ -908,7 +908,19 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 
     // Build the body as a detached chain first, then attach it with a single store.
     //
-    // The children are unreachable by any other thread while they are being built, so
+    // This publishes child links, not use lists. For example, decoding `return f(x)`
+    // calls IRUse::init for `f` and its type, adding uses to eager globals that other
+    // threads can already see. The decoder mutex serializes those insertions. Shared
+    // source-module readers must follow operands/children, not traverse or mutate use
+    // lists: those lists are incomplete until all referencing bodies are materialized,
+    // and reading them during a decode would race IRUse::init.
+    //
+    // linkIR creates a separate destination in initializeSharedSpecContext;
+    // cloneGlobalValueWithCodeCommon follows source operands/children into that copy.
+    // Backend use-list transformations, including convertAtomicToStorageBuffer, operate
+    // on the destination. A new source-module consumer must preserve this distinction.
+    //
+    // The children are unreachable through child links while they are being built, so
     // linking them to each other needs no synchronization. Attaching must then be the
     // only publication, and exactly one store: splicing the chain on as it is built --
     // linking the first child to the last decoration before the rest exist -- would let a

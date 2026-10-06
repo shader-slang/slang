@@ -1314,6 +1314,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Add a slang library - such that its contents can be referenced during linking.
     This is equivalent to the -r command line option.
 
+    The implementation retains its own copy of the library data.
+    An application may free `libData` immediately after this call returns.
+
     @param basePath The base path used to lookup referenced modules.
     @param libData The library data
     @param libDataSize The size of the library data
