@@ -10,13 +10,13 @@ entirely from the command line — there is deliberately no CMake target to buil
 that runs `run-tutorial.sh` (whose golden-file checks fail on drift) is a planned
 follow-up; until then the check runs whenever a human runs the script.
 
-| File | Role |
-| --- | --- |
-| `hello-coverage.slang` | The compute shader the chapter instruments. |
-| `hello-coverage-host.cpp` | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, prints the outputs, and writes the raw counters. It uses no Slang headers or library. Pass `--no-coverage` to skip the counter report and run it as a plain CPU shared-library dispatch. |
-| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both fail on drift from any number the chapter publishes: the SPIR-V manifest's `counter_count`/`space`/`binding`, the host program's printed outputs and counters, and the produced LCOV records. |
-| `expected.lcov` | The LCOV records the chapter publishes; the single copy both runner scripts assert against. |
-| `expected-host-output.txt` | The host program's stdout as the chapter publishes it (outputs and raw counter slots); both runner scripts assert against it. |
+| File                                   | Role                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hello-coverage.slang`                 | The compute shader the chapter instruments.                                                                                                                                                                                                                                                                                            |
+| `hello-coverage-host.cpp`              | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, prints the outputs, and writes the raw counters. It uses no Slang headers or library. Pass `--no-coverage` to skip the counter report and run it as a plain CPU shared-library dispatch. |
+| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both fail on drift from any number the chapter publishes: the SPIR-V manifest's `counter_count`/`space`/`binding`, the host program's printed outputs and counters, and the produced LCOV records.          |
+| `expected.lcov`                        | The LCOV records the chapter publishes; the single copy both runner scripts assert against.                                                                                                                                                                                                                                            |
+| `expected-host-output.txt`             | The host program's stdout as the chapter publishes it (outputs and raw counter slots); both runner scripts assert against it.                                                                                                                                                                                                          |
 
 ## Quick run
 
@@ -81,6 +81,8 @@ Thread 0 uses a gain of 1.0 and the other three use 2.0, so `applyGain`'s branch
 3/1 (slots 1 and 2). Slot 6 is `value = 0.0` (line 19), which no input exercises — the
 LCOV report shows it in red.
 
-For GPU dispatch and the in-process (C++ API) workflow, see
-[`examples/shader-coverage-image-pipeline`](../shader-coverage-image-pipeline) and
-[`examples/shader-coverage-bvh-traversal`](../shader-coverage-bvh-traversal).
+For a host using slang-rhi, continue with the
+[image-pipeline example](../shader-coverage-image-pipeline/). For an engine with
+its own runtime, use the [native backend example](../shader-coverage-backends/).
+See [Choose your coverage integration path](../../docs/user-guide/a3-01-shader-coverage.md#choose-your-coverage-integration-path)
+for the available workflows.

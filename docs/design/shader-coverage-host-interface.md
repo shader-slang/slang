@@ -155,7 +155,7 @@ reservation is a follow-up design tracked at
 | Vulkan / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                     |
 | Direct Metal hosts                      | `getResourceInfo(...)`                                                      | read `binding` as the `[[buffer(N)]]` index; `space == -1` is the expected sentinel (see "Direct Metal host binding recipe" below) |
 | CUDA / CPU-style marshaling hosts       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                |
-| `slang-rhi` (planned)                   | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` once the companion slang-rhi support lands (see "`slang-rhi` consumption model" below)                |
+| `slang-rhi` (Vulkan / CUDA)             | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` (see "`slang-rhi` consumption model" below)                                                           |
 
 D3D12 / HLSL hosts are expected to use the same `space` / `binding`
 metadata shape; defining the D3D12 runtime binding policy is part of
@@ -382,11 +382,11 @@ wraparound past 2^32 hits per counter slot.
 
 ## `slang-rhi` consumption model
 
-The `slang-rhi` integration is planned work, tracked in
-[shader-slang/slang-rhi#739](https://github.com/shader-slang/slang-rhi/pull/739);
-the interface names below come from that in-flight change, while the
-Slang side of the contract (the metadata objects above) is what it
-consumes. The intended flow:
+The optional API in `<slang-rhi/synthetic-bindings.h>` is available in the
+pinned slang-rhi dependency. Vulkan and CUDA support global synthetic resources;
+CPU, Metal, D3D11, D3D12 and WGPU reject non-empty synthetic descriptors. This
+RHI support matrix is separate from compiler instrumentation and native host
+support. The flow is:
 
 1. Slang compiles the shader and exposes `ICoverageTracingMetadata`
    and `ISyntheticResourceMetadata`.
@@ -403,3 +403,10 @@ The important design choice is that `slang-rhi` does not introduce a
 separate backend-specific raw binding model in its core API: hidden
 resources map into ordinary resolved `ShaderOffset`s, keeping the
 runtime binding model uniform.
+
+The [image-pipeline example](../../examples/shader-coverage-image-pipeline/)
+shows automatic placement with RHI; the
+[BVH example](../../examples/shader-coverage-bvh-traversal/) shows explicit placement.
+Both register the resulting compiler metadata before creating the RHI program.
+The [backend example](../../examples/shader-coverage-backends/) instead demonstrates
+native binding without RHI, including CPU and Metal.
