@@ -34,7 +34,8 @@ static void diagnoseMissingReturnForTarget(
 {
     if (languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
     {
-        sink->diagnose(Diagnostics::MissingReturnNotAllowedInSlang202c{.location = missingReturn->sourceLoc});
+        sink->diagnose(
+            Diagnostics::MissingReturnNotAllowedInSlang202c{.location = missingReturn->sourceLoc});
     }
     else if (doesTargetAllowMissingReturns(target))
     {
@@ -91,7 +92,12 @@ void checkForMissingReturns(
     bool diagnoseWarning)
 {
     // Look for any `missingReturn` instructions
-    checkForMissingReturnsRec(module->getModuleInst(), sink, languageVersion, target, diagnoseWarning);
+    checkForMissingReturnsRec(
+        module->getModuleInst(),
+        sink,
+        languageVersion,
+        target,
+        diagnoseWarning);
 }
 
 } // namespace Slang
