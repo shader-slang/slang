@@ -255,9 +255,9 @@ struct CollectGlobalUniformParametersContext
             //
             auto fieldKey = builder->createStructKey();
 
-            // A global varying is not collected. Both the element layout and the
-            // offset-element layout of the global-scope parameter group name it, so we
-            // re-key every layout that does, leaving no module-scope use of the variable.
+            // The element and offset-element layouts of the global-scope parameter group
+            // both name a global varying. We re-key every such layout, because a layout
+            // left naming the variable is a module-scope use that later passes cannot place.
             //
             auto originalKey = fieldLayoutAttr->getFieldKey();
             if (_isGlobalVaryingVar(originalKey))
