@@ -5197,6 +5197,13 @@ err(
     span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
 )
 
+err(
+    "missing-return-not-allowed-in-slang-202c",
+    40025,
+    "non-void function must return in Slang 202c and later",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c and later" }
+)
+
 warning(
     "missing-return",
     41010,

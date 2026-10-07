@@ -23,10 +23,14 @@ For coverage-driven _analysis_ workflows on realistic kernels, see the
 sibling examples `shader-coverage-image-pipeline` and
 `shader-coverage-bvh-traversal`.
 
+This example intentionally uses native APIs and has no slang-rhi dependency.
+For the RHI integration path, start with
+[`shader-coverage-image-pipeline`](../shader-coverage-image-pipeline/); the
+[BVH example](../shader-coverage-bvh-traversal/) also shows explicit placement.
+
 The Vulkan path uses the shared
 [`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
-and [implementation](../shader-coverage-common/vk_compute_demo.cpp), the same
-runtime helper as those two examples. It is compiled only when a Vulkan loader
+and [implementation](../shader-coverage-common/vk_compute_demo.cpp), which remains the native Vulkan reference. It is compiled only when a Vulkan loader
 is found; the CPU, CUDA, and Metal paths do not depend on it.
 
 ## Running
@@ -104,6 +108,15 @@ entry indices and counter indices are not interchangeable. The saved
   when running from outside the source tree.
 
 ## Build requirements
+
+To build without slang-rhi (tests also require RHI, so disable them):
+
+```bash
+cmake -S . -B build-native -G "Ninja Multi-Config" \
+    -DSLANG_ENABLE_SLANG_RHI=OFF -DSLANG_ENABLE_TESTS=OFF \
+    -DSLANG_ENABLE_EXAMPLES=ON
+cmake --build build-native --config Release --target shader-coverage-backends
+```
 
 - CPU path: a system C++ toolchain for host-callable compilation.
   Required — coverage instrumentation is skipped on the slang-llvm JIT
