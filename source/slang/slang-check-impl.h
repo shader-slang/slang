@@ -2208,6 +2208,12 @@ public:
     // Capture the "base" expression in case this is a member reference
     Expr* GetBaseExpr(Expr* expr);
 
+    /// Try to constant-fold a global or static const variable's initializer.
+    /// Store the result in varDecl->val, preserving any previously computed value.
+    /// If folding fails, varDecl->val remains null.
+    /// For an extern declaration, this evaluates its default initializer.
+    void tryConstantFoldInitializer(VarDeclBase* varDecl);
+
     /// Validate a declaration to ensure that it doesn't introduce a circularly-defined constant
     ///
     /// Circular definition in a constant may lead to infinite looping or stack overflow in

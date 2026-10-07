@@ -2257,6 +2257,26 @@ bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
     return false;
 }
 
+void SemanticsVisitor::tryConstantFoldInitializer(VarDeclBase* varDecl)
+{
+    if (varDecl->val)
+        return;
+    if (!varDecl->initExpr)
+        return;
+    if (!isValidSpecializationConstantType(varDecl->type.type))
+        return;
+
+    auto parentDecl = getParentDecl(varDecl);
+    bool isGlobalOrStaticConst = varDecl->findModifier<ConstModifier>() &&
+                                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
+                                  varDecl->findModifier<HLSLStaticModifier>());
+    if (isGlobalOrStaticConst)
+    {
+        varDecl->val =
+            tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+    }
+}
+
 IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
 {
     // The easiest way to test if the declaration is circular is to
@@ -2777,20 +2797,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
-    if (varDecl->initExpr)
-    {
-        if (as<BasicExpressionType>(varDecl->type.type))
-        {
-            auto parentDecl = getParentDecl(varDecl);
-            if (varDecl->findModifier<ConstModifier>() &&
-                (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
-                 varDecl->findModifier<HLSLStaticModifier>()))
-            {
-                varDecl->val =
-                    tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
-            }
-        }
-    }
+    tryConstantFoldInitializer(varDecl);
 
     checkMeshOutputDecl(varDecl);
 
@@ -3469,9 +3476,15 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         varDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
-        // Update constant value
-        //
-        if (!varDecl->val)
+        // The earlier folding attempt may have encountered unresolved names.
+        // Try again now that CheckTerm has checked the initializer.
+        auto errorCountBeforeFolding = getSink()->getErrorCount();
+        if (errorCountBeforeFolding == errorCountBeforeInitCheck)
+            tryConstantFoldInitializer(varDecl);
+
+        // Constant folding can diagnose circular initializers such as A = B, B = A.
+        // Skip the check below if folding reported an error, to avoid duplicate diagnostics.
+        if (!varDecl->val && getSink()->getErrorCount() == errorCountBeforeFolding)
         {
             varDecl->val = _validateCircularVarDefinition(varDecl);
             // If this is a global `static const` variable and we still couldn't constant-fold
