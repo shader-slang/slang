@@ -193,13 +193,13 @@ counters are inserted, with examples, see
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
    - **Assigns canonical line counters** per function/file/line. Multiple
-     markers on one line count entry into their source-mapped CFG region,
-     including another visit on a loop cycle wholly within that region.
+     markers on one line are counted through a single block of the line's
+     CFG region: its loop header if it has one, else the block dominating
+     the rest of the line.
      Lines confined to one block retain coalescing when they execute together.
      Function and branch markers retain dedicated counters.
    - **Rewrites markers** as atomic counter updates in count mode, or
-     stores of `1` in boolean mode. Count-mode line regions use temporary
-     visited state, then SSA construction removes that storage. Metadata
+     stores of `1` in boolean mode. Metadata
      records each canonical line once; consumers deduplicate slot aliases
      per line and OR boolean hits.
    - **Records source entries on the artifact's

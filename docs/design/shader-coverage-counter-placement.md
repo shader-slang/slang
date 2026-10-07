@@ -40,17 +40,18 @@ int conditional(int x) { if (x > 0) return 1; else return 2; }
 
 Lowering emits markers before executable statements and at evaluated scalar
 conditions and conditional-expression arms. The coverage pass groups markers
-by function, source file, and line. Blocks containing that line form a region;
-compiler-generated blocks without line markers are transparent. Entering the
-region counts one visit. A back edge that cycles entirely within the region
-starts another visit, so a one-line loop counts repeated condition evaluations.
-A temporary visited flag prevents counting both the condition and selected
-return of a one-line `if` twice. Count-mode probes are guarded by this state,
-so a repeated visit does not issue an atomic addition of zero. SSA construction
-removes the temporary storage, and ordinary simplification removes constant guards.
-Boolean mode only records whether any part of the line executed and needs no
-visited state. A probe dominated by another probe of the same line is omitted,
-since the first probe already guarantees that the hit flag is set.
+by function, source file, and line. Blocks containing that line form a region,
+and the region is counted through one block so that `conditional` above reports
+one visit per call, not the condition plus the selected return. If the region
+contains a loop header, that header is the counted block: it runs once per
+iteration and once more on exit, so a `for` header reports its condition
+evaluations even though its initializer, test, and increment lie in different
+blocks. Otherwise the counted block is the one that dominates the rest of the
+region, and a probe dominated by another probe of the same line is omitted.
+Both rules need only one dominator tree per function and no runtime state, in
+count and boolean mode alike. A loop confined to a single source line is the
+exception: it counts executions of its counted block, which is the loop header
+only when the loop has a test.
 
 Each function/file/line has one canonical metadata entry. Distinct source
 functions on the same line contribute separate counts. Lines confined to a
@@ -103,8 +104,8 @@ The normal `coverageCpuRuntimeLineRegions` and
 `coverageCpuRuntimeExpressionBranches` unit tests also exercise these semantics
 without requiring GCC, gcov, or genhtml. They cover both counter widths and modes,
 one-line loops, nested loops, early exits, skipped operands, and nested expressions.
-`coverage-line-region-probes.slang` checks for redundant zero-valued atomics and
-compiles the region control flow to SPIR-V.
+`coverage-line-region-probes.slang` checks that a multi-block line issues one
+probe and compiles the region control flow to SPIR-V.
 
 ## Function Coverage: `-trace-function-coverage`
 
