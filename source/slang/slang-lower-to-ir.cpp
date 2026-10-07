@@ -11480,24 +11480,63 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl) { return lowerConstantDeclCommon(decl); }
 
+    // Create an IR global variable storing `valueType`, with the declaration metadata of `decl`.
+    //
+    // Requires the builder in `subContext` to insert at global scope or inside an enclosing
+    // generic, with its current source location set to `decl->loc` for debug information.
+    // `valueType` is the stored value's type; this function creates the pointer type for storage.
+    IRGlobalVar* createGlobalVarStorage(IRGenContext* subContext, VarDecl* decl, IRType* valueType)
+    {
+        auto builder = subContext->irBuilder;
+        auto storage = builder->createGlobalVar(valueType);
+
+        // We attach linkage and a name for references from other compilation units and emission.
+        // `maybeSetRate` translates storage modifiers such as `groupshared` and `__actualGlobal`
+        // to IR rates, which target passes use to distinguish shared and persistent storage.
+        addLinkageDecoration(subContext, storage, decl);
+        addNameHint(subContext, storage, decl);
+        maybeSetRate(subContext, storage, decl);
+
+        // We translate variable attributes and record debug information. The
+        // `IRHighLevelDeclDecoration` also associates the storage with its AST declaration.
+        addVarDecorations(subContext, storage, decl);
+        maybeAddDebugLocationDecoration(subContext, storage);
+        builder->addHighLevelDeclDecoration(storage, decl);
+        return storage;
+    }
+
+    // Begin the initializer block of a global variable and insert subsequent instructions there.
+    //
+    // Requires `storage` to have no initializer blocks. The caller emits code ending in an
+    // `IRReturn` of the stored value's type. Target initialization passes or emission use that
+    // returned value to initialize `storage`.
+    void beginGlobalVarInitializer(IRBuilder* builder, IRGlobalVar* storage)
+    {
+        builder->setInsertInto(storage);
+        auto block = builder->emitBlock();
+        builder->setInsertInto(block);
+    }
+
+    // Lower a global declaration as a shader parameter, constant, or variable with storage.
+    //
+    // Returns the value or pointer used for subsequent references to `decl`. Function-scope
+    // `static` declarations are emitted outside the function, inside any enclosing generics.
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
     {
-        // A non-`static` global is actually a shader parameter in HLSL.
-        //
-        // TODO: We should probably make that case distinct at the AST
-        // level as well, since global shader parameters are fairly
-        // different from global variables.
-        //
+        // We first distinguish shader parameters from variables with implementation storage.
+        // `isGlobalShaderParameter` accounts for scope and storage modifiers, including HLSL's
+        // convention that an unqualified file or namespace variable is a shader parameter.
         if (isGlobalShaderParameter(decl))
         {
             return lowerGlobalShaderParam(decl);
         }
 
-        // A `static const` global is actually a compile-time constant.
+        // We lower `static const` declarations as constants instead of allocating storage.
         //
-        if (decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
+        if (decl->hasModifier<HLSLStaticModifier>())
         {
-            return lowerGlobalConstantDecl(decl);
+            if (decl->hasModifier<ConstModifier>())
+                return lowerGlobalConstantDecl(decl);
         }
 
         NestedContext nested(this);
@@ -11506,60 +11545,115 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRGeneric* outerGeneric = nullptr;
 
-        // If we are static, then we need to insert the declaration before the parent.
-        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl`
-        // functionality
+        // We now choose where to emit storage. A function-scope `static` variable must be
+        // emitted outside its function, but inside any generics that specialize the variable.
         if (isFunctionStaticVarDecl(decl))
         {
-            // We need to insert the constant at a level above
-            // the function being emitted. This will usually
-            // be the global scope, but it might be an outer
-            // generic if we are lowering a generic function.
             subBuilder->setInsertBefore(subBuilder->getFunc());
         }
         else if (!isFunctionVarDecl(decl))
         {
+            // File, namespace, and aggregate declarations may also be enclosed by generics.
+            // We emit those generics before creating the variable's storage.
             outerGeneric = emitOuterGenerics(subContext, decl, decl);
         }
 
         IRType* varType = lowerType(subContext, decl->getType());
 
-        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use
-        // a decoration to identify an *actual* global?
+        // We create storage using the helper shared with uniform shadows.
+        auto irGlobal = createGlobalVarStorage(subContext, decl, varType);
 
-        IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(varType);
-
-        addLinkageDecoration(subContext, irGlobal, decl);
-        addNameHint(subContext, irGlobal, decl);
-
-        maybeSetRate(subContext, irGlobal, decl);
-
-        addVarDecorations(subContext, irGlobal, decl);
-        maybeAddDebugLocationDecoration(subContext, irGlobal);
-
-        if (decl)
+        // A linked replacement can introduce resources into an otherwise ordinary value type.
+        // We record the file/namespace `static` category so linked-type validation can enforce
+        // its storage restriction without applying it to static aggregate members or locals.
+        if (isGlobalDecl(decl))
         {
-            subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
+            if (decl->hasModifier<HLSLStaticModifier>())
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
         {
-            subBuilder->setInsertInto(irGlobal);
-
-            IRBlock* entryBlock = subBuilder->emitBlock();
-            subBuilder->setInsertInto(entryBlock);
+            // For a declaration with an initializer, we emit a block that returns its initial
+            // value. Target initialization passes or emission later store that value in the global.
+            beginGlobalVarInitializer(subBuilder, irGlobal);
 
             LoweredValInfo initVal = lowerLValueExpr(subContext, initExpr);
             subContext->irBuilder->emitReturn(getSimpleVal(subContext, initVal));
         }
 
-        // A global variable's SSA value is a *pointer* to
-        // the underlying storage.
+        // We finish any enclosing generics so each specialization refers to its own storage.
+        // The lowered result remains a pointer. We register it so later references to `decl`
+        // access that storage rather than lowering another variable.
         auto loweredValue =
             LoweredValInfo::ptr(finishOuterGenerics(subBuilder, irGlobal, outerGeneric));
         context->setGlobalValue(decl, loweredValue);
 
         return loweredValue;
+    }
+
+    // Lower a uniform parameter shadow to private storage or an alias to its input.
+    //
+    // Requires header checking to have selected `decl`'s type and `shouldBeImmutableAlias`.
+    // Registers and returns the lowered value used by all subsequent references to `decl`.
+    LoweredValInfo visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl* decl)
+    {
+        // We need to initialize the shadow from its underlying parameter. We first lower
+        // that parameter using ordinary shader-parameter lowering to obtain its IR value.
+        auto parameter = decl->uniformParameter;
+        auto input = ensureDecl(context, parameter);
+
+        // Next, we need the value that will initialize the shadow. For a legacy `cbuffer`,
+        // header checking selects the buffer's element struct as the shadow's type. The
+        // parameter still has its `ConstantBuffer<T>` type and its original binding.
+        // Ordinary shader-parameter lowering represents that buffer as a simple,
+        // pointer-like IR value, which we can dereference to obtain the element struct.
+        auto initialValue = input;
+        if (!decl->getType()->equals(parameter->getType()))
+        {
+            SLANG_RELEASE_ASSERT(parameter->hasModifier<ImplicitParameterGroupVariableModifier>());
+            auto bufferType = as<ConstantBufferType>(parameter->getType());
+            SLANG_RELEASE_ASSERT(bufferType);
+            SLANG_RELEASE_ASSERT(decl->getType()->equals(bufferType->getElementType()));
+            SLANG_RELEASE_ASSERT(input.flavor == LoweredValInfo::Flavor::Simple);
+            // We use the existing pointer representation for implicit buffer dereference.
+            // `getSimpleVal` will emit a load when a caller needs the whole struct value.
+            initialValue = LoweredValInfo::ptr(input.val);
+        }
+
+        // Header checking requires an alias for unsupported storage and specialization constants.
+        // `GetTypeForDeclRef` made references immutable. We map them to the parameter value,
+        // or to its contents for a legacy buffer, without changing the computed shadow type.
+        if (decl->shouldBeImmutableAlias)
+        {
+            context->setGlobalValue(decl, initialValue);
+            return initialValue;
+        }
+
+        // Otherwise, we need an IR global variable and initialization code for the shadow.
+        // We create its storage using the shared helper for ordinary `static` globals.
+        NestedContext nested(this);
+        auto builder = nested.getBuilder();
+        auto subContext = nested.getContext();
+        auto valueType = lowerType(subContext, decl->getType());
+        auto storage = createGlobalVarStorage(subContext, decl, valueType);
+
+        // Mutable shadows have the storage rules of file/namespace `static` variables.
+        // We record that category for validation of types resolved during linking.
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+
+        // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
+        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
+        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
+        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        beginGlobalVarInitializer(builder, storage);
+        builder->emitReturn(getSimpleVal(subContext, initialValue));
+
+        // We register the pointer to the new storage so every reference to the shadow,
+        // including references in helper functions, accesses that variable.
+        auto result = LoweredValInfo::ptr(storage);
+        context->setGlobalValue(decl, result);
+        return result;
     }
 
     LoweredValInfo lowerFunctionStaticConstVarDecl(VarDeclBase* decl)

@@ -687,6 +687,12 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
+    // Determine the type and mutability of a uniform parameter shadow.
+    //
+    // Requires the parser-created association in `decl->uniformParameter`. Sets the checked type
+    // and `shouldBeImmutableAlias`; the shadow has no written type or initializer to check.
+    void visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl* decl);
+
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
     void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
@@ -948,6 +954,14 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    // Check the body of a synthesized uniform parameter shadow.
+    void visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl*)
+    {
+        // We have no initializer expression to check for a shadow: the parser only records
+        // its associated parameter. Lowering will initialize the shadow from that parameter,
+        // which we check independently as an ordinary shader parameter declaration.
+    }
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -1594,6 +1608,10 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 /// Is `decl` a global shader parameter declaration?
 bool isGlobalShaderParameter(VarDeclBase* decl)
 {
+    // We exclude uniform shadows because they are implementation variables, not shader inputs.
+    if (as<UniformParameterShadowVarDecl>(decl))
+        return false;
+
     // If it's an *actual* global it is not a global shader parameter
     if (decl->hasModifier<ActualGlobalModifier>())
     {
@@ -1673,17 +1691,20 @@ QualType getTypeForDeclRef(
         qualType.type = getType(astBuilder, varDeclRef);
 
         bool isLValue = true;
+        if (auto shadowVar = as<UniformParameterShadowVarDecl>(varDeclRef.getDecl()))
+        {
+            // Header checking applies the mutable-global type restriction to a shadow.
+            // We make references immutable when the shadow must alias its parameter instead.
+            isLValue = !shadowVar->shouldBeImmutableAlias;
+        }
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
             isLValue = false;
 
         // Global-scope shader parameters should not be writable,
         // since they are effectively program inputs.
         //
-        // TODO: We could eventually treat a mutable global shader
-        // parameter as a shorthand for an immutable parameter and
-        // a global variable that gets initialized from that parameter,
-        // but in order to do so we'd need to support global variables
-        // with resource types better in the back-end.
+        // With HLSL compatibility enabled, the parser introduces a shadow variable for uses
+        // within the shader. The underlying parameter remains immutable in either mode.
         //
         if (isGlobalShaderParameter(varDeclRef.getDecl()))
             isLValue = false;
@@ -1710,9 +1731,15 @@ QualType getTypeForDeclRef(
             }
         }
 
-        // Ensures child of struct is set read-only or not
+        // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
+        // compatibility mode. The parser keeps these modifiers on the underlying parameter,
+        // so we obtain them from that declaration without replacing the shadow's value type.
+        auto declForMemoryQualifier = varDeclRef.getDecl();
+        if (auto shadow = as<UniformParameterShadowVarDecl>(declForMemoryQualifier))
+            declForMemoryQualifier = shadow->uniformParameter;
+
         bool isWriteOnly = false;
-        if (auto collection = varDeclRef.getDecl()->findModifier<MemoryQualifierSetModifier>())
+        if (auto collection = declForMemoryQualifier->findModifier<MemoryQualifierSetModifier>())
         {
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
             {
@@ -2650,6 +2677,140 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     _validateCircularVarDefinition(varDecl);
 }
 
+// Test whether `typeTags` permit mutable file or namespace variable storage.
+//
+// This is the shared type restriction for ordinary `static` globals and uniform shadows.
+// Requires the tags of the checked variable type. A true result means no currently known
+// storage restriction applies. Ordinary type checking still validates the type; after linking,
+// shared IR validation rejects opaque or unsized storage that a replacement definition introduces.
+static bool isTypeAllowedForMutableGlobalVariable(TypeTag typeTags)
+{
+    // We need to reject resource storage until the back end can legalize mutable resource
+    // globals. `TypeTag::Opaque` includes structs and arrays containing such resources.
+    if ((int)typeTags & (int)TypeTag::Opaque)
+        return false;
+
+    // We cannot allocate a private variable containing an array with an absent or unbounded
+    // element count. A count that will be resolved by linking is a separate, allowed case.
+    if ((int)typeTags & (int)TypeTag::Unsized)
+        return false;
+
+    // Mutable global storage requires an addressable value that we can load and replace.
+    // `ParameterBlock<T>` instead represents a binding container, so we cannot allocate
+    // ordinary variable storage for it even when its elements have fixed sizes.
+    if ((int)typeTags & (int)TypeTag::NonAddressable)
+        return false;
+
+    // No known storage restriction applies. We allow the general case, including types
+    // whose final definition or array size will be supplied during linking. After linking
+    // and specialization, `validateMutableGlobalVariableTypes` checks opaque and unsized storage.
+    return true;
+}
+
+// Check the type of a mutable file or namespace `static` variable.
+//
+// Requires `typeTags` to describe `decl`'s checked type. Diagnoses opaque and non-addressable
+// storage; `SemanticsDeclBodyVisitor::checkVarDeclCommon` reports unsized storage before calling.
+static void checkMutableGlobalVariableType(
+    SemanticsVisitor* visitor,
+    VarDeclBase* decl,
+    TypeTag typeTags)
+{
+    // We only apply the mutable-global restriction to file and namespace `static` variables.
+    // Function locals and shader parameters have different storage rules.
+    if (!isGlobalDecl(decl))
+        return;
+    if (!decl->hasModifier<HLSLStaticModifier>())
+        return;
+
+    // A `const` global does not need mutable storage, so the restriction does not apply.
+    if (decl->hasModifier<ConstModifier>())
+        return;
+    if (isTypeAllowedForMutableGlobalVariable(typeTags))
+        return;
+
+    // We diagnose attempts to allocate mutable resource globals, including arrays and structs
+    // containing resources. Removing mutability or declaring a shader parameter can be valid
+    // alternatives, depending on whether the declaration has an initializer.
+    if ((int)typeTags & (int)TypeTag::Opaque)
+    {
+        visitor->getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = decl});
+        if (decl->initExpr)
+            visitor->getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = decl});
+        else
+            visitor->getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = decl});
+        return;
+    }
+
+    // `SemanticsDeclBodyVisitor::checkVarDeclCommon` already reported unsized storage.
+    // We avoid reporting a second error for the same storage restriction.
+    if ((int)typeTags & (int)TypeTag::Unsized)
+        return;
+
+    // The remaining unsupported form is a non-addressable value, such as `ParameterBlock<T>`.
+    // We diagnose it before lowering attempts to allocate mutable global storage.
+    SLANG_RELEASE_ASSERT((int)typeTags & (int)TypeTag::NonAddressable);
+    visitor->getSink()->diagnose(Diagnostics::MutableGlobalRequiresAddressableType{.decl = decl});
+}
+
+// Test whether `decl` needs the sized-type check for independently stored variables.
+static bool requiresSizedVariableType(VarDeclBase* decl)
+{
+    // Shader parameters and function parameters are supplied by the caller or application.
+    // We exclude them from the unsized-variable diagnostic; their parameter checks own sizing.
+    if (isGlobalShaderParameter(decl))
+        return false;
+    if (as<ParamDecl>(decl))
+        return false;
+
+    // A non-static field is stored as part of its aggregate. Its type can be unsized when
+    // it is the final field. `SemanticsDeclBodyVisitor::checkVarDeclCommon` separately checks
+    // its position within the aggregate, so we exclude instance fields from this diagnostic.
+    if (as<AggTypeDecl>(getParentDecl(decl)))
+        return isEffectivelyStatic(decl);
+
+    return true;
+}
+
+void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
+    UniformParameterShadowVarDecl* decl)
+{
+    // The parser introduces a shadow to implement assignments to a uniform shader parameter.
+    // It records the associated parameter instead of a written type or initializer. We need
+    // that parameter's checked type before we can choose the shadow's type and mutability.
+    auto parameter = decl->uniformParameter;
+    SLANG_RELEASE_ASSERT(parameter);
+    ensureDecl(parameter, DeclCheckState::CanUseTypeOfValueDecl);
+
+    // The type depends on the form of the parameter. For an ordinary file or namespace
+    // parameter, we use exactly the parameter's type.
+    Type* valueType = parameter->getType();
+
+    // Consider `cbuffer CB { float x; }`. The parser desugars it to an implicit
+    // `ConstantBuffer<T>`, where `T` is a struct containing `x`. We use `T` for the shadow
+    // because assignments to the buffer's fields must update a copy of that struct.
+    if (parameter->hasModifier<ImplicitParameterGroupVariableModifier>())
+    {
+        // The implicit-group modifier also occurs on legacy `tbuffer` declarations.
+        // We only unwrap `ConstantBuffer<T>`; other parameter groups retain their own types.
+        if (auto bufferType = as<ConstantBufferType>(valueType))
+            valueType = bufferType->getElementType();
+    }
+    decl->type.type = valueType;
+
+    // We apply the same type restriction as for an ordinary mutable `static` global.
+    // `GetTypeForDeclRef` uses the flag to reject writes to an unsupported type, while reads
+    // remain valid. IR lowering aliases the parameter value without allocating unsupported
+    // storage. We keep the computed `valueType` in either case.
+    decl->shouldBeImmutableAlias = !isTypeAllowedForMutableGlobalVariable(getTypeTags(valueType));
+
+    // References to specialization constants must retain their identity as compile-time
+    // constants, for example when used in `numthreads`. We alias these parameters even when
+    // their value type would otherwise permit mutable storage.
+    if (isSpecializationConstant(parameter))
+        decl->shouldBeImmutableAlias = true;
+}
+
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -2741,10 +2902,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // arrays in specific cases)
         //
         validateArraySizeForVariable(varDecl);
-        //
-        // Similarly, we want to check the element type for any restrictions
-        //
-        validateArrayElementTypeForVariable(varDecl);
     }
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
@@ -2902,14 +3059,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
-    // Propagate type tags.
-    if (auto parentAggTypeDecl = as<AggTypeDecl>(getParentDecl(varDecl)))
-    {
-        if (auto varDeclRefType = as<DeclRefType>(varDecl->type.type))
-        {
-            parentAggTypeDecl->unionTagsWith(getTypeTags(varDeclRefType));
-        }
-    }
     if (getOptionSet().getBoolOption(CompilerOptionName::NoMangle) && isGlobalDecl(varDecl))
     {
         // If -no-mangle option is set, we will add `ExternCpp` modifier to all
@@ -2953,6 +3102,22 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     checkVisibility(varDecl);
+
+    // We finish ordinary `VarDecl` signatures here. Generic value-parameter visitors may
+    // still change their declarations' types after this common routine returns.
+    if (as<VarDecl>(varDecl))
+    {
+        // Array-element validation calls `getTypeTags`, which may encounter `varDecl` again
+        // through a recursive struct. The type, array bound, and modifiers of `varDecl` are
+        // now determined, so we publish its signature before validating the element type.
+        if (!varDecl->isChecked(DeclCheckState::SignatureChecked))
+            varDecl->setCheckState(DeclCheckState::SignatureChecked);
+    }
+
+    // Header checking has already advanced declarations with inferred types or array bounds
+    // to `DefinitionChecked`. We validate their array elements here because
+    // `SemanticsDeclBodyVisitor` will not run for those declarations.
+    validateArrayElementTypeForVariable(varDecl);
 }
 
 static void addAutoDiffModifiersToFunc(
@@ -3102,7 +3267,6 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
     {
         SemanticsVisitor visitor(withDeclToExcludeFromLookup(structDecl));
         structDecl->aliasedType = visitor.CheckProperType(structDecl->aliasedType);
-        structDecl->addTag(getTypeTags(structDecl->aliasedType));
     }
 
     checkVisibility(structDecl);
@@ -3625,9 +3789,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     validateStructuredBufferElementType(this, varDecl);
 
-    bool isGlobalOrLocalVar = !isGlobalShaderParameter(varDecl) && !as<ParamDecl>(varDecl) &&
-                              (!parentDecl || isEffectivelyStatic(varDecl));
-    if (isGlobalOrLocalVar)
+    // We reject unsized ordinary variables, while parameters and trailing aggregate fields
+    // have separate rules. Mutable `static` globals also use the shared type restriction.
+    if (requiresSizedVariableType(varDecl))
     {
         bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
         if (isUnsized)
@@ -3635,17 +3799,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
         }
 
-        bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
-        if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
-            varDecl->hasModifier<HLSLStaticModifier>())
-        {
-            // Opaque type global variable must be const.
-            getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
-            if (varDecl->initExpr)
-                getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
-            else
-                getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = varDecl});
-        }
+        checkMutableGlobalVariableType(this, varDecl, varTypeTags);
     }
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))

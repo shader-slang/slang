@@ -5845,7 +5845,88 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-// Finish up work on a declaration that was parsed
+// Create a shadow variable for a uniform parameter when HLSL compatibility is enabled.
+//
+// Requires `decl->parentDecl` to identify a non-generic lexical scope, with `decl` not yet
+// inserted into lookup. Returns `nullptr` for non-HLSL input, a disabled option, or a declaration
+// that is not a mutable uniform shader parameter. On success, this function copies visibility,
+// transfers `__transparent`, and renames the parameter while recording its original name.
+// The caller inserts both declarations into that scope and assigns the shadow's lexical parent.
+static UniformParameterShadowVarDecl* createUniformParameterShadowVarIfNeeded(
+    Parser* parser,
+    Decl* decl)
+{
+    // We only apply uniform parameter shadowing to HLSL declarations.
+    if (parser->getSourceLanguage() != SourceLanguage::HLSL)
+        return nullptr;
+
+    // Global uniform shader parameters are immutable unless legacy compatibility is enabled.
+    if (!parser->options.optionSet.getBoolOption(
+            CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility))
+        return nullptr;
+
+    // We first determine whether the declaration is a uniform shader parameter.
+    // `CompleteDecl` has assigned its lexical parent, so `isGlobalShaderParameter` can
+    // distinguish file and namespace parameters from local variables and members.
+    auto parameter = as<VarDecl>(decl);
+    if (!parameter)
+        return nullptr;
+    if (!isGlobalShaderParameter(parameter))
+        return nullptr;
+
+    // An explicitly immutable declaration must remain immutable in compatibility mode.
+    // We check both `const` and `let` before constructing a shadow variable.
+    if (parameter->hasModifier<ConstModifier>())
+        return nullptr;
+    if (as<LetDecl>(parameter))
+        return nullptr;
+
+    // We now construct the variable that lookup will find in place of the parameter.
+    auto shadowVar = parser->astBuilder->create<UniformParameterShadowVarDecl>();
+    shadowVar->loc = parameter->loc;
+    shadowVar->nameAndLoc = parameter->nameAndLoc;
+    shadowVar->uniformParameter = parameter;
+
+    // We need to choose modifiers for the shadow. It replaces the parameter for lookup, so
+    // lookup must apply the parameter's visibility to the shadow declaration.
+    if (auto visibility = parameter->findModifier<VisibilityModifier>())
+    {
+        addModifier(
+            shadowVar,
+            as<VisibilityModifier>(parser->astBuilder->createByNodeType(visibility->astNodeType)));
+    }
+    // We leave binding and layout modifiers on the underlying parameter. They affect the
+    // program's binary interface and reflection; the shadow is only used in its implementation.
+
+    // The parser desugars a legacy `cbuffer` into a variable with the `__transparent` modifier.
+    // With this modifier, lookup in the containing scope can find members of the variable.
+    // We want lookup to find members of the shadow, so we transfer the modifier to it.
+    if (auto transparent = parameter->findModifier<TransparentModifier>())
+    {
+        removeModifier(parameter, transparent);
+        // `removeModifier` unlinks the modifier without clearing `next`. We detach that link
+        // so that `addModifier` transfers only `__transparent`, leaving later modifiers in place.
+        transparent->next = nullptr;
+        addModifier(shadowVar, transparent);
+    }
+
+    // Both declarations will enter the same scope, so we rename the parameter to leave its
+    // original name available for the shadow. Reflection and diagnostics must still identify
+    // the parameter by its original name; legacy `cbuffer` parsing already records that name.
+    if (!parameter->hasModifier<ParameterGroupReflectionName>())
+    {
+        auto reflectionName = parser->astBuilder->create<ParameterGroupReflectionName>();
+        reflectionName->nameAndLoc = parameter->nameAndLoc;
+        addModifier(parameter, reflectionName);
+    }
+    // We use an internal name containing `$`, which the lexer does not accept in identifiers.
+    // A later user declaration therefore cannot collide with the renamed parameter.
+    parameter->nameAndLoc.name =
+        getName(parser, "$uniformParameter_" + getText(parameter->getName()));
+    return shadowVar;
+}
+
+// Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
     Decl* decl,
@@ -5936,8 +6017,17 @@ static void CompleteDecl(
 
         if (!as<GenericDecl>(containerDecl))
         {
-            // Make sure the decl is properly nested inside its lexical parent
+            // Legacy HLSL code may treat a uniform parameter as a mutable temporary. We assign
+            // the lexical parent so the helper can identify file and namespace parameters.
+            decl->parentDecl = containerDecl;
+            auto shadowVar = createUniformParameterShadowVarIfNeeded(parser, decl);
+
+            // The helper has finished renaming the parameter and transferring `__transparent`.
+            // We can now insert both declarations without exposing the parameter's members
+            // through lookup. Generic declarations are handled by the separate case below.
             AddMember(containerDecl, decl);
+            if (shadowVar)
+                AddMember(containerDecl, shadowVar);
 
             // As a special case, if we are adding an unscoped enum to container, we should also
             // create static const decls for each enum case and add them to the container.
