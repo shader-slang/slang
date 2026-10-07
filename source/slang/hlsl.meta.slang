@@ -29780,6 +29780,7 @@ struct CoopMat
     // The groupshared overloads of `dx::linalg::Matrix::Load` and `Store` take the array
     // directly, plus an element index and an element stride (both in units of the array's
     // element type), unlike the byte-addressed `(RW)ByteAddressBuffer` overloads above.
+    [ForceInline]
     [require(sm_6_10)]
     [__NoSideEffect]
     internal static This __hlslLoadGroupshared<
@@ -29794,6 +29795,7 @@ struct CoopMat
             __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
     }
 
+    [ForceInline]
     [require(sm_6_10)]
     internal void __hlslStoreGroupshared<
         let matrixLayout : CoopMatMatrixLayout,
