@@ -9,22 +9,25 @@
 // dead payload collapses to an empty value that legalizes through `legalizeBitCast`. The `-cpu` run
 // dispatches both conformers (thread 0 → Foo1, thread 1 → Foo2) and checks each backward derivative
 // — d/dv(sum v) = 1 and d/dv(sum 2*v) = 2 — so the bulk-copied `Foo2` path is covered numerically.
-// The `IR` run checks the marshalling forms just before empty-type legalization: `Foo1`'s context
-// packs field-wise, while `Foo2`'s context packs as a single whole-object `bitCast` into `AnyValue16`.
+// The `FIELDWISE` and `BULKCOPY` runs check the marshalling forms just before empty-type legalization:
+// `Foo1`'s context packs field-wise, while `Foo2`'s context packs as a single whole-object `bitCast`
+// into `AnyValue16`. Each form gets its own run because the relative order of the two conformers'
+// marshalling functions in the module is not stable across host compilers.
 // The `CPP` run checks that no backward context is marshalled field-wise in the emitted C++: there
 // must be no `packAnyValue...(s_bwdCallableCtx...)` definition. The positive anchor
 // (`struct KernelContext_`, emitted for every CPU entry point ahead of all functions) guards against
 // an aborting compile, which emits nothing, and scopes the negative check to the function bodies.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=IR):-target cpp -entry computeMain -stage compute -dump-ir-before legalizeEmptyTypes
-// IR: func %packAnyValue16_{{.*}}Foo1x5Fbar)
-// IR-NOT: bitCast
-// IR: return_val
-// IR: func %packAnyValue16_{{.*}}Foo2x5Fbar)
-// IR-NEXT: {
-// IR-NEXT: block
-// IR-NEXT: param
-// IR-NEXT: = bitCast(
+//TEST:SIMPLE(filecheck=FIELDWISE):-target cpp -entry computeMain -stage compute -dump-ir-before legalizeEmptyTypes
+// FIELDWISE: func %packAnyValue16_{{.*}}Foo1x5Fbar)
+// FIELDWISE-NOT: bitCast
+// FIELDWISE: return_val
+//TEST:SIMPLE(filecheck=BULKCOPY):-target cpp -entry computeMain -stage compute -dump-ir-before legalizeEmptyTypes
+// BULKCOPY: func %packAnyValue16_{{.*}}Foo2x5Fbar)
+// BULKCOPY-NEXT: {
+// BULKCOPY-NEXT: block
+// BULKCOPY-NEXT: param
+// BULKCOPY-NEXT: = bitCast(
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 // CPP: struct KernelContext_
 // CPP-NOT: packAnyValue{{[0-9]+}}_{{[0-9]+}}(s_bwdCallableCtx
