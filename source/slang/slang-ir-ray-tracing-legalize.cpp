@@ -408,12 +408,8 @@ struct RayTracingPayloadLegalizationContext
     // getForcedStructType's comment.
     //
     // ReportHit's HLSL arm, identified by KnownBuiltinDeclName::ReportHit, takes its attributes
-    // by value, so a nonempty non-struct attribute is wrapped by value with no storage or copy:
-    //
-    //     ReportHit(t, kind, float2(u, v));   // becomes
-    //     ReportHit(t, kind, makeStruct(HitAttributes_t, float2(u, v)));
-    //
-    // HitAttributes_t is the type wrapNonStructEntryPointParam gives a receiver's parameter.
+    // by value, so a nonempty non-struct attribute is wrapped by value with no storage or copy.
+    // Its HitAttributes_t is the type wrapNonStructEntryPointParam gives a receiver's parameter.
     void legalizeD3DCall(IRCall* call)
     {
         switch (getBuiltinFuncEnum(call->getCallee()))
