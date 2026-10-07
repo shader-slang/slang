@@ -4944,9 +4944,8 @@ inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
 /// branch-arm identity, or coverage-mode-specific metadata at the end
 /// without changing the COM interface. Entries are source-location
 /// based: line coverage emits one canonical entry per function/file/line.
-/// Different lines may share a counter when they execute together. Exporters
-/// deduplicate counter aliases per source line, sum distinct count-mode slots,
-/// and combine boolean-mode hits with logical OR.
+/// Different lines may share a counter when they execute together, so read
+/// results per entry through `counterIndex`, never per counter.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);

@@ -200,8 +200,8 @@ counters are inserted, with examples, see
      Function and branch markers retain dedicated counters.
    - **Rewrites markers** as atomic counter updates in count mode, or
      stores of `1` in boolean mode. Metadata
-     records each canonical line once; consumers deduplicate slot aliases
-     per line and OR boolean hits.
+     records each canonical line once; consumers read each entry through
+     its `counterIndex`.
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its
