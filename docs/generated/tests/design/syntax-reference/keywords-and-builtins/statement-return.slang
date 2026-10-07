@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#statement-keywords
-//META: doc_section_digest=1fb3516e49ddbb5d4259751275e6b594d9d69aa0b1266c092e549ec5de2b449a
+//META: doc_section_digest=0d8e1ca053b429da8e96d222f706189d5ed5e28ff7285b41aa4ffea890ca7d1f
 //META: purpose=`return <expr>` is a statement keyword that hands a value back to the caller and ends the function.
 //META: intent=functional
 //META: pipeline_stage=parse

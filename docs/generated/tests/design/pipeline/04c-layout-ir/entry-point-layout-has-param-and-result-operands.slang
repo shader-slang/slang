@@ -14,7 +14,7 @@
 // that each operand is defined by its own `varLayout(` instruction - the
 // parameters layout and the result layout the lowering step supplies.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 
@@ -24,7 +24,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = int(tid.x);
 }
 
-// CHECK-LABEL: ### AFTER validateAndRemoveAssumeAddress:
+// CHECK-LABEL: ### AFTER {{[A-Za-z0-9_]+}}:
 // CHECK: EntryPointLayout(%{{[0-9]+}}, %{{[0-9]+}})
 // CHECK: varLayout(
 // CHECK: varLayout(

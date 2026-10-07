@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#option-set-toggles
-//META: doc_section_digest=d95eda883eb0804ab1b80bcfd1567b5546c822286eb81da20bfc48d4944ed849
+//META: doc_section_digest=fbeeea07809c9805840949444c53383bbc2008651cf6d8186e90c648ffe29510
 //META: purpose=Verifies -matrix-layout-row-major makes HLSL emit `#pragma pack_matrix(row_major)` instead of the default column_major.
 //META: intent=characterization
 //META: covers=source/slang/slang-options.cpp

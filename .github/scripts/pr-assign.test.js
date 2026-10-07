@@ -14,13 +14,17 @@ const {
 });
 
 const OWNERS = new Set(["owner1", "owner2"]);
+// Source-internal for this repo: overlaps owners, plus an Internal-only login
+// who is eligible for linked-issue inheritance but not for committer-signal.
+const INTERNAL = new Set(["owner1", "owner2", "internal1"]);
 const COLLAB = new Set(["owner1", "owner2", "dev1", "dev2"]); // owners are also collaborators
 const MAINT = "maintainer";
 
 function select(issue, committers, extra) {
   return selectAssigneeAndReviewers({
     issueAssignees: issue, committersBySignal: committers,
-    owners: OWNERS, collaborators: COLLAB, author: "author", maintainer: MAINT,
+    owners: OWNERS, internalMembers: INTERNAL, collaborators: COLLAB,
+    author: "author", maintainer: MAINT,
     ...(extra || {}),
   });
 }
@@ -28,10 +32,34 @@ function select(issue, committers, extra) {
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
 
-test("issue assignee wins", () => {
+test("issue assignee wins when source-internal", () => {
   const { assignee, autoRequestedReviewer } = select(["owner2"], ["owner1", "dev1"]);
   assert.strictEqual(assignee, "owner2");
   assert.strictEqual(autoRequestedReviewer, "owner2");
+});
+
+test("issue assignee wins when Internal but not on owners team", () => {
+  const { assignee, autoRequestedReviewer } = select(
+    ["internal1"], ["owner1", "dev1"]);
+  assert.strictEqual(assignee, "internal1");
+  assert.strictEqual(autoRequestedReviewer, "internal1");
+});
+
+test("issue assignee ignored when not source-internal", () => {
+  const { assignee } = select(["dev1"], ["owner1", "dev1"]);
+  assert.strictEqual(assignee, "owner1");
+});
+
+test("issue assignee ignored when internal roster unknown", () => {
+  const { assignee } = select(["owner2"], ["owner1"], { internalMembers: null });
+  assert.strictEqual(assignee, "owner1");
+});
+
+test("issue assignee match is case-insensitive", () => {
+  const { assignee } = select(["Internal1"], ["owner1"], {
+    internalMembers: new Set(["internal1"]),
+  });
+  assert.strictEqual(assignee, "Internal1");
 });
 
 test("commit-signal owner when no issue", () => {
@@ -84,6 +112,7 @@ test("author shepherd is not auto-requested; top collaborator is suggested", () 
       issueAssignees: [],
       committersBySignal: ["dev1", "owner1"],
       owners: OWNERS,
+      internalMembers: INTERNAL,
       collaborators: COLLAB,
       author: "owner1",
       maintainer: MAINT,

@@ -16,11 +16,24 @@ import sys
 
 
 def slug(heading_text: str) -> str:
-    # GitHub-flavored anchor slug: lowercase, drop everything but word
-    # chars/space/hyphen (this strips backticks, punctuation), spaces->hyphens.
+    """Return the GitHub-flavored anchor slug for a heading.
+
+    Lowercase, drop everything but word chars / space / hyphen (this strips
+    backticks and punctuation), then map each remaining whitespace character to
+    one hyphen.
+
+    Each space maps to its own hyphen — runs are *not* collapsed. That is what
+    GitHub does, and it is what the rest of this pipeline assumes: a heading
+    like `### Downstream DXC / fxc` loses the slash and keeps both surrounding
+    spaces, so its anchor is `downstream-dxc--fxc` with two hyphens. Collapsing
+    the run here produced `downstream-dxc-fxc`, which matches no `doc_ref` any
+    bundle records, so `section_text` raised "anchor not found" and every test
+    anchored to such a heading was silently skipped by the digest lint — 104
+    tests across 32 anchors were exempt from the drift tripwire because of it.
+    """
     s = heading_text.strip().lower()
     s = re.sub(r"[^\w\s-]", "", s)
-    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"\s", "-", s)
     return s
 
 

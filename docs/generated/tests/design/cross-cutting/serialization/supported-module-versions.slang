@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#versioning-and-backwards-compatibility
-//META: doc_section_digest=cb78d732a38829923799f001491f6911d556886feef35c8b52482561b61f8caf
+//META: doc_section_digest=c9080f0d1aa3fe7ea37fa518bb69fbe0bf0e6639c696c66bc692daba92f2d68f
 //META: purpose=The reader accepts a bounded range of serialization versions rather than only the newest one, and -get-supported-module-versions prints that minimum and maximum.
 //META: intent=functional
 //META: pipeline_stage=link

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#pack-and-expansion
-//META: doc_section_digest=bee2a58322e072cc00e82140814df0fcca180d4ab4d912ad3941f22a06a1ccff
+//META: doc_section_digest=f1d013ecbb4291ee5120d87ee4a7aaff7498ca0557ed29f92a7a1edacb0b7622
 //META: purpose=Trimming a pack removes exactly one slot, so a one-element pack trims to length zero and an already-empty pack stays at length zero.
 //META: intent=boundary
 //META: pipeline_stage=runtime

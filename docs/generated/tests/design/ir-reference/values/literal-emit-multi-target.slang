@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literal-payload-encoding
-//META: doc_section_digest=f6737af21fc0ce62bf35ca601aa6d8bc483fabcafaedad874ca80c1323a37207
+//META: doc_section_digest=672f1ff4df3d6c9814b5d0c169ddd3fc324a012fc71fc9ae6dc5c95d5559ecf2
 //META: purpose=An integer literal `42` and a float literal `3.5` emit as a recognizable numeric token on every text-emit target.
 //META: intent=functional
 //META: pipeline_stage=emit

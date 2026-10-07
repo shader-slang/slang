@@ -148,8 +148,12 @@ option(
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
-option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_IR "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
+option(
+    SLANG_ENABLE_VALIDATION_FOSSIL
+    "Enable fossil deserialization validation"
+)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -163,6 +167,27 @@ option(
     SLANG_ENABLE_ASAN
     "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
 )
+option(
+    SLANG_ENABLE_TSAN
+    "Enable ThreadSanitizer (TSan); clang/gcc on non-Windows only. Mutually exclusive with SLANG_ENABLE_ASAN."
+)
+# The compiler driver rejects combining -fsanitize=address and -fsanitize=thread,
+# so a build with both options enabled would otherwise fail at compile time on
+# the first instrumented file. Reject the combination here at configure time to
+# fail fast with a clear message instead.
+if(SLANG_ENABLE_ASAN AND SLANG_ENABLE_TSAN)
+    message(
+        FATAL_ERROR
+        "SLANG_ENABLE_ASAN and SLANG_ENABLE_TSAN are mutually exclusive; enable at most one."
+    )
+endif()
+# ThreadSanitizer has no Windows implementation in clang-cl, MinGW, or MSVC.
+# Reject it here alongside the mutual-exclusion check so both SLANG_ENABLE_TSAN
+# constraints fail fast at configure time in one place, rather than surfacing
+# later during per-target setup.
+if(SLANG_ENABLE_TSAN AND WIN32)
+    message(FATAL_ERROR "SLANG_ENABLE_TSAN is not supported on Windows.")
+endif()
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 option(
     SLANG_ENABLE_TIME_TRACE
@@ -174,6 +199,11 @@ option(
     SLANG_STANDARD_MODULE_DEVELOP_BUILD
     "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
     ON
+)
+set(SLANG_DISABLE_NOTE_IDS
+    ""
+    CACHE STRING
+    "Comma-separated note IDs disabled by runtime sessions and module builds"
 )
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
@@ -202,9 +232,26 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
+option(
+    SLANG_ENABLE_RECORD_REPLAY
+    "Build the API record-replay layer and its slang_*RecordLayer/*Replay C API. When OFF, the record-replay sources are excluded and that C API is compiled as exported disabled stubs (ABI preserved)."
+    ON
+)
+
+# The slang-replay tool links the record-replay subsystem, so it cannot be built once that
+# subsystem is excluded. Force it off (rather than erroring) so an existing SLANG_ENABLE_REPLAYER=ON
+# cache entry does not make the two options contradict each other.
+if(NOT SLANG_ENABLE_RECORD_REPLAY AND SLANG_ENABLE_REPLAYER)
+    message(
+        STATUS
+        "SLANG_ENABLE_RECORD_REPLAY is OFF; forcing SLANG_ENABLE_REPLAYER OFF (the slang-replay tool depends on the record-replay subsystem)."
+    )
+    set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "Enable slang-replay tool" FORCE)
+endif()
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
@@ -383,6 +430,12 @@ if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
         "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
     )
 endif()
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_TSAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_TSAN, but this mimalloc configuration is not built with TSan instrumentation (MI_DEBUG_TSAN), so data races inside mimalloc's own allocator are not detected"
+    )
+endif()
 
 option(
     SLANG_ENABLE_RELEASE_DEBUG_INFO
@@ -391,6 +444,18 @@ option(
 )
 
 option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" OFF)
+
+enum_option(
+    SLANG_INSTALL_USER_SKILLS
+    AUTO
+    "Whether to install the pinned Slang user skills:"
+    AUTO
+    "Install them when the exact, clean submodule checkout is available"
+    ON
+    "Require and install the exact, clean submodule checkout"
+    OFF
+    "Do not install Slang user skills"
+)
 
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
@@ -576,9 +641,18 @@ if(${SLANG_USE_SYSTEM_MINIZ})
 endif()
 
 if(${SLANG_USE_SYSTEM_LZ4})
-    find_package(lz4 REQUIRED)
+    find_package(lz4 CONFIG QUIET)
+    if(NOT TARGET LZ4::lz4 AND NOT TARGET lz4_static)
+        # Homebrew's LZ4 exposes pkg-config metadata but no CMake package.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET GLOBAL liblz4)
+    endif()
     if(NOT TARGET lz4_static)
-        add_library(lz4_static ALIAS LZ4::lz4)
+        if(TARGET LZ4::lz4)
+            add_library(lz4_static ALIAS LZ4::lz4)
+        else()
+            add_library(lz4_static ALIAS PkgConfig::LZ4)
+        endif()
     endif()
 endif()
 
@@ -587,13 +661,29 @@ if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
 endif()
 
 if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+    # The wrapper links the opt and link libraries, which are separate CMake packages.
     find_package(SPIRV-Tools REQUIRED)
+    find_package(SPIRV-Tools-opt REQUIRED)
+    find_package(SPIRV-Tools-link REQUIRED)
 endif()
 
 if(${SLANG_USE_SYSTEM_GLSLANG})
     find_package(glslang REQUIRED)
+    if(
+        NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+        AND (TARGET SPIRV-Tools-opt OR TARGET SPIRV-Tools-link)
+    )
+        message(
+            FATAL_ERROR
+            "The installed glslang package imports SPIRV-Tools targets; set SLANG_USE_SYSTEM_SPIRV_TOOLS=ON to avoid conflicting with bundled targets"
+        )
+    endif()
     if(NOT TARGET glslang)
         add_library(glslang ALIAS glslang::glslang)
+    endif()
+    if(NOT TARGET SPIRV)
+        # Keep the wrapper's target name while using the installed glslang library location.
+        add_library(SPIRV ALIAS glslang::SPIRV)
     endif()
 endif()
 
@@ -674,6 +764,114 @@ install(
     EXCLUDE_FROM_ALL
     PATTERN ".*" EXCLUDE
 )
+
+# The vendored deps below are statically linked into the shipped libraries, and
+# their licenses -- BSD-2-Clause (cmark, lz4) and glslang's mixed
+# BSD/MIT/Apache-2.0 license (see external/README.md) -- require reproducing the
+# copyright notice in binary redistributions. Ship each one's own notice file
+# (its real COPYING/LICENSE, which carries the copyright lines a generic SPDX
+# template omits). Each condition mirrors the source selection in
+# external/CMakeLists.txt, installing the notice only when the vendored
+# submodule -- not a system copy or an override path -- is the source we build
+# against; a missing notice file then fails the install loudly rather than
+# silently shipping a non-compliant package.
+if(NOT SLANG_OVERRIDE_CMARK_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/cmark/COPYING"
+        DESTINATION third-party-notices
+        RENAME cmark-COPYING
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(NOT SLANG_USE_SYSTEM_LZ4 AND NOT SLANG_OVERRIDE_LZ4_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/lz4/lib/LICENSE"
+        DESTINATION third-party-notices
+        RENAME lz4-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_GLSLANG
+    AND NOT SLANG_OVERRIDE_GLSLANG_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/glslang/LICENSE.txt"
+        DESTINATION third-party-notices
+        RENAME glslang-LICENSE.txt
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
+# The vendored deps below are MIT-licensed (miniz, mimalloc, unordered_dense)
+# or Apache-2.0-licensed (spirv-tools), and are likewise statically linked
+# into the shipped libraries -- miniz and unordered_dense unconditionally
+# into `core`, mimalloc when Slang-owned allocations or SPIRV-Tools request
+# it, and spirv-tools when glslang support is built. MIT's license-and-
+# copyright-notice clause and Apache-2.0's attribution-retention requirement
+# (Apache-2.0 SS4; spirv-tools carries no upstream NOTICE file, so SS4(d)'s
+# NOTICE-carry clause does not apply here) both require reproducing the
+# dependency's own notice in binary redistributions, same as the BSD trio
+# above. Each condition again mirrors the source selection in
+# external/CMakeLists.txt.
+if(NOT SLANG_USE_SYSTEM_MINIZ AND NOT SLANG_OVERRIDE_MINIZ_PATH)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/miniz/LICENSE"
+        DESTINATION third-party-notices
+        RENAME miniz-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    NOT SLANG_USE_SYSTEM_UNORDERED_DENSE
+    AND NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/unordered_dense/LICENSE"
+        DESTINATION third-party-notices
+        RENAME unordered_dense-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    (
+        SLANG_ENABLE_MIMALLOC
+        OR (
+            SLANG_ENABLE_SLANG_GLSLANG
+            AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+            AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        )
+    )
+    AND NOT SLANG_OVERRIDE_MIMALLOC_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/mimalloc/LICENSE"
+        DESTINATION third-party-notices
+        RENAME mimalloc-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+if(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+)
+    install(
+        FILES "${slang_SOURCE_DIR}/external/spirv-tools/LICENSE"
+        DESTINATION third-party-notices
+        RENAME spirv-tools-LICENSE
+        COMPONENT metadata
+        EXCLUDE_FROM_ALL
+    )
+endif()
+
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
@@ -684,6 +882,8 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
+include(SlangUserSkills)
+slang_install_user_skills()
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility

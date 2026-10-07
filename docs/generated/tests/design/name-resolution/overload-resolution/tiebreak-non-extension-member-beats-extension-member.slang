@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: generated_at=2026-08-13T00:00:00+00:00
+//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#tie-breaking-comparator
-//META: doc_section_digest=0e88a4c199b9104278b3521621b40977c51bf79de76dba25baf25391ba7ba51a
+//META: doc_section_digest=1d384c53a44075a9ff7b3de0f1907c30fb579e521154ac25ad145d433be8dd6a
 //META: purpose=CompareLookupResultItems prefers a declaration in the type itself over an equally-applicable member contributed by an extension.
 //META: intent=functional
 //META: pipeline_stage=check

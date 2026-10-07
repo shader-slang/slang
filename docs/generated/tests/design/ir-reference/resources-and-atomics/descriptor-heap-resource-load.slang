@@ -15,7 +15,7 @@
 // opcode in the HLSL-targeted dump where the heap is implicit and the
 // index is the only operand.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main
 
 uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 uniform DescriptorHandle<StructuredBuffer<float4>> src;

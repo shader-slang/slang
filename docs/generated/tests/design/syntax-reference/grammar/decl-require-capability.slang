@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#user-defined-syntax
-//META: doc_section_digest=7b5f8dd8046f56712186bea6498104c3a0faf4b662ee04fc92a8939c967b50e7
+//META: doc_section_digest=77193a84001e2dd3a4e1bf2d11d6477121389e9cd54ff79bc9ed35f252918a29
 //META: purpose=`RequireCapabilityDecl` parses as `'__require_capability' CapabilityName ';'` with no parentheses around the name.
 //META: intent=functional
 //META: pipeline_stage=parse

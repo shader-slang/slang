@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=078844f9de8080a010d3c70d4af44f40667b8ce158b13e5adda01e318abce99c
+//META: doc_section_digest=8661d99511cfbac4ddbac2f0c7e26c6482606dcfb0d70903168829b486372184
 //META: purpose=The `:` spelling of a where-clause bound accepts a comma-separated list and produces one constraint decl per bound, so a single `where T : IA, IB` grants both interfaces.
 //META: intent=functional
 //META: pipeline_stage=parse

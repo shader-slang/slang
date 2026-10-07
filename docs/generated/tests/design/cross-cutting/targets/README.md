@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: b4eb3af2d063e70c55f611f44e2811ed2377cf1ef99ebef779fa0f68a75867bf
+model: gpt-5.6-sol
+generated_at: 2026-09-16T06:40:19Z
+source_commit: d3b56927b854c14fa1ac169b72da6e080ea80833
+watched_paths_digest: ae4ecf3a8d0550a9b7a41fdf512139e37f0f5a520470aa731ef7c12647e3d2f0
 source_doc: docs/generated/design/cross-cutting/targets.md
-source_doc_digest: c0020ac82e5ca47330324f2f9e48c5680dabecc099b44650f62c1f0b0824fdb9
+source_doc_digest: 17c44d8c152f02477de96d75c284561a0a68bbc60055e05c53e5a61396a4760e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -32,10 +32,23 @@ in one language — belongs to the `target-pipelines/*` bundles, which
 this document explicitly hands off to, so it is recorded under
 `## Untested claims` rather than tested twice.
 
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md). **Partial**:
+this covers `#profiles-versus-explicit--capability`, rewritten by the doc-gap
+fill (#12477); the rest of the document is not yet enumerated.
+
+1. `-profile` pins a version within a version family; `-capability` adds atoms on top of it.
+2. Requested capability atoms are folded into the profile's capability set one at a time, not pre-joined, so one incompatible atom cannot invalidate the set and hide a compatible atom's version raise.
+3. When a requested `-capability` raises the highest version in the profile's own family above the pinned version, the compile stops with `E00046` rather than silently emitting the higher version.
+4. When the profile pins no version of that family — including when no `-profile` is given, or when the profile names a different family — nothing is diagnosed and the capability's version is emitted.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                                                            | Intent     | Anchor                                                                                                                    | Tests                                                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| C3: A `-capability` whose atom inherits a higher version than the pinned `-profile` of the same family stops the compile with E00046 instead of silently raising the emitted version. | negative   | [#profiles-versus-explicit--capability](../../../../design/cross-cutting/targets.md#profiles-versus-explicit--capability) | [`capability-raises-version-above-profile-diag.slang`](capability-raises-version-above-profile-diag.slang) |
+| C4: The same capability is accepted — emitting a 1.6 module — when the profile already pins 1.6, when no profile is given, and when the profile names a different version family. | boundary   | [#profiles-versus-explicit--capability](../../../../design/cross-cutting/targets.md#profiles-versus-explicit--capability) | [`capability-version-raise-accepted-emission.slang`](capability-version-raise-accepted-emission.slang) |
 | The `subgroup_workgroup_index` compound alias admits `WaveGetWaveIndex` / `WaveGetNumWaves` in a compute entry point; the queries compile and surface subgroup constructs in the emitted HLSL, GLSL, SPIR-V assembly, Metal and WGSL.            | functional | [#auto-generated-reference](../../../../design/cross-cutting/targets.md#auto-generated-reference)                         | [`compound-alias-wave-index-compute-emission.slang`](compound-alias-wave-index-compute-emission.slang)                         |
 | The `subgroup_workgroup_index` compound alias restricts `WaveGetNumWaves` to compute-class stages on SPIR-V; a fragment entry point calling it is rejected by the capability system with E36107.                                                 | negative   | [#auto-generated-reference](../../../../design/cross-cutting/targets.md#auto-generated-reference)                         | [`compound-alias-wave-index-fragment-spirv-rejected.slang`](compound-alias-wave-index-fragment-spirv-rejected.slang)           |
 | The `subgroup_workgroup_index` compound alias restricts `WaveGetWaveIndex` to compute-class stages on GLSL; a fragment entry point calling it is rejected by the capability system with E36107.                                                  | negative   | [#auto-generated-reference](../../../../design/cross-cutting/targets.md#auto-generated-reference)                         | [`compound-alias-wave-index-fragment-glsl-rejected.slang`](compound-alias-wave-index-fragment-glsl-rejected.slang)             |
@@ -51,7 +64,7 @@ this document explicitly hands off to, so it is recorded under
 | A `__target_switch` with a single `case` arm: under the matching target the arm body is selected by `slang-ir-specialize-target-switch.cpp` — the minimum non-empty target-switch shape.                                                         | boundary   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-single-arm.slang`](target-switch-single-arm.slang)                                                             |
 | A `__target_switch` with no arm matching the active target and no `default:` is rejected with a stage / capability diagnostic when reached from an entry point on the unmatched target.                                                          | negative   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-missing-arm-rejected.slang`](target-switch-missing-arm-rejected.slang)                                         |
 | Target choice surfaces through target-specific lowering passes; a `[shader("compute")]` entry point emits the target-shaped compute marker on each text-emit backend.                                                                            | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`per-target-entry-point-marker.slang`](per-target-entry-point-marker.slang)                                                   |
-| The CUDA-specific immutable-load lowering pass rewrites reads from `uniform` globals as `__ldg(...)` calls on CUDA only, while HLSL, GLSL, SPIR-V, Metal, WGSL and C++ read the field directly.                                                  | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                                                     |
+| The CUDA-specific immutable-load lowering pass rewrites read-only `StructuredBuffer` loads as `__ldg(...)` calls on CUDA only, while the other text targets use their ordinary buffer-load forms.                                                 | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`cuda-immutable-load-uses-ldg.slang`](cuda-immutable-load-uses-ldg.slang)                                                     |
 | When the active target has no matching `case` arm in `__target_switch` but a `default:` arm exists, `slang-ir-specialize-target-switch.cpp` selects the default — the legal alternative to the negative "no arm, no default" companion.          | boundary   | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-missing-arm-falls-to-default.slang`](target-switch-missing-arm-falls-to-default.slang)                         |
 | `slang-ir-specialize-target-switch.cpp` resolves `[target]` switches against the active TargetRequest; a `__target_switch` with per-target branches surfaces the selected branch's body in the target's emitted text.                            | functional | [#how-target-choice-affects-ir](../../../../design/cross-cutting/targets.md#how-target-choice-affects-ir)                 | [`target-switch-selects-active-branch.slang`](target-switch-selects-active-branch.slang)                                       |
 | A Profile carries a Stage; `-profile cs_6_5` binds Compute. Asking for `-stage vertex` on the same command line populates the entry point's stage with two different atoms and produces `E00031: conflicting stages`.                            | negative   | [#profiles](../../../../design/cross-cutting/targets.md#profiles)                                                         | [`profile-stage-conflict-with-explicit-stage-rejected.slang`](profile-stage-conflict-with-explicit-stage-rejected.slang)       |

@@ -219,11 +219,11 @@ finding in `README.md`.
 The standard form used here is:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 ```
 
 Per the universal `_common.md` rule: combine `-dump-ir` with
-**`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+**`-target <text-target>`** AND **`-o -`** so the IR dump
 goes to stdout uncontaminated by target text. Mostly use
 `pipeline_stage=lower` in `//META` — these are LOWER-TO-IR
 observations.
@@ -249,7 +249,7 @@ Do not use any GPU-only directive.
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `generics-and-existentials.md` (or one of the listed
       secondary docs).
-- [ ] Every test uses `-target spirv-asm -dump-ir -o /dev/null
+- [ ] Every test uses `-target spirv-asm -dump-ir -o -
 -entry main -stage compute` per CLAUDE.md.
 - [ ] Outputs escape DCE: write to an `RWStructuredBuffer<T>` so
       the IR survives.
@@ -268,7 +268,7 @@ Do not use any GPU-only directive.
 
 ## Lessons captured (apply to this bundle as well)
 
-- `-dump-ir` requires `-target <X>` and `-o /dev/null`.
+- `-dump-ir` requires `-target <X>` and `-o -`.
 - The IR dump prefixes user IR with a large preamble (capability
   tables, core-module annotations, autodiff witness tables).
   Anchor patterns at the opcode spelling itself or at user-named

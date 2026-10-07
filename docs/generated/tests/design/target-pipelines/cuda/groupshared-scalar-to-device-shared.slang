@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools
-//META: doc_section_digest=5fafdc04391fe1499bf74bfe01420955a8364571f1b55e362cc671d3444538c9
+//META: doc_section_digest=9d22512c322523764ce371d9c4007f35d2bbc6c883c193616d4814d1ae0d08eb
 //META: purpose=Verifies a scalar groupshared int becomes __device__ __shared__ on CUDA emit (the array-form smoke test already covers the aggregate case).
 //META: intent=boundary
 //META: pipeline_stage=emit

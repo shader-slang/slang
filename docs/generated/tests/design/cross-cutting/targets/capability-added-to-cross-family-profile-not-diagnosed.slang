@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles-versus-explicit--capability
-//META: doc_section_digest=6338b86622ea875f504152b5ddc3a5a14136107bda31e2cda6971489b31391a4
+//META: doc_section_digest=aa5b75d19e741d5bc36e7de273e6e9a576a676ed130d76b894b28a5c65ebc8e9
 //META: purpose=When the `-profile` pins no version of the target's version family, a `-capability` that raises the emitted version is not diagnosed as a conflict and the raised version is emitted.
 //META: intent=boundary
 //META: pipeline_stage=check

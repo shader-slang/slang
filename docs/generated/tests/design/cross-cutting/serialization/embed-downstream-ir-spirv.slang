@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#riff-container-format
-//META: doc_section_digest=0c078e337fe0de98e2ce6d13119538d84997c407efe297937c76318154a68096
+//META: doc_section_digest=c3872ce39a0a99f95d45350011c21ffe6f4b1200f4572d0862793fd74066c9a8
 //META: purpose=The container composes the AST and IR payloads with auxiliary data, and with -embed-downstream-ir a SPIR-V blob joins it and surfaces as an EmbeddedDownstreamIR entry under -dump-module.
 //META: intent=functional
 //META: pipeline_stage=link

@@ -9,6 +9,7 @@ This chapter documents features that are under active development. Experimental 
 In this chapter:
 
 1. [Shader Execution Coverage](a3-01-shader-coverage.md)
+2. [Generic Numerics](a3-02-numerics.md)
 
 <!-- RTD-TOC-START
 ```{toctree}
@@ -16,5 +17,6 @@ In this chapter:
 :hidden:
 
 Shader Execution Coverage <a3-01-shader-coverage>
+Generic Numerics <a3-02-numerics>
 ```
 RTD-TOC-END -->

@@ -269,8 +269,8 @@ accepts whitespace-separated decimal values instead.
 
 Line coverage is one of three modes. `-trace-function-coverage` adds one entry per
 function. `-trace-branch-coverage` adds one entry per branch arm — `if`/`else` arms,
-loop-condition outcomes, and `switch` arms; `&&`, `||`, and `?:` are not instrumented — so a
-report can give true/false counts per condition. The modes are independent. The converter
+loop-condition outcomes, `switch` arms, and the true/false arms of `?:` conditions and of the
+left operands of `&&` and `||` — so a report can give true/false counts per condition. The modes are independent. The converter
 emits `FN:`/`FNDA:` and `BRDA:` records for them. `-trace-coverage-boolean` replaces atomic
 counting with a plain store of 1 in whichever modes are enabled; it enables no mode by
 itself. Use it when hit/not-hit is enough.

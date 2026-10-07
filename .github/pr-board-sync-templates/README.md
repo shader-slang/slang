@@ -43,8 +43,13 @@ the reference for what slang runs.
 4. Ensure the org-level secret `SLANG_PR_BOT_TOKEN` (a dedicated bot PAT with org
    Projects RW + Members read; repo Contents read, Pull requests write, Issues
    write, Metadata read) is available to the repo. The callers map only that
-   secret; the reusable workflow uses it for every call, so callers should keep
-   `permissions: {}` to drop the unused `GITHUB_TOKEN` scopes.
+   secret. Repo-scoped writes are made as `github-actions[bot]`, so each calling
+   job grants `issues: write` (assignees, linked issues, and comments) and
+   `pull-requests: write` (review requests). The reusable workflow uses the PAT
+   for org-team reads and ProjectsV2 writes, which `GITHUB_TOKEN` cannot do, and
+   as a compatibility fallback for assignment/reviewer writes while existing
+   callers roll out these grants. Comments never fall back to the PAT because
+   that would subscribe its human owner to the PR.
 
 The nightly sweep (`pr-sweep-nightly.yml`, `mode: sweep`) is the idempotent
 backstop for anything the per-event path cannot see (missed webhooks, failed runs,

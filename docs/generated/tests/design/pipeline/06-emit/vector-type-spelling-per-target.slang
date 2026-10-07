@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#shared-c-like-base
-//META: doc_section_digest=a59d860b5f6a346b23bed14b56396e2c1ea41a3005067b975c01053cca1644c4
+//META: doc_section_digest=4b10e63cd2245887946d5a04f643460694312535bff48052c288d542dac985ca
 //META: purpose=A Slang `float3` is spelled with each backend's native vector syntax — `float3` on HLSL/Metal/CUDA, `vec3` on GLSL, `vec3<f32>` on WGSL, and the prelude template `Vector<float, 3>` on C++ — because `emitType` is one of the operations each subclass overrides.
 //META: intent=functional
 //META: pipeline_stage=emit

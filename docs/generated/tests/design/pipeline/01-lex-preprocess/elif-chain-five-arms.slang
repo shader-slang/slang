@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#preprocessor-directives
-//META: doc_section_digest=4608df68ba69a62121bc1827dea7e4379ab2e4bc223340d0aead0d9cc6654fc2
+//META: doc_section_digest=b8118c99e1f7a9dcb30eebf7d13f30e2f807dfde61a88dc27f936547536b52c3
 //META: purpose=Stress probe of `#elif`: in a 5-arm `#if`/`#elif*4`/`#else` chain, only the matching arm runs and the others are inactive.
 //META: intent=stress
 //META: pipeline_stage=preprocess

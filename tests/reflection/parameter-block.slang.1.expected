@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "a",
@@ -125,10 +126,141 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "a",
+                "bindings": [
+                    {"kind": "shaderResource", "index": 0},
+                    {"kind": "samplerState", "index": 0}
+                ],
+                "type": {
+                    "kind": "parameterBlock",
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "Helper",
+                        "fields": [
+                            {
+                                "name": "t",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "s",
+                                "type": {
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "samplerState", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "samplerState", "index": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1},
+                            {"kind": "samplerState", "value": 1}
+                        ]
+                    },
+                    "containerVarLayout": {
+
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "name": "Helper",
+                            "fields": [
+                                {
+                                    "name": "t",
+                                    "type": {
+                                        "kind": "resource",
+                                        "baseShape": "texture2D",
+                                        "resultType": {
+                                            "kind": "vector",
+                                            "elementCount": 4,
+                                            "elementType": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            }
+                                        },
+                                        "sizes": [
+                                            {"kind": "shaderResource", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "shaderResource", "index": 0}
+                                },
+                                {
+                                    "name": "s",
+                                    "type": {
+                                        "kind": "samplerState",
+                                        "sizes": [
+                                            {"kind": "samplerState", "value": 1}
+                                        ]
+                                    },
+                                    "binding": {"kind": "samplerState", "index": 0}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "shaderResource", "value": 1},
+                                {"kind": "samplerState", "value": 1}
+                            ]
+                        },
+                        "bindings": [
+                            {"kind": "shaderResource", "index": 0},
+                            {"kind": "samplerState", "index": 0}
+                        ]
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1},
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "b",
+                "binding": {"kind": "shaderResource", "index": 1},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

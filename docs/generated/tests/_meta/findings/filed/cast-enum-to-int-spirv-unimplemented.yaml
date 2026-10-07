@@ -8,7 +8,10 @@ observed_at: 2026-05-28T10:30:00+00:00
 evidence:
   command: slangc repro.slang -target spirv-asm -entry main -stage compute -o /dev/null
   source_slang: docs/generated/tests/target-pipelines/spirv/cast-enum-to-int.slang
-  observed_summary: An explicit enum-to-int cast in a SPIR-V-targeted entry point aborts compilation with an internal "unimplemented" error (`Unhandled local inst in spirv-emit: castToVoid`). Other text-emit targets (HLSL, GLSL, CUDA) handle the same construct.
+  observed_summary: >-
+    An explicit enum-to-int cast in a SPIR-V-targeted entry point aborts compilation with an
+    internal "unimplemented" error (`Unhandled local inst in spirv-emit: castToVoid`). Other
+    text-emit targets (HLSL, GLSL, CUDA) handle the same construct.
   exit_code: 255
   minimized_repro: |
     enum Color : int { Red = 1, Green = 2, Blue = 3 }

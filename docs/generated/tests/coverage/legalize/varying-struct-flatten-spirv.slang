@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T17:00:00Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=7aa90a50fa61e43bbfc5d0af2203fd4cee827be1fbe30b61a2022eca4801f55f
+//META: doc_section_digest=5ecc062dc93859b69b080811db13201d5e12052d67767a4d49a4d8787cb40272
 //META: purpose=Verifies the SPIR-V varying-param legalizer splits a struct input/output into per-field OpVariable globals decorated with sequential Location indices, routing SV_Position to BuiltIn Position.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-legalize-varying-params.cpp

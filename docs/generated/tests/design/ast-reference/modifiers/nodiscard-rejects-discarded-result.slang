@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability--autodiff-annotations
-//META: doc_section_digest=a162d3ea93755dfa0e856855015bcc93b11eb24c29ad4e2f7cda299e7c6be3b7
+//META: doc_section_digest=b0c3a7d91822154a961b319d70bc835f44d68d38eef2d49365b0588620bb973e
 //META: purpose=A call to a `[NoDiscard]` function whose result is discarded is diagnosed.
 //META: intent=negative
 //META: pipeline_stage=check

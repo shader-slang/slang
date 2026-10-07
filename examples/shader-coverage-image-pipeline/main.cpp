@@ -1,19 +1,19 @@
 // Image-pipeline coverage demo — raw-Vulkan host driver.
 //
 // Single-dispatch compute pipeline: denoise → tonemap → gamma applied
-// to a synthetic 1080p test image. Runs in "smoke" mode (single
-// operator/boundary/gamma) or "full" mode (full parameter sweep). The
-// coverage delta between the two runs is the demo's headline.
+// to a synthetic test image (320x180 by default). Runs in
+// "smoke" mode (single operator/boundary/gamma) or "full" mode (full
+// parameter sweep). The coverage delta between the two runs is the
+// demo's headline.
 //
-// All GPU-runtime calls go through `vk_compute_demo.h` so the entire
-// raw-Vulkan path is isolated to one file. When slang-rhi PR #739
-// lands, the migration replaces only `vk_compute_demo.h` + this file's
-// Vulkan touch points; the slang sources and demo logic stay
-// unchanged. See `vk_compute_demo.h`'s file-level comment for the
-// step-by-step swap procedure.
+// GPU-runtime calls go through the shared shader-coverage-common/vk_compute_demo.h
+// helper. See that header's file-level comment for the migration to slang-rhi
+// after PR #739 lands; the Slang sources and demo logic stay unchanged.
 
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/coverage-counters.h"
+#include "shader-coverage-common/vk_compute_demo.h"
 
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -30,6 +30,7 @@
 #include <vector>
 
 using Slang::ComPtr;
+using coverageDemo::decodeCoverageCounters;
 
 namespace
 {
@@ -42,8 +43,6 @@ namespace
 // the BVH-traversal demo, which dictates the slot up front via
 // `-trace-coverage-binding` (the "raw/explicit binding" approach). Both
 // are valid; this pair exists to show each one end-to-end.
-constexpr uint32_t kImageWidth = 1920;
-constexpr uint32_t kImageHeight = 1080;
 
 struct PipelineParams
 {
@@ -64,6 +63,16 @@ struct PipelineParams
 {
     std::cerr << "error: " << message << "\n";
     std::exit(1);
+}
+
+// Parse the entire argument so negative, overflowing, or trailing text is rejected.
+uint32_t parseUnsigned(std::string_view value, const char* option)
+{
+    uint32_t result = 0;
+    auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+    if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size())
+        fail(std::string(option) + " requires an unsigned integer");
+    return result;
 }
 
 void checkSlang(SlangResult result, const char* what)
@@ -302,11 +311,11 @@ CompiledShader compileShader(const CompileOptions& options)
     return out;
 }
 
-// Deterministic synthetic 1080p HDR test image: smooth gradient +
+// Deterministic synthetic HDR test image: smooth gradient +
 // hard-edged strips + an HDR spike.
 std::vector<float> generateTestImage(uint32_t width, uint32_t height)
 {
-    std::vector<float> pixels(width * height * 4);
+    std::vector<float> pixels(size_t(width) * height * 4);
     std::mt19937 rng(12345);
     std::normal_distribution<float> noise(0.0f, 0.05f);
     for (uint32_t y = 0; y < height; ++y)
@@ -563,13 +572,21 @@ CoverageSummary summarize(
     const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
-    const uint32_t n = coverage->getCounterCount();
+    // Iterate entries ([0, getEntryCount())), not counters: several
+    // entries can share one counterIndex once line coverage coalesces
+    // markers, so a counter-indexed loop both under-visits (stops at
+    // getCounterCount() < getEntryCount()) and misattributes hits (entry
+    // i's counter is not generally counter i). Look each entry's counter
+    // up by its own counterIndex instead, mirroring writeLcov() below.
+    const uint32_t n = coverage->getEntryCount();
     for (uint32_t i = 0; i < n; ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
-        const bool covered = hits[i] > 0;
+        const bool covered = entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                             entry.counterIndex < (uint32_t)hits.size() &&
+                             hits[entry.counterIndex] > 0;
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
@@ -614,6 +631,9 @@ int main(int argc, char** argv)
     try
     {
         std::string mode = "smoke";
+        // Keep the 48-configuration counting demo small; opt into benchmark-sized inputs.
+        uint32_t imageWidth = 320;
+        uint32_t imageHeight = 180;
         bool enableCoverage = true;
         // This demo intentionally defaults to 32-bit counters even though
         // the compiler default is 64-bit (see
@@ -638,13 +658,12 @@ int main(int argc, char** argv)
         // of N rows to avoid OS watchdog resets (Windows TDR /
         // VK_ERROR_DEVICE_LOST) on coverage-instrumented runs. The
         // bilateral filter's inner loop creates heavy atomic contention on
-        // a few counters, and full mode's parameter sweep makes each config
-        // dispatch long enough to trip the watchdog, so full mode defaults
-        // to 128-row tiles — a safe height on any GPU. Smoke mode is quick
-        // and defaults to whole-image dispatch. Pass an explicit value to
+        // a few counters, especially with large images. Full mode defaults to
+        // 128-row tiles to limit work per submission. Smoke mode defaults
+        // to whole-image dispatch. Pass an explicit value to
         // tune (smaller if you still observe TDR), or `--tile-rows=0` to
-        // force whole-image dispatch in full mode. --coverage-mode=boolean
-        // also eliminates TDR risk without tiling.
+        // force whole-image dispatch in full mode. Batching does not limit
+        // total process runtime; use the smaller default image for quick runs.
         constexpr uint32_t kTileRowsUnset = UINT32_MAX;
         constexpr uint32_t kFullModeTileRows = 128;
         uint32_t tileRows = kTileRowsUnset; // resolved per mode after parsing
@@ -673,6 +692,10 @@ int main(int argc, char** argv)
                 mode = "smoke";
             else if (a == "--mode=full")
                 mode = "full";
+            else if (a.substr(0, 8) == "--width=")
+                imageWidth = parseUnsigned(a.substr(8), "--width");
+            else if (a.substr(0, 9) == "--height=")
+                imageHeight = parseUnsigned(a.substr(9), "--height");
             else if (a == "--no-coverage")
                 enableCoverage = false;
             else if (a == "--coverage")
@@ -686,7 +709,11 @@ int main(int argc, char** argv)
             else if (a == "--coverage-mode=boolean")
                 coverageBoolean = true;
             else if (a.substr(0, kTileRowsFlag.size()) == kTileRowsFlag)
-                tileRows = (uint32_t)std::stoul(std::string(a.substr(kTileRowsFlag.size())));
+            {
+                tileRows = parseUnsigned(a.substr(kTileRowsFlag.size()), "--tile-rows");
+                if (tileRows % 8 != 0)
+                    fail("--tile-rows must be 0 or a multiple of 8 to avoid overlapping tiles");
+            }
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
@@ -697,6 +724,12 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
+
+        // Denoise uses signed pixel indices; keep width * height representable in int32_t.
+        if (imageWidth == 0 || imageWidth > 65535 || imageHeight == 0 || imageHeight > 65535)
+            fail("--width and --height must be in [1, 65535]");
+        if (uint64_t(imageWidth) * imageHeight > INT32_MAX)
+            fail("image pixel count must not exceed INT32_MAX");
 
         // Resolve the tile-rows default per mode (see the flag comment
         // above): full mode tiles by default, smoke mode does not. An
@@ -791,7 +824,8 @@ int main(int argc, char** argv)
             setBindings,
             "main");
 
-        const auto image = generateTestImage(kImageWidth, kImageHeight);
+        std::cout << "image: " << imageWidth << "x" << imageHeight << "\n";
+        const auto image = generateTestImage(imageWidth, imageHeight);
         auto inputBuf =
             ctx.createBuffer(image.size() * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         ctx.upload(inputBuf, image.data(), inputBuf.size);
@@ -846,8 +880,9 @@ int main(int argc, char** argv)
         // Neither shape affects coverage results: tiles partition the image,
         // every pixel is processed exactly once, and counters accumulate
         // across all submissions.
-        const uint32_t effectiveTileRows = (tileRows == 0) ? kImageHeight : tileRows;
-        const uint32_t groupsX = (kImageWidth + 7) / 8;
+        const uint32_t effectiveTileRows =
+            (tileRows == 0) ? imageHeight : std::min(tileRows, imageHeight);
+        const uint32_t groupsX = (imageWidth + 7) / 8;
         uint32_t dispatchCount = 0;
 
         std::cout << "running " << configs.size() << " config(s) in mode=" << mode
@@ -862,21 +897,20 @@ int main(int argc, char** argv)
         for (const auto& cfg : configs)
         {
             PipelineParams p = {};
-            p.imageWidth = kImageWidth;
-            p.imageHeight = kImageHeight;
+            p.imageWidth = imageWidth;
+            p.imageHeight = imageHeight;
             p.tonemapOp = cfg.tonemapOp;
             p.boundaryMode = cfg.boundaryMode;
             p.gammaMode = cfg.gammaMode;
             p.bilateralSigmaS = cfg.sigmaS;
             p.bilateralSigmaR = cfg.sigmaR;
             p.exposure = cfg.exposure;
-            for (uint32_t y0 = 0; y0 < kImageHeight; y0 += effectiveTileRows)
+            for (uint32_t y0 = 0; y0 < imageHeight; y0 += effectiveTileRows)
             {
                 p.tileOriginY = y0;
                 ctx.upload(paramsBuf, &p, sizeof(p));
-                const uint32_t bandRows = (kImageHeight - y0 < effectiveTileRows)
-                                              ? (kImageHeight - y0)
-                                              : effectiveTileRows;
+                const uint32_t bandRows =
+                    (imageHeight - y0 < effectiveTileRows) ? (imageHeight - y0) : effectiveTileRows;
                 const uint32_t groupsY = (bandRows + 7) / 8;
                 ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
                 ++dispatchCount;
@@ -906,15 +940,7 @@ int main(int argc, char** argv)
         // consume the manifest's `element_stride` see consistent layout.
         std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
         ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-        std::vector<uint64_t> hits(counterCount, 0);
-        for (uint32_t i = 0; i < counterCount; ++i)
-        {
-            uint64_t value = 0;
-            const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-            for (uint32_t b = 0; b < counterByteWidth; ++b)
-                value |= (uint64_t)slot[b] << (b * 8);
-            hits[i] = value;
-        }
+        auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
 
         auto summary = summarize(shader.coverageMetadata, hits);
         printSummary(mode.c_str(), summary);

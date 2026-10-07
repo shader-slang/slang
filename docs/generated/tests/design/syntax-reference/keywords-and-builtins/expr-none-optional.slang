@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#expression-keywords
-//META: doc_section_digest=6c39a8a833fc084f0b1f7e30400e6efc997d8e919471186717dfce4ca0bf8e11
+//META: doc_section_digest=96871287e0a5c71c8f6df1013470b534356880ae94ba849477f98d1e5a7bf53f
 //META: purpose=`none` is the expression keyword for the empty value of `Optional<T>`; `hasValue` discriminates between the empty and present cases.
 //META: intent=functional
 //META: pipeline_stage=parse

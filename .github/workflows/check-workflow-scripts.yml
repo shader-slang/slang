@@ -1,8 +1,9 @@
 name: Check Workflow Scripts
 
 # Lightweight unit tests for the JavaScript used by our GitHub workflows
-# (committer-signal ranking + assignee/reviewer selection inlined into
-# pr-board-sync.yml, extracted at test time). This is the single home for
+# (committer-signal ranking, assignee/reviewer selection, and GITHUB_TOKEN write
+# routing inlined into pr-board-sync.yml and extracted at test time). This is the
+# single home for
 # workflow-JS test coverage: any new .github/scripts/*.test.js is picked up
 # automatically by the run step below -- no edit here needed.
 #

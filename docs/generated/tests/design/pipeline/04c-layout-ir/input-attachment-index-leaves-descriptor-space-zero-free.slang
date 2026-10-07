@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#vkinput_attachment_index-and-descriptor-space-occupancy
-//META: doc_section_digest=d2fe0dddc6cc4095f50d2538cb7552381a2cbc93b5d58b9250e25e6460a15b15
+//META: doc_section_digest=64e6abc862811cd949ddf304b8c8c65e328f8071001faa58f91d23f126ef213d
 //META: purpose=An input-attachment index does not occupy a descriptor set, so a SubpassInput entry-point parameter leaves set 0 available to the bindless descriptor heap.
 //META: intent=functional
 //META: pipeline_stage=layout

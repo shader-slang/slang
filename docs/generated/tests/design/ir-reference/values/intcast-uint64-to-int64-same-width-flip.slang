@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#conversions
-//META: doc_section_digest=15a849f7cabcf06b95570121d08d30f735912628e8a357779f17fa39de0aca01
+//META: doc_section_digest=fd36e77aadaffc9bfb74e35c83d2c6e2a74c726d09922af2aa3a95ce43fcac0c
 //META: purpose=Expansion: zero-width-change `uint64_t -> int64_t` signedness flip lowers to a single `intCast(%u64a)` with `Int64` result.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // Counterpart to the existing same-width 32-bit flip; verifies
 // `intCast` is the single shape at the 64-bit rank as well.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform uint64_t u64a;
 uniform RWStructuredBuffer<int64_t> buf;

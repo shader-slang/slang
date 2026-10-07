@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#capability-system
-//META: doc_section_digest=ae73a8962b418df71d4a8a3d2d9b722c9933a29ec7eefb63e8b0b9e081f0fe14
+//META: doc_section_digest=42bb2b8e4a42e0ceb11d49a4ca220fc9b2fff51da3e1dfe9c94764da839027ca
 //META: purpose=A capability name such as `raytracing` expands to a disjunction of conjunctions whose stage atoms exclude `compute`, so calling `TraceRay` from a compute entry point on HLSL is rejected with `E36107`.
 //META: intent=negative
 //META: pipeline_stage=check

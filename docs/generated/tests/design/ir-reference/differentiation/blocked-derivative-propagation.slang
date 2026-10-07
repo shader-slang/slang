@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#detachderivative
-//META: doc_section_digest=6a606134e98de20cf82c1e5baedde0a38a9f404df32219b204c2dad2b81869b7
+//META: doc_section_digest=2d9c586271d84829bc8507a623949ff3b07f378f4cab8990c857359a815b285d
 //META: purpose=detachDerivative blocks derivative propagation through its operand and is deleted once differentiation is done, so no detach spelling survives into any target text.
 //META: intent=functional
 //META: pipeline_stage=emit

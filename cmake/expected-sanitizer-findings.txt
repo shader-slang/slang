@@ -31,25 +31,6 @@
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
 
-# #11936: Record-replay replay path leaks objects created by replayed
-# calls: the replay path invokes proxied methods with default-initialized
-# out-parameters and discards the results, so replayed object-creating
-# calls (sessions and filesystems via tryWrap, digest blobs via
-# getSessionDescDigest) are never released. tryWrap matches the proxy
-# wrapper allocations (proxy-base.cpp); callWithDefaults matches the
-# discarded-out-parameter allocations made inside replayed calls
-# (proxy-macros.h). Deliberately NOT matching generic allocation helpers
-# like RawBlob::tryCreate -- that would silently accept unrelated future
-# blob leaks.
-LEAK: SlangRecord::tryWrap
-LEAK: SlangRecord::callWithDefaults
-# Also #11936: the replay-playback unit tests leak their TestCalculatorProxy
-# objects (a reference taken during record/replay of proxied calls is never
-# released; the handle registry itself stores raw pointers, so the imbalance
-# is in the call path). The allocation site is the test function, so match
-# the test-function name prefix.
-LEAK: _replayContext
-
 # #11938: Repro load leaks CacheFileSystem::PathInfo entries that have no
 # unique identity: the post-load hand-off to the CacheFileSystem's owning
 # unique-identity map skips them (see the TODO in slang-repro.cpp), so
@@ -85,3 +66,9 @@ slang-type-layout.h:772
 #   #10828 LEAK: _maybeBeginMacroInvocation -- fixed by this PR: the
 #     wrong-arg-count macro invocation error paths now free the
 #     MacroInvocation.
+#   #11936 LEAK: SlangRecord::tryWrap / SlangRecord::callWithDefaults /
+#     _replayContext -- fixed: createSession now releases the file-system
+#     wrapper reference it creates; the ReplayContext releases proxies the
+#     playback dispatcher orphaned into discarded outputs at teardown; and
+#     the replay-playback unit tests attach their test proxies instead of
+#     double-counting them.

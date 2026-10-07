@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#other
-//META: doc_section_digest=892b92052aae4d71e1cd28cc1ecd17d43d75413f857441cfa244f1066aa8c1fb
+//META: doc_section_digest=0d0762e4e59612e4c842da9adb0ce25510dfd2380e8ab427638f4c6b2bd64f9a
 //META: purpose=The synthesized struct initializer carries a constructor decoration; the dump prints constructor(true) with a Bool literal operand.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // initializer `S { ... }` invokes the struct's synthesized initializer, and
 // the CHECK pins the printed operand form `constructor(true)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#reverse-mode
-//META: doc_section_digest=e69ab230c20c4f232ce87275aa033089eef9df01efc5d5cb733c5d15d1290426
+//META: doc_section_digest=50d50fc11cd5cf0d2c306ba5b1a1d9c8f2003b1c2a912a6b97e3c47bfd1c314a
 //META: purpose=A [TreatAsDifferentiable] callable gets the trivial reverse-mode phases TrivialBackwardDifferentiatePrimal, TrivialBackwardDifferentiatePropagate and TrivialBackwardRemat instead of the ordinary ones.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // also emitted for `%g` inside the LOWER-TO-IR section — the two families are
 // alternatives, not layers.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

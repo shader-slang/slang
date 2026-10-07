@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:24:33Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: da0d1f10369218c4e091cd72414d8d541941c541ee85497b27e089007588104f
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: d62ed3d2d5e78332b69f58ddf07b9770380e9c7a11a3789d113d04ab3161c0de
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -74,7 +74,11 @@ ModuleHeader    ::= 'module' (IDENT | STRING_LIT)? ';'       -- parseModuleDecla
                                               --   token, never dotted; omitted = current module)
                   | 'implementing' ModuleName ';'            -- parseImplementingDecl
                                               --   (via parseFileReferenceDeclBase)
-ModuleName      ::= IDENT ('.' IDENT)* | STRING_LIT          -- dotted identifier or string literal
+ModuleName      ::= IDENT ('.' IDENT)* | STRING_LIT          -- dotted identifier or string literal;
+                                                              --   only the 'implementing' alternative
+                                                              --   (and ImportPath) reaches the dotted
+                                                              --   form, since a declared module name
+                                                              --   is a single token
 
 TopDecl         ::= ImportDecl                                -- parseDecls -> ParseDecl
                   | ModuleHeader                              -- placement is semantic
@@ -176,8 +180,10 @@ TypeAliasDecl   ::= 'typealias' IDENT ('<' GenericParams '>')? WhereClause? '=' 
 StructDecl      ::= 'struct' Attribute* IDENT? GenericParams? Inheritance?
                     WhereClause? StructBody                   -- Parser::ParseStruct
                   | 'struct' Attribute* IDENT? GenericParams? Inheritance? '=' Type ';'
-                                                              -- type-alias form (aliasedType)
-                  | 'struct' Attribute* IDENT? ';'            -- forward declaration (hasBody = false)
+                                                              -- link-time symbol alias (aliasedType);
+                                                              --   NOT a 'typealias' (see below)
+                  | 'struct' Attribute* IDENT? ';'            -- bodyless declaration (hasBody = false);
+                                                              --   NOT a C-style forward declaration
 ClassDecl       ::= 'class'  IDENT Inheritance? StructBody    -- Parser::ParseClass
                                                               -- (no generic params, no 'where'
                                                               --   clause and no forward form)
@@ -223,6 +229,42 @@ directly (see [keywords-and-builtins.md](keywords-and-builtins.md)).
 That is why the name is optional above — an anonymous one gets a
 generated name — and why the declaration can be followed by a
 declarator, as in `struct Foo { int x; } foo;`.
+
+Two of the `StructDecl` alternatives are easy to misread as their C or
+`typealias` counterparts, and neither behaves that way.
+
+The `'=' Type` form sets `aliasedType`
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+6424) and is a **link-time symbol alias**, not a type alias. Its
+intended spelling carries `export`, as in
+`export struct Foo : IFoo = Bar;`, and lowering turns it into an
+`IRSymbolAlias`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 12714). The name is therefore resolved when modules are linked,
+not while the declaring module is checked — which is why
+`isConcreteFieldOwningAggregate` (line 6663 in the same file) treats an
+`aliasedType` struct exactly like a bodyless `extern struct X;` and
+refuses to build a field-wise `IRMakeStruct` for it: the fields "only
+materialize during linking". Compile `struct Alias = Base;` on its own,
+with no link step to resolve it, and the name does not behave like
+`Base` at all — it has no members to access and no initializer
+conversion. If you want an ordinary alias, `typealias` is the
+construct; the two are unrelated.
+
+The bodyless `'struct' IDENT ';'` form is accepted, but it does not
+admit a later definition of the same name, so it cannot be used the way
+a C forward declaration is. Only functions get the nuanced
+redeclaration treatment: `checkForRedeclaration` routes a pair of
+`FuncDecl`s to `checkFuncRedeclaration` — the comment there names "the
+inherited legacy of C forward declarations" as the reason — and for
+every other flavor of declaration falls through to
+"we do not allow duplicate declarations with the same name", reporting
+`Redeclaration` (E30200) plus `SeePreviousDeclarationOf`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 13823-13847). A `struct Fwd;` followed by
+`struct Fwd { int v; }` is thus two conflicting declarations rather
+than a declaration completed by its definition, and a subsequent use of
+the name is additionally ambiguous between them.
 
 The `Attribute*` slot inside `'struct'` is a legacy placement, with the
 bracket *after* the keyword. `Parser::ParseStruct` still parses it to
@@ -320,6 +362,21 @@ AccessorName    ::= 'get' | 'set' | 'ref'        -- parseAccessorDecl; any other
                                                   -- accessor name is diagnosed (Unexpected)
 ```
 
+A `__func_extension` names the higher-order form it is defining and
+then gives that form's signature. Its parameters go through
+`parseModernParamList`, so either parameter spelling is accepted, and
+the body is an ordinary `FuncBody`:
+
+```
+float cube(float x) { return x * x * x; }
+
+__func_extension fwd_diff(cube)(DifferentialPair<float> x)
+    -> DifferentialPair<float>
+{
+    return diffPair(cube(x.p), 3.0 * x.p * x.p * x.d);
+}
+```
+
 ### Variable / binding declarations
 
 ```
@@ -380,19 +437,43 @@ AttributeSyntaxDecl ::= 'attribute_syntax' '[' IDENT AttributeParams? ']' ':' ID
                                                               --   alias form for attributes
 AttributeParams     ::= '(' AttributeParam (',' AttributeParam)* ')'
 AttributeParam      ::= IDENT (':' Type)? ('=' ArgExpr)?      -- parseAttributeParamDecl
-RequireCapabilityDecl ::= '__require_capability' CapabilityName (('+' | ',') CapabilityName)* ';'
+RequireCapabilityDecl ::= '__require_capability' CapabilityName ';'
                                                               -- parseRequireCapabilityDecl; there are
-                                                              --   no parentheses, and each name must be
+                                                              --   no parentheses, exactly one atom
+                                                              --   (see note), and the name must be
                                                               --   a known capability atom
                                                               --   (findCapabilityName), otherwise
                                                               --   UnknownCapability is reported
 CapabilityName        ::= IDENT
 ```
 
+The `':'` clause of both `SyntaxDecl` and `AttributeSyntaxDecl` is
+resolved by `astBuilder->findSyntaxClass`, so the names it can take
+are the compiler's own AST node classes, not types declared in the
+program being compiled. The core module is where the two forms are
+used, and it supplies a readable example of each — the first installs
+a modifier keyword, the second an attribute together with its
+parameters
+([core.meta.slang](../../../../source/slang/core.meta.slang)):
+
+```
+syntax constexpr : ConstExprModifier;
+attribute_syntax [vk_binding(binding: int, set: int = 0)] : GLSLBindingAttribute;
+```
+
+The single-atom restriction is not a deliberate design: after reading
+a name, `parseRequireCapabilityDecl` tries to continue the list with
+`AdvanceIf(parser, "+")` / `AdvanceIf(parser, ",")`, and that overload
+matches only an `Identifier` token whose text is the given string —
+never the `+` or `,` operator tokens the lexer actually produces. The
+loop therefore always stops after the first atom, and
+`__require_capability a + b;` fails at the following mandatory `';'`.
+
 The statement-level spelling is different: `__requireCapability` inside
 a function body *does* take parentheses and only allows commas —
 `'__requireCapability' '(' CapabilityName (',' CapabilityName)* ')' ';'`
-(`Parser::ParseRequireCapabilityStatement`).
+(`Parser::ParseRequireCapabilityStatement`). It is the only spelling
+that can name several atoms at once.
 
 ## Statements
 
@@ -588,6 +669,20 @@ AssignOp        ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
                   | '<<=' | '>>=' | '&=' | '|=' | '^='
 ```
 
+The value a `LambdaExpr` produces is consumed through the `IFunc`
+interface declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang), whose
+requirement is `TR operator()(expand each TP p)`. The runnable
+shape of the production is therefore a lambda passed to (or stored in)
+an `IFunc`-constrained binding, which is what supplies the call
+syntax:
+
+```
+float apply(IFunc<float, float> f, float x) { return f(x); }
+
+// apply((float v) => v * 2.0, 3.0) is 6.0
+```
+
 ### Literal forms vs. token kinds
 
 `INT_LIT`, `FLOAT_LIT`, `STRING_LIT`, and `CHAR_LIT` are distinct
@@ -640,16 +735,29 @@ Anything else is treated as a comparison.
 Inside a generic argument list the ladder itself changes: while
 `genericDepth` is non-zero, `GetOpLevel` returns `Precedence::Invalid`
 for `>`, `>=`, and `>>`, so those tokens cannot be consumed as
-operators and are available to close the argument list. `<`, `<=`, and
-the rest keep their normal precedence, which is why a comparison such
-as `A<(x > y)>` needs the parentheses.
+operators and are available to close the argument list
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+7817-7831). `<`, `<=`, and the rest keep their normal precedence.
+
+The asymmetry is absolute, and parentheses do not rescue it.
+`genericDepth` is incremented only on entering a generic argument list
+and decremented on leaving it (lines 1750/1780, 2895/2914, 6158/6162);
+nothing resets it for a nested parenthesized subexpression. So `>`,
+`>=`, and `>>` are unavailable as operators *anywhere* inside an open
+generic argument list, `A<(x > y)>` included — the inner `>` still
+closes the list rather than comparing, and the parse fails at the
+unexpected `)`. Only the `<` family keeps working, so `A<(x < y)>` is
+the spelling that does what it looks like.
 
 ## Modifiers
 
 ```
 ModifierList    ::= (Modifier | Attribute)+
-Modifier        ::= ModifierKeyword ModifierTail?
-ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
+Modifier        ::= BareModifierKeyword                       -- takes no further tokens
+                  | TailModifierKeyword ModifierTail?         -- tail required for most, optional
+                                                              --   for four; see note
+BareModifierKeyword
+                ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
                   | 'public' | 'private' | 'internal' | 'extern' | 'export'
                   | 'uniform' | 'groupshared' | 'precise'
                   | 'nointerpolation' | 'noperspective' | 'linear' | 'sample' | 'centroid'
@@ -659,22 +767,40 @@ ModifierKeyword ::= 'in' | 'out' | 'inout' | 'const' | 'static' | 'inline'
                   | 'override' | 'dynamic_uniform' | 'param' | 'require'
                   | 'dyn' | 'highp' | 'lowp' | 'mediump'
                   | 'volatile' | 'coherent' | 'restrict' | 'readonly' | 'writeonly'
-                  | 'shared' | 'layout' | 'hitAttributeEXT'
+                  | 'shared' | 'hitAttributeEXT'
                   | '__ref' | '__constref' | '__builtin' | '__global' | '__exported'
                   | '__prefix' | '__postfix'
-                  | '__intrinsic_op' | '__target_intrinsic'
-                  | '__specialized_for_target' | '__attributeTarget'
+TailModifierKeyword
+                ::= 'layout' | '__attributeTarget'            -- tail required
                   | '__glsl_extension' | '__glsl_version' | '__spirv_version'
                   | '__wgsl_extension' | '__cuda_sm_version'
                   | '__builtin_type' | '__builtin_requirement'
                   | '__magic_type' | '__magic_enum' | '__intrinsic_type'
-                  | '__implicit_conversion'
+                  | '__intrinsic_op' | '__target_intrinsic'   -- tail optional
+                  | '__specialized_for_target' | '__implicit_conversion'
 
-ModifierTail    ::= '(' ArgList? ')'                          -- per-modifier; see keywords-and-builtins.md
+ModifierTail    ::= '(' ModifierArgs ')'                      -- per-modifier token shape, not a
+                                                              --   general ArgList; see note
 ```
 
-The complete keyword inventory is in
-[keywords-and-builtins.md](keywords-and-builtins.md).
+The split follows `g_parseSyntaxEntries[]`: a modifier registered
+there with a syntax class alone is parsed by `parseSimpleSyntax` and
+takes no further tokens, while a tail is read by the modifier's own
+parse callback. Having a callback does not imply a tail, though:
+`shared`, `volatile`, `coherent`, `restrict`, `readonly`,
+`writeonly`, and `hitAttributeEXT` have one only to choose between
+HLSL and GLSL modifier nodes or to report a deprecation, and read
+nothing after the keyword, so they are listed as bare keywords above.
+
+A `ModifierTail` is not an `ArgList`. Each modifier reads a fixed
+token shape of its own: an identifier
+(`__glsl_extension(GL_EXT_texture_shadow_lod)`), an integer literal
+(`__builtin_type(...)`), a version literal (`__spirv_version(1.3)`),
+a target name with an optional definition
+(`__target_intrinsic(hlsl, RayDesc)`), a magic-type name with an
+optional tag (`__magic_type(DifferentiableType)`), or the
+GLSL qualifier list of `layout(...)`. The complete keyword inventory
+is in [keywords-and-builtins.md](keywords-and-builtins.md).
 
 ## Attributes and decorations
 
@@ -723,7 +849,8 @@ GenericParam    ::= 'typename'? IDENT (':' Type)? ('=' Type)?  -- type parameter
                                                               --   (GenericTypePackParamDecl)
                   | 'each'? Type IDENT ('=' Expr)?             -- traditional type-first value
                                                               --   parameter, e.g. `<int N>`
-                  | 'functype' IDENT (':' Type)?               -- function-type parameter
+                  | 'functype' IDENT (':' Type)?               -- function-type parameter;
+                                                              --   parses, but see the note below
                                                               -- all forms: ParseGenericParamDecl
 
 WhereClause     ::= ('where' WhereTerm)+                       -- maybeParseGenericConstraints;
@@ -742,17 +869,50 @@ traditional value pack (`each int D`). Note that the `:` constraint on
 a generic parameter takes a *single* supertype, unlike the where-clause
 `:` form, which accepts a comma-separated list.
 
+The `functype` form is listed because the parser accepts it, not
+because it is usable yet. `ParseGenericParamDecl` handles it by
+creating an ordinary `GenericTypeParamDecl` and then a
+`GenericTypeConstraintDecl` whose comment says "Create a
+func-type-constraint and add it" — but that constraint is never given a
+`sub` or `sup` and is never `AddMember`ed to the generic
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+1662-1671). What survives is therefore an unconstrained type parameter
+with a dangling constraint node. The consequences follow from that: an
+optional `: Type` is handled by the shared tail below (lines
+1718-1734), which builds a normal subtype constraint and so demands an
+interface, rejecting a function type such as `functype(int) -> int` as
+a constraint; and because nothing records that the parameter is
+callable, invoking it in the body does not resolve. Treat the
+production as reserved syntax until the constraint is actually
+attached.
+
 Each `where` keyword introduces exactly one `WhereTerm`
 (`maybeParseGenericConstraints` loops over `while (AdvanceIf("where"))`);
 to state several constraints, repeat the keyword. A leading
 `optional` modifier (parsed as `OptionalConstraintModifier`) is
 accepted on every term except `__hasDiffTypeInfo`. The
 `countof(Pack) == IntExpr` form is *oriented*: the reversed spelling
-`N == countof(Pack)` is recognized only to emit a targeted
-diagnostic. `nonempty(Pack)` and `countof(Pack) == IntExpr` are
-pack-shape constraints on a variadic `each` parameter;
-`__hasDiffTypeInfo(Type)` is a compiler-internal differentiability
-constraint.
+`N == countof(Pack)` is recognized only to emit
+`VariadicPackCountConstraintRequiresCountofOnLeft`, which asks for the
+constraint to be rewritten with `countof` on the left, and the rest of
+that `where` clause is then skipped. `nonempty(Pack)` and
+`countof(Pack) == IntExpr` are pack-shape constraints on a variadic
+`each` parameter; `__hasDiffTypeInfo(Type)` is a compiler-internal
+differentiability constraint.
+
+An `optional` conformance constraint is one the argument type does not
+have to satisfy, so anything the constraint provides has to be guarded
+by an `is` test before it is used:
+
+```
+interface IThing { void thing(); }
+
+void f<T>(T t) where optional T : IThing
+{
+    if (T is IThing)
+        t.thing();
+}
+```
 
 Where-clauses appear after the parameter list (or after the result
 clause for function-style declarations) and are syntactically optional

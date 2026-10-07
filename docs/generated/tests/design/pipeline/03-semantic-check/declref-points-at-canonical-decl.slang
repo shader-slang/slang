@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#inputs-and-outputs
-//META: doc_section_digest=325192a5d2be9d9ec0f3812a36230d5c900a48f1c7af5d97ada17cd1926349b1
+//META: doc_section_digest=08374a105dd7eccc27319a2290144a2580fe44bbf49c4e69a9b6439014f50c38
 //META: purpose=After checking, every DeclRef-bearing node points at the canonical decl, so a call written before the callee's declaration still resolves to it.
 //META: intent=functional
 //META: pipeline_stage=check

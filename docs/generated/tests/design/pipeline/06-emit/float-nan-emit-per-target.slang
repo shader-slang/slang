@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#shared-c-like-base
-//META: doc_section_digest=a59d860b5f6a346b23bed14b56396e2c1ea41a3005067b975c01053cca1644c4
+//META: doc_section_digest=4b10e63cd2245887946d5a04f643460694312535bff48052c288d542dac985ca
 //META: purpose=Boundary: `NaN` also has no literal spelling, so WGSL calls a synthesized `_slang_getNan` helper while HLSL/GLSL/Metal/CUDA/C++ emit the division `0.0 / 0.0` and SPIR-V encodes the quiet-NaN bit pattern as a hex-exponent `OpConstant`.
 //META: intent=boundary
 //META: pipeline_stage=emit

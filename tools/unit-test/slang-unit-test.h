@@ -62,6 +62,14 @@ struct UnitTestContext
 
 typedef void (*UnitTestFunc)(UnitTestContext*);
 
+/// The registry of unit tests exported by a unit-test shared library.
+///
+/// The registry has process lifetime: it lives in a function-local static inside the module and is
+/// filled in exactly once, by the load-time static constructors that `SLANG_UNIT_TEST` generates.
+/// Callers may therefore enumerate the tests as many times as they like (slang-test does so once
+/// per retry pass), but must not release the registry until the process is done running tests,
+/// because re-loading an already-resident shared library does not re-run its static constructors
+/// and so cannot refill it.
 class IUnitTestModule
 {
 public:
@@ -69,6 +77,9 @@ public:
     virtual SLANG_NO_THROW const char* SLANG_MCALL getTestName(SlangInt index) = 0;
     virtual SLANG_NO_THROW UnitTestFunc SLANG_MCALL getTestFunc(SlangInt index) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setTestReporter(ITestReporter* reporter) = 0;
+
+    /// Releases the registered tests. Valid only at process teardown: it empties a registry that
+    /// nothing can refill, so the module is unusable afterwards.
     virtual SLANG_NO_THROW void SLANG_MCALL destroy() = 0;
 };
 

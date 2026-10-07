@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#intval-family
-//META: doc_section_digest=7dc220c4c4dd5c2b21296a00da8c0b8bb7caf5c69af13f6b032f0ae0e4047ecd
+//META: doc_section_digest=3b7a66f73a4b30e3c18815ae985a8f256039debd8a5caa97ed928ac84dcbb5bd
 //META: purpose=A sizeof of a type is a compile-time integer value, usable in a constant initializer, and is strictly positive for a non-empty type.
 //META: intent=functional
 //META: pipeline_stage=check

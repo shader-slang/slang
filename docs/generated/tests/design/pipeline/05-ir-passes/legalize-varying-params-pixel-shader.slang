@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#type-and-value-legalization
-//META: doc_section_digest=857d9a7b5620991cb161cbee5d5f843c16e973d3c494110ba22777ebfea3d38f
+//META: doc_section_digest=be338458e89c71e229e00d5eae5f44da20b6937edb6e9cd44c679913a4082adf
 //META: purpose=Expansion: legalize-varying-params on a pixel-shader entry point routes user-defined TEXCOORD inputs into per-target shapes and `SV_Target` into the per-target output marker on HLSL and GLSL.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

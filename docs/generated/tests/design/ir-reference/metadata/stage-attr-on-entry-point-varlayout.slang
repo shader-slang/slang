@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#attr-family
-//META: doc_section_digest=2da76dd4726862c0040f126154c48b23ed2237c18f88f175659ae9d45c2fec5d
+//META: doc_section_digest=d04af1d542b300e2a0bbb935e77e3c2a63823444c7ee62a2765c374e4959f38b
 //META: purpose=The stage attribute tags an entry-point varLayout with a single pipeline-stage integer literal.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // the captured id is resolved back to a `stage` definition from within the
 // var layout that owns it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 
@@ -26,4 +26,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: = varLayout(%{{[0-9]+}}, %{{[0-9]+}}, %[[STAGE:[0-9]+]])
-// CHECK: %[[STAGE]]{{.*}}= stage({{[0-9]+}} : Int)
+// The literal is a `Stage` enumerator, so a compute entry point prints as 6.
+// CHECK: %[[STAGE]]{{.*}}= stage(6 : Int)

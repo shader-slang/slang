@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#callback-parsed-modifiers-some-take-arguments
-//META: doc_section_digest=557cf0f3299bd01f39ec11c6f02c2350e5ea53a150f24a86af629fbc6eeb5392
+//META: doc_section_digest=a48e55cd5ae68644046c4a9b6fb64c4c695a77cce176cbfeb3dcf8d2ad253635
 //META: purpose=`hitAttributeEXT` is a callback-parsed modifier in the raytracing family; an HLSL-style intersection shader that calls `ReportHit` with a user-defined hit-attribute struct lowers to GLSL with a `hitAttributeEXT`-decorated variable and pulls in the `GL_EXT_ray_tracing` extension.
 //META: intent=expansion
 //META: pipeline_stage=emit
