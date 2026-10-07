@@ -8474,6 +8474,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRTargetIntrinsicDecoration* intrinsic)
     {
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
+        // A failed snippet parse is diagnosed during legalization, and emitSPIRVFromIR stops before
+        // this assertion.
         SLANG_ASSERT(snippet);
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
@@ -8507,8 +8509,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     Dictionary<SpvSnippet::ASMConstant, SpvInst*> m_spvSnippetConstantInsts;
 
-    // Emit SPV Inst that represents a constant defined in a SpvSnippet.
-    SpvInst* maybeEmitSpvConstant(SpvSnippet::ASMConstant constant)
+    // Returns a SPIR-V constant instruction, creating and caching it on a miss; `constant.type`
+    // must be resolved and validated.
+    SpvInst* emitSpvConstant(SpvSnippet::ASMConstant constant)
     {
         SpvInst* result = nullptr;
         if (m_spvSnippetConstantInsts.tryGetValue(constant, result))
@@ -8516,10 +8519,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
+        SLANG_RELEASE_ASSERT(SpvSnippet::isEmittableASMType(constant.type));
         switch (constant.type)
         {
         case SpvSnippet::ASMType::Float:
             result = emitFloatConstant(constant.floatValues[0], builder.getType(kIROp_FloatType));
+            break;
+        case SpvSnippet::ASMType::Half:
+            result = emitFloatConstant(constant.floatValues[0], builder.getType(kIROp_HalfType));
             break;
         case SpvSnippet::ASMType::Float2:
             {
@@ -8534,6 +8541,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case SpvSnippet::ASMType::Int:
             result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
+            break;
+        case SpvSnippet::ASMType::UInt:
+            result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getUIntType());
             break;
         case SpvSnippet::ASMType::UInt16:
             result = emitIntConstant(
@@ -8551,6 +8561,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     makeArray(element1, element2));
             }
             break;
+        default:
+            SLANG_UNEXPECTED("unhandled constant type in emitSpvConstant");
         }
         m_spvSnippetConstantInsts[constant] = result;
         return result;
@@ -8559,6 +8571,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Emit SPV Inst that represents a type defined in a SpvSnippet.
     void emitSpvSnippetASMTypeOperand(SpvSnippet::ASMType type)
     {
+        SLANG_RELEASE_ASSERT(SpvSnippet::isEmittableASMType(type));
         IRBuilder builder(m_irModule);
         builder.setInsertInto(m_irModule->getModuleInst());
         IRType* irType = nullptr;
@@ -8668,21 +8681,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 case SpvSnippet::ASMOperandType::ConstantReference:
                     {
                         auto constant = snippet->constants[operand.content];
-                        if (constant.type == SpvSnippet::ASMType::FloatOrDouble)
-                        {
-                            switch (extractBaseType(context.irResultType))
-                            {
-                            case BaseType::Float:
-                                constant.type = SpvSnippet::ASMType::Float;
-                                break;
-                            case BaseType::Double:
-                                constant.type = SpvSnippet::ASMType::Double;
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-                        SpvInst* spvConstant = maybeEmitSpvConstant(constant);
+                        constant.type =
+                            resolveSnippetConstantType(constant.type, context.irResultType);
+                        SpvInst* spvConstant = emitSpvConstant(constant);
                         emitOperand(spvConstant);
                     }
                     break;

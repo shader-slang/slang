@@ -46,6 +46,51 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
     return SpvSnippet::ASMType::None;
 }
 
+bool SpvSnippet::isEmittableASMType(ASMType type)
+{
+    switch (type)
+    {
+    case ASMType::Int:
+    case ASMType::UInt:
+    case ASMType::UInt16:
+    case ASMType::Half:
+    case ASMType::Float:
+    case ASMType::Float2:
+    case ASMType::UInt2:
+        return true;
+    default:
+        return false;
+    }
+}
+
+UnownedStringSlice SpvSnippet::getASMTypeName(ASMType type)
+{
+    switch (type)
+    {
+    case ASMType::Int:
+        return UnownedStringSlice("int");
+    case ASMType::UInt:
+        return UnownedStringSlice("uint");
+    case ASMType::UInt16:
+        return UnownedStringSlice("uint16_t");
+    case ASMType::Half:
+        return UnownedStringSlice("half");
+    case ASMType::Float:
+        return UnownedStringSlice("float");
+    case ASMType::Double:
+        return UnownedStringSlice("double");
+    case ASMType::FloatOrDouble:
+        return UnownedStringSlice("float-or-double (_p)");
+    case ASMType::Float2:
+        return UnownedStringSlice("float2");
+    case ASMType::UInt2:
+        return UnownedStringSlice("uint2");
+    case ASMType::None:
+        return UnownedStringSlice("unknown");
+    }
+    SLANG_UNEXPECTED("unhandled ASMType in getASMTypeName");
+}
+
 // Read an unsigned integer (a SPIR-V word) or a SPIR-V enum (currently those
 // which are coded into this function).
 //
@@ -115,6 +160,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
             {
                 String instName = tokenReader.ReadToken().Content;
                 mapInstNameToIndex.set(instName, (int)snippet->instructions.getCount());
+                inst.resultName = instName;
                 tokenReader.Read(Slang::Misc::TokenType::OpAssign);
             }
             SpvOp opCode;
@@ -282,7 +328,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             {
                                 switch (constant.type)
                                 {
+                                case ASMType::Half:
                                 case ASMType::Float:
+                                // A `double` constant is never emitted, but reading it as a float
+                                // lets validateSpvSnippet report it instead of a parse error.
+                                case ASMType::Double:
                                 case ASMType::Float2:
                                 case ASMType::FloatOrDouble:
                                     constant.floatValues[i] = tokenReader.ReadFloat();

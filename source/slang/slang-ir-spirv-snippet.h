@@ -78,6 +78,11 @@ struct SpvSnippet : public RefObject
         UInt2,
     };
 
+    // Returns whether both emitSpvSnippetASMTypeOperand and emitSpvConstant can lower `type`.
+    static bool isEmittableASMType(ASMType type);
+
+    static UnownedStringSlice getASMTypeName(ASMType type);
+
     static const int kMaxASMConstantValues = 4;
 
     struct ASMConstant
@@ -137,6 +142,7 @@ struct SpvSnippet : public RefObject
     {
         SpvWord opCode = 0;
         List<ASMOperand> operands;
+        String resultName;
     };
 
     List<ASMInst> instructions;
