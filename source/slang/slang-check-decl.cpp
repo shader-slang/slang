@@ -16351,10 +16351,10 @@ void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl*
     getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
-// Check the error type declared by a `throws` clause on `decl`, or set it to `Bottom` when there
-// is none. Checking of `throw` statements and `try` expressions reads the enclosing callable's
-// `errorType` and relies on every callable having one after its header is checked, including
-// accessors, which have no `throws` syntax.
+// We give each function, constructor, subscript and accessor an error type when its header is
+// checked: the type named by its `throws` clause, or `Bottom` when there is none. Accessors have
+// no `throws` syntax and so always get `Bottom`. Checking of `throw` statements and `try`
+// expressions reads the enclosing callable's `errorType` directly and relies on it being set.
 void SemanticsDeclHeaderVisitor::checkCallableErrorType(CallableDecl* decl)
 {
     auto errorType = decl->errorType;
@@ -17606,7 +17606,6 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
     // A `set` accessor always returns `void`.
     //
     decl->returnType.type = getASTBuilder()->getVoidType();
-    checkCallableErrorType(decl);
 
     // A setter always receives a single value representing
     // the new value to set into the storage.
@@ -17685,6 +17684,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
                 .param = newValueParam});
         }
     }
+    checkCallableErrorType(decl);
     checkDifferentiableCallableCommon(decl);
 }
 
