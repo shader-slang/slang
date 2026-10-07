@@ -9,7 +9,7 @@
 // `CustomFwd.eval` has the user-written forward derivative `100 t`, to tell it apart.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 interface ICurve
 {
@@ -301,4 +301,18 @@ void computeMain()
     __bwd_diff(Accumulator.add)(ba, sp2, 1.0);
     // CHECK: 8.0
     outputBuffer[30] = sp2.d;
+
+    // A nested static form takes `this` once, as its first argument.
+    let nestedStatic = __fwd_diff(__fwd_diff(Weighted.eval))(
+        w,
+        diffPair(diffPair(3.0, 1.0), diffPair(1.0, 0.0)));
+    // CHECK: 10.0
+    outputBuffer[31] = nestedStatic.d.d;
+    Scaled z;
+    z.k = 0.0;
+    let nestedScaled = __fwd_diff(__fwd_diff(Scaled.eval))(
+        diffPair(diffPair(s, z), diffPair(z, z)),
+        diffPair(diffPair(3.0, 1.0), diffPair(1.0, 0.0)));
+    // CHECK: 10.0
+    outputBuffer[32] = nestedScaled.d.d;
 }

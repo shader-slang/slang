@@ -170,17 +170,12 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         return witness;
     };
 
-    auto paramDecls = callableDeclRef.getDecl()->getParameters();
-    Index paramIndex = 0;
     for (auto paramType : funcType->getParamTypes())
     {
-        auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
-        auto paramDecl = paramIndex < paramDecls.getCount() ? paramDecls[paramIndex] : nullptr;
-        auto witness = paramDecl && paramDecl->findModifier<NoDiffModifier>()
-                           ? nullptr
-                           : getDiffWitness(paramValueType);
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
+        auto witness =
+            doesTypeHaveNoDiffModifier(paramInfo.type) ? nullptr : getDiffWitness(paramInfo.type);
         paramWitnesses.add(witness);
-        paramIndex++;
     }
 
     SubtypeWitness* returnWitness =
@@ -189,25 +184,18 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
             ? nullptr
             : getDiffWitness(funcType->getResultType());
 
-    QualType thisValueType;
     Type* thisParamType = nullptr;
-    if (!callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() &&
-        !as<ConstructorDecl>(callableDeclRef.getDecl()))
+    SubtypeWitness* thisWitness = nullptr;
+
+    if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
     {
-        thisValueType = getTypeForThisExpr(this, callableDeclRef);
-        if (thisValueType.type)
-        {
-            if (thisValueType.isLeftValue)
-                thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
-            else
-                thisParamType = thisValueType.type;
-        }
+        // Keep the witness faithful to the checked primal receiver ABI. Each derivative-function
+        // consumer applies its own role-specific transformation to this declaration-derived mode;
+        // specialization and the differentiated value type must not reselect the mode.
+        thisParamType = getParamTypeWithModeWrapper(astBuilder, *thisParamInfo);
+        if (!doesTypeHaveNoDiffModifier(thisParamInfo->type))
+            thisWitness = getDiffWitness(thisParamInfo->type);
     }
-
-    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
-
-    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
-        thisWitness = nullptr;
 
     return astBuilder->getOrCreate<DiffTypeInfoWitness>(
         thisParamType,
