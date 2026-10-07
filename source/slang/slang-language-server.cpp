@@ -2354,6 +2354,29 @@ void sendRefreshRequests(JSONRPCConnection* connection)
     connection->sendCall(UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
 }
 
+// Each `update*` function below receives one setting from either a `workspace/configuration`
+// reply or a `workspace/didChangeConfiguration` notification, and applies one rule to it. An
+// invalid value means the message did not mention the setting, so we keep its current value. JSON
+// null means the client has no value for it now, so we restore the built-in default; LSP requires a
+// client to answer null for a setting it cannot provide. Any other value is converted and applied.
+static bool isNullConfigValue(const JSONValue& value)
+{
+    return value.getKind() == JSONValue::Kind::Null;
+}
+
+template<typename T>
+static void applyConfigValue(
+    JSONToNativeConverter& converter,
+    const JSONValue& value,
+    T& option,
+    const T& defaultValue)
+{
+    if (isNullConfigValue(value))
+        option = defaultValue;
+    else if (value.isValid())
+        converter.convert(value, &option);
+}
+
 void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
 {
     if (macros.isValid())
@@ -2361,7 +2384,8 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> predefinedMacros;
-        if (SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
+        if (isNullConfigValue(macros) ||
+            SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
         {
             if (m_core.m_workspace->updatePredefinedMacros(predefinedMacros))
             {
@@ -2378,7 +2402,7 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> searchPaths;
-        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
+        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
             if (m_core.m_workspace->updateSearchPaths(searchPaths))
             {
@@ -2394,8 +2418,8 @@ void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-        bool searchPaths;
-        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
+        bool searchPaths = Workspace::kDefaultSearchInWorkspace;
+        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
             if (m_core.m_workspace->updateSearchInWorkspace(searchPaths))
             {
@@ -2407,7 +2431,11 @@ void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
 
 void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
 {
-    if (jsonValue.isValid())
+    if (isNullConfigValue(jsonValue))
+    {
+        m_core.m_commitCharacterBehavior = LanguageServerCore::kDefaultCommitCharacterBehavior;
+    }
+    else if (jsonValue.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2440,24 +2468,36 @@ void LanguageServer::updateFormattingOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    if (enableFormatOnType.isValid())
-        converter.convert(enableFormatOnType, &m_core.m_formatOptions.enableFormatOnType);
-    if (clangFormatLoc.isValid())
-        converter.convert(clangFormatLoc, &m_core.m_formatOptions.clangFormatLocation);
-    if (clangFormatStyle.isValid())
-        converter.convert(clangFormatStyle, &m_core.m_formatOptions.style);
-    if (clangFormatFallbackStyle.isValid())
-        converter.convert(clangFormatFallbackStyle, &m_core.m_formatOptions.fallbackStyle);
-    if (allowLineBreakOnType.isValid())
-        converter.convert(
-            allowLineBreakOnType,
-            &m_core.m_formatOptions.allowLineBreakInOnTypeFormatting);
-    if (allowLineBreakInRange.isValid())
-        converter.convert(
-            allowLineBreakInRange,
-            &m_core.m_formatOptions.allowLineBreakInRangeFormatting);
-    if (m_core.m_formatOptions.style.getLength() == 0)
-        m_core.m_formatOptions.style = Slang::FormatOptions().style;
+    const FormatOptions defaultOptions;
+    auto& options = m_core.m_formatOptions;
+    applyConfigValue(
+        converter,
+        enableFormatOnType,
+        options.enableFormatOnType,
+        defaultOptions.enableFormatOnType);
+    applyConfigValue(
+        converter,
+        clangFormatLoc,
+        options.clangFormatLocation,
+        defaultOptions.clangFormatLocation);
+    applyConfigValue(converter, clangFormatStyle, options.style, defaultOptions.style);
+    applyConfigValue(
+        converter,
+        clangFormatFallbackStyle,
+        options.fallbackStyle,
+        defaultOptions.fallbackStyle);
+    applyConfigValue(
+        converter,
+        allowLineBreakOnType,
+        options.allowLineBreakInOnTypeFormatting,
+        defaultOptions.allowLineBreakInOnTypeFormatting);
+    applyConfigValue(
+        converter,
+        allowLineBreakInRange,
+        options.allowLineBreakInRangeFormatting,
+        defaultOptions.allowLineBreakInRangeFormatting);
+    if (options.style.getLength() == 0)
+        options.style = defaultOptions.style;
 }
 
 void LanguageServer::updateInlayHintOptions(
@@ -2466,10 +2506,15 @@ void LanguageServer::updateInlayHintOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-    bool showDeducedType = false;
-    bool showParameterNames = false;
-    converter.convert(deducedTypes, &showDeducedType);
-    converter.convert(parameterNames, &showParameterNames);
+    const Slang::InlayHintOptions defaultOptions;
+    bool showDeducedType = m_core.m_inlayHintOptions.showDeducedType;
+    bool showParameterNames = m_core.m_inlayHintOptions.showParameterNames;
+    applyConfigValue(converter, deducedTypes, showDeducedType, defaultOptions.showDeducedType);
+    applyConfigValue(
+        converter,
+        parameterNames,
+        showParameterNames,
+        defaultOptions.showParameterNames);
     if (showDeducedType != m_core.m_inlayHintOptions.showDeducedType ||
         showParameterNames != m_core.m_inlayHintOptions.showParameterNames)
     {
@@ -2483,7 +2528,11 @@ void LanguageServer::updateInlayHintOptions(
 
 void LanguageServer::updateTraceOptions(const JSONValue& value)
 {
-    if (value.isValid())
+    if (isNullConfigValue(value))
+    {
+        m_traceOptions = kDefaultTraceOptions;
+    }
+    else if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2502,7 +2551,11 @@ void LanguageServer::updateTraceOptions(const JSONValue& value)
 
 void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
 {
-    if (value.isValid())
+    if (isNullConfigValue(value))
+    {
+        m_core.m_workspace->workspaceFlavor = Workspace::kDefaultWorkspaceFlavor;
+    }
+    else if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2529,7 +2582,7 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
 // uses, store it on the workspace, and refresh open documents if it changed. An empty value clears
 // the setting (UNKNOWN, compiler default); an unrecognized non-empty value is logged and the
 // previously configured version is left in place, so a typo does not silently disable a working
-// configuration.
+// configuration. A null value clears the setting the same way an empty one does.
 void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
 {
     if (value.isValid())
@@ -2537,7 +2590,7 @@ void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         String str;
-        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &str)))
         {
             SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
             if (str.getLength() != 0)

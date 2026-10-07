@@ -171,8 +171,10 @@ public:
     List<String> additionalSearchPaths;
     OrderedHashSet<String> workspaceSearchPaths;
     List<OwnedPreprocessorMacroDefinition> predefinedMacros;
-    bool searchInWorkspace = true;
-    WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
+    static constexpr bool kDefaultSearchInWorkspace = true;
+    bool searchInWorkspace = kDefaultSearchInWorkspace;
+    static constexpr WorkspaceFlavor kDefaultWorkspaceFlavor = WorkspaceFlavor::Standard;
+    WorkspaceFlavor workspaceFlavor = kDefaultWorkspaceFlavor;
 
     // Language version assumed for files with no `#language` directive, from the
     // `slang.predefinedLanguageVersion` setting. UNKNOWN means "unset": nothing is injected and the

@@ -2818,6 +2818,92 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return SLANG_OK;
     };
 
+    String testFileContent;
+
+    if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
+    {
+        return TestResult::Fail;
+    }
+
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+
+    // A `//CONFIG_REPLY:<section>=<json>` or `//CONFIG:<key>=<json>` directive holds a JSON value.
+    // It is parsed into the connection's container right before use, because the container is
+    // reset whenever a message is read.
+    auto parseConfigValue = [&](UnownedStringSlice text, JSONValue& outValue) -> SlangResult
+    {
+        return JSONRPCUtil::parseJSON(
+            text.trim(),
+            connection->getContainer(),
+            connection->getSink(),
+            outValue);
+    };
+
+    Dictionary<String, UnownedStringSlice> configReplies;
+    for (auto line : lines)
+    {
+        line = line.trimStart();
+        if (!line.startsWith("//"))
+            continue;
+        line = line.tail(2).trimStart();
+        if (!line.startsWith("CONFIG_REPLY:"))
+            continue;
+        line = line.tail(UnownedStringSlice("CONFIG_REPLY:").getLength());
+        Index eqIndex = line.indexOf('=');
+        if (eqIndex < 0)
+            return TestResult::Fail;
+        configReplies[line.head(eqIndex).trim()] = line.tail(eqIndex + 1);
+    }
+    if (configReplies.getCount() && !input.testOptions->commandOptions.containsKey("config-pull"))
+        return TestResult::Fail;
+
+    // The harness answers the server's `workspace/configuration` request with one value per
+    // requested section, taken from `//CONFIG_REPLY:` lines, and JSON null for every other section.
+    // LSP requires null for a setting the client cannot provide, so this is the reply an editor
+    // without Slang-specific defaults (such as Zed) sends. Other server calls that arrive first,
+    // such as `client/registerCapability`, are answered with a null result.
+    auto answerConfigRequest = [&]() -> SlangResult
+    {
+        for (;;)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            if (call.method != LanguageServerProtocol::ConfigurationParams::methodName)
+            {
+                if (call.id.isValid())
+                    SLANG_RETURN_ON_FAIL(connection->sendNullResult(call.id));
+                continue;
+            }
+
+            LanguageServerProtocol::ConfigurationParams configParams;
+            SLANG_RETURN_ON_FAIL(
+                connection->toNativeArgsOrSendError(call.params, &configParams, call.id));
+            List<JSONValue> values;
+            for (auto& item : configParams.items)
+            {
+                JSONValue value = JSONValue::makeNull();
+                UnownedStringSlice replyText;
+                if (configReplies.tryGetValue(item.section, replyText))
+                    SLANG_RETURN_ON_FAIL(parseConfigValue(replyText, value));
+                values.add(value);
+            }
+            JSONResultResponse response;
+            response.id = call.id;
+            response.result =
+                connection->getContainer()->createArray(values.getBuffer(), values.getCount());
+            return connection->sendRPC(&response);
+        }
+    };
+
+    if (input.testOptions->commandOptions.containsKey("config-pull"))
+    {
+        if (SLANG_FAILED(connection->sendCall(UnownedStringSlice("initialized"))) ||
+            SLANG_FAILED(answerConfigRequest()))
+            return TestResult::Fail;
+    }
+
     if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
     {
         // Configured search paths intentionally precede auto-discovered workspace paths. Exercise
@@ -2832,13 +2918,6 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     }
 
     // Send open document call.
-    String testFileContent;
-
-    if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
-    {
-        return TestResult::Fail;
-    }
-
     LanguageServerProtocol::DidOpenTextDocumentParams openDocParams;
     openDocParams.textDocument.version = 0;
     openDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
@@ -2849,30 +2928,59 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         JSONValue::makeInt(1));
     List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
     bool diagnosticsReceived = false;
+    bool configChangedSinceLastRequest = false;
+    // Server-to-client calls can arrive before the response to a request: diagnostics, and the
+    // refresh requests that a configuration change sends. The server never blocks on a reply to a
+    // call it sends, so we skip them here.
     auto waitForNonDiagnosticResponse = [&]() -> SlangResult
     {
-        repeat:
-            if (SLANG_FAILED(connection->waitForResult(-1)))
-                return SLANG_FAIL;
-            if (connection->getMessageType() == JSONRPCMessageType::Call)
+        configChangedSinceLastRequest = false;
+    repeat:
+        if (SLANG_FAILED(connection->waitForResult(-1)))
+            return SLANG_FAIL;
+        if (connection->getMessageType() == JSONRPCMessageType::Call)
+        {
+            JSONRPCCall call;
+            connection->getRPC(&call);
+            if (call.method == "textDocument/publishDiagnostics")
             {
-                JSONRPCCall call;
-                connection->getRPC(&call);
-                if (call.method == "textDocument/publishDiagnostics")
-                {
-                    diagnosticsReceived = true;
-                    LanguageServerProtocol::PublishDiagnosticsParams arg;
-                    if (SLANG_FAILED(connection->getMessage(&arg)))
-                        return SLANG_FAIL;
-                    diagnostics.add(arg);
-                    goto repeat;
-                }
+                diagnosticsReceived = true;
+                LanguageServerProtocol::PublishDiagnosticsParams arg;
+                if (SLANG_FAILED(connection->getMessage(&arg)))
+                    return SLANG_FAIL;
+                diagnostics.add(arg);
             }
-            return SLANG_OK;
+            goto repeat;
+        }
+        return SLANG_OK;
     };
 
-    List<UnownedStringSlice> lines;
-    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+    // Unlike `sendConfig`, a directive's value may leave the setting unchanged, in which case the
+    // server sends no refresh requests. Nothing is drained here; the next request's
+    // `waitForNonDiagnosticResponse` skips any refresh requests, because the server applies a
+    // configuration change before it answers a queued request. If no request follows, the end of
+    // the test sends one, so no refresh request is left for the next test to read.
+    auto sendConfigNotification = [&](UnownedStringSlice directive) -> SlangResult
+    {
+        Index eqIndex = directive.indexOf('=');
+        if (eqIndex < 0)
+            return SLANG_FAIL;
+        JSONValue value;
+        SLANG_RETURN_ON_FAIL(parseConfigValue(directive.tail(eqIndex + 1), value));
+        auto container = connection->getContainer();
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(
+            settingsValue,
+            container->getKey(directive.head(eqIndex).trim()),
+            value);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        configChangedSinceLastRequest = true;
+        return connection->sendCall(
+            LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+            &configParams);
+    };
 
     StringBuilder actualOutputSB;
     auto parseLocation = [&](UnownedStringSlice text, Index startPos, Int& linePos, Int& colPos)
@@ -2939,6 +3047,79 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     JSONValue::makeBool(false))))
                 return TestResult::Fail;
             actualOutputSB << "--------\nsearchInAllWorkspaceDirectories: false\n";
+        }
+        else if (line.startsWith("CONFIG:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("CONFIG:").getLength());
+            if (SLANG_FAILED(sendConfigNotification(arg)))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nconfig: " << arg.trim() << "\n";
+        }
+        else if (line.trim() == "CONFIG_REPULL")
+        {
+            // A `settings: null` notification asks the server to pull every setting again.
+            LanguageServerProtocol::DidChangeConfigurationParams configParams;
+            configParams.settings = JSONValue::makeNull();
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+                    &configParams)) ||
+                SLANG_FAILED(answerConfigRequest()))
+                return TestResult::Fail;
+            configChangedSinceLastRequest = true;
+            actualOutputSB << "--------\nconfig: re-pulled\n";
+        }
+        else if (line.startsWith("ON_TYPE_FORMAT:"))
+        {
+            // Only whether on-type formatting is enabled is reported: a disabled server answers
+            // null, and an enabled one answers a list of edits, which is empty when clang-format
+            // is unavailable.
+            auto arg = line.tail(UnownedStringSlice("ON_TYPE_FORMAT:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::DocumentOnTypeFormattingParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.ch = "}";
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DocumentOnTypeFormattingParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\non-type formatting: "
+                           << (receivedNullResult(connection) ? "disabled" : "enabled") << "\n";
+        }
+        else if (line.trim() == "INLAY")
+        {
+            LanguageServerProtocol::InlayHintParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.range.start.line = 0;
+            params.range.start.character = 0;
+            params.range.end.line = int(lines.getCount());
+            params.range.end.character = 0;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::InlayHintParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\ninlay hints:\n";
+            List<LanguageServerProtocol::InlayHint> hints;
+            if (!receivedNullResult(connection) && SLANG_FAILED(connection->getMessage(&hints)))
+                return TestResult::Fail;
+            for (auto& hint : hints)
+            {
+                actualOutputSB << hint.position.line << "," << hint.position.character << " "
+                               << hint.label << "\n";
+            }
         }
         else if (line.startsWith("SIGNATURE:"))
         {
@@ -3075,6 +3256,21 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
         }
     }
+    // The language server process is shared by every LANG_SERVER test, so refresh requests caused
+    // by a `//CONFIG:` line after the last request must be read here. A document symbol request has
+    // no side effects, and the server answers it only after handling every message sent before it.
+    if (configChangedSinceLastRequest)
+    {
+        LanguageServerProtocol::DocumentSymbolParams params;
+        params.textDocument.uri = openDocParams.textDocument.uri;
+        if (SLANG_FAILED(connection->sendCall(
+                LanguageServerProtocol::DocumentSymbolParams::methodName,
+                &params,
+                JSONValue::makeInt(callId++))) ||
+            SLANG_FAILED(waitForNonDiagnosticResponse()))
+            return TestResult::Fail;
+    }
+
     LanguageServerProtocol::DidCloseTextDocumentParams closeDocParams;
     closeDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
     connection->sendCall(
