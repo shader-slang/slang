@@ -2450,6 +2450,14 @@ void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
     }
 }
 
+Modifier* SemanticsVisitor::createGLSLReadOnlyModifier(ReadOnlyModifier* readOnly)
+{
+    auto glslReadOnly = m_astBuilder->create<GLSLReadOnlyModifier>();
+    glslReadOnly->loc = readOnly->loc;
+    glslReadOnly->keywordName = readOnly->keywordName;
+    return glslReadOnly;
+}
+
 void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 {
     // TODO(tfoley): need to make sure this only
@@ -2479,6 +2487,23 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
             {
                 getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
                 removeModifier(syntaxNode, ceM);
+            }
+        }
+    }
+
+    // `readonly` on a `__ref` parameter stays a `ReadOnlyModifier` until the parameter's type is
+    // checked; on every other declaration it is the GLSL memory qualifier. We replace it in the
+    // list itself, because `checkModifier` finds the `MemoryQualifierSetModifier` made for an
+    // earlier memory qualifier through `syntaxNode->modifiers`.
+    if (!(as<ParamDecl>(syntaxNode) && syntaxNode->hasModifier<RefModifier>()))
+    {
+        for (auto link = &syntaxNode->modifiers.first; *link; link = &(*link)->next)
+        {
+            if (auto readOnly = as<ReadOnlyModifier>(*link))
+            {
+                auto glslReadOnly = createGLSLReadOnlyModifier(readOnly);
+                glslReadOnly->next = readOnly->next;
+                *link = glslReadOnly;
             }
         }
     }

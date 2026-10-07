@@ -2479,6 +2479,10 @@ public:
         ModifiableSyntaxNode* syntaxNode,
         bool ignoreUnallowedModifier);
 
+    /// Create the GLSL memory qualifier that `readonly` denotes on any declaration other than a
+    /// `__ref` parameter of ordinary data.
+    Modifier* createGLSLReadOnlyModifier(ReadOnlyModifier* readOnly);
+
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
     void checkVisibility(Decl* decl);
 

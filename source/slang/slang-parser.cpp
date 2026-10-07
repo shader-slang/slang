@@ -10487,10 +10487,10 @@ static NodeBase* parseReadonlyModifier(Parser* parser, void* /*userData*/)
 {
     ModifierListBuilder listBuilder;
 
-    auto glslMod = parser->astBuilder->create<GLSLReadOnlyModifier>();
-    glslMod->keywordName = getName(parser, "readonly");
-    glslMod->loc = parser->tokenReader.peekLoc();
-    listBuilder.add(glslMod);
+    auto readOnlyMod = parser->astBuilder->create<ReadOnlyModifier>();
+    readOnlyMod->keywordName = getName(parser, "readonly");
+    readOnlyMod->loc = parser->tokenReader.peekLoc();
+    listBuilder.add(readOnlyMod);
 
     return listBuilder.getFirst();
 }

@@ -380,10 +380,10 @@ class BorrowModifier : public Modifier
 };
 
 // `readonly` as a reference-access modifier on a `__ref` parameter: the
-// callee may only read through the reference. The parser produces the
-// GLSL memory qualifier for `readonly`, and checking reclassifies it as
-// this modifier once the parameter's type is known not to be an image or
-// buffer.
+// callee may only read through the reference. The parser produces this
+// modifier for every `readonly`; checking replaces it with the GLSL memory
+// qualifier on any other declaration, and on a `__ref` parameter whose type
+// turns out to be an image or buffer.
 FIDDLE()
 class ReadOnlyModifier : public Modifier
 {
@@ -2323,11 +2323,6 @@ public:
     {
         memoryModifiers.add(mod);
         memoryQualifiers |= type;
-    }
-    void removeQualifier(Modifier* mod, Flags::MemoryQualifiersBit type)
-    {
-        memoryModifiers.remove(mod);
-        memoryQualifiers &= ~uint32_t(type);
     }
     uint32_t getMemoryQualifierBit() { return memoryQualifiers; }
     List<Modifier*> getModifiers() { return memoryModifiers; }
