@@ -13010,6 +13010,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 else
                 {
                     alias = subBuilder->emitSymbolAlias(loweredType);
+                    addNameHint(subContext, alias, decl);
                 }
                 addLinkageDecoration(subContext, alias, decl);
 

@@ -90,6 +90,10 @@ struct IRSharedSpecContext
 
     // Diagnostic sink for reporting errors during linking.
     DiagnosticSink* sink = nullptr;
+
+    // Mangled names already reported as conflicting exports, so that a symbol
+    // reached from several entry points is diagnosed once per link.
+    HashSet<String> reportedExportConflicts;
 };
 
 void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv);
@@ -1380,6 +1384,174 @@ bool isBetterForTarget(IRSpecContext* context, IRInst* newVal, IRInst* oldVal)
     return false;
 }
 
+// Return true if `inst` is a definition that its module exports for other modules to link.
+//
+// Every definition that is not imported carries an `[export]` linkage decoration, so that
+// decoration alone does not distinguish an `export` declaration from an ordinary module-local
+// definition. The `export` keyword also adds `[hlslExport]` and drops the module name from the
+// mangled name. Other attributes add `[hlslExport]` too (for example `[DllExport]`), but their
+// symbols keep module-qualified names and so never meet a definition from another module.
+static bool isExportedDefinition(IRInst* inst)
+{
+    // The linkage decorations sit on an outer `IRGeneric`, while lowering may put
+    // `[hlslExport]` on the value the generic returns.
+    bool isMarkedExported =
+        inst->findDecoration<IRHLSLExportDecoration>() ||
+        getResolvedInstForDecorations(inst)->findDecoration<IRHLSLExportDecoration>();
+    return isMarkedExported && inst->findDecoration<IRExportDecoration>() &&
+           !inst->findDecoration<IRImportDecoration>() && isDefinition(inst);
+}
+
+// Return true if a conflict over the witness table `witnessTable` is reported through the
+// conformance's type rather than on its own.
+//
+// A witness for an exported type, such as the `Renderer : IRenderer` witness that comes with
+// `export struct Renderer : IRenderer { ... }`, conflicts exactly when the type does, and the
+// type's own symbol carries the warning.
+static bool isWitnessReportedThroughItsType(IRWitnessTable* witnessTable)
+{
+    IRInst* concreteType = witnessTable->getConcreteType();
+    return concreteType && isExportedDefinition(concreteType);
+}
+
+// Return true if `a` and `b` come from the same module.
+//
+// A module can reach the linker twice, as a source translation unit and as its own precompiled
+// `.slang-module`. The two IR modules are distinct but share the module name, and
+// `Linkage::loadModuleFromBlob` does not load two different modules under one name, so the
+// name identifies the module.
+static bool areFromSameModule(IRInst* a, IRInst* b)
+{
+    IRModule* moduleA = a->getModule();
+    IRModule* moduleB = b->getModule();
+    if (moduleA == moduleB)
+        return true;
+    Name* nameA = moduleA->getName();
+    return nameA && nameA == moduleB->getName();
+}
+
+// Return the name under which E45002 reports the symbol defined by `inst`.
+//
+// A conformance witness table has no name of its own, so we describe it by the conformance it
+// provides, as in `Thing : IValue`. A generic carries its name hint on the value it defines,
+// but a generic type alias returns another type, whose name we must not report. Anything without
+// a usable name hint is reported by its mangled name.
+static String getExportedDefinitionDisplayName(IRInst* inst)
+{
+    IRInst* resolved = getResolvedInstForDecorations(inst);
+    if (auto witnessTable = as<IRWitnessTable>(resolved))
+    {
+        StringBuilder sb;
+        getTypeNameHint(sb, getResolvedInstForDecorations(witnessTable->getConcreteType()));
+        sb << " : ";
+        getTypeNameHint(sb, getResolvedInstForDecorations(witnessTable->getConformanceType()));
+        return sb.produceString();
+    }
+
+    IRInst* named = inst;
+    if (auto generic = as<IRGeneric>(inst))
+    {
+        IRInst* returnVal = findGenericReturnVal(generic);
+        if (returnVal && returnVal->getParent() && returnVal->getParent()->getParent() == generic)
+            named = returnVal;
+    }
+    if (auto nameHint = named->findDecoration<IRNameHintDecoration>())
+        return nameHint->getName();
+    return getMangledName(inst);
+}
+
+// Report E45002 when `bestVal` was chosen among two or more exported definitions of the symbol
+// `sym` that the target-specialization, export-versus-import and definition-versus-declaration
+// rules in `isBetterForTarget` cannot order.
+//
+// Consider two modules that each contain `export struct Renderer : IRenderer = ...;` for one
+// `extern struct Renderer`. Neither definition is better, so the selection loop keeps whichever
+// it saw first, and that depends on the order of the modules in the link. We leave the selection
+// as it is and warn, naming the module whose definition was selected and every other one.
+//
+// The warning is about the exported symbol, not about everything that comes with it. The
+// members of an exported struct are selected separately, and nothing makes their selection agree
+// with the struct's, so the struct is reported without naming the module whose members are used.
+static void diagnoseConflictingExportedDefinitions(
+    IRSpecContext* context,
+    IRSpecSymbol* sym,
+    IRInst* bestVal)
+{
+    auto shared = context->getShared();
+    if (!shared->sink || !shared->targetReq || !shared->isFinalCodegenLink)
+        return;
+    if (!sym->nextWithSameName || !isExportedDefinition(bestVal))
+        return;
+    if (auto witnessTable = as<IRWitnessTable>(getResolvedInstForDecorations(bestVal)))
+    {
+        if (isWitnessReportedThroughItsType(witnessTable))
+            return;
+    }
+
+    String mangledName = getMangledName(bestVal);
+    if (shared->reportedExportConflicts.contains(mangledName))
+        return;
+
+    CapabilitySet targetCaps = getTargetCapabilities(context);
+    if (_getBestSpecializationCaps(bestVal, targetCaps).isInvalid())
+        return;
+
+    List<IRInst*> conflictingCandidates;
+    List<Name*> candidateModules;
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        IRInst* candidate = ss->irGlobalValue;
+        if (candidate == bestVal || areFromSameModule(candidate, bestVal))
+            continue;
+        if (!isExportedDefinition(candidate) ||
+            _getBestSpecializationCaps(candidate, targetCaps).isInvalid())
+            continue;
+
+        // Neither candidate is better when the two comparisons agree; with matching
+        // target-specialized definitions, both report `true`.
+        if (isBetterForTarget(context, candidate, bestVal) !=
+            isBetterForTarget(context, bestVal, candidate))
+            continue;
+
+        Name* candidateModule = candidate->getModule()->getName();
+        if (candidateModules.contains(candidateModule))
+            continue;
+        candidateModules.add(candidateModule);
+        conflictingCandidates.add(candidate);
+    }
+    if (conflictingCandidates.getCount() == 0)
+        return;
+
+    shared->reportedExportConflicts.add(mangledName);
+    String symbolName = getExportedDefinitionDisplayName(bestVal);
+    bool emitted = shared->sink->diagnose(Diagnostics::ConflictingExportedDefinitions{
+        .symbol = symbolName,
+        .selectedModule = getText(bestVal->getModule()->getName()),
+        .location = bestVal->sourceLoc,
+    });
+    if (!emitted)
+        return;
+    for (IRInst* candidate : conflictingCandidates)
+    {
+        shared->sink->diagnose(Diagnostics::ConflictingExportedDefinitionCandidate{
+            .symbol = symbolName,
+            .candidateModule = getText(candidate->getModule()->getName()),
+            .location = candidate->sourceLoc,
+        });
+    }
+
+    // The methods and fields of a type defined directly by each module have their own symbols,
+    // which the linker selects independently of the type's.
+    IRInst* resolved = getResolvedInstForDecorations(bestVal);
+    if (as<IRStructType>(resolved) || as<IRClassType>(resolved))
+    {
+        shared->sink->diagnose(Diagnostics::ConflictingExportedTypeMembers{
+            .symbol = symbolName,
+            .location = bestVal->sourceLoc,
+        });
+    }
+}
+
 IRFunc* cloneFuncImpl(
     IRSpecContextBase* context,
     IRBuilder* builder,
@@ -1618,6 +1790,8 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         return nullptr;
     }
+
+    diagnoseConflictingExportedDefinitions(context, sym, bestVal);
 
     // Check that the best value we found is valid: if it's a function,
     // it should either have a body, be an intrinsic, or be imported.
