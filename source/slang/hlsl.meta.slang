@@ -20928,6 +20928,9 @@ bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
 __generic<A>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
+// A target-agnostic identity so IR passes recognize the HLSL `ReportHit` call, whose native
+// operation requires a struct attribute argument, without depending on its emitted spelling.
+[KnownBuiltin($( (int)KnownBuiltinDeclName::ReportHit))]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
