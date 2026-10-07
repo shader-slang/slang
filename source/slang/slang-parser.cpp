@@ -6562,7 +6562,7 @@ Decl* Parser::ParseStruct()
 
 Decl* Parser::ParseStruct(StructDecl* decl)
 {
-    ReadToken();
+    ReadToken(as<HLSLClassDecl>(decl) ? "class" : "struct");
     FillPosition(decl);
 
     if (LookAheadToken(TokenType::LBracket))
