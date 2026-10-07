@@ -26,16 +26,16 @@ void computeMain()
 
 // Each specialized function returns HLSL `min`/`max` applied to its matrix parameters. A loop
 // over rows would instead index the parameters and return a separate result variable.
-// HLSL: float3x3 genMax_{{[0-9]+}}(float3x3 a_{{[0-9]+}}, float3x3 b_{{[0-9]+}})
+// HLSL: float3x3 genMax_{{[0-9]+}}(column_major float3x3 a_{{[0-9]+}}, column_major float3x3 b_{{[0-9]+}})
 // HLSL-NOT: }
 // HLSL: return max(a_{{[0-9]+}}, b_{{[0-9]+}});
-// HLSL: float3x3 genMin_{{[0-9]+}}(float3x3 a_{{[0-9]+}}, float3x3 b_{{[0-9]+}})
+// HLSL: float3x3 genMin_{{[0-9]+}}(column_major float3x3 a_{{[0-9]+}}, column_major float3x3 b_{{[0-9]+}})
 // HLSL-NOT: }
 // HLSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
 
-// SPIR-V has no matrix `FMin`/`FMax`, so the concrete overload applies the vector instruction to
+// SPIR-V has no matrix `NMin`/`NMax`, so the concrete overload applies the vector instruction to
 // each row; a matrix-typed extended instruction would be invalid SPIR-V.
 // SPIRV-NOT: OpExtInst %mat3v3float
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMin
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMax
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMin
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMax
 // SPIRV-NOT: OpExtInst %mat3v3float

@@ -116,11 +116,11 @@ interface IComparable
 // that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
 // matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
 // `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
-// implement these by calling `min`/`max` on their own operands (the matrix conformance converts
-// them to the default layout first). That call is resolved when each builtin conformance is
-// checked, where the operand shape is known, so it binds the concrete overload for that shape,
-// which ranks above the generic ones that would call back into `__min`/`__max` without end. Each
-// target then gets its native vector operation where it has one, and the same per-element code as a
+// implement these by calling `min`/`max` on their own operands. That call is resolved when each
+// builtin conformance is checked, where the operand shape is known, so it binds the concrete
+// overload for that shape, which ranks above the generic ones that would call back into
+// `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
+// and the same per-element code as a
 // direct call on cpp/cuda.
 //
 // `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
@@ -2539,24 +2539,19 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
-    // The concrete matrix overloads take the default layout. We convert to it explicitly because
-    // an implicit layout conversion at the call would cost more than the conversion-free generic
-    // `min<T : IFloat>`, which would win and call back into `__min` without end. Layout conversions
-    // preserve element values, so converting the result back to `This` returns the same matrix.
+    // The concrete floating-point matrix overloads accept layout `L` directly. Overload resolution
+    // therefore selects the shaped overload without a layout conversion or a recursive call to
+    // the whole-type `IFloat` forwarder.
     [__unsafeForceInlineEarly]
     override This __min(This other)
     {
-        matrix<T, N, M> x = this;
-        matrix<T, N, M> y = other;
-        return min(x, y);
+        return min(this, other);
     }
 
     [__unsafeForceInlineEarly]
     override This __max(This other)
     {
-        matrix<T, N, M> x = this;
-        matrix<T, N, M> y = other;
-        return max(x, y);
+        return max(this, other);
     }
 
     [Differentiable]
