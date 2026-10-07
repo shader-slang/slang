@@ -14,6 +14,7 @@ public interface IRenderer
 }
 
 public extern struct GenericRenderer<T> : IRenderer;
+public extern struct FixedRenderer<T> : IRenderer;
 public extern uint computeValue();
 
 RWStructuredBuffer<uint> output;
@@ -24,4 +25,5 @@ public void computeMain()
 {
     output[0] = GenericRenderer<int>.value();
     output[1] = computeValue();
+    output[2] = FixedRenderer<int>.value();
 }

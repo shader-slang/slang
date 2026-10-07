@@ -94,8 +94,9 @@ struct IRSharedSpecContext
     // Mangled names already reported by `diagnoseConflictingExportedDefinitions`. Selection can
     // run more than once for one name: cloning an `export struct R : I = X;` alias resolves it to
     // `X` without registering the alias, so each module's alias that the link keeps alive selects
-    // among the same candidates again. The set lives for one link, so a compile for several
-    // targets reports once per target.
+    // among the same candidates again. The set lives for one `linkIR` call, and like E45001 the
+    // warning repeats for each link: once per target, and once per entry point for targets that
+    // link entry points separately unless `-whole-program` is given.
     HashSet<String> reportedExportConflicts;
 };
 
@@ -1447,8 +1448,8 @@ static bool areFromSameModule(IRInst* a, IRInst* b)
 
 // Return the value that `inst` defines: for a generic, the value it returns if that value lives
 // inside the generic, and `inst` itself otherwise. A generic link-time type alias such as
-// `export struct Renderer<T> : IRenderer = RendererA<T>;` returns `specialize(RendererA, T)`,
-// which is neither named nor a struct, so the alias is not mistaken for `RendererA`.
+// `export struct Renderer<T> : IRenderer = RendererA;` returns the global `RendererA`, which the
+// alias does not define, so the alias is not mistaken for `RendererA`.
 static IRInst* getDefinedValue(IRInst* inst)
 {
     auto generic = as<IRGeneric>(inst);
@@ -1458,15 +1459,25 @@ static IRInst* getDefinedValue(IRInst* inst)
     return returnVal && isChildInstOf(returnVal, generic) ? returnVal : inst;
 }
 
-// Return the name under which E45002 reports the symbol defined by `inst`.
+// Return the name hint of `inst`, or of the value it defines, or null if neither has one.
+static IRNameHintDecoration* findDefinitionNameHint(IRInst* inst)
+{
+    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        return nameHint;
+    return getDefinedValue(inst)->findDecoration<IRNameHintDecoration>();
+}
+
+// Return the name under which E45002 reports `bestVal`, one of the declarations of the symbol
+// `sym`.
 //
 // A conformance witness table has no name of its own, so we describe it by the conformance it
-// provides, as in `Thing : IValue`. A generic link-time type alias carries its name hint itself,
-// and any other generic carries it on the value it defines. Anything without a name hint is
-// reported by its mangled name.
-static String getExportedDefinitionDisplayName(IRInst* inst)
+// provides, as in `Thing : IValue`. A link-time type alias such as `export struct R : I = X;`
+// carries no name hint either, but every declaration in `sym` declares the same symbol, so we take
+// the name from one that has a hint, such as the `extern struct R` that the alias defines. A symbol
+// that no declaration names is reported by its mangled name.
+static String getExportedDefinitionDisplayName(IRSpecSymbol* sym, IRInst* bestVal)
 {
-    IRInst* resolved = getResolvedInstForDecorations(inst);
+    IRInst* resolved = getResolvedInstForDecorations(bestVal);
     if (auto witnessTable = as<IRWitnessTable>(resolved))
     {
         StringBuilder sb;
@@ -1476,17 +1487,22 @@ static String getExportedDefinitionDisplayName(IRInst* inst)
         return sb.produceString();
     }
 
-    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+    if (auto nameHint = findDefinitionNameHint(bestVal))
         return nameHint->getName();
-    if (auto nameHint = getDefinedValue(inst)->findDecoration<IRNameHintDecoration>())
-        return nameHint->getName();
-    return getMangledName(inst);
+    for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+    {
+        if (auto nameHint = findDefinitionNameHint(ss->irGlobalValue))
+            return nameHint->getName();
+    }
+    return getMangledName(bestVal);
 }
 
-// Return true if `isBetterForTarget` prefers neither `a` nor `b`. Usually both comparisons return
-// `false`. For two definitions specialized for the same target, `CapabilitySet::isBetterForTarget`
-// reports each as better than the other, so both return `true`.
-static bool isNeitherBetterForTarget(IRSpecContext* context, IRInst* a, IRInst* b)
+// Return true if the selection loop in `cloneGlobalValueWithLinkage` chooses between `a` and `b` by
+// the order it visits them, because `isBetterForTarget` gives the same answer in both directions.
+// Usually both comparisons return `false` and the loop keeps the one it visited first. For two
+// definitions specialized for the same target, `CapabilitySet::isBetterForTarget` reports each as
+// better than the other, so both return `true` and the loop keeps the one it visited last.
+static bool doesSelectionDependOnOrder(IRSpecContext* context, IRInst* a, IRInst* b)
 {
     return isBetterForTarget(context, a, b) == isBetterForTarget(context, b, a);
 }
@@ -1496,11 +1512,10 @@ static bool isNeitherBetterForTarget(IRSpecContext* context, IRInst* a, IRInst* 
 // rules in `isBetterForTarget` cannot order.
 //
 // Consider two modules that each contain `export struct Renderer : IRenderer = ...;` for one
-// `extern struct Renderer`. Neither definition is better (`isNeitherBetterForTarget`). When both
-// comparisons return `false` the selection loop keeps the candidate it visited first, and when both
-// return `true` it keeps the one it visited last. Either way the order of the modules in the link
-// decides. We leave the selection as it is and warn, naming the module whose definition was
-// selected and every other one.
+// `extern struct Renderer`. Neither definition is better, so the selection loop chooses by the
+// order in which it visits them (`doesSelectionDependOnOrder`), and that order follows the order of
+// the modules in the link. We leave the selection as it is and warn, naming the module whose
+// definition was selected and every other one.
 //
 // The warning is about the exported symbol, not about everything that comes with it. The methods
 // of an exported struct are selected separately, and nothing makes their selection agree with the
@@ -1511,7 +1526,8 @@ static void diagnoseConflictingExportedDefinitions(
     IRInst* bestVal)
 {
     // `prelinkIR` also selects definitions, but without a target, so `isBetterForTarget` orders
-    // nothing there, and without a sink. Only the final per-target link reports.
+    // nothing there. Only the final per-target link reports, and, like E45001, only when the
+    // caller gave it a sink.
     auto shared = context->getShared();
     if (!shared->isFinalCodegenLink || !shared->sink)
         return;
@@ -1524,9 +1540,9 @@ static void diagnoseConflictingExportedDefinitions(
         return;
 
     // If even the selected definition cannot be used on this target, no candidate can, and there
-    // is no choice between definitions to report.
-    CapabilitySet targetCaps = getTargetCapabilities(context);
-    if (_getBestSpecializationCaps(bestVal, targetCaps).isInvalid())
+    // is no choice between definitions to report. Once `bestVal` is usable, a candidate that is not
+    // usable never ties with it.
+    if (_getBestSpecializationCaps(bestVal, getTargetCapabilities(context)).isInvalid())
         return;
 
     bool isBestWitnessOfExportedType = isWitnessOfExportedType(bestVal);
@@ -1536,8 +1552,7 @@ static void diagnoseConflictingExportedDefinitions(
         IRInst* candidate = ss->irGlobalValue;
         if (areFromSameModule(candidate, bestVal))
             continue;
-        if (!isHLSLExportedDefinition(candidate) ||
-            _getBestSpecializationCaps(candidate, targetCaps).isInvalid())
+        if (!isHLSLExportedDefinition(candidate))
             continue;
 
         // Two witnesses whose types are both exported definitions come with two exported
@@ -1546,7 +1561,7 @@ static void diagnoseConflictingExportedDefinitions(
         if (isBestWitnessOfExportedType && isWitnessOfExportedType(candidate))
             continue;
 
-        if (!isNeitherBetterForTarget(context, candidate, bestVal))
+        if (!doesSelectionDependOnOrder(context, candidate, bestVal))
             continue;
 
         bool isModuleListed =
@@ -1559,12 +1574,13 @@ static void diagnoseConflictingExportedDefinitions(
         return;
 
     shared->reportedExportConflicts.add(mangledName);
-    String symbolName = getExportedDefinitionDisplayName(bestVal);
+    String symbolName = getExportedDefinitionDisplayName(sym, bestVal);
     bool emitted = shared->sink->diagnose(Diagnostics::ConflictingExportedDefinitions{
         .symbol = symbolName,
         .selectedModule = getText(bestVal->getModule()->getName()),
         .location = bestVal->sourceLoc,
     });
+    // The notes are separate diagnostics, so a disabled warning would otherwise leave them behind.
     if (!emitted)
         return;
     for (IRInst* candidate : conflictingCandidates)

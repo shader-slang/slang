@@ -11,6 +11,13 @@ public struct GenericRendererA<T> : IRenderer
 
 export struct GenericRenderer<T> : IRenderer = GenericRendererA<T>;
 
+public struct FixedRendererA : IRenderer
+{
+    public static uint value() { return 55; }
+}
+
+export struct FixedRenderer<T> : IRenderer = FixedRendererA;
+
 public export struct Box<T> : IValue
 {
     public uint value() { return 33; }
