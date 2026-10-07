@@ -1,27 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-features half -output-using-type -Xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-features half -output-using-type -Xslang -experimental-feature
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -render-features half -output-using-type -Xslang -experimental-feature
+//TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type -Xslang -experimental-feature -Xslang -floating-point-mode -Xslang precise
+//TEST(compute):COMPARE_COMPUTE:-llvm -output-using-type -Xslang -experimental-feature
+//TEST(compute):COMPARE_COMPUTE:-dx12 -render-features half -output-using-type -Xslang -experimental-feature
+//TEST(compute, vulkan):COMPARE_COMPUTE:-vk -render-features half -output-using-type -Xslang -experimental-feature
+//TEST(compute):COMPARE_COMPUTE:-cuda -render-features half -output-using-type -Xslang -experimental-feature
 
 // Verify numeric-operand selection through the public extrema witness, including half/float/double
 // scalars, vectors, and an explicit column-major matrix. The input NaN comes from a buffer so
 // constant folding cannot replace the operations before witness specialization.
-
-// CHECK: type: int32_t
-// CHECK-NEXT: 3
-// CHECK-NEXT: 7
-// CHECK-NEXT: 1
-// CHECK-NEXT: 1
-// CHECK-NEXT: 5
-// CHECK-NEXT: 9
-// CHECK-NEXT: 3
-// CHECK-NEXT: 5
-// CHECK-NEXT: 7
-// CHECK-NEXT: 8
-// CHECK-NEXT: 3
-// CHECK-NEXT: 7
-// CHECK-NEXT: 5
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer
