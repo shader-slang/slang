@@ -69,12 +69,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // 0) is, so we trace through it to that base. Without this case a bindless
         // resource argument would not be recognized as specializable.
         case kIROp_CastDynamicResource:
-        // An array `BuiltinCast` converts each element of its operand on its own, so the callee
-        // can apply it to the original value as well as the caller can.
-        case kIROp_BuiltinCast:
             {
-                if (arg->getOp() == kIROp_BuiltinCast && !isArrayBuiltinCast(arg))
-                    return false;
                 auto base = arg->getOperand(0);
 
                 // We will "recurse" on the base of
@@ -663,13 +658,6 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
-        else if (isArrayBuiltinCast(oldArg))
-        {
-            // Like a field access, the cast is rebuilt inside the specialized callee, so we
-            // record it in the key alongside the rest of the access chain.
-            ioInfo.key.vals.add(oldArg->getFullType());
-            getCallInfoForArg(ioInfo, oldArg->getOperand(0));
-        }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
             // We are accessing a resource from a bindless handle.
@@ -1005,15 +993,6 @@ struct FunctionParameterSpecializationContext
                 1,
                 newOperands);
             return newVal;
-        }
-        else if (isArrayBuiltinCast(oldArg))
-        {
-            auto newBase = getSpecializedValueForArg(ioInfo, oldArg->getOperand(0));
-
-            auto builder = getBuilder();
-            builder->setInsertInto(ioInfo.newBodyInsts);
-            return builder
-                ->emitIntrinsicInst(oldArg->getFullType(), kIROp_BuiltinCast, 1, &newBase);
         }
         else if (auto castHandleToResource = as<IRCastDescriptorHandleToResource>(oldArg))
         {

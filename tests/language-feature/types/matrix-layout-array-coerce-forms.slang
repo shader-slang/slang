@@ -56,13 +56,8 @@ void main()
     output[8] = same[1][2][3];
 }
 
-// The buffer arrays keep their explicit layouts (Slang `row_major` is SPIR-V `ColMajor`). No form
-// copies a whole array: each use reads the one matrix it needs from the buffer, and `use` is
-// specialized to read the buffer directly instead of taking a plain array argument.
+// The buffer arrays keep their explicit layouts (Slang `row_major` is SPIR-V `ColMajor`).
 // SPV-DAG: OpMemberDecorate %{{.*}} 0 ColMajor
 // SPV-DAG: OpMemberDecorate %{{.*}} 0 RowMajor
-// SPV-NOT: %_ptr_Function__arr_
-// HLSL: float use_0()
-// HLSL-NOT: float4x4 {{.*}}[int(2)] =
 // HLSL: void main()
 // GLSL: void main()

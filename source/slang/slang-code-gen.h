@@ -93,7 +93,6 @@ struct RequiredLoweringPassSet
     bool sumVectorMatrix;
     bool lateRequireCapability;
     bool unresolvedMatrixLayout;
-    bool arrayBuiltinCast;
 };
 
 /// A context for code generation in the compiler back-end

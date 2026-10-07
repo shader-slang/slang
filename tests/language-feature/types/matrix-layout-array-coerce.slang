@@ -77,7 +77,6 @@ void fillUnsized(out float2x4 m[], int count)
                 m[k][r][c] = 50 + 8 * k + 4 * r + c;
 }
 
-// More than 16 elements, so the conversion is a loop rather than unrolled.
 float countMismatchesLong(float2x2 m[20])
 {
     float mismatches = 0;
@@ -89,8 +88,6 @@ float countMismatchesLong(float2x2 m[20])
     return mismatches;
 }
 
-// A conversion directly in module scope has no control flow for a loop, so it is unrolled even
-// though the array has more than 16 elements.
 // clang-format off
 static const row_major float2x2 moduleScopeLong[20] = {
     float2x2(0, 1, 2, 3), float2x2(1, 2, 3, 4), float2x2(2, 3, 4, 5), float2x2(3, 4, 5, 6),

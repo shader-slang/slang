@@ -84,10 +84,6 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
             {
                 a = argFieldAddr->getBase();
             }
-            else if (isArrayBuiltinCast(a))
-            {
-                a = a->getOperand(0);
-            }
             else if (auto argLoad = as<IRLoad>(a))
             {
                 a = argLoad->getPtr();
