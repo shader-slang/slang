@@ -1,11 +1,14 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Witness-constraint inference when the subject type argument is an interface
-// type. Generic arguments still come from the subject's facets, and an equality
-// constraint still narrows an interface-typed default to the concrete type it
-// names (gh-13461).
+// Witness-constraint inference around interface-typed subjects (gh-13461).
+// `getFromFoo(a)` and `getFromBar(b)` open their existential arguments, so `U`
+// comes from the opened type's facets. Array arguments are not opened, so `T`
+// is the interface type itself: `useBar(arr)` and `optionalDer(arr)` take the
+// interface-subject path of witness inference. `getDefaulted` and
+// `sameAsDefault` are equalities that narrow an interface-typed default to a
+// concrete type.
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 interface IBar<X>
@@ -39,6 +42,29 @@ U getFromBar<T, U>(T t)
     return t.v();
 }
 
+int useBar<T>(T[2] t)
+    where T : IBar<int>
+{
+    return 1;
+}
+
+interface IDer : IBar<int>
+{
+}
+
+struct D : IDer
+{
+    int v() { return 9; }
+}
+
+int optionalDer<T>(T[2] t)
+    where optional T : IDer
+{
+    if (T is IDer)
+        return 1;
+    return 2;
+}
+
 interface IGet
 {
     int get();
@@ -67,6 +93,9 @@ void computeMain()
     IFoo<int> a = S();
     IFoo<int> b = S5();
     S s;
+    IFoo<int> arr[2] = { S(), S5() };
+    IBar<int> bars[2] = { D(), D() };
+    D ders[2] = { D(), D() };
 
     // CHECK: 7
     outputBuffer[0] = getFromFoo(a);
@@ -76,4 +105,10 @@ void computeMain()
     outputBuffer[2] = getDefaulted(1);
     // CHECK-NEXT: 1
     outputBuffer[3] = sameAsDefault(s);
+    // CHECK-NEXT: 1
+    outputBuffer[4] = useBar(arr);
+    // CHECK-NEXT: 2
+    outputBuffer[5] = optionalDer(bars);
+    // CHECK-NEXT: 1
+    outputBuffer[6] = optionalDer(ders);
 }

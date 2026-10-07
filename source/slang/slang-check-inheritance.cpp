@@ -130,7 +130,8 @@ void SharedSemanticsContext::cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWi
     // being linearized, such as an extension's `where T : IOther<T>` checked
     // against `sub = IOther<Z>`, would otherwise linearize an `IOther<IOther<Z>>`
     // that nothing reads, and that linearization applies the same extension
-    // again.
+    // again. Witness-constraint inference avoids the same converse query for
+    // interface subjects (`tryInferOrdinaryArgsFromWitnessConstraint`).
     UInt subTypeGeneration = _getInheritanceInfoCacheGeneration(sub);
     if (!subTypeGeneration)
         return;

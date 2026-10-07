@@ -5,7 +5,7 @@
 // type applies the extension to the type's interface bases too, and that
 // application must terminate (gh-13461).
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 interface IComparable<T>
@@ -69,10 +69,50 @@ struct W : ISelf<W>
 {
 }
 
+// The equality spelling, where linearizing `Foo<int>`'s base `IOther<int>`
+// checks `IOther<int> == Foo<IOther<int>>`.
+struct Foo<X> : IOther<X>
+{
+}
+
+extension<T> T : IRec<T>
+    where T == Foo<T>
+{
+}
+
+// Mutually conditional extensions, applied to a type that conforms to one side.
+interface IA<X>
+{
+}
+
+interface IB<X>
+{
+}
+
+extension<T> T : IA<T>
+    where T : IB<T>
+{
+}
+
+extension<T> T : IB<T>
+    where T : IA<T>
+{
+}
+
+struct Y : IB<Y>
+{
+}
+
 int useRec<T>(T t)
     where T : IRec<T>
 {
     return 1;
+}
+
+int useA<T>(T t)
+    where T : IA<T>
+{
+    return 5;
 }
 
 int usePlain<T : IPlain>(T t)
@@ -94,13 +134,19 @@ void computeMain()
     Num c = { 2 };
     Z z;
     W w;
+    Y y;
+    Foo<int> foo;
 
     // CHECK: 1
     outputBuffer[0] = a.eq(b) ? 1 : 0;
     // CHECK-NEXT: 0
     outputBuffer[1] = a.eq(c) ? 1 : 0;
+    // CHECK-NEXT: 1
+    outputBuffer[2] = useRec(z);
+    // CHECK-NEXT: 2
+    outputBuffer[3] = usePlain(z);
     // CHECK-NEXT: 3
-    outputBuffer[2] = useRec(z) + usePlain(z);
-    // CHECK-NEXT: 3
-    outputBuffer[3] = useSelf(w);
+    outputBuffer[4] = useSelf(w);
+    // CHECK-NEXT: 5
+    outputBuffer[5] = useA(y);
 }
