@@ -243,7 +243,7 @@ struct UsedRanges
             const auto& rr = ranges[i];
             if (index >= rr.begin && index < rr.end)
             {
-                return index;
+                return i;
             }
         }
         return -1;
