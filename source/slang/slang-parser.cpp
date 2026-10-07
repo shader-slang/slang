@@ -220,8 +220,9 @@ public:
 
     // Parse a struct declaration into the supplied, newly allocated node.
     //
-    // Requires the corresponding keyword to be the next token. Returns the declaration,
-    // or a `GenericDecl` containing it when a generic parameter clause is present.
+    // Requires `class` to be the next token for an `HLSLClassDecl`, and `struct` otherwise.
+    // Returns the declaration, or a `GenericDecl` containing it when a generic parameter
+    // clause is present.
     Decl* ParseStruct(StructDecl* decl);
     ClassDecl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
@@ -232,7 +233,8 @@ public:
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     // Test whether lookahead is a declaration keyword allowed in statement contexts.
     //
-    // Skips modifiers without consuming tokens.
+    // Skips modifiers without consuming tokens. Recognizes `struct` in all dialects
+    // and `class` in the HLSL dialect.
     bool isLookaheadADeclKeywordAllowedInStmtContexts();
     Stmt* parseLabelStatement();
     DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
