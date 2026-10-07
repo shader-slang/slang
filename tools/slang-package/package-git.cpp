@@ -114,7 +114,8 @@ static Index _findCandidate(const List<TagCandidate>& candidates, const String& 
 static SlangResult _parseReleaseTagLines(
     const String& text,
     List<TagCandidate>& outCandidates,
-    String& outError)
+    String& outError,
+    List<String>* outWarnings)
 {
     SLANG_UNUSED(outError);
     outCandidates.clear();
@@ -131,7 +132,7 @@ static SlangResult _parseReleaseTagLines(
         UnownedStringSlice tagSlice =
             isPeeled ? reference.head(reference.getLength() - 3) : reference;
         PackageVersion version;
-        if (SLANG_FAILED(parseReleaseTag(tagSlice, version)))
+        if (!acceptCanonicalReleaseTag(tagSlice, version, outWarnings))
             continue;
 
         String tag(tagSlice);
@@ -157,7 +158,8 @@ static SlangResult _parseReleaseTagLines(
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
-    String& outError)
+    String& outError,
+    List<String>* outWarnings)
 {
     List<String> arguments;
     arguments.add("show-ref");
@@ -183,7 +185,7 @@ SlangResult listReleaseTagsFromRepository(
         outCandidates.clear();
         return SLANG_OK;
     }
-    return _parseReleaseTagLines(result.standardOutput, outCandidates, outError);
+    return _parseReleaseTagLines(result.standardOutput, outCandidates, outError, outWarnings);
 }
 
 static SlangResult _selectCommitFromRefLines(
@@ -466,7 +468,8 @@ SlangResult findVersionTagAtHead(
     String& outTag,
     PackageVersion& outVersion,
     bool& outFound,
-    String& outError)
+    String& outError,
+    List<String>* outWarnings)
 {
     List<String> arguments;
     arguments.add("tag");
@@ -481,7 +484,7 @@ SlangResult findVersionTagAtHead(
     {
         String tag = line.trim();
         PackageVersion version;
-        if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
+        if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, outWarnings))
             continue;
         if (outFound)
         {
@@ -501,7 +504,8 @@ SlangResult findNearestReleaseTag(
     String& outTag,
     PackageVersion& outVersion,
     bool& outFound,
-    String& outError)
+    String& outError,
+    List<String>* outWarnings)
 {
     outFound = false;
     outTag = String();
@@ -521,7 +525,7 @@ SlangResult findNearestReleaseTag(
     {
         String tag = line.trim();
         PackageVersion version;
-        if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
+        if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, outWarnings))
             continue;
 
         List<String> countArguments;

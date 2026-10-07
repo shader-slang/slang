@@ -161,10 +161,15 @@ distributions start shipping them independently. Unknown `tools` keys are errors
 
 Ordinary dependency versions come from Git tags named `v` followed by one or more decimal
 components, such as `v1.2.3` or `v2026.10.1.4`. Publishers must treat those tags as immutable.
-Comparison is numeric from left to right, and a shorter sequence comes before the same sequence
-with more components, so `1.2.3 < 1.2.3.0 < 1.2.3.1 < 1.2.4`. `1.2.3` and `1.2.3.0` are different
-releases. These are dotted release identifiers, not Semantic Version values, and a component must
-fit in 32 bits. At most 32 components are accepted. A manifest may instead pin an opaque branch or
+Trailing zero components are not a different release: `1.2.3`, `1.2.3.0`, and `1.2.3.0.0` are the
+same release, and a zero that is not trailing still counts, so `1.2.0.1` is newer than `1.2`.
+Comparison is numeric from left to right on that canonical release, so `1.2.3 < 1.2.3.1 < 1.2.4`.
+The canonical tag is `v` plus that spelling, with no leading zeros and no trailing zero components.
+`v1.2.3` and `v1.2.0.1` are canonical. `v1.2` is the canonical tag for the release 1.2.0, so
+`v1.2.0`, `v1.2.3.0`, and `v01.2.3` are ignored. The solver warns once for each ignored tag and
+names the canonical tag. These are dotted release identifiers, not Semantic Version values, and a
+component must fit in 32 bits. At most 32 components are accepted, counted before trailing zeros
+are removed. A manifest may instead pin an opaque branch or
 tag with `ref` and omit `as` to derive the solver identity from the nearest release tag on that
 line, or write `as` to assign it explicitly. `schema_version` in `slang-package.json` is only the
 file format version. For a Git package the lock records the resolved ref, exact version, and
@@ -203,14 +208,16 @@ Each dependency entry has one of three shapes, matching `slang package dependenc
 constraints, or a single exact version. `^` increments the leftmost non-zero component, or the
 last component when every written component is zero, and drops the components after it. `^1.2.3`
 means `>=1.2.3 <2`, `^0.2.3` means `>=0.2.3 <0.3`, `^0.0.3` means `>=0.0.3 <0.0.4`, `^0.0` means
-`>=0.0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. `~` increments the second component when
+`>=0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. `~` increments the second component when
 at least two are written, and the only component otherwise: `~1.2.3` means `>=1.2.3 <1.3`,
 `~1.2.3.4` means `>=1.2.3.4 <1.3`, and `~1` means `>=1 <2`. For example, `^1.2 !=1.5.0` accepts
 later 1.x releases except 1.5.0, and `~1.2.3 || ^2` accepts either alternative. Dependents still
 unify one version per package name: every incoming constraint must match that version. Both
-`version` and `as` omit the release tag's `v` prefix. A bare version matches only the sequence
-that was written, so `1.2.3` does not match `1.2.3.0`. Because a shorter sequence sorts first, a
-written upper bound such as `<2.0.0` also matches `2` and `2.0`. `ref` is a branch, tag, or full
+`version` and `as` omit the release tag's `v` prefix. A bare version matches one release, so
+`1.2.3` also matches `1.2.3.0`. A `^` or `~` bound still uses every component that was written,
+including trailing zeros: `^0.0.0` means `>=0 <0.0.1`, which is narrower than `^0`. Because
+`2`, `2.0`, and `2.0.0` are the same release, `<2.0.0` does not match `2` or `2.0`. `ref` is a
+branch, tag, or full
 40-character commit ID; the lock always records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an

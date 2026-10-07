@@ -268,9 +268,11 @@ struct TagCandidate
 /// Consider this example: `>=1.2.0 !=1.3.0` matches 1.2.0 and 1.4.0 but not 1.3.0.
 /// `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` matches either interval. Whitespace-separated
 /// comparisons in one clause are AND; `||` joins clauses as OR. A clause may be a single
-/// exact version such as `1.4.0` or `1.4.0.2`. `^` increments the leftmost non-zero component,
-/// or the last component when every component is zero, and drops what follows: `^1.2.3` means
-/// `>=1.2.3 <2`, `^0.0` means `>=0.0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. `~`
+/// exact version such as `1.4` or `1.4.0.2`. Trailing zero components name the same release, so
+/// `1.2.3` matches `1.2.3.0`. `^` increments the leftmost non-zero component, or the last
+/// component when every written component is zero, and drops what follows: `^1.2.3` means
+/// `>=1.2.3 <2`, `^0.0` means `>=0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. The written
+/// trailing zeros choose that bound, so `^0.0.0` is `>=0 <0.0.1` and is narrower than `^0`. `~`
 /// increments the second component when at least two are written: `~1.2.3.4` means
 /// `>=1.2.3.4 <1.3`, and `~1` means `>=1 <2`.
 SlangResult parseVersionConstraint(
@@ -297,6 +299,26 @@ inline SlangResult parseReleaseTag(const String& tag, PackageVersion& outVersion
     return parseReleaseTag(tag.getUnownedSlice(), outVersion);
 }
 
+/// Return whether `tag` is the canonical spelling of a release, and warn when it is not.
+///
+/// Consider the tags `v1.2.3`, `v1.2.3.0`, and `v01.2.3`. They all name the release 1.2.3, and
+/// only `v1.2.3` is canonical: `v` followed by the release with no leading zeros and no trailing
+/// zero components. `v1.2` is the canonical tag for 1.2.0, while `v1.2.0.1` is already canonical
+/// because its final component is not zero. A tag that is not a dotted release, such as `latest`,
+/// is ignored without a warning. When `outWarnings` is set, each ignored release tag is reported
+/// once and the warning names the canonical tag.
+bool acceptCanonicalReleaseTag(
+    const UnownedStringSlice& tag,
+    PackageVersion& outVersion,
+    List<String>* outWarnings);
+inline bool acceptCanonicalReleaseTag(
+    const String& tag,
+    PackageVersion& outVersion,
+    List<String>* outWarnings)
+{
+    return acceptCanonicalReleaseTag(tag.getUnownedSlice(), outVersion, outWarnings);
+}
+
 /// Parse an exact dotted version written without a `v` prefix.
 SlangResult parseExactVersion(
     const UnownedStringSlice& text,
@@ -314,6 +336,14 @@ inline String formatExactVersion(const PackageVersion& version)
 {
     return version.format();
 }
+
+/// Return whether two exact-version strings name the same release.
+///
+/// Trailing zero components are not part of the identity, so `1.0.0` and `1` match. The lock
+/// records the canonical spelling, while a manifest pin or an overlay `as` keeps the text the user
+/// typed. A string that is not an exact version does not match, and two identical strings match
+/// even when they are empty.
+bool sameExactRelease(const String& left, const String& right);
 
 inline constexpr char kSlangToolchainName[] = "slang-toolchain";
 

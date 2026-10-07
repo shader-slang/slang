@@ -869,7 +869,7 @@ SlangResult validateWorkspaceResolvedProject(
             return SLANG_FAIL;
         }
         const LockedPackage& package = lock.packages[packageIndex];
-        if (localPackage.as.getLength() && package.version != localPackage.as)
+        if (localPackage.as.getLength() && !sameExactRelease(package.version, localPackage.as))
         {
             outError = String("Locked version for local override '") + package.name +
                        "' does not match slang-package-overlay.json. Run 'slang package update'.";

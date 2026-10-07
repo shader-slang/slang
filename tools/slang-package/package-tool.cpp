@@ -612,7 +612,7 @@ static SlangResult _validateLocalPackages(
                        "'slang package update'.";
             return SLANG_FAIL;
         }
-        if (localPackage.as.getLength() && package->version != localPackage.as)
+        if (localPackage.as.getLength() && !sameExactRelease(package->version, localPackage.as))
         {
             outError = String("Locked version for local override '") + package->name +
                        "' does not match slang-package-overlay.json. Run "
@@ -1558,6 +1558,7 @@ static SlangResult _update(
             effectiveLocalPackages,
             outError));
     }
+    List<String> warnings;
     if (useLocalResolver)
     {
         for (auto& localPackage : effectiveLocalPackages)
@@ -1581,7 +1582,8 @@ static SlangResult _update(
                         tag,
                         inferredVersion,
                         foundTag,
-                        inferError)) &&
+                        inferError,
+                        &warnings)) &&
                     foundTag)
                 {
                     localPackage.as = formatExactVersion(inferredVersion);
@@ -1602,7 +1604,6 @@ static SlangResult _update(
     }
 
     LockFile lock;
-    List<String> warnings;
     ResolveReport report;
     if (useLocalResolver)
     {
@@ -3167,6 +3168,7 @@ static SlangResult _adoptInPlaceOverride(
         }
         ref = requestedRef;
     }
+    List<String> warnings;
     if (version.getLength())
     {
         PackageVersion ignoredVersion;
@@ -3178,7 +3180,7 @@ static SlangResult _adoptInPlaceOverride(
         bool foundTag = false;
         String headTag;
         SLANG_RETURN_ON_FAIL(
-            findVersionTagAtHead(checkout, headTag, taggedVersion, foundTag, outError));
+            findVersionTagAtHead(checkout, headTag, taggedVersion, foundTag, outError, &warnings));
         if (foundTag)
         {
             version = formatExactVersion(taggedVersion);
@@ -3194,9 +3196,12 @@ static SlangResult _adoptInPlaceOverride(
                 nearestTag,
                 taggedVersion,
                 foundTag,
-                outError));
+                outError,
+                &warnings));
             if (!foundTag)
             {
+                for (const auto& warning : warnings)
+                    fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
                 outError = String("Editable checkout HEAD has no semantic-version tag in its "
                                   "history: ") +
                            name + ". Pass --as VERSION to adopt this commit.";
@@ -3218,7 +3223,6 @@ static SlangResult _adoptInPlaceOverride(
     package.commit = headCommit;
 
     localPackages.removeAt(localIndex);
-    List<String> warnings;
     SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,

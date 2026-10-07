@@ -70,6 +70,7 @@ public:
     String cacheRoot;
     String depsDirectory;
     bool allowRemote = true;
+    List<String>* warnings = nullptr;
     List<String> preparedPackages;
 
     SlangResult initialize(String& outError)
@@ -114,7 +115,7 @@ public:
     {
         String repositoryPath;
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
-        return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError);
+        return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError, warnings);
     }
 
     virtual SlangResult resolveReference(
@@ -146,8 +147,14 @@ public:
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
         String tag;
         bool found = false;
-        SLANG_RETURN_ON_FAIL(
-            findNearestReleaseTag(repositoryPath, commit, tag, outVersion, found, outError));
+        SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
+            repositoryPath,
+            commit,
+            tag,
+            outVersion,
+            found,
+            outError,
+            warnings));
         if (!found)
         {
             outError = String("Pinned ref for package '") + packageName +
@@ -195,12 +202,14 @@ public:
     const List<LocalPackage>* localPackages = nullptr;
     GitPackageResolverSource gitSource;
     bool allowRemote = true;
+    List<String>* warnings = nullptr;
 
     SlangResult initialize(String& outError)
     {
         gitSource.projectRoot = projectRoot;
         gitSource.depsDirectory = depsDirectory;
         gitSource.allowRemote = allowRemote;
+        gitSource.warnings = warnings;
         return gitSource.initialize(outError);
     }
 
@@ -268,8 +277,14 @@ public:
             SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
         String tag;
         bool found = false;
-        SLANG_RETURN_ON_FAIL(
-            findNearestReleaseTag(checkout, headCommit, tag, outVersion, found, outError));
+        SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
+            checkout,
+            headCommit,
+            tag,
+            outVersion,
+            found,
+            outError,
+            warnings));
         if (!found)
         {
             outError = String("Override for package '") + packageName +
@@ -860,7 +875,7 @@ private:
         SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, pathVersion, outError));
         if (package.canonicalPath == canonicalPath && package.locked.path.getLength())
         {
-            if (package.locked.version != dependency.as)
+            if (!sameExactRelease(package.locked.version, dependency.as))
             {
                 outError = String("Package '") + dependency.name +
                            "' is required from one path with different 'as' versions.";
@@ -951,7 +966,7 @@ private:
                     return SLANG_FAIL;
                 }
                 if (existing.ref.getLength() && existing.as.getLength() &&
-                    dependency.as.getLength() && existing.as != dependency.as)
+                    dependency.as.getLength() && !sameExactRelease(existing.as, dependency.as))
                 {
                     outError = String("Package '") + dependency.name +
                                "' is pinned to more than one Git ref or 'as' version.";
@@ -1028,7 +1043,7 @@ private:
                 return SLANG_FAIL;
             }
             if (dependency.ref.getLength() && dependency.as.getLength() &&
-                dependency.as != package.locked.version)
+                !sameExactRelease(dependency.as, package.locked.version))
             {
                 outError = String("Path dependency '") + dependency.name + "' provides version " +
                            package.locked.version + ", which conflicts with pinned Git version " +
@@ -1054,7 +1069,8 @@ private:
             }
             if (dependency.ref.getLength() &&
                 (package.locked.ref != dependency.ref ||
-                 (dependency.as.getLength() && package.locked.version != dependency.as)))
+                 (dependency.as.getLength() &&
+                  !sameExactRelease(package.locked.version, dependency.as))))
             {
                 outError = String("Selected package '") + dependency.name +
                            "' conflicts with a pinned Git ref.";
@@ -1346,6 +1362,7 @@ SlangResult resolveDependencies(
     source.projectRoot = projectRoot;
     source.depsDirectory = getWorkspaceDepsDirectory(manifest);
     source.allowRemote = !offline;
+    source.warnings = outWarnings;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;
     resolver.source = &source;
@@ -1370,6 +1387,7 @@ SlangResult resolveDependenciesFromLocalPackages(
     source.depsDirectory = getWorkspaceDepsDirectory(manifest);
     source.localPackages = &localPackages;
     source.allowRemote = !offline;
+    source.warnings = outWarnings;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     Resolver resolver;
     resolver.source = &source;

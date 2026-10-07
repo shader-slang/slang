@@ -227,7 +227,7 @@ SLANG_UNIT_TEST(PackageGitResolvesAnnotatedTagToCommit)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(Path::combine(repository, "content.txt"), "content")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     List<TagCandidate> candidates;
     String error;
@@ -239,11 +239,59 @@ SLANG_UNIT_TEST(PackageGitResolvesAnnotatedTagToCommit)
     arguments.add("-C");
     arguments.add(repository);
     arguments.add("rev-parse");
-    arguments.add("v1.0.0^{commit}");
+    arguments.add("v1^{commit}");
     ExecuteResult result;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGit(arguments, result)));
     SLANG_CHECK_ABORT(result.resultCode == 0);
     SLANG_CHECK(candidates[0].commit == result.standardOutput.trim());
+}
+
+SLANG_UNIT_TEST(PackageGitIgnoresNonCanonicalReleaseTags)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    const String repository = Path::combine(temp.path, "repository");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(repository));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(repository, "content.txt"), "content")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.2.3")));
+
+    const char* aliases[] = {"v1.2.3.0", "v01.2.3"};
+    for (auto alias : aliases)
+    {
+        List<String> arguments;
+        arguments.add("-C");
+        arguments.add(repository);
+        arguments.add("tag");
+        arguments.add(alias);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(arguments)));
+    }
+
+    List<TagCandidate> candidates;
+    List<String> warnings;
+    String error;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(listReleaseTagsFromRepository(repository, candidates, error, &warnings)));
+    SLANG_CHECK(candidates.getCount() == 1);
+    SLANG_CHECK(candidates[0].ref == "v1.2.3");
+    SLANG_CHECK(candidates[0].version.format() == "1.2.3");
+    SLANG_CHECK(warnings.getCount() == 2);
+    bool sawTrailingZero = false;
+    bool sawLeadingZero = false;
+    for (const auto& warning : warnings)
+    {
+        if (warning ==
+            "Git tag 'v1.2.3.0' is not the canonical release tag 'v1.2.3' and will be ignored by "
+            "the solver.")
+            sawTrailingZero = true;
+        if (warning ==
+            "Git tag 'v01.2.3' is not the canonical release tag 'v1.2.3' and will be ignored by "
+            "the solver.")
+            sawLeadingZero = true;
+    }
+    SLANG_CHECK(sawTrailingZero);
+    SLANG_CHECK(sawLeadingZero);
 }
 
 SLANG_UNIT_TEST(PackageGitCachedHeadTracksOriginHead)
@@ -255,7 +303,7 @@ SLANG_UNIT_TEST(PackageGitCachedHeadTracksOriginHead)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(Path::combine(repository, "content.txt"), "main")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     List<String> branchArguments;
     branchArguments.add("-C");
@@ -291,13 +339,13 @@ SLANG_UNIT_TEST(PackageGitMaterializationUsesCacheInsteadOfOrigin)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
     String sourcePath = Path::combine(repository, "content.txt");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(sourcePath, "version 1")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     String version1Commit;
     String error;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, version1Commit, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
 
     String checkout = Path::combine(temp.path, "checkout");
     String unavailableOrigin = Path::combine(temp.path, "unavailable-origin");
@@ -327,7 +375,7 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(cache)));
     String sourcePath = Path::combine(cache, "content.txt");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(sourcePath, "version 1")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(cache, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(cache, "v1")));
 
     String lockedCommit;
     String error;
@@ -346,8 +394,8 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
         cache)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(cache, "move v1.0.0")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(cache, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(cache, "move v1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(cache, "v1")));
     String movedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(cache, movedCommit, error)));
 
@@ -364,7 +412,7 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without confirmation")) >= 0);
     String checkoutTag;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1.0.0", checkoutTag, error)));
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTag, error)));
     SLANG_CHECK(checkoutTag == lockedCommit);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
@@ -378,7 +426,7 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
         error,
         cache)));
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1.0.0", checkoutTag, error)));
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTag, error)));
     SLANG_CHECK(checkoutTag == movedCommit);
     String checkoutHead;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutHead, error)));
@@ -394,7 +442,7 @@ SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "content.txt"), "version 1")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     String commit;
     String error;
@@ -415,7 +463,7 @@ SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
 
     String sourcePath = Path::combine(repository, "content.txt");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
     String nextCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, nextCommit, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
@@ -458,7 +506,7 @@ SLANG_UNIT_TEST(PackageGitDirtyPredicateIncludesCommitsAndStashes)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(committedRepository)));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(committedRepository, "content.txt"), "base")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(committedRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(committedRepository, "v1")));
     String expectedCommit;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(getRepositoryHeadCommit(committedRepository, expectedCommit, error)));
@@ -502,7 +550,7 @@ SLANG_UNIT_TEST(PackageGitDirtyPredicateIncludesCommitsAndStashes)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(stashedRepository)));
     String stashedContent = Path::combine(stashedRepository, "content.txt");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(stashedContent, "base")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(stashedRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(stashedRepository, "v1")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(getRepositoryHeadCommit(stashedRepository, expectedCommit, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(stashedContent, "changed")));
@@ -564,7 +612,7 @@ SLANG_UNIT_TEST(PackageToolStatusReportsUnmaterializedCheckouts)
             Path::combine(repository, String("src/") + packageName + ".slang"),
             String("module ") + packageName + ";\n")));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
         Dependency dependency;
         dependency.name = packageName;
@@ -643,7 +691,7 @@ SLANG_UNIT_TEST(PackageToolPublishChecksOnlyChangedGitPackages)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -701,7 +749,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -811,14 +859,14 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(repository, "src/noise.slang"),
         "module noise;\n// v1.1")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
     root.dependencies[0].version = ">=1.0.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
-    SLANG_CHECK(editedLock.packages[0].ref == "v1.1.0");
+    SLANG_CHECK(editedLock.packages[0].ref == "v1.1");
     SLANG_CHECK(File::exists(checkoutSource));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(checkoutSource, restoredSource)));
     SLANG_CHECK(restoredSource == "module noise;\n// v1.1");
@@ -907,7 +955,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), editedLock, error)));
     SLANG_CHECK(editedLock.packages[0].ref == "feature-ref");
-    SLANG_CHECK(editedLock.packages[0].version == "1.1.0");
+    SLANG_CHECK(editedLock.packages[0].version == "1.1");
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateIgnoresOverrides)
@@ -934,7 +982,7 @@ SLANG_UNIT_TEST(PackageToolUpdateIgnoresOverrides)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -1004,7 +1052,7 @@ SLANG_UNIT_TEST(PackageToolUpdateIgnoresOverrides)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
     SLANG_CHECK(lock.packages[0].path.getLength() == 0);
-    SLANG_CHECK(lock.packages[0].ref == "v1.0.0");
+    SLANG_CHECK(lock.packages[0].ref == "v1");
     SLANG_CHECK(File::exists(Path::combine(temp.path, "deps/noise/src/noise.slang")));
 
     List<LocalPackage> registered;
@@ -1045,7 +1093,7 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(helperRepo, "src/helper.slang"), "module helper;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(helperRepo)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1")));
 
     String displayRepo = Path::combine(temp.path, "upstream-display");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(displayRepo));
@@ -1065,7 +1113,7 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(displayRepo, "src/display.slang"), "module display;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(displayRepo)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(displayRepo, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(displayRepo, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -1104,7 +1152,7 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
     displayV2.licenseFiles.add("LICENSE");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(displayRepo, "slang-package.json"), displayV2, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(displayRepo, "v2.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(displayRepo, "v2")));
 
     const char* overrideArguments[] = {
         "slang-package",
@@ -1150,7 +1198,7 @@ SLANG_UNIT_TEST(PackageToolIgnoreOverridesParksEditedDependency)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockAfterIgnore, error)));
     SLANG_CHECK(lockAfterIgnore.packages.getCount() == 1);
     SLANG_CHECK(lockAfterIgnore.packages[0].name == "display");
-    SLANG_CHECK(lockAfterIgnore.packages[0].ref == "v2.0.0");
+    SLANG_CHECK(lockAfterIgnore.packages[0].ref == "v2");
     SLANG_CHECK(File::exists(helperCheckout));
     String helperAfterIgnore;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(helperCheckout, helperAfterIgnore)));
@@ -1219,7 +1267,7 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             _writeFile(Path::combine(repository, String("src/") + name + ".slang"), source)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
         return repository;
     };
 
@@ -1252,11 +1300,11 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(noiseRepo, "src/noise.slang"),
         "module noise;\n// v1.1\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(helperRepo, "src/helper.slang"),
         "module helper;\n// v1.1\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1")));
 
     PackageTool::LockFile lockBefore;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1277,7 +1325,7 @@ SLANG_UNIT_TEST(PackageToolUpdateRefusesDirtyUnregisteredCheckout)
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("noise: 1 changed")) >= 0);
 
-    // Nothing was resolved, written, or replaced: the lock still selects v1.0.0, the sibling
+    // Nothing was resolved, written, or replaced: the lock still selects v1, the sibling
     // checkout that the refused update would have upgraded is untouched, and the local change
     // survives.
     PackageTool::LockFile lockAfter;
@@ -1364,7 +1412,7 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             _writeFile(Path::combine(repository, String("src/") + name + ".slang"), source)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
         return repository;
     };
 
@@ -1409,11 +1457,11 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(noiseRepo, "src/noise.slang"),
         "module noise;\n// v1.1\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.1")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(helperRepo, "src/helper.slang"),
         "module helper;\n// v1.1\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(helperRepo, "v1.1")));
 
     PackageTool::LockFile lockBefore;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1438,14 +1486,14 @@ SLANG_UNIT_TEST(PackageToolEditAdoptsLocalTree)
     SLANG_CHECK_ABORT(helperIndex >= 0);
     SLANG_CHECK(lockAfter.packages[noiseIndex].git == noiseRepo);
     SLANG_CHECK(lockAfter.packages[noiseIndex].path == "deps/noise");
-    SLANG_CHECK(lockAfter.packages[noiseIndex].version == "1.0.0");
+    SLANG_CHECK(lockAfter.packages[noiseIndex].version == "1");
     String searchPaths;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "slang-package-includes.txt"), searchPaths)));
     SLANG_CHECK(
         searchPaths.getUnownedSlice().indexOf(
             Path::combine(temp.path, "deps/noise/extra").getUnownedSlice()) >= 0);
-    SLANG_CHECK(lockAfter.packages[helperIndex].ref == "v1.1.0");
+    SLANG_CHECK(lockAfter.packages[helperIndex].ref == "v1.1");
     String helperAfter;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::readAllText(Path::combine(temp.path, "deps/helper/src/helper.slang"), helperAfter)));
@@ -1487,7 +1535,7 @@ SLANG_UNIT_TEST(PackageToolOverrideAddBeforeFirstLock)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(noiseRepo, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(noiseRepo)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1")));
 
     const char* addNoiseArguments[] = {
         "slang-package",
@@ -1524,7 +1572,7 @@ SLANG_UNIT_TEST(PackageToolOverrideAddBeforeFirstLock)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(_writeFile(Path::combine(sidecar, "src/math.slang"), "module math;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(sidecar)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(sidecar, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(sidecar, "v1")));
 
     const char* addArguments[] = {
         "slang-package",
@@ -1600,7 +1648,7 @@ SLANG_UNIT_TEST(PackageToolEditIsInPlaceOverride)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -1701,7 +1749,7 @@ SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(noiseRepository, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(noiseRepository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepository, "v1")));
 
     String grainRepository = Path::combine(temp.path, "upstream-grain");
     SLANG_CHECK_ABORT(Path::createDirectoryRecursive(grainRepository));
@@ -1716,7 +1764,7 @@ SLANG_UNIT_TEST(PackageToolNamedValidateAndLocalPublishableChecks)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(grainRepository, "src/grain.slang"), "module grain;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(grainRepository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -1820,7 +1868,7 @@ static SlangResult _prepareRootWithUnsolvedGitNoise(
     SLANG_RETURN_ON_FAIL(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n"));
     SLANG_RETURN_ON_FAIL(_initializeRepository(repository));
-    SLANG_RETURN_ON_FAIL(_commitAndTag(repository, "v1.0.0"));
+    SLANG_RETURN_ON_FAIL(_commitAndTag(repository, "v1"));
 
     Manifest root;
     String rootManifestPath = Path::combine(projectRoot, "slang-package.json");
@@ -2133,12 +2181,12 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsVersionTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(checkout, "src/noise.slang"),
         "module noise;\n// tagged\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(checkout, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(checkout, "v1.1")));
     List<String> tagArguments;
     tagArguments.add("-C");
     tagArguments.add(checkout);
     tagArguments.add("tag");
-    tagArguments.add("v2.0.0");
+    tagArguments.add("v2");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(tagArguments)));
     tagArguments[3] = "nightly";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(tagArguments)));
@@ -2152,7 +2200,7 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsVersionTag)
     tagArguments.add(checkout);
     tagArguments.add("tag");
     tagArguments.add("-d");
-    tagArguments.add("v2.0.0");
+    tagArguments.add("v2");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(tagArguments)));
 
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
@@ -2169,13 +2217,13 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsVersionTag)
     Manifest manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
-    SLANG_CHECK(manifest.dependencies[0].ref == "v1.1.0");
-    SLANG_CHECK(manifest.dependencies[0].as == "1.1.0");
+    SLANG_CHECK(manifest.dependencies[0].ref == "v1.1");
+    SLANG_CHECK(manifest.dependencies[0].as == "1.1");
     PackageTool::LockFile lock;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
-    SLANG_CHECK(lock.packages[0].ref == "v1.1.0");
-    SLANG_CHECK(lock.packages[0].version == "1.1.0");
+    SLANG_CHECK(lock.packages[0].ref == "v1.1");
+    SLANG_CHECK(lock.packages[0].version == "1.1");
 }
 
 SLANG_UNIT_TEST(PackageToolUneditAdoptsNearestAncestorTag)
@@ -2193,7 +2241,7 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsNearestAncestorTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(checkout, "src/noise.slang"),
         "module noise;\n// after tag\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(checkout, "work after v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(checkout, "work after v1")));
     String headCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headCommit, error)));
 
@@ -2205,7 +2253,7 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsNearestAncestorTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
     SLANG_CHECK(manifest.dependencies[0].ref == headCommit);
-    SLANG_CHECK(manifest.dependencies[0].as == "1.0.0");
+    SLANG_CHECK(manifest.dependencies[0].as == "1");
 }
 
 SLANG_UNIT_TEST(PackageToolUneditAdoptsBranchRef)
@@ -2270,13 +2318,13 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsBranchRef)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
     SLANG_CHECK(manifest.dependencies[0].ref == "main");
-    SLANG_CHECK(manifest.dependencies[0].as == "1.0.0");
+    SLANG_CHECK(manifest.dependencies[0].as == "1");
     PackageTool::LockFile lock;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
     SLANG_CHECK(lock.packages[0].ref == "main");
     SLANG_CHECK(lock.packages[0].commit == headCommit);
-    SLANG_CHECK(lock.packages[0].version == "1.0.0");
+    SLANG_CHECK(lock.packages[0].version == "1");
 }
 
 SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
@@ -2297,8 +2345,8 @@ SLANG_UNIT_TEST(PackageToolFetchInstallsLockedCommitAfterMovedTag)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n// retagged\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1.0.0")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, "deps/noise"))));
     String searchPathsPath = Path::combine(temp.path, "slang-package-includes.txt");
@@ -2351,12 +2399,12 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedTag)
     String checkout = Path::combine(temp.path, "deps/noise");
     String lockedCommit;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1.0.0", lockedCommit, error)));
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", lockedCommit, error)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n// retagged\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1.0.0")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     String movedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, movedCommit, error)));
 
@@ -2366,8 +2414,8 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedTag)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
 
     String checkoutTagCommit;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        resolveLocalRevision(checkout, "refs/tags/v1.0.0", checkoutTagCommit, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTagCommit, error)));
     SLANG_CHECK(checkoutTagCommit == lockedCommit);
 
     const char* confirmedFetchArguments[] = {"slang-package", "fetch", "--yes"};
@@ -2376,8 +2424,8 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedTag)
         SLANG_COUNT_OF(confirmedFetchArguments),
         confirmedFetchArguments,
         error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        resolveLocalRevision(checkout, "refs/tags/v1.0.0", checkoutTagCommit, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTagCommit, error)));
     SLANG_CHECK(checkoutTagCommit == movedCommit);
 
     String checkoutHead;
@@ -2448,18 +2496,18 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsDeletedUpstreamTagWithoutDeletingCheckout
     deleteTagArguments.add(repository);
     deleteTagArguments.add("tag");
     deleteTagArguments.add("-d");
-    deleteTagArguments.add("v1.0.0");
+    deleteTagArguments.add("v1");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(deleteTagArguments)));
 
     const char* fetchArguments[] = {"slang-package", "fetch", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("locked ref 'v1.0.0'")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("locked ref 'v1'")) >= 0);
 
     String checkoutTag;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveLocalRevision(
         Path::combine(temp.path, "deps/noise"),
-        "refs/tags/v1.0.0",
+        "refs/tags/v1",
         checkoutTag,
         error)));
 }
@@ -2485,7 +2533,7 @@ SLANG_UNIT_TEST(PackageToolFetchReportsAllRepositoriesWithMovedRefs)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(colorRepository, "src/color.slang"), "module color;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(colorRepository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(colorRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(colorRepository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -2505,8 +2553,8 @@ SLANG_UNIT_TEST(PackageToolFetchReportsAllRepositoriesWithMovedRefs)
     {
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(_writeFile(Path::combine(repository, "moved-tag.txt"), "move tag\n")));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1.0.0")));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     }
 
     StdoutCapture stdoutCapture;
@@ -2688,7 +2736,7 @@ SLANG_UNIT_TEST(PackageToolUpdateContentFailureAdvisesFetch)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         File::writeAllText(Path::combine(repository, "src/noise.slang"), "int broken;\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
 
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
@@ -2724,7 +2772,7 @@ SLANG_UNIT_TEST(PackageToolUpdateDryRunRunsLegalGraphWithoutWriting)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(grainRepository, "src/grain.slang"), "module grain;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(grainRepository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(grainRepository, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -2764,12 +2812,12 @@ SLANG_UNIT_TEST(PackageToolUpdateOfflineUsesCacheAndIgnoresNewRemoteTags)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockBefore, error)));
     SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
-    SLANG_CHECK(lockBefore.packages[0].version == "1.0.0");
+    SLANG_CHECK(lockBefore.packages[0].version == "1");
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(repository, "src/noise.slang"),
-        "module noise;\n// v1.1.0\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+        "module noise;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
 
     const char* offlineArguments[] = {"slang-package", "update", "--offline", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -2805,7 +2853,7 @@ SLANG_UNIT_TEST(PackageToolUpdateOfflineUsesCacheAndIgnoresNewRemoteTags)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lockOnline, error)));
     SLANG_CHECK_ABORT(lockOnline.packages.getCount() == 1);
-    SLANG_CHECK(lockOnline.packages[0].version == "1.1.0");
+    SLANG_CHECK(lockOnline.packages[0].version == "1.1");
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateOfflineFailsWithoutCache)
@@ -2840,7 +2888,7 @@ SLANG_UNIT_TEST(PackageToolRefAndAsDependencyWithoutVersionResolves)
         "--git",
         repository.getBuffer(),
         "--ref",
-        "v1.0.0",
+        "v1",
         "--as",
         "1.0.0",
     };
@@ -2854,8 +2902,8 @@ SLANG_UNIT_TEST(PackageToolRefAndAsDependencyWithoutVersionResolves)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
     SLANG_CHECK_ABORT(lock.packages.getCount() == 1);
-    SLANG_CHECK(lock.packages[0].ref == "v1.0.0");
-    SLANG_CHECK(lock.packages[0].version == "1.0.0");
+    SLANG_CHECK(lock.packages[0].ref == "v1");
+    SLANG_CHECK(lock.packages[0].version == "1");
     SLANG_CHECK(lock.packages[0].commit.getLength() == 40);
 }
 
@@ -2889,7 +2937,7 @@ SLANG_UNIT_TEST(PackageToolRefWithoutAsDerivesVersionFromHistory)
         readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
     SLANG_CHECK_ABORT(lock.packages.getCount() == 1);
     SLANG_CHECK(lock.packages[0].ref == "main");
-    SLANG_CHECK(lock.packages[0].version == "1.0.0");
+    SLANG_CHECK(lock.packages[0].version == "1");
     SLANG_CHECK(lock.packages[0].commit.getLength() == 40);
 }
 
@@ -2956,7 +3004,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinFromLock)
     SLANG_CHECK_ABORT(lockBefore.packages.getCount() == 1);
     String lockedVersion = lockBefore.packages[0].version;
     String lockedCommit = lockBefore.packages[0].commit;
-    SLANG_CHECK(lockedVersion == "1.0.0");
+    SLANG_CHECK(lockedVersion == "1");
     SLANG_CHECK(lockedCommit.getLength() == 40);
 
     const char* pinArguments[] = {"slang-package", "dependency", "pin", "noise"};
@@ -2980,8 +3028,8 @@ SLANG_UNIT_TEST(PackageToolDependencyPinFromLock)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(repository, "src/noise.slang"),
-        "module noise;\n// v1.1.0\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1.0")));
+        "module noise;\n// v1.1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.1")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     PackageTool::LockFile lockAfterDefaultPinUpdate;
@@ -3013,9 +3061,9 @@ SLANG_UNIT_TEST(PackageToolDependencyPinFromLock)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
         Path::combine(repository, "src/noise.slang"),
-        "module noise;\n// moved v1.0.0\n")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1.0.0")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1.0.0")));
+        "module noise;\n// moved v1\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(repository, "move v1")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
     PackageTool::LockFile lockAfterCommitPinUpdate;
@@ -3047,7 +3095,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinFromLock)
         lockAfterToPinUpdate,
         error)));
     SLANG_CHECK_ABORT(lockAfterToPinUpdate.packages.getCount() == 1);
-    SLANG_CHECK(lockAfterToPinUpdate.packages[0].version == "1.1.0");
+    SLANG_CHECK(lockAfterToPinUpdate.packages[0].version == "1.1");
 
     const char* pinBothArguments[] = {
         "slang-package",
@@ -3128,7 +3176,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             _writeFile(Path::combine(repository, String("src/") + name + ".slang"), source)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(repository)));
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1.0.0")));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(repository, "v1")));
         return repository;
     };
 
@@ -3151,7 +3199,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(noiseRepo, "src/noise.slang"), "module noise;\n")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(noiseRepo)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1.0.0")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(noiseRepo, "v1")));
 
     Manifest root;
     String rootManifestPath = Path::combine(temp.path, "slang-package.json");
@@ -3188,7 +3236,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay)
             helperIndex = i;
     SLANG_CHECK_ABORT(helperIndex >= 0);
     SLANG_CHECK(root.dependencies[helperIndex].git == helperRepo);
-    SLANG_CHECK(root.dependencies[helperIndex].version == "1.0.0");
+    SLANG_CHECK(root.dependencies[helperIndex].version == "1");
 
     const char* editArguments[] = {"slang-package", "edit", "noise"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -3206,7 +3254,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay)
             noiseIndex = i;
     SLANG_CHECK_ABORT(noiseIndex >= 0);
     SLANG_CHECK(root.dependencies[noiseIndex].git == noiseRepo);
-    SLANG_CHECK(root.dependencies[noiseIndex].version == "1.0.0");
+    SLANG_CHECK(root.dependencies[noiseIndex].version == "1");
     PackageTool::LockFile lockAfterOverlayPin;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(
         Path::combine(temp.path, "slang-package-lock.json"),
@@ -3223,7 +3271,7 @@ SLANG_UNIT_TEST(PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay)
     Index overlaidNoiseIndex = findLockedPackageIndex(lockAfterOverlayUpdate, "noise");
     SLANG_CHECK_ABORT(overlaidNoiseIndex >= 0);
     SLANG_CHECK(isLocalOverrideLockedPackage(lockAfterOverlayUpdate.packages[overlaidNoiseIndex]));
-    SLANG_CHECK(lockAfterOverlayUpdate.packages[overlaidNoiseIndex].version == "1.0.0");
+    SLANG_CHECK(lockAfterOverlayUpdate.packages[overlaidNoiseIndex].version == "1");
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(pinNoiseArguments),

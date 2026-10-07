@@ -37,7 +37,8 @@ SlangResult validateLockedDependency(
     const LockedPackage& lockedPackage = lock.packages[outPackageIndex];
     if (dependency.path.getLength())
     {
-        if (!isPathOnlyLockedPackage(lockedPackage) || lockedPackage.version != dependency.as)
+        if (!isPathOnlyLockedPackage(lockedPackage) ||
+            !sameExactRelease(lockedPackage.version, dependency.as))
         {
             outError = String("Lock file does not use the declared path version for dependency '") +
                        dependency.name + "'. Run 'slang package update'.";
@@ -82,7 +83,7 @@ SlangResult validateLockedDependency(
                        dependency.name + "'. Run 'slang package update'.";
             return SLANG_FAIL;
         }
-        if (dependency.as.getLength() && lockedPackage.version != dependency.as)
+        if (dependency.as.getLength() && !sameExactRelease(lockedPackage.version, dependency.as))
         {
             outError = String("Lock file no longer matches the pinned ref for dependency '") +
                        dependency.name + "'. Run 'slang package update'.";

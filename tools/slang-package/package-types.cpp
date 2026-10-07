@@ -17,6 +17,27 @@ SlangResult parseReleaseTag(const UnownedStringSlice& tag, PackageVersion& outVe
     return PackageVersion::parse(tag.tail(1), outVersion);
 }
 
+bool acceptCanonicalReleaseTag(
+    const UnownedStringSlice& tag,
+    PackageVersion& outVersion,
+    List<String>* outWarnings)
+{
+    if (SLANG_FAILED(parseReleaseTag(tag, outVersion)))
+        return false;
+    String canonical = String("v") + outVersion.format();
+    if (String(tag) == canonical)
+        return true;
+    if (outWarnings)
+    {
+        String warning = String("Git tag '") + String(tag) +
+                         "' is not the canonical release tag '" + canonical +
+                         "' and will be ignored by the solver.";
+        if (!outWarnings->contains(warning))
+            outWarnings->add(warning);
+    }
+    return false;
+}
+
 SlangResult parseExactVersion(
     const UnownedStringSlice& text,
     PackageVersion& outVersion,
@@ -30,9 +51,22 @@ SlangResult parseExactVersion(
     return SLANG_OK;
 }
 
+bool sameExactRelease(const String& left, const String& right)
+{
+    if (left == right)
+        return true;
+    PackageVersion leftVersion;
+    PackageVersion rightVersion;
+    String error;
+    if (SLANG_FAILED(parseExactVersion(left, leftVersion, error)) ||
+        SLANG_FAILED(parseExactVersion(right, rightVersion, error)))
+        return false;
+    return leftVersion == rightVersion;
+}
+
 /// Build the exclusive upper bound by incrementing `incrementIndex` and dropping every component
-/// after it. Trailing zeros are not written back because a shorter sequence sorts before the same
-/// sequence with extra components.
+/// after it. The new last component is one greater than the chosen component, so the bound does
+/// not end in zero.
 static SlangResult _exclusiveUpperBound(
     const PackageVersion& lower,
     Index incrementIndex,
@@ -57,9 +91,11 @@ static SlangResult _exclusiveUpperBound(
 /// written component is zero.
 ///
 /// Consider `^0.0`: both components are zero, so the upper bound increments the last written
-/// component and the range is `>=0.0 <0.1`. The explicit `^0.0.0` is `>=0.0.0 <0.0.1`. A later
-/// non-zero component moves the boundary there, so `^0.0.0.4` is `>=0.0.0.4 <0.0.0.5`, while
-/// `^1.2.3.4` still increments the first component and is `>=1.2.3.4 <2`.
+/// component and the range is `>=0 <0.1`. The explicit `^0.0.0` is `>=0 <0.0.1`. Trailing zeros
+/// are not a different release, but they still choose this bound, which is why `^0.0.0` is
+/// narrower than `^0`. A later non-zero component moves the boundary there, so `^0.0.0.4` is
+/// `>=0.0.0.4 <0.0.0.5`, while `^1.2.3.4` still increments the first component and is
+/// `>=1.2.3.4 <2`.
 static Index _caretIncrementIndex(const PackageVersion& version)
 {
     for (Index i = 0; i < version.components.getCount(); ++i)
@@ -94,19 +130,21 @@ static SlangResult _parseCompatibilityRange(
     VersionClause& clause,
     String& outError)
 {
-    PackageVersion lower;
-    if (SLANG_FAILED(PackageVersion::parse(term.tail(1), lower)))
+    PackageVersion written;
+    if (SLANG_FAILED(PackageVersion::parsePreservingTrailingZeros(term.tail(1), written)))
     {
         outError = String("Invalid version in version constraint: ") + String(term);
         return SLANG_FAIL;
     }
     Index incrementIndex = 0;
     if (term[0] == '^')
-        incrementIndex = _caretIncrementIndex(lower);
-    else if (lower.components.getCount() > 1)
+        incrementIndex = _caretIncrementIndex(written);
+    else if (written.components.getCount() > 1)
         incrementIndex = 1;
     PackageVersion upper;
-    SLANG_RETURN_ON_FAIL(_exclusiveUpperBound(lower, incrementIndex, upper, term, outError));
+    SLANG_RETURN_ON_FAIL(_exclusiveUpperBound(written, incrementIndex, upper, term, outError));
+    PackageVersion lower;
+    SLANG_RETURN_ON_FAIL(PackageVersion::parse(term.tail(1), lower));
     _addInclusiveExclusiveRange(clause, lower, upper);
     return SLANG_OK;
 }

@@ -26,7 +26,17 @@ static SlangResult _parsePackageVersionComponent(const UnownedStringSlice& text,
     return SLANG_OK;
 }
 
-SlangResult PackageVersion::parse(const UnownedStringSlice& text, PackageVersion& outVersion)
+/// Drop trailing zero components, leaving at least one. `1.2.0.0` becomes `1.2`, and `0.0.0`
+/// becomes `0`. A zero before a non-zero component stays, so `1.0.1` is unchanged.
+static void _removeTrailingZeros(List<uint32_t>& components)
+{
+    while (components.getCount() > 1 && components.getLast() == 0)
+        components.removeLast();
+}
+
+SlangResult PackageVersion::parsePreservingTrailingZeros(
+    const UnownedStringSlice& text,
+    PackageVersion& outVersion)
 {
     List<UnownedStringSlice> parts;
     StringUtil::split(text, '.', parts);
@@ -42,6 +52,21 @@ SlangResult PackageVersion::parse(const UnownedStringSlice& text, PackageVersion
         parsed.components.add(component);
     }
     outVersion = parsed;
+    return SLANG_OK;
+}
+
+PackageVersion::PackageVersion(uint32_t major, uint32_t minor, uint32_t patch)
+{
+    components.add(major);
+    components.add(minor);
+    components.add(patch);
+    _removeTrailingZeros(components);
+}
+
+SlangResult PackageVersion::parse(const UnownedStringSlice& text, PackageVersion& outVersion)
+{
+    SLANG_RETURN_ON_FAIL(parsePreservingTrailingZeros(text, outVersion));
+    _removeTrailingZeros(outVersion.components);
     return SLANG_OK;
 }
 

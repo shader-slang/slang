@@ -179,9 +179,61 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("1.2.3"), constraint, error)));
     SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 3)));
     SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.0"), version)));
-    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(constraint.matches(version));
+    SLANG_CHECK(PackageVersion(1, 2, 3) == version);
+    SLANG_CHECK(version.format() == "1.2.3");
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.0.0"), version)));
+    SLANG_CHECK(version == PackageVersion(1, 2, 3));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.1"), version)));
     SLANG_CHECK(PackageVersion(1, 2, 3) < version);
     SLANG_CHECK(version < PackageVersion(1, 2, 4));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.0"), version)));
+    SLANG_CHECK(version == PackageVersion(1, 2, 0));
+    SLANG_CHECK(version.format() == "1.2");
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.0.1"), version)));
+    SLANG_CHECK(version.format() == "1.2.0.1");
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("0.0.0"), version)));
+    SLANG_CHECK(version.format() == "0");
+    SLANG_CHECK(sameExactRelease("1.0.0", "1"));
+    SLANG_CHECK(sameExactRelease("1.2.3.0", "1.2.3"));
+    SLANG_CHECK(sameExactRelease("", ""));
+    SLANG_CHECK(!sameExactRelease("1.0.0", "1.0.1"));
+    SLANG_CHECK(!sameExactRelease("1.0.0", "v1"));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("<2.0.0"), constraint, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("2"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("2.0"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.9"), version)));
+    SLANG_CHECK(constraint.matches(version));
+    List<String> ignoredTagWarnings;
+    SLANG_CHECK(
+        acceptCanonicalReleaseTag(UnownedStringSlice("v1.2.3"), version, &ignoredTagWarnings));
+    SLANG_CHECK(ignoredTagWarnings.getCount() == 0);
+    SLANG_CHECK(
+        acceptCanonicalReleaseTag(UnownedStringSlice("v1.2"), version, &ignoredTagWarnings));
+    SLANG_CHECK(version == PackageVersion(1, 2, 0));
+    SLANG_CHECK(
+        acceptCanonicalReleaseTag(UnownedStringSlice("v1.2.0.1"), version, &ignoredTagWarnings));
+    SLANG_CHECK(version.format() == "1.2.0.1");
+    SLANG_CHECK(
+        !acceptCanonicalReleaseTag(UnownedStringSlice("v1.2.0"), version, &ignoredTagWarnings));
+    SLANG_CHECK(ignoredTagWarnings.getCount() == 1);
+    SLANG_CHECK(
+        ignoredTagWarnings[0] == "Git tag 'v1.2.0' is not the canonical release tag 'v1.2' and "
+                                 "will be ignored by the solver.");
+    SLANG_CHECK(
+        !acceptCanonicalReleaseTag(UnownedStringSlice("v1.2.3.0"), version, &ignoredTagWarnings));
+    SLANG_CHECK(
+        !acceptCanonicalReleaseTag(UnownedStringSlice("v01.2.3"), version, &ignoredTagWarnings));
+    SLANG_CHECK(ignoredTagWarnings.getCount() == 3);
+    SLANG_CHECK(
+        !acceptCanonicalReleaseTag(UnownedStringSlice("latest"), version, &ignoredTagWarnings));
+    SLANG_CHECK(ignoredTagWarnings.getCount() == 3);
+    SLANG_CHECK(
+        !acceptCanonicalReleaseTag(UnownedStringSlice("v1.2.0"), version, &ignoredTagWarnings));
+    SLANG_CHECK(ignoredTagWarnings.getCount() == 3);
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^1.2.x"), constraint, error)));
     SLANG_CHECK(
@@ -199,7 +251,7 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
         error)));
     SLANG_CHECK(SLANG_FAILED(parseExactVersion(UnownedStringSlice("^1.2.3"), version, error)));
     SLANG_CHECK(SLANG_SUCCEEDED(parseExactVersion(UnownedStringSlice("1.2"), version, error)));
-    SLANG_CHECK(version != PackageVersion(1, 2, 0));
+    SLANG_CHECK(version == PackageVersion(1, 2, 0));
     SLANG_CHECK(SLANG_SUCCEEDED(parseExactVersion(UnownedStringSlice("1.2.3.4"), version, error)));
     SLANG_CHECK(SLANG_SUCCEEDED(parseReleaseTag(UnownedStringSlice("v1.2.3.4"), version)));
     SLANG_CHECK(SLANG_FAILED(parseReleaseTag(UnownedStringSlice("1.2.3"), version)));
@@ -3499,7 +3551,7 @@ SLANG_UNIT_TEST(PackageResolverPinnedRefUsesClaimedVersion)
     const LockedPackage* noise = _findLockedPackage(lock, "noise");
     SLANG_CHECK_ABORT(noise);
     SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.4.0");
+    SLANG_CHECK(noise->version == "1.4");
     SLANG_CHECK(noise->commit == "commit-main");
 }
 
@@ -3521,7 +3573,7 @@ SLANG_UNIT_TEST(PackageResolverPinnedRefDerivesAsFromHistory)
     const LockedPackage* noise = _findLockedPackage(lock, "noise");
     SLANG_CHECK_ABORT(noise);
     SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.3.0");
+    SLANG_CHECK(noise->version == "1.3");
     SLANG_CHECK(noise->commit == "commit-main");
 }
 
@@ -3544,7 +3596,7 @@ SLANG_UNIT_TEST(PackageResolverPinnedRefWithoutVersionConstraint)
     const LockedPackage* noise = _findLockedPackage(lock, "noise");
     SLANG_CHECK_ABORT(noise);
     SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.4.0");
+    SLANG_CHECK(noise->version == "1.4");
     SLANG_CHECK(noise->commit == "commit-main");
 }
 
@@ -3626,11 +3678,11 @@ SLANG_UNIT_TEST(PackageResolverBacktracksPastRetractionAndExclude)
     }
     SLANG_CHECK_ABORT(mathReport);
     SLANG_CHECK(mathReport->skips.getCount() == 2);
-    SLANG_CHECK(mathReport->skips[0].version == "1.2.0");
+    SLANG_CHECK(mathReport->skips[0].version == "1.2");
     SLANG_CHECK(
         mathReport->skips[0].reason.getUnownedSlice().indexOf(UnownedStringSlice("retracted")) >=
         0);
-    SLANG_CHECK(mathReport->skips[1].version == "1.1.0");
+    SLANG_CHECK(mathReport->skips[1].version == "1.1");
     SLANG_CHECK(
         mathReport->skips[1].reason.getUnownedSlice().indexOf(
             UnownedStringSlice("workspace excludes")) >= 0);
@@ -3676,13 +3728,13 @@ SLANG_UNIT_TEST(PackageResolverUnsatisfiableAfterRetractionAndExclude)
         "slang-package: error: Could not select a version for package 'math'.\n"
         "\n"
         "Required by:\n"
-        "  a@1.0.0 requires >=1.1.0 <1.3.0\n"
+        "  a@1 requires >=1.1.0 <1.3.0\n"
         "\n"
         "Candidates considered:\n"
-        "  1.3.0: does not satisfy >=1.1.0 <1.3.0 required by a@1.0.0\n"
-        "  1.2.0: retracted — Broken numerics\n"
-        "  1.1.0: workspace excludes this release — Workspace regression\n"
-        "  1.0.0: does not satisfy >=1.1.0 <1.3.0 required by a@1.0.0\n"
+        "  1.3: does not satisfy >=1.1.0 <1.3.0 required by a@1\n"
+        "  1.2: retracted — Broken numerics\n"
+        "  1.1: workspace excludes this release — Workspace regression\n"
+        "  1: does not satisfy >=1.1.0 <1.3.0 required by a@1\n"
         "\n"
         "No candidate satisfies every requirement for package 'math'.\n"
         "Help: adjust the listed version requirements or workspace exclusions, then run 'slang "
@@ -3843,7 +3895,7 @@ SLANG_UNIT_TEST(PackageResolverReportRecordsSkips)
     SLANG_CHECK(noise->ref == "v1.0.0");
     SLANG_CHECK(report.packages.getCount() == 1);
     SLANG_CHECK(report.packages[0].skips.getCount() == 1);
-    SLANG_CHECK(report.packages[0].skips[0].version == "1.1.0");
+    SLANG_CHECK(report.packages[0].skips[0].version == "1.1");
     SLANG_CHECK(
         report.packages[0].skips[0].reason.getUnownedSlice().indexOf(
             UnownedStringSlice("workspace excludes")) >= 0);
@@ -4066,7 +4118,7 @@ SLANG_UNIT_TEST(PackageResolverDropsConstraintNotesFromShadowedGitPackage)
     SLANG_CHECK(lockedQ->path == "deps/m/vendor/q");
     const LockedPackage* lockedShared = _findLockedPackage(lock, "shared");
     SLANG_CHECK_ABORT(lockedShared);
-    SLANG_CHECK(lockedShared->version == "2.0.0");
+    SLANG_CHECK(lockedShared->version == "2");
 
     const ResolvePackageExplanation* sharedReport = nullptr;
     for (const auto& explanation : report.packages)

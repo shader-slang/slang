@@ -7,11 +7,16 @@ namespace Slang
 namespace PackageTool
 {
 
-/// List dotted release tags already present in a local clone, without contacting a remote.
+/// List canonical dotted release tags already present in a local clone, without contacting a
+/// remote.
+///
+/// A tag that names a release with a non-canonical spelling, such as `v1.2.0` or `v01.2.3`, is
+/// omitted. When `outWarnings` is set, each omitted tag is reported once.
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
-    String& outError);
+    String& outError,
+    List<String>* outWarnings = nullptr);
 
 /// Resolve `ref` from the origin-tracking refs and objects already present in a package cache.
 SlangResult resolveCachedReference(
@@ -55,13 +60,17 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
-/// Find the one release-version tag that points at `HEAD`, or report that none exists.
+/// Find the one canonical release tag that points at `HEAD`, or report that none exists.
+///
+/// A non-canonical release tag is not a match. When `outWarnings` is set, each such tag is
+/// reported once.
 SlangResult findVersionTagAtHead(
     const String& repositoryPath,
     String& outTag,
     PackageVersion& outVersion,
     bool& outFound,
-    String& outError);
+    String& outError,
+    List<String>* outWarnings = nullptr);
 
 /// Resolve `revision` in `repositoryPath` to a 40-character commit ID.
 SlangResult resolveLocalRevision(
@@ -70,19 +79,21 @@ SlangResult resolveLocalRevision(
     String& outCommit,
     String& outError);
 
-/// Find the nearest dotted release tag that is an ancestor of `commit`.
+/// Find the nearest canonical release tag that is an ancestor of `commit`.
 ///
-/// Consider this example: `main` is three commits after `v1.3.0`. The pin still checks out
-/// `main`, and this helper reports `v1.3.0` so the solver can treat that tree as 1.3.0 when `as`
-/// is omitted. Tags that are not ancestors of `commit` are ignored. Two equally near release tags
-/// are an error.
+/// Consider this example: `main` is three commits after `v1.3`. The pin still checks out `main`,
+/// and this helper reports `v1.3` so the solver can treat that tree as 1.3 when `as` is omitted.
+/// Tags that are not ancestors of `commit` are ignored. A non-canonical release tag, such as
+/// `v1.3.0`, is not a candidate; when `outWarnings` is set it is reported once. Two equally near
+/// release tags are an error.
 SlangResult findNearestReleaseTag(
     const String& repositoryPath,
     const String& commit,
     String& outTag,
     PackageVersion& outVersion,
     bool& outFound,
-    String& outError);
+    String& outError,
+    List<String>* outWarnings = nullptr);
 
 /// Return whether `text` is a full Git object ID (40- or 64-character hex).
 bool isGitObjectId(const UnownedStringSlice& text);
