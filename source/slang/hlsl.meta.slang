@@ -20928,6 +20928,9 @@ bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
 __generic<A>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
+// A target-agnostic identity so IR passes recognize a `ReportHit` call regardless of the
+// `__target_switch` arm selected, without depending on the intrinsic's emitted spelling.
+[KnownBuiltin($( (int)KnownBuiltinDeclName::ReportHit))]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
