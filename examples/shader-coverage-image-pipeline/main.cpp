@@ -20,7 +20,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <map>
 #include <random>
 #include <slang-com-ptr.h>
@@ -641,9 +640,6 @@ int exampleMain(int argc, char** argv)
         // robustness fallback. When set, the demo creates the directory
         // if needed.
         std::filesystem::path outputDir;
-        // Optional application output readback, also supported with --no-coverage.
-        std::filesystem::path outputFile;
-        constexpr std::string_view kOutputFileFlag = "--output-file=";
         // `--demo-dir=<path>`: explicit override for the directory
         // containing the demo's `.slang` assets. Empty (default) means
         // `getDemoDirectory()` discovers them itself (`__FILE__`
@@ -682,12 +678,6 @@ int exampleMain(int argc, char** argv)
                 tileRows = parseUnsigned(a.substr(kTileRowsFlag.size()), "--tile-rows");
                 if (tileRows % 8 != 0)
                     fail("--tile-rows must be 0 or a multiple of 8 to avoid overlapping tiles");
-            }
-            else if (a.substr(0, kOutputFileFlag.size()) == kOutputFileFlag)
-            {
-                outputFile = std::string(a.substr(kOutputFileFlag.size()));
-                if (outputFile.empty())
-                    fail("--output-file requires a nonempty path");
             }
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
@@ -807,21 +797,17 @@ int exampleMain(int argc, char** argv)
         const auto image = generateTestImage(imageWidth, imageHeight);
         auto inputBuf = createStorageBuffer(
             device,
+            "inputImage",
             image.size() * sizeof(float),
             4 * sizeof(float),
             image.data());
-        // NaN sentinels let the output regression detect unwritten pixels/rays.
-        // Ordinary runs avoid the extra initialization and readback.
-        std::vector<float> initialOutput;
-        if (!outputFile.empty())
-            initialOutput.assign(image.size(), std::numeric_limits<float>::quiet_NaN());
-        auto outputBuf = createStorageBuffer(
+        auto outputBuf =
+            createStorageBuffer(device, "output", image.size() * sizeof(float), 4 * sizeof(float));
+        auto paramsBuf = createStorageBuffer(
             device,
-            image.size() * sizeof(float),
-            4 * sizeof(float),
-            initialOutput.empty() ? nullptr : initialOutput.data());
-        auto paramsBuf =
-            createStorageBuffer(device, sizeof(PipelineParams), sizeof(PipelineParams));
+            "paramsBuffer",
+            sizeof(PipelineParams),
+            sizeof(PipelineParams));
         rhi::ShaderCursor cursor(root);
         checkSlang(cursor["inputImage"].setBinding(inputBuf), "bind inputImage");
         checkSlang(cursor["outputImage"].setBinding(outputBuf), "bind outputImage");
@@ -833,7 +819,8 @@ int exampleMain(int argc, char** argv)
         if (enableCoverage)
         {
             std::vector<uint8_t> zero(size_t(counterCount) * counterByteWidth, 0);
-            coverageBuf = createStorageBuffer(device, zero.size(), counterByteWidth, zero.data());
+            coverageBuf =
+                createStorageBuffer(device, "coverage", zero.size(), counterByteWidth, zero.data());
             checkSlang(
                 rhi::bindSyntheticResource(
                     program,
@@ -910,9 +897,6 @@ int exampleMain(int argc, char** argv)
         std::cout << "render wall time: " << renderMs << " ms (" << configs.size() << " config(s), "
                   << dispatchCount << " dispatches, " << (renderMs / configs.size())
                   << " ms/config)\n";
-
-        if (!outputFile.empty())
-            coverageDemo::writeOutputBuffer(device, outputBuf, outputFile);
 
         if (!enableCoverage)
         {

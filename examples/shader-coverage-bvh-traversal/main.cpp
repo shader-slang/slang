@@ -25,7 +25,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <limits>
 #include <random>
 #include <slang-com-ptr.h>
 #include <slang-rhi/shader-cursor.h>
@@ -731,9 +730,6 @@ int exampleMain(int argc, char** argv)
         // robustness fallback. When set, the demo creates the directory
         // if needed.
         std::filesystem::path outputDir;
-        // Optional application output readback, also supported with --no-coverage.
-        std::filesystem::path outputFile;
-        constexpr std::string_view kOutputFileFlag = "--output-file=";
         // `--demo-dir=<path>`: explicit override for the directory
         // containing the demo's `.slang` assets. Empty (default) means
         // `getDemoDirectory()` discovers them itself (`__FILE__`
@@ -780,12 +776,6 @@ int exampleMain(int argc, char** argv)
                 coverageBoolean = false;
             else if (a == "--coverage-mode=boolean")
                 coverageBoolean = true;
-            else if (a.substr(0, kOutputFileFlag.size()) == kOutputFileFlag)
-            {
-                outputFile = std::string(a.substr(kOutputFileFlag.size()));
-                if (outputFile.empty())
-                    fail("--output-file requires a nonempty path");
-            }
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
@@ -909,30 +899,31 @@ int exampleMain(int argc, char** argv)
         rhi::ComPtr<rhi::ICommandQueue> queue;
         checkSlang(device->getQueue(rhi::QueueType::Graphics, queue.writeRef()), "getQueue");
 
-        auto rayBuf =
-            createStorageBuffer(device, rays.size() * sizeof(Ray), sizeof(Ray), rays.data());
+        auto rayBuf = createStorageBuffer(
+            device,
+            "rays",
+            rays.size() * sizeof(Ray),
+            sizeof(Ray),
+            rays.data());
         auto triBuf = createStorageBuffer(
             device,
+            "triangles",
             tris.size() * sizeof(Triangle),
             sizeof(Triangle),
             tris.data());
         auto nodeBuf = createStorageBuffer(
             device,
+            "nodes",
             nodes.size() * sizeof(BVHNode),
             sizeof(BVHNode),
             nodes.data());
         auto globalsBuf =
-            createStorageBuffer(device, sizeof(Globals), sizeof(Globals), &globalsData);
-        // NaN sentinels let the output regression detect unwritten pixels/rays.
-        // Ordinary runs avoid the extra initialization and readback.
-        std::vector<float> initialOutput;
-        if (!outputFile.empty())
-            initialOutput.assign(rays.size() * 4, std::numeric_limits<float>::quiet_NaN());
+            createStorageBuffer(device, "globals", sizeof(Globals), sizeof(Globals), &globalsData);
         auto outputBuf = createStorageBuffer(
             device,
+            "output",
             rays.size() * 4 * sizeof(float),
-            4 * sizeof(float),
-            initialOutput.empty() ? nullptr : initialOutput.data());
+            4 * sizeof(float));
         rhi::ShaderCursor cursor(root);
         checkSlang(cursor["rays"].setBinding(rayBuf), "bind rays");
         checkSlang(cursor["triangles"].setBinding(triBuf), "bind triangles");
@@ -946,7 +937,8 @@ int exampleMain(int argc, char** argv)
         if (enableCoverage)
         {
             std::vector<uint8_t> zero(size_t(counterCount) * counterByteWidth, 0);
-            coverageBuf = createStorageBuffer(device, zero.size(), counterByteWidth, zero.data());
+            coverageBuf =
+                createStorageBuffer(device, "coverage", zero.size(), counterByteWidth, zero.data());
             checkSlang(
                 rhi::bindSyntheticResource(
                     program,
@@ -1013,9 +1005,6 @@ int exampleMain(int argc, char** argv)
                       << (renderMs / batchCount) << " ms/batch)\n";
         else
             std::cout << "render wall time: " << renderMs << " ms\n";
-
-        if (!outputFile.empty())
-            coverageDemo::writeOutputBuffer(device, outputBuf, outputFile);
 
         if (enableCoverage)
         {
