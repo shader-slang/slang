@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -1290,10 +1291,261 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
+// Move resource selection onto indices when all incoming values access the same heap or array.
+// For example, `c ? samplers[i] : samplers[j]` becomes `samplers[c ? i : j]`.
+//
+// A loop can make this more complicated than matching the two operands of a select.
+// Consider this example:
+//
+//     SamplerState samplers[2];
+//     Texture2D<float4> texture;
+//
+//     float4 sampleTexture(uint count, float2 uv)
+//     {
+//         SamplerState s = samplers[0];
+//         for (uint k = 0; k < count; k++)
+//         {
+//             if (k % 2 == 0)
+//                 s = samplers[1];
+//         }
+//         return texture.SampleLevel(s, uv, 0);
+//     }
+//
+// After SSA construction, the loop header has a block parameter for `s`. Its incoming
+// values are samplers[0] and the result of the if statement. The merge after the if has
+// another block parameter, which receives either samplers[1] or the loop header's `s`.
+// Each parameter therefore depends on the other. Neither can be handled by a rule that
+// requires every incoming value to already be an array access.
+//
+// We follow both block parameters and selects until we reach the resource accesses. If
+// they all use the same source and compatible types, we can change the entire selection
+// to use indices. The relevant IR changes look like this (other instructions omitted):
+//
+//     // Before:
+//     block %header(param %s : SamplerState, ...):
+//         ...
+//     block %assign:
+//         let %newS : SamplerState = getElement(%samplers, 1 : Int)
+//         unconditionalBranch(%merge, %newS)
+//     block %keep:
+//         unconditionalBranch(%merge, %s)
+//     block %merge(param %nextS : SamplerState):
+//         ...
+//     unconditionalBranch(%header, %nextS, ...)
+//
+//     // After (unused resource accesses omitted):
+//     block %header(param %s : Int, ...):
+//         let %index : Int = nonUniformResourceIndex(%s)
+//         let %sampler : SamplerState = getElement(%samplers, %index)
+//         ...
+//     block %assign:
+//         unconditionalBranch(%merge, 1 : Int)
+//     block %keep:
+//         unconditionalBranch(%merge, %s)
+//     block %merge(param %nextS : Int):
+//         ...
+//     unconditionalBranch(%header, %nextS, ...)
+//
+// The sample operation now uses %sampler. The branches, including the loop back edge,
+// still pass arguments in the same positions, but carry indices instead of resources.
+// An IRSelect changes similarly: its two value operands become indices, its result type
+// becomes the index type, and a resource access after it supplies the original uses.
+// We check all incoming values before changing any instruction, so a rejected case leaves
+// the IR intact.
+static bool specializeResourceSelection(IRInst* selection)
+{
+    struct SelectionNode
+    {
+        IRInst* inst;
+        // These are the incoming branch arguments for a block parameter, or the two
+        // value operands of a select. Keep their original values because redirecting
+        // uses during the rewrite will also change these operands.
+        List<IRUse*> edges;
+        List<IRInst*> values;
+    };
+
+    auto resourceType = selection->getDataType();
+    if (!isResourceType(resourceType) || as<IRArrayTypeBase>(resourceType))
+        return false;
+
+    List<IRInst*> workList;
+    HashSet<IRInst*> visited;
+    List<SelectionNode> nodes;
+    // A resource access maps to its index operand. A select or block parameter maps
+    // to itself, since we will change that instruction to produce an index.
+    Dictionary<IRInst*, IRInst*> indices;
+    IRInst* representative = nullptr;
+    IRInst* resourceSource = nullptr;
+    IRType* indexType = nullptr;
+    workList.add(selection);
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        auto inst = workList[i];
+        if (!visited.add(inst))
+            continue;
+        if (inst->getDataType() != resourceType)
+            return false;
+
+        SelectionNode node;
+        node.inst = inst;
+        if (auto param = as<IRParam>(inst))
+        {
+            // Function parameters have no incoming branch arguments to inspect. For other
+            // block parameters, collect the argument in the same position on each branch.
+            auto block = as<IRBlock>(param->getParent());
+            if (!block || block == cast<IRGlobalValueWithCode>(block->getParent())->getFirstBlock())
+                return false;
+            auto paramIndex = getParamIndexInBlock(param);
+            for (auto predecessor : block->getPredecessors())
+            {
+                auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
+                if (!branch || branch->getTargetBlock() != block)
+                    return false;
+                node.edges.add(branch->getArgs() + paramIndex);
+            }
+            if (node.edges.getCount() == 0)
+                return false;
+        }
+        else if (auto select = as<IRSelect>(inst))
+        {
+            if (!as<IRBoolType>(select->getCondition()->getDataType()))
+                return false;
+            node.edges.add(select->getOperandUse(1));
+            node.edges.add(select->getOperandUse(2));
+        }
+        else
+        {
+            // Global resource arrays and the built-in heaps are immutable descriptor sources.
+            // Local arrays or arbitrary loads might change between the original and new access.
+            IRInst* source = nullptr;
+            IRInst* index = nullptr;
+            switch (inst->getOp())
+            {
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+                {
+                    auto load = cast<IRSPIRVLoadDescriptorFromHeap>(inst);
+                    source = load->getHeap();
+                    index = load->getIndex();
+                    if (!as<IRSPIRVResourceHeap>(source) && !as<IRSPIRVSamplerHeap>(source))
+                        return false;
+                    break;
+                }
+            case kIROp_GetElement:
+                {
+                    auto getElement = cast<IRGetElement>(inst);
+                    source = getElement->getBase();
+                    index = getElement->getIndex();
+                    // Storage-buffer arrays already support selection through variable pointers.
+                    // Rewriting them would unnecessarily require nonuniform descriptor-indexing
+                    // capabilities.
+                    if (!as<IRResourceTypeBase>(resourceType) &&
+                        !as<IRSamplerStateTypeBase>(resourceType))
+                        return false;
+                    if (!as<IRGlobalParam>(source) || !as<IRArrayTypeBase>(source->getDataType()))
+                        return false;
+                    break;
+                }
+            default:
+                return false;
+            }
+            if (representative && (inst->getOp() != representative->getOp() ||
+                                   source != resourceSource || index->getDataType() != indexType))
+                return false;
+            representative = inst;
+            resourceSource = source;
+            indexType = index->getDataType();
+            indices.add(inst, index);
+            continue;
+        }
+        for (auto edge : node.edges)
+        {
+            node.values.add(edge->get());
+            workList.add(edge->get());
+        }
+        indices.add(inst, inst);
+        nodes.add(node);
+    }
+
+    // A cycle without any descriptor access does not establish a source to rematerialize.
+    if (!representative)
+        return false;
+
+    // Keep the existing selects, block parameters, and branch argument positions. Only
+    // their types and incoming values change; the original index computations stay where
+    // they were. Recreate the resource after each selection for uses that need a resource.
+    for (auto& node : nodes)
+    {
+        auto inst = node.inst;
+        inst->setFullType(indexType);
+        IRBuilder builder(inst);
+        setInsertAfterOrdinaryInst(&builder, inst);
+        IRInst* index = inst;
+        if (as<IRGetElement>(representative))
+        {
+            // Array selections can be nonuniform even when the incoming indices are constant.
+            // SPIRVLoadDescriptorFromHeap needs no marker: DescriptorHeapEXT permits
+            // nonuniform resource access by default.
+            index = builder.emitNonUniformResourceIndexInst(index);
+        }
+        IRInst* operands[] = {resourceSource, index};
+        auto resource =
+            builder.emitIntrinsicInst(resourceType, representative->getOp(), 2, operands);
+        traverseUses(
+            inst,
+            [&](IRUse* use)
+            {
+                if (use->getUser() != index && use->getUser() != resource)
+                    use->set(resource);
+            });
+    }
+    // Redirecting uses above also made selections refer to the recreated resources.
+    // Replace those operands with the indices recorded before the rewrite. In particular,
+    // a loop back edge must carry the index from the previous iteration, not its sampler.
+    for (auto& node : nodes)
+        for (Index i = 0; i < node.edges.getCount(); i++)
+            node.edges[i]->set(indices[node.values[i]]);
+    // Original resource accesses, and recreated resources used only by other selections,
+    // may now be unused. Leave them for simplifyIR in specializeResourceUsage to remove.
+    return true;
+}
+
+// Find resource-valued selects and block parameters in function bodies and try to replace
+// them with index selections. Function parameters are handled by specializeResourceParameters.
+static bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module)
+{
+    // This is needed for both SPIR-V and GLSL: eliminating a sampler-valued phi would
+    // introduce a function-local sampler variable, which those targets cannot represent.
+    // Selecting an integer index lets us load the sampler from its heap or array instead.
+    // The access instructions and nonuniform-index handling used here cover Khronos targets.
+    // WGSL also restricts resource locals, but extending this pass to it requires checking
+    // its resource-array and nonuniform-indexing rules; that is not handled here.
+    if (!isKhronosTarget(codeGenContext->getTargetReq()))
+        return false;
+
+    bool changed = false;
+    for (auto global : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(global);
+        if (!func)
+            continue;
+        List<IRInst*> selections;
+        for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
+                if ((as<IRParam>(inst) && block != func->getFirstBlock()) || as<IRSelect>(inst))
+                    selections.add(inst);
+        for (auto selection : selections)
+            changed |= specializeResourceSelection(selection);
+    }
+    return changed;
+}
+
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     bool result = false;
-    // We apply two kinds of specialization to clean up resource value usage:
+    // We apply three kinds of specialization to clean up resource value usage:
+    //
+    // * Replace selections of resources from the same heap or array with selections
+    //   of their indices.
     //
     // * Specalize call sites based on the actual resources
     //   that a called function will return/output.
@@ -1301,7 +1553,7 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
     // * Specialize called functions based on the actual resources
     //   passed as input at specific call sites.
     //
-    // We need to run the two passes in an iterative fashion (combined with IR
+    // We need to run these passes in an iterative fashion (combined with IR
     // simplification passes), because each optimization may open up opportunties
     // for the other to apply.
     //
@@ -1318,6 +1570,7 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             // for D3D targets that are not okay for Vulkan), we
             // pass down the target request along with the IR.
             //
+            changed |= specializeResourceSelections(codeGenContext, irModule);
             changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
