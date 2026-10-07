@@ -34,6 +34,8 @@ struct MultiLevelContext : rt::IHitContext
 [require(structural_raytracing_closesthit)]
 void checkPortableClosestHit(rt::ClosestHitInput<PortableContext> input)
 {
+    let limit = input.maxInstanceCount;
+//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
     let count = input.instanceCount;
 //CHECK-DAG: 'instanceCount' is not a member of 'rt.ClosestHitInput<PortableContext>'.
     let index = input.getInstanceIndex(0);
@@ -45,6 +47,8 @@ void checkPortableClosestHit(rt::ClosestHitInput<PortableContext> input)
 [require(structural_raytracing_anyhit)]
 void checkPortableAnyHit(rt::AnyHitInput<PortableContext> input)
 {
+    let limit = input.maxInstanceCount;
+//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
     let count = input.instanceCount;
 //CHECK-DAG: 'instanceCount' is not a member of 'rt.AnyHitInput<PortableContext>'.
     let index = input.getInstanceIndex(0);
@@ -56,6 +60,8 @@ void checkPortableAnyHit(rt::AnyHitInput<PortableContext> input)
 [require(structural_raytracing_intersection)]
 void checkPortableIntersection(rt::IntersectionInput<PortableContext> input)
 {
+    let limit = input.maxInstanceCount;
+//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
     let count = input.instanceCount;
 //CHECK-DAG: 'instanceCount' is not a member of 'rt.IntersectionInput<PortableContext>'.
     let index = input.getInstanceIndex(0);
@@ -78,6 +84,8 @@ void checkMultiLevelScalars(rt::ClosestHitInput<MultiLevelContext> input)
 [require(structural_raytracing_miss)]
 void checkMiss(rt::MissInput<MultiLevelContext> input)
 {
+    let limit = input.maxInstanceCount;
+//CHECK-DAG: 'maxInstanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
     let count = input.instanceCount;
 //CHECK-DAG: 'instanceCount' is not a member of 'rt.MissInput<MultiLevelContext>'.
     let index = input.getInstanceIndex(0);

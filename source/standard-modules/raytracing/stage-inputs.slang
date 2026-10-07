@@ -578,6 +578,13 @@ public extension<Context> ClosestHitInput<Context>
     where Context : IHitContext
     where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
 {
+    /// Gives the maximum number of instances on a path as a specialization-time constant.
+    ///
+    /// One acceleration-structure level belongs to the primitive AS, so a level count of three
+    /// allows at most two instances. The actual `instanceCount` can be smaller than this limit.
+    public static const uint maxInstanceCount =
+        Context.TraceContext.AccelerationStructure.levelCount - 1;
+
     /// Counts the instances on the current primitive's path.
     ///
     /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.
@@ -724,6 +731,13 @@ public extension<Context> AnyHitInput<Context>
     where Context : IHitContext
     where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
 {
+    /// Gives the maximum number of instances on a path as a specialization-time constant.
+    ///
+    /// One acceleration-structure level belongs to the primitive AS, so a level count of three
+    /// allows at most two instances. The actual `instanceCount` can be smaller than this limit.
+    public static const uint maxInstanceCount =
+        Context.TraceContext.AccelerationStructure.levelCount - 1;
+
     /// Counts the instances on the current primitive's path.
     ///
     /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.
@@ -849,6 +863,13 @@ public extension<Context> IntersectionInput<Context>
     where Context : IHitContext
     where Context.TraceContext.AccelerationStructure : IMultiLevelAccelerationStructure
 {
+    /// Gives the maximum number of instances on a path as a specialization-time constant.
+    ///
+    /// One acceleration-structure level belongs to the primitive AS, so a level count of three
+    /// allows at most two instances. The actual `instanceCount` can be smaller than this limit.
+    public static const uint maxInstanceCount =
+        Context.TraceContext.AccelerationStructure.levelCount - 1;
+
     /// Counts the instances on the current primitive's path.
     ///
     /// The count excludes the primitive acceleration structure and is at most `maxLevelCount - 1`.

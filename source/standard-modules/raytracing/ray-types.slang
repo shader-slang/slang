@@ -103,10 +103,14 @@ public typealias AccelerationStructure = RaytracingAccelerationStructure;
 /// Identifies depth-parameterized handles for the multilevel stage-input extensions.
 ///
 /// Extension lookup cannot infer a depth appearing only in a nested associated-type equality.
-/// This internal marker lets those extensions select the whole handle family without requiring
+/// This internal contract lets those extensions select the whole handle family without requiring
 /// shader code to supply a second depth argument when reading an instance path.
 [sealed]
-internal interface IMultiLevelAccelerationStructure {}
+internal interface IMultiLevelAccelerationStructure
+{
+    /// Includes the final primitive acceleration structure as well as the instance levels.
+    static const uint levelCount;
+}
 
 /// Represents Metal traversal with an explicit maximum acceleration-structure depth.
 ///
@@ -118,7 +122,10 @@ internal interface IMultiLevelAccelerationStructure {}
 __intrinsic_type(RaytracingAccelerationStructure)
 public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
     : IAccelerationStructure, IMultiLevelAccelerationStructure
-{}
+{
+    /// Gives the maximum acceleration-structure depth, including the primitive level.
+    public static const uint levelCount = maxLevelCount;
+}
 
 /// Exposes the built-in attributes of a triangle hit as a zero-storage property view.
 ///
