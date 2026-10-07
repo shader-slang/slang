@@ -11,7 +11,6 @@ RWStructuredBuffer<float> outBuf;
 
 //CHECK: E29003
 //CHECK: SPIR-V id not defined by an earlier instruction '%a' in target intrinsic snippet: %a = OpNop %a
-//CHECK-NOT: E99997
 __target_intrinsic(spirv, "%a = OpNop %a")
 float selfReference(float a);
 

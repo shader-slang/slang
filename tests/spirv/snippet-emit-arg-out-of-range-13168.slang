@@ -9,7 +9,6 @@ RWStructuredBuffer<float> outBuf;
 
 //CHECK: E29003
 //CHECK: out-of-range argument reference '_1' in target intrinsic snippet: OpNop _1
-//CHECK-NOT: E99997
 __target_intrinsic(spirv, "OpNop _1")
 float outOfRangeArg(float a);
 

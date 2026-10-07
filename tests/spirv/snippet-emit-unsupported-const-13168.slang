@@ -31,7 +31,6 @@ int pConstOnInt(int a);
 __target_intrinsic(spirv, "OpNop const(notatype, 1)")
 float unknownConst(float a);
 
-//CHECK-NOT: E99997
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

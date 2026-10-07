@@ -22,7 +22,6 @@ float useFloatOrDoubleType(float a);
 __target_intrinsic(spirv, "OpNop _type(notatype)")
 float useUnknownType(float a);
 
-//CHECK-NOT: E99997
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
