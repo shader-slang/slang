@@ -2561,11 +2561,11 @@ ImageFormat inferImageFormatFromTextureType(
 
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
 {
-    // Matrix layout modifiers are `TypeModifier`s, so for ordinary declarators the parser
-    // moves them onto the type expression and `visitModifiedTypeExpr` bakes in the layout.
-    // A traditional-style function parameter (leading-modifier syntax), however, parses its
-    // modifiers before its type and keeps them on the decl, so this decl-side branch remains
-    // the applier for that path.
+    // Matrix layout modifiers are `TypeModifier`s, so wherever a declaration has a type
+    // expression the parser moves them onto it and `visitModifiedTypeExpr` bakes in the layout.
+    // A declaration whose type is inferred from its initializer (`row_major var m = init;`) has
+    // no type expression, so the modifier stays on the decl and this branch applies it to the
+    // inferred matrix type.
     if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
     {
         if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
@@ -13981,6 +13981,79 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     return true;
 }
 
+/// Return whether parameter types `a` and `b` are equal up to the layout of the matrices they
+/// contain, for the purpose of matching function signatures. For example,
+/// `row_major float2x3[2]` and `column_major float2x3[2]` are equal up to matrix layout.
+///
+/// The relation is symmetric and looks through exactly the shapes a leading
+/// `row_major`/`column_major` on a parameter produces: a matrix, an array of them (sized or
+/// unsized, compared by count), and a pointer to them (`PtrType`, compared on every other
+/// operand). A matrix elsewhere, such as in a struct field or a generic argument like
+/// `StructuredBuffer<row_major float2x3>`, makes the types different.
+static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
+{
+    if (a->equals(b))
+        return true;
+    if (auto arrayA = as<ArrayExpressionType>(a))
+    {
+        auto arrayB = as<ArrayExpressionType>(b);
+        return arrayB && arrayA->getElementCount()->equals(arrayB->getElementCount()) &&
+               isSameTypeUpToMatrixLayout(arrayA->getElementType(), arrayB->getElementType());
+    }
+    if (auto ptrA = as<PtrType>(a))
+    {
+        auto ptrB = as<PtrType>(b);
+        return ptrB && ptrA->getAccessQualifier()->equals(ptrB->getAccessQualifier()) &&
+               ptrA->getAddressSpace()->equals(ptrB->getAddressSpace()) &&
+               ptrA->getDataLayout()->equals(ptrB->getDataLayout()) &&
+               isSameTypeUpToMatrixLayout(ptrA->getValueType(), ptrB->getValueType());
+    }
+    auto matrixA = as<MatrixExpressionType>(a);
+    auto matrixB = as<MatrixExpressionType>(b);
+    return matrixA && matrixB && matrixA->getElementType()->equals(matrixB->getElementType()) &&
+           matrixA->getRowCount()->equals(matrixB->getRowCount()) &&
+           matrixA->getColumnCount()->equals(matrixB->getColumnCount());
+}
+
+/// Return whether `a` and `b`, which are the same up to matrix layout, differ in the layout of a
+/// matrix behind a pointer, as in `row_major float2x3*` vs `column_major float2x3*` or arrays of
+/// such pointers. A matrix or array of matrices passed by value converts between layouts; memory
+/// reached through a pointer does not.
+static bool doesMatrixLayoutDifferBehindPointer(Type* a, Type* b)
+{
+    SLANG_ASSERT(isSameTypeUpToMatrixLayout(a, b));
+    if (a->equals(b))
+        return false;
+    if (auto arrayA = as<ArrayExpressionType>(a))
+    {
+        auto arrayB = as<ArrayExpressionType>(b);
+        return doesMatrixLayoutDifferBehindPointer(
+            arrayA->getElementType(),
+            arrayB->getElementType());
+    }
+    // Two unequal types that are the same up to matrix layout are either matrices, which differ
+    // by value, or pointers whose pointees differ in layout.
+    return as<PtrType>(a) != nullptr;
+}
+
+/// Return whether `fst` and `snd`, whose signatures match up to matrix layout, have a parameter
+/// whose types differ in the layout of a matrix behind a pointer.
+static bool doPointerParamLayoutsDiffer(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto fstParams = getParameters(astBuilder, fst).toArray();
+    auto sndParams = getParameters(astBuilder, snd).toArray();
+    SLANG_ASSERT(fstParams.getCount() == sndParams.getCount());
+    for (Index ii = 0; ii < fstParams.getCount(); ++ii)
+    {
+        if (doesMatrixLayoutDifferBehindPointer(
+                getType(astBuilder, fstParams[ii]),
+                getType(astBuilder, sndParams[ii])))
+            return true;
+    }
+    return false;
+}
+
 bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
 {
 
@@ -14000,8 +14073,14 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         auto fstParam = fstParams[ii];
         auto sndParam = sndParams[ii];
 
-        // If a given parameter type doesn't match, then signatures don't match
-        if (!getType(m_astBuilder, fstParam)->equals(getType(m_astBuilder, sndParam)))
+        // Matrix layout alone does not distinguish two signatures (see the declaration for the
+        // full rule). This is interim: mangled names do not encode matrix layout
+        // (shader-slang/slang#13383), so two such functions would share one linkage name. Once
+        // mangling distinguishes them, this comparison becomes `equals` and
+        // `doPointerParamLayoutsDiffer` has nothing left to reject.
+        if (!isSameTypeUpToMatrixLayout(
+                getType(m_astBuilder, fstParam),
+                getType(m_astBuilder, sndParam)))
             return false;
 
         // If one parameter is `out` and the other isn't, then they don't match
@@ -14505,6 +14584,21 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
             getSink()->diagnose(diagnostic);
             return SLANG_FAIL;
         }
+    }
+
+    // Signatures match up to matrix layout, but calls are checked against the primary
+    // declaration while each body is lowered with its own parameter types. For a parameter passed
+    // by value, `inout`/`out`, `__ref` or `__constref`, the call still reads and writes the right
+    // logical values, including through buffer and `groupshared` storage
+    // (matrix-layout-array-param-call.slang). A pointer's pointee layout decides how memory is
+    // read, and nothing converts between two pointee layouts, so two declarations whose pointer
+    // parameters differ in a pointee's matrix layout conflict. This runs after the two-bodies
+    // check so that two definitions still report a redefinition.
+    if (doPointerParamLayoutsDiffer(newDeclRef, oldDeclRef))
+    {
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+        getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
+        return SLANG_FAIL;
     }
 
     // At this point we've processed the redeclaration and
