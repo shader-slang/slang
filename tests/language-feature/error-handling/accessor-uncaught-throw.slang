@@ -19,6 +19,7 @@ struct GetterThrow
     {
         get { throw MyError.Failed; }
 //CHECK:      ^^^^^ uncaught 'throw' in non-throwing function
+//CHECK:      ^^^^^ the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.
     }
 }
 
@@ -30,6 +31,7 @@ struct SetterThrow
         get { return x; }
         set { throw MyError.Failed; }
 //CHECK:      ^^^^^ uncaught 'throw' in non-throwing function
+//CHECK:      ^^^^^ the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.
     }
 }
 
@@ -39,6 +41,7 @@ struct SubscriptGetterThrow
     {
         get { throw MyError.Failed; }
 //CHECK:      ^^^^^ uncaught 'throw' in non-throwing function
+//CHECK:      ^^^^^ the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.
     }
 }
 
@@ -48,6 +51,7 @@ struct GetterTry
     {
         get { return try f(); }
 //CHECK:             ^^^ uncaught 'try' in non-throwing function
+//CHECK:             ^^^ the current function or environment is not declared to throw any errors, but the 'try' clause is not caught
     }
 }
 
@@ -59,6 +63,7 @@ struct SetterTry
         get { return x; }
         set { x = try f(); }
 //CHECK:          ^^^ uncaught 'try' in non-throwing function
+//CHECK:          ^^^ the current function or environment is not declared to throw any errors, but the 'try' clause is not caught
     }
 }
 

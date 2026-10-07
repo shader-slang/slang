@@ -746,6 +746,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void checkCallableErrorType(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
@@ -16350,6 +16351,24 @@ void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl*
     getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
+// Check the error type declared by a `throws` clause on `decl`, or set it to `Bottom` when there
+// is none. Checking of `throw` statements and `try` expressions reads the enclosing callable's
+// `errorType` and relies on every callable having one after its header is checked, including
+// accessors, which have no `throws` syntax.
+void SemanticsDeclHeaderVisitor::checkCallableErrorType(CallableDecl* decl)
+{
+    auto errorType = decl->errorType;
+    if (errorType.type || errorType.exp)
+    {
+        errorType = CheckProperType(errorType);
+    }
+    else
+    {
+        errorType = TypeExp(m_astBuilder->getBottomType());
+    }
+    decl->errorType = errorType;
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -16374,16 +16393,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         }
     }
 
-    auto errorType = decl->errorType;
-    if (errorType.type || errorType.exp)
-    {
-        errorType = CheckProperType(errorType);
-    }
-    else
-    {
-        errorType = TypeExp(m_astBuilder->getBottomType());
-    }
-    decl->errorType = errorType;
+    checkCallableErrorType(decl);
 
     // TODO: This is a workaround to make sure that the function's type constraints are represented
     // as a Constraint(sub=Lookup(This, funcDecl), sup=...), instead of referring to the function
@@ -17587,6 +17597,7 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
         }
     }
 
+    checkCallableErrorType(decl);
     checkDifferentiableCallableCommon(decl);
 }
 
@@ -17595,6 +17606,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
     // A `set` accessor always returns `void`.
     //
     decl->returnType.type = getASTBuilder()->getVoidType();
+    checkCallableErrorType(decl);
 
     // A setter always receives a single value representing
     // the new value to set into the storage.
