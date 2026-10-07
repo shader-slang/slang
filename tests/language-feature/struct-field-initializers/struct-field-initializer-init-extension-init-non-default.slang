@@ -14,7 +14,6 @@ struct DefaultStructWithInit
 };
 extension DefaultStructWithInit
 {
-    [mutating]
     __init(int inData)
     {
         data1 = 3;
