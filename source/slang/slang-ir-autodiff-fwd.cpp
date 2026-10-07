@@ -2080,14 +2080,24 @@ struct ForwardDiffTranslationContext
             diffDiffVal = getDifferentialZeroOfType(builder, origDiffVal->getDataType());
         SLANG_ASSERT(diffDiffVal);
 
-        auto primalPairType = getOrCreateDiffPairType(
-            builder,
-            primalVal
-                ->getDataType()); // findOrTranslatePrimalInst(builder, origInst->getFullType());
-        auto diffPairType = getOrCreateDiffPairType(
-            builder,
-            diffPrimalVal
-                ->getDataType()); // findOrTranslateDiffInst(builder, origInst->getFullType());
+        // Preserve the explicit type of the pair being differentiated. Consider a
+        // differentiable wrapper that calls a method on a no_diff parameter:
+        //     float evaluate(no_diff Polynomial p, float x) { return p.evaluate(x); }
+        // The first derivative packs p into a DiffPair<Polynomial> for the method
+        // receiver, while p itself retains its no_diff type. Differentiating that
+        // pair must preserve its result type: looking up a pair type for the
+        // attributed operand would fail because no_diff has no such annotation.
+        auto primalPairType = findOrTranslatePrimalInst(builder, origInst->getFullType());
+        // The full type can be rate-qualified; check the underlying value-pair type.
+        SLANG_RELEASE_ASSERT(as<IRDifferentialPairType>(unwrapAttributedType(primalPairType)));
+
+        // The differential operand already has type T.Differential, without the
+        // primal operand's no_diff modifier. IDifferentiable requires that type
+        // to be differentiable, and maybeAddTypeAnnotationsForHigherOrderDiff
+        // registers its pair annotation. Looking up that annotation gives the
+        // concrete DiffPair<T.Differential> needed here, even when the whole
+        // pair's associated Differential type is still a deferred lookupWitness.
+        auto diffPairType = getOrCreateDiffPairType(builder, diffPrimalVal->getDataType());
         if (origInst->getOp() == kIROp_MakeDifferentialPair)
         {
             auto primalPair = builder->emitMakeDifferentialValuePair(
