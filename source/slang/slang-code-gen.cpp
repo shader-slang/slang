@@ -722,17 +722,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
 
-            // Generated HLSL declares its default layout with `#pragma pack_matrix` and spells
-            // every matrix declaration's layout explicitly. We use those declarations as the
-            // source of truth instead of also passing DXC's `-Zpr` option. For example, copying
-            // an explicit column-major `float2x3` gradient through an `out` parameter with `-Zpr`
-            // can reorder its elements even when the HLSL declarations preserve that layout.
-            // Pass-through HLSL has no generated layout declarations, so it still needs the option.
-            if (isPassThroughEnabled())
-            {
-                options.matrixLayout =
-                    (SlangMatrixLayoutMode)getTargetProgram()->getOptionSet().getMatrixLayoutMode();
-            }
+            // Set the matrix layout
+            options.matrixLayout =
+                (SlangMatrixLayoutMode)getTargetProgram()->getOptionSet().getMatrixLayoutMode();
         }
 
         // Set the profile

@@ -1805,24 +1805,24 @@ void HLSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, Declarator
 {
     if (declarator)
     {
-        // HLSL attaches matrix layout to declarations rather than to matrix type names.
-        // We spell the layout even when it matches the module default: DXC does not consistently
-        // apply `#pragma pack_matrix` to every storage context. Explicit declarations preserve the
-        // IR matrix layout without the `-Zpr` option, which can reorder explicit column-major
-        // matrices copied through `out` parameters.
+        // HLSL only allow matrix layout modifier when declaring a variable or struct field.
         if (auto matType = as<IRMatrixType>(type))
         {
             auto matrixLayout = getIntVal(matType->getLayout());
-            switch (matrixLayout)
+            if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() !=
+                (MatrixLayoutMode)matrixLayout)
             {
-            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
-                m_writer->emit("column_major ");
-                break;
-            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-                m_writer->emit("row_major ");
-                break;
-            default:
-                break;
+                switch (matrixLayout)
+                {
+                case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+                    m_writer->emit("column_major ");
+                    break;
+                case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+                    m_writer->emit("row_major ");
+                    break;
+                default:
+                    break;
+                }
             }
         }
     }

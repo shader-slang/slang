@@ -26,10 +26,10 @@ void computeMain()
 
 // Each specialized function returns HLSL `min`/`max` applied to its matrix parameters. A loop
 // over rows would instead index the parameters and return a separate result variable.
-// HLSL: float3x3 genMax_{{[0-9]+}}(column_major float3x3 a_{{[0-9]+}}, column_major float3x3 b_{{[0-9]+}})
+// HLSL: float3x3 genMax_{{[0-9]+}}(float3x3 a_{{[0-9]+}}, float3x3 b_{{[0-9]+}})
 // HLSL-NOT: }
 // HLSL: return max(a_{{[0-9]+}}, b_{{[0-9]+}});
-// HLSL: float3x3 genMin_{{[0-9]+}}(column_major float3x3 a_{{[0-9]+}}, column_major float3x3 b_{{[0-9]+}})
+// HLSL: float3x3 genMin_{{[0-9]+}}(float3x3 a_{{[0-9]+}}, float3x3 b_{{[0-9]+}})
 // HLSL-NOT: }
 // HLSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
 

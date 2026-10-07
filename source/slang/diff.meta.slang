@@ -1672,8 +1672,10 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     b = diffPair(b.p, vector<T, 3>.Differential(dbx, dby, dbz));
 }
 
-// Vector derivatives are shared by binary builtins regardless of how their matrix overloads
-// spell layout.
+// VECTOR_BINARY_DIFF_IMPL supplies vector derivatives. Matrix derivatives use MATRIX_BINARY_DIFF_IMPL
+// for default-layout primals, or MATRIX_LAYOUT_BINARY_DIFF_IMPL when the primal carries layout L.
+// VECTOR_MATRIX_BINARY_DIFF_IMPL combines vector and default-layout matrix derivatives for atan2,
+// fmod, and pow. Min/max combine the vector macro with the explicit-layout matrix macro.
 #define VECTOR_BINARY_DIFF_IMPL(NAME)                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [PreferRecompute]                                                                        \
@@ -1715,9 +1717,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     }
 
 // The derivative signature must spell the same matrix layout parameters as the primal overload so
-// `[ForwardDerivativeOf]` and `[BackwardDerivativeOf]` can bind the pair. Builtins such as `atan2`,
-// `fmod`, and `pow` have default-layout matrix primals and use this macro. The `min` and `max`
-// primals preserve an explicit `MatrixLayoutMode`, so they use `MATRIX_LAYOUT_BINARY_DIFF_IMPL`.
+// `[ForwardDerivativeOf]` and `[BackwardDerivativeOf]` can bind the pair.
 #define MATRIX_BINARY_DIFF_IMPL(NAME)                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
     [PreferRecompute]                                                                        \
