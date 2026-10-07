@@ -3,9 +3,7 @@
 //TEST:SIMPLE_EX(filecheck=NO_VARYING): -lang glsl tests/glsl/gh-9078-global-varying-in-vertex.slang -stage vertex -entry main -target cuda
 //TEST:SIMPLE_EX(filecheck=NO_VARYING): -lang glsl tests/glsl/gh-9078-global-varying-in-vertex.slang -stage vertex -entry main -target cpp
 
-// A vertex shader with a GLSL-style global `in`, a global `out` and a global `uniform`, covering
-// the input side of https://github.com/shader-slang/slang/issues/9078 on the targets that run
-// `introduceExplicitGlobalContext`.
+// See https://github.com/shader-slang/slang/issues/9078.
 
 // METAL: float4 c{{.*}} {{\[\[}}user(COLOR){{\]\]}}
 // METAL: float4 p{{.*}} {{\[\[}}attribute(0){{\]\]}}

@@ -238,9 +238,9 @@ struct CollectGlobalUniformParametersContext
         {
             // A global `in`/`out` variable is a varying, not a uniform parameter, so we never
             // collect it, even on CPU/CUDA where its layout has uniform size. We still re-key
-            // every struct field layout that names it, in both the element and offset-element
-            // layouts, because a layout naming the variable is a use outside any function,
-            // which `introduceExplicitGlobalContext` cannot rewrite.
+            // every struct field layout that names it, including the offset-element layout when
+            // there is one, because `introduceExplicitGlobalContext` cannot rewrite a use of a
+            // global variable outside a function.
             //
             auto originalKey = fieldLayoutAttr->getFieldKey();
             if (_isGlobalVaryingVar(originalKey))
