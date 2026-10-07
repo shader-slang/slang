@@ -4155,21 +4155,61 @@ static void emitExpressionLineCoverage(IRGenContext* context, Expr* expr)
     }
 }
 
-// Count the decisions that are actually evaluated. For `a && b`, lowering the
-// logical expression records `a` and, only on its true path, `b`. Its consumer must
-// not record the merged result as another decision: that would count a skipped
-// `b` as an evaluated false branch. Parentheses preserve that same decision tree.
-static IRInst* lowerCoverageCondition(IRGenContext* context, Expr* expr)
+// The decision a scalar condition makes, for a consumer that branches on the condition's value
+// itself. `siteID` is 0 when the condition has no decision of its own to report, for example
+// because branch coverage is off or the condition is a short-circuit expression whose operands
+// already report theirs. `inverted` is set when the consumer branches on the logical negation of
+// the decision's value.
+struct CoverageDecision
+{
+    SourceLoc loc;
+    uint32_t siteID = 0;
+    bool inverted = false;
+};
+
+// Emit the branch-coverage marker for one arm of the consumer's branch at the current insert
+// location. `conditionTrue` names the arm in terms of the condition the consumer was given, so the
+// caller does not need to know whether lowering saw through a negation.
+static void emitCoverageDecisionArm(
+    IRGenContext* context,
+    const CoverageDecision& decision,
+    bool conditionTrue)
+{
+    bool decisionTrue = conditionTrue != decision.inverted;
+    emitBranchCoverageMarker(
+        context,
+        decision.loc,
+        decision.siteID,
+        decisionTrue ? 1 : 2,
+        decisionTrue ? slang::CoverageBranchArmKind::TrueArm
+                     : slang::CoverageBranchArmKind::FalseArm);
+}
+
+// Lower a scalar condition and count the decisions that are actually evaluated. For `a && b`,
+// lowering the logical expression records `a` and, only on its true path, `b`. Its consumer must
+// not record the merged result as another decision: that would count a skipped `b` as an
+// evaluated false branch. Parentheses preserve that same decision tree.
+//
+// A consumer that branches directly on the returned value passes `outDecision` and puts the arm
+// markers on its own branch arms, as in `if (x > 0)`. Without `outDecision` there is no branch of
+// the caller's to hold the markers, as for the right operand of `a && b` whose value is merged
+// before anything branches on it, so a dedicated two-way branch carries them instead.
+static IRInst* lowerCoverageCondition(
+    IRGenContext* context,
+    Expr* expr,
+    CoverageDecision* outDecision = nullptr)
 {
     if (auto paren = as<ParenExpr>(expr))
-        return lowerCoverageCondition(context, paren->base);
+        return lowerCoverageCondition(context, paren->base, outDecision);
 
     if (context->traceBranchCoverage)
     {
         if (auto builtin = as<BuiltinOperatorExpr>(expr))
             if (builtin->op == BuiltinOperationKind::Not)
             {
-                auto operand = lowerCoverageCondition(context, builtin->arguments[0]);
+                auto operand = lowerCoverageCondition(context, builtin->arguments[0], outDecision);
+                if (outDecision && outDecision->siteID != 0)
+                    outDecision->inverted = !outDecision->inverted;
                 return context->irBuilder->emitNot(operand->getDataType(), operand);
             }
     }
@@ -4180,11 +4220,19 @@ static IRInst* lowerCoverageCondition(IRGenContext* context, Expr* expr)
         !getParentFunc(context->irBuilder->getInsertLoc().getInst()))
         return value;
 
+    auto site = allocateCoverageBranchSiteID(context);
+    if (outDecision)
+    {
+        outDecision->loc = expr->loc;
+        outDecision->siteID = site;
+        outDecision->inverted = false;
+        return value;
+    }
+
     auto builder = context->irBuilder;
     auto trueBlock = builder->createBlock();
     auto falseBlock = builder->createBlock();
     auto mergeBlock = builder->createBlock();
-    auto site = allocateCoverageBranchSiteID(context);
     builder->emitIfElse(value, trueBlock, falseBlock, mergeBlock);
     builder->insertBlock(trueBlock);
     emitBranchCoverageMarker(context, expr->loc, site, 1, slang::CoverageBranchArmKind::TrueArm);
@@ -7254,17 +7302,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto thenBlock = builder->createBlock();
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
-        auto irCond = lowerCoverageCondition(context, expr->arguments[0]);
+        CoverageDecision decision;
+        auto irCond = lowerCoverageCondition(context, expr->arguments[0], &decision);
         builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
         emitCurrentDebugScope(context);
+        emitCoverageDecisionArm(context, decision, true);
         emitExpressionLineCoverage(context, expr->arguments[1]);
         auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
         builder->emitBranch(afterBlock, 1, &trueVal);
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
         emitCurrentDebugScope(context);
+        emitCoverageDecisionArm(context, decision, false);
         emitExpressionLineCoverage(context, expr->arguments[2]);
         auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
         builder->emitBranch(afterBlock, 1, &falseVal);
@@ -7282,7 +7333,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto thenBlock = builder->createBlock();
         auto elseBlock = builder->createBlock();
         auto afterBlock = builder->createBlock();
-        auto irCond = lowerCoverageCondition(context, expr->arguments[0]);
+        CoverageDecision decision;
+        auto irCond = lowerCoverageCondition(context, expr->arguments[0], &decision);
 
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
 
@@ -7295,6 +7347,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->setInsertInto(thenBlock);
         emitCurrentDebugScope(context);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+        emitCoverageDecisionArm(context, decision, true);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                            ? lowerCoverageCondition(context, expr->arguments[1])
                            : builder->getBoolValue(true);
@@ -7307,6 +7360,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->setInsertInto(elseBlock);
         emitCurrentDebugScope(context);
         maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
+        emitCoverageDecisionArm(context, decision, false);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                             ? builder->getBoolValue(false)
                             : lowerCoverageCondition(context, expr->arguments[1]);
@@ -8473,7 +8527,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = lowerCoverageCondition(context, condExpr);
+        CoverageDecision decision;
+        auto irCond = lowerCoverageCondition(context, condExpr, &decision);
 
         maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
@@ -8489,11 +8544,35 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitCoverageDecisionArm(context, decision, true);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
             insertBlock(elseBlock);
+            emitCoverageDecisionArm(context, decision, false);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
+
+            insertBlock(afterBlock);
+        }
+        else if (decision.siteID != 0)
+        {
+            // The implicit else arm needs its own block to hold the false-arm marker.
+            auto thenBlock = createBlock();
+            auto elseBlock = createBlock();
+            auto afterBlock = createBlock();
+
+            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+
+            insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitCoverageDecisionArm(context, decision, true);
+            lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
+            emitBranchIfNeeded(afterBlock);
+
+            insertBlock(elseBlock);
+            emitCoverageDecisionArm(context, decision, false);
 
             insertBlock(afterBlock);
         }
@@ -8588,19 +8667,30 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        CoverageDecision decision;
         if (const auto condExpr = stmt->predicateExpression)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = lowerCoverageCondition(context, stmt->predicateExpression);
+            auto irCondition =
+                lowerCoverageCondition(context, stmt->predicateExpression, &decision);
 
+            // Now we want to `break` if the loop condition is false. Its false arm needs a block
+            // of its own when it carries a coverage marker.
+            auto conditionFalseLabel = decision.siteID != 0 ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
 
-            // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            if (decision.siteID != 0)
+            {
+                insertBlock(conditionFalseLabel);
+                emitCoverageDecisionArm(context, decision, false);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        emitCoverageDecisionArm(context, decision, true);
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8698,19 +8788,29 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        CoverageDecision decision;
         if (auto condExpr = stmt->predicate)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = lowerCoverageCondition(context, condExpr);
+            auto irCondition = lowerCoverageCondition(context, condExpr, &decision);
 
+            // Now we want to `break` if the loop condition is false. Its false arm needs a block
+            // of its own when it carries a coverage marker.
+            auto conditionFalseLabel = decision.siteID != 0 ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
 
-            // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            if (decision.siteID != 0)
+            {
+                insertBlock(conditionFalseLabel);
+                emitCoverageDecisionArm(context, decision, false);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        emitCoverageDecisionArm(context, decision, true);
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8769,7 +8869,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
 
-            auto irCondition = lowerCoverageCondition(context, condExpr);
+            CoverageDecision decision;
+            auto irCondition = lowerCoverageCondition(context, condExpr, &decision);
 
             // One thing to be careful here is that lowering irCondition
             // may create additional blocks due to short circuiting, so
@@ -8794,10 +8895,29 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
-            builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+            if (decision.siteID != 0)
+            {
+                // `invCondition` is the loop-exit test. Its true arm is the original
+                // condition's false arm, so that arm exits the loop through a block of its own
+                // that holds the false-arm marker.
+                auto loopExitBlock = builder->createBlock();
+                builder->emitIfElse(invCondition, loopExitBlock, mergeBlock, mergeBlock);
 
-            insertBlock(mergeBlock);
-            builder->emitBranch(loopHead);
+                insertBlock(loopExitBlock);
+                emitCoverageDecisionArm(context, decision, false);
+                emitBranchIfNeeded(breakLabel);
+
+                insertBlock(mergeBlock);
+                emitCoverageDecisionArm(context, decision, true);
+                builder->emitBranch(loopHead);
+            }
+            else
+            {
+                builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+
+                insertBlock(mergeBlock);
+                builder->emitBranch(loopHead);
+            }
         }
 
         // Finally we insert the label that a `break` will jump to
