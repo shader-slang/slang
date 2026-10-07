@@ -1433,7 +1433,11 @@ static void emitReflectionEntryPointJSON(
         emitReflectionParamJSON(writer, resultVarLayout, reflectionTracker);
     }
 
-    if (entryPoint->getStage() == SLANG_STAGE_COMPUTE)
+    // Mesh and amplification shaders declare `[numthreads]` too, and a Metal host needs it to
+    // size the draw.
+    auto stage = entryPoint->getStage();
+    if (stage == SLANG_STAGE_COMPUTE || stage == SLANG_STAGE_MESH ||
+        stage == SLANG_STAGE_AMPLIFICATION)
     {
         SlangUInt threadGroupSize[3];
         entryPoint->getComputeThreadGroupSize(3, threadGroupSize);
