@@ -1,6 +1,7 @@
 #include "slang-syntax.h"
 
 #include "slang-ast-print.h"
+#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
@@ -948,35 +949,56 @@ NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> c
     return astBuilder->getOrCreate<NamedExpressionType>(specializedDeclRef);
 }
 
-std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
-    ASTBuilder* astBuilder,
-    Type* paramTypeWithDirection)
+std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
 {
-    SLANG_UNUSED(astBuilder);
-    if (as<OutParamType>(paramTypeWithDirection))
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(declRef);
+
+    auto decl = declRef.getDecl();
+    SLANG_RELEASE_ASSERT(decl->isChecked(DeclCheckState::SignatureChecked));
+
+    auto attribute = decl->findModifier<ThisParamInfoAttribute>();
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
     {
-        auto outParamType = as<OutParamType>(paramTypeWithDirection);
-        return {outParamType->getValueType(), ParamPassingMode::Out};
+        if (auto callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource()))
+        {
+            // Consider `apply_bwd`, an interface requirement looked up through a function-as-type.
+            // Its declaration's receiver is the interface `This`, but its callable ABI follows the
+            // function used as the lookup source: a free function has no effective `this`
+            // parameter, while a method has the same one as its primal declaration. Delegate to
+            // that callable's checked information so this query preserves both possibilities. A
+            // receiverless requirement has no attribute and remains receiverless regardless of
+            // the callable used as its lookup source.
+            SLANG_RELEASE_ASSERT(
+                callableDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked));
+            if (attribute)
+                return findEffectiveThisParamInfo(astBuilder, DeclRef<Decl>(callableDeclRef));
+        }
     }
-    else if (as<BorrowInOutParamType>(paramTypeWithDirection))
-    {
-        auto inoutParamType = as<BorrowInOutParamType>(paramTypeWithDirection);
-        return {inoutParamType->getValueType(), ParamPassingMode::BorrowInOut};
-    }
-    else if (as<RefParamType>(paramTypeWithDirection))
-    {
-        auto refParamType = as<RefParamType>(paramTypeWithDirection);
-        return {refParamType->getValueType(), refParamType->getParamPassingMode()};
-    }
-    else if (as<BorrowInParamType>(paramTypeWithDirection))
-    {
-        auto constRefParamType = as<BorrowInParamType>(paramTypeWithDirection);
-        return {constRefParamType->getValueType(), ParamPassingMode::BorrowIn};
-    }
-    else
-    {
-        return {paramTypeWithDirection, ParamPassingMode::In};
-    }
+
+    if (!attribute)
+        return std::nullopt;
+
+    ParamInfo result = attribute->info;
+    SLANG_RELEASE_ASSERT(result.type);
+    result.type = declRef.substitute(astBuilder, result.type);
+    return result;
+}
+
+ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
+{
+    auto result = findEffectiveThisParamInfo(astBuilder, declRef);
+    SLANG_RELEASE_ASSERT(result.has_value());
+    return *result;
+}
+
+bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo)
+{
+    if (doesParamPassingModeIndicateWritableStorage(thisParamInfo.mode))
+        return true;
+
+    return callableDeclRef.is<SetterDecl>() &&
+           isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(thisParamInfo.type));
 }
 
 bool doesTypeHaveNoDiffModifier(Type* type)
@@ -991,6 +1013,27 @@ bool doesTypeHaveNoDiffModifier(Type* type)
     return false;
 }
 
+List<DeclRef<ParamDecl>> getParametersForCallableSignature(
+    ASTBuilder* astBuilder,
+    DeclRef<CallableDecl> declRef)
+{
+    List<DeclRef<ParamDecl>> result;
+
+    if (declRef.as<AccessorDecl>())
+    {
+        if (auto callableParent = declRef.getParent().as<CallableDecl>())
+        {
+            for (auto paramDeclRef : getParameters(astBuilder, callableParent))
+                result.add(paramDeclRef);
+        }
+    }
+
+    for (auto paramDeclRef : getParameters(astBuilder, declRef))
+        result.add(paramDeclRef);
+
+    return result;
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
     List<Type*> paramTypes;
@@ -1002,42 +1045,13 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
-        auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
-        if (!paramValueType)
-        {
-            paramValueType = astBuilder->getErrorType();
-        }
-
-        auto paramDecl = paramDeclRef.getDecl();
-        if (paramDecl->findModifier<NoDiffModifier>() &&
-            !doesTypeHaveNoDiffModifier(paramValueType))
-        {
-            paramValueType =
-                astBuilder->getModifiedType(paramValueType, astBuilder->getNoDiffModifierVal());
-        }
-        auto paramMode = getParamPassingMode(paramDecl);
-        auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
-
-        paramTypes.add(paramType);
+        auto paramInfo = getParamInfo(astBuilder, paramDeclRef);
+        if (!paramInfo.type)
+            paramInfo.type = astBuilder->getErrorType();
+        paramTypes.add(getParamTypeWithModeWrapper(astBuilder, paramInfo));
     };
-    auto parent = declRef.getParent();
-    // An accessor includes parameters from a callable storage parent before its own parameters.
-    // For example, a subscript setter receives the subscript index before the value being set.
-    // A property is not callable, so it contributes no parameters here.
-    if (declRef.as<AccessorDecl>())
-    {
-        if (auto callableParent = parent.as<CallableDecl>())
-        {
-            for (auto paramDeclRef : getParameters(astBuilder, callableParent))
-            {
-                visitParamDecl(paramDeclRef);
-            }
-        }
-    }
-    for (auto paramDeclRef : getParameters(astBuilder, declRef))
-    {
+    for (auto paramDeclRef : getParametersForCallableSignature(astBuilder, declRef))
         visitParamDecl(paramDeclRef);
-    }
 
     auto funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
     return as<FuncType>(funcType->substitute(astBuilder, SubstitutionSet(declRef))->resolve());

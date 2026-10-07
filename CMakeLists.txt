@@ -228,7 +228,7 @@ option(
 )
 option(
     SLANG_ENABLE_EXAMPLES
-    "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"
+    "Enable example targets (most require SLANG_ENABLE_SLANG_RHI)"
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)

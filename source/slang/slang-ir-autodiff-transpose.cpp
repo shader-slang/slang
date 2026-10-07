@@ -1691,18 +1691,25 @@ struct DiffTransposePass
         IRMakeDifferentialPair* fwdMakePair,
         IRInst* revValue)
     {
+        // MakeDifferentialPair constructs a value pair, but revValue's associated
+        // type may still be an unresolved lookupWitness. The generic
+        // emitDifferentialPairGetPrimal/GetDifferential helpers dispatch on
+        // IRDifferentialPairType versus IRDifferentialPtrPairType; an unresolved
+        // type reaches their unreachable assertion and returns null in release.
+        // The explicit value-pair getters emit the intrinsics with the supplied
+        // result types, using the pair flavor established by MakeDifferentialPair.
         TranspositionResult result;
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getPrimal(),
-            builder->emitDifferentialPairGetPrimal(
+            builder->emitDifferentialValuePairGetPrimal(
                 fwdMakePair->getPrimal()->getDataType(),
                 revValue),
             fwdMakePair));
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getDifferentialValue(),
-            builder->emitDifferentialPairGetDifferential(
+            builder->emitDifferentialValuePairGetDifferential(
                 fwdMakePair->getDifferentialValue()->getDataType(),
                 revValue),
             fwdMakePair));

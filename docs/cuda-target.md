@@ -339,6 +339,46 @@ If this fails, the default OptiX SDK install locations are searched. On Windows 
 
 If OptiX headers cannot be found, compilation will fail.
 
+## Geometry index
+
+D3D12 and Vulkan define the geometry index as the zero-based index of a build input (geometry) within a bottom-level
+acceleration structure. OptiX has no device-side query for that index. The closest value it provides is the _SBT GAS
+index_: the index of a primitive's record in the shader binding table (SBT), relative to its geometry acceleration
+structure (GAS). For a primitive in build input _k_, it is the sum of `numSbtRecords` over build inputs `0` to `k-1`,
+plus the primitive's entry in `sbtIndexOffsetBuffer` if one is set. See the shader binding table chapter of the OptiX
+Programming Guide for details.
+
+Slang maps the geometry-index operations to the SBT GAS index:
+
+- `GeometryIndex()` and `gl_GeometryIndexEXT` return `optixGetSbtGASIndex()`. This requires OptiX 7.1 or later.
+- `HitObject.GetGeometryIndex()` returns `optixHitObjectGetSbtGASIndex()`.
+- `HitObject.MakeHit` and `HitObject.MakeMotionHit` take an SBT GAS index as their `GeometryIndex` argument. With
+  OptiX 8.1 they pass it to OptiX as `sbtGASIdx`. With OptiX 9.0 and later, see the limitation below.
+
+The returned values (and the `GeometryIndex` argument of the OptiX 8.1 `MakeHit` path) are SBT GAS indices. An SBT GAS
+index equals the D3D12/Vulkan geometry index when every build input of the GAS has exactly one SBT record
+(`numSbtRecords = 1`). OptiX requires each `sbtIndexOffsetBuffer` entry to be less than `numSbtRecords`, so with one
+record per build input every per-primitive offset is 0. Curve build inputs always have one SBT record.
+[slang-rhi](https://github.com/shader-slang/slang-rhi) builds triangle, custom-primitive, sphere and curve build
+inputs this way.
+
+Cluster acceleration structures do not use per-build-input SBT records. The SBT GAS index of a cluster triangle is the
+`sbtIndex` set when the cluster is built, so it equals the geometry index that the application assigns to the triangle
+only if the application uses that value as the `sbtIndex`. slang-rhi documents its cluster geometry index as the OptiX
+`sbtIndex`.
+
+Applications that build acceleration structures with the OptiX API directly and give a build input more than one SBT
+record still get the SBT GAS index from these operations. It then differs from the D3D12/Vulkan geometry index for
+the build inputs that follow that build input, and for primitives that use a non-zero SBT index offset.
+
+**Limitation:** with OptiX 9.0 and later, `HitObject.MakeHit` and `HitObject.MakeMotionHit` build the new hit object
+from the serialized _current outgoing hit object_ (`optixHitObjectGetTraverseData`) rather than from their
+hit-identifying arguments. `AccelerationStructure`, `Ray.Origin`, `Ray.Direction`, `Ray.TMin` and, for motion hits,
+`CurrentTime` are still passed to OptiX. The `InstanceIndex`, `GeometryIndex`, `PrimitiveIndex`, `HitKind`, `Ray.TMax`
+and attribute arguments, and the shader-table arguments (`RayContributionToHitGroupIndex`,
+`MultiplierForGeometryContributionToHitGroupIndex`, `HitGroupRecordIndex`), are not used, so the resulting hit
+describes the hit object that was current before the call rather than the primitive the caller names.
+
 Limitations
 ===========
 

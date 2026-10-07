@@ -2824,11 +2824,44 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
     return paramType;
 }
 
+ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
+{
+    ParamInfo result;
+    result.type = getParamValueType(astBuilder, paramDeclRef);
+    result.mode = getParamPassingMode(paramDeclRef.getDecl());
+    return result;
+}
+
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
-    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
-    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+    return getParamTypeWithModeWrapper(astBuilder, getParamInfo(astBuilder, paramDeclRef));
+}
+
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& paramInfo)
+{
+    SLANG_RELEASE_ASSERT(paramInfo.type);
+    // The mode is encoded by the wrapper this function adds; accepting a wrapped value type would
+    // give one parameter two independently encoded modes.
+    SLANG_RELEASE_ASSERT(!as<ParamPassingModeType>(paramInfo.type));
+    switch (paramInfo.mode)
+    {
+    case ParamPassingMode::In:
+        return paramInfo.type;
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(paramInfo.type);
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(paramInfo.type);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(paramInfo.type);
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+        return astBuilder->getRefParamType(
+            paramInfo.type,
+            getRefParamPassingModeAccess(paramInfo.mode));
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramInfo.type);
+    }
 }
 
 Type* getParamTypeWithModeWrapper(
@@ -2836,23 +2869,7 @@ Type* getParamTypeWithModeWrapper(
     Type* paramValueType,
     ParamPassingMode paramMode)
 {
-    switch (paramMode)
-    {
-    case ParamPassingMode::In:
-        return paramValueType;
-    case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(paramValueType);
-    case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(paramValueType);
-    case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(paramValueType);
-    case ParamPassingMode::RefReadWrite:
-    case ParamPassingMode::RefReadOnly:
-        return astBuilder->getRefParamType(paramValueType, getRefParamPassingModeAccess(paramMode));
-    default:
-        SLANG_UNEXPECTED("unhandled parameter-passing mode");
-        UNREACHABLE_RETURN(paramValueType);
-    }
+    return getParamTypeWithModeWrapper(astBuilder, ParamInfo{paramValueType, paramMode});
 }
 
 void Module::_collectShaderParams(DiagnosticSink* sink)

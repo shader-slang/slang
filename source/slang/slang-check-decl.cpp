@@ -746,7 +746,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitAssocTypeDecl(AssocTypeDecl* decl);
 
-    void checkDifferentiableCallableCommon(CallableDecl* decl);
+    void checkDifferentiableCallableSignature(CallableDecl* decl);
+    void synthesizeDifferentiabilityRequirements(CallableDecl* decl);
 
     void checkInterfaceRequirement(Decl* decl);
 
@@ -859,18 +860,17 @@ struct SemanticsDeclBasesVisitor : public SemanticsDeclVisitorBase,
     void visitFuncExtensionDecl(FuncExtensionDecl* decl);
 
     // Helpers for visitFuncExtensionDecl — one per higher-order expression type.
-    // Returns true on success, false on error.
-    bool _funcExtensionForwardDiff(
+    void _funcExtensionForwardDiff(
         ExtensionDecl* extensionDecl,
         FuncDecl* innerFunc,
         Type* baseFuncAsType,
         DeclVisibility visibility);
-    bool _funcExtensionBackwardDiff(
+    void _funcExtensionBackwardDiff(
         ExtensionDecl* extensionDecl,
         FuncDecl* innerFunc,
         Type* baseFuncAsType,
         DeclVisibility visibility);
-    bool _funcExtensionApply(
+    void _funcExtensionApply(
         ExtensionDecl* extensionDecl,
         FuncDecl* innerFunc,
         Type* baseFuncAsType,
@@ -1857,33 +1857,6 @@ DeclRef<ExtensionDecl> applyExtensionToType(
         return DeclRef<ExtensionDecl>();
 
     return semantics->applyExtensionToType(extDecl, type, additionalSubtypeWitness);
-}
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl)
-{
-    ThisExpr* expr = visitor->getASTBuilder()->create<ThisExpr>();
-    expr->scope = funcDecl->ownedScope;
-    expr->loc = funcDecl->loc;
-
-    DiagnosticSink dummySink;
-    auto tempVisitor = SemanticsVisitor(visitor->withSink(&dummySink));
-
-    auto checkedExpr = tempVisitor.CheckTerm(expr);
-
-    return !(as<ErrorType>(checkedExpr->type)) ? (checkedExpr->type) : nullptr;
-}
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef)
-{
-    auto type = getTypeForThisExpr(visitor, funcDeclRef.getDecl());
-    if (type)
-        return QualType(
-            substituteType(
-                SubstitutionSet(funcDeclRef.declRefBase),
-                visitor->getASTBuilder(),
-                type),
-            type.isLeftValue);
-    return nullptr;
 }
 
 Type* SemanticsVisitor::resolveType(Type* type)
@@ -5382,14 +5355,37 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
-static bool _hasNoDiffParameterSignature(ParamDecl* decl, Type* type)
+static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)
 {
     return decl->findModifier<NoDiffModifier>() || doesTypeHaveNoDiffModifier(type);
 }
 
-static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)
+static void _configureSynthesizedParamDecl(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamInfo const& paramInfo);
+
+static void _configureSynthesizedEffectiveThisParam(
+    ASTBuilder* astBuilder,
+    CallableDecl* callableDecl,
+    ThisExpr* thisExpr,
+    ParamInfo const& paramInfo);
+
+static bool _doParamInfosMatch(ParamInfo const& satisfyingInfo, ParamInfo const& requiredInfo)
 {
-    return decl->findModifier<NoDiffModifier>() || doesTypeHaveNoDiffModifier(type);
+    return satisfyingInfo.mode == requiredInfo.mode &&
+           satisfyingInfo.type->equals(requiredInfo.type);
+}
+
+static bool _doEffectiveThisParamInfosMatch(
+    std::optional<ParamInfo> const& satisfyingInfo,
+    std::optional<ParamInfo> const& requiredInfo)
+{
+    if (satisfyingInfo.has_value() != requiredInfo.has_value())
+        return false;
+    if (!satisfyingInfo)
+        return true;
+    return _doParamInfosMatch(*satisfyingInfo, *requiredInfo);
 }
 
 bool SemanticsVisitor::doesSignatureMatchRequirement(
@@ -5397,43 +5393,16 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
-    {
-        // A `[mutating]` method can't satisfy a non-`[mutating]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
-        return false;
-    }
 
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
-    {
-        // A `[constref]` method can't satisfy a non-`[constref]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
+    // A direct witness must have exactly the receiver ABI promised by the requirement: either both
+    // declarations have no effective `this` parameter, or both have one with the same substituted
+    // type and parameter-passing mode. Some mismatches can be adapted semantically, but those must
+    // take the existing wrapper-synthesis path instead of installing the implementation directly.
+    auto satisfyingThisInfo = findEffectiveThisParamInfo(satisfyingMemberDeclRef);
+    auto requiredThisInfo = findEffectiveThisParamInfo(requiredMemberDeclRef);
+    if (!_doEffectiveThisParamInfosMatch(satisfyingThisInfo, requiredThisInfo))
         return false;
-    }
 
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<RefAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<RefAttribute>())
-    {
-        // A `[ref]` method can't satisfy a non-`[ref]` requirement.
-        // The opposite direction is okay, but we will need to synthesize a wrapper
-        // to ensure type matches, so we will return false here either way.
-        return false;
-    }
-
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
-    {
-        // A `static` method can't satisfy a non-`static` requirement and vice versa.
-        return false;
-    }
-
-    // TODO: This could cause issues later. FuncAliasDecl should be resolved
-    // _before_ the static-ness check, but we're currently doing it after.
-    //
     if (auto aliasDecl = satisfyingMemberDeclRef.as<FuncAliasDecl>())
     {
         satisfyingMemberDeclRef = substituteDeclRef(
@@ -5441,15 +5410,6 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
                                       getCurrentASTBuilder(),
                                       aliasDecl.getDecl()->targetDeclRef)
                                       .as<CallableDecl>();
-    }
-
-    if (satisfyingMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>() !=
-        requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
-    {
-        // A `[NoDiffThis]` method has a different differentiability signature. Return false so
-        // requirement witness synthesis can build a wrapper with the requirement's exact `this`
-        // differentiability mode when the call itself is otherwise valid.
-        return false;
     }
 
     if (auto funcType = requiredMemberDeclRef.getDecl()->funcType.type)
@@ -5486,20 +5446,10 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         {
             auto requiredParam = requiredParams[paramIndex];
             auto satisfyingParam = satisfyingParams[paramIndex];
-            if (getParamPassingMode(requiredParam.getDecl()) !=
-                getParamPassingMode(satisfyingParam.getDecl()))
+            auto requiredParamInfo = getParamInfo(m_astBuilder, requiredParam);
+            auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
+            if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
-            auto requiredParamType = getType(m_astBuilder, requiredParam);
-            auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
-
-            if (!requiredParamType->equals(satisfyingParamType))
-                return false;
-
-            if (_hasNoDiffParameterSignature(requiredParam.getDecl(), requiredParamType) !=
-                _hasNoDiffParameterSignature(satisfyingParam.getDecl(), satisfyingParamType))
-            {
-                return false;
-            }
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -5560,13 +5510,30 @@ bool SemanticsVisitor::doesAccessorMatchRequirement(
     if (!satisfyingMemberClass.isSubClassOf(requiredMemberClass))
         return false;
 
-    // We do not check the parameters or return types of accessors
-    // here, under the assumption that the validity checks for
-    // the parent `property` declaration would already make sure
-    // they are in order.
+    // As with methods, an accessor can be entered directly in the witness table only when its
+    // effective receiver parameters have the same ABI. Returning false here leaves adaptable
+    // cases to the property/subscript accessor wrapper-synthesis path.
+    auto satisfyingThisInfo = findEffectiveThisParamInfo(satisfyingMemberDeclRef);
+    auto requiredThisInfo = findEffectiveThisParamInfo(requiredMemberDeclRef);
+    if (!_doEffectiveThisParamInfosMatch(satisfyingThisInfo, requiredThisInfo))
+        return false;
 
-    // TODO: There are other checks we need to make here, like not letting
-    // an ordinary `set` satisfy a `[nonmutating] set` requirement.
+    // A setter's value parameter belongs to the accessor rather than its property/subscript
+    // container. Compare its complete semantic encoding here so that modes and type modifiers such
+    // as `no_diff` participate in direct-witness matching just as they do for method parameters.
+    auto satisfyingParams = getParameters(m_astBuilder, satisfyingMemberDeclRef).toArray();
+    auto requiredParams = getParameters(m_astBuilder, requiredMemberDeclRef).toArray();
+    if (satisfyingParams.getCount() != requiredParams.getCount())
+        return false;
+    for (Index i = 0; i < requiredParams.getCount(); ++i)
+    {
+        auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParams[i]);
+        auto requiredParamInfo = getParamInfo(m_astBuilder, requiredParams[i]);
+        if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
+            return false;
+    }
+
+    // Accessor result types are fixed by the already-matched property/subscript storage type.
 
     return true;
 }
@@ -5684,11 +5651,9 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     {
         auto requiredParam = requiredParams[paramIndex];
         auto satisfyingParam = satisfyingParams[paramIndex];
-
-        auto requiredParamType = getType(m_astBuilder, requiredParam);
-        auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
-
-        if (!requiredParamType->equals(satisfyingParamType))
+        auto requiredParamInfo = getParamInfo(m_astBuilder, requiredParam);
+        auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
+        if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
             return false;
     }
 
@@ -6840,6 +6805,56 @@ static Type* _moveNoDiffFromTypeToParamDecl(
     return type;
 }
 
+static void _configureSynthesizedParamDecl(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamInfo const& paramInfo)
+{
+    SLANG_RELEASE_ASSERT(paramInfo.type);
+
+    // `ParamInfo` keeps `no_diff` in its value type, while a checked `ParamDecl` stores the same
+    // fact as a declaration modifier. Preserve that established AST representation without
+    // deriving the mode again from the substituted value type.
+    paramDecl->type.type = _moveNoDiffFromTypeToParamDecl(astBuilder, paramInfo.type, paramDecl);
+
+    auto modeModifier = astBuilder->create<SynthesizedParamPassingModeModifier>();
+    modeModifier->mode = paramInfo.mode;
+    addModifier(paramDecl, modeModifier);
+}
+
+static void _configureSynthesizedEffectiveThisParam(
+    ASTBuilder* astBuilder,
+    CallableDecl* callableDecl,
+    ThisExpr* thisExpr,
+    ParamInfo const& paramInfo)
+{
+    SLANG_RELEASE_ASSERT(thisExpr);
+    SLANG_RELEASE_ASSERT(paramInfo.type);
+
+    // This modifier is an input to signature checking, not checked information itself. The normal
+    // checker will compute the synthesized declaration's receiver type, combine it with this
+    // declaration-owned mode and `no_diff` policy, and then attach the sole
+    // `ThisParamInfoAttribute`. Keeping that order gives synthesized and source declarations the
+    // same checked-data producer.
+    auto modeModifier = astBuilder->create<SynthesizedParamPassingModeModifier>();
+    modeModifier->mode = paramInfo.mode;
+    addModifier(callableDecl, modeModifier);
+
+    if (doesTypeHaveNoDiffModifier(paramInfo.type))
+    {
+        // Preserve the requirement's checked receiver ABI even when this wrapper does not carry a
+        // differentiability header of its own. `NoDiffThisAttribute` is the declaration input by
+        // which normal signature checking reconstructs that `no_diff` value type. The publication
+        // step recognizes this existing marker and will not attach a second one.
+        auto noDiffThisModifier = astBuilder->create<NoDiffThisAttribute>();
+        noDiffThisModifier->isSynthesized = true;
+        addModifier(callableDecl, noDiffThisModifier);
+    }
+
+    thisExpr->type.isLeftValue =
+        isThisExprWritable(makeDeclRef(callableDecl).as<CallableDecl>(), paramInfo);
+}
+
 static void populateParams(
     ASTBuilder* astBuilder,
     CallableDecl* decl,
@@ -6854,36 +6869,15 @@ static void populateParams(
         auto paramDecl = astBuilder->create<ParamDecl>();
         paramDecl->loc = synthesizedLoc;
         paramDecl->nameAndLoc.loc = synthesizedLoc;
-
-        if (auto outType = as<OutParamType>(paramType))
-        {
-            paramDecl->type.type = outType->getValueType();
-            addModifier(paramDecl, astBuilder->create<OutModifier>());
-        }
-        else if (auto inOutType = as<BorrowInOutParamType>(paramType))
-        {
-            paramDecl->type.type = inOutType->getValueType();
-            addModifier(paramDecl, astBuilder->create<InOutModifier>());
-        }
-        else if (auto inType = as<BorrowInParamType>(paramType))
-        {
-            paramDecl->type.type = inType->getValueType();
-            addModifier(paramDecl, astBuilder->create<BorrowModifier>());
-        }
-        else
-        {
-            paramDecl->type.type = paramType;
-        }
-
-        paramDecl->type.type =
-            _moveNoDiffFromTypeToParamDecl(astBuilder, paramDecl->type.type, paramDecl);
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
+        _configureSynthesizedParamDecl(astBuilder, paramDecl, paramInfo);
         decl->addMember(paramDecl);
 
         // Create an expression that references the parameter for use in arguments.
         auto synArg = astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(paramDecl);
-        synArg->type.type = paramDecl->type.type;
-        synArg->type.isLeftValue = as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+        synArg->type.type = paramInfo.type;
+        synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7224,20 +7218,20 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
     CallableDecl* synthesized,
     ThisExpr*& synThis)
 {
-    // Required interface methods can be `static` or non-`static`,
-    // and non-`static` methods can be `[mutating]` or non-`[mutating]`.
-    // All of these details affect how we introduce our `this` parameter,
-    // if any.
-    //
-    if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+    auto requiredThisInfo = findEffectiveThisParamInfo(requiredMemberDeclRef);
+    auto requiredDecl = requiredMemberDeclRef.getDecl();
+
+    // Staticness is copied directly from the requirement. It is independent of whether this
+    // particular declaration owns an effective `this` parameter: constructors operate on a local
+    // `this` value, and a non-static synthesized subscript supplies a `this` expression to its
+    // accessors even though the subscript container itself is not a callable parameter owner.
+    if (requiredDecl->hasModifier<HLSLStaticModifier>())
     {
         auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
-        synthesized->modifiers.first = synStaticModifier;
+        addModifier(synthesized, synStaticModifier);
     }
     else if (context)
     {
-        // For a non-`static` requirement, we need a `this` parameter.
-        //
         synThis = m_astBuilder->create<ThisExpr>();
         synThis->scope = synthesized->ownedScope;
 
@@ -7246,40 +7240,17 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         //
         synThis->type.type = context->conformingType;
 
-        if (requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
+        if (requiredThisInfo)
         {
-            // If the interface requirement is `[mutating]` then our
-            // synthesized method should be too, and also the `this`
-            // parameter should be an l-value.
-            //
+            _configureSynthesizedEffectiveThisParam(
+                m_astBuilder,
+                synthesized,
+                synThis,
+                *requiredThisInfo);
+        }
+        else
+        {
             synThis->type.isLeftValue = true;
-
-            auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
-            addModifier(synthesized, synMutatingAttr);
-        }
-        if (requiredMemberDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
-        {
-            // If the interface requirement is `[constref]` then our
-            // synthesized method should be too.
-            //
-            auto synConstRefAttr = m_astBuilder->create<ConstRefAttribute>();
-            addModifier(synthesized, synConstRefAttr);
-        }
-        if (requiredMemberDeclRef.getDecl()->hasModifier<RefAttribute>())
-        {
-            // If the interface requirement is `[ref]` then our
-            // synthesized method should be too.
-            //
-            synThis->type.isLeftValue = true;
-
-            auto synConstRefAttr = m_astBuilder->create<RefAttribute>();
-            addModifier(synthesized, synConstRefAttr);
-        }
-        if (requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
-        {
-            auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
-            noDiffThisAttr->isSynthesized = true;
-            addModifier(synthesized, noDiffThisAttr);
         }
     }
 
@@ -7321,10 +7292,10 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
     }
 }
 
-/// Parameters synthesized from a requirement get their modifiers from the
-/// requirement's effective mode rather than from a copy of its modifiers,
-/// because several spellings (`const __ref`, a legacy alias, an inferred mode)
-/// produce the same mode, and only the mode has to match.
+/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
+/// function type has only its effective mode, and several spellings (`const __ref`,
+/// a legacy alias, an inferred mode) produce the same mode, so we spell each mode
+/// one canonical way.
 static void addModifiersForParamPassingMode(
     ASTBuilder* astBuilder,
     ParamDecl* paramDecl,
@@ -7382,31 +7353,27 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
     //
     for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
     {
-        auto paramType = QualType(getType(m_astBuilder, paramDeclRef));
+        auto paramInfo = getParamInfo(m_astBuilder, paramDeclRef);
+        auto paramType = QualType(paramInfo.type);
 
         // For each parameter of the requirement, we create a matching
         // parameter (same name and type) for the synthesized method.
         //
         auto synParamDecl = m_astBuilder->create<ParamDecl>();
         synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
-        synParamDecl->type.type = paramType.type;
+        _configureSynthesizedParamDecl(m_astBuilder, synParamDecl, paramInfo);
 
         // We need to add the parameter as a child declaration of
         // the method we are building.
         //
         synthesized->addMember(synParamDecl);
 
-        // The synthesized parameter must have the same effective passing mode
-        // as the requirement's, whatever modifier spelling produced it there.
-        auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
-        addModifiersForParamPassingMode(m_astBuilder, synParamDecl, paramMode);
-        paramType.isLeftValue = paramMode != ParamPassingMode::BorrowIn;
-        if (paramDeclRef.getDecl()->hasModifier<NoDiffModifier>())
-        {
-            auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-            noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-            addModifier(synParamDecl, noDiffModifier);
-        }
+        // The parameter variable itself is usable as an l-value except when it is an immutable
+        // borrow. This expression property describes uses inside the wrapper body; its ABI remains
+        // the independently stored `paramInfo.mode`.
+        paramType.isLeftValue = true;
+        if (paramInfo.mode == ParamPassingMode::BorrowIn)
+            paramType.isLeftValue = false;
 
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
@@ -7673,7 +7640,13 @@ static bool canBindFirstArgAsReceiver(
     auto firstArgType = firstArg->type.type;
     SLANG_ASSERT(firstArgType);
     SLANG_ASSERT(context->conformingType);
-    return firstArgType->getCanonicalType()->equals(context->conformingType->getCanonicalType());
+
+    // Semantic value modifiers such as `no_diff` affect how autodiff processes the value, but do
+    // not change whether the value's underlying type can supply the receiver for the adapted call.
+    // Keep those modifiers on the synthesized argument and compare only the nominal value types.
+    return unwrapModifiedType(firstArgType)
+        ->getCanonicalType()
+        ->equals(unwrapModifiedType(context->conformingType)->getCanonicalType());
 }
 
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
@@ -7754,8 +7727,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
     baseOverloadedExpr->lookupResult2 = lookupResult;
 
-    // Track whether we are using a non-static method to satisfy a static requirement
-    // by treating the first parameter as the implicit 'this' argument.
+    // Track whether we are using a non-static method to satisfy a static requirement by treating
+    // the first parameter as the receiver argument.
     bool nonStaticSatisfiesStatic = false;
 
     // Non-static methods cannot implement static methods, remove them.
@@ -7764,7 +7737,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
 
         // If no static candidates remain, a non-static method can still satisfy this static
-        // requirement by treating the requirement's first parameter as the implicit `this`:
+        // requirement by treating the requirement's first parameter as the receiver:
         //
         //      interface IFoo { static int method(This val, int x); }
         //      struct MyStruct : IFoo { int method(int x) { ... } }
@@ -8374,9 +8347,9 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
 ///
 /// Consider a field satisfying `property value : int { get; set; }`. The getter and setter need
 /// distinct `this.value` expression trees whose `ThisExpr`s are scoped to their respective
-/// accessors. Sharing a property-scoped tree would cause body checking to treat the setter's
-/// receiver as immutable. Subscript wrappers follow the same rule and clone their index argument
-/// expressions so that each accessor body owns its complete expression tree.
+/// accessors. Sharing a property-scoped tree would also share the value category computed from one
+/// accessor's effective `this` parameter mode. Subscript wrappers follow the same rule and clone
+/// their index argument expressions so that each accessor body owns its complete expression tree.
 static Expr* _createSynthesizedAccessorStorageExpr(
     SemanticsVisitor* visitor,
     DeclRef<ContainerDecl> requiredMemberDeclRef,
@@ -8431,6 +8404,9 @@ static Expr* _createSynthesizedAccessorStorageExpr(
 
     SLANG_RELEASE_ASSERT(requiredMemberDeclRef.as<SubscriptDecl>());
 
+    // The argument expressions are syntax owned by the synthesized subscript signature. Clone
+    // them for each accessor so delayed body checking cannot observe checked-state mutations from
+    // a sibling accessor.
     List<Expr*> synthesizedArgs;
     ASTCloner cloner(astBuilder, visitor);
     for (auto arg : synthesizedContainerArgs)
@@ -8470,6 +8446,15 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
     for (auto requiredAccessorDeclRef :
          getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef))
     {
+        // This synthesis path forwards through an instance expression rooted at `this`. An exact
+        // static accessor witness is installed directly before reaching this path, but adapting a
+        // mismatched static accessor would instead require a type-based lookup expression. Decline
+        // that unsupported conversion rather than manufacturing a receiver for a declaration that
+        // has no effective `this` parameter.
+        auto requiredThisInfo = findEffectiveThisParamInfo(requiredAccessorDeclRef);
+        if (!requiredThisInfo)
+            return false;
+
         // The synthesized accessor will be an AST node of the same class as
         // the required accessor.
         //
@@ -8493,25 +8478,11 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         List<Expr*> synArgs;
         for (auto requiredParamDeclRef : getParameters(m_astBuilder, requiredAccessorDeclRef))
         {
-            auto paramType = getParamValueType(m_astBuilder, requiredParamDeclRef);
+            auto paramInfo = getParamInfo(m_astBuilder, requiredParamDeclRef);
 
             auto synParamDecl = m_astBuilder->create<ParamDecl>();
             synParamDecl->nameAndLoc = requiredParamDeclRef.getDecl()->nameAndLoc;
-
-            // The synthesized parameter will have the same name and raw stored
-            // type as the requirement. Parameter checking normalizes `no_diff`
-            // onto the `ParamDecl` itself, but references to that parameter in
-            // the synthesized accessor body still need the value type that
-            // callers observe. This applies to synthesized property and
-            // subscript setters alike.
-            synParamDecl->type.type = getType(m_astBuilder, requiredParamDeclRef);
-
-            if (requiredParamDeclRef.getDecl()->findModifier<NoDiffModifier>())
-            {
-                auto noDiffModifier = m_astBuilder->create<NoDiffModifier>();
-                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
-                addModifier(synParamDecl, noDiffModifier);
-            }
+            _configureSynthesizedParamDecl(m_astBuilder, synParamDecl, paramInfo);
 
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
@@ -8523,17 +8494,14 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             //
             auto synArg = m_astBuilder->create<VarExpr>();
             synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
+            synArg->type.type = paramInfo.type;
+            synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
             synArgs.add(synArg);
         }
 
-        // We need to create a `this` expression to be used in the body
-        // of the synthesized accessor.
-        //
-        // TODO: if we ever allow `static` properties or subscripts,
-        // we will need to handle that case here, by *not* creating
-        // a `this` expression.
-        //
+        // We need to create a `this` expression to be used in the body of the synthesized
+        // accessor. The receiver check above excludes static accessors from this instance-only
+        // synthesis path.
         ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
         synThis->scope = synAccessorDecl->ownedScope;
 
@@ -8542,56 +8510,17 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         //
         synThis->type.type = context->conformingType;
 
-        // A `get` accessor should default to an immutable `this`,
-        // while other accessors default to mutable `this`.
-        //
-        // TODO: If we ever add other kinds of accessors, we will
-        // need to check that this assumption stays valid.
-        //
-        synThis->type.isLeftValue = true;
-        if (as<GetterDecl>(requiredAccessorDeclRef))
-            synThis->type.isLeftValue = false;
-
-        // If the accessor requirement is `[nonmutating]` then our
-        // synthesized accessor should be too, and also the `this`
-        // parameter should *not* be an l-value.
-        //
-        if (requiredAccessorDeclRef.getDecl()->hasModifier<NonmutatingAttribute>())
-        {
-            synThis->type.isLeftValue = false;
-
-            auto synAttr = m_astBuilder->create<NonmutatingAttribute>();
-            synAccessorDecl->modifiers.first = synAttr;
-        }
-        //
-        // Note: we don't currently support `[mutating] get` accessors,
-        // but the desired behavior in that case is clear, so we go
-        // ahead and future-proof this code a bit:
-        //
-        else if (requiredAccessorDeclRef.getDecl()->hasModifier<MutatingAttribute>())
-        {
-            synThis->type.isLeftValue = true;
-
-            auto synAttr = m_astBuilder->create<MutatingAttribute>();
-            synAccessorDecl->modifiers.first = synAttr;
-        }
-        else if (requiredAccessorDeclRef.getDecl()->hasModifier<RefAttribute>())
-        {
-            synThis->type.isLeftValue = true;
-
-            auto synAttr = m_astBuilder->create<RefAttribute>();
-            synAccessorDecl->modifiers.first = synAttr;
-        }
-        else if (requiredAccessorDeclRef.getDecl()->hasModifier<ConstRefAttribute>())
-        {
-            auto synAttr = m_astBuilder->create<ConstRefAttribute>();
-            synAccessorDecl->modifiers.first = synAttr;
-        }
+        _configureSynthesizedEffectiveThisParam(
+            m_astBuilder,
+            synAccessorDecl,
+            synThis,
+            *requiredThisInfo);
 
         // Parent the accessor before checking its body. In particular, checking an accessor-local
-        // `this` expression needs to find the accessor that determines whether receiver storage is
-        // writable. The enclosing property or subscript is still speculative and is not published
-        // as a witness unless all of its accessors succeed.
+        // `this` expression queries the accessor's effective `this` parameter information. That
+        // information depends on the complete declaration path through the property or subscript
+        // to the enclosing type. The container is still speculative and is not published as a
+        // witness unless all of its accessors succeed.
         synthesizedAccessorContainer->addMember(synAccessorDecl);
 
         // We are going to synthesize an expression and then perform
@@ -8610,7 +8539,6 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         //
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         SemanticsVisitor subVisitor(withSink(&tempSink));
-
         auto synthesizedStorageExpr = _createSynthesizedAccessorStorageExpr(
             &subVisitor,
             requiredMemberDeclRef,
@@ -8793,12 +8721,16 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
     }
 
     List<Expr*> synArgs;
-    ThisExpr* synThis;
+    ThisExpr* synThis = nullptr;
     auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(
         context,
         requiredMemberDeclRef,
         synArgs,
         synThis);
+    // Signature synthesis creates the subscript declaration's effective `this` parameter metadata
+    // and a matching `this` expression together. The subscript has no body of its own, so that
+    // expression is unused here. Each accessor below creates its own metadata and expression from
+    // the corresponding accessor requirement.
     auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
     SLANG_UNUSED(synThis);
 
@@ -9599,7 +9531,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
         addModifier(synFunc, m_astBuilder->create<HLSLStaticModifier>());
 
     context->parentDecl->addDirectMemberDecl(synFunc);
-
 
     if (kind == BuiltinRequirementKind::ForwardDerivativeFunc)
     {
@@ -13544,29 +13475,39 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
         // Register additional types outside the function body first.
         auto oldAttr = m_parentDifferentiableAttr;
         m_parentDifferentiableAttr = newContext.getParentDifferentiableAttribute();
-        for (auto param : decl->getParameters())
+        for (auto paramDeclRef :
+             getParametersForCallableSignature(m_astBuilder, makeDeclRef(decl).as<CallableDecl>()))
+        {
+            auto param = paramDeclRef.getDecl();
             maybeRegisterDifferentiableType(
                 m_astBuilder,
                 param->type.type,
                 getDiagnosticPos(param->type));
+        }
         maybeRegisterDifferentiableType(
             m_astBuilder,
             decl->returnType.type,
             getDiagnosticPos(decl->returnType));
-        if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
+        if (as<ConstructorDecl>(decl))
         {
             auto parentDecl = getParentDecl(decl);
-            // An accessor's direct parent is its storage declaration, not the container that
-            // supplies `this`. Consider `Box<T>.Value.set`: registering `Value` does not make
-            // `Box<T>` available to autodiff when the setter stores into one of its fields. Skip
-            // the property here, just as we skip a subscript for its accessors, so the aggregate
-            // receiver is registered in the accessor's generic context.
-            if (as<PropertyDecl>(parentDecl) || as<SubscriptDecl>(parentDecl))
-                parentDecl = getParentDecl(parentDecl);
             auto parentDeclRef =
                 createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentDecl));
             auto thisType = calcThisType(parentDeclRef);
             maybeRegisterDifferentiableType(m_astBuilder, thisType, parentDeclRef.getLoc());
+        }
+        else
+        {
+            auto declRef =
+                createDefaultSubstitutionsIfNeeded(m_astBuilder, this, decl->getDefaultDeclRef())
+                    .as<FunctionDeclBase>();
+            if (auto thisParamInfo = findEffectiveThisParamInfo(declRef))
+            {
+                maybeRegisterDifferentiableType(
+                    m_astBuilder,
+                    thisParamInfo->type,
+                    declRef.getLoc());
+            }
         }
         m_parentDifferentiableAttr = oldAttr;
     }
@@ -14028,6 +13969,25 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     return true;
 }
 
+static bool _doParamPassingModesMatchForOverload(ParamPassingMode first, ParamPassingMode second)
+{
+    if (first == second)
+        return true;
+
+    // Calls cannot select between an output-only and an input/output overload, so those two modes
+    // have historically shared an overload-signature category. The immutable-borrow and `ref`
+    // modes remain distinct from that category and from ordinary `in`.
+    auto isOutOrInOut = [](ParamPassingMode mode)
+    { return mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut; };
+    if (isOutOrInOut(first) && isOutOrInOut(second))
+        return true;
+
+    // A declaration and a definition that differ only in `readonly` on a `ref` parameter declare
+    // the same function, and mangling gives every `Ref*` mode the same name, so the `Ref*` modes
+    // also share one overload-signature category.
+    return isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second);
+}
+
 bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
 {
 
@@ -14051,24 +14011,9 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         if (!getType(m_astBuilder, fstParam)->equals(getType(m_astBuilder, sndParam)))
             return false;
 
-        // If one parameter is `out` and the other isn't, then they don't match
-        //
-        // Note(tfoley): we don't consider `out` and `inout` as distinct here,
-        // because there is no way for overload resolution to pick between them.
-        if (fstParam.getDecl()->hasModifier<OutModifier>() !=
-            sndParam.getDecl()->hasModifier<OutModifier>())
-            return false;
-
-        // If one parameter is `ref` and the other isn't, then they don't match.
-        //
-        if (fstParam.getDecl()->hasModifier<RefModifier>() !=
-            sndParam.getDecl()->hasModifier<RefModifier>())
-            return false;
-
-        // If one parameter is `constref` and the other isn't, then they don't match.
-        //
-        if (fstParam.getDecl()->hasModifier<BorrowModifier>() !=
-            sndParam.getDecl()->hasModifier<BorrowModifier>())
+        if (!_doParamPassingModesMatchForOverload(
+                getParamPassingMode(fstParam.getDecl()),
+                getParamPassingMode(sndParam.getDecl())))
             return false;
     }
 
@@ -15675,54 +15620,8 @@ static bool _callableHasDifferentiabilityHeaderModifier(CallableDecl* decl)
            decl->findModifier<MaybeDifferentiableAttribute>();
 }
 
-static Type* _getThisTypeForImplicitNoDiffThis(SemanticsVisitor* visitor, CallableDecl* decl)
+void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDecl* decl)
 {
-    if (isInterfaceRequirement(decl))
-    {
-        auto interfaceDecl = findParentInterfaceDecl(decl);
-        if (!interfaceDecl)
-            return nullptr;
-
-        auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(
-            visitor->getASTBuilder(),
-            visitor,
-            makeDeclRef(interfaceDecl));
-        return DeclRefType::create(visitor->getASTBuilder(), interfaceDeclRef);
-    }
-
-    auto parentDecl = getParentDecl(decl);
-    if (!parentDecl)
-        return nullptr;
-
-    return visitor->calcThisType(makeDeclRef(parentDecl));
-}
-
-static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
-    SemanticsVisitor* visitor,
-    CallableDecl* decl)
-{
-    if (!_callableHasDifferentiabilityHeaderModifier(decl) || isEffectivelyStatic(decl) ||
-        decl->hasModifier<NoDiffThisAttribute>())
-    {
-        return;
-    }
-
-    auto thisType = _getThisTypeForImplicitNoDiffThis(visitor, decl);
-    if (!thisType || as<ErrorType>(thisType))
-        return;
-
-    if (!visitor->isTypeDifferentiable(thisType))
-    {
-        auto noDiffThisModifier = visitor->getASTBuilder()->create<NoDiffThisAttribute>();
-        noDiffThisModifier->isSynthesized = true;
-        addModifier(decl, noDiffThisModifier);
-    }
-}
-
-void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
-{
-    _maybeAddImplicitNoDiffThisForNonDifferentiableThis(this, decl);
-
     // TODO: Need to make this not depend on the attribute, but rather on differentiability
     // in general..
     //
@@ -15731,8 +15630,9 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
         // Add `no_diff` modifiers to parameters.
         // This is necessary to preserve no-diff-ness for generic function before and after
         // specialization.
-        for (auto paramDecl : decl->getParameters())
+        for (auto paramDeclRef : getParametersForCallableSignature(m_astBuilder, makeDeclRef(decl)))
         {
+            auto paramDecl = paramDeclRef.getDecl();
             if (!paramDecl->type.type)
                 continue;
             if (!isTypeDifferentiable(paramDecl->type.type))
@@ -15746,6 +15646,10 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
+                // This is intentionally a restriction on an explicitly written `borrow`
+                // modifier, not on the parameter's effective mode. A non-copyable declared type
+                // can adjust an ordinary `in` parameter to `BorrowIn`; that declaration-derived
+                // mode is valid here and must remain stable under specialization.
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())
                 {
                     getSink()->diagnose(Diagnostics::CannotUseBorrowInOnDifferentiableParameter{
@@ -15782,23 +15686,23 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 }
             }
         }
-
-        if (!isEffectivelyStatic(decl))
-        {
-            auto constrefAttr = decl->findModifier<ConstRefAttribute>();
-            auto refAttr = decl->findModifier<RefAttribute>();
-            if (constrefAttr || refAttr)
-            {
-                if (isTypeDifferentiable(calcThisType(getParentDecl(decl))))
-                {
-                    Modifier* attr = constrefAttr ? (Modifier*)constrefAttr : (Modifier*)refAttr;
-                    getSink()->diagnose(
-                        Diagnostics::CannotUseConstrefOnDifferentiableMemberMethod{.attr = attr});
-                }
-            }
-        }
     }
-    //
+}
+
+static Modifier* _findUnsupportedDifferentiableThisParamModeAttribute(Decl* decl)
+{
+    // This diagnostic is a restriction on the declaration's source spelling, not a query for its
+    // effective mode. Preserve the established ConstRef-before-Ref choice even when another
+    // attribute, such as `[mutating]`, takes precedence when the effective mode is computed.
+    if (auto attribute = decl->findModifier<ConstRefAttribute>())
+        return attribute;
+    if (auto attribute = decl->findModifier<RefAttribute>())
+        return attribute;
+    return nullptr;
+}
+
+void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(CallableDecl* decl)
+{
     // Generate extensions for this function decl that implement
     // the auto-diff interfaces via synthesized declarations.
     //
@@ -15808,6 +15712,25 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     // extension __func_as_type(decl) : IBackwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     //
+
+    if (decl->findModifier<DifferentiableAttribute>())
+    {
+        // Signature checking has already recorded the declaration's effective receiver ABI. Use
+        // that checked result to decide whether this differentiability restriction applies. In
+        // particular, a non-copyable receiver may have `BorrowIn` mode without a `[constref]`
+        // attribute, and an extension on a callable may inherit the target callable's mode.
+        if (auto thisParamInfo = findEffectiveThisParamInfo(getDefaultDeclRef(decl)))
+        {
+            if (auto attribute = _findUnsupportedDifferentiableThisParamModeAttribute(decl))
+            {
+                if (isTypeDifferentiable(unwrapModifiedType(thisParamInfo->type)))
+                {
+                    getSink()->diagnose(Diagnostics::CannotUseConstrefOnDifferentiableMemberMethod{
+                        .attr = attribute});
+                }
+            }
+        }
+    }
 
     if (as<FunctionDeclBase>(decl))
     {
@@ -16432,7 +16355,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         addModifier(decl, noDiffMod);
     }
 
-    checkDifferentiableCallableCommon(decl);
+    checkDifferentiableCallableSignature(decl);
 
     // If this method is intended to be a CUDA kernel, verify that the return type is void.
     if (decl->findModifier<CudaKernelAttribute>())
@@ -16796,7 +16719,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 //       static fwd_diff(DifferentialPair<float> x) -> DifferentialPair<float> { ... }  // user body
 //   }
 //
-bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
+void SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
     ExtensionDecl* extensionDecl,
     FuncDecl* innerFunc,
     Type* baseFuncAsType,
@@ -16811,8 +16734,6 @@ bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
 
     innerFunc->nameAndLoc.name = getName("fwd_diff");
     addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
-    extensionDecl->addMember(innerFunc);
-    return true;
 }
 
 // Populate the extension for a backward derivative func_extension.
@@ -16831,7 +16752,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionForwardDiff(
 //       synthesized static remat = BackwardRematFromLegacyBwdDiffFunc(...)    // synthesized
 //   }
 //
-bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
+void SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
     ExtensionDecl* extensionDecl,
     FuncDecl* innerFunc,
     Type* baseFuncAsType,
@@ -16843,10 +16764,9 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
     inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
     extensionDecl->addMember(inheritanceDecl);
 
-    // Mark static so it doesn't acquire an implicit `this` parameter
-    // (the user's explicit self parameter handles this-type).
+    // Mark the declaration static because the user's explicit self argument already represents
+    // the value on which the derivative operates.
     addModifier(innerFunc, astBuilder->create<HLSLStaticModifier>());
-    extensionDecl->addMember(innerFunc);
 
     auto userFuncDeclRef =
         createDefaultSubstitutionsIfNeeded(astBuilder, this, innerFunc->getDefaultDeclRef());
@@ -16907,7 +16827,6 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
         getCalculatedDiffFuncType("RematFuncType", baseFuncAsType, minimalCtxType, fullCtxType),
         true,
         visibility);
-    return true;
 }
 
 // Populate the extension for a custom __apply (forward pass) func_extension.
@@ -16930,7 +16849,7 @@ bool SemanticsDeclBasesVisitor::_funcExtensionBackwardDiff(
 //   extension MyCtx : IBwdCallable<foo> { }                       // conformance for the context
 //   type
 //
-bool SemanticsDeclBasesVisitor::_funcExtensionApply(
+void SemanticsDeclBasesVisitor::_funcExtensionApply(
     ExtensionDecl* extensionDecl,
     FuncDecl* innerFunc,
     Type* baseFuncAsType,
@@ -16938,10 +16857,6 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     SourceLoc loc)
 {
     auto astBuilder = getASTBuilder();
-
-    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
-    inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
-    extensionDecl->addMember(inheritanceDecl);
 
     // Ensure innerFunc's return type is checked so we can extract CtxType.
     ensureDecl(innerFunc, DeclCheckState::SignatureChecked);
@@ -16952,11 +16867,16 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
     if (!tupleType || tupleType->getMemberCount() != 2)
     {
         getSink()->diagnose(Diagnostics::FuncExtensionApplyReturnType{.location = loc});
-        return false;
+        return;
     }
     auto ctxType = tupleType->getMember(1);
 
-    extensionDecl->addMember(innerFunc);
+    // Do not advertise the differentiability conformance until the declaration has a usable
+    // context type. If signature validation fails above, the generated extension remains the
+    // function's canonical owner but contains no partial conformance for later phases to consume.
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->base.type = getBackwardDiffFuncInterfaceType(baseFuncAsType);
+    extensionDecl->addMember(inheritanceDecl);
 
     auto userFuncDeclRef =
         createDefaultSubstitutionsIfNeeded(astBuilder, this, innerFunc->getDefaultDeclRef());
@@ -17033,8 +16953,6 @@ bool SemanticsDeclBasesVisitor::_funcExtensionApply(
             outermostDecl = outermostDecl->parentDecl;
         getModuleDecl(extensionDecl)->addMember(outermostDecl);
     }
-
-    return true;
 }
 
 static void _moveModifiersToFunc(Decl* src, Decl* dst)
@@ -17087,6 +17005,15 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         return;
     }
 
+    const bool isForwardDiff = as<ForwardDifferentiateExpr>(diffExpr) != nullptr;
+    const bool isBackwardDiff = as<BackwardDifferentiateExpr>(diffExpr) != nullptr;
+    const bool isApply = as<ApplyForBwdExpr>(diffExpr) != nullptr;
+    if (!isForwardDiff && !isBackwardDiff && !isApply)
+    {
+        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedOperator{.location = decl->loc});
+        return;
+    }
+
     auto innerFunc = decl->innerFunc;
 
     // Attributes/modifiers on `__func_extension` conceptually decorate the
@@ -17130,8 +17057,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 applyFuncType->getParamCount() == fakeArgs.getCount() + 1)
             {
                 auto thisArg = astBuilder->create<VarExpr>();
-                auto [thisArgType, thisArgDirection] = splitParameterTypeAndDirection(
-                    astBuilder,
+                auto [thisArgType, thisArgDirection] = getParamInfoFromTypeWithModeWrapper(
                     applyFuncType->getParamTypeWithModeWrapper(0));
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
@@ -17177,7 +17103,8 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // Wire enough parent information for synthesis helpers
     // (addOrExtendSynthesizedStruct, createDefaultSubstitutionsIfNeeded, etc.)
     // to traverse the parent chain. Non-generic extensions are added to the
-    // module only after the func-extension has been successfully populated.
+    // module after helper-specific population is complete, including when a
+    // helper diagnoses an invalid signature and leaves only the ownership shell.
     auto genericParent = as<GenericDecl>(decl->parentDecl);
     if (genericParent)
     {
@@ -17193,23 +17120,21 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     auto visibility = getDeclVisibility(baseFuncDeclRef.getDecl());
     addVisibilityModifier(extensionDecl, visibility);
 
+    // Moving the user-written function into the generated extension establishes its final
+    // declaration context. This transfer is deliberately irreversible: signature checking records
+    // context-dependent information, including the effective `this` parameter, and later phases
+    // must be able to reach the checked declaration even if helper-specific validation diagnoses an
+    // error. An invalid helper therefore leaves this ownership shell in place while omitting any
+    // conformance or synthesized members that depend on the invalid signature.
+    extensionDecl->addMember(innerFunc);
+
     // Dispatch to the appropriate helper based on the higher-order expression type.
-    bool success = false;
-    if (as<ForwardDifferentiateExpr>(diffExpr))
-        success = _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
-    else if (as<BackwardDifferentiateExpr>(diffExpr))
-        success = _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
-    else if (as<ApplyForBwdExpr>(diffExpr))
-        success =
-            _funcExtensionApply(extensionDecl, innerFunc, baseFuncAsType, visibility, decl->loc);
+    if (isForwardDiff)
+        _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
+    else if (isBackwardDiff)
+        _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else
-        getSink()->diagnose(Diagnostics::FuncExtensionUnsupportedOperator{.location = decl->loc});
-    if (!success)
-    {
-        if (genericParent && genericParent->inner == extensionDecl)
-            genericParent->inner = decl;
-        return;
-    }
+        _funcExtensionApply(extensionDecl, innerFunc, baseFuncAsType, visibility, decl->loc);
 
     if (!genericParent)
         getModuleDecl(decl)->addMember(extensionDecl);
@@ -17367,6 +17292,303 @@ Type* SemanticsVisitor::calcThisType(Type* type)
     }
 }
 
+static bool _isThisParamModeAttribute(Modifier* modifier)
+{
+    return as<MutatingAttribute>(modifier) || as<ConstRefAttribute>(modifier) ||
+           as<RefAttribute>(modifier) || as<NonmutatingAttribute>(modifier);
+}
+
+ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode)
+{
+    auto mode = defaultMode;
+    if (policyDecl->hasModifier<MutatingAttribute>())
+        mode = ParamPassingMode::BorrowInOut;
+    else if (policyDecl->hasModifier<ConstRefAttribute>())
+        mode = ParamPassingMode::BorrowIn;
+    else if (policyDecl->hasModifier<RefAttribute>())
+        mode = ParamPassingMode::RefReadWrite;
+    else if (policyDecl->hasModifier<NonmutatingAttribute>())
+        mode = ParamPassingMode::In;
+    else if (as<SetterDecl>(policyDecl))
+        mode = ParamPassingMode::BorrowInOut;
+    return mode;
+}
+
+static ParamPassingMode _foldThisParamModePolicies(
+    List<Decl*> const& policyDecls,
+    ParamPassingMode defaultMode)
+{
+    // Fold from the innermost declaration toward its transparent parents. An outer declaration's
+    // policy replaces the mode carried from its child, while the ordering below preserves the
+    // established precedence when multiple spellings occur on the same declaration.
+    auto mode = defaultMode;
+    for (auto policyDecl : policyDecls)
+        mode = applyThisParamModePolicy(policyDecl, mode);
+    return mode;
+}
+
+static void _diagnoseThisParamModeAttributes(
+    SemanticsVisitor* semantics,
+    List<Decl*> const& policyDecls,
+    bool isClassMember)
+{
+    for (auto policyDecl : policyDecls)
+    {
+        for (auto modifier : policyDecl->modifiers)
+        {
+            if (!_isThisParamModeAttribute(modifier))
+                continue;
+
+            if (isClassMember)
+            {
+                semantics->getSink()->diagnose(
+                    Diagnostics::ThisParamModeAttributeOnClassMember{.attribute = modifier});
+            }
+            else
+            {
+                semantics->getSink()->diagnose(
+                    Diagnostics::ThisParamModeAttributeWithoutEffectiveThisParam{
+                        .attribute = modifier});
+            }
+        }
+    }
+}
+
+// Returns whether the effective parameter value type for `decl` must carry `no_diff`. Keeping this
+// decision in the side-effect-free computation makes an in-progress signature preview identical
+// to the value that will be published when signature checking finishes.
+static bool _shouldEffectiveThisParamTypeBeNoDiff(
+    SemanticsVisitor* semantics,
+    Decl* decl,
+    Type* receiverType)
+{
+    if (decl->hasModifier<NoDiffThisAttribute>() || doesTypeHaveNoDiffModifier(receiverType))
+        return true;
+
+    auto callableDecl = as<CallableDecl>(decl);
+    return callableDecl && _callableHasDifferentiabilityHeaderModifier(callableDecl) &&
+           !semantics->isTypeDifferentiable(receiverType);
+}
+
+std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
+    Decl* decl,
+    bool shouldDiagnoseModeAttributes)
+{
+    // Build the effective `this` parameter from the declaration outward. Constructors do not have
+    // such a parameter, and a static or unsupported nesting edge ends the search. Otherwise, walk
+    // through property, subscript, and generic containers until reaching the declaration that
+    // supplies the receiver value type, collecting the mode policy along the way.
+    //
+    // Next, resolve that receiver type. An extension on a callable delegates to the callable's
+    // effective `this` parameter so that it preserves the callable ABI. Then select the effective
+    // mode: a `SynthesizedParamPassingModeModifier` makes the mode declaration-owned; otherwise the
+    // collected policy and declared receiver type determine it. Declaration ownership is what lets
+    // a synthesized wrapper retain a non-`In` mode even for a class receiver; an ordinary class
+    // member instead diagnoses mode attributes and defaults to `In`. Finally, encode `no_diff` in
+    // the parameter value type and return the `ParamInfo`.
+    List<Decl*> policyDecls;
+    policyDecls.add(decl);
+
+    auto diagnoseModeAttributes = [&](bool isClassMember)
+    {
+        if (shouldDiagnoseModeAttributes)
+            _diagnoseThisParamModeAttributes(this, policyDecls, isClassMember);
+    };
+
+    // A constructor operates on a local `this` value that is uninitialized on entry and returned
+    // by default at the end of the body. That value is deliberately not modeled as a parameter.
+    if (as<ConstructorDecl>(decl))
+    {
+        diagnoseModeAttributes(false);
+        return std::nullopt;
+    }
+
+    Decl* innerDecl = decl;
+    ContainerDecl* receiverProvider = nullptr;
+    for (auto parentDecl = as<ContainerDecl>(innerDecl->parentDecl); parentDecl;
+         parentDecl = as<ContainerDecl>(innerDecl->parentDecl))
+    {
+        // Staticness is a property of each nesting edge. Checking every edge is important for an
+        // accessor nested under a static property/subscript and for declarations wrapped in a
+        // `GenericDecl`.
+        if (isEffectivelyStatic(innerDecl, parentDecl))
+        {
+            diagnoseModeAttributes(false);
+            return std::nullopt;
+        }
+
+        if (as<InterfaceDefaultImplDecl>(parentDecl) || as<AggTypeDeclBase>(parentDecl))
+        {
+            receiverProvider = parentDecl;
+            break;
+        }
+
+        // These declarations are transparent when finding the declaration that supplies the
+        // receiver type, but their modifiers can still participate in the established mode
+        // policy.
+        if (as<PropertyDecl>(parentDecl) || as<SubscriptDecl>(parentDecl) ||
+            as<GenericDecl>(parentDecl))
+        {
+            policyDecls.add(parentDecl);
+            innerDecl = parentDecl;
+            continue;
+        }
+
+        diagnoseModeAttributes(false);
+        return std::nullopt;
+    }
+
+    if (!receiverProvider)
+    {
+        diagnoseModeAttributes(false);
+        return std::nullopt;
+    }
+
+    Type* receiverType = nullptr;
+    ParamPassingMode mode = ParamPassingMode::In;
+    bool hasDeclarationOwnedMode = false;
+    bool isClassMember = false;
+
+    if (auto synthesizedMode = decl->findModifier<SynthesizedParamPassingModeModifier>())
+    {
+        mode = synthesizedMode->mode;
+        hasDeclarationOwnedMode = true;
+    }
+
+    if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(receiverProvider))
+    {
+        receiverType =
+            DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
+    }
+    else if (auto extensionDecl = as<ExtensionDecl>(receiverProvider))
+    {
+        ensureDecl(extensionDecl, DeclCheckState::CanUseExtensionTargetType);
+        auto targetType = getTargetType(m_astBuilder, makeDeclRef(extensionDecl));
+        if (auto targetDeclRefType = as<DeclRefType>(targetType);
+            targetDeclRefType && targetDeclRefType->getDeclRef().as<CallableDecl>())
+        {
+            // A member of an extension on a callable has the same effective receiver as that
+            // callable. In particular, the target's mode remains the source of truth, matching
+            // the pre-existing ABI for function extensions.
+            auto targetInfo = findEffectiveThisParamInfo(targetDeclRefType->getDeclRef());
+            if (!targetInfo)
+            {
+                diagnoseModeAttributes(false);
+                return std::nullopt;
+            }
+            receiverType = targetInfo->type;
+            if (!hasDeclarationOwnedMode)
+            {
+                mode = targetInfo->mode;
+                hasDeclarationOwnedMode = true;
+            }
+            isClassMember = isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(receiverType));
+        }
+        else
+        {
+            receiverType = calcThisType(targetType);
+            isClassMember = isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(targetType));
+        }
+    }
+    else
+    {
+        auto aggTypeDecl = as<AggTypeDecl>(receiverProvider);
+        SLANG_ASSERT(aggTypeDecl);
+        receiverType = calcThisType(getDefaultDeclRef(aggTypeDecl));
+        isClassMember = as<ClassDecl>(aggTypeDecl) != nullptr;
+    }
+
+    if (!receiverType)
+    {
+        diagnoseModeAttributes(false);
+        return std::nullopt;
+    }
+
+    if (isClassMember)
+    {
+        diagnoseModeAttributes(true);
+        if (!hasDeclarationOwnedMode)
+            mode = ParamPassingMode::In;
+    }
+    else if (!hasDeclarationOwnedMode)
+    {
+        mode = _foldThisParamModePolicies(policyDecls, mode);
+        mode = adjustParamPassingModeBasedOnParamType(mode, receiverType);
+    }
+
+    if (_shouldEffectiveThisParamTypeBeNoDiff(this, decl, receiverType) &&
+        !doesTypeHaveNoDiffModifier(receiverType))
+    {
+        receiverType =
+            m_astBuilder->getModifiedType(receiverType, m_astBuilder->getNoDiffModifierVal());
+    }
+
+    ParamInfo result;
+    result.type = receiverType;
+    result.mode = mode;
+    return result;
+}
+
+void SemanticsVisitor::checkAndAttachEffectiveThisParamInfo(Decl* decl)
+{
+    // Abstract storage and generic wrappers contribute context to an accessor/function, but they
+    // do not own a callable receiver parameter themselves.
+    if (!as<FunctionDeclBase>(decl) && !as<FuncAliasDecl>(decl))
+        return;
+
+    SLANG_ASSERT(!decl->findModifier<ThisParamInfoAttribute>());
+    auto info = checkEffectiveThisParamInfo(decl, /* shouldDiagnoseModeAttributes */ true);
+    if (!info)
+        return;
+
+    // The producer has already encoded the effective receiver's `no_diff` status in its value type.
+    // When a callable with a differentiability header ends up with such a receiver, also publish
+    // the declaration marker used by diagnostics and mangling. An explicit source marker or one
+    // copied onto a synthesized wrapper already supplies that policy, so the existing-modifier
+    // guard preserves a unique marker. In particular, accessors have a property or subscript
+    // between themselves and the aggregate that supplies their receiver; deriving the status with
+    // a separate parent walk can easily make interface and satisfying accessors produce different
+    // witnesses.
+    if (auto callableDecl = as<CallableDecl>(decl);
+        callableDecl && _callableHasDifferentiabilityHeaderModifier(callableDecl) &&
+        !decl->hasModifier<NoDiffThisAttribute>() && doesTypeHaveNoDiffModifier(info->type))
+    {
+        auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
+        noDiffThisModifier->isSynthesized = true;
+        addModifier(decl, noDiffThisModifier);
+    }
+
+    auto attribute = m_astBuilder->create<ThisParamInfoAttribute>();
+    attribute->loc = decl->loc;
+    attribute->info = *info;
+    addModifier(decl, attribute);
+}
+
+std::optional<ParamInfo> SemanticsVisitor::findEffectiveThisParamInfo(DeclRef<Decl> const& declRef)
+{
+    ensureDecl(declRef.getDecl(), DeclCheckState::SignatureChecked);
+
+    // A lookup through a callable-as-type can delegate its effective receiver ABI to the callable
+    // used as the lookup source. Ensure both declarations before entering the passive query, which
+    // asserts that all semantic work has already been completed.
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        if (auto callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource()))
+        {
+            ensureDecl(callableDeclRef.getDecl(), DeclCheckState::SignatureChecked);
+        }
+    }
+
+    return Slang::findEffectiveThisParamInfo(m_astBuilder, declRef);
+}
+
+ParamInfo SemanticsVisitor::getEffectiveThisParamInfo(DeclRef<Decl> const& declRef)
+{
+    auto result = findEffectiveThisParamInfo(declRef);
+    SLANG_RELEASE_ASSERT(result.has_value());
+    return *result;
+}
+
 Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
 {
     // We want to look at the parent of the declaration,
@@ -17440,6 +17662,16 @@ void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     visitAbstractStorageDeclCommon(decl);
 
     checkCallableDeclCommon(decl);
+
+    for (auto param : decl->getParameters())
+    {
+        auto mode = getParamPassingMode(param);
+        if (mode != ParamPassingMode::In && mode != ParamPassingMode::BorrowIn)
+        {
+            getSink()->diagnose(
+                Diagnostics::SubscriptParamMustBeInputOnly{.mode = mode, .param = param});
+        }
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
@@ -17620,7 +17852,7 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
         }
     }
 
-    checkDifferentiableCallableCommon(decl);
+    checkDifferentiableCallableSignature(decl);
 }
 
 void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
@@ -17634,8 +17866,8 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
     //
     // The user may declare that parameter explicitly and
     // thereby control its name, or they can declare no
-    // parmaeters and allow the compiler to synthesize one
-    // names `newValue`.
+    // parameters and allow the compiler to synthesize one
+    // named `newValue`.
     //
     ParamDecl* newValueParam = nullptr;
     auto params = decl->getParameters();
@@ -17691,22 +17923,38 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         // and then enforce that it matches what we expect.
         //
         auto actualType = CheckProperType(newValueParam->type);
+        newValueParam->type = actualType;
+        auto actualValueType = getParamValueType(m_astBuilder, makeDeclRef(newValueParam));
 
         if (as<ErrorType>(actualType))
         {
         }
-        else if (actualType->equals(newValueType))
+        else if (actualValueType->equals(newValueType))
         {
         }
         else
         {
             getSink()->diagnose(Diagnostics::SetAccessorParamWrongType{
-                .actualType = actualType,
+                .actualType = actualValueType,
                 .expectedType = newValueType,
                 .param = newValueParam});
         }
     }
-    checkDifferentiableCallableCommon(decl);
+
+    if (newValueParam->initExpr)
+    {
+        getSink()->diagnose(Diagnostics::SetAccessorParamCannotHaveDefaultValue{
+            .initExpr = newValueParam->initExpr});
+    }
+
+    auto newValueMode = getParamPassingMode(newValueParam);
+    if (newValueMode != ParamPassingMode::In && newValueMode != ParamPassingMode::BorrowIn)
+    {
+        getSink()->diagnose(Diagnostics::SetAccessorParamMustBeInputOnly{
+            .mode = newValueMode,
+            .param = newValueParam});
+    }
+    checkDifferentiableCallableSignature(decl);
 }
 
 GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)
@@ -18699,11 +18947,27 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
         break;
 
     case DeclCheckState::SignatureChecked:
-        SemanticsDeclHeaderVisitor(shared).dispatch(decl);
+        {
+            SemanticsDeclHeaderVisitor visitor(shared);
+            visitor.dispatch(decl);
+            visitor.checkAndAttachEffectiveThisParamInfo(decl);
+        }
         break;
 
     case DeclCheckState::ReadyForReference:
-        SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+        {
+            // Differentiability requirements inspect the declaration's effective `this` parameter
+            // while constructing their type-info witness. Run that synthesis only after the
+            // SignatureChecked transition has committed the checked parameter information, and
+            // before redeclaration checking can consume the synthesized declarations.
+            if (auto functionDecl = as<FunctionDeclBase>(decl);
+                functionDecl && !as<SynthesizedFuncDecl>(functionDecl))
+            {
+                SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
+                    functionDecl);
+            }
+            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+        }
         break;
 
     case DeclCheckState::ReadyForLookup:
@@ -19290,25 +19554,6 @@ static Expr* getDerivativeExprWithPrimalGenericArgumentsIfNeeded(
     return genericAppExpr;
 }
 
-// Applies a resolved primal specialization to freshly synthesized imaginary argument types in
-// place. `getImaginaryArgsToForwardDerivative` creates these expressions from the primal's
-// unsubstituted parameter and receiver types, so no checked AST shares the nodes and the
-// specialization must be applied exactly once. Consider a derivative over `vector<T, N>` that
-// selects a primal declared over `U`: the substitution rewrites the primal's imaginary `U`
-// arguments into the derivative's `T` context before validation.
-static void specializeImaginaryArgumentTypes(
-    ASTBuilder* astBuilder,
-    ArgsWithDirectionInfo& args,
-    DeclRef<FunctionDeclBase> primalDeclRef)
-{
-    SubstitutionSet substitutions(primalDeclRef);
-    for (auto arg : args.args)
-        arg->type.type = substituteType(substitutions, astBuilder, arg->type.type);
-    if (args.thisArg)
-        args.thisArg->type.type =
-            substituteType(substitutions, astBuilder, args.thisArg->type.type);
-}
-
 // Checks a derivative against a primal declaration reference. `genericSignatureResolutionStatus`
 // states whether this function must still infer a mapping between their outer generic signatures
 // or preserve the specialized primal reference that higher-order overload resolution already chose.
@@ -19424,13 +19669,11 @@ void checkDerivativeAttributeImpl(
 
     List<Expr*> argList = imaginaryArguments;
     List<ParamPassingMode> paramDirections = expectedParamDirections;
-    bool expectStaticFunc = false;
 
     if (expectedThisArg)
     {
         argList.insert(0, expectedThisArg);
         paramDirections.insert(0, expectedThisArgDirection);
-        expectStaticFunc = true;
     }
 
     auto invokeExpr = subVisitor.constructUncheckedInvokeExpr(checkedDerivativeExpr, argList);
@@ -19486,42 +19729,45 @@ void checkDerivativeAttributeImpl(
                             .attr = attr->loc});
                 }
             }
-            // The `imaginaryArguments` list does not include the `this` parameter.
-            // So we need to check that `this` type matches.
-            bool primalIsStatic = isEffectivelyStatic(primalFuncDecl);
-            if (primalIsStatic)
-                expectStaticFunc = true;
+            // A differentiated receiver is passed as the first explicit argument, so in that case
+            // the custom derivative itself must not have an effective `this` parameter. Otherwise
+            // its effective parameter must exactly preserve the primal's passing mode and have a
+            // compatible checked type. This is an ABI check: inferring it again from expression
+            // l-value state would lose distinctions such as `BorrowIn` versus `In`. Type modifiers
+            // such as `no_diff` control whether the primal receiver becomes an explicit derivative
+            // argument, but do not change the object type required by a member derivative.
+            auto primalThisInfo = visitor->findEffectiveThisParamInfo(primalDeclRef);
+            auto derivativeDeclRef =
+                resolvedDerivativeDeclRefExpr->declRef.template as<FunctionDeclBase>();
+            auto derivativeThisInfo = visitor->findEffectiveThisParamInfo(derivativeDeclRef);
+            auto expectedDerivativeThisInfo =
+                expectedThisArg ? std::optional<ParamInfo>() : primalThisInfo;
 
-            bool derivativeFuncIsStatic =
-                isEffectivelyStatic(resolvedDerivativeDeclRefExpr->declRef.getDecl());
-
-            if (expectStaticFunc && !derivativeFuncIsStatic)
+            if (expectedDerivativeThisInfo.has_value() != derivativeThisInfo.has_value())
             {
-                visitor->getSink()->diagnose(
-                    Diagnostics::CustomDerivativeExpectedStatic{.attr = attr->loc});
-                return;
-            }
-
-            if (!derivativeFuncIsStatic)
-            {
-                auto primalThisType = getTypeForThisExpr(visitor, primalDeclRef);
-                DeclRef<FunctionDeclBase> derivativeDeclRef =
-                    resolvedDerivativeDeclRefExpr->declRef.template as<FunctionDeclBase>();
-                auto derivativeThisType = getTypeForThisExpr(visitor, derivativeDeclRef);
-
-                // If the function is a member function, we need to check that the
-                // `this` type matches the expected type. This will ensure that after lowering
-                // to IR, the two functions are compatible.
-                //
-                if (primalThisType && !canSolveGenericThisTypeCompatibility(
-                                          visitor,
-                                          primalThisType,
-                                          derivativeThisType))
+                if (!expectedDerivativeThisInfo && derivativeThisInfo)
+                {
+                    visitor->getSink()->diagnose(
+                        Diagnostics::CustomDerivativeExpectedStatic{.attr = attr->loc});
+                }
+                else
                 {
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
-                    return;
                 }
+                return;
+            }
+
+            if (expectedDerivativeThisInfo &&
+                (expectedDerivativeThisInfo->mode != derivativeThisInfo->mode ||
+                 !canSolveGenericThisTypeCompatibility(
+                     visitor,
+                     unwrapModifiedType(expectedDerivativeThisInfo->type),
+                     unwrapModifiedType(derivativeThisInfo->type))))
+            {
+                visitor->getSink()->diagnose(
+                    Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
+                return;
             }
 
             // A `[ForwardDerivative]`, `[BackwardDerivative]`, or `[PrimalSubstitute]` attribute on
@@ -19650,90 +19896,73 @@ const char* getDerivativeAttrName<PrimalSubstituteAttribute>()
     return "PrimalSubstitute";
 }
 
-// Returns the parameters that participate in a callable's derivative signature. As established by
-// `collectParameterLists` and `getFuncType`, an accessor nested under a callable parent receives
-// the parent's parameters before its own. For example, a subscript setter receives `index` before
-// `newValue`; a property has no callable parent parameters to contribute.
-static List<ParamDecl*> getParametersForDerivativeSignature(FunctionDeclBase* func)
-{
-    List<ParamDecl*> params;
-    if (auto accessor = as<AccessorDecl>(func))
-    {
-        if (auto parentCallable = as<CallableDecl>(accessor->parentDecl))
-        {
-            for (auto param : parentCallable->getParameters())
-                params.add(param);
-        }
-    }
-    for (auto param : func->getParameters())
-        params.add(param);
-    return params;
-}
-
 ArgsWithDirectionInfo getImaginaryArgsToFunc(
     ASTBuilder* astBuilder,
     FunctionDeclBase* func,
     SourceLoc loc)
 {
-    auto params = getParametersForDerivativeSignature(func);
+    auto params =
+        getParametersForCallableSignature(astBuilder, makeDeclRef(func).as<CallableDecl>());
 
     List<Expr*> imaginaryArguments;
     List<ParamPassingMode> directions;
-    for (auto param : params)
+    for (auto paramDeclRef : params)
     {
+        auto param = paramDeclRef.getDecl();
+        auto direction = getParamPassingMode(param);
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
+        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
         arg->type.type = param->getType();
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        directions.add(getParamPassingMode(param));
+        directions.add(direction);
     }
     return {imaginaryArguments, directions, nullptr, ParamPassingMode::In};
 }
 
 ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     SemanticsVisitor* visitor,
-    FunctionDeclBase* originalFuncDecl,
+    DeclRef<FunctionDeclBase> originalFuncDeclRef,
     SourceLoc loc)
 {
-    Expr* thisArgExpr = nullptr;
-    if (auto thisType = getTypeForThisExpr(visitor, originalFuncDecl))
-    {
-        thisArgExpr = visitor->getASTBuilder()->create<VarExpr>();
-        thisArgExpr->type = thisType;
-        thisArgExpr->loc = loc;
+    auto astBuilder = visitor->getASTBuilder();
+    auto originalFuncDecl = originalFuncDeclRef.getDecl();
+    SubstitutionSet substitutions(originalFuncDeclRef);
 
-        if (visitor->isTypeDifferentiable(thisType) &&
-            !originalFuncDecl->findModifier<NoDiffThisAttribute>() &&
-            !isEffectivelyStatic(originalFuncDecl))
+    Expr* thisArgExpr = nullptr;
+    ParamPassingMode thisTypeDirection = ParamPassingMode::In;
+    if (auto thisParamInfo = visitor->findEffectiveThisParamInfo(originalFuncDeclRef))
+    {
+        if (auto pairType = visitor->tryGetDifferentialPairType(thisParamInfo->type))
         {
-            auto pairType = visitor->tryGetDifferentialPairType(thisType);
+            thisArgExpr = astBuilder->create<VarExpr>();
+            thisTypeDirection = getDifferentiatedThisParamMode(thisParamInfo->mode);
             thisArgExpr->type.type = pairType;
-        }
-        else
-        {
-            thisArgExpr = nullptr;
+            thisArgExpr->type.isLeftValue =
+                doesParamPassingModeIndicateWritableStorage(thisTypeDirection);
+            thisArgExpr->loc = loc;
         }
     }
 
-    ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                             ? ParamPassingMode::In
-                                             : ParamPassingMode::BorrowInOut;
-
-    auto params = getParametersForDerivativeSignature(originalFuncDecl);
+    auto params = getParametersForCallableSignature(
+        astBuilder,
+        makeDeclRef(originalFuncDecl).as<CallableDecl>());
 
     List<Expr*> imaginaryArguments;
-    for (auto param : params)
+    for (auto paramDeclRef : params)
     {
-        auto arg = visitor->getASTBuilder()->create<VarExpr>();
+        auto param = paramDeclRef.getDecl();
+        auto paramType = substituteType(substitutions, astBuilder, param->getType());
+        auto direction = getParamPassingMode(param);
+        auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-        arg->type.type = param->getType();
+        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
+        arg->type.type = paramType;
         arg->loc = loc;
         if (!param->findModifier<NoDiffModifier>())
         {
-            if (auto pairType = visitor->tryGetDifferentialPairType(param->getType()))
+            if (auto pairType = visitor->tryGetDifferentialPairType(paramType))
             {
                 arg->type.type = pairType;
             }
@@ -19743,9 +19972,9 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
 
     // Copy parameter directions as is.
     List<ParamPassingMode> expectedParamDirections;
-    for (auto param : params)
+    for (auto paramDeclRef : params)
     {
-        expectedParamDirections.add(getParamPassingMode(param));
+        expectedParamDirections.add(getParamPassingMode(paramDeclRef.getDecl()));
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
@@ -19753,69 +19982,65 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
 
 ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
     SemanticsVisitor* visitor,
-    FunctionDeclBase* originalFuncDecl,
+    DeclRef<FunctionDeclBase> originalFuncDeclRef,
     SourceLoc loc)
 {
+    auto astBuilder = visitor->getASTBuilder();
+    auto originalFuncDecl = originalFuncDeclRef.getDecl();
+    SubstitutionSet substitutions(originalFuncDeclRef);
+
     Expr* thisArgExpr = nullptr;
-    if (auto thisType = getTypeForThisExpr(visitor, originalFuncDecl))
+    ParamPassingMode thisTypeDirection = ParamPassingMode::In;
+    if (auto thisParamInfo = visitor->findEffectiveThisParamInfo(originalFuncDeclRef))
     {
-        thisArgExpr = visitor->getASTBuilder()->create<VarExpr>();
-        thisArgExpr->type = thisType;
-        thisArgExpr->loc = loc;
-
-        if (visitor->isTypeDifferentiable(thisType) &&
-            !originalFuncDecl->findModifier<NoDiffThisAttribute>() &&
-            !isEffectivelyStatic(originalFuncDecl))
+        if (auto pairType = visitor->tryGetDifferentialPairType(thisParamInfo->type))
         {
-            auto pairType = visitor->tryGetDifferentialPairType(thisType);
+            thisArgExpr = astBuilder->create<VarExpr>();
             thisArgExpr->type.type = pairType;
+            thisTypeDirection = getDifferentiatedThisParamMode(thisParamInfo->mode);
 
-            // TODO: for ptr pair types, no need to set isLeftValue to true.
-            if (as<DifferentialPairType>(thisArgExpr->type.type))
-                thisArgExpr->type.isLeftValue = true;
-        }
-        else
-        {
-            thisArgExpr = nullptr;
+            // Back-propagating through a by-value differentiable receiver accumulates into its
+            // differential, so an `In` value pair becomes writable storage. The remaining
+            // reference mode stays part of the receiver ABI, and a pointer pair preserves the
+            // differentiated mode because it already carries the required reference semantics.
+            if (as<DifferentialPairType>(pairType) && thisTypeDirection == ParamPassingMode::In)
+                thisTypeDirection = ParamPassingMode::BorrowInOut;
+
+            thisArgExpr->type.isLeftValue =
+                doesParamPassingModeIndicateWritableStorage(thisTypeDirection);
+            thisArgExpr->loc = loc;
         }
     }
-
-    ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                             ? ParamPassingMode::In
-                                             : ParamPassingMode::BorrowInOut;
 
     List<Expr*> imaginaryArguments;
     List<ParamPassingMode> expectedParamDirections;
 
-    auto isOutParam = [&](ParamDecl* param)
+    auto params = getParametersForCallableSignature(
+        astBuilder,
+        makeDeclRef(originalFuncDecl).as<CallableDecl>());
+
+    for (auto paramDeclRef : params)
     {
-        return param->findModifier<OutModifier>() != nullptr &&
-               param->findModifier<InModifier>() == nullptr &&
-               param->findModifier<InOutModifier>() == nullptr;
-    };
-
-    auto params = getParametersForDerivativeSignature(originalFuncDecl);
-
-    for (auto param : params)
-    {
-        auto arg = visitor->getASTBuilder()->create<VarExpr>();
-        arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = param->findModifier<OutModifier>() ? true : false;
-        arg->type.type = param->getType();
-        arg->loc = loc;
-
+        auto param = paramDeclRef.getDecl();
+        auto paramType = substituteType(substitutions, astBuilder, param->getType());
         ParamPassingMode direction = getParamPassingMode(param);
+        bool isOutParam = direction == ParamPassingMode::Out;
+        auto arg = astBuilder->create<VarExpr>();
+        arg->declRef = makeDeclRef(param);
+        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
+        arg->type.type = paramType;
+        arg->loc = loc;
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
         if (isDiffParam)
         {
-            auto diffPair = visitor->tryGetDifferentialPairType(param->getType());
+            auto diffPair = visitor->tryGetDifferentialPairType(paramType);
             if (auto pairType = as<DifferentialPairType>(diffPair))
             {
                 arg->type.type = pairType;
                 arg->type.isLeftValue = true;
 
-                if (isOutParam(param))
+                if (isOutParam)
                 {
                     // out T : IDifferentiable -> in T.Differential
                     arg->type.isLeftValue = false;
@@ -19844,7 +20069,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         }
         if (!isDiffParam)
         {
-            if (isOutParam(param))
+            if (isOutParam)
             {
                 // Skip non-differentiable out params.
                 continue;
@@ -19859,11 +20084,10 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         imaginaryArguments.add(arg);
         expectedParamDirections.add(direction);
     }
-    if (auto diffReturnType = visitor->tryGetDifferentialType(
-            visitor->getASTBuilder(),
-            originalFuncDecl->returnType.type))
+    auto returnType = substituteType(substitutions, astBuilder, originalFuncDecl->returnType.type);
+    if (auto diffReturnType = visitor->tryGetDifferentialType(astBuilder, returnType))
     {
-        auto arg = visitor->getASTBuilder()->create<InitializerListExpr>();
+        auto arg = astBuilder->create<InitializerListExpr>();
         arg->type.isLeftValue = false;
         arg->type.type = diffReturnType;
         arg->loc = loc;
@@ -20155,9 +20379,7 @@ static void translateFwdDerivativeAttributeToAD2(
     visitor->addVisibilityModifier(funcAliasDecl, synthesizedVisibility.memberVisibility);
     funcAliasDecl->targetDeclRef = userDefinedFwdDiffFunc;
 
-    if (userDefinedFwdDiffFunc.getDecl()->findModifier<HLSLStaticModifier>() ||
-        (userDefinedFwdDiffFunc.as<FunctionDeclBase>() &&
-         !getTypeForThisExpr(visitor, userDefinedFwdDiffFunc.as<FunctionDeclBase>()).type))
+    if (!visitor->findEffectiveThisParamInfo(userDefinedFwdDiffFunc))
         addModifier(funcAliasDecl, astBuilder->create<HLSLStaticModifier>());
 
     fwdDiffExtension->addMember(funcAliasDecl);
@@ -20298,8 +20520,7 @@ static void checkDerivativeAttribute(
     SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
 
     ArgsWithDirectionInfo imaginaryArguments =
-        getImaginaryArgsToForwardDerivative(visitor, primalDeclRef.getDecl(), attr->loc);
-    specializeImaginaryArgumentTypes(visitor->getASTBuilder(), imaginaryArguments, primalDeclRef);
+        getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
         visitor,
         primalDeclRef,
@@ -20330,16 +20551,22 @@ static void checkDerivativeAttribute(
     if (attr->funcExpr->type.type)
         return;
 
+    auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
+                             getCurrentASTBuilder(),
+                             visitor,
+                             funcDecl->getDefaultDeclRef())
+                             .as<FunctionDeclBase>();
     ArgsWithDirectionInfo imaginaryArguments =
-        getImaginaryArgsToForwardDerivative(visitor, funcDecl, attr->loc);
+        getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
         visitor,
-        funcDecl,
+        primalDeclRef,
         attr,
         imaginaryArguments.args,
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection);
+        imaginaryArguments.thisArgDirection,
+        PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved);
 
     if (!as<DeclRefExpr>(attr->funcExpr))
     {
@@ -20347,7 +20574,7 @@ static void checkDerivativeAttribute(
         return;
     }
 
-    translateFwdDerivativeAttributeToAD2(visitor, funcDecl, attr);
+    translateFwdDerivativeAttributeToAD2(visitor, funcDecl, primalDeclRef, attr);
 
     if (getCurrentASTBuilder()->m_substituteMap.containsKey(funcDecl))
         for (auto targetDecl : getCurrentASTBuilder()->m_substituteMap[funcDecl])
@@ -20364,16 +20591,22 @@ static void checkDerivativeAttribute(
     if (attr->funcExpr->type.type)
         return;
 
+    auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
+                             getCurrentASTBuilder(),
+                             visitor,
+                             funcDecl->getDefaultDeclRef())
+                             .as<FunctionDeclBase>();
     ArgsWithDirectionInfo imaginaryArguments =
-        getImaginaryArgsToBackwardDerivative(visitor, funcDecl, attr->loc);
+        getImaginaryArgsToBackwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
         visitor,
-        funcDecl,
+        primalDeclRef,
         attr,
         imaginaryArguments.args,
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
-        imaginaryArguments.thisArgDirection);
+        imaginaryArguments.thisArgDirection,
+        PrimalAndDerivativeGenericSignatureResolutionStatus::NotYetResolved);
 
     if (!as<DeclRefExpr>(attr->funcExpr))
     {
@@ -20381,24 +20614,16 @@ static void checkDerivativeAttribute(
         return;
     }
 
-    translateBwdDerivativeAttributeToAD2(
-        visitor,
-        funcDecl,
-        createDefaultSubstitutionsIfNeeded(
-            getCurrentASTBuilder(),
-            visitor,
-            funcDecl->getDefaultDeclRef())
-            .as<FunctionDeclBase>(),
-        attr);
+    translateBwdDerivativeAttributeToAD2(visitor, funcDecl, primalDeclRef, attr);
 
     if (getCurrentASTBuilder()->m_substituteMap.containsKey(funcDecl))
         for (auto targetDecl : getCurrentASTBuilder()->m_substituteMap[funcDecl])
         {
-            auto primalDeclRef = buildQualifiedReference(visitor, funcDecl, targetDecl);
+            auto qualifiedPrimalDeclRef = buildQualifiedReference(visitor, funcDecl, targetDecl);
             translateBwdDerivativeAttributeToAD2(
                 visitor,
                 as<FunctionDeclBase>(targetDecl),
-                primalDeclRef.as<FunctionDeclBase>(),
+                qualifiedPrimalDeclRef.as<FunctionDeclBase>(),
                 attr);
         }
 }

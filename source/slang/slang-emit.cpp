@@ -1683,7 +1683,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            SLANG_PASS(checkForMissingReturns, sink, target, false);
+            SLANG_PASS(
+                checkForMissingReturns,
+                sink,
+                SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN,
+                target,
+                false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
@@ -1963,8 +1968,10 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
         // Give empty ray/callable payloads physical storage at native interfaces before type
-        // legalization erases their logical values. Ordinary helper signatures/copies are left
-        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
+        // legalization erases their logical values, and wrap non-struct D3D payloads and hit
+        // attributes in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
         SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
 
         if (isMetalTarget(targetRequest))
