@@ -173,8 +173,7 @@ public:
     List<OwnedPreprocessorMacroDefinition> predefinedMacros;
     static constexpr bool kDefaultSearchInWorkspace = true;
     bool searchInWorkspace = kDefaultSearchInWorkspace;
-    static constexpr WorkspaceFlavor kDefaultWorkspaceFlavor = WorkspaceFlavor::Standard;
-    WorkspaceFlavor workspaceFlavor = kDefaultWorkspaceFlavor;
+    WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
 
     // Language version assumed for files with no `#language` directive, from the
     // `slang.predefinedLanguageVersion` setting. UNKNOWN means "unset": nothing is injected and the

@@ -101,9 +101,7 @@ public:
         Messages,
         Verbose
     };
-    static constexpr CommitCharacterBehavior kDefaultCommitCharacterBehavior =
-        CommitCharacterBehavior::MembersOnly;
-    CommitCharacterBehavior m_commitCharacterBehavior = kDefaultCommitCharacterBehavior;
+    CommitCharacterBehavior m_commitCharacterBehavior = CommitCharacterBehavior::MembersOnly;
     ComPtr<slang::IGlobalSession> m_session;
     RefPtr<Workspace> m_workspace;
     FormatOptions m_formatOptions;
@@ -193,8 +191,7 @@ public:
     RefPtr<JSONRPCConnection> m_connection;
     RttiTypeFuncsMap m_typeMap;
     bool m_initialized = false;
-    static constexpr TraceOptions kDefaultTraceOptions = TraceOptions::Off;
-    TraceOptions m_traceOptions = kDefaultTraceOptions;
+    TraceOptions m_traceOptions = TraceOptions::Off;
     std::chrono::time_point<std::chrono::system_clock> m_lastDiagnosticUpdateTime;
     Dictionary<String, String> m_lastPublishedDiagnostics;
     HashSet<String> m_pendingModulesToUpdateDiagnostics;

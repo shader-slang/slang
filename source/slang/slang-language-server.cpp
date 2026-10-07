@@ -2354,16 +2354,21 @@ void sendRefreshRequests(JSONRPCConnection* connection)
     connection->sendCall(UnownedStringSlice("workspace/inlayHint/refresh"), JSONValue::makeInt(0));
 }
 
-// Each `update*` function below receives one setting from either a `workspace/configuration`
-// reply or a `workspace/didChangeConfiguration` notification, and applies one rule to it. An
-// invalid value means the message did not mention the setting, so we keep its current value. JSON
-// null means the client has no value for it now, so we restore the built-in default; LSP requires a
-// client to answer null for a setting it cannot provide. Any other value is converted and applied.
 static bool isNullConfigValue(const JSONValue& value)
 {
     return value.getKind() == JSONValue::Kind::Null;
 }
 
+// Apply one client setting from a `workspace/configuration` reply or a
+// `workspace/didChangeConfiguration` notification to `option`. An invalid `value` means the message
+// did not mention the setting, as when a notification passes `JSONValue()` for the other arguments
+// of an updater that takes several settings, so `option` keeps its current value. JSON null means
+// the client has no value for the setting now, so `option` takes `defaultValue`; LSP requires a
+// client to answer null for a setting it cannot provide. Any other value is converted into
+// `option`.
+//
+// Only settings with a non-empty default need this helper. The converter turns null into an empty
+// list or string, and the remaining updaters already treat an empty value as their default.
 template<typename T>
 static void applyConfigValue(
     JSONToNativeConverter& converter,
@@ -2384,8 +2389,7 @@ void LanguageServer::updatePredefinedMacros(const JSONValue& macros)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> predefinedMacros;
-        if (isNullConfigValue(macros) ||
-            SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
+        if (SLANG_SUCCEEDED(converter.convert(macros, &predefinedMacros)))
         {
             if (m_core.m_workspace->updatePredefinedMacros(predefinedMacros))
             {
@@ -2402,7 +2406,7 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         List<String> searchPaths;
-        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
+        if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
             if (m_core.m_workspace->updateSearchPaths(searchPaths))
             {
@@ -2414,28 +2418,19 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
 
 void LanguageServer::updateSearchInWorkspace(const JSONValue& value)
 {
-    if (value.isValid())
+    auto container = m_connection->getContainer();
+    JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+    bool searchInWorkspace = m_core.m_workspace->searchInWorkspace;
+    applyConfigValue(converter, value, searchInWorkspace, Workspace::kDefaultSearchInWorkspace);
+    if (m_core.m_workspace->updateSearchInWorkspace(searchInWorkspace))
     {
-        auto container = m_connection->getContainer();
-        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
-        bool searchPaths = Workspace::kDefaultSearchInWorkspace;
-        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
-        {
-            if (m_core.m_workspace->updateSearchInWorkspace(searchPaths))
-            {
-                sendRefreshRequests(m_connection);
-            }
-        }
+        sendRefreshRequests(m_connection);
     }
 }
 
 void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
 {
-    if (isNullConfigValue(jsonValue))
-    {
-        m_core.m_commitCharacterBehavior = LanguageServerCore::kDefaultCommitCharacterBehavior;
-    }
-    else if (jsonValue.isValid())
+    if (jsonValue.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2528,11 +2523,7 @@ void LanguageServer::updateInlayHintOptions(
 
 void LanguageServer::updateTraceOptions(const JSONValue& value)
 {
-    if (isNullConfigValue(value))
-    {
-        m_traceOptions = kDefaultTraceOptions;
-    }
-    else if (value.isValid())
+    if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2551,11 +2542,7 @@ void LanguageServer::updateTraceOptions(const JSONValue& value)
 
 void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
 {
-    if (isNullConfigValue(value))
-    {
-        m_core.m_workspace->workspaceFlavor = Workspace::kDefaultWorkspaceFlavor;
-    }
-    else if (value.isValid())
+    if (value.isValid())
     {
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
@@ -2582,7 +2569,7 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
 // uses, store it on the workspace, and refresh open documents if it changed. An empty value clears
 // the setting (UNKNOWN, compiler default); an unrecognized non-empty value is logged and the
 // previously configured version is left in place, so a typo does not silently disable a working
-// configuration. A null value clears the setting the same way an empty one does.
+// configuration.
 void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
 {
     if (value.isValid())
@@ -2590,7 +2577,7 @@ void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
         auto container = m_connection->getContainer();
         JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
         String str;
-        if (isNullConfigValue(value) || SLANG_SUCCEEDED(converter.convert(value, &str)))
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
         {
             SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
             if (str.getLength() != 0)

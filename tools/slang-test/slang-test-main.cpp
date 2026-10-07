@@ -2840,6 +2840,19 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             outValue);
     };
 
+    auto reportDirectiveError = [&](UnownedStringSlice line, const char* problem)
+    {
+        StringBuilder lineText;
+        lineText << line;
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid LANG_SERVER directive in '%s': %s: %s",
+            input.filePath.getBuffer(),
+            problem,
+            lineText.getBuffer());
+        return TestResult::Fail;
+    };
+
     Dictionary<String, UnownedStringSlice> configReplies;
     for (auto line : lines)
     {
@@ -2849,20 +2862,45 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         line = line.tail(2).trimStart();
         if (!line.startsWith("CONFIG_REPLY:"))
             continue;
-        line = line.tail(UnownedStringSlice("CONFIG_REPLY:").getLength());
-        Index eqIndex = line.indexOf('=');
+        if (!input.testOptions->commandOptions.containsKey("config-pull"))
+            return reportDirectiveError(line, "CONFIG_REPLY requires the config-pull option");
+        auto reply = line.tail(UnownedStringSlice("CONFIG_REPLY:").getLength());
+        Index eqIndex = reply.indexOf('=');
         if (eqIndex < 0)
-            return TestResult::Fail;
-        configReplies[line.head(eqIndex).trim()] = line.tail(eqIndex + 1);
+            return reportDirectiveError(line, "expected <section>=<json>");
+        String section = reply.head(eqIndex).trim();
+        if (configReplies.containsKey(section))
+            return reportDirectiveError(line, "duplicate section");
+        configReplies[section] = reply.tail(eqIndex + 1);
     }
-    if (configReplies.getCount() && !input.testOptions->commandOptions.containsKey("config-pull"))
-        return TestResult::Fail;
+
+    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
+    bool diagnosticsReceived = false;
+    // Every LANG_SERVER test shares one language server process, so a call the server sends must
+    // be read before the test ends or the next test reads it in place of its own response. A
+    // configuration message makes the server send zero or more refresh requests, depending on the
+    // setting and whether it changed. We set this flag whenever one is sent, and `waitForResponse`
+    // clears it, because the server sends those requests before it answers any later request.
+    bool mayHaveUnreadServerCalls = false;
+    // Record a `textDocument/publishDiagnostics` notification, or skip any other server-to-client
+    // call. The server never blocks on a reply to the calls it sends, so skipping is safe.
+    auto handleServerCall = [&](const JSONRPCCall& call) -> SlangResult
+    {
+        if (call.method != "textDocument/publishDiagnostics")
+            return SLANG_OK;
+        diagnosticsReceived = true;
+        LanguageServerProtocol::PublishDiagnosticsParams arg;
+        SLANG_RETURN_ON_FAIL(connection->getMessage(&arg));
+        diagnostics.add(arg);
+        return SLANG_OK;
+    };
 
     // The harness answers the server's `workspace/configuration` request with one value per
     // requested section, taken from `//CONFIG_REPLY:` lines, and JSON null for every other section.
     // LSP requires null for a setting the client cannot provide, so this is the reply an editor
-    // without Slang-specific defaults (such as Zed) sends. Other server calls that arrive first,
-    // such as `client/registerCapability`, are answered with a null result.
+    // without Slang-specific defaults (such as Zed) sends. Other server calls that arrive first are
+    // handled as `handleServerCall` does, and a request among them, such as
+    // `client/registerCapability`, is answered with a null result.
     auto answerConfigRequest = [&]() -> SlangResult
     {
         for (;;)
@@ -2872,6 +2910,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
             if (call.method != LanguageServerProtocol::ConfigurationParams::methodName)
             {
+                SLANG_RETURN_ON_FAIL(handleServerCall(call));
                 if (call.id.isValid())
                     SLANG_RETURN_ON_FAIL(connection->sendNullResult(call.id));
                 continue;
@@ -2893,6 +2932,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             response.id = call.id;
             response.result =
                 connection->getContainer()->createArray(values.getBuffer(), values.getCount());
+            mayHaveUnreadServerCalls = true;
             return connection->sendRPC(&response);
         }
     };
@@ -2926,45 +2966,36 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         LanguageServerProtocol::DidOpenTextDocumentParams::methodName,
         &openDocParams,
         JSONValue::makeInt(1));
-    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
-    bool diagnosticsReceived = false;
-    bool configChangedSinceLastRequest = false;
-    // Server-to-client calls can arrive before the response to a request: diagnostics, and the
-    // refresh requests that a configuration change sends. The server never blocks on a reply to a
-    // call it sends, so we skip them here.
-    auto waitForNonDiagnosticResponse = [&]() -> SlangResult
+    // Wait for the response to the request just sent, handling the server-to-client calls that
+    // arrive before it with `handleServerCall`.
+    auto waitForResponse = [&]() -> SlangResult
     {
-        configChangedSinceLastRequest = false;
-    repeat:
-        if (SLANG_FAILED(connection->waitForResult(-1)))
-            return SLANG_FAIL;
-        if (connection->getMessageType() == JSONRPCMessageType::Call)
+        for (;;)
         {
-            JSONRPCCall call;
-            connection->getRPC(&call);
-            if (call.method == "textDocument/publishDiagnostics")
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            if (connection->getMessageType() != JSONRPCMessageType::Call)
             {
-                diagnosticsReceived = true;
-                LanguageServerProtocol::PublishDiagnosticsParams arg;
-                if (SLANG_FAILED(connection->getMessage(&arg)))
-                    return SLANG_FAIL;
-                diagnostics.add(arg);
+                mayHaveUnreadServerCalls = false;
+                return SLANG_OK;
             }
-            goto repeat;
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            SLANG_RETURN_ON_FAIL(handleServerCall(call));
         }
-        return SLANG_OK;
     };
 
-    // Unlike `sendConfig`, a directive's value may leave the setting unchanged, in which case the
-    // server sends no refresh requests. Nothing is drained here; the next request's
-    // `waitForNonDiagnosticResponse` skips any refresh requests, because the server applies a
-    // configuration change before it answers a queued request. If no request follows, the end of
-    // the test sends one, so no refresh request is left for the next test to read.
+    // Send a `//CONFIG:<key>=<json>` directive as a `workspace/didChangeConfiguration`
+    // notification. Any refresh requests it causes are read by the next `waitForResponse`. The
+    // server keeps formatting, inlay-hint, commit-character and trace options across `initialize`,
+    // so a test that changes one of them sets it back to its default before the test ends.
     auto sendConfigNotification = [&](UnownedStringSlice directive) -> SlangResult
     {
         Index eqIndex = directive.indexOf('=');
         if (eqIndex < 0)
+        {
+            reportDirectiveError(directive, "expected CONFIG:<key>=<json>");
             return SLANG_FAIL;
+        }
         JSONValue value;
         SLANG_RETURN_ON_FAIL(parseConfigValue(directive.tail(eqIndex + 1), value));
         auto container = connection->getContainer();
@@ -2976,7 +3007,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 
         LanguageServerProtocol::DidChangeConfigurationParams configParams;
         configParams.settings = settingsValue;
-        configChangedSinceLastRequest = true;
+        mayHaveUnreadServerCalls = true;
         return connection->sendCall(
             LanguageServerProtocol::DidChangeConfigurationParams::methodName,
             &configParams);
@@ -3014,7 +3045,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             List<LanguageServerProtocol::CompletionItem> completionItems;
@@ -3057,6 +3088,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         }
         else if (line.trim() == "CONFIG_REPULL")
         {
+            if (!input.testOptions->commandOptions.containsKey("config-pull"))
+                return reportDirectiveError(line, "CONFIG_REPULL requires the config-pull option");
             // A `settings: null` notification asks the server to pull every setting again.
             LanguageServerProtocol::DidChangeConfigurationParams configParams;
             configParams.settings = JSONValue::makeNull();
@@ -3065,7 +3098,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     &configParams)) ||
                 SLANG_FAILED(answerConfigRequest()))
                 return TestResult::Fail;
-            configChangedSinceLastRequest = true;
+            mayHaveUnreadServerCalls = true;
             actualOutputSB << "--------\nconfig: re-pulled\n";
         }
         else if (line.startsWith("ON_TYPE_FORMAT:"))
@@ -3089,7 +3122,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\non-type formatting: "
                            << (receivedNullResult(connection) ? "disabled" : "enabled") << "\n";
@@ -3109,7 +3142,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\ninlay hints:\n";
             List<LanguageServerProtocol::InlayHint> hints;
@@ -3138,7 +3171,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::SignatureHelp sigInfo;
@@ -3184,7 +3217,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::Hover hover;
@@ -3219,7 +3252,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::TextEditCompletionItem resolved;
@@ -3241,7 +3274,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         {
             if (!diagnosticsReceived)
             {
-                waitForNonDiagnosticResponse();
+                waitForResponse();
             }
             actualOutputSB << "--------\n";
             for (auto item : diagnostics)
@@ -3256,10 +3289,10 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
         }
     }
-    // The language server process is shared by every LANG_SERVER test, so refresh requests caused
-    // by a `//CONFIG:` line after the last request must be read here. A document symbol request has
-    // no side effects, and the server answers it only after handling every message sent before it.
-    if (configChangedSinceLastRequest)
+    // A configuration message sent after the last request may have left server calls unread (see
+    // `mayHaveUnreadServerCalls`). A document symbol request has no side effects, and the server
+    // answers it only after handling every message sent before it.
+    if (mayHaveUnreadServerCalls)
     {
         LanguageServerProtocol::DocumentSymbolParams params;
         params.textDocument.uri = openDocParams.textDocument.uri;
@@ -3267,7 +3300,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 LanguageServerProtocol::DocumentSymbolParams::methodName,
                 &params,
                 JSONValue::makeInt(callId++))) ||
-            SLANG_FAILED(waitForNonDiagnosticResponse()))
+            SLANG_FAILED(waitForResponse()))
             return TestResult::Fail;
     }
 

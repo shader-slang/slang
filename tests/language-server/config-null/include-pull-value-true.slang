@@ -1,7 +1,7 @@
 //TEST:LANG_SERVER(config-pull, filecheck=CHECK):
 
-// The client supplies `slang.searchInAllWorkspaceDirectories` and answers null for every other
-// section, so the include below resolves from lib/, a folder that is never opened.
+// The client supplies `slang.searchInAllWorkspaceDirectories` as a flat key and answers null for
+// every other section, so the include target in lib/, a folder that is never opened, resolves.
 
 //CONFIG_REPLY:slang.searchInAllWorkspaceDirectories=true
 
