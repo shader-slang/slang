@@ -1388,8 +1388,9 @@ bool isBetterForTarget(IRSpecContext* context, IRInst* newVal, IRInst* oldVal)
 }
 
 // The helpers below support warning E45002, which reports a link-time symbol that more than one
-// module defines with the `export` keyword when `isBetterForTarget` cannot say which definition
-// is better. The linker still selects one of them, but the module order decides which.
+// module supplies as a definition marked `[hlslExport]` (which the `export` keyword adds) when
+// `isBetterForTarget` cannot say which definition is better. The linker still selects one of them,
+// but the module order decides which.
 
 // Return true if `inst` is a definition that carries `[hlslExport]` and is not imported.
 //
