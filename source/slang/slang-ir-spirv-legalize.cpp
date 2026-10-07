@@ -963,30 +963,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             if (cls != AddressSpace::Generic)
                 addressSpace = cls;
         }
-        for (auto decor : inst->getDecorations())
-        {
-            switch (decor->getOp())
-            {
-            case kIROp_VulkanRayPayloadDecoration:
-                addressSpace = AddressSpace::RayPayloadKHR;
-                break;
-            case kIROp_VulkanRayPayloadInDecoration:
-                addressSpace = AddressSpace::IncomingRayPayload;
-                break;
-            case kIROp_VulkanCallablePayloadDecoration:
-                addressSpace = AddressSpace::CallableDataKHR;
-                break;
-            case kIROp_VulkanCallablePayloadInDecoration:
-                addressSpace = AddressSpace::IncomingCallableData;
-                break;
-            case kIROp_VulkanHitObjectAttributesDecoration:
-                addressSpace = AddressSpace::HitObjectAttribute;
-                break;
-            case kIROp_VulkanHitAttributesDecoration:
-                addressSpace = AddressSpace::HitAttribute;
-                break;
-            }
-        }
+        auto rayTracingAddressSpace = getRayTracingInterfaceAddressSpace(inst);
+        if (rayTracingAddressSpace != AddressSpace::Generic)
+            addressSpace = rayTracingAddressSpace;
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
         auto newPtrType = builder.getPtrType(

@@ -900,6 +900,204 @@ bool validateStructuredBufferResourceTypes(
     return context.validate(module);
 }
 
+/// Returns true if a pointer into `addrSpace` may point to memory that holds a logical pointer.
+/// SPIR-V only allows a logical pointer in a `Function` or `Private` (`ThreadLocal`) variable.
+/// Before address-space specialization, local and `static` variables are typed with the `Generic`
+/// address space, so we accept it as local here; `isLogicalPointerType` likewise treats a
+/// `Generic` pointer as logical, since it is not physical either.
+static bool canAddressSpaceHoldLogicalPointer(AddressSpace addrSpace)
+{
+    switch (addrSpace)
+    {
+    case AddressSpace::Generic:
+    case AddressSpace::ThreadLocal:
+    case AddressSpace::Function:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// If the global `inst` describes memory that is shared across invocations or supplied from
+/// outside the shader, returns the type of the data held there, and otherwise null. A type inst
+/// qualifies when it is a structured buffer, a parameter group or GLSL buffer block (its element),
+/// or a pointer into a non-local address space (its pointee); a global variable qualifies when it
+/// is `groupshared` or `__global`, a global varying input or output, or a ray-tracing payload or
+/// attribute.
+static IRType* getNonLocalMemoryValueType(IRInst* inst)
+{
+    if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst))
+        return bufferType->getElementType();
+    if (auto groupType = as<IRPointerLikeType>(inst))
+        return groupType->getElementType();
+    if (auto ptrType = as<IRPtrType>(inst))
+    {
+        return canAddressSpaceHoldLogicalPointer(ptrType->getAddressSpace())
+                   ? nullptr
+                   : ptrType->getValueType();
+    }
+    if (auto globalVar = as<IRGlobalVar>(inst))
+    {
+        bool isNonLocal = as<IRGroupSharedRate>(globalVar->getRate()) ||
+                          as<IRActualGlobalRate>(globalVar->getRate()) ||
+                          globalVar->findDecoration<IRGlobalInputDecoration>() ||
+                          globalVar->findDecoration<IRGlobalOutputDecoration>() ||
+                          getRayTracingInterfaceAddressSpace(globalVar) != AddressSpace::Generic;
+        return isNonLocal ? globalVar->getDataType()->getValueType() : nullptr;
+    }
+    return nullptr;
+}
+
+/// Diagnoses the memory described by the global type `type`, which holds a logical pointer in
+/// its values of type `valueType`. The implicit parameter groups that collect global and
+/// entry-point `uniform` parameters have no declaration of their own, but their fields stand for
+/// those parameters, so we report at each field that holds a logical pointer. Otherwise we report
+/// at a shader parameter or struct field declared with `type`, or failing that, at some other use
+/// of `type` (in use-list order, not source order).
+static void diagnoseNonLocalMemoryType(IRInst* type, IRType* valueType, DiagnosticSink* sink)
+{
+    auto structType = as<IRStructType>(valueType);
+    if (structType && structType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+    {
+        for (auto field : structType->getFields())
+        {
+            if (typeContainsLogicalPointer(field->getFieldType()))
+            {
+                sink->diagnose(
+                    Diagnostics::LogicalPointerInNonLocalMemory{.location = field->sourceLoc});
+            }
+        }
+        return;
+    }
+
+    for (auto use = type->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if ((as<IRGlobalParam>(user) || as<IRStructField>(user)) && user->sourceLoc.isValid())
+        {
+            sink->diagnose(
+                Diagnostics::LogicalPointerInNonLocalMemory{.location = user->sourceLoc});
+            return;
+        }
+    }
+    sink->diagnose(Diagnostics::LogicalPointerInNonLocalMemory{.location = findFirstUseLoc(type)});
+}
+
+/// Diagnoses the varying parameters and the result of the entry point `func` that hold a logical
+/// pointer, since they live in the pipeline interface, supplied from or returned to outside the
+/// shader. Returns false if any were diagnosed.
+static bool validateEntryPointInterface(IRFunc* func, DiagnosticSink* sink)
+{
+    bool isValid = true;
+    for (auto param : func->getParams())
+    {
+        // `out` and `inout` parameters are typed as pointers to the interface value.
+        auto type = param->getDataType();
+        auto paramPtrType = as<IRPtrTypeBase>(type);
+        if (paramPtrType && !as<IRPtrType>(type))
+            type = paramPtrType->getValueType();
+        if (!typeContainsLogicalPointer(type))
+            continue;
+
+        sink->diagnose(Diagnostics::LogicalPointerInNonLocalMemory{.location = param->sourceLoc});
+        isValid = false;
+    }
+    if (typeContainsLogicalPointer(func->getResultType()))
+    {
+        sink->diagnose(Diagnostics::LogicalPointerInNonLocalMemory{.location = func->sourceLoc});
+        isValid = false;
+    }
+    return isValid;
+}
+
+/// Identifies a kind of type-described non-local memory holding a value of type `valueType`, so
+/// that structurally distinct type insts describing the same memory are reported once. A pointer
+/// type is told apart by its address space, and every other container by its opcode alone (with
+/// `addressSpace` left `Generic`).
+struct NonLocalMemoryKey
+{
+    IROp op;
+    AddressSpace addressSpace;
+    IRType* valueType;
+
+    bool operator==(const NonLocalMemoryKey& other) const
+    {
+        return op == other.op && addressSpace == other.addressSpace && valueType == other.valueType;
+    }
+};
+
+bool validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink)
+{
+    bool isValid = true;
+
+    // A parameter group type, for example, appears both with and without a layout operand, so we
+    // report type-described memory once per `NonLocalMemoryKey`. Each variable is its own memory.
+    List<NonLocalMemoryKey> reported;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto valueType = getNonLocalMemoryValueType(globalInst);
+        if (!valueType || !typeContainsLogicalPointer(valueType))
+            continue;
+        isValid = false;
+
+        if (as<IRGlobalVar>(globalInst))
+        {
+            sink->diagnose(
+                Diagnostics::LogicalPointerInNonLocalMemory{.location = globalInst->sourceLoc});
+            continue;
+        }
+
+        auto ptrType = as<IRPtrType>(globalInst);
+        NonLocalMemoryKey key{
+            globalInst->getOp(),
+            ptrType ? ptrType->getAddressSpace() : AddressSpace::Generic,
+            valueType};
+        if (reported.contains(key))
+            continue;
+        reported.add(key);
+
+        diagnoseNonLocalMemoryType(globalInst, valueType, sink);
+    }
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto entryPoint = as<IRFunc>(globalInst);
+        if (entryPoint && entryPoint->findDecoration<IREntryPointDecoration>() &&
+            !validateEntryPointInterface(entryPoint, sink))
+            isValid = false;
+    }
+
+    // A byte-address buffer's contents are typed only at each load and store.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                IRType* dataType = nullptr;
+                if (inst->getOp() == kIROp_ByteAddressBufferLoad)
+                    dataType = inst->getDataType();
+                else if (inst->getOp() == kIROp_ByteAddressBufferStore)
+                {
+                    // The stored value is the last operand (`IRBuilder::emitByteAddressBufferStore`
+                    // emits buffer, offset, alignment, value).
+                    dataType = inst->getOperand(inst->getOperandCount() - 1)->getDataType();
+                }
+                if (!dataType || !typeContainsLogicalPointer(dataType))
+                    continue;
+
+                sink->diagnose(
+                    Diagnostics::LogicalPointerInNonLocalMemory{.location = inst->sourceLoc});
+                isValid = false;
+            }
+        }
+    }
+    return isValid;
+}
+
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
 {
     validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());

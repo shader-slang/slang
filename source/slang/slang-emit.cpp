@@ -2025,8 +2025,16 @@ Result linkAndOptimizeIR(
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
             return SLANG_FAIL;
 
+        // SPIR-V only allows a logical pointer in `Function` and `Private` storage. Resource type
+        // legalization below splits logical pointers out of aggregates held there, but it cannot
+        // split them out of any other memory, so we reject those shapes before it runs.
+        if (doesTargetLegalizeLogicalPointers(targetRequest) &&
+            !validateLogicalPointerStorage(irModule, sink))
+            return SLANG_FAIL;
+
         // Many of our target languages and/or downstream compilers
-        // don't support `struct` types that have resource-type fields.
+        // don't support `struct` types that have resource-type fields
+        // (nor, on SPIR-V, fields holding logical pointers).
         // In order to work around this limitation, we will rewrite the
         // IR so that any structure types with resource-type fields get
         // split into a "tuple" that comprises the ordinary fields (still

@@ -131,6 +131,11 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// Returns the SPIR-V ray-tracing interface address space (ray payload, callable payload, hit
+// attributes or hit-object attributes) that a decoration on the global variable `inst` places it
+// in, or `AddressSpace::Generic` if it has no such decoration.
+AddressSpace getRayTracingInterfaceAddressSpace(IRInst* inst);
+
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
@@ -216,6 +221,22 @@ IRType* getMatrixElementType(IRType* type);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
+
+// True if `type` is a pointer in a logical address space, possibly wrapped in attributes, or an
+// array (of any rank) of such pointers, mirroring how `isResourceType` treats arrays. A logical
+// address space is any other than `AddressSpace::UserPointer`, the only one that maps to a
+// physical storage class on SPIR-V; an unresolved `Generic` pointer counts as logical because it
+// has not been shown to be physical. Only `IRPtrType` is considered, not the other
+// `IRPtrTypeBase` kinds such as out/ref parameter types.
+bool isLogicalPointerType(IRType* type);
+
+// True if `type` is a logical pointer type or holds one in a struct field or array element.
+bool typeContainsLogicalPointer(IRType* type);
+
+// True if type legalization splits logical pointers out of aggregates for `targetReq`, which is
+// the case on SPIR-V, where a logical pointer may not be a member of a composite value.
+// `validateLogicalPointerStorage` must run for exactly these targets, before the split.
+bool doesTargetLegalizeLogicalPointers(TargetRequest* targetReq);
 
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is

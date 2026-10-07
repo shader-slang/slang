@@ -93,6 +93,17 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
+/// Diagnose logical pointers held in memory other than SPIR-V `Function` and `Private` storage,
+/// which is the only memory where SPIR-V allows a logical pointer: structured-buffer and
+/// byte-address-buffer contents, parameter-group and GLSL buffer-block elements (including the
+/// implicit groups that hold global and entry-point `uniform` parameters), the pointees of pointers
+/// into other address spaces, `groupshared` variables, global varyings, ray-tracing payload and
+/// attribute variables, and entry-point varying parameters and results. It runs on the targets
+/// where `doesTargetLegalizeLogicalPointers`, after `uniform` parameters are collected and before
+/// `legalizeResourceTypes`, which cannot split a logical pointer out of such memory. Returns false
+/// if any were diagnosed.
+bool validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink);
+
 // Process kIROp_AssumeAddress instructions. When validate is true, checks that
 // getRootAddr(addr) is not a function-local variable (kIROp_Var) holding a
 // plain value, and emits an error if it is. Vars whose stored type is a pointer,
