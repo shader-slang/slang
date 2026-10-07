@@ -42,16 +42,16 @@ import slang.numerics.differentiable;
 
 The `slang.numerics` module design decomposes numeric types into two broad categories:
 
-- _shaped_ types are things like `vector`, `matrix`, etc. that can be thought of as a homogeneous collection of elements,
+- *shaped* types are things like `vector`, `matrix`, etc. that can be thought of as a homogeneous collection of elements,
   and where the intended semantics for mathematical operations is that they apply element-wise
 
-- _scalar_ types are the logical elements or components of shaped types.
+- *scalar* types are the logical elements or components of shaped types.
   Mathematical operations on a scalar type are uniquely defined by the semantics of that type.
 
 The `slang.numerics` module allows scalars to be treated as shaped types - they just have a scalar (rank 0) shape.
 
 In most cases, the interfaces that `slang.numerics` provides are for shaped types by default, so that it is easy to write code that works cleanly for both scalars and vectors/matrices.
-When a developer specifically needs operations that only make sense on scalars (e.g., a total ordering exists on integers, but Slang does not define a total ordering on _vectors_ of integers), they should opt in to the scalar-specific interfaces.
+When a developer specifically needs operations that only make sense on scalars (e.g., a total ordering exists on integers, but Slang does not define a total ordering on *vectors* of integers), they should opt in to the scalar-specific interfaces.
 
 > Note:
 >
@@ -84,6 +84,7 @@ Within the body of the generic, the ordinary `+` and `*` operators can be used o
 >
 > `INumeric` is just one of the interfaces that `slang.numerics` provides.
 > In a later section we will discuss how to pick the right interface to use as a constraint, based on the needs of your code.
+
 
 Here is some code that uses `squarePlusOne`:
 
@@ -142,7 +143,7 @@ bool isPositive<T : IScalarIntegerType>(T value)
 
 ### Adapting to Different Shapes
 
-Rather than restricting ourselves to only scalar types for `isPositive`, we might instead decide that we want to write code that works with _any_ integer type, whether scalar or shaped.
+Rather than restricting ourselves to only scalar types for `isPositive`, we might instead decide that we want to write code that works with *any* integer type, whether scalar or shaped.
 We might, for example, decide that we will consider a shaped value to be "positive" if all of its elements are positive.
 In that case, we could write the function as:
 
@@ -351,7 +352,7 @@ T shiftedSine<T>(T value, T phase)
 Comparison and ordering operations are a key place where the difference between scalar and shaped types becomes relevant.
 The numerics module provides interfaces for both element-wise shaped comparisons as well as interfaces appropriate to the scalar case.
 
-Note that these interfaces are one place where the numerics module gives the shorter and more natural names to the _scalar_ interfaces, while the shaped interfaces get the longer and more explicit names.
+Note that these interfaces are one place where the numerics module gives the shorter and more natural names to the *scalar* interfaces, while the shaped interfaces get the longer and more explicit names.
 
 The following interfaces support comparison and ordering:
 
