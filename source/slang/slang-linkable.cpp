@@ -177,6 +177,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
 
     auto linkage = getLinkage();
 
+    // The code below adds associations to the entry point result artifact, which is cached and
+    // shared between callers, so serialize it with other component-type operations.
+    std::lock_guard<std::recursive_mutex> lock(linkage->getComponentTypeOperationMutex());
+
     auto target = linkage->targets[targetIndex];
 
     auto targetProgram = getTargetProgram(target);
