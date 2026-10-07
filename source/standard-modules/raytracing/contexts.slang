@@ -13,7 +13,20 @@ public interface ITraceContext
     ///
     /// An interface lets this API support both the portable two-level BVH and targets such as
     /// Metal that also support multi-level BVHs through `MultiLevelAccelerationStructure`.
+    ///
+    /// @par Constraints
+    /// Must conform to the sealed `IAccelerationStructure` interface. Select the portable
+    /// `rt::AccelerationStructure` handle or a supported `MultiLevelAccelerationStructure<N>`.
+    /// The selected type's target requirements also apply to this context.
     associatedtype AccelerationStructure : IAccelerationStructure;
+
+    /// Selects whether traversal uses a ray time and which geometry can move.
+    ///
+    /// @par Constraints
+    /// Must conform to the sealed `IRayMotion` interface. Select `NoMotion`, `PrimitiveMotion`,
+    /// `InstanceMotion`, or `PrimitiveAndInstanceMotion`; the selected type's target and version
+    /// requirements apply to this context. Stage-input `time` additionally requires conformance
+    /// to `IEnabledRayMotion`.
     associatedtype Motion : IRayMotion;
 }
 
@@ -28,10 +41,19 @@ public interface IStageContext
     ///
     /// This keeps the acceleration-structure topology and motion model consistent with the schema
     /// used by `RayTracer`; the context describes types rather than a runtime object.
+    ///
+    /// @par Constraints
+    /// Must conform to `ITraceContext`. When a stage belongs to a program schema, its trace
+    /// context must equal the schema's `TraceContext`; conformance to this interface alone does
+    /// not enforce that cross-stage equality.
     associatedtype TraceContext : ITraceContext;
 
     /// Describes the host-supplied record bytes that this stage reads through `input.record`.
-    /// Use `void` when the stage has no record data.
+    ///
+    /// @par Constraints
+    /// This associated type has no conformance constraint. Use `void` when the stage has no
+    /// record data. For a non-void type, the application must supply matching record data using
+    /// the target's record layout; this declaration does not validate the host allocation.
     associatedtype Record;
 }
 
@@ -44,12 +66,31 @@ public interface IStageContext
 /// reuse an `IHitContext` when it shares that context's payload and record types.
 public interface IPayloadContext : IStageContext
 {
+    /// Describes the mutable ray payload exchanged between a trace call and its hit or miss stage.
+    ///
+    /// @par Constraints
+    /// This associated type has no conformance constraint. The trace call's payload and the
+    /// receiving stage's payload must have the same type. Although an intersection stage uses
+    /// an `IHitContext`, its input does not provide access to this payload. An ordinary user
+    /// struct with no instance fields is an implicit payload: omit the explicit `trace` payload
+    /// argument and do not access `input.payload` for that type.
     associatedtype Payload;
 }
 
 /// Describes the primitive and payload contract shared by every stage in one hit group.
+///
+/// Conformance to `IPayloadContext` supplies the inherited `TraceContext`, `Record`, and `Payload`
+/// requirements. The hit group requires its stage contexts to equal this complete context type.
 public interface IHitContext : IPayloadContext
 {
+    /// Selects the geometry kind and the attributes exposed by the hit-stage inputs.
+    ///
+    /// @par Constraints
+    /// Must conform to the sealed `IIntersectionPrimitive` interface. Select `TrianglePrimitive`,
+    /// `CurvePrimitive`, or `BoundingBoxPrimitive<CustomAttributes>`. An intersection shader
+    /// additionally requires `ICustomIntersectionPrimitive`; `NoIntersection` instead requires
+    /// `IBuiltinIntersectionPrimitive`. Those stage constraints restrict this selection when a
+    /// hit group is assembled.
     associatedtype Primitive : IIntersectionPrimitive;
 }
 
@@ -62,6 +103,10 @@ public interface ICallableContext : IStageContext
     /// Describes the mutable data supplied by shader code to `RayTracer.callShader`.
     /// The callable stage reads and updates that argument through `input.data`, and the caller
     /// observes those updates when the call returns.
+    ///
+    /// @par Constraints
+    /// This associated type has no conformance constraint. The argument passed to `callShader`
+    /// and the receiving callable stage must use the same callable-data type.
     associatedtype CallableData;
 }
 

@@ -28,24 +28,34 @@ namespace rt
 ///
 /// Thus a one-payload program uses IDs 0 through 4. Each table occupies one argument-buffer ID;
 /// its function slots and the host's SBT record indices are separate from these resource bindings.
-/// A standalone descriptor's argument buffer is bound at the entry point's reflected `[[buffer(B)]]`
-/// index. `B` follows normal parameter binding allocation and is not a fixed slot such as zero.
+/// A standalone descriptor's argument buffer is bound at the entry point's reflected
+/// `[[buffer(B)]]` index. `B` follows normal parameter binding allocation and is not a fixed slot
+/// such as zero.
 /// A descriptor inside another ParameterBlock follows that containing parameter's reflected layout.
 /// The host must use reflection for the outer binding, payload partitions, and resource IDs rather
 /// than infer them from source declaration order. TODO: implement this target layout and its
 /// reflection in the adapter slice; this frontend slice diagnoses descriptors reaching codegen.
+/// @tparam Schema The trace context and finite shader lists describing the bound program.
+///
+/// @par Constraints
+/// `Schema` must conform to `ITraceProgramSchema`.
 /// @category raytracing
 __magic_type(TraceProgramDescriptorType)
 __intrinsic_type(TraceProgramDescriptor)
 public struct TraceProgramDescriptor<Schema>
     where Schema : ITraceProgramSchema
 {
-    // Suppress the synthesized public constructor without declaring a default constructor.
-    // Consider `struct Bindings { TraceProgramDescriptor<MySchema> program; }`, bound through
-    // `ParameterBlock<Bindings>`. A private zero-argument constructor would still be selected as
-    // the field's default initializer while synthesizing Bindings' constructor, then fail access
-    // checking. Requiring an argument leaves the descriptor non-default-initializable, so the
-    // containing binding struct can carry a host-supplied handle without trying to construct one.
+    /// Suppresses the synthesized public constructor without declaring a default constructor.
+    ///
+    /// Consider `struct Bindings { TraceProgramDescriptor<MySchema> program; }`, bound through
+    /// `ParameterBlock<Bindings>`. A private zero-argument constructor would still be selected as
+    /// the field's default initializer while synthesizing `Bindings`' constructor, then fail access
+    /// checking. Requiring an argument leaves the descriptor non-default-initializable, so the
+    /// containing binding struct can carry a host-supplied handle without trying to construct one.
+    /// @param[in] unavailable An unused argument preventing implicit default construction.
+    ///
+    /// @par Constraints
+    /// Private to this type; callers obtain descriptors through host binding.
     private __init(int unavailable) {}
 }
 

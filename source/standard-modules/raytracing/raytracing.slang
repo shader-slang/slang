@@ -1,4 +1,8 @@
-/** Experimental structural pipeline ray tracing API. */
+/// Provides the experimental structural pipeline ray-tracing API.
+///
+/// @par Availability
+/// Requires an explicit `import slang.raytracing` and the `-experimental-feature` option.
+/// Target adapter synthesis is deferred; API declarations remain available for frontend checking.
 [ExperimentalModule]
 module raytracing;
 
