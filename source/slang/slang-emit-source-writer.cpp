@@ -253,11 +253,14 @@ void SourceWriter::emit(double value)
 
     int expBase2;
     std::frexp(value, &expBase2);
-    // Fixed precision counts fractional digits. For magnitudes at least 0.5
-    // (expBase2 >= 0), max_digits10 fractional digits guarantee enough significant digits.
+    // frexp writes value = mantissa * 2^expBase2 with |mantissa| in [0.5, 1), so
+    // expBase2 < 0 means a nonzero magnitude below 0.5. Fixed precision counts fractional
+    // digits; at magnitude 0.5 or above, max_digits10 fractional digits are sufficient.
     // Consider (1 + 2^-30) / 65536: fixed precision would discard low significand
     // bits after its leading fractional zeros. Scientific notation preserves those bits.
-    // Keep zero in fixed format and the existing large-value scientific threshold.
+    // frexp gives zero exponent 0, keeping zero in fixed format. Retain the large-value
+    // cutoff at expBase2 >= 17 (magnitude >= 2^16) to keep large literals compact. This
+    // cutoff controls presentation; unlike the small-value cutoff, it is not needed for precision.
     std::ios::fmtflags flags =
         (expBase2 < 0 || expBase2 >= 17) ? std::ios::scientific : std::ios::fixed;
 

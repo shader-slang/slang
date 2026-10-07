@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
+
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O0
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -O3
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -O0
@@ -47,6 +50,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     case 20: ok = actual == -0x1.0000000000001p-1022l; break;
     case 21: ok = actual == -0x0.0000000000001p-1022l; break;
     }
+    // Give each successful lane a distinct marker so ordered checks identify which
+    // input failed, rather than accepting a marker from a different passing lane.
     outputBuffer[lane] = ok ? 8000 + lane : 0;
 }
 
@@ -72,3 +77,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: 8019
 // CHECK: 8020
 // CHECK: 8021
+
+// Check the complete spelling, not just the exponent: scientific notation with too
+// few significant digits would still lose bits. GLSL also needs its double suffix.
+// HLSL: == 1.52587890767108547e-05;
+// HLSL: == -1.52587890767108547e-05;
+// GLSL: == 1.52587890767108547e-05LF;
+// GLSL: == -1.52587890767108547e-05LF;
