@@ -83,7 +83,7 @@ SLANG_UNIT_TEST(downstreamArgsSelfOverrideWithDoublesTheList)
 }
 
 // `inheritFrom` and `copyWithoutLevelLocalOptions` never carry `DownstreamArgs` from one level to
-// another, while the other options still flow as before.
+// another, while other options are still inherited and copied.
 SLANG_UNIT_TEST(downstreamArgsAreNotInheritedOrCopied)
 {
     CompilerOptionSet session;

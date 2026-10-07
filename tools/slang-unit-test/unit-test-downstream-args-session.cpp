@@ -13,6 +13,8 @@
 
 using namespace Slang;
 
+// slangc registers every known tool name and adds a `DownstreamArgs` entry for each, most of them
+// empty, so we count only the entries that carry arguments.
 static Index countDownstreamArgsEntries(const slang::CompilerOptionEntry* entries, SlangInt count)
 {
     Index result = 0;
@@ -194,4 +196,67 @@ SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
     SLANG_CHECK(
         spirv.indexOf(toSlice("-Xnvrtc --gpu-architecture=compute_86 -Xnvrtc --fmad=true "
                               "-Xnvrtc -DTARGET -Xnvrtc --fmad=false")) != -1);
+}
+
+// Return the session-description digest for a PTX target, with an `nvrtc` `DownstreamArgs` entry
+// at the session level and at the target level; a null argument leaves that level without one.
+static ComPtr<ISlangBlob> getDigestWithNvrtcArgs(
+    slang::IGlobalSession* globalSession,
+    const char* sessionArg,
+    const char* targetArg)
+{
+    slang::CompilerOptionEntry targetEntry = {};
+    targetEntry.name = slang::CompilerOptionName::DownstreamArgs;
+    targetEntry.value.kind = slang::CompilerOptionValueKind::String;
+    targetEntry.value.stringValue0 = "nvrtc";
+    targetEntry.value.stringValue1 = targetArg;
+    slang::CompilerOptionEntry sessionEntry = targetEntry;
+    sessionEntry.value.stringValue1 = sessionArg;
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_PTX;
+    targetDesc.compilerOptionEntries = &targetEntry;
+    targetDesc.compilerOptionEntryCount = targetArg ? 1 : 0;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+    sessionDesc.compilerOptionEntries = &sessionEntry;
+    sessionDesc.compilerOptionEntryCount = sessionArg ? 1 : 0;
+
+    ComPtr<ISlangBlob> digest;
+    globalSession->getSessionDescDigest(&sessionDesc, digest.writeRef());
+    return digest;
+}
+
+static bool sameDigest(ISlangBlob* a, ISlangBlob* b)
+{
+    return a->getBufferSize() == b->getBufferSize() &&
+           memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
+}
+
+// Callers such as SlangPy key their shader caches on `getSessionDescDigest`, so the digest has to
+// change with the `DownstreamArgs` of either level and tell the two levels apart. A target's
+// options no longer hold a copy of the session's, so each level reaches the digest only through its
+// own set.
+SLANG_UNIT_TEST(sessionDescDigestCoversDownstreamArgsAtEachLevel)
+{
+    slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
+
+    ComPtr<ISlangBlob> none = getDigestWithNvrtcArgs(globalSession, nullptr, nullptr);
+    ComPtr<ISlangBlob> sessionFalse =
+        getDigestWithNvrtcArgs(globalSession, "--fmad=false", nullptr);
+    SLANG_CHECK_ABORT(none && sessionFalse);
+
+    SLANG_CHECK(
+        sameDigest(sessionFalse, getDigestWithNvrtcArgs(globalSession, "--fmad=false", nullptr)));
+    SLANG_CHECK(!sameDigest(none, sessionFalse));
+    SLANG_CHECK(
+        !sameDigest(sessionFalse, getDigestWithNvrtcArgs(globalSession, "--fmad=true", nullptr)));
+    SLANG_CHECK(!sameDigest(none, getDigestWithNvrtcArgs(globalSession, nullptr, "--fmad=false")));
+    SLANG_CHECK(
+        !sameDigest(sessionFalse, getDigestWithNvrtcArgs(globalSession, nullptr, "--fmad=false")));
+    SLANG_CHECK(!sameDigest(
+        getDigestWithNvrtcArgs(globalSession, "--fmad=false", "--fmad=true"),
+        getDigestWithNvrtcArgs(globalSession, "--fmad=true", "--fmad=false")));
 }

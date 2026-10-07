@@ -378,7 +378,7 @@ Setting options for tools that aren't used in a Slang compilation has no effect.
 `slangc` finds the boundaries of each forwarded argument before it parses any other option:
 
 * `-X<tool> <arg>` forwards exactly one argument, `<arg>`. A missing `<arg>` is error 100001.
-* `-X<tool>... <args> -X.` forwards every argument up to the matching `-X.`. If there is no `-X.`, it forwards everything up to the end of the command line. A nested `-X<other>...` opens another scope that needs its own `-X.`, and an unclosed nested scope is error 100002.
+* `-X<tool>... <args> -X.` forwards every argument up to the matching `-X.`. If there is no `-X.`, it forwards everything up to the end of the command line. Everything inside is forwarded to `<tool>` unchanged, including any nested `-X<other>... -X.`. Nesting is used only to find the matching `-X.`, so a nested `-X<other>...` needs its own `-X.`, and an unclosed nested scope is error 100002.
 * `-X.` outside an open `-X<tool>...` scope is error 100003. A bare `-X` with no tool name is error 100004, and an unknown tool name is error 100000.
 
 For example, in `-Xnvrtc --fmad=true --fmad=false -X` only `--fmad=true` belongs to `-Xnvrtc`. `--fmad=false` is left as an ordinary `slangc` argument and is not forwarded. The trailing `-X` then fails with error 100004 while `slangc` is still separating out the downstream arguments, before ordinary options are parsed. Without the trailing `-X`, `slangc` instead rejects `--fmad=false` as an unknown option. To forward both arguments, write `-Xnvrtc --fmad=true -Xnvrtc --fmad=false` or `-Xnvrtc... --fmad=true --fmad=false -X.`.
@@ -1179,7 +1179,7 @@ The final tool invocation can still order some arguments differently, because ex
 
 The downstream compiler decides how repeated or conflicting arguments are handled, and that behavior can differ between tools and between versions of the same tool. Slang does not guarantee either "last one wins" or a rejection. For example, NVRTC 12.6 rejects `--fmad=true --fmad=false` with "defined more than once". NVRTC 13.0.88 has been reported to accept the same pair with a warning and use `false`, and to accept two identical `--fmad=false` arguments silently. To control a flag precisely, pass it at one level only.
 
-Earlier versions of Slang could discard the session's entire argument list for a tool when `linkWithOptions` also supplied arguments for that tool, so the session's `--gpu-architecture` was lost in the example above. Slang now passes both lists.
+Earlier versions of Slang could discard the session's entire argument list for a tool when a target description or `linkWithOptions` also supplied arguments for that tool, so the session's `--gpu-architecture` was lost in the example above. Slang now passes both lists.
 
 ### Compiler Option ABI Stability
 
