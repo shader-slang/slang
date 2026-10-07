@@ -1995,7 +1995,7 @@ int SemanticsVisitor::CompareLookupResultItems(
     }
     if (rigthIsExtern)
     {
-        return (leftIsExtern ? -1 : 0);
+        return -1;
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
