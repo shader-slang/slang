@@ -5,9 +5,8 @@
 // emitted code still marks the heap index non-uniform regardless of opt-pass ordering.
 //
 // The property is asserted on the HLSL backend, where `NonUniformResourceIndex` is the SM6.6
-// surface form and its survival is directly observable. SPIR-V decoration is checked in
-// `desc-heap-nonuniform-spirv.slang`: the default heap path carries `NonUniform`, whereas
-// `spvDescriptorHeapEXT` needs no decoration because heap accesses are non-uniform by default.
+// surface form and its survival is directly observable. SPIR-V decoration is covered by
+// `desc-heap-nonuniform-spirv.slang`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6

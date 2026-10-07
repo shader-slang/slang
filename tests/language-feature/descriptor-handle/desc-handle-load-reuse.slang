@@ -25,10 +25,8 @@
 // value, so one load yields that lane's resource and every use reuses it. Divergence is *across
 // lanes*, not across the repeated uses, so a single load per lane is right; a divergent case is
 // asserted below to pin that it coalesces to the same two loads (parity with the already-shipping
-// `spvDescriptorHeapEXT` path). The divergent entry point's heap accesses do carry a `NonUniform`
-// decoration while the uniform one's do not, so the two differ in decoration even though they
-// coalesce identically -- the coalescing invariant this file pins is independent of that
-// decoration. The decoration behavior itself is covered by desc-heap-nonuniform-spirv.slang.
+// `spvDescriptorHeapEXT` path). `NonUniform` decoration is covered by
+// desc-heap-nonuniform-spirv.slang.
 //
 // These use the DEFAULT SPIR-V path (no `spvDescriptorHeapEXT`): that path lowers a
 // `DescriptorHandle<T>` to `getElement(__slang_resource_heap, index)`, which the legalizer turns
