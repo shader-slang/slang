@@ -1,11 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute
 
-// #13168: emittable snippet operands still lower to real SPIR-V. `const(uint, ...)` and
-// `const(half, ...)` are emittable (the type-operand path already lowers `uint`/`half`), a
-// `const(_p, ...)` on a float-returning intrinsic resolves to `float`, and a `_type(...)` naming an
-// emittable type lowers on the type-operand path. emitSpvConstant / emitSpvSnippetASMTypeOperand
-// emit an `OpConstant` / type for each, so the snippets below lower to `OpIAdd` / `OpFAdd` /
-// `OpBitcast`. Two distinct `half` constants pin the cache-keying fix (see addQuarterHalf).
+// Emittable operands (`const(uint|half)`, a float-resolving `const(_p)`, `_type(uint)`) lower to
+// SPIR-V, and distinct `half` constants are not merged by the constant cache.
 
 RWStructuredBuffer<float> outBuf;
 
@@ -15,8 +11,6 @@ uint addSevenU(uint x);
 __target_intrinsic(spirv, "OpFAdd resultType resultId _0 const(half, 0.5)")
 half addHalfConst(half x);
 
-// A second, distinct `half` constant: the constant cache keys on `floatValues`, so distinct half
-// values must emit distinct `OpConstant`s rather than collapsing to a single shared one.
 __target_intrinsic(spirv, "OpFAdd resultType resultId _0 const(half, 0.25)")
 half addQuarterHalf(half x);
 
@@ -37,8 +31,7 @@ void computeMain()
     outBuf[4] = float(reinterpretAsUInt(outBuf[4]));
 }
 
-// The disassembler prints half constants in hex (0.5 -> 0x1p-1, 0.25 -> 0x1p-2) but the float
-// constant in decimal (0.5); the two half values are distinct, proving the cache does not collide.
+// Half constants are printed in hex: 0x1p-1 is 0.5 and 0x1p-2 is 0.25.
 //CHECK-DAG: OpConstant %uint 7
 //CHECK-DAG: OpConstant %half 0x1p-1
 //CHECK-DAG: OpConstant %half 0x1p-2

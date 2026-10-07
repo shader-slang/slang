@@ -1,9 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 
-// #13168: a snippet argument reference `_N` is valid only for `N < argCount`. `outOfRangeArg` takes
-// one argument (only `_0` is valid), so the `_1` reference is out of range and is diagnosed
-// (E29003) during legalization, before emitSpvSnippet would index its argument array out of bounds.
-// `_1` pins the `content >= argCount` boundary that an off-by-one `>` check would miss.
+// `_1` on a one-argument call pins the exclusive `_N < argCount` bound.
 
 RWStructuredBuffer<float> outBuf;
 

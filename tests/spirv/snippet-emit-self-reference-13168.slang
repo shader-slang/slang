@@ -1,11 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 
-// #13168: an instruction reference `%name` inside a snippet emits as an index into the instructions
-// already emitted before it, so it must name a strictly-earlier instruction. The parser registers a
-// result name before parsing that instruction's own operands, so the self-reference `%a = OpNop %a`
-// resolves to its own not-yet-emitted index and slips past the parser's undefined-name check (a
-// forward reference is still caught there). validateSpvSnippet diagnoses it (E29003) during
-// legalization, before emitSpvSnippet would index its emittedInsts array out of bounds.
+// The parser registers `%a` before its operands, so this self-reference reaches legalization,
+// which must reject it.
 
 RWStructuredBuffer<float> outBuf;
 

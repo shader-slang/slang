@@ -1,11 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry computeMain -stage compute
 
-// #13168: the SPIR-V emitter lowers only a fixed set of snippet type operands (isEmittableASMType).
-// A `_type(...)` naming a type outside that set -- `double`, the `_p` float-or-double placeholder
-// (a type operand has no result-type resolution), or an unrecognized token (mapped to the `None`
-// sentinel by parseASMType) -- is diagnosed (E29003) during SPIR-V legalization, before it reaches
-// the emitter. `__target_intrinsic` is in baseLanguageScope, so such a snippet is reachable from
-// ordinary user code.
+// A `_type(...)` of an unemittable type, including `_p`, which has no result-type resolution, is
+// diagnosed before emission.
 
 RWStructuredBuffer<float> outBuf;
 
