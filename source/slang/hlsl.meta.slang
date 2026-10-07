@@ -19904,6 +19904,303 @@ ${
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 $}
 
+//@public:
+
+//
+// Wave Clustered intrinsics.
+// These are Slang specific intrinsics corresponding to GL_KHR_shader_subgroup_clustered.
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredSum(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredSum(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
+            OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredProduct(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredProduct(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMul($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredMin(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredMin(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMin($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredMax(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredMax(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredMax($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return value;
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitAnd(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitAnd(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitOr(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitOr(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredOr($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public T WaveClusteredBitXor(T value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_clustered)
+[ForceInline]
+[require(glsl_spirv, subgroup_clustered)]
+public vector<T,N> WaveClusteredBitXor(vector<T,N> value, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredXor($0, $1)";
+    case spirv:
+        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
+    }
+}
 
 //
 // Quad Control intrinsics
@@ -21774,18 +22071,22 @@ extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback
 //
 
 /// Returns the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader.
-/// @return Zero-based index of the geometry in the current instance
+/// @return Zero-based index of the geometry in the current instance. On CUDA/OptiX, the SBT GAS index
+/// of the hit primitive, which equals the geometry index when every build input of the geometry
+/// acceleration structure has one shader binding table record (see "Geometry index" in the CUDA target
+/// documentation).
 /// @remarks Available in intersection, any-hit, and closest-hit shaders
 /// @category raytracing
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 uint GeometryIndex()
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "GeometryIndex";
     case glsl: __intrinsic_asm "(gl_GeometryIndexEXT)";
+    case cuda: __intrinsic_asm "optixGetSbtGASIndex";
     case spirv: return spirv_asm {
             result:$$uint = OpLoad builtin(RayGeometryIndexKHR:uint);
         };
@@ -23908,6 +24209,8 @@ struct HitObject
         /// TraceRay. The computed index must reference a valid hit group record in the shader table. The
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -24094,6 +24397,8 @@ struct HitObject
         /// reference a valid hit group record in the shader table. The Attributes parameter must either be an
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
+        /// On CUDA/OptiX, GeometryIndex is an SBT GAS index (see `GeometryIndex()`), and with OptiX 9.0 and
+        /// later the hit-identifying arguments are not used (see "Geometry index" in the CUDA target documentation).
     [ForceInline]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
@@ -24855,6 +25160,7 @@ struct HitObject
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
+        /// On CUDA/OptiX, returns the SBT GAS index of the hit primitive; see `GeometryIndex()`.
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -32808,83 +33114,12 @@ extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
     }
 }
 
-// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
-// The specialization is only here to satisfy differentiable arithmetic requirements.
+// Reuse the existing arithmetic methods so `x * x` and `x.mul(x)` select the same custom
+// derivative. Redeclaring [Differentiable] methods here would instead ask autodiff to
+// differentiate their target-specific intrinsic bodies.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 extension CoopVec<T, N> : IDifferentiableArithmetic
 {
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This add(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 + $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecAdd($0, $1)";
-        default: return __pureAdd(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This sub(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 - $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecSub($0, $1)";
-        default: return __pureSub(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    This mul(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 * $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecMul($0, $1)";
-        default: return __pureMul(other);
-        }
-    }
-
-    [Differentiable]
-    [ForceInline]
-    [require(cooperative_vector)]
-    This div(This other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 / $1";
-        default: return __pureDiv(other);
-        }
-    }
-
-    [Differentiable]
-    [require(cooperative_vector)]
-    This neg()
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "-$0";
-        default: return __pureNeg(this);
-        }
-    }
 }
 
 // Conditional custom derivatives for floating-point CoopVec arithmetic. Keeping these

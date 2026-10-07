@@ -463,19 +463,15 @@ not what gets counted:
   attribution for codebases with heavy generic / template use —
   matters most for neural-slang.
 
-### Cross-repo follow-ups
+### Runtime integration
 
-Tracked outside this repository:
-
-- **slang-rhi synthetic-resource binding.** Lets hosts that dispatch
-  via slang-rhi bind the hidden coverage buffer through
-  `bindSyntheticResource(...)` instead of their own pipeline-layout
-  code.
-  [shader-slang/slang-rhi#739](https://github.com/shader-slang/slang-rhi/pull/739).
-- **slang-rhi Metal backend binding quirk.** The slang-rhi Metal
-  backend returns garbage counter values; direct Metal hosts are
-  unaffected.
-  [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
+- **slang-rhi synthetic-resource binding.** Available for global resources on
+  Vulkan and CUDA through `ShaderProgramSyntheticResourcesDesc` and
+  `bindSyntheticResource(...)`; other RHI backends do not yet support it.
+  See the [host integration guide](shader-coverage-host-interface.md#slang-rhi-consumption-model)
+  and the image-pipeline and BVH examples.
+- **Metal.** Use the native Metal path in `shader-coverage-backends` until
+  RHI implements synthetic-resource binding for Metal.
 
 ### Possible extensions
 
