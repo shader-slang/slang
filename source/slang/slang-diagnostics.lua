@@ -4295,6 +4295,13 @@ standalone_note(
 )
 
 standalone_note(
+    "suggest-generic-parameter-constraint",
+    40026,
+    "consider constraining '~param:Name' as '~param:Name : ~constraintType:Type' to satisfy an overload's requirement '~required:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
     "overload-candidate-generic-constraint-not-satisfied", -- keep in sync with E30440's span message
     40023,
     "could not satisfy the generic constraint '~constraint:String'",
