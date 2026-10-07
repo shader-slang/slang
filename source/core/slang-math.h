@@ -221,21 +221,27 @@ inline unsigned short FloatToHalf(float val)
     const unsigned int fraction = bits & 0x007fffffu;
     if (exponent == 255)
     {
-        // Preserve the established NaN classification and sign, even if all payload bits
-        // would otherwise be discarded by narrowing.
+        // Preserve the NaN-vs-infinity distinction and sign. As before, narrowing does not
+        // preserve the NaN payload or distinguish quiet NaNs from signaling NaNs.
         return (unsigned short)(sign | 0x7c00u | (fraction != 0));
     }
+    // Float32 uses bias 127; Half uses bias 15. Exponents above 127 + 15 overflow.
     if (exponent > 142)
         return (unsigned short)(sign | 0x7c00u);
+    // Half subnormals are multiples of 2^-24. Values below 2^-25 round to zero.
     if (exponent < 102)
         return (unsigned short)sign;
 
     const unsigned int significand = fraction | 0x00800000u;
+    // Below 127 - 14, align to the Half subnormal grid at 2^-24: discard
+    // 23 - (exponent - 127) - 24 = 126 - exponent bits. Otherwise discard 23 - 10 bits.
     const unsigned int shift = exponent < 113 ? 126 - exponent : 13;
     unsigned int result = exponent < 113 ? 0 : (exponent - 113) << 10;
     result += significand >> shift;
     const unsigned int remainder = significand & ((1u << shift) - 1);
     const unsigned int halfway = 1u << (shift - 1);
+    // result is the truncated Half encoding in both branches, so its low bit selects
+    // even ties. A carry can reach the minimum normal or advance the exponent to infinity.
     result += remainder > halfway || (remainder == halfway && (result & 1));
     return (unsigned short)(sign | result);
 }
