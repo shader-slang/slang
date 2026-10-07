@@ -131,7 +131,7 @@ python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
 
 The host in [`main.cpp`](main.cpp) runs these steps:
 
-| Stage     | What happens                                                                                                                  | Key API                                                          |
+| Stage     | Description                                                                                                                   | Key API                                                          |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Compile   | Enable line, function and branch coverage. Request set 1, binding 0 with `TraceCoverageBinding`.                              | `IComponentType::link`, `getEntryPointCode`                      |
 | Describe  | Read synthetic-resource metadata and register it before RHI creates the program.                                              | `getCoverageResourceDesc`, `ShaderProgramSyntheticResourcesDesc` |
@@ -240,6 +240,18 @@ to build the full LCOV directly, skipping the manifest+converter step.
 - Counters default to 32 bits for MoltenVK. `--counter-width=64` requires
   `AtomicInt64` support; device creation fails if no suitable device is available.
 
+### Application output and diagnostics
+
+Pass `--output-file=results.bin` to save the final application output, including
+with `--no-coverage`. The parent directory must exist. The file contains four
+native-endian float32 components per pixel/ray in row-major order. Image full mode
+saves the result of the final configuration. Readback occurs after the timed loop.
+This option initializes the output to NaNs so the regression detects missing writes.
+
+RHI messages and failing SlangResult values are printed to stderr. If the backend
+reports device loss during a count-mode dispatch, reduce the tile/batch size or
+use `--coverage-mode=boolean` to reduce atomic contention.
+
 ### Checking the RHI integration
 
 After building both workflow examples, run this from the repository root:
@@ -250,6 +262,7 @@ python3 examples/shader-coverage-common/check-rhi-examples.py --bin-dir build/Re
 
 The check runs small smoke/full workloads, compares tiled/batched counters with
 single-dispatch counters, checks count/boolean hit locations and LCOV export,
-and runs coverage-disabled baselines. On a GPU with 64-bit buffer atomics,
+and compares finite application output across recording modes, batching and
+coverage-disabled baselines (with a small floating-point tolerance). On a GPU with 64-bit buffer atomics,
 repeat with `--counter-width=64`. Windows can use `python` in place of `python3`;
 pass the actual executable directory with `--bin-dir` for a custom build tree.

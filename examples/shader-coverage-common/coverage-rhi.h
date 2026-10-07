@@ -1,11 +1,50 @@
 #pragma once
 
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <slang-rhi.h>
 #include <slang-rhi/synthetic-bindings.h>
 #include <stdexcept>
+#include <string>
 
 namespace coverageDemo
 {
+
+// Forward RHI diagnostics to stderr, including the backend's explanation of failures.
+// The callback must outlive the device. A single fprintf call keeps each message together
+// when RHI reports from multiple threads.
+class DiagnosticCallback : public rhi::IDebugCallback
+{
+public:
+    SLANG_NO_THROW void SLANG_MCALL handleMessage(
+        rhi::DebugMessageType type,
+        rhi::DebugMessageSource source,
+        const char* message) override
+    {
+        std::fprintf(stderr, "RHI: %s\n", message);
+    }
+};
+
+// Write application output after the caller has waited for all GPU submissions.
+// This optional readback is independent of coverage artifacts, so regressions can
+// compare covered and uncovered execution without changing the timing loop.
+inline void writeOutputBuffer(
+    rhi::IDevice* device,
+    rhi::IBuffer* buffer,
+    const std::filesystem::path& path)
+{
+    rhi::ComPtr<slang::IBlob> data;
+    auto result = device->readBuffer(buffer, 0, buffer->getDesc().size, data.writeRef());
+    if (SLANG_FAILED(result))
+        throw std::runtime_error(
+            "read output buffer failed with SlangResult " + std::to_string(result));
+    std::ofstream output(path, std::ios::binary);
+    output.write(static_cast<const char*>(data->getBufferPointer()), data->getBufferSize());
+    output.close();
+    if (!output)
+        throw std::runtime_error("failed to write output buffer to " + path.string());
+}
 
 // Coverage in these demos produces one global read/write buffer. Translate its
 // compiler metadata before creating the RHI program; ordinary reflection does

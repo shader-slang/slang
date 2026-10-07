@@ -84,5 +84,5 @@ LCOV report shows it in red.
 For a host using slang-rhi, continue with the
 [image-pipeline example](../shader-coverage-image-pipeline/). For an engine with
 its own runtime, use the [native backend example](../shader-coverage-backends/).
-See [Choose your coverage integration path](../../docs/user-guide/a3-01-shader-coverage.md#choose-your-coverage-integration-path)
+See [Coverage integration options](../../docs/user-guide/a3-01-shader-coverage.md#coverage-integration-options)
 for the available workflows.

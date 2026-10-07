@@ -12,7 +12,7 @@ Most examples use `slang-rhi` to manage GPU resources and dispatch shaders.
 Using it is optional: the native coverage backend example below demonstrates
 integration with an application's own runtime.
 
-## Choose your coverage integration path
+## Coverage integration options
 
 | Your host                             | Start here                                        | Binding demonstrated                                                     |
 | ------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |

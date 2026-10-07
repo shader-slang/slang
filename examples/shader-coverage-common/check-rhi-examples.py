@@ -8,6 +8,8 @@ Use --counter-width=64 only on a device with 64-bit buffer atomics.
 
 import argparse
 import json
+import math
+import struct
 from pathlib import Path
 import subprocess
 import sys
@@ -49,6 +51,25 @@ def covered_entries(manifest, counters):
     return covered
 
 
+def read_output(path, element_count):
+    """Read float4 results and reject unwritten NaN sentinels or invalid values."""
+    raw = path.read_bytes()
+    assert len(raw) == element_count * 4 * 4, "Unexpected application output size"
+    values = struct.unpack(f"={element_count * 4}f", raw)
+    assert all(math.isfinite(value) for value in values), "Unwritten or non-finite output"
+    assert any(value != 0 for value in values), "Expected nonzero application output"
+    return values
+
+
+def check_output(reference, actual):
+    """Allow ordinary float rounding changes caused by instrumentation."""
+    assert len(reference) == len(actual)
+    for index, (expected, value) in enumerate(zip(reference, actual)):
+        assert math.isclose(expected, value, rel_tol=1e-5, abs_tol=1e-6), (
+            f"Application output differs at component {index}: {expected} != {value}"
+        )
+
+
 def main():
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
@@ -58,25 +79,43 @@ def main():
     suffix = ".exe" if sys.platform == "win32" else ""
     converter = root / "tools" / "shader-coverage" / "slang-coverage-to-lcov.py"
     demos = [
-        ("image-pipeline", ["--width=24", "--height=17"], "--tile-rows", 8),
-        ("bvh-traversal", ["--ray-grid-size=17"], "--batch-size", 64),
+        ("image-pipeline", ["--width=24", "--height=17"], "--tile-rows", 8, 24 * 17),
+        ("bvh-traversal", ["--ray-grid-size=17"], "--batch-size", 64, 17 * 17),
     ]
     runs = 0
     with tempfile.TemporaryDirectory(prefix="slang-rhi-coverage-") as temp:
-        for name, dimensions, batch_flag, batch_size in demos:
+        for name, dimensions, batch_flag, batch_size, element_count in demos:
             binary = (args.bin_dir / f"shader-coverage-{name}{suffix}").resolve()
             shader_dir = root / "examples" / f"shader-coverage-{name}"
             base = [str(binary), *dimensions, f"--demo-dir={shader_dir}",
                     f"--counter-width={args.counter_width}"]
             for mode in ("smoke", "full"):
+                # The uncovered whole dispatch is the reference for both recording
+                # modes and batching. Keep output files separate from coverage artifacts.
+                reference = None
+                for batch in (0, batch_size):
+                    output = Path(temp) / f"{name}-{mode}-disabled-{batch}"
+                    output_file = output.with_suffix(".output.bin")
+                    run([*base, f"--mode={mode}", "--no-coverage", f"{batch_flag}={batch}",
+                         f"--output-dir={output}", f"--output-file={output_file}"])
+                    runs += 1
+                    assert not output.exists(), "Coverage-disabled run wrote coverage artifacts"
+                    actual = read_output(output_file, element_count)
+                    if reference is None:
+                        reference = actual
+                    else:
+                        check_output(reference, actual)
                 hits = {}
                 for recording in ("count", "boolean"):
                     results = []
                     for batch in (0, batch_size):
                         output = Path(temp) / f"{name}-{mode}-{recording}-{batch}"
+                        output_file = output.with_suffix(".output.bin")
                         run([*base, f"--mode={mode}", f"--coverage-mode={recording}",
-                             f"{batch_flag}={batch}", f"--output-dir={output}"])
+                             f"{batch_flag}={batch}", f"--output-dir={output}",
+                             f"--output-file={output_file}"])
                         runs += 1
+                        check_output(reference, read_output(output_file, element_count))
                         manifest, counters = read_counters(output, mode, args.counter_width)
                         if recording == "boolean":
                             assert set(counters) <= {0, 1}, "Boolean counters must be hit flags"
@@ -89,12 +128,7 @@ def main():
                     assert results[0] == results[1], f"Batching changed coverage: {name}/{mode}/{recording}"
                     hits[recording] = covered_entries(*results[0])
                 assert hits["count"] == hits["boolean"], f"Recording mode changed hit locations: {name}/{mode}"
-                output = Path(temp) / f"{name}-{mode}-disabled"
-                run([*base, f"--mode={mode}", "--no-coverage", f"{batch_flag}={batch_size}",
-                     f"--output-dir={output}"])
-                runs += 1
-                assert not output.exists(), "Coverage-disabled run wrote coverage artifacts"
-                print(f"PASS {name}/{mode}: batching, count/boolean, export, coverage disabled", flush=True)
+                print(f"PASS {name}/{mode}: output, batching, count/boolean, export, coverage disabled", flush=True)
     print(f"PASS {runs} Vulkan demo runs ({args.counter_width}-bit counters)")
 
 

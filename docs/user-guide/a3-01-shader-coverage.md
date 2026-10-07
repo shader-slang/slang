@@ -283,7 +283,7 @@ entry point metadata (`slang::ISyntheticResourceMetadata`: binding location;
 `slang::ICoverageTracingMetadata`: counters and source attribution) instead of a sidecar
 file.
 
-## Choose your coverage integration path
+## Coverage integration options
 
 | Your host                             | Start here                                                       | Binding demonstrated                                                     |
 | ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |

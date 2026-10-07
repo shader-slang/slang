@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <slang-com-ptr.h>
 #include <slang-rhi/shader-cursor.h>
@@ -150,7 +151,7 @@ uint32_t parseUnsigned(std::string_view value, const char* option)
 void checkSlang(SlangResult result, const char* what)
 {
     if (SLANG_FAILED(result))
-        fail(std::string(what) + " failed");
+        fail(std::string(what) + " failed with SlangResult " + std::to_string(result));
 }
 
 void diagnoseIfNeeded(slang::IBlob* diagnostics)
@@ -571,19 +572,14 @@ CompiledShader compileShader(const CompileOptions& options)
     checkSlang(composed->link(linked.writeRef(), diagnostics.writeRef()), "link");
     diagnoseIfNeeded(diagnostics);
 
-    ComPtr<slang::IBlob> code;
-    diagnostics.setNull();
-    checkSlang(
-        linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()),
-        "getEntryPointCode");
-    diagnoseIfNeeded(diagnostics);
-
     CompiledShader out;
     out.session = session;
     out.linkedProgram = linked;
 
     if (options.enableCoverage)
     {
+        // Metadata retrieval emits the shader and describes its generated resources.
+        // Without coverage, RHI requests the code when it builds the program.
         diagnostics.setNull();
         checkSlang(
             linked->getEntryPointMetadata(0, 0, out.metadata.writeRef(), diagnostics.writeRef()),
@@ -735,6 +731,9 @@ int exampleMain(int argc, char** argv)
         // robustness fallback. When set, the demo creates the directory
         // if needed.
         std::filesystem::path outputDir;
+        // Optional application output readback, also supported with --no-coverage.
+        std::filesystem::path outputFile;
+        constexpr std::string_view kOutputFileFlag = "--output-file=";
         // `--demo-dir=<path>`: explicit override for the directory
         // containing the demo's `.slang` assets. Empty (default) means
         // `getDemoDirectory()` discovers them itself (`__FILE__`
@@ -781,6 +780,12 @@ int exampleMain(int argc, char** argv)
                 coverageBoolean = false;
             else if (a == "--coverage-mode=boolean")
                 coverageBoolean = true;
+            else if (a.substr(0, kOutputFileFlag.size()) == kOutputFileFlag)
+            {
+                outputFile = std::string(a.substr(kOutputFileFlag.size()));
+                if (outputFile.empty())
+                    fail("--output-file requires a nonempty path");
+            }
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
@@ -862,7 +867,9 @@ int exampleMain(int argc, char** argv)
         globalsData.triCount = (uint32_t)tris.size();
         globalsData.nodeCount = (uint32_t)nodes.size();
 
+        coverageDemo::DiagnosticCallback diagnosticCallback;
         rhi::DeviceDesc deviceDesc = {};
+        deviceDesc.debugCallback = &diagnosticCallback;
         deviceDesc.deviceType = rhi::DeviceType::Vulkan;
         const rhi::Feature atomicInt64 = rhi::Feature::AtomicInt64;
         if (enableCoverage && counterByteWidth == 8)
@@ -916,8 +923,16 @@ int exampleMain(int argc, char** argv)
             nodes.data());
         auto globalsBuf =
             createStorageBuffer(device, sizeof(Globals), sizeof(Globals), &globalsData);
-        auto outputBuf =
-            createStorageBuffer(device, rays.size() * 4 * sizeof(float), 4 * sizeof(float));
+        // NaN sentinels let the output regression detect unwritten pixels/rays.
+        // Ordinary runs avoid the extra initialization and readback.
+        std::vector<float> initialOutput;
+        if (!outputFile.empty())
+            initialOutput.assign(rays.size() * 4, std::numeric_limits<float>::quiet_NaN());
+        auto outputBuf = createStorageBuffer(
+            device,
+            rays.size() * 4 * sizeof(float),
+            4 * sizeof(float),
+            initialOutput.empty() ? nullptr : initialOutput.data());
         rhi::ShaderCursor cursor(root);
         checkSlang(cursor["rays"].setBinding(rayBuf), "bind rays");
         checkSlang(cursor["triangles"].setBinding(triBuf), "bind triangles");
@@ -998,6 +1013,9 @@ int exampleMain(int argc, char** argv)
                       << (renderMs / batchCount) << " ms/batch)\n";
         else
             std::cout << "render wall time: " << renderMs << " ms\n";
+
+        if (!outputFile.empty())
+            coverageDemo::writeOutputBuffer(device, outputBuf, outputFile);
 
         if (enableCoverage)
         {
