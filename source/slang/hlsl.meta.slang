@@ -29777,6 +29777,36 @@ struct CoopMat
             __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
     }
 
+    // The groupshared overloads of `dx::linalg::Matrix::Load` and `Store` take the array
+    // directly, plus an element index and an element stride (both in units of the array's
+    // element type), unlike the byte-addressed `(RW)ByteAddressBuffer` overloads above.
+    [require(sm_6_10)]
+    [__NoSideEffect]
+    internal static This __hlslLoadGroupshared<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__constref groupshared U[V] data, uint element, uint stride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
+    [require(sm_6_10)]
+    internal void __hlslStoreGroupshared<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__ref groupshared U[V] data, uint element, uint stride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
 
     /// Copies the contents from another cooperative matrix into this matrix.
     /// @param U The element type of the source cooperative matrix.
@@ -30217,7 +30247,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -30225,6 +30255,8 @@ struct CoopMat
     {
         __target_switch
         {
+        case hlsl:
+            __hlslStoreGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -30280,7 +30312,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -30289,6 +30321,8 @@ struct CoopMat
     {
         __target_switch
         {
+        case hlsl:
+            __hlslStoreGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -30502,7 +30536,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -30510,6 +30544,8 @@ $}
     {
         __target_switch
         {
+        case hlsl:
+            return __hlslLoadGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
@@ -30566,7 +30602,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_metal_spirv, cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -30575,6 +30611,8 @@ $}
     {
         __target_switch
         {
+        case hlsl:
+            return __hlslLoadGroupshared<matrixLayout>(data, element, stride);
         case spirv:
             let pointer = __getAddress(data[element]);
             let alignment = 16U;
