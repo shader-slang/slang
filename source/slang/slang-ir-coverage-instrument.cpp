@@ -6,7 +6,6 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-ssa.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
@@ -1319,13 +1318,7 @@ struct CoverageInstrumenter
     // `emitRuntimeProbe` selects the runtime update independently of metadata.
     // Coalesced single-block lines share a probe but retain separate entries;
     // repeated markers of one source line retain only its canonical entry.
-    // `shouldRecord` guards a multi-block count-mode probe with region state.
-    void lowerMarkerOp(
-        IRInst* markerOp,
-        UInt slot,
-        bool emitRuntimeProbe,
-        bool recordEntry = true,
-        IRInst* shouldRecord = nullptr)
+    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe, bool recordEntry = true)
     {
         CoverageTracingEntry entry;
         populateEntryForMarker(markerOp, slot, entry);
@@ -1341,30 +1334,6 @@ struct CoverageInstrumenter
 
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
-
-        // A repeated visit within the same source-line region must not issue
-        // an atomic operation, even an addition of zero: that still contends
-        // on the shared counter. Keep the probe conditional and let ordinary
-        // SSA simplification remove guards whose value is statically known.
-        IRBlock* afterProbe = nullptr;
-        if (shouldRecord)
-        {
-            auto block = as<IRBlock>(markerOp->getParent());
-            SLANG_RELEASE_ASSERT(block);
-            afterProbe = builder.createBlock();
-            afterProbe->insertAfter(block);
-            for (auto inst = markerOp; inst;)
-            {
-                auto next = inst->getNextInst();
-                inst->insertAtEnd(afterProbe);
-                inst = next;
-            }
-            auto probeBlock = builder.createBlock();
-            probeBlock->insertBefore(afterProbe);
-            builder.setInsertInto(block);
-            builder.emitIf(shouldRecord, probeBlock, afterProbe);
-            builder.setInsertInto(probeBlock);
-        }
 
         // Bindless form: select this shader's buffer out of the descriptor
         // array first, then index within it. The array index is uniform by
@@ -1431,9 +1400,6 @@ struct CoverageInstrumenter
             builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
         }
 
-        if (afterProbe)
-            builder.emitBranch(afterProbe);
-
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
         // this removal — the op would otherwise be silently dropped here.
@@ -1444,37 +1410,31 @@ struct CoverageInstrumenter
     void run(List<IRInst*> const& markerOps)
     {
         // A source line can span several blocks: `if (p) return a; else return b;`
-        // must count one visit, not the condition plus the selected return. Treat
-        // its marked blocks as a region. Count entry into that region, and count
-        // another visit when a loop cycles entirely inside it. Blocks without a
-        // line marker are transparent; they are compiler control-flow plumbing.
+        // must count one visit, not the condition plus the selected return. We
+        // group the markers of one function, file and line into a region and count
+        // the region through one block, chosen below.
         struct LineRegion
         {
             IRFunc* func = nullptr;
             String file;
             uint32_t line = 0;
             UInt slot = 0;
-            IRInst* visited = nullptr;
+            IRBlock* countedBlock = nullptr;
             HashSet<IRBlock*> blocks;
         };
         List<LineRegion> regions;
         Dictionary<IRFunc*, Dictionary<String, Dictionary<uint32_t, Index>>> regionIndices;
         Dictionary<IRInst*, Index> markerRegion;
-        Dictionary<IRFunc*, HashSet<IRBlock*>> blocksWithLines;
-        HashSet<IRFunc*> functions;
         List<UInt> slots;
         List<bool> emitsProbe;
         List<bool> recordsEntry;
-        List<IRInst*> probeConditions;
         slots.setCount(markerOps.getCount());
         emitsProbe.setCount(markerOps.getCount());
         recordsEntry.setCount(markerOps.getCount());
-        probeConditions.setCount(markerOps.getCount());
         for (Index i = 0; i < markerOps.getCount(); ++i)
         {
             auto marker = markerOps[i];
             emitsProbe[i] = recordsEntry[i] = true;
-            probeConditions[i] = nullptr;
             if (marker->getOp() != kIROp_IncrementCoverageCounter)
                 continue;
             auto func = getParentFunc(marker);
@@ -1503,8 +1463,6 @@ struct CoverageInstrumenter
             emitsProbe[i] = !region.blocks.contains(block);
             region.blocks.add(block);
             markerRegion.add(marker, regionIndex);
-            blocksWithLines.getOrAddValue(func, HashSet<IRBlock*>()).add(block);
-            functions.add(func);
         }
 
         // Preserve coalescing for lines confined to one block. Different source
@@ -1544,136 +1502,74 @@ struct CoverageInstrumenter
                 emitsProbe[i] = emittedSingleBlockSlots.add(region.slot);
         }
 
-        if (booleanMode)
+        // A line that spans several blocks counts one visit through a single
+        // counted block per region; the other blocks of the region record nothing.
+        //
+        // If the region contains a loop header, that header is the counted block:
+        // it runs once per iteration and once more on exit, which is how often a
+        // reader expects `for (uint i = 0; i < n; ++i)` to be reported even though
+        // its initializer, test, and increment lie in different blocks. Otherwise
+        // the counted block is whichever block of the region dominates the rest, as
+        // in `if (p) return a; else return b;` on one line, where only the
+        // condition's probe is needed. Regions with several entry points keep a
+        // probe at each block that no other block of the region dominates.
+        struct FunctionLoops
         {
-            // Hit flags never reset. If another block in this source-line
-            // region dominates this probe, reaching it already guarantees the
-            // flag is set. In `if (p) return a; else return b;` on one line,
-            // only the condition's store is needed, not either return's store.
-            Dictionary<IRFunc*, RefPtr<IRDominatorTree>> dominators;
-            for (Index i = 0; i < markerOps.getCount(); ++i)
+            RefPtr<IRDominatorTree> dom;
+            HashSet<IRBlock*> loopHeaders;
+        };
+        Dictionary<IRFunc*, FunctionLoops> functionLoops;
+        auto getLoops = [&](IRFunc* func) -> FunctionLoops&
+        {
+            auto& loops = functionLoops.getOrAddValue(func, FunctionLoops());
+            if (!loops.dom)
             {
-                Index regionIndex;
-                if (!emitsProbe[i] || !markerRegion.tryGetValue(markerOps[i], regionIndex))
+                loops.dom = computeDominatorTree(func);
+                for (auto block : func->getBlocks())
+                    for (auto successor : block->getSuccessors())
+                        if (loops.dom->dominates(successor, block))
+                            loops.loopHeaders.add(successor);
+            }
+            return loops;
+        };
+        for (auto& region : regions)
+        {
+            if (region.blocks.getCount() == 1)
+                continue;
+            auto& loops = getLoops(region.func);
+            // Prefer the innermost header: one that no other header of the region
+            // dominates.
+            for (auto block : region.func->getBlocks())
+            {
+                if (!region.blocks.contains(block) || !loops.loopHeaders.contains(block))
                     continue;
-                auto& region = regions[regionIndex];
-                if (region.blocks.getCount() == 1)
-                    continue;
-                auto& dom = dominators.getOrAddValue(region.func, RefPtr<IRDominatorTree>());
-                if (!dom)
-                    dom = computeDominatorTree(region.func);
-                auto block = as<IRBlock>(markerOps[i]->getParent());
-                for (auto parent = dom->getImmediateDominator(block); parent;
-                     parent = dom->getImmediateDominator(parent))
-                {
-                    if (region.blocks.contains(parent))
-                    {
-                        emitsProbe[i] = false;
-                        break;
-                    }
-                }
+                if (!region.countedBlock || loops.dom->dominates(region.countedBlock, block))
+                    region.countedBlock = block;
             }
         }
-        else
+        for (Index i = 0; i < markerOps.getCount(); ++i)
         {
-            IRBuilder builder(module);
-            auto zero = builder.getIntValue(counterElementType, 0);
-            auto one = builder.getIntValue(counterElementType, 1);
-            Dictionary<IRBlock*, IRInst*> blockStarts;
-            for (auto func : functions)
-                for (auto block : func->getBlocks())
-                    blockStarts.add(block, block->getFirstOrdinaryInst());
-            for (auto& region : regions)
+            Index regionIndex;
+            if (!emitsProbe[i] || !markerRegion.tryGetValue(markerOps[i], regionIndex))
+                continue;
+            auto& region = regions[regionIndex];
+            if (region.blocks.getCount() == 1)
+                continue;
+            auto block = as<IRBlock>(markerOps[i]->getParent());
+            if (region.countedBlock)
             {
-                if (region.blocks.getCount() == 1)
-                    continue;
-                builder.setInsertBefore(region.func->getFirstBlock()->getFirstOrdinaryInst());
-                region.visited = builder.emitVar(counterElementType);
-                builder.emitStore(region.visited, zero);
-                for (auto block : region.func->getBlocks())
-                {
-                    if (blocksWithLines[region.func].contains(block) &&
-                        !region.blocks.contains(block))
-                    {
-                        builder.setInsertBefore(blockStarts[block]);
-                        builder.emitStore(region.visited, zero);
-                    }
-                }
+                emitsProbe[i] = block == region.countedBlock;
+                continue;
             }
-
-            // A loop contained in one source line never leaves that line's
-            // region. Split its back edge to start a new visit. A loop spanning
-            // other lines already resets the state on leaving the region.
-            for (auto func : functions)
+            auto& dom = getLoops(region.func).dom;
+            for (auto parent = dom->getImmediateDominator(block); parent;
+                 parent = dom->getImmediateDominator(parent))
             {
-                auto dom = computeDominatorTree(func);
-                List<IREdge> backEdges;
-                for (auto block : func->getBlocks())
-                    for (auto it = block->getSuccessors().begin();
-                         it != block->getSuccessors().end();
-                         ++it)
-                        if (dom->dominates(*it, block))
-                            backEdges.add(it.getEdge());
-                for (auto edge : backEdges)
+                if (region.blocks.contains(parent))
                 {
-                    auto head = edge.getSuccessor();
-                    auto tail = edge.getPredecessor();
-                    List<IRInst*> resetVars;
-                    for (auto& region : regions)
-                    {
-                        if (region.func != func || !region.visited)
-                            continue;
-                        HashSet<IRBlock*> reached;
-                        List<IRBlock*> pending;
-                        pending.add(head);
-                        bool reachesTail = false;
-                        for (Index p = 0; p < pending.getCount(); ++p)
-                        {
-                            auto block = pending[p];
-                            if (reached.contains(block) || (blocksWithLines[func].contains(block) &&
-                                                            !region.blocks.contains(block)))
-                                continue;
-                            reached.add(block);
-                            if (block == tail)
-                            {
-                                reachesTail = true;
-                                break;
-                            }
-                            for (auto successor : block->getSuccessors())
-                                pending.add(successor);
-                        }
-                        if (reachesTail)
-                            resetVars.add(region.visited);
-                    }
-                    if (resetVars.getCount() == 0)
-                        continue;
-                    auto edgeBlock = builder.createBlock();
-                    edgeBlock->insertBefore(head);
-                    builder.setInsertInto(edgeBlock);
-                    List<IRInst*> args;
-                    for (auto param : head->getParams())
-                        args.add(builder.emitParam(param->getDataType()));
-                    for (auto var : resetVars)
-                        builder.emitStore(var, zero);
-                    builder.emitBranch(head, args.getCount(), args.getBuffer());
-                    edge.getUse()->set(edgeBlock);
+                    emitsProbe[i] = false;
+                    break;
                 }
-            }
-
-            for (Index i = 0; i < markerOps.getCount(); ++i)
-            {
-                if (!emitsProbe[i])
-                    continue;
-                Index regionIndex;
-                if (!markerRegion.tryGetValue(markerOps[i], regionIndex))
-                    continue;
-                auto& region = regions[regionIndex];
-                if (!region.visited)
-                    continue;
-                builder.setInsertBefore(markerOps[i]);
-                auto visited = builder.emitLoad(region.visited);
-                probeConditions[i] = builder.emitEql(visited, zero);
-                builder.emitStore(region.visited, one);
             }
         }
         const auto counterCount = (Index)nextSlot;
@@ -1718,15 +1614,7 @@ struct CoverageInstrumenter
         // has always kept the two separate; hosts size the readback buffer
         // from the counter count and attribute results per entry.
         for (Index i = 0; i < markerOps.getCount(); ++i)
-            lowerMarkerOp(
-                markerOps[i],
-                slots[i],
-                emitsProbe[i],
-                recordsEntry[i],
-                probeConditions[i]);
-        if (!booleanMode)
-            for (auto func : functions)
-                constructSSA(module, func);
+            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i], recordsEntry[i]);
     }
 };
 
