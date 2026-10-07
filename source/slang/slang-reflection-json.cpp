@@ -1433,11 +1433,12 @@ static void emitReflectionEntryPointJSON(
         emitReflectionParamJSON(writer, resultVarLayout, reflectionTracker);
     }
 
-    // Mesh and amplification shaders declare `[numthreads]` too, and a Metal host needs it to
-    // size the draw.
+    // Every stage that takes `[numthreads]`, matching `needsNumThreads` in
+    // `slang-check-shader.cpp`. A thread-launch node has no attribute and reports its implicit
+    // size of 1x1x1.
     auto stage = entryPoint->getStage();
     if (stage == SLANG_STAGE_COMPUTE || stage == SLANG_STAGE_MESH ||
-        stage == SLANG_STAGE_AMPLIFICATION)
+        stage == SLANG_STAGE_AMPLIFICATION || stage == SLANG_STAGE_NODE)
     {
         SlangUInt threadGroupSize[3];
         entryPoint->getComputeThreadGroupSize(3, threadGroupSize);
