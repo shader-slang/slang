@@ -404,6 +404,7 @@ class ExtensionDecl : public AggTypeDeclBase
 
 
 // Properties of a checked type used to validate storage and parameter declarations.
+//
 // `SemanticsVisitor::getTypeTags` combines these flags for instantiated fields and base types.
 enum class TypeTag
 {

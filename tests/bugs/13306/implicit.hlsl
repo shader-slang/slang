@@ -18,4 +18,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK: result code = 0
 // CHECK: warning[E39019]
 // CHECK: 'x' is implicitly a global shader parameter
-// CHECK-NOT: SLANG_uniformParameter
+// CHECK-NOT: $uniformParameter_

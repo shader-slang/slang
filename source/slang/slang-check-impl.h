@@ -1967,6 +1967,12 @@ public:
             getDefaultDeclRef(declToSpecialize));
     }
 
+    /// Construct a checked variable or member expression for `declRef`.
+    ///
+    /// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
+    /// Selects the expression kind from the base and whether the declaration is static. The result
+    /// includes the declaration's type and the read/write restrictions of any instance-member
+    /// access.
     DeclRefExpr* ConstructDeclRefExpr(
         DeclRef<Decl> declRef,
         Expr* baseExpr,
@@ -3576,9 +3582,10 @@ public:
 
     /// Compute the storage properties of `type`, including its specialized instance fields.
     ///
-    /// Checks aggregate and field declarations only far enough to use their types; it does not
-    /// check field initializers. For example, `struct Box<T> { T value; };` has an opaque field
-    /// when instantiated as `Box<Texture2D>`, but not as `Box<float>`.
+    /// Checks aggregate and field declarations only far enough to use their types. Field
+    /// initializers are checked only when needed to infer a type or array bound. For example,
+    /// `struct Box<T> { T value; };` has an opaque field when instantiated as `Box<Texture2D>`,
+    /// but not as `Box<float>`.
     /// Returns established flags, rather than proof that absent properties cannot occur.
     /// Unsubstituted generic parameters have no established flags. Includes `TypeTag::Incomplete`
     /// for externally replaceable definitions and link-time aliases, and when recursive

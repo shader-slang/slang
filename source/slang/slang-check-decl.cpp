@@ -688,6 +688,9 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
     // Determine the type and mutability of a uniform parameter shadow.
+    //
+    // Requires the parser-created association in `decl->uniformParameter`. Sets the checked type
+    // and `shouldBeImmutableAlias`; the shadow has no written type or initializer to check.
     void visitUniformParameterShadowVarDecl(UniformParameterShadowVarDecl* decl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
@@ -2769,10 +2772,6 @@ static bool requiresSizedVariableType(VarDeclBase* decl)
     return true;
 }
 
-// Determine the type and mutability of a uniform parameter shadow.
-//
-// Requires the parser-created association in `decl->uniformParameter`. Sets the checked type
-// and `shouldBeImmutableAlias`; the shadow has no written type or initializer to check.
 void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
     UniformParameterShadowVarDecl* decl)
 {

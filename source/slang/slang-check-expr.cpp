@@ -356,11 +356,6 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-// Diagnose use of a deprecated or removed declaration at `loc`.
-//
-// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language version
-// to decide whether removal applies; reports nothing when no module is available. Inspects
-// `originalExpr`, when non-null, to suppress repeats and uses at the declaration's name location.
 void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
@@ -477,11 +472,6 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     return true;
 }
 
-// Construct a checked variable or member expression for `declRef`.
-//
-// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
-// Selects the expression kind from the base and whether the declaration is static. The result
-// includes the declaration's type and the read/write restrictions of any instance-member access.
 DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     DeclRef<Decl> declRef,
     Expr* baseExpr,
@@ -627,7 +617,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                                          (expr->type.hasReadOnlyOnTarget == false);
 
                 // A property may be writable without a writable base. We inspect its first
-                // setter or ref accessor to determine whether it requires writable receiver storage.
+                // setter or ref accessor to determine whether it requires writable receiver
+                // storage.
                 if (!expr->type.isLeftValue)
                 {
                     if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))

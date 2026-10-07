@@ -200,6 +200,8 @@ bool isResourceType(IRType* type)
 }
 
 
+// A type property tested by the queries for by-value storage.
+//
 // The queries below inspect the values stored in an aggregate. The compiler represents a
 // native pointer as an address, with separate storage for the pointed-to value. These queries
 // treat parameter-group types as leaves because `isResourceType` classifies them as opaque.
@@ -289,12 +291,6 @@ static IRType* findContainedTypeWithProperty(
     return nullptr;
 }
 
-/// Test for opaque values or invalid recursion in the by-value storage of `type`.
-///
-/// Assigns the matching type to `outLeafOpaqueHandleType`, if supplied, only on a match.
-/// The shared traversal inspects struct fields, array elements, and tuple elements.
-/// Conservatively returns true for invalid by-value recursion, assigning the recursive
-/// aggregate type to `outLeafOpaqueHandleType` even if that aggregate contains no resource.
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
 {
     HashSet<IRType*> visited;
@@ -306,10 +302,6 @@ bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
     return true;
 }
 
-/// Test whether by-value storage for `type` contains an unsized array.
-///
-/// Uses the same traversal as `isOpaqueType` while selecting `IRUnsizedArrayType`.
-/// Native pointer pointees and parameter-group contents are outside this by-value inspection.
 bool isUnsizedType(IRType* type)
 {
     HashSet<IRType*> visited;

@@ -766,12 +766,6 @@ void validateVectorsAndMatrices(
     }
 }
 
-/// Reject mutable globals whose linked types require unsupported storage.
-///
-/// Requires a linked `module` at the pipeline checkpoint after `specializeModule` and before
-/// `legalizeResourceTypes`. Checks file- or namespace-scope `static` variables and uniform
-/// shadows marked with `IRFileOrNamespaceScopeStaticVarDecoration`. Returns `false` after
-/// diagnosing any such variable that contains opaque values or unsized arrays by value.
 bool validateMutableGlobalVariableTypes(IRModule* module, DiagnosticSink* sink)
 {
     // When checking `extern struct Thing {}; uniform Thing input;`, semantic checking cannot

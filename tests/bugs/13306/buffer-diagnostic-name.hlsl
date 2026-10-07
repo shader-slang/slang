@@ -15,4 +15,4 @@ void main()
 
 // CHECK: parameter 'Second' overlaps with parameter 'First'
 // CHECK-NOT: SLANG_parameterGroup
-// CHECK-NOT: SLANG_uniformParameter
+// CHECK-NOT: $uniformParameter_

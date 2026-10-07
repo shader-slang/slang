@@ -621,10 +621,6 @@ struct TypeTagContext
     }
 };
 
-/// Compute established storage properties of `type` and its instantiated contents.
-///
-/// Returns partial information when a definition is replaceable or inspection cannot finish.
-/// An absent flag does not prove that a later specialization or replacement lacks that property.
 TypeTag SemanticsVisitor::getTypeTags(Type* type)
 {
     // We start a fresh query so tags are computed from the checked type and its substitutions.
