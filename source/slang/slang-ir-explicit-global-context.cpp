@@ -402,9 +402,10 @@ struct IntroduceExplicitGlobalContextPass
     struct ContextFieldInfo
     {
         IRStructKey* key = nullptr;
+        IRType* type = nullptr;
 
         // Is this field a pointer to the actual value?
-        // For groupshared variables, this will be true.
+        // This is true for groupshared variables and borrowed resource-array parameters.
         bool needDereference = false;
     };
     Dictionary<IRInst*, ContextFieldInfo> m_mapInstToContextFieldInfo;
@@ -420,7 +421,20 @@ struct IntroduceExplicitGlobalContextPass
 
         IRType* fieldDataType = type;
         bool needDereference = false;
-        if (kind == GlobalObjectKind::GlobalVar)
+        if (kind == GlobalObjectKind::GlobalParam &&
+            (m_target == CodeGenTarget::Metal || m_target == CodeGenTarget::MetalLib ||
+             m_target == CodeGenTarget::MetalLibAssembly) &&
+            getMetalResourceArrayElementType(type))
+        {
+            // Consider `Texture2D textures[96]` used by a helper. Metal receives the resource
+            // array by value, but copying it into every invocation's context makes runtime
+            // indexing unnecessarily expensive. Keep a read-only reference to the entry-point
+            // parameter's storage instead. The dedicated address space preserves its by-value
+            // ABI without pretending that an ordinary SSA parameter has an address.
+            fieldDataType = builder.getBorrowInParamType(type, AddressSpace::MetalKernelParam);
+            needDereference = true;
+        }
+        else if (kind == GlobalObjectKind::GlobalVar)
         {
             auto ptrType = as<IRPtrTypeBase>(type);
             if (ptrType->getAddressSpace() == AddressSpace::GroupShared)
@@ -456,7 +470,9 @@ struct IntroduceExplicitGlobalContextPass
         // for the instruction, so that we can use the key
         // to access the field later.
         //
-        m_mapInstToContextFieldInfo.add(originalInst, ContextFieldInfo{key, needDereference});
+        m_mapInstToContextFieldInfo.add(
+            originalInst,
+            ContextFieldInfo{key, fieldDataType, needDereference});
     }
 
     void createContextForEntryPoint(IRFunc* entryPointFunc)
@@ -492,8 +508,8 @@ struct IntroduceExplicitGlobalContextPass
                 continue;
             }
 
-            globalParam.entryPointParam =
-                builder.createParam(globalParam.globalParam->getFullType());
+            auto fieldInfo = m_mapInstToContextFieldInfo[globalParam.globalParam];
+            globalParam.entryPointParam = builder.createParam(fieldInfo.type);
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(
                 &cloneEnv,
@@ -533,7 +549,7 @@ struct IntroduceExplicitGlobalContextPass
         for (auto entryPointParam : entryPointParamsToAdd)
         {
             auto fieldInfo = m_mapInstToContextFieldInfo[entryPointParam.globalParam];
-            auto fieldType = entryPointParam.globalParam->getFullType();
+            auto fieldType = fieldInfo.type;
             auto fieldPtrType = builder.getPtrType(fieldType);
 
             // We compute the addrress of the field and store the
@@ -590,7 +606,7 @@ struct IntroduceExplicitGlobalContextPass
         auto fieldInfo = m_mapInstToContextFieldInfo[globalParam];
 
         auto valType = globalParam->getFullType();
-        auto ptrType = builder.getPtrType(valType);
+        auto ptrType = builder.getPtrType(fieldInfo.type);
 
         // We then iterate over the uses of the parameter,
         // being careful to defend against the use/def information
@@ -646,7 +662,44 @@ struct IntroduceExplicitGlobalContextPass
             // in the context struct and loading from it.
             //
             auto ptr = builder.emitFieldAddress(ptrType, contextParam, fieldInfo.key);
-            auto val = builder.emitLoad(valType, ptr);
+            auto val = builder.emitLoad(ptr);
+            if (fieldInfo.needDereference)
+            {
+                // Consider `textures[i].SampleLevel(s, uv, condition ? 1 : 0)`. The receiver's
+                // GetElement precedes the conditional's branches. Loading the whole array here
+                // would force a value temporary when the texture is consumed in a later block.
+                // Resource handles in the entry-point array cannot change, so retain its
+                // address and load only the selected element at the original receiver use.
+                if (auto getElement = as<IRGetElement>(user))
+                {
+                    if (isUseBaseAddrOperand(use, user))
+                    {
+                        auto elementPtr = builder.emitElementAddress(val, getElement->getIndex());
+                        auto elementVal = builder.emitLoad(elementPtr);
+                        getElement->replaceUsesWith(elementVal);
+                        getElement->removeAndDeallocate();
+                        continue;
+                    }
+                }
+
+                // The borrow-in parameter rewrite may have introduced a write-once temporary
+                // just to pass this global array to a helper. Its handles are immutable, so
+                // forward their existing storage instead of making another invocation-local
+                // copy. This is the same immutable-temporary contract used by that rewrite.
+                if (auto store = as<IRStore>(user))
+                {
+                    auto storeDest = store->getPtr();
+                    if (store->getValUse() == use &&
+                        storeDest->findDecoration<IRTempCallArgImmutableVarDecoration>())
+                    {
+                        storeDest->replaceUsesWith(val);
+                        store->removeAndDeallocate();
+                        storeDest->removeAndDeallocate();
+                        continue;
+                    }
+                }
+                val = builder.emitLoad(valType, val);
+            }
             use->set(val);
         }
     }

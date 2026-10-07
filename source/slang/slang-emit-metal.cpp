@@ -155,7 +155,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
-    IRType* paramType = unwrapDescriptorHandle(param->getDataType());
+    IRType* paramType = param->getDataType();
+    if (isMetalByValueResourceArrayParam(param))
+        paramType = cast<IRBorrowInParamType>(paramType)->getValueType();
+    paramType = unwrapDescriptorHandle(paramType);
 
     // MSL accepts a fixed-size array of textures or samplers as an entry-point
     // argument and binds it to consecutive slots from one base index (MSL 4.1
@@ -165,8 +168,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     // an unsized array has no direct argument form. Nested and unsized arrays
     // get no attribute: neither has a correct direct spelling in MSL.
     IRType* textureOrSamplerType = paramType;
-    if (auto arrayType = as<IRArrayType>(paramType))
-        textureOrSamplerType = unwrapDescriptorHandle(arrayType->getElementType());
+    if (auto elementType = getMetalResourceArrayElementType(paramType))
+        textureOrSamplerType = elementType;
 
     for (auto rr : layout->getOffsetAttrs())
     {
@@ -1297,6 +1300,18 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
+void MetalSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec)
+{
+    if (isMetalByValueResourceArrayParam(inst))
+    {
+        m_writer->emit("(&");
+        m_writer->emit(getName(inst));
+        m_writer->emit(")");
+        return;
+    }
+    Super::emitOperandImpl(inst, outerPrec);
+}
+
 void MetalSourceEmitter::_validateCoopMatrixType(IRCoopMatrixType* coopType)
 {
     auto rows = getIntVal(coopType->getRowCount());
@@ -1452,6 +1467,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit("*");
                 break;
             case AddressSpace::ThreadLocal:
+            case AddressSpace::MetalKernelParam:
                 m_writer->emit(" thread");
                 m_writer->emit("*");
                 break;
@@ -1771,7 +1787,15 @@ void MetalSourceEmitter::_emitStageAccessSemantic(
 
 void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    Super::emitSimpleFuncParamImpl(param);
+    if (isMetalByValueResourceArrayParam(param))
+    {
+        auto borrowInType = cast<IRBorrowInParamType>(param->getDataType());
+        emitType(borrowInType->getValueType(), getName(param));
+    }
+    else
+    {
+        Super::emitSimpleFuncParamImpl(param);
+    }
     emitFuncParamLayoutImpl(param);
 }
 

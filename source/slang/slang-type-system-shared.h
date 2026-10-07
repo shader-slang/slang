@@ -168,6 +168,10 @@ enum class AddressSpace : uint64_t
     // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
     NodePayloadAMDX,
 
+    // The physical storage of a by-value Metal entry-point resource-array parameter.
+    // The IR names its address while the entry-point ABI still receives the array by value.
+    MetalKernelParam,
+
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
 };
