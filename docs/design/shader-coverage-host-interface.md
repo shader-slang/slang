@@ -316,15 +316,13 @@ execution counts for both counter widths.
 
 ### CUDA hosts
 
-CUDA uses the same uniform-marshaling contract as CPU: the buffer is
-packed into the kernel's global-params payload, the metadata reports
-`uniformOffset` / `uniformStride`, and the payload slot holds the same
-`(data pointer, element count)` pair (the CUDA prelude's
-`RWStructuredBuffer<T>` layout). The differences from the CPU recipe
-are the ones inherent to the driver model: the pointer written at
-`uniformOffset` must be a device pointer (e.g. from `cuMemAlloc`), the
-params payload is passed to the kernel through the launch API, and
-reading the counters back requires a device-to-host copy.
+CUDA packs the buffer into the kernel's global-params payload at the
+metadata's `uniformOffset`. The payload slot holds a single 8-byte device
+pointer (the CUDA prelude's `RWStructuredBuffer<T>` layout), and
+`uniformStride` is 8. Allocate `getCounterCount()` elements, but do not write
+an element count into the parameter payload. Earlier compiler versions used
+a 16-byte pointer/count pair; hosts supporting both must follow the reflected
+layout. Reading the counters back requires a device-to-host copy.
 
 ## Counter element width and device requirements
 

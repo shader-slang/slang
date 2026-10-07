@@ -73,44 +73,27 @@
 #define SLANG_INLINE inline
 
 
-// Since we are using unsigned arithmatic care is need in this comparison.
-// It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
-// Which means only a single test is needed
-
 // Asserts for bounds checking.
 // It is assumed index/count are unsigned types.
 #define SLANG_BOUND_ASSERT(index, count) SLANG_PRELUDE_ASSERT(index < count);
-#define SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes) \
-    SLANG_PRELUDE_ASSERT(index <= (sizeInBytes - elemSize) && (index & 3) == 0);
 
 // Macros to zero index if an access is out of range
 #define SLANG_BOUND_ZERO_INDEX(index, count) index = (index < count) ? index : 0;
-#define SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes) \
-    index = (index <= (sizeInBytes - elemSize)) ? index : 0;
 
 // The 'FIX' macro define how the index is fixed. The default is to do nothing. If
 // SLANG_ENABLE_BOUND_ZERO_INDEX the fix macro will zero the index, if out of range
 #ifdef SLANG_ENABLE_BOUND_ZERO_INDEX
 #define SLANG_BOUND_FIX(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
-#define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes) \
-    SLANG_BOUND_ZERO_INDEX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
 #define SLANG_BOUND_FIX_FIXED_ARRAY(index, count) \
     SLANG_BOUND_ZERO_INDEX(index, count) SLANG_BOUND_ZERO_INDEX(index, count)
 #else
 #define SLANG_BOUND_FIX(index, count)
-#define SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
 #define SLANG_BOUND_FIX_FIXED_ARRAY(index, count)
 #endif
 
 #ifndef SLANG_BOUND_CHECK
 #define SLANG_BOUND_CHECK(index, count) \
     SLANG_BOUND_ASSERT(index, count) SLANG_BOUND_FIX(index, count)
-#endif
-
-#ifndef SLANG_BOUND_CHECK_BYTE_ADDRESS
-#define SLANG_BOUND_CHECK_BYTE_ADDRESS(index, elemSize, sizeInBytes) \
-    SLANG_BOUND_ASSERT_BYTE_ADDRESS(index, elemSize, sizeInBytes)    \
-    SLANG_BOUND_FIX_BYTE_ADDRESS(index, elemSize, sizeInBytes)
 #endif
 
 #ifndef SLANG_BOUND_CHECK_FIXED_ARRAY
@@ -160,8 +143,7 @@ struct FixedArray
     T m_data[SIZE];
 };
 
-// An array that has no specified size, becomes a 'Array'. This stores the size so it can
-// potentially do bounds checking.
+// An array with no specified size becomes an Array, which stores its pointer and element count.
 template<typename T>
 struct Array
 {
@@ -2705,79 +2687,41 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
 template<typename T>
 struct StructuredBuffer
 {
-    SLANG_CUDA_CALL T& operator[](size_t index) const
-    {
-#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_BOUND_CHECK(index, count);
-#endif
-        return data[index];
-    }
+    SLANG_CUDA_CALL T& operator[](size_t index) const { return data[index]; }
 
-    SLANG_CUDA_CALL T& Load(size_t index) const
-    {
-#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_BOUND_CHECK(index, count);
-#endif
-        return data[index];
-    }
-
-#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) const
-    {
-        *outNumStructs = uint32_t(count);
-        *outStride = uint32_t(sizeof(T));
-    }
-#endif
+    SLANG_CUDA_CALL T& Load(size_t index) const { return data[index]; }
 
     T* data;
-#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-    size_t count;
-#endif
 };
 
 template<typename T>
 struct RWStructuredBuffer : StructuredBuffer<T>
 {
-    SLANG_CUDA_CALL T& operator[](size_t index) const
-    {
-#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_BOUND_CHECK(index, this->count);
-#endif
-        return this->data[index];
-    }
+    SLANG_CUDA_CALL T& operator[](size_t index) const { return this->data[index]; }
 };
 
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
 struct ByteAddressBuffer
 {
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outDim) const { *outDim = uint32_t(sizeInBytes); }
-    SLANG_CUDA_CALL uint32_t Load(size_t index) const
-    {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
-        return data[index >> 2];
-    }
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const { return data[index >> 2]; }
     SLANG_CUDA_CALL uint2 Load2(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint2{data[dataIdx], data[dataIdx + 1]};
     }
     SLANG_CUDA_CALL uint3 Load3(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]};
     }
     SLANG_CUDA_CALL uint4 Load4(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]};
     }
     template<typename T>
     SLANG_CUDA_CALL T Load(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         T data;
         memcpy(&data, ((const char*)this->data) + index, sizeof(T));
         return data;
@@ -2787,11 +2731,9 @@ struct ByteAddressBuffer
     {
         StructuredBuffer<T> rs;
         rs.data = (T*)data;
-        rs.count = sizeInBytes / sizeof(T);
         return rs;
     }
     const uint32_t* data;
-    size_t sizeInBytes; //< Must be multiple of 4
 };
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwbyteaddressbuffer
@@ -3064,55 +3006,40 @@ __device__ __forceinline__ void __slang_atomic_reduce_dec(int32_t* addr, int ord
 // Missing support for Load with status
 struct RWByteAddressBuffer
 {
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outDim) const { *outDim = uint32_t(sizeInBytes); }
 
-    SLANG_CUDA_CALL uint32_t Load(size_t index) const
-    {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
-        return data[index >> 2];
-    }
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const { return data[index >> 2]; }
     SLANG_CUDA_CALL uint2 Load2(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint2{data[dataIdx], data[dataIdx + 1]};
     }
     SLANG_CUDA_CALL uint3 Load3(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]};
     }
     SLANG_CUDA_CALL uint4 Load4(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2;
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]};
     }
     template<typename T>
     SLANG_CUDA_CALL T Load(size_t index) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         T data;
         memcpy(&data, ((const char*)this->data) + index, sizeof(T));
         return data;
     }
 
-    SLANG_CUDA_CALL void Store(size_t index, uint32_t v) const
-    {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 4, sizeInBytes);
-        data[index >> 2] = v;
-    }
+    SLANG_CUDA_CALL void Store(size_t index, uint32_t v) const { data[index >> 2] = v; }
     SLANG_CUDA_CALL void Store2(size_t index, uint2 v) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 8, sizeInBytes);
         const size_t dataIdx = index >> 2;
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
     }
     SLANG_CUDA_CALL void Store3(size_t index, uint3 v) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 12, sizeInBytes);
         const size_t dataIdx = index >> 2;
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -3120,7 +3047,6 @@ struct RWByteAddressBuffer
     }
     SLANG_CUDA_CALL void Store4(size_t index, uint4 v) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, 16, sizeInBytes);
         const size_t dataIdx = index >> 2;
         data[dataIdx + 0] = v.x;
         data[dataIdx + 1] = v.y;
@@ -3130,7 +3056,6 @@ struct RWByteAddressBuffer
     template<typename T>
     SLANG_CUDA_CALL void Store(size_t index, T const& value) const
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         memcpy((char*)data + index, &value, sizeof(T));
     }
 
@@ -3138,7 +3063,6 @@ struct RWByteAddressBuffer
     template<typename T>
     SLANG_CUDA_CALL T* _getPtrAt(size_t index)
     {
-        SLANG_BOUND_CHECK_BYTE_ADDRESS(index, sizeof(T), sizeInBytes);
         return (T*)(((char*)data) + index);
     }
     template<typename T>
@@ -3146,11 +3070,9 @@ struct RWByteAddressBuffer
     {
         RWStructuredBuffer<T> rs;
         rs.data = (T*)data;
-        rs.count = sizeInBytes / sizeof(T);
         return rs;
     }
     uint32_t* data;
-    size_t sizeInBytes; //< Must be multiple of 4
 };
 
 

@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type -xslang -DPOINTER_ONLY_BUFFER
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
@@ -14,8 +14,11 @@ AppendStructuredBuffer<int> outputBuffer;
 RWStructuredBuffer<int> inBuffer;
 
 // Make sure the bindings are correct. outputBuffer should take two slots, and inBuffer
-// should be at binding 2.
-// CHECK: OpDecorate %inBuffer Binding 2
+// should be at binding 3, after the uniform buffer containing bufferCount.
+// CHECK: OpDecorate %inBuffer Binding 3
+
+//TEST_INPUT:set bufferCount = 8
+uniform uint bufferCount;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
@@ -26,7 +29,12 @@ void computeMain(uint i : SV_GroupIndex)
     GroupMemoryBarrier();
 
     uint numStructs, stride;
+    // CUDA buffer references have no length; the host supplies it explicitly.
+#ifdef POINTER_ONLY_BUFFER
+    numStructs = bufferCount;
+#else
     outputBuffer.GetDimensions(numStructs, stride);
+#endif
     if(i == 0)
         outputBuffer.Append(int(numStructs));
 
