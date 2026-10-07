@@ -375,7 +375,8 @@ struct BitCastLoweringContext
             return;
         }
 
-        if (fromTypeSize.size != toTypeSize.size)
+        bool sizesMatch = fromTypeSize.size == toTypeSize.size;
+        if (!sizesMatch)
         {
             sink->diagnose(Diagnostics::NotEqualBitCastSize{
                 .fromType = fromType,
@@ -384,6 +385,21 @@ struct BitCastLoweringContext
                 .toSize = toTypeSize.size,
                 .location = inst->sourceLoc,
             });
+        }
+
+        // `readObject` cannot rebuild an opaque handle from bytes, so a destination holding one
+        // that `lowerOpaqueBitCast` could not match field-for-field is an error.
+        if (isOpaqueType(toType, nullptr))
+        {
+            if (sizesMatch)
+            {
+                sink->diagnose(Diagnostics::BitCastOfOpaqueType{
+                    .fromType = fromType,
+                    .toType = toType,
+                    .location = inst->sourceLoc,
+                });
+            }
+            return;
         }
 
         // Enumerate all fields in to-type and obtain its value from operand object.
@@ -402,6 +418,181 @@ void lowerBitCast(IRModule* module, TargetProgram* targetProgram, DiagnosticSink
     context.targetProgram = targetProgram;
     context.sink = sink;
     context.processModule();
+}
+
+// Return true if two opaque-free types occupy the same bytes under natural layout, so that a
+// `BitCast` between them can be lowered later by `lowerBitCast` with byte semantics.
+static bool haveSameNaturalLayout(TargetProgram* targetProgram, IRType* a, IRType* b)
+{
+    auto targetReq = targetProgram->getTargetReq();
+    IRSizeAndAlignment aLayout, bLayout;
+    if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, a, &aLayout)) ||
+        SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, b, &bLayout)))
+        return false;
+    return aLayout.size == bLayout.size && aLayout.alignment == bLayout.alignment;
+}
+
+// Return the offset given to `field` by `[[vk::offset]]`, which overrides natural layout, or -1.
+static IRIntegerValue getExplicitFieldOffset(IRStructField* field)
+{
+    if (auto offsetDecor = field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+        return offsetDecor->getOffset()->getValue();
+    return -1;
+}
+
+// Return true if a `BitCast` from `fromType` to `toType` can be rewritten by
+// `emitOpaqueBitCast`, matching the two types position-for-position. Opaque handles must have
+// identical types on both sides; opaque-free parts must have the same natural size and alignment.
+// Because every position matches in size and alignment, every field lands at the same offset in
+// both types, so the rewrite equals a byte-level bit_cast wherever the types have a byte
+// representation.
+static bool isOpaqueBitCastMatch(TargetProgram* targetProgram, IRType* fromType, IRType* toType)
+{
+    if (isTypeEqual(fromType, toType))
+        return true;
+
+    if (!isOpaqueType(fromType, nullptr) && !isOpaqueType(toType, nullptr))
+        return haveSameNaturalLayout(targetProgram, fromType, toType);
+
+    if (auto fromStruct = as<IRStructType>(fromType))
+    {
+        auto toStruct = as<IRStructType>(toType);
+        if (!toStruct)
+            return false;
+        List<IRStructField*> toFields;
+        for (auto field : toStruct->getFields())
+            toFields.add(field);
+        Index fieldIndex = 0;
+        for (auto fromField : fromStruct->getFields())
+        {
+            if (fieldIndex >= toFields.getCount())
+                return false;
+            auto toField = toFields[fieldIndex++];
+            if (getExplicitFieldOffset(fromField) != getExplicitFieldOffset(toField))
+                return false;
+            if (!isOpaqueBitCastMatch(
+                    targetProgram,
+                    fromField->getFieldType(),
+                    toField->getFieldType()))
+                return false;
+        }
+        return fieldIndex == toFields.getCount();
+    }
+
+    if (auto fromArray = as<IRArrayType>(fromType))
+    {
+        auto toArray = as<IRArrayType>(toType);
+        if (!toArray)
+            return false;
+        auto fromCount = as<IRIntLit>(fromArray->getElementCount());
+        auto toCount = as<IRIntLit>(toArray->getElementCount());
+        if (!fromCount || !toCount || fromCount->getValue() != toCount->getValue())
+            return false;
+        return isOpaqueBitCastMatch(
+            targetProgram,
+            fromArray->getElementType(),
+            toArray->getElementType());
+    }
+
+    return false;
+}
+
+// Rebuild `src`, a value of type `fromType`, as a value of type `toType`. The types must satisfy
+// `isOpaqueBitCastMatch`: opaque handles are copied as-is, and each opaque-free part becomes an
+// ordinary `BitCast` that `lowerBitCast` lowers later.
+static IRInst* emitOpaqueBitCast(IRBuilder& builder, IRInst* src, IRType* fromType, IRType* toType)
+{
+    if (isTypeEqual(fromType, toType))
+        return src;
+
+    if (!isOpaqueType(fromType, nullptr) && !isOpaqueType(toType, nullptr))
+        return builder.emitBitCast(toType, src);
+
+    if (auto fromStruct = as<IRStructType>(fromType))
+    {
+        auto toStruct = cast<IRStructType>(toType);
+        List<IRStructField*> toFields;
+        for (auto field : toStruct->getFields())
+            toFields.add(field);
+        List<IRInst*> fieldValues;
+        for (auto fromField : fromStruct->getFields())
+        {
+            auto toField = toFields[fieldValues.getCount()];
+            auto fromFieldType = fromField->getFieldType();
+            auto fieldValue = builder.emitFieldExtract(fromFieldType, src, fromField->getKey());
+            fieldValues.add(
+                emitOpaqueBitCast(builder, fieldValue, fromFieldType, toField->getFieldType()));
+        }
+        return builder.emitMakeStruct(toStruct, fieldValues);
+    }
+
+    auto fromArray = cast<IRArrayType>(fromType);
+    auto toArray = cast<IRArrayType>(toType);
+    auto fromElementType = fromArray->getElementType();
+    auto elementCount = cast<IRIntLit>(fromArray->getElementCount())->getValue();
+    List<IRInst*> elements;
+    for (IRIntegerValue i = 0; i < elementCount; i++)
+    {
+        auto element = builder.emitElementExtract(
+            fromElementType,
+            src,
+            builder.getIntValue(builder.getIntType(), i));
+        elements.add(
+            emitOpaqueBitCast(builder, element, fromElementType, toArray->getElementType()));
+    }
+    return builder.emitMakeArray(toArray, (UInt)elements.getCount(), elements.getBuffer());
+}
+
+void lowerOpaqueBitCast(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    bool diagnoseUnmatchedCasts,
+    DiagnosticSink* sink)
+{
+    List<IRInst*> bitCasts;
+    overAllBlocks(
+        module,
+        [&](IRBlock* block)
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getOp() == kIROp_BitCast)
+                    bitCasts.add(inst);
+            }
+        });
+
+    for (auto inst : bitCasts)
+    {
+        auto operand = inst->getOperand(0);
+        auto fromType = operand->getDataType();
+        auto toType = inst->getDataType();
+
+        // A cast with no aggregate side, such as one handle type to another, has nothing for
+        // resource-type legalization to split apart, so we leave it to the target.
+        if (!isCompositeType(fromType) && !isCompositeType(toType))
+            continue;
+        if (!isOpaqueType(fromType, nullptr) && !isOpaqueType(toType, nullptr))
+            continue;
+
+        if (!isOpaqueBitCastMatch(targetProgram, fromType, toType))
+        {
+            if (diagnoseUnmatchedCasts)
+            {
+                sink->diagnose(Diagnostics::BitCastOfOpaqueType{
+                    .fromType = fromType,
+                    .toType = toType,
+                    .location = inst->sourceLoc,
+                });
+            }
+            continue;
+        }
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRBuilderSourceLocRAII sourceLocScope(&builder, inst->sourceLoc);
+        inst->replaceUsesWith(emitOpaqueBitCast(builder, operand, fromType, toType));
+        inst->removeAndDeallocate();
+    }
 }
 
 } // namespace Slang

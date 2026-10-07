@@ -1964,6 +1964,21 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
+    // A `bit_cast` between aggregates holding opaque handles has to be rewritten before
+    // resource-type legalization splits those aggregates apart. Only targets that legalize
+    // resource types give a handle no byte representation, so only they reject a cast that
+    // cannot be rewritten field-for-field.
+    if (requiredLoweringPassSet.bitcast)
+    {
+        SLANG_PASS(
+            lowerOpaqueBitCast,
+            targetProgram,
+            options.shouldLegalizeExistentialAndResourceTypes,
+            sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {

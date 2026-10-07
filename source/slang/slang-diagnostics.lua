@@ -5616,6 +5616,13 @@ err(
 )
 
 err(
+    "bit-cast-of-opaque-type",
+    41205,
+    "cannot bit_cast a type containing an opaque handle",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': an opaque handle field (resource, sampler, buffer) can only be copied to a field of the same handle type at the same position, and the remaining fields must match in size and alignment" }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
