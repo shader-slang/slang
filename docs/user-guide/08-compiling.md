@@ -1165,15 +1165,17 @@ meanings of their `CompilerOptionValue` encodings.
 
 A `DownstreamArgs` entry is the API form of the `slangc` `-X` option. Each entry names its own downstream tool in `stringValue0`, such as `nvrtc`, `dxc` or `spirv-opt`, and holds that tool's arguments in `stringValue1`, one argument per line.
 
-`DownstreamArgs` entries can be given at three levels: the session (`SessionDesc`), a target (`TargetDesc`), and a linked program (`IComponentType::linkWithOptions`). When Slang invokes a tool, it passes that tool's arguments from all three levels, in session, target, then linked-program order. Within each level the arguments keep the order they were given in. Slang appends the entries for one tool. It does not override, merge or deduplicate individual flags.
+`DownstreamArgs` entries can be given at three levels: the session (`SessionDesc`), a target (`TargetDesc`), and a linked program (`IComponentType::linkWithOptions`). Slang combines a tool's arguments from all three levels into one list, in session, target, then linked-program order. Within each level the arguments keep the order they were given in. Slang appends the entries for one tool. It does not override, merge or deduplicate individual flags.
 
-For example, a session entry for `nvrtc` with `stringValue1` set to `"--gpu-architecture=compute_86\n--fmad=true"`, combined with a `linkWithOptions` entry for `nvrtc` holding `--fmad=false`, forwards all three arguments in this order:
+For example, a session entry for `nvrtc` with `stringValue1` set to `"--gpu-architecture=compute_86\n--fmad=true"`, combined with a `linkWithOptions` entry for `nvrtc` holding `--fmad=false`, forwards all three arguments, combined in this order:
 
 ```
 --gpu-architecture=compute_86 --fmad=true --fmad=false
 ```
 
 Slang does not remove `--fmad=true`.
+
+The final tool invocation can still order some arguments differently, because existing argument processing runs after the lists are combined. Slang treats an argument written as `-I<dir>` as an include path rather than passing it through as-is, and for NVRTC it emits include paths before the remaining arguments. So a target-level `-ITARGET` is searched before a session-level `--include-path=SESSION`, while `--include-path=` at both levels keeps the combined order.
 
 The downstream compiler decides how repeated or conflicting arguments are handled, and that behavior can differ between tools and between versions of the same tool. Slang does not guarantee either "last one wins" or a rejection. For example, NVRTC 12.6 rejects `--fmad=true --fmad=false` with "defined more than once". NVRTC 13.0.88 has been reported to accept the same pair with a warning and use `false`, and to accept two identical `--fmad=false` arguments silently. To control a flag precisely, pass it at one level only.
 
