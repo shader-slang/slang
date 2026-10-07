@@ -2367,8 +2367,8 @@ static bool isNullConfigValue(const JSONValue& value)
 // client to answer null for a setting it cannot provide. Any other value is converted into
 // `option`.
 //
-// Only settings with a non-empty default need this helper. The converter turns null into an empty
-// list or string, and the remaining updaters already treat an empty value as their default.
+// The remaining updaters already interpret the converter's empty string or list for null as their
+// default.
 template<typename T>
 static void applyConfigValue(
     JSONToNativeConverter& converter,

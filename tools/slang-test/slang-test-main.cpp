@@ -2966,8 +2966,6 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         LanguageServerProtocol::DidOpenTextDocumentParams::methodName,
         &openDocParams,
         JSONValue::makeInt(1));
-    // Wait for the response to the request just sent, handling the server-to-client calls that
-    // arrive before it with `handleServerCall`.
     auto waitForResponse = [&]() -> SlangResult
     {
         for (;;)
