@@ -84,8 +84,8 @@ static bool requiresPayloadAccessQualifiers(TargetProgram* targetProgram)
 }
 
 // Return whether a D3D native interface needs a value of this type in a one-field wrapper struct.
-// D3D accepts only struct payloads and hit attributes; an empty value instead needs dummy storage
-// or none at all, so it is never wrapped.
+// D3D accepts only struct payloads and hit attributes. An empty value is never wrapped: an empty
+// payload gets dummy storage instead, and an empty hit attribute gets no storage.
 static bool needsForcedStructWrapper(IRType* type)
 {
     return !as<IRStructType>(type) && !isEmptyType(type);
@@ -100,8 +100,10 @@ static bool isHitAttributesParam(IRParam* param)
     return layout && layout->usesResourceKind(LayoutResourceKind::HitAttributes);
 }
 
-// The interface a one-field wrapper struct adapts. Each role has its own wrapper per value type,
-// because only a ray payload wrapper is a [raypayload] struct with access qualifiers at SM 6.7.
+// A role names the D3D interface that a one-field wrapper struct adapts. Each role has its own
+// wrapper per value type: only a ray payload wrapper is a [raypayload] struct with access
+// qualifiers at SM 6.7, and only a hit-attribute wrapper is received as a read-only `borrow in`
+// parameter rather than an `inout` one.
 enum class ForcedStructRole
 {
     RayPayload,
@@ -259,10 +261,10 @@ struct RayTracingPayloadLegalizationContext
     // and type legalization remove it later. dummy is separate storage created by the caller.
     //
     // Replacing only the argument would leave an Empty parameter that type legalization can
-    // erase, and the call would disagree with its declaration. For a pointer argument we preserve
-    // the parameter's pointer kind/address space and change its value type; a by-value argument,
-    // such as ReportHit's wrapped attributes, gives the parameter its own type. We then rebuild
-    // the IRFunc's type. These IRParams
+    // erase, and the call would disagree with its declaration. A pointer argument replaces a
+    // pointer parameter, so we preserve the parameter's pointer kind/address space and change its
+    // value type; a by-value argument, such as ReportHit's wrapped attributes, replaces a by-value
+    // parameter, which takes the argument's type. We then rebuild the IRFunc's type. These IRParams
     // describe a target intrinsic's signature; they are not an ordinary helper body whose typed
     // uses would also need rewriting. The callers adapt every call to that specialization using
     // shared physical types, so repeated calls finish with the same declaration and argument type.
@@ -297,8 +299,8 @@ struct RayTracingPayloadLegalizationContext
         call->setArg(index, arg);
     }
 
-    // Return the cached one-field wrapper struct for a non-struct D3D payload, creating it on
-    // first use. Dispatch arguments and receiving shader parameters both use it.
+    // Return the cached one-field wrapper struct for a non-struct D3D payload or hit attribute,
+    // creating it on first use. Sending arguments and receiving shader parameters both use it.
     // Consider this example:
     //
     //     uint p = 7;
@@ -318,13 +320,13 @@ struct RayTracingPayloadLegalizationContext
     //     nativeTraceRay(..., temporary);
     //     store(p, load(field));
     //
-    // Unlike an empty dummy, data carries the real input and output. Callable data and other
-    // struct-only markers use ForceVarIntoStructTemporarily_t, and hit attributes use
-    // HitAttributes_t; neither has ray-payload decoration. The cache is keyed by source value
-    // type and separated by role: every call to a specialized native function must use the same
-    // struct type, not a fresh nominally distinct struct for each call. A receiver in the same
-    // module shares that wrapper as well; a separately compiled one relies only on the wrapper
-    // having its value type's layout.
+    // Unlike an empty dummy, data carries the real value: input and output for a payload, input
+    // only for a hit attribute. Callable data, like the non-ray struct-only marker, uses
+    // ForceVarIntoStructTemporarily_t, and hit attributes use HitAttributes_t; neither has
+    // ray-payload decoration. The cache is keyed by source value type and separated by role:
+    // every call to a specialized native function must use the same struct type, not a fresh
+    // nominally distinct struct for each call. A receiver in the same module shares that wrapper
+    // as well; a separately compiled one relies only on the wrapper having its value type's layout.
     IRStructType* getForcedStructType(IRType* valueType, ForcedStructRole role)
     {
         auto& types = forcedStructTypes[Index(role)];
@@ -397,19 +399,20 @@ struct RayTracingPayloadLegalizationContext
     // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local,
     // and a nonempty non-struct one gets the ForceVarIntoStructTemporarily_t wrapper with
     // copy-in/copy-out, the type wrapNonStructEntryPointParam also gives a callable shader's
-    // parameter. Only a ray-payload marker selects dummy storage for an empty value: no source
-    // uses the non-ray ForceVarIntoStructTemporarily marker, so emitForcedStructTemporary
-    // asserts rather than wraps an empty value reaching it.
+    // parameter.
     // TraceRay's HLSL arm instead passes p through ForceVarIntoRayPayloadStructTemporarily, which
     // identifies the argument needing a DummyRayPayload local. Both use
     // replaceNativeCallArgumentAndUpdateSignature to keep the native call and signature consistent.
-    // Nonempty structs pass through unchanged; other nonempty values behind a struct-only marker
-    // keep their real values through the wrapper and copy-in/copy-out sequence shown in
-    // getForcedStructType's comment.
+    // Behind either struct-only marker, structs, including empty ones, pass through unchanged and
+    // other nonempty values keep their real values through the wrapper and copy-in/copy-out
+    // sequence shown in getForcedStructType's comment. Only the ray-payload marker selects dummy
+    // storage for an empty non-struct value; no source uses the non-ray marker, so
+    // emitForcedStructTemporary asserts rather than wraps such a value reaching it.
     //
     // ReportHit's HLSL arm, identified by KnownBuiltinDeclName::ReportHit, takes its attributes
-    // by value, so a nonempty non-struct attribute is wrapped by value with no storage or copy.
-    // Its HitAttributes_t is the type wrapNonStructEntryPointParam gives a receiver's parameter.
+    // by value and never writes them back, so a nonempty non-struct attribute becomes a
+    // makeStruct value, with no addressable temporary and no copy-back. Its HitAttributes_t is
+    // the type wrapNonStructEntryPointParam gives a receiver's parameter.
     void legalizeD3DCall(IRCall* call)
     {
         switch (getBuiltinFuncEnum(call->getCallee()))
@@ -493,8 +496,8 @@ struct RayTracingPayloadLegalizationContext
 
     // Return a wrapper temporary for call to use in place of logical, a pointer to nonempty
     // non-struct storage. Before call we copy logical's value into the wrapper's data field, and
-    // after call we copy it back, except for read-only hit attributes; the caller installs the
-    // returned temporary as the argument.
+    // after call we copy it back, except for hit attributes, whose receiving parameter is
+    // `borrow in`; the caller installs the returned temporary as the argument.
     IRInst* emitForcedStructTemporary(IRCall* call, IRInst* logical, ForcedStructRole role)
     {
         auto valueType = cast<IRPtrTypeBase>(logical->getDataType())->getValueType();
@@ -689,7 +692,7 @@ struct RayTracingPayloadLegalizationContext
     // A closesthit shader's `in float2 attributes` has already become a read-only `borrow in`
     // pointer through translateEntryPointInParamToBorrow. It becomes `borrow in HitAttributes_t`,
     // the type ReportHit's wrapped argument has, and each read loads its data field. An ordinary
-    // caller's wrapper temporary is copied in only, since the receiver cannot write attributes.
+    // caller's wrapper temporary is copied in only, as for any `in` argument.
     void wrapNonStructEntryPointParam(IRFunc* func, IRParam* param, ForcedStructRole role)
     {
         auto ptrType = cast<IRPtrTypeBase>(param->getDataType());
@@ -805,13 +808,14 @@ struct RayTracingPayloadLegalizationContext
         bool allEmpty = true;
         for (auto param : func->getParams())
         {
-            // Each hit-attribute parameter is wrapped; D3D itself rejects a signature with more
-            // than one, so there is no need to diagnose that here.
+            // D3D receives hit attributes only through an `in` parameter, which
+            // translateEntryPointInParamToBorrow has made `borrow in`. Each nonempty non-struct one
+            // is wrapped. Other spellings, such as `__ref`, and a signature with more than one
+            // hit-attribute parameter are invalid on D3D; we leave them for DXC to diagnose.
             if (isD3D && isHitAttributesParam(param))
             {
                 auto borrowType = as<IRBorrowInParamType>(param->getDataType());
-                SLANG_RELEASE_ASSERT(borrowType);
-                if (needsForcedStructWrapper(borrowType->getValueType()))
+                if (borrowType && needsForcedStructWrapper(borrowType->getValueType()))
                     wrapNonStructEntryPointParam(func, param, ForcedStructRole::HitAttributes);
                 continue;
             }
@@ -832,7 +836,7 @@ struct RayTracingPayloadLegalizationContext
                     addRayPayloadDecorationIfNeeded(builder, type);
                 }
             }
-            else if (!isEmptyType(valueType))
+            else if (needsForcedStructWrapper(valueType))
                 wrapNonStructEntryPointParam(
                     func,
                     param,
