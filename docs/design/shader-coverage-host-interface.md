@@ -186,9 +186,10 @@ host:
 
 The executable reference for this recipe is the in-tree
 [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/)
-Vulkan path, which binds through exactly this contract and renders LCOV reports
-from the readback. The image-pipeline and BVH examples reach the same binding
-through slang-rhi instead (see "`slang-rhi` consumption model" below).
+Vulkan path, which binds through exactly this contract and writes the manifest
+and counter snapshot for subsequent LCOV conversion. The image-pipeline and BVH
+examples reach the same binding through slang-rhi instead (see "`slang-rhi`
+consumption model" below).
 
 ### Direct CPU host binding recipe
 
