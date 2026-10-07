@@ -13010,8 +13010,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 else
                 {
                     alias = subBuilder->emitSymbolAlias(loweredType);
-                    addNameHint(subContext, alias, decl);
                 }
+                addNameHint(subContext, alias, decl);
                 addLinkageDecoration(subContext, alias, decl);
 
                 // Enumerate all witnesses and lower IRSymbolAlias for them as well.

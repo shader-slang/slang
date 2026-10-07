@@ -6485,7 +6485,7 @@ standalone_note(
 standalone_note(
     "conflicting-exported-type-members",
     -1,
-    "the methods and fields of '~symbol' are linked separately and may come from a different one of these modules",
+    "the methods of '~symbol' are linked separately and may come from a different one of these modules",
     span { loc = "location" }
 )
 

@@ -91,8 +91,11 @@ struct IRSharedSpecContext
     // Diagnostic sink for reporting errors during linking.
     DiagnosticSink* sink = nullptr;
 
-    // Mangled names already reported as conflicting exports, so that a symbol
-    // reached from several entry points is diagnosed once per link.
+    // Mangled names already reported by `diagnoseConflictingExportedDefinitions`. Selection can
+    // run more than once for one name: cloning an `export struct R : I = X;` alias resolves it to
+    // `X` without registering the alias, so each module's alias that the link keeps alive selects
+    // among the same candidates again. The set lives for one link, so a compile for several
+    // targets reports once per target.
     HashSet<String> reportedExportConflicts;
 };
 
@@ -1384,17 +1387,25 @@ bool isBetterForTarget(IRSpecContext* context, IRInst* newVal, IRInst* oldVal)
     return false;
 }
 
-// Return true if `inst` is a definition that its module exports for other modules to link.
+// The helpers below support warning E45002, which reports a link-time symbol that more than one
+// module defines with the `export` keyword when `isBetterForTarget` cannot say which definition
+// is better. The linker still selects one of them, but the module order decides which.
+
+// Return true if `inst` is a definition that carries `[hlslExport]` and is not imported.
 //
 // Every definition that is not imported carries an `[export]` linkage decoration, so that
-// decoration alone does not distinguish an `export` declaration from an ordinary module-local
-// definition. The `export` keyword also adds `[hlslExport]` and drops the module name from the
-// mangled name. Other attributes add `[hlslExport]` too (for example `[DllExport]`), but their
-// symbols keep module-qualified names and so never meet a definition from another module.
-static bool isExportedDefinition(IRInst* inst)
+// decoration alone does not tell a user's `export` from a module-local definition. Definitions
+// from two modules share a mangled name only when the name leaves the defining module out: the
+// mangler drops the module name for `extern` and `export` declarations and uses the bare name for
+// `__extern_cpp` ones (`emitQualifiedName` in slang-mangle.cpp), and a conformance witness is named
+// by its type and interface. Other attributes that add `[hlslExport]`, such as `[DllExport]`, do
+// not change the mangled name, so on an ordinary declaration they keep the module name. Lowering
+// adds `[hlslExport]` to a witness when its type or extension is `export`ed or its interface is a
+// COM interface, and two modules that provide one such conformance do conflict.
+static bool isHLSLExportedDefinition(IRInst* inst)
 {
-    // The linkage decorations sit on an outer `IRGeneric`, while lowering may put
-    // `[hlslExport]` on the value the generic returns.
+    // The linkage decorations sit on an outer `IRGeneric`, while lowering puts `[hlslExport]` for
+    // a generic `export extension` on the witness table that the generic returns.
     bool isMarkedExported =
         inst->findDecoration<IRHLSLExportDecoration>() ||
         getResolvedInstForDecorations(inst)->findDecoration<IRHLSLExportDecoration>();
@@ -1402,24 +1413,27 @@ static bool isExportedDefinition(IRInst* inst)
            !inst->findDecoration<IRImportDecoration>() && isDefinition(inst);
 }
 
-// Return true if a conflict over the witness table `witnessTable` is reported through the
-// conformance's type rather than on its own.
-//
-// A witness for an exported type, such as the `Renderer : IRenderer` witness that comes with
-// `export struct Renderer : IRenderer { ... }`, conflicts exactly when the type does, and the
-// type's own symbol carries the warning.
-static bool isWitnessReportedThroughItsType(IRWitnessTable* witnessTable)
+// Return true if `inst` is a conformance witness table whose type is itself an exported
+// definition of its module, such as the `Renderer : IRenderer` witness that comes with
+// `export struct Renderer : IRenderer { ... }` or with a generic `export struct Box<T> : IValue`.
+static bool isWitnessOfExportedType(IRInst* inst)
 {
+    auto witnessTable = as<IRWitnessTable>(getResolvedInstForDecorations(inst));
+    if (!witnessTable)
+        return false;
     IRInst* concreteType = witnessTable->getConcreteType();
-    return concreteType && isExportedDefinition(concreteType);
+    if (auto specialize = as<IRSpecialize>(concreteType))
+        concreteType = specialize->getBase();
+    return concreteType && isHLSLExportedDefinition(concreteType);
 }
 
-// Return true if `a` and `b` come from the same module.
-//
-// A module can reach the linker twice, as a source translation unit and as its own precompiled
-// `.slang-module`. The two IR modules are distinct but share the module name, and
-// `Linkage::loadModuleFromBlob` does not load two different modules under one name, so the
-// name identifies the module.
+// Two IR modules that share a module name count as one module, because the loaders keep one
+// module per name: `findOrLoadSerializedModuleForModuleLibrary` returns the module already loaded
+// under the name of a precompiled `.slang-module`, and `loadModuleFromBlob` rejects a different
+// source under a name already loaded. A translation unit compiled in the same request can still
+// meet its own precompiled form at link time. Contents are not compared, so an edited source
+// linked with a stale precompiled form of itself also counts as one module. A module without a
+// name is identified by its IR module alone.
 static bool areFromSameModule(IRInst* a, IRInst* b)
 {
     IRModule* moduleA = a->getModule();
@@ -1430,12 +1444,25 @@ static bool areFromSameModule(IRInst* a, IRInst* b)
     return nameA && nameA == moduleB->getName();
 }
 
+// Return the value that `inst` defines: for a generic, the value it returns if that value lives
+// inside the generic, and `inst` itself otherwise. A generic link-time type alias such as
+// `export struct Renderer<T> : IRenderer = RendererA<T>;` returns `specialize(RendererA, T)`,
+// which is neither named nor a struct, so the alias is not mistaken for `RendererA`.
+static IRInst* getDefinedValue(IRInst* inst)
+{
+    auto generic = as<IRGeneric>(inst);
+    if (!generic)
+        return inst;
+    IRInst* returnVal = findGenericReturnVal(generic);
+    return returnVal && isChildInstOf(returnVal, generic) ? returnVal : inst;
+}
+
 // Return the name under which E45002 reports the symbol defined by `inst`.
 //
 // A conformance witness table has no name of its own, so we describe it by the conformance it
-// provides, as in `Thing : IValue`. A generic carries its name hint on the value it defines,
-// but a generic type alias returns another type, whose name we must not report. Anything without
-// a usable name hint is reported by its mangled name.
+// provides, as in `Thing : IValue`. A generic link-time type alias carries its name hint itself,
+// and any other generic carries it on the value it defines. Anything without a name hint is
+// reported by its mangled name.
 static String getExportedDefinitionDisplayName(IRInst* inst)
 {
     IRInst* resolved = getResolvedInstForDecorations(inst);
@@ -1448,16 +1475,19 @@ static String getExportedDefinitionDisplayName(IRInst* inst)
         return sb.produceString();
     }
 
-    IRInst* named = inst;
-    if (auto generic = as<IRGeneric>(inst))
-    {
-        IRInst* returnVal = findGenericReturnVal(generic);
-        if (returnVal && returnVal->getParent() && returnVal->getParent()->getParent() == generic)
-            named = returnVal;
-    }
-    if (auto nameHint = named->findDecoration<IRNameHintDecoration>())
+    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        return nameHint->getName();
+    if (auto nameHint = getDefinedValue(inst)->findDecoration<IRNameHintDecoration>())
         return nameHint->getName();
     return getMangledName(inst);
+}
+
+// Return true if `isBetterForTarget` prefers neither `a` nor `b`. Usually both comparisons return
+// `false`. For two definitions specialized for the same target, `CapabilitySet::isBetterForTarget`
+// reports each as better than the other, so both return `true`.
+static bool isNeitherBetterForTarget(IRSpecContext* context, IRInst* a, IRInst* b)
+{
+    return isBetterForTarget(context, a, b) == isBetterForTarget(context, b, a);
 }
 
 // Report E45002 when `bestVal` was chosen among two or more exported definitions of the symbol
@@ -1465,59 +1495,64 @@ static String getExportedDefinitionDisplayName(IRInst* inst)
 // rules in `isBetterForTarget` cannot order.
 //
 // Consider two modules that each contain `export struct Renderer : IRenderer = ...;` for one
-// `extern struct Renderer`. Neither definition is better, so the selection loop keeps whichever
-// it saw first, and that depends on the order of the modules in the link. We leave the selection
-// as it is and warn, naming the module whose definition was selected and every other one.
+// `extern struct Renderer`. Neither definition is better (`isNeitherBetterForTarget`). When both
+// comparisons return `false` the selection loop keeps the candidate it visited first, and when both
+// return `true` it keeps the one it visited last. Either way the order of the modules in the link
+// decides. We leave the selection as it is and warn, naming the module whose definition was
+// selected and every other one.
 //
-// The warning is about the exported symbol, not about everything that comes with it. The
-// members of an exported struct are selected separately, and nothing makes their selection agree
-// with the struct's, so the struct is reported without naming the module whose members are used.
+// The warning is about the exported symbol, not about everything that comes with it. The methods
+// of an exported struct are selected separately, and nothing makes their selection agree with the
+// struct's, so a note says so instead of naming the module whose methods are used.
 static void diagnoseConflictingExportedDefinitions(
     IRSpecContext* context,
     IRSpecSymbol* sym,
     IRInst* bestVal)
 {
+    // `prelinkIR` also selects definitions, but without a target, so `isBetterForTarget` orders
+    // nothing there, and without a sink. Only the final per-target link reports.
     auto shared = context->getShared();
-    if (!shared->sink || !shared->targetReq || !shared->isFinalCodegenLink)
+    if (!shared->isFinalCodegenLink || !shared->sink)
         return;
-    if (!sym->nextWithSameName || !isExportedDefinition(bestVal))
+    SLANG_ASSERT(shared->targetReq);
+    if (!sym->nextWithSameName || !isHLSLExportedDefinition(bestVal))
         return;
-    if (auto witnessTable = as<IRWitnessTable>(getResolvedInstForDecorations(bestVal)))
-    {
-        if (isWitnessReportedThroughItsType(witnessTable))
-            return;
-    }
 
     String mangledName = getMangledName(bestVal);
     if (shared->reportedExportConflicts.contains(mangledName))
         return;
 
+    // If even the selected definition cannot be used on this target, no candidate can, and there
+    // is no choice between definitions to report.
     CapabilitySet targetCaps = getTargetCapabilities(context);
     if (_getBestSpecializationCaps(bestVal, targetCaps).isInvalid())
         return;
 
+    bool isBestWitnessOfExportedType = isWitnessOfExportedType(bestVal);
     List<IRInst*> conflictingCandidates;
-    List<Name*> candidateModules;
     for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
     {
         IRInst* candidate = ss->irGlobalValue;
-        if (candidate == bestVal || areFromSameModule(candidate, bestVal))
+        if (areFromSameModule(candidate, bestVal))
             continue;
-        if (!isExportedDefinition(candidate) ||
+        if (!isHLSLExportedDefinition(candidate) ||
             _getBestSpecializationCaps(candidate, targetCaps).isInvalid())
             continue;
 
-        // Neither candidate is better when the two comparisons agree; with matching
-        // target-specialized definitions, both report `true`.
-        if (isBetterForTarget(context, candidate, bestVal) !=
-            isBetterForTarget(context, bestVal, candidate))
+        // Two witnesses whose types are both exported definitions come with two exported
+        // definitions of that type from different modules (the witness name includes the type's),
+        // and the type's own symbol carries the warning.
+        if (isBestWitnessOfExportedType && isWitnessOfExportedType(candidate))
             continue;
 
-        Name* candidateModule = candidate->getModule()->getName();
-        if (candidateModules.contains(candidateModule))
+        if (!isNeitherBetterForTarget(context, candidate, bestVal))
             continue;
-        candidateModules.add(candidateModule);
-        conflictingCandidates.add(candidate);
+
+        bool isModuleListed =
+            conflictingCandidates.findFirstIndex(
+                [&](IRInst* listed) { return areFromSameModule(listed, candidate); }) >= 0;
+        if (!isModuleListed)
+            conflictingCandidates.add(candidate);
     }
     if (conflictingCandidates.getCount() == 0)
         return;
@@ -1540,10 +1575,8 @@ static void diagnoseConflictingExportedDefinitions(
         });
     }
 
-    // The methods and fields of a type defined directly by each module have their own symbols,
-    // which the linker selects independently of the type's.
-    IRInst* resolved = getResolvedInstForDecorations(bestVal);
-    if (as<IRStructType>(resolved) || as<IRClassType>(resolved))
+    IRInst* definedValue = getDefinedValue(bestVal);
+    if (as<IRStructType>(definedValue) || as<IRClassType>(definedValue))
     {
         shared->sink->diagnose(Diagnostics::ConflictingExportedTypeMembers{
             .symbol = symbolName,
