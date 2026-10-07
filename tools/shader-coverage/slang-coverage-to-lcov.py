@@ -13,8 +13,7 @@ Pipeline:
        Counter slots are assigned according to the coverage metadata.
        Line coverage coalesces entries that execute together onto a
        shared counter, so several entries may name the same slot and
-       there can be fewer counters than entries. Deduplicate slot aliases
-       for each source line before accumulating.
+       there are fewer counters than entries. Accumulate per entry.
        Function and branch modes use one direct counter
        per marker op, but consumers must treat the manifest as
        authoritative.
@@ -186,12 +185,9 @@ def iter_manifest_entries(manifest):
                 counter = entry.get("counter")
                 yield {
                     "kind": kind,
-                    "mode": entry.get("mode", "count"),
-                    "counter": (
-                        None
-                        if counter is None
-                        else parse_manifest_int(counter, "v2 entry counter")
-                    ),
+                    "counter": None
+                    if counter is None
+                    else parse_manifest_int(counter, "v2 entry counter"),
                     "file": entry.get("file"),
                     "line": parse_manifest_int(entry["line"], "v2 entry line"),
                     "function": entry.get("function"),
@@ -258,9 +254,6 @@ def main():
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     functions_by_source = collections.defaultdict(dict)
     branches_by_source = collections.defaultdict(dict)
-    line_slots = collections.defaultdict(set)
-    identity_slots = collections.defaultdict(set)
-    boolean_sources = set()
     skipped_entries = 0
     skipped_by_kind = {}
     for entry in iter_manifest_entries(manifest):
@@ -278,22 +271,10 @@ def main():
         if not source or line <= 0:
             skipped_entries += 1
             continue
-        boolean = entry.get("mode", "count") == "boolean"
-        count = int(counters[idx] != 0) if boolean else counters[idx]
-        if boolean:
-            boolean_sources.add(source)
+        count = counters[idx]
 
         if kind == "line":
-            # Entries can alias a coalesced runtime slot. Count that slot once
-            # per source line; boolean recording is a union, never a sum.
-            if idx not in line_slots[(source, line)]:
-                if boolean:
-                    hits_by_line[source][line] = int(
-                        hits_by_line[source][line] != 0 or count != 0
-                    )
-                else:
-                    hits_by_line[source][line] += count
-                line_slots[(source, line)].add(idx)
+            hits_by_line[source][line] += count
         elif kind == "function":
             function_name = entry.get("function") or entry.get("function_mangled")
             if not function_name:
@@ -301,15 +282,8 @@ def main():
                     skipped_by_kind.get("function-without-name", 0) + 1
                 )
                 continue
-            identity = (source, kind, function_name)
-            if idx in identity_slots[identity]:
-                continue
-            identity_slots[identity].add(idx)
-            old_line, old_count = functions_by_source[source].get(
-                function_name, (line, 0)
-            )
-            combined = int(bool(old_count or count)) if boolean else old_count + count
-            functions_by_source[source][function_name] = (min(old_line, line), combined)
+            old_line, old_count = functions_by_source[source].get(function_name, (line, 0))
+            functions_by_source[source][function_name] = (min(old_line, line), old_count + count)
         elif kind == "branch":
             branch_site = entry.get("branch_site")
             branch_arm = entry.get("branch_arm")
@@ -326,44 +300,28 @@ def main():
                     "must be non-negative"
                 )
             branch_key = (line, branch_site, branch_arm)
-            identity = (source, kind, branch_key)
-            if idx in identity_slots[identity]:
-                continue
-            identity_slots[identity].add(idx)
-            old_count = branches_by_source[source].get(branch_key, 0)
             branches_by_source[source][branch_key] = (
-                int(bool(old_count or count)) if boolean else old_count + count
+                branches_by_source[source].get(branch_key, 0) + count
             )
         else:
             skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
 
-    # Function-only manifests still prove execution of their declaration lines.
-    # Sum distinct function entries on one line, retaining explicit line events.
+    # A function entry is not a line entry, but genhtml needs a line record at
+    # every FN line, so a function-only manifest proves its declaration line.
     for source, functions in functions_by_source.items():
         function_lines = collections.defaultdict(int)
         for line, count in functions.values():
             function_lines[line] += count
         for line, count in function_lines.items():
-            hits_by_line[source].setdefault(
-                line, int(count != 0) if source in boolean_sources else count
-            )
+            hits_by_line[source].setdefault(line, count)
 
-    # A decision is evaluated if any of its outcomes executed. Group by site,
-    # not source line: older switch manifests put outcomes on case-label lines.
-    site_counts = collections.defaultdict(int)
+    # A decision is evaluated if any outcome executed; BRDA reports "-" for the
+    # outcomes of an unevaluated decision rather than an untaken zero.
+    evaluated_sites = set()
     for source, branches in branches_by_source.items():
         for (line, site, arm), count in branches.items():
-            site_counts[(source, site)] += count
-        # Current compilers emit a canonical line event at every decision. For
-        # older branch-only manifests, the largest decision count at a location
-        # is a conservative lower bound, not an exact reconstructed line count.
-        branch_lines = collections.defaultdict(int)
-        for (line, site, arm), count in branches.items():
-            branch_lines[line] = max(branch_lines[line], site_counts[(source, site)])
-        for line, count in branch_lines.items():
-            hits_by_line[source].setdefault(
-                line, int(count != 0) if source in boolean_sources else count
-            )
+            if count:
+                evaluated_sites.add((source, site))
 
     out = sys.stdout if args.output == "-" else open(args.output, "w")
     out.write(f"TN:{args.test_name}\n")
@@ -372,20 +330,16 @@ def main():
         out.write(f"SF:{source}\n")
         functions = functions_by_source[source]
         function_sort_key = lambda item: (item[1][0], item[0])
-        for function_name, (line, _) in sorted(
-            functions.items(), key=function_sort_key
-        ):
+        for function_name, (line, _) in sorted(functions.items(), key=function_sort_key):
             out.write(f"FN:{line},{function_name}\n")
-        for function_name, (_, count) in sorted(
-            functions.items(), key=function_sort_key
-        ):
+        for function_name, (_, count) in sorted(functions.items(), key=function_sort_key):
             out.write(f"FNDA:{count},{function_name}\n")
         if functions:
             out.write(f"FNF:{len(functions)}\n")
             out.write(f"FNH:{sum(1 for _, count in functions.values() if count > 0)}\n")
         branches = branches_by_source[source]
         for (line, branch_site, branch_arm), count in sorted(branches.items()):
-            taken = count if site_counts[(source, branch_site)] else "-"
+            taken = count if (source, branch_site) in evaluated_sites else "-"
             out.write(f"BRDA:{line},{branch_site},{branch_arm},{taken}\n")
         if branches:
             out.write(f"BRF:{len(branches)}\n")

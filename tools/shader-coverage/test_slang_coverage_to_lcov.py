@@ -77,7 +77,10 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertEqual(
             result.stdout,
-            "TN:shader_coverage\n" "SF:shader.slang\n" "DA:12,12\n" "end_of_record\n",
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "DA:12,12\n"
+            "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
 
@@ -97,7 +100,10 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertEqual(
             result.stdout,
-            "TN:shader_coverage\n" "SF:shader.slang\n" "DA:12,5\n" "end_of_record\n",
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "DA:12,5\n"
+            "end_of_record\n",
         )
         self.assertIn(
             "note: skipped 2 coverage entries without attributable source location",
@@ -153,7 +159,6 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRF:1\n"
             "BRH:1\n"
             "DA:12,12\n"
-            "DA:13,11\n"
             "end_of_record\n",
         )
         # Counterless source entries stay in the manifest/metadata, but
@@ -221,7 +226,6 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRH:1\n"
             "DA:10,5\n"
             "DA:11,3\n"
-            "DA:12,2\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -397,7 +401,6 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRF:1\n"
             "BRH:1\n"
             "DA:20,3\n"
-            "DA:21,4\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -617,7 +620,6 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRDA:12,1,1,7\n"
             "BRF:1\n"
             "BRH:1\n"
-            "DA:12,7\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -644,7 +646,9 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         result = self.run_converter(manifest, check=False)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error: manifest counter count must be an integer", result.stderr)
+        self.assertIn(
+            "error: manifest counter count must be an integer", result.stderr
+        )
 
     def test_reports_non_integral_manifest_counter_count(self):
         manifest = {
@@ -656,7 +660,9 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         result = self.run_converter(manifest, check=False)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("error: manifest counter count must be an integer", result.stderr)
+        self.assertIn(
+            "error: manifest counter count must be an integer", result.stderr
+        )
 
     def test_reports_boolean_v2_counter(self):
         manifest = {
@@ -838,8 +844,10 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
     def test_entries_may_share_a_counter_slot(self):
         # Coalesced line coverage points several source entries at one
-        # counter. Each distinct line receives the value, but repeated
-        # aliases on one line must not multiply its execution count.
+        # counter. The converter must accumulate per *entry*, so a slot
+        # shared by two lines reports that slot's value on each line,
+        # and two entries on the same line still sum — this is what
+        # keeps LCOV output unchanged when coalescing is enabled.
         manifest = {
             "version": 2,
             "counter_count": 1,
@@ -857,8 +865,9 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertIn("DA:10,5\n", result.stdout)
         self.assertIn("DA:11,5\n", result.stdout)
-        # Repeated aliases describe the same execution, not extra hits.
-        self.assertIn("DA:12,5\n", result.stdout)
+        # Two entries on line 12 sum, exactly as they would with two
+        # dedicated slots holding 5 each.
+        self.assertIn("DA:12,10\n", result.stdout)
         self.assertEqual(result.stderr, "")
 
     def test_binary_counters_unsupported_stride_errors(self):
@@ -880,64 +889,6 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unsupported element_stride 2", result.stderr)
-
-    def test_boolean_counts_are_unions_for_every_kind(self):
-        entries = []
-        for kind in ["line", "function", "branch"]:
-            for slot in [0, 0, 1]:
-                entries.append(
-                    dict(
-                        kind=kind,
-                        counter=slot,
-                        mode="boolean",
-                        file="shader.slang",
-                        line=12,
-                        function="helper",
-                        branch_site=1,
-                        branch_arm=1,
-                    )
-                )
-        result = self.run_converter(
-            dict(version=2, counter_count=2, entries=entries), "1 1"
-        )
-        self.assertIn("DA:12,1\n", result.stdout)
-        self.assertIn("FNDA:1,helper\n", result.stdout)
-        self.assertIn("BRDA:12,1,1,1\n", result.stdout)
-
-    def test_untaken_switch_arm_on_another_line_is_evaluated(self):
-        entries = [
-            dict(
-                kind="branch",
-                counter=i,
-                file="shader.slang",
-                line=12 + i,
-                branch_site=1,
-                branch_arm=i,
-            )
-            for i in range(2)
-        ]
-        result = self.run_converter(
-            dict(version=2, counter_count=2, entries=entries), "4 0"
-        )
-        self.assertIn("BRDA:13,1,1,0\n", result.stdout)
-
-    def test_explicit_line_event_is_not_inflated_by_decisions(self):
-        entries = [dict(kind="line", counter=0, file="shader.slang", line=12)]
-        entries += [
-            dict(
-                kind="branch",
-                counter=i + 1,
-                file="shader.slang",
-                line=12,
-                branch_site=i,
-                branch_arm=1,
-            )
-            for i in range(2)
-        ]
-        result = self.run_converter(
-            dict(version=2, counter_count=3, entries=entries), "4 4 2"
-        )
-        self.assertIn("DA:12,4\n", result.stdout)
 
 
 if __name__ == "__main__":

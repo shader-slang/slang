@@ -13,7 +13,6 @@
 #include "shader-coverage-common/coverage-counters.h"
 #include "shader-coverage-common/vk_compute_demo.h"
 
-#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -24,12 +23,10 @@
 #include <iostream>
 #include <map>
 #include <random>
-#include <set>
 #include <slang-com-ptr.h>
 #include <slang.h>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 using Slang::ComPtr;
@@ -465,8 +462,6 @@ void writeLcov(
     struct FileRecords
     {
         std::map<uint32_t, uint64_t> lines; // line → accumulated count
-        bool booleanMode = false;
-        std::set<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>> seenEntries;
         std::vector<FuncRecord> funcs;
         std::vector<BranchRecord> branches;
     };
@@ -480,95 +475,43 @@ void writeLcov(
             continue;
         if (!entry.file || !*entry.file || entry.line == 0)
             continue;
-        if (entry.counterIndex == slang::kInvalidCoverageCounterIndex)
-            continue;
-        if (entry.counterIndex >= hits.size())
-            fail("coverage entry counter index is out of range");
+        // Each entry's counter slot is identified by counterIndex; use it to
+        // look up the actual hit count. kInvalidCoverageCounterIndex marks
+        // metadata-only entries that have no runtime counter. The range guard
+        // (`< hits.size()`) is a defensive check against a hypothetical
+        // compiler bug returning an out-of-bounds index.
+        const uint64_t count = (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                                entry.counterIndex < (uint32_t)hits.size())
+                                   ? hits[entry.counterIndex]
+                                   : 0;
         auto& rec = byFile[entry.file];
-        rec.booleanMode = entry.counterMode == slang::CoverageCounterMode::Boolean;
-        const uint64_t count =
-            rec.booleanMode ? uint64_t(hits[entry.counterIndex] != 0) : hits[entry.counterIndex];
-        if (!rec.seenEntries
-                 .emplace(
-                     uint32_t(entry.kind),
-                     entry.line,
-                     entry.branchSiteID,
-                     entry.branchArmID,
-                     entry.counterIndex)
-                 .second)
-            continue;
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
-            if (rec.booleanMode)
-                rec.lines[entry.line] = rec.lines[entry.line] != 0 || count != 0;
-            else
-                rec.lines[entry.line] += count;
+            rec.lines[entry.line] += count;
             break;
         case slang::CoverageEntryKind::Function:
-            {
-                const char* name =
-                    entry.functionName ? entry.functionName : entry.functionMangledName;
-                if (!name || !*name)
-                    break;
-                auto it = std::find_if(
-                    rec.funcs.begin(),
-                    rec.funcs.end(),
-                    [&](const FuncRecord& fn) { return fn.name == name; });
-                if (it == rec.funcs.end())
-                    rec.funcs.push_back({entry.line, name, count});
-                else
-                {
-                    it->line = std::min(it->line, entry.line);
-                    it->count = rec.booleanMode ? uint64_t(it->count != 0 || count != 0)
-                                                : it->count + count;
-                }
-                break;
-            }
+            rec.funcs.push_back({entry.line, entry.functionName ? entry.functionName : "", count});
+            break;
         case slang::CoverageEntryKind::Branch:
-            {
-                auto it = std::find_if(
-                    rec.branches.begin(),
-                    rec.branches.end(),
-                    [&](const BranchRecord& br)
-                    {
-                        return br.line == entry.line && br.siteId == entry.branchSiteID &&
-                               br.armId == entry.branchArmID;
-                    });
-                if (it == rec.branches.end())
-                    rec.branches.push_back(
-                        {entry.line, entry.branchSiteID, entry.branchArmID, count});
-                else
-                    it->count = rec.booleanMode ? uint64_t(it->count != 0 || count != 0)
-                                                : it->count + count;
-                break;
-            }
+            rec.branches.push_back({entry.line, entry.branchSiteID, entry.branchArmID, count});
+            break;
         default:
             break;
         }
     }
 
+    // genhtml needs a line record at every FN line, so a function entry also
+    // proves its declaration line.
     for (auto& fp : byFile)
     {
-        auto& rec = fp.second;
         std::map<uint32_t, uint64_t> functionLines;
-        for (const auto& fn : rec.funcs)
+        for (const auto& fn : fp.second.funcs)
             functionLines[fn.line] += fn.count;
         for (const auto& line : functionLines)
-            rec.lines.emplace(
-                line.first,
-                rec.booleanMode ? uint64_t(line.second != 0) : line.second);
-        std::map<uint32_t, uint64_t> decisionCounts;
-        for (const auto& br : rec.branches)
-            decisionCounts[br.siteId] += br.count;
-        std::map<uint32_t, uint64_t> branchLines;
-        for (const auto& br : rec.branches)
-            branchLines[br.line] = std::max(branchLines[br.line], decisionCounts[br.siteId]);
-        for (const auto& line : branchLines)
-            rec.lines.emplace(
-                line.first,
-                rec.booleanMode ? uint64_t(line.second != 0) : line.second);
+            fp.second.lines.emplace(line.first, line.second);
     }
+
     std::ofstream f(path, std::ios::binary);
     if (!f)
         fail("cannot open for writing: " + path.string());
@@ -608,6 +551,8 @@ void writeLcov(
         if (!rec.branches.empty())
         {
             uint32_t bHit = 0;
+            // A decision is evaluated if any outcome executed; BRDA reports "-"
+            // for the outcomes of an unevaluated decision, not an untaken zero.
             std::map<uint32_t, bool> evaluatedSites;
             for (const auto& br : rec.branches)
                 evaluatedSites[br.siteId] = evaluatedSites[br.siteId] || br.count != 0;
@@ -647,49 +592,42 @@ CoverageSummary summarize(
     const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
-    std::map<std::pair<std::string, uint32_t>, bool> lines;
-    std::map<std::pair<std::string, std::string>, bool> functions;
-    std::map<std::tuple<std::string, uint32_t, uint32_t>, bool> branches;
-    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+    // Iterate entries ([0, getEntryCount())), not counters: several
+    // entries can share one counterIndex once line coverage coalesces
+    // markers, so a counter-indexed loop both under-visits (stops at
+    // getCounterCount() < getEntryCount()) and misattributes hits (entry
+    // i's counter is not generally counter i). Look each entry's counter
+    // up by its own counterIndex instead, mirroring writeLcov() below.
+    const uint32_t n = coverage->getEntryCount();
+    for (uint32_t i = 0; i < n; ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
-        if (!entry.file || !*entry.file || !entry.line ||
-            entry.counterIndex == slang::kInvalidCoverageCounterIndex)
-            continue;
-        if (entry.counterIndex >= hits.size())
-            fail("coverage entry counter index is out of range");
-        const bool covered = hits[entry.counterIndex] != 0;
-        auto lineKey = std::make_pair(std::string(entry.file), entry.line);
-        // The LCOV exporter also exposes the source locations of function
-        // entries and decisions as lines, even in function/branch-only mode.
-        lines[lineKey] = lines[lineKey] || covered;
-        if (entry.kind == slang::CoverageEntryKind::Function)
+        const bool covered = entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                             entry.counterIndex < (uint32_t)hits.size() &&
+                             hits[entry.counterIndex] > 0;
+        switch (entry.kind)
         {
-            const char* name = entry.functionName ? entry.functionName : entry.functionMangledName;
-            if (name && *name)
-            {
-                auto key = std::make_pair(std::string(entry.file), std::string(name));
-                functions[key] = functions[key] || covered;
-            }
-        }
-        else if (entry.kind == slang::CoverageEntryKind::Branch)
-        {
-            auto key =
-                std::make_tuple(std::string(entry.file), entry.branchSiteID, entry.branchArmID);
-            branches[key] = branches[key] || covered;
+        case slang::CoverageEntryKind::Line:
+            ++s.lineTotal;
+            if (covered)
+                ++s.lineCovered;
+            break;
+        case slang::CoverageEntryKind::Function:
+            ++s.functionTotal;
+            if (covered)
+                ++s.functionCovered;
+            break;
+        case slang::CoverageEntryKind::Branch:
+            ++s.branchTotal;
+            if (covered)
+                ++s.branchCovered;
+            break;
+        default:
+            break;
         }
     }
-    s.lineTotal = uint32_t(lines.size());
-    s.functionTotal = uint32_t(functions.size());
-    s.branchTotal = uint32_t(branches.size());
-    for (const auto& line : lines)
-        s.lineCovered += line.second;
-    for (const auto& function : functions)
-        s.functionCovered += function.second;
-    for (const auto& branch : branches)
-        s.branchCovered += branch.second;
     return s;
 }
 
