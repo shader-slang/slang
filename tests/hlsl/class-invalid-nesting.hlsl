@@ -1,12 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
 // Subclasses of `StructDecl` must enforce both parent and child declaration nesting rules.
-// The diagnostic should name the HLSL spelling `class`, not the internal AST node kind.
+// The diagnostic should describe the declaration as an HLSL-style class.
 interface IContainer
 {
     class InvalidChild
 //CHECK:  ^^^^^^^^^^^^ declaration not allowed here
-//CHECK:  ^^^^^^^^^^^^ class is not allowed here.
+//CHECK:  ^^^^^^^^^^^^ HLSL-style class is not allowed here.
     {
         int value;
     };

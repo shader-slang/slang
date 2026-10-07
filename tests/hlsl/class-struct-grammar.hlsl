@@ -3,7 +3,7 @@
 // COMPILE: result code = 0
 
 // HLSL classes share the struct parser, including Slang's extensions to HLSL syntax.
-// Inline generic parameters and anonymous declarations must use the shared struct grammar.
+// A generic parameter clause and an anonymous declaration are accepted by struct parsing.
 // https://github.com/shader-slang/slang/issues/13495
 class Box<T>
 {
