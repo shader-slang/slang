@@ -1,7 +1,8 @@
 // An entry point can also be called as an ordinary function. On D3D a closesthit shader's
 // non-struct hit-attribute parameter becomes a wrapper struct, so an ordinary call passes a
 // wrapper temporary. The callee cannot write its attributes, so the argument is copied in only.
-// Every hit-attribute parameter is wrapped; D3D itself rejects a signature with more than one.
+// The MULTI run checks only that the pass wraps each hit-attribute parameter of a signature D3D
+// rejects, with more than one, without asserting; DXC diagnoses that signature.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile lib_6_6 -whole-program -O0 -validate-ir-detailed
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile lib_6_6 -whole-program -O3 -validate-ir-detailed

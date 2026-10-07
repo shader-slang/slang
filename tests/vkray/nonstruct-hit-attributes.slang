@@ -11,9 +11,9 @@
 //TEST:SIMPLE(filecheck=SEND): -target hlsl -profile lib_6_6 -entry isectVector -stage intersection
 //TEST:SIMPLE(filecheck=RECV): -target hlsl -profile lib_6_6 -entry closestHitVector -stage closesthit
 //TEST:SIMPLE(filecheck=RECV): -target hlsl -profile lib_6_6 -entry anyHitVector -stage anyhit
-//TEST:SIMPLE(filecheck=SOLO): -target dxil-asm -profile lib_6_6 -entry isectVector -stage intersection
-//TEST:SIMPLE(filecheck=SOLO): -target dxil-asm -profile lib_6_6 -entry closestHitVector -stage closesthit
-//TEST:SIMPLE(filecheck=SOLO): -target dxil-asm -profile lib_6_6 -entry anyHitVector -stage anyhit
+//TEST:SIMPLE(filecheck=SOLOSEND): -target dxil-asm -profile lib_6_6 -entry isectVector -stage intersection
+//TEST:SIMPLE(filecheck=SOLORECV): -target dxil-asm -profile lib_6_6 -entry closestHitVector -stage closesthit
+//TEST:SIMPLE(filecheck=SOLORECV): -target dxil-asm -profile lib_6_6 -entry anyHitVector -stage anyhit
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry isectVector -stage intersection -emit-spirv-directly -validate-ir
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry closestHitVector -stage closesthit -emit-spirv-directly -validate-ir
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry anyHitVector -stage anyhit -emit-spirv-directly -validate-ir
@@ -163,8 +163,10 @@ void closestHitStruct(inout float4 payload, in UserAttributes attributes)
 // RECV-NEXT: };
 // RECV: void {{closestHitVector|anyHitVector}}(inout RayPayload_t{{[A-Za-z0-9_]*}} {{[A-Za-z0-9_]+}}, [[recvType]] [[recvParam:[A-Za-z0-9_]+]])
 // RECV: [[recvParam]].[[recvField]]
-// SOLO: %struct.HitAttributes_t{{[A-Za-z0-9_]*}} = type { <2 x float> }
-// SOLO: define void @
+// SOLOSEND: %struct.[[sendStruct:HitAttributes_t[A-Za-z0-9_]*]] = type { <2 x float> }
+// SOLOSEND: call i1 @dx.op.reportHit.struct.[[sendStruct]](i32 158, {{.*}}, %struct.[[sendStruct]]*
+// SOLORECV: %struct.[[recvStruct:HitAttributes_t[A-Za-z0-9_]*]] = type { <2 x float> }
+// SOLORECV: define void @{{.*}}, %struct.[[recvStruct]]* {{.*}}%attributes
 
 // The Khronos targets keep their hit-attribute globals of the value type itself.
 // SPIRV-NOT: HitAttributes_t
