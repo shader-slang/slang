@@ -21,7 +21,9 @@
 // produces, which would leave the actual context struct unchecked. The Metal
 // and CUDA pipelines expand the captured context into separate arguments of
 // the propagate function, so no context struct is emitted for those two
-// targets and only the propagate function name is checked there.
+// targets. Each of those runs forbids the struct before requiring the propagate
+// function name, because a forbidden pattern is only checked up to the next
+// match, and the struct would precede the function if it were emitted.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
@@ -51,9 +53,11 @@ void main()
 //HLSL: s_bwdProp_myfunc_{{[0-9]+}}(
 //GLSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //GLSL: s_bwdProp_myfunc_{{[0-9]+}}(
+//METAL-NOT: struct s_bwdCallableCtx_myfunc
 //METAL: s_bwdProp_myfunc_{{[0-9]+}}(
 //WGSL: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //WGSL: s_bwdProp_myfunc_{{[0-9]+}}(
+//CUDA-NOT: struct s_bwdCallableCtx_myfunc
 //CUDA: s_bwdProp_myfunc_{{[0-9]+}}(
 //CPP: struct s_bwdCallableCtx_myfunc_{{[0-9]+}}
 //CPP: s_bwdProp_myfunc_{{[0-9]+}}(
