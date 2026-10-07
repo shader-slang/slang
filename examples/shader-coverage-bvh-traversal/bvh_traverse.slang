@@ -87,11 +87,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             // Internal node — push both children. Order matters for
             // performance (push the farther child first so the closer
             // child gets popped first), but for the demo we use a
-            // simple direction-dependent conditional expression.
+            // simple direction-dependent ordering branch.
             int leftChild = node.leftIndex;
             int rightChild = node.rightIndex;
-            stack[stackPtr++] = ray.dir.x >= 0.0 ? rightChild : leftChild;
-            stack[stackPtr++] = ray.dir.x >= 0.0 ? leftChild : rightChild;
+            if (ray.dir.x >= 0.0)
+            {
+                stack[stackPtr++] = rightChild;
+                stack[stackPtr++] = leftChild;
+            }
+            else
+            {
+                stack[stackPtr++] = leftChild;
+                stack[stackPtr++] = rightChild;
+            }
         }
     }
 

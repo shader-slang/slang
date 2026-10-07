@@ -5,8 +5,8 @@ import bvh_types;
 
 public bool rayAabbIntersect(Ray ray, float3 bmin, float3 bmax)
 {
-    // Slab test. The compound rejection condition demonstrates how ||
-    // renders alongside the && parallel-ray check in rayTriangleIntersect.
+    // Slab test. Branchless version is faster on GPU but for the
+    // coverage demo we want each axis to be a distinct branch.
     float3 invDir = float3(1.0) / ray.dir;
     float3 t0 = (bmin - ray.origin) * invDir;
     float3 t1 = (bmax - ray.origin) * invDir;
@@ -16,7 +16,11 @@ public bool rayAabbIntersect(Ray ray, float3 bmin, float3 bmax)
     float tEnter = max(max(tmin.x, tmin.y), tmin.z);
     float tExit = min(min(tmax.x, tmax.y), tmax.z);
 
-    if (tEnter > tExit || tExit < ray.tMin || tEnter > ray.tMax)
+    if (tEnter > tExit)
+        return false;
+    if (tExit < ray.tMin)
+        return false;
+    if (tEnter > ray.tMax)
         return false;
     return true;
 }
