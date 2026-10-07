@@ -3028,9 +3028,23 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
                 }
             }
         }
+        else if (as<DeclRefType>(checkedBase->type.type))
+        {
+            // An expression whose checked type is a `DeclRefType` is a value, such as a swizzle
+            // (`uv.y`) or tuple element (`t._0`), and a value takes no generic arguments. An
+            // expression that names a type, namespace, function, generic or overload set has a
+            // kind-like type that is not a `DeclRefType`, and a wrapper such as the `LetExpr`
+            // that `_CheckTerm` adds for temporaries takes the type of its body.
+            baseKind = BaseGenericKind::NonGeneric;
+        }
 
-        if (as<MemberExpr>(base) &&
-            (as<DeclRefExpr>(checkedBase) || as<OverloadedExpr>(checkedBase)))
+        // Checking a `MemberExpr` stores its dereferenced or opened base back into the node,
+        // so checking the unchecked node again can apply `->` to a non-pointer (`p->y` with
+        // `float2* p` would report that `vector<float,2>` cannot be dereferenced). We reuse the
+        // checked node once the kind is decided: `Generic` is only set for a `DeclRefExpr` or
+        // `OverloadedExpr`, which `AddGenericOverloadCandidates` accepts, while an `Unknown`
+        // node may be a `LetExpr` that it rejects, as in `h.o.get<4>()` with an interface `o`.
+        if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
         {
             base = checkedBase;
         }
@@ -7471,6 +7485,7 @@ Stmt* Parser::parseIfLetStatement()
 
     auto varDecl = astBuilder->create<LetDecl>();
     varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->loc = identifierToken.loc;
     varDecl->initExpr = memberExpr;
     varDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(positiveScopeDecl, varDecl);
@@ -7487,18 +7502,24 @@ Stmt* Parser::parseIfLetStatement()
 
     if (ifStatement->positiveStatement)
     {
-        auto seqPositiveStmt = as<SeqStmt>(ifStatement->positiveStatement);
-        if (!seqPositiveStmt)
-        {
-            seqPositiveStmt = astBuilder->create<SeqStmt>();
-        }
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
+        varDeclrStatement->loc = varDecl->loc;
         varDeclrStatement->decl = varDecl;
 
-        seqPositiveStmt->stmts.add(varDeclrStatement);
-        seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
-        ifStatement->positiveStatement = seqPositiveStmt;
+        SeqStmt* scopedBody = astBuilder->create<SeqStmt>();
+        scopedBody->loc = identifierToken.loc;
+        scopedBody->stmts.add(varDeclrStatement);
+        scopedBody->stmts.add(ifStatement->positiveStatement);
+
+        // Preserve the parser scope that contains the unwrapped user binding as
+        // an ordinary scoped statement. Later lowering can then attach debug
+        // variables for the binding to this lexical scope instead of the
+        // enclosing function/block.
+        BlockStmt* positiveScopeStmt = astBuilder->create<BlockStmt>();
+        positiveScopeStmt->loc = identifierToken.loc;
+        positiveScopeStmt->scopeDecl = positiveScopeDecl;
+        positiveScopeStmt->body = scopedBody;
+        ifStatement->positiveStatement = positiveScopeStmt;
     }
 
     newBody->stmts.add(ifStatement);

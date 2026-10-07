@@ -385,12 +385,6 @@ bool isValueType(IRInst* dataType)
     }
 }
 
-bool isArrayBuiltinCast(IRInst* inst)
-{
-    return inst->getOp() == kIROp_BuiltinCast && as<IRArrayType>(inst->getDataType()) &&
-           as<IRArrayType>(inst->getOperand(0)->getDataType());
-}
-
 bool isScalarOrVectorType(IRInst* type)
 {
     switch (type->getOp())
@@ -1584,19 +1578,6 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func)
     auto order = getReverseMirroredPostorder(func);
     for (auto block : order)
         block->insertAtEnd(func);
-}
-
-IRBlock* splitBlockBefore(IRBuilder& builder, IRInst* inst)
-{
-    builder.setInsertBefore(inst);
-    auto tailBlock = builder.emitBlock();
-    for (auto cur = inst; cur;)
-    {
-        auto next = cur->getNextInst();
-        cur->insertAtEnd(tailBlock);
-        cur = next;
-    }
-    return tailBlock;
 }
 
 void removeLinkageDecorations(IRInst* inst)

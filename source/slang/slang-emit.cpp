@@ -78,7 +78,6 @@
 #include "slang-ir-liveness.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
-#include "slang-ir-lower-array-builtin-cast.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
@@ -449,6 +448,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
@@ -651,10 +651,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_LateRequireCapability:
         result.lateRequireCapability = true;
-        break;
-    case kIROp_BuiltinCast:
-        if (isArrayBuiltinCast(inst))
-            result.arrayBuiltinCast = true;
         break;
     case kIROp_MatrixType:
         // An `Unknown` layout needs the pass. So does `Unknown` passed as a generic argument,
@@ -1816,10 +1812,6 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
-        // The buffer-load specializations that the main pipeline runs first do not run for the
-        // VM, and the bytecode emitter cannot handle an array cast.
-        if (requiredLoweringPassSet.arrayBuiltinCast)
-            SLANG_PASS(lowerArrayBuiltinCasts);
         SLANG_PASS(performForceInlining);
         // Autodiff can leave void differential parameters and matching call arguments, but the
         // bytecode constants section cannot represent void values. Remove them before emission,
@@ -2127,12 +2119,6 @@ Result linkAndOptimizeIR(
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
     SLANG_PASS(specializeArrayParameters, codeGenContext);
-
-    // Gated on `arrayBuiltinCast`. Array casts come from the front end, `lowerLValueCast` and
-    // autodiff, all before the last `calcRequiredLoweringPassSet` scan; the specialization passes
-    // above only clone existing casts into specialized callees.
-    if (requiredLoweringPassSet.arrayBuiltinCast)
-        SLANG_PASS(lowerArrayBuiltinCasts);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -3305,6 +3291,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugTypeComposite,
         NonSemanticShaderDebugInfo100DebugTypeMember,
         NonSemanticShaderDebugInfo100DebugFunction,
+        NonSemanticShaderDebugInfo100DebugLexicalBlock,
         NonSemanticShaderDebugInfo100DebugScope,
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,

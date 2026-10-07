@@ -4139,6 +4139,26 @@ public:
         QualType const& baseType,
         bool supressDiagnostic = false);
 
+    /// Called after member lookup on `expr` has failed with `baseType` as the base. If the base is
+    /// a user-declared generic type parameter (directly, or as `T.m` / `v::m`), emit a note for
+    /// each interface that: is visible from the failed access and not from the core module;
+    /// directly declares a visible requirement of the failed name, static when the access is
+    /// static; and, by its unqualified name, resolves to itself at the generic declaration that
+    /// owns the parameter. A non-generic interface gets `where T : IFoo`; a generic one gets
+    /// "consider constraining 'T' to interface 'IFoo'", since its type arguments cannot be
+    /// inferred.
+    void maybeSuggestMissingGenericConstraintForMemberLookup(
+        DeclRefExpr* expr,
+        QualType const& baseType);
+
+    /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
+    /// visible from `scope`) finds exactly one distinct declaration and it is `decl`. A diagnostic
+    /// that prints an unqualified name for the user to write at `scope` uses this to check the name
+    /// will mean `decl` there; for a generic declaration, `decl` is the `GenericDecl`, which is
+    /// what lookup returns for its name. The default mask also finds non-type declarations, so a
+    /// same-named function makes this conservatively return false.
+    bool doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl);
+
     SharedSemanticsContext& operator=(const SharedSemanticsContext&) = delete;
 
 
@@ -4541,26 +4561,6 @@ QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase>
 
 bool isUnsizedArrayType(Type* type);
 
-/// Return whether `toType` and `fromType` are equal up to the layout of their matrices: either two
-/// matrices that agree on element type, row count and column count, or two sized arrays of the same
-/// length whose element types again satisfy this predicate. It also holds for two identical types,
-/// so callers test for equality first.
-///
-/// The array case exists because a layout modifier on an array declaration applies to its matrix
-/// element. Consider this example:
-///
-///     cbuffer Skin { row_major float4x4 bones[4]; }
-///     float3 skin(float4x4 b[4], uint i, float3 p);
-///     ... skin(bones, i, p) ...
-///
-/// `bones` has type `matrix<float,4,4,RowMajor>[4]` and the parameter has `matrix<float,4,4>[4]`.
-/// Layout only describes how a matrix is stored in memory, so a value converts element by element.
-/// Array elements are related only through this predicate, never through general coercion, so an
-/// `int[2]` does not convert to a `float[2]` this way. Unsized arrays are excluded because an
-/// element-by-element conversion needs a length.
-bool isMatrixLayoutConversion(Type* toType, Type* fromType);
-
-/// Return whether `toType` and `fromType` are arrays for which `isMatrixLayoutConversion` holds.
 bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType);
 
 bool isInterfaceType(Type* type);
