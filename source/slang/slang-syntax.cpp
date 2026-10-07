@@ -224,6 +224,7 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         sb << "struct";
         break;
     case ASTNodeType::ClassDecl:
+    case ASTNodeType::HLSLClassDecl:
         sb << "class";
         break;
     case ASTNodeType::GLSLInterfaceBlockDecl:

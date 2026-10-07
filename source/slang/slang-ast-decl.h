@@ -416,6 +416,15 @@ class StructDecl : public AggTypeDecl
     Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
 };
 
+// A `class` declaration in the HLSL dialect denotes a value type, like a `struct`.
+// We retain the distinct declaration kind so that HLSL-specific checking can be added
+// without changing Slang's reference-type `ClassDecl` semantics.
+FIDDLE()
+class HLSLClassDecl : public StructDecl
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class SynthesizedStructDecl : public AggTypeDecl
 {

@@ -215,7 +215,11 @@ public:
     bool LookAheadToken(const char* string, int offset);
 
     void parseSourceFile(ContainerDecl* parentDecl);
-    Decl* ParseStruct();
+    // Parse a `struct` or HLSL `class` declaration into the supplied, newly allocated node.
+    //
+    // Requires the corresponding keyword to be the next token. Returns the declaration,
+    // or a `GenericDecl` containing it when inline generic parameters are present.
+    Decl* ParseStruct(StructDecl* decl);
     ClassDecl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
     Stmt* ParseStatement(
@@ -3613,14 +3617,20 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     }
     else if (parser->LookAheadToken("struct"))
     {
-        auto decl = parser->ParseStruct();
+        auto decl = parser->ParseStruct(parser->astBuilder->create<StructDecl>());
         typeSpec.decl = decl;
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
     }
     else if (parser->LookAheadToken("class"))
     {
-        auto decl = parser->ParseClass();
+        // HLSL `class` declarations have value semantics and use the struct grammar.
+        // Slang `class` declarations retain their separate reference-type representation.
+        Decl* decl;
+        if (parser->getSourceLanguage() == SourceLanguage::HLSL)
+            decl = parser->ParseStruct(parser->astBuilder->create<HLSLClassDecl>());
+        else
+            decl = parser->ParseClass();
         typeSpec.decl = decl;
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
@@ -5505,6 +5515,18 @@ static ParamDecl* parseAttributeParamDecl(Parser* parser)
     return paramDecl;
 }
 
+// Return the declaration kind whose nesting rules apply to `declType`.
+//
+// Struct subclasses use the same rules as `StructDecl`. For example, parsing
+// `class Outer { class Inner { int x; }; };` in HLSL produces two `HLSLClassDecl`
+// nodes, and we must validate both the parent and child as struct declarations.
+static ASTNodeType getDeclTypeForNestingValidity(ASTNodeType declType)
+{
+    if (SyntaxClass<NodeBase>(declType).isSubClassOf<StructDecl>())
+        return ASTNodeType::StructDecl;
+    return declType;
+}
+
 static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
 {
     switch (declType)
@@ -5549,6 +5571,9 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
 // Can a decl of `declType` be allowed as a children of `parentType`?
 static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeType declType)
 {
+    parentType = getDeclTypeForNestingValidity(parentType);
+    declType = getDeclTypeForNestingValidity(declType);
+
     // If decl is not known as a decl that can be written by the user (e.g. a synthesized decl
     // type), then we just allow it.
     if (!shouldDeclBeCheckedForNestingValidity(declType))
@@ -6521,11 +6546,15 @@ void Parser::parseSourceFile(ContainerDecl* program)
     currentScope = nullptr;
 }
 
-Decl* Parser::ParseStruct()
+// Parse the common declaration grammar for structs and HLSL classes.
+//
+// The caller supplies the node so that we preserve the distinction between `StructDecl`
+// and `HLSLClassDecl` while sharing attributes, names, generic parameters, inheritance,
+// and body parsing. Semantic checking owns the rules for the resulting value types.
+Decl* Parser::ParseStruct(StructDecl* decl)
 {
-    StructDecl* rs = astBuilder->create<StructDecl>();
-    ReadToken("struct");
-    FillPosition(rs);
+    ReadToken();
+    FillPosition(decl);
 
     if (LookAheadToken(TokenType::LBracket))
     {
@@ -6541,7 +6570,7 @@ Decl* Parser::ParseStruct()
         }
         // note: no diagnostics before Slang version 2025
 
-        Modifier** modifierLink = &rs->modifiers.first;
+        Modifier** modifierLink = &decl->modifiers.first;
 
         // Even if this syntax is now removed in Slang 2026, we'll still parse
         // it to keep the diagnostics output sane.
@@ -6553,12 +6582,12 @@ Decl* Parser::ParseStruct()
 
     if (LookAheadToken(TokenType::Identifier))
     {
-        rs->nameAndLoc = expectIdentifier(this);
+        decl->nameAndLoc = expectIdentifier(this);
     }
     else
     {
-        rs->nameAndLoc.name = generateName(this);
-        rs->nameAndLoc.loc = rs->loc;
+        decl->nameAndLoc.name = generateName(this);
+        decl->nameAndLoc.loc = decl->loc;
     }
     return parseOptGenericDecl(
         this,
@@ -6566,11 +6595,11 @@ Decl* Parser::ParseStruct()
         {
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
-            parseOptionalInheritanceClause(this, rs);
+            parseOptionalInheritanceClause(this, decl);
             if (AdvanceIf(this, TokenType::OpAssign))
             {
-                rs->aliasedType = ParseTypeExp();
-                PushScope(rs);
+                decl->aliasedType = ParseTypeExp();
+                PushScope(decl);
                 PopScope();
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
@@ -6579,16 +6608,16 @@ Decl* Parser::ParseStruct()
                         .expectedToken = "';'",
                         .location = this->tokenReader.peekToken().loc});
                 }
-                return rs;
+                return decl;
             }
             if (LookAheadToken(TokenType::Semicolon))
             {
-                rs->hasBody = false;
-                return rs;
+                decl->hasBody = false;
+                return decl;
             }
             maybeParseGenericConstraints(this, genericParent);
-            parseDeclBody(this, rs);
-            return rs;
+            parseDeclBody(this, decl);
+            return decl;
         });
 }
 
@@ -7310,6 +7339,20 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     return false;
 }
 
+// Test whether the next block item declares a struct or an HLSL class, after modifiers.
+//
+// We parse these declarations with `ParseDecl` rather than as expressions. For example,
+// `class Local { int x; };` in an HLSL function must use the same declaration path as
+// a local struct. Slang reference-type classes keep their existing parsing behavior.
+static bool isStructOrHLSLClassDeclarationAhead(Parser* parser)
+{
+    if (lookAheadTokenAfterModifiers(parser, "struct"))
+        return true;
+    if (parser->getSourceLanguage() != SourceLanguage::HLSL)
+        return false;
+    return lookAheadTokenAfterModifiers(parser, "class");
+}
+
 Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
 {
     if (!beginMatch(this, MatchedTokenType::CurlyBraces))
@@ -7354,7 +7397,7 @@ Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
     };
     while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
     {
-        if (lookAheadTokenAfterModifiers(this, "struct"))
+        if (isStructOrHLSLClassDeclarationAhead(this))
         {
             auto declBase = ParseDecl(this, scopeDecl);
             if (auto declGroup = as<DeclGroup>(declBase))
