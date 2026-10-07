@@ -268,22 +268,24 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 }
 
 // Generate a single function that dispatches to each function in the collection.
-// The resulting function will have one additional parameter to accept the tag
-// indicating which function to call.
+// The leading parameters accept witness tags; the first selects the function.
+// Additional tags are allowed only when the caller proves they describe the same type.
 //
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
     Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
-    TargetRequest* targetReq)
+    TargetRequest* targetReq,
+    UInt leadingTagCount)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
 
-    // Consume the first parameter of the expected function type
+    SLANG_ASSERT(leadingTagCount > 0 && leadingTagCount <= dispatchFuncType->getParamCount());
+    // Consume the witness tags before marshalling the original function parameters.
     List<IRType*> innerParamTypes;
     for (auto paramType : dispatchFuncType->getParamTypes())
         innerParamTypes.add(paramType);
-    innerParamTypes.removeAt(0); // Remove the first parameter (ID)
+    innerParamTypes.removeRange(0, leadingTagCount);
 
     auto resultType = dispatchFuncType->getResultType();
     auto innerDispatchFuncType = builder.getFuncType(innerParamTypes, resultType);
@@ -306,6 +308,8 @@ IRFunc* createDispatchFunc(
     builder.setInsertInto(entryBlock);
 
     auto idParam = builder.emitParam(builder.getUIntType());
+    for (UInt i = 1; i < leadingTagCount; ++i)
+        builder.emitParam(dispatchFuncType->getParamType(i));
 
     // Create parameters for the original function arguments
     List<IRInst*> originalParams;

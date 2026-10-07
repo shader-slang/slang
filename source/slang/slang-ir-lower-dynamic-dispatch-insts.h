@@ -51,10 +51,14 @@ void lowerGetDispatcher(
 // whether the synthesized wrapper/dispatch functions should be force-inlined
 // (see the force-inline decoration comment at this function's definition);
 // pass nullptr to skip that decision entirely and never force-inline.
+// When leadingTagCount exceeds one, the caller must establish that all leading
+// tags select the same concrete type. Only the first selects a mapping entry;
+// the remaining tags preserve the caller ABI and are not forwarded to the body.
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
     Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
-    TargetRequest* targetReq);
+    TargetRequest* targetReq,
+    UInt leadingTagCount = 1);
 
 // Report diagnostic information about a dynamic dispatch site.
 void reportDispatchLocation(

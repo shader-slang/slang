@@ -1623,6 +1623,13 @@ class ForceInlineAttribute : public Attribute
     FIDDLE(...)
 };
 
+// Request concrete copies of a generic helper for a bounded conformance set.
+FIDDLE()
+class SpecializePerConformanceAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 
 /// An attribute that marks a type declaration as either allowing or
 /// disallowing the type to be inherited from in other modules.

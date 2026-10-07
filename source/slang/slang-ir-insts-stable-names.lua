@@ -879,5 +879,7 @@ return {
 	["reportOptiXIntersection"] = 902,
 	["Decoration.postDepthCoverage"] = 903,
 	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
-	["DebugLexicalBlock"] = 906
+	["DebugLexicalBlock"] = 906,
+	["Decoration.SpecializePerConformance"] = 907,
+	["Decoration.ConstrainedTypeDecoration"] = 908
 }
