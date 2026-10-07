@@ -677,16 +677,3 @@ effect runs inside a derivative is not guaranteed. A backward derivative
 can skip primal code whose results it does not need, counters included.
 Counts gathered while derivatives run therefore do not measure how often
 the differentiable function's source executed.
-
-## Future Region Coverage
-
-Line coverage already shares one counter across the source entries of
-a straight-line region (see [Counter coalescing](#counter-coalescing)),
-but each entry still names a concrete counter and reports a real
-count. Future source-region coverage may move further toward a
-clang-style model where entries describe source _ranges_ and some
-reported counts are derived arithmetically from other counters rather
-than read directly. That would extend coverage metadata — most likely
-by using `kInvalidCoverageCounterIndex` for derived entries — but it
-should not change the basic rule that hidden resource binding is
-separate from source attribution.
