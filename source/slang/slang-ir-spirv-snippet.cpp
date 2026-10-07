@@ -59,8 +59,6 @@ bool SpvSnippet::isEmittableASMType(ASMType type)
     case ASMType::UInt2:
         return true;
     default:
-        // None (the unknown-token sentinel), Double, and FloatOrDouble have no lowering in either
-        // emitter switch, so an operand of one of these types is diagnosed rather than emitted.
         return false;
     }
 }
@@ -88,12 +86,8 @@ UnownedStringSlice SpvSnippet::getASMTypeName(ASMType type)
     case ASMType::UInt2:
         return UnownedStringSlice("uint2");
     case ASMType::None:
-        // None is the sentinel parseASMType returns for an unrecognized type token; naming it
-        // "unknown" is the spelling the un-emittable-operand diagnostic reports for such a token.
         return UnownedStringSlice("unknown");
     }
-    // Every ASMType enumerator is handled above, and omitting `default` lets -Wswitch flag a newly
-    // added one; reaching here means an out-of-contract cast to a non-enumerator value.
     SLANG_UNEXPECTED("unhandled ASMType in getASMTypeName");
 }
 
@@ -336,14 +330,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                                 {
                                 case ASMType::Half:
                                 case ASMType::Float:
-                                // `Double` is read here even though it is not isEmittableASMType
-                                // and is never emitted: reading its fractional literal lets the
-                                // snippet parse and reach the legalization-time `E29003`
-                                // "un-emittable operand" diagnostic (raised by validateSpvSnippet),
-                                // rather than failing as a misleading `E29000` parse error. It
-                                // lands in `floatValues` (narrowed to 32-bit) because that is the
-                                // field ASMConstant hashes/compares on; the narrowing is harmless
-                                // precisely because a `double` constant never reaches emit.
+                                // A `double` constant is never emitted, but reading it as a float
+                                // lets validateSpvSnippet report it instead of a parse error.
                                 case ASMType::Double:
                                 case ASMType::Float2:
                                 case ASMType::FloatOrDouble:

@@ -1000,27 +1000,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return;
     }
 
-    // Diagnoses a parsed snippet operand the SPIR-V emitter cannot lower, returning false after the
-    // first offending operand. Validation runs here, during legalization, rather than at emit
-    // because the offending call stays in the IR: the emitSPIRVFromIR error-count gate then stops
-    // emission before emitSpvSnippet reaches the operand and aborts or dereferences a null.
+    // We validate during legalization so emitSPIRVFromIR stops before an invalid operand reaches
+    // emission.
     bool validateSpvSnippet(
         IRCall* inst,
         IRTargetIntrinsicDecoration* intrinsic,
         SpvSnippet* snippet)
     {
         const auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : intrinsic->sourceLoc;
-        // emitSpvSnippet fills context.argumentIds with exactly one id per call argument, so
-        // getArgCount() is the same bound its `_N` (ObjectReference) access indexes against.
         const auto argCount = (SpvWord)inst->getArgCount();
         for (Index i = 0; i < snippet->instructions.getCount(); i++)
         {
             for (const auto& operand : snippet->instructions[i].operands)
             {
-                // operand.content is interpreted per kind: an ASMType enum for a TypeReference, an
-                // index into snippet->constants for a ConstantReference, an argument number for an
-                // ObjectReference (_N), and an earlier-instruction index for an InstReference
-                // (%name).
                 switch (operand.type)
                 {
                 case SpvSnippet::ASMOperandType::TypeReference:
@@ -1030,10 +1022,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             operand.type == SpvSnippet::ASMOperandType::TypeReference;
                         auto asmType = isType ? (SpvSnippet::ASMType)operand.content
                                               : snippet->constants[operand.content].type;
-                        // A `const(_p, ...)` constant resolves to `float`/`double` from the
-                        // intrinsic's result type exactly as emitSpvSnippet does, so it is checked
-                        // in its resolved form; a `_type(_p)` operand has no such resolution and is
-                        // checked as written.
                         if (!isType)
                             asmType = SPIRVEmitSharedContext::resolveSnippetConstantType(
                                 asmType,
@@ -1064,12 +1052,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     }
                     break;
                 case SpvSnippet::ASMOperandType::InstReference:
-                    // A `%name` operand emits as an index into the instructions already emitted
-                    // before this one (emitSpvSnippet's emittedInsts), so it must name a strictly
-                    // earlier instruction. The parser registers a result name before parsing that
-                    // instruction's own operands, so a self-reference like `%a = OpNop %a` resolves
-                    // to its own not-yet-emitted index (content == i) and slips past the parser's
-                    // undefined-name check; at emit, content >= i indexes past emittedInsts.
+                    // The parser registers `%a` before parsing its own operands, so a
+                    // self-reference such as `%a = OpNop %a` is only caught here.
                     if (operand.content >= (SpvWord)i)
                     {
                         m_sink->diagnose(Diagnostics::InvalidSpirvSnippetOperand{
@@ -1081,9 +1065,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     }
                     break;
                 default:
-                    // The remaining operand kinds carry nothing this validator can reject: SpvWord
-                    // and the Float*Selection operands are raw SPIR-V words, ResultId/ResultTypeId
-                    // are compiler-generated, and GLSL450ExtInstSet is a fixed ext-inst-set id.
                     break;
                 }
             }

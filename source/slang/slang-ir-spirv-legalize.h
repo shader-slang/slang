@@ -64,11 +64,8 @@ struct SPIRVEmitSharedContext
     }
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 
-    // Resolves a `const(...)` operand's ASMType against the intrinsic's result type: a
-    // `FloatOrDouble` (`_p`) constant becomes `Float` or `Double` to match the result type, and any
-    // other type (including a `FloatOrDouble` whose result type is neither) passes through
-    // unchanged. Shared by the emitter and the legalization-time validator so both agree on which
-    // constant operands are emittable.
+    // Maps `FloatOrDouble` to `Float` or `Double` for matching result types, leaving `type`
+    // unchanged otherwise.
     static SpvSnippet::ASMType resolveSnippetConstantType(
         SpvSnippet::ASMType type,
         IRType* resultType);
