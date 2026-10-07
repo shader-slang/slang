@@ -972,6 +972,19 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
     return pass.considerAllCallSites();
 }
 
+// Return whether a call to `callee` may keep its `groupshared` parameters, which are `Workgroup`
+// pointers, across the call boundary instead of being inlined away. Direct SPIR-V allows such a
+// pointer parameter under the `VariablePointers` capability, so we keep the boundary for a
+// `[noinline]` callee when the target already enables `SPV_KHR_variable_pointers`. We never enable
+// the extension only to keep a boundary.
+static bool canKeepGroupSharedParamsAcrossCall(TargetProgram* targetProgram, IRFunc* callee)
+{
+    return targetProgram->shouldEmitSPIRVDirectly() &&
+           callee->findDecoration<IRNoInlineDecoration>() &&
+           targetProgram->getTargetReq()->getTargetCaps().implies(
+               CapabilityAtom::SPV_KHR_variable_pointers);
+}
+
 namespace
 { // anonymous
 
@@ -1061,13 +1074,18 @@ struct TypeInliningPass : InliningPassBase
             return true;
         }
 
-        const auto count = Count(callee->getParamCount());
-        for (Index i = 0; i < count; ++i)
+        bool keepGroupSharedParams = canKeepGroupSharedParamsAcrossCall(targetProgram, callee);
+        Index i = 0;
+        for (auto param : callee->getParams())
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
+            bool isKeptGroupSharedParam =
+                keepGroupSharedParams && as<IRGroupSharedRate>(param->getRate());
+            if (!isKeptGroupSharedParam &&
+                doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
+            ++i;
         }
 
         return false;
@@ -1234,21 +1252,56 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    GLSLResourceReturnFunctionInliningPass(IRModule* module)
+    // When true, only the `groupshared`-by-reference parameter case triggers inlining; the
+    // GLSL-specific resource-return / illegal-parameter-type cases are skipped. WGSL uses this
+    // mode: it can represent resources fine, but baseline WGSL cannot take a `ptr<workgroup, ...>`
+    // as a function parameter, so a `groupshared`-by-reference parameter must still be inlined
+    // away.
+    bool m_groupSharedByRefOnly = false;
+
+    TargetProgram* m_targetProgram = nullptr;
+
+    GLSLResourceReturnFunctionInliningPass(
+        IRModule* module,
+        TargetProgram* targetProgram,
+        bool groupSharedByRefOnly)
         : Super(module)
+        , m_groupSharedByRefOnly(groupSharedByRefOnly)
+        , m_targetProgram(targetProgram)
     {
     }
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if (isResourceType(info.callee->getResultType()))
+        if (!m_groupSharedByRefOnly && isResourceType(info.callee->getResultType()))
         {
             return true;
         }
+        bool keepGroupSharedParams =
+            canKeepGroupSharedParamsAcrossCall(m_targetProgram, info.callee);
         for (auto param : info.callee->getParams())
         {
-            if (isIllegalGLSLParameterType(param->getDataType()))
+            if (!m_groupSharedByRefOnly && isIllegalGLSLParameterType(param->getDataType()))
                 return true;
+            // A `groupshared` value passed by reference becomes a pointer parameter into
+            // the `Workgroup` storage class, which neither the Khronos backends nor WGSL can
+            // represent as a function parameter (GLSL has no pointers, a SPIR-V `Workgroup`
+            // pointer cannot legally cross a function boundary without the `VariablePointers`
+            // capability, and baseline WGSL lacks `ptr<workgroup>` parameters). The
+            // `groupshared`-ness lives on the parameter's rate (`IRGroupSharedRate`), not on its
+            // value type, so the value-type checks above never catch it. Inline the callee so the
+            // parameter disappears and the accesses fall directly on the `Workgroup` global,
+            // mirroring how resource parameters are handled here. Direct SPIR-V with
+            // `VariablePointers` already enabled is the exception, as
+            // `canKeepGroupSharedParamsAcrossCall` describes.
+            if (as<IRGroupSharedRate>(param->getRate()))
+            {
+                if (keepGroupSharedParams)
+                    continue;
+                return true;
+            }
+            if (m_groupSharedByRefOnly)
+                continue;
             auto outType = as<IROutParamTypeBase>(param->getDataType());
             if (!outType)
                 continue;
@@ -1260,9 +1313,12 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
+void performGLSLResourceReturnFunctionInlining(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    bool groupSharedByRefOnly)
 {
-    GLSLResourceReturnFunctionInliningPass pass(module);
+    GLSLResourceReturnFunctionInliningPass pass(module, targetProgram, groupSharedByRefOnly);
     bool changed = true;
 
     while (changed)
