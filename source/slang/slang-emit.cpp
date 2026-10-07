@@ -1683,7 +1683,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            SLANG_PASS(checkForMissingReturns, sink, target, false);
+            SLANG_PASS(
+                checkForMissingReturns,
+                sink,
+                SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN,
+                target,
+                false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
