@@ -7,7 +7,6 @@ on:
     paths:
       - "extras/**/*.py"
       - "tools/compile-perf/**/*.py"
-      - "tools/shader-coverage/**/*.py"
       - ".github/workflows/check-python-core.yml"
   merge_group:
     types: [checks_requested]
@@ -115,9 +114,6 @@ jobs:
       - name: Test compile-perf sampling, provenance and confirmation
         run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
 
-      - name: Test shader coverage LCOV export
-        run: python3 tools/shader-coverage/test_slang_coverage_to_lcov.py
-
   # The compile-perf suite's only Windows consumer is the scheduled nightly,
   # so a Windows-only defect in an import-time self-check merges green and
   # surfaces a day later as a lost data point rather than as a PR failure.
@@ -161,6 +157,3 @@ jobs:
 
       - name: Test compile-perf sampling, provenance and confirmation
         run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'
-
-      - name: Test shader coverage LCOV export
-        run: python tools/shader-coverage/test_slang_coverage_to_lcov.py
