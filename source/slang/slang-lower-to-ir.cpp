@@ -16747,10 +16747,11 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             }
             else if (fieldDecl.getDecl())
             {
-                // The key names the declaration rather than evaluating it: a global variable
-                // (such as a GLSL `out` global) lowers to a pointer, and `getSimpleVal` would
-                // emit a module-scope load of it. `createIRModuleForLayout` keys the
-                // global-scope layout the same way.
+                // A field key identifies the field's declaration: the struct key of a struct
+                // field, or the variable itself (not a load of it) for a global variable in the
+                // global scope's offset-element layout. That key must be the same instruction
+                // `createIRModuleForLayout` uses for the element layout, because passes such as
+                // `collectGlobalUniformParameters` find both entries through it.
                 irFieldKey = materialize(context, ensureDecl(context, fieldDecl.getDecl())).val;
             }
             else

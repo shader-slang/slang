@@ -65,10 +65,9 @@ struct CollectGlobalUniformParametersContext
         }
     }
 
-    /// Is `key` a GLSL-style global `in` or `out` variable?
-    ///
-    /// Such a variable is a varying, not a uniform parameter, even on targets (CPU, CUDA) whose
-    /// varying layout rules give it uniform size. `translateGlobalVaryingVar` handles it later.
+    /// Return whether `key` is a global variable declared with a GLSL-style `in` or `out`
+    /// modifier: an `IRGlobalVar` carrying `IRGlobalInputDecoration` or
+    /// `IRGlobalOutputDecoration`.
     static bool _isGlobalVaryingVar(IRInst* key)
     {
         if (!as<IRGlobalVar>(key))
@@ -237,9 +236,30 @@ struct CollectGlobalUniformParametersContext
 
         for (auto fieldLayoutAttr : orderedFields)
         {
+            // A global `in`/`out` variable is a varying, not a uniform parameter, so we never
+            // collect it, even on CPU/CUDA where its layout has uniform size. We still re-key
+            // every struct field layout that names it, in both the element and offset-element
+            // layouts, because a layout naming the variable is a use outside any function,
+            // which `introduceExplicitGlobalContext` cannot rewrite.
+            //
+            auto originalKey = fieldLayoutAttr->getFieldKey();
+            if (_isGlobalVaryingVar(originalKey))
+            {
+                builder->setInsertAfter(originalKey);
+                auto varyingKey = builder->createStructKey();
+                traverseUses(
+                    originalKey,
+                    [&](IRUse* use)
+                    {
+                        if (as<IRStructFieldLayoutAttr>(use->getUser()))
+                            builder->replaceOperand(use, varyingKey);
+                    });
+                continue;
+            }
+
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
-            // global shader parameter, or a GLSL-style global varying variable.
+            // global shader parameter.
 
             // Save the original global param before replacement.
             auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
@@ -254,23 +274,6 @@ struct CollectGlobalUniformParametersContext
             // parameter structure type, and that field will need a key.
             //
             auto fieldKey = builder->createStructKey();
-
-            // The element and offset-element layouts of the global-scope parameter group
-            // both name a global varying. We re-key every such layout, because a layout
-            // left naming the variable is a module-scope use that later passes cannot place.
-            //
-            auto originalKey = fieldLayoutAttr->getFieldKey();
-            if (_isGlobalVaryingVar(originalKey))
-            {
-                traverseUses(
-                    originalKey,
-                    [&](IRUse* use)
-                    {
-                        if (as<IRStructFieldLayoutAttr>(use->getUser()))
-                            builder->replaceOperand(use, fieldKey);
-                    });
-                continue;
-            }
 
             // In order to make sure that the existing IR layout information for
             // the global scope remains valid, we will swap out the key in the
