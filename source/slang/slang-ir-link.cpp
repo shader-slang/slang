@@ -1459,7 +1459,6 @@ static IRInst* getDefinedValue(IRInst* inst)
     return returnVal && isChildInstOf(returnVal, generic) ? returnVal : inst;
 }
 
-// Return the name hint of `inst`, or of the value it defines, or null if neither has one.
 static IRNameHintDecoration* findDefinitionNameHint(IRInst* inst)
 {
     if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
