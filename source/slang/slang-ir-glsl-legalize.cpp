@@ -1177,30 +1177,29 @@ IRInst* getOrCreateBuiltinParamForHullShader(
     return outputControlPointIdParam;
 }
 
+/// Builds the `IRTypeLayout` for a patch constant function's result type.
+///
+/// Field offsets are relative to the enclosing struct, not absolute locations, and no locations
+/// are reserved here. The caller (`invokePatchConstantFuncInHullShader`) captures the first free
+/// slot before calling, stores it as the result offset, and reserves `[base, base + span)` from
+/// the layout's `VaryingOutput` size afterwards.
+///
+/// TODO: there is a more general issue with nested arrayed structs in (#13330);
+/// take this case into account when fixing it as well.
 IRTypeLayout* createPatchConstantFuncResultTypeLayout(
-    GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     IRBuilder& irBuilder,
     IRType* type)
 {
-    // TODO: there is a more general issue with nested arrayed structs in (#13330)
-    // take this case into account when fixing it as well
     if (auto structType = as<IRStructType>(type))
     {
-        // Field offsets below are relative to this struct; the walker
-        // (createGLSLGlobalVaryingsImpl) adds them to the enclosing binding.
-        const Index structBase =
-            context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
         UInt reservedCount = 0;
         IRStructTypeLayout::Builder builder(&irBuilder);
         for (auto field : structType->getFields())
         {
             auto fieldType = field->getFieldType();
-            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(
-                context,
-                codeGenContext,
-                irBuilder,
-                fieldType);
+            IRTypeLayout* fieldTypeLayout =
+                createPatchConstantFuncResultTypeLayout(codeGenContext, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
             if (decoration &&
@@ -1224,11 +1223,6 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 UInt varyingCount = sizeAttr ? sizeAttr->getFiniteSize() : 0;
 
                 varLayoutForKind->offset = reservedCount;
-                for (UInt i = 0; i < varyingCount; ++i)
-                {
-                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
-                        (Index)(structBase + reservedCount + i));
-                }
                 reservedCount += varyingCount;
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
@@ -1245,7 +1239,6 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
         auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(
-            context,
             codeGenContext,
             irBuilder,
             arrayType->getElementType());
@@ -1424,20 +1417,22 @@ void invokePatchConstantFuncInHullShader(
     // Struct field offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
     auto constantOutputBase =
         context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(
-        context,
-        codeGenContext,
-        builder,
-        constantOutputType);
+    IRTypeLayout* constantOutputLayout =
+        createPatchConstantFuncResultTypeLayout(codeGenContext, builder, constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
-    if (constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+    if (auto sizeAttr = constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
     {
         auto resultVarInfo =
             resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
         resultVarInfo->offset = (UInt)constantOutputBase;
         resultVarInfo->space = 0;
+        for (UInt i = 0; i < sizeAttr->getFiniteSize(); ++i)
+        {
+            context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
+                constantOutputBase + (Index)i);
+        }
     }
 
     context->entryPointFunc = constantFunc;
