@@ -209,30 +209,35 @@ SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
     return Math::DoubleInt64Union::makeFromInt64(value).dvalue;
 }
 
+// Rounds a Float32 value to the nearest Half, choosing the even encoding on ties. Constant
+// folding must agree with runtime narrowing: for example, 1.00048828125 is halfway between
+// Half 1.0 and its successor, so it rounds to 1.0. Retain every discarded bit until rounding,
+// including when a normal Float32 becomes a Half subnormal.
 inline unsigned short FloatToHalf(float val)
 {
-    const auto x = FloatAsInt(val);
+    const unsigned int bits = unsigned(FloatAsInt(val));
+    const unsigned int sign = (bits >> 16) & 0x8000u;
+    const unsigned int exponent = (bits >> 23) & 0xffu;
+    const unsigned int fraction = bits & 0x007fffffu;
+    if (exponent == 255)
+    {
+        // Preserve the established NaN classification and sign, even if all payload bits
+        // would otherwise be discarded by narrowing.
+        return (unsigned short)(sign | 0x7c00u | (fraction != 0));
+    }
+    if (exponent > 142)
+        return (unsigned short)(sign | 0x7c00u);
+    if (exponent < 102)
+        return (unsigned short)sign;
 
-    unsigned short bits = (x >> 16) & 0x8000;
-    unsigned short m = (x >> 12) & 0x07ff;
-    unsigned int e = (x >> 23) & 0xff;
-    if (e < 103)
-        return bits;
-    if (e > 142)
-    {
-        bits |= 0x7c00u;
-        bits |= e == 255 && (x & 0x007fffffu);
-        return bits;
-    }
-    if (e < 113)
-    {
-        m |= 0x0800u;
-        bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-        return bits;
-    }
-    bits |= ((e - 112) << 10) | (m >> 1);
-    bits += m & 1;
-    return bits;
+    const unsigned int significand = fraction | 0x00800000u;
+    const unsigned int shift = exponent < 113 ? 126 - exponent : 13;
+    unsigned int result = exponent < 113 ? 0 : (exponent - 113) << 10;
+    result += significand >> shift;
+    const unsigned int remainder = significand & ((1u << shift) - 1);
+    const unsigned int halfway = 1u << (shift - 1);
+    result += remainder > halfway || (remainder == halfway && (result & 1));
+    return (unsigned short)(sign | result);
 }
 
 inline float HalfToFloat(unsigned short input)
