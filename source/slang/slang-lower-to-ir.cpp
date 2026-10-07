@@ -3564,6 +3564,18 @@ void addArg(
             auto irArgType = lowerType(context, argType);
             LoweredValInfo tempVar = createVar(context, irArgType);
 
+            // Global shader parameters are immutable values. When borrowing one requires a
+            // temporary, record its write-once call-argument role so target lowering can
+            // forward the parameter's storage once it becomes addressable. Do not apply this
+            // to mutable expressions, whose value may need to be captured before later arguments.
+            if (paramPassingMode == ParamPassingMode::BorrowIn &&
+                argVal.flavor == LoweredValInfo::Flavor::Simple && as<IRGlobalParam>(argVal.val))
+            {
+                context->irBuilder->addDecoration(
+                    tempVar.val,
+                    kIROp_TempCallArgImmutableVarDecoration);
+            }
+
             //
             // Depending on what direction(s) data is being passed,
             // we may need to transfer the argument value into the
