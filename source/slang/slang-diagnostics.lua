@@ -1470,6 +1470,20 @@ err(
     span { loc = "expr:Expr", message = "'~name:Name' is not a member of '~type:Type'." }
 )
 
+standalone_note(
+    "suggest-constraint-for-missing-member",
+    30032,
+    "consider adding a constraint such as 'where ~genericParam:Name : ~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "suggest-generic-interface-constraint-for-missing-member",
+    30033,
+    "consider constraining '~genericParam:Name' to interface '~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
 err(
     "argument-expected-lvalue",
     30047,
@@ -5130,6 +5144,13 @@ err(
     40020,
     "loop unrolling failed",
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
+)
+
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
 )
 
 fatal(

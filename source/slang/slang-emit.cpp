@@ -50,6 +50,7 @@
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
+#include "slang-ir-expand-autodiff-parameter-contexts.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
@@ -447,6 +448,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
@@ -1793,6 +1795,14 @@ Result linkAndOptimizeIR(
     SLANG_PASS(lowerTuples, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    // Expand captured parameters for CUDA (including PTX and OptiX) and Metal after tuple
+    // lowering, before aggregate parameters are converted to references. Keep the other target
+    // pipelines unchanged until this optimization is validated for them.
+    if (target == CodeGenTarget::CUDASource || isMetalTarget(target))
+    {
+        SLANG_PASS(expandAutodiffParameterContexts);
+    }
 
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
     if (sink->getErrorCount() != 0)
@@ -3282,6 +3292,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugTypeComposite,
         NonSemanticShaderDebugInfo100DebugTypeMember,
         NonSemanticShaderDebugInfo100DebugFunction,
+        NonSemanticShaderDebugInfo100DebugLexicalBlock,
         NonSemanticShaderDebugInfo100DebugScope,
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,
