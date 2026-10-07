@@ -190,7 +190,7 @@ def main():
 
     active_runs = any_active_ci(fetch_active_runs(args.repo, args.workflow))
     if active_runs:
-        print(f"CI is still active ({len(active_runs)} run(s)); not rerunning bot CI.")
+        print("CI is still active; not rerunning bot CI.")
         for run in active_runs[:10]:
             print(
                 f"  active #{run.get('run_number')} "

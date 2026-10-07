@@ -11,7 +11,6 @@ without the other.
 
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +27,8 @@ DEFAULT_BOT_LOGINS = {
 
 # Candidate statuses. Waiting runs need a job-level capacity check below.
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+
+
 def waiting_run_uses_runner_capacity(repo, run):
     """Check jobs before treating an approval-waiting run as a blocker.
 
@@ -72,38 +73,43 @@ def run_actor_login(run):
     return ""
 
 
-def fetch_active_runs(repo, workflow):
-    """Return active CI runs for the workflow across all active statuses.
+def fetch_active_runs(repo, workflow, include_run=None):
+    """Find sufficient evidence that relevant CI still needs runner capacity.
 
-    Queries every status in ACTIVE_STATUSES and paginates each query, so a
-    higher-priority run is never missed because it sits in a less-common state
-    or on a later page. Waiting runs block only if their jobs still need runner
-    capacity; environment approval alone is not runner contention.
+    The gate and retry scheduler need a busy/quiet decision, not an exhaustive
+    inventory. Query runner-active statuses first and stop on a relevant run.
+    Only when those are quiet, inspect waiting runs one at a time, stopping at
+    the first runnable sibling. For example, an active human build makes it
+    unnecessary to inspect a backlog of 100 Falcor approval requests.
+
+    The gate supplies include_run to exclude itself and newer bot runs before
+    any job requests. The retry scheduler considers every run. A quiet result
+    still requires checking all relevant waiting runs; missing/API-error state
+    must never be interpreted as permission to proceed.
     """
-    runs = {}
-    for status in sorted(ACTIVE_STATUSES):
+    def relevant(run):
+        return include_run is None or include_run(run)
+
+    endpoint = f"/repos/{repo}/actions/workflows/{workflow}/runs"
+    for status in sorted(ACTIVE_STATUSES - {"waiting"}):
         items, err = gh_api_list(
-            f"/repos/{repo}/actions/workflows/{workflow}/runs"
-            f"?status={status}&per_page=100",
-            "workflow_runs",
+            f"{endpoint}?status={status}&per_page=100", "workflow_runs"
         )
         if err:
             raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in items or []:
-            runs[run["id"]] = run
-    active = [run for run in runs.values() if run.get("status") != "waiting"]
-    waiting = [run for run in runs.values() if run.get("status") == "waiting"]
-    # Old approval requests can accumulate. Bound concurrency so inspecting
-    # them fits the short-lived retry workflow without flooding the API.
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        checks = [
-            (run, executor.submit(waiting_run_uses_runner_capacity, repo, run))
-            for run in waiting
-        ]
-        for run, check in checks:
-            if check.result():
-                active.append(run)
-    return active
+        active = [run for run in items or [] if relevant(run)]
+        if active:
+            return active
+
+    waiting, err = gh_api_list(
+        f"{endpoint}?status=waiting&per_page=100", "workflow_runs"
+    )
+    if err:
+        raise RuntimeError(f"Failed to list waiting runs: {err}")
+    for run in waiting or []:
+        if relevant(run) and waiting_run_uses_runner_capacity(repo, run):
+            return [run]
+    return []
 
 
 def parse_github_time(value):

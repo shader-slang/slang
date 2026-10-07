@@ -151,6 +151,74 @@ class TestApprovalWaits(unittest.TestCase):
         self.assertEqual([r["id"] for r in bots], [3])
 
 
+class TestPriorityApiPressure(unittest.TestCase):
+    def fixture(self, statuses, jobs):
+        def api(endpoint, key):
+            if key == "jobs":
+                run_id = int(endpoint.split("/runs/")[1].split("/")[0])
+                return jobs[run_id], None
+            status = endpoint.split("status=")[1].split("&")[0]
+            return statuses.get(status, []), None
+        return mock.patch.object(priority, "gh_api_list", side_effect=api)
+
+    def test_active_ci_avoids_waiting_list_and_all_job_requests(self):
+        active = {"id": 1, "status": "in_progress"}
+        with self.fixture({"in_progress": [active]}, {}) as api:
+            self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml"), [active])
+        self.assertEqual(api.call_count, 1)
+        self.assertFalse(any(call.args[1] == "jobs" for call in api.call_args_list))
+
+    def test_each_runner_active_status_short_circuits_before_waiting(self):
+        for status in priority.ACTIVE_STATUSES - {"waiting"}:
+            with self.subTest(status=status):
+                active = {"id": 1, "status": status}
+                with self.fixture({status: [active]}, {}) as api:
+                    self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml"), [active])
+                self.assertFalse(any("status=waiting" in call.args[0]
+                                     for call in api.call_args_list))
+
+    def test_waiting_inspection_stops_at_first_capacity_blocker(self):
+        waiting = [{"id": i, "status": "waiting"} for i in range(1, 106)]
+        with self.fixture({"waiting": waiting}, {1: [{"status": "queued"}]}) as api:
+            self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml"), [waiting[0]])
+        self.assertEqual(sum(call.args[1] == "jobs" for call in api.call_args_list), 1)
+
+    def test_gate_excludes_self_and_newer_bots_before_job_requests(self):
+        waiting = [
+            {"id": 10, "run_number": 10, "status": "waiting",
+             "actor": {"login": "nv-slang-bot[bot]"}},
+            {"id": 11, "run_number": 11, "status": "waiting",
+             "actor": {"login": "nv-slang-bot[bot]"}},
+            {"id": 1, "run_number": 1, "status": "waiting",
+             "actor": {"login": "human"}},
+        ]
+        include = lambda run: any(wait.classify_blockers(
+            [run], 10, 10, priority.normalize_bot_logins()
+        ))
+        with self.fixture({"waiting": waiting}, {1: [{"status": "queued"}]}) as api:
+            self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml", include), [waiting[2]])
+        job_calls = [call.args[0] for call in api.call_args_list if call.args[1] == "jobs"]
+        self.assertEqual(job_calls, ["/repos/o/r/actions/runs/1/jobs?per_page=100"])
+
+    def test_irrelevant_active_bot_does_not_hide_waiting_human(self):
+        newer = {"id": 11, "run_number": 11, "status": "in_progress",
+                 "actor": {"login": "nv-slang-bot[bot]"}}
+        human = {"id": 1, "status": "waiting", "actor": {"login": "human"}}
+        include = lambda run: any(wait.classify_blockers(
+            [run], 10, 10, priority.normalize_bot_logins()
+        ))
+        with self.fixture({"in_progress": [newer], "waiting": [human]},
+                          {1: [{"status": "in_progress"}]}):
+            self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml", include), [human])
+
+    def test_quiet_result_checks_every_relevant_waiting_run(self):
+        waiting = [{"id": i, "status": "waiting"} for i in range(1, 4)]
+        jobs = {i: [{"status": "completed"}, {"status": "waiting"}] for i in range(1, 4)}
+        with self.fixture({"waiting": waiting}, jobs) as api:
+            self.assertEqual(priority.fetch_active_runs("o/r", "ci.yml"), [])
+        self.assertEqual(sum(call.args[1] == "jobs" for call in api.call_args_list), 3)
+
+
 class TestYieldClassification(unittest.TestCase):
     def test_cancelled_approval_does_not_prevent_yield_retry(self):
         self.assertTrue(retry.failed_only_because_priority_gate(yielded_jobs()))
