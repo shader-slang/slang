@@ -1731,12 +1731,12 @@ QualType getTypeForDeclRef(
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
         // so we obtain them from that declaration without replacing the shadow's value type.
-        auto memoryQualifierDecl = varDeclRef.getDecl();
-        if (auto shadow = as<UniformParameterShadowVarDecl>(memoryQualifierDecl))
-            memoryQualifierDecl = shadow->uniformParameter;
+        auto declForMemoryQualifier = varDeclRef.getDecl();
+        if (auto shadow = as<UniformParameterShadowVarDecl>(declForMemoryQualifier))
+            declForMemoryQualifier = shadow->uniformParameter;
 
         bool isWriteOnly = false;
-        if (auto collection = memoryQualifierDecl->findModifier<MemoryQualifierSetModifier>())
+        if (auto collection = declForMemoryQualifier->findModifier<MemoryQualifierSetModifier>())
         {
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
             {
@@ -2903,10 +2903,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // arrays in specific cases)
         //
         validateArraySizeForVariable(varDecl);
-        //
-        // Similarly, we want to check the element type for any restrictions
-        //
-        validateArrayElementTypeForVariable(varDecl);
     }
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
@@ -3107,6 +3103,22 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     checkVisibility(varDecl);
+
+    // We finish ordinary `VarDecl` signatures here. Generic value-parameter visitors may
+    // still change their declarations' types after this common routine returns.
+    if (as<VarDecl>(varDecl))
+    {
+        // Array-element validation calls `getTypeTags`, which may encounter `varDecl` again
+        // through a recursive struct. The type, array bound, and modifiers of `varDecl` are
+        // now determined, so we publish its signature before validating the element type.
+        if (!varDecl->isChecked(DeclCheckState::SignatureChecked))
+            varDecl->setCheckState(DeclCheckState::SignatureChecked);
+    }
+
+    // Header checking has already advanced declarations with inferred types or array bounds
+    // to `DefinitionChecked`. We validate their array elements here because
+    // `SemanticsDeclBodyVisitor` will not run for those declarations.
+    validateArrayElementTypeForVariable(varDecl);
 }
 
 static void addAutoDiffModifiersToFunc(

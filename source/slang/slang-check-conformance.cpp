@@ -426,6 +426,8 @@ bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
 /// A context for computing the storage-related properties of a type and its instance fields.
 ///
 /// The `getTags` method inspects checked field signatures rather than cached aggregate tags.
+/// Header checking needs these properties to choose storage for uniform parameter shadows,
+/// before body checking has accumulated tags on the aggregate declaration.
 /// For example, `struct Box<T> { T value; };` has an opaque field in `Box<Texture2D>`, but not
 /// in `Box<float>`. Caching tags on the unspecialized declaration cannot describe both cases.
 /// Requires `visitor` to identify the semantic-checking context before `getTags` is called.
@@ -591,7 +593,12 @@ struct TypeTagContext
         {
             if (isEffectivelyStatic(field))
                 continue;
-            visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
+
+            // We access `field` directly rather than through name lookup. `getType` requires
+            // its checked signature, but not the redeclaration checks in `ReadyForReference`.
+            // Header checking publishes `SignatureChecked` before array-element validation,
+            // so we can inspect a recursive field without re-entering that validation.
+            visitor->ensureDecl(field, DeclCheckState::SignatureChecked);
             auto fieldRef =
                 visitor->getASTBuilder()->getMemberDeclRef(aggregateRef, field).as<VarDeclBase>();
             tags = TypeTag(int(tags) | int(getTags(getType(visitor->getASTBuilder(), fieldRef))));
