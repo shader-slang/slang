@@ -1814,13 +1814,13 @@ private:
         // or rejects the constraint. (Proving that witness ends in
         // `cacheSubtypeWitness`, which must not linearize `sup` either.)
         //
-        // An equality `T == S` against a concrete `S`, with `T` defaulted to an
-        // interface, keeps the join, because its answer `S` is the solution. An
+        // An equality `T == S` against a non-interface `S`, with `T` defaulted to
+        // an interface, keeps the join, because its answer `S` is the solution. An
         // equality against an interface `sup` has the recursive shape above, and
         // only a type-equality witness can satisfy it, so it is skipped too.
-        bool isEqualityToConcreteType =
+        bool isEqualityToNonInterfaceType =
             typeConstraintDecl->isEqualityConstraint && !isInterfaceType(sup);
-        if (isInterfaceType(sub) && !isEqualityToConcreteType)
+        if (isInterfaceType(sub) && !isEqualityToNonInterfaceType)
             return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
 
         // `TryJoinTypes()` is the existing path that compares a concrete type
