@@ -49,6 +49,11 @@
 // CHECK_XD-SAME: -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2
 // CHECK_XD-SAME: -stage compute
 
+//TEST:SIMPLE(filecheck=CHECK_XG): -target spirv -g3 -Xnvrtc... --fmad=true --fmad=false -X. -emit-spirv-directly
+// CHECK_XG:  OpString "-target spirv
+// CHECK_XG-SAME: -Xnvrtc --fmad=true -Xnvrtc --fmad=false
+// CHECK_XG-SAME: -stage compute
+
 [numthreads(1,1,1)]
 void computeMain()
 {}

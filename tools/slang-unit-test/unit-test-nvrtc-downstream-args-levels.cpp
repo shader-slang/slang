@@ -1,5 +1,6 @@
 // unit-test-nvrtc-downstream-args-levels.cpp
 
+#include "core/slang-list.h"
 #include "core/slang-string.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

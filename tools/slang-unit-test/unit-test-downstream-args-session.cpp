@@ -122,9 +122,8 @@ SLANG_UNIT_TEST(serializedModuleFreshnessCoversSessionDownstreamArgs)
     }
 }
 
-// The command line recorded in SPIR-V debug info lists the arguments the target program passes to
-// downstream tools. With an argument at each of the session, target and link levels, all three
-// appear, in that order. Nothing here runs a downstream tool, so the test needs no NVRTC.
+// SPIR-V debug info records the command line a target program passes to downstream tools, so we
+// can check the forwarded order of session, target and link arguments without running NVRTC.
 SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
@@ -145,7 +144,7 @@ SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
     sessionOptions[0].name = slang::CompilerOptionName::DownstreamArgs;
     sessionOptions[0].value.kind = slang::CompilerOptionValueKind::String;
     sessionOptions[0].value.stringValue0 = "nvrtc";
-    sessionOptions[0].value.stringValue1 = "-DSESSION";
+    sessionOptions[0].value.stringValue1 = "--gpu-architecture=compute_86\n--fmad=true";
     sessionOptions[1].name = slang::CompilerOptionName::DebugInformation;
     sessionOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
     sessionOptions[1].value.intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL;
@@ -182,7 +181,7 @@ SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
         diagnostics.writeRef())));
 
     slang::CompilerOptionEntry linkArg = targetArg;
-    linkArg.value.stringValue1 = "-DLINK";
+    linkArg.value.stringValue1 = "--fmad=false";
     ComPtr<slang::IComponentType> linked;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         composite->linkWithOptions(linked.writeRef(), 1, &linkArg, diagnostics.writeRef())));
@@ -192,5 +191,7 @@ SLANG_UNIT_TEST(downstreamArgsComposeSessionTargetLinkInOrder)
         SLANG_SUCCEEDED(linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())));
 
     UnownedStringSlice spirv((const char*)code->getBufferPointer(), code->getBufferSize());
-    SLANG_CHECK(spirv.indexOf(toSlice("-Xnvrtc -DSESSION -Xnvrtc -DTARGET -Xnvrtc -DLINK")) != -1);
+    SLANG_CHECK(
+        spirv.indexOf(toSlice("-Xnvrtc --gpu-architecture=compute_86 -Xnvrtc --fmad=true "
+                              "-Xnvrtc -DTARGET -Xnvrtc --fmad=false")) != -1);
 }
