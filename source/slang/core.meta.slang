@@ -120,8 +120,7 @@ interface IComparable
 // builtin conformance is checked, where the operand shape is known, so it binds the concrete
 // overload for that shape, which ranks above the generic ones that would call back into
 // `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
-// and the same per-element code as a
-// direct call on cpp/cuda.
+// and the same per-element code as a direct call on cpp/cuda.
 //
 // `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
 // defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a

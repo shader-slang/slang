@@ -344,29 +344,17 @@ public vector<T, N> __numericInterfaceBuiltinAbs<
         return ::BUILTIN(left, right);                                           \
     }
 
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericInterfaceBuiltinAtan2,
-    atan2,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinAtan2, atan2,
     __BuiltinFloatingPointType)
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericInterfaceBuiltinCopySign,
-    copysign,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinCopySign, copysign,
     __BuiltinFloatingPointType)
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericInterfaceBuiltinPow,
-    pow,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinPow, pow,
     __BuiltinFloatingPointType)
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericInterfaceBuiltinRemainder,
-    fmod,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericInterfaceBuiltinRemainder, fmod,
     __BuiltinFloatingPointType)
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericsBuiltinMaximum,
-    max,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMaximum, max,
     __BuiltinArithmeticType)
-SLANG_NUMERICS_BINARY_ADAPTER(
-    __numericsBuiltinMinimum,
-    min,
+SLANG_NUMERICS_BINARY_ADAPTER(__numericsBuiltinMinimum, min,
     __BuiltinArithmeticType)
 
 #undef SLANG_NUMERICS_BINARY_ADAPTER

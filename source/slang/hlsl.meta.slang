@@ -13614,8 +13614,8 @@ T max(T x, T y)
     __target_switch
     {
     case llvm:
-        // LLVM 21.1.1's `maximumnum` intrinsic miscompiles on x86, so implement the operation
-        // explicitly while preserving its established NaN behavior.
+        // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate
+        // invalid code on x86.
         //__intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
         if (isnan(x)) return y;
         if (isnan(y)) return x;

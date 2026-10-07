@@ -1,10 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
-//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
-//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
-
 // General equality, ordering, numerical-extrema, and real-ordering-function contracts do not
 // require numeric arithmetic or a Scalar and Mask. Application types can use these operations
 // without claiming unrelated numeric capabilities.
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-general-ordering.hlsl -experimental-feature
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-general-ordering.spv -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1

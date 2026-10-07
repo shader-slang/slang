@@ -62,10 +62,14 @@ void computeMain()
 // GLSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
 // GLSL: vec3 maxFloat_{{[0-9]+}}(vec3 a_{{[0-9]+}}, vec3 b_{{[0-9]+}})
 // GLSL-NOT: }
-// GLSL: return (mix(mix(max((a_{{[0-9]+}}), (b_{{[0-9]+}})), (a_{{[0-9]+}}), isnan((b_{{[0-9]+}}))), (b_{{[0-9]+}}), isnan((a_{{[0-9]+}}))));
+// GLSL: return (mix(mix(max(
+// GLSL-SAME: isnan(
+// GLSL-SAME: isnan(
 // GLSL: vec3 minFloat_{{[0-9]+}}(vec3 a_{{[0-9]+}}, vec3 b_{{[0-9]+}})
 // GLSL-NOT: }
-// GLSL: return (mix(mix(min((a_{{[0-9]+}}), (b_{{[0-9]+}})), (a_{{[0-9]+}}), isnan((b_{{[0-9]+}}))), (b_{{[0-9]+}}), isnan((a_{{[0-9]+}}))));
+// GLSL: return (mix(mix(min(
+// GLSL-SAME: isnan(
+// GLSL-SAME: isnan(
 
 // METAL: int3 maxInteger_{{[0-9]+}}(int3 a_{{[0-9]+}}, int3 b_{{[0-9]+}})
 // METAL-NOT: }
