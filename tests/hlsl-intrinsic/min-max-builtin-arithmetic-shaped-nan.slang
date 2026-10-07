@@ -2,12 +2,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -Xslang -floating-point-mode -Xslang precise
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -emit-spirv-via-glsl -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 // HLSL/DXIL and SPIR-V's `NMin`/`NMax` return the numeric operand when exactly one input is NaN,
 // and a NaN when both are NaNs. Runtime input prevents constant folding from hiding a difference
-// between concrete calls, arithmetic-constrained calls, and `IFloat` witness dispatch.
+// between concrete calls, arithmetic-constrained calls, and `IFloat` witness dispatch. GLSL
+// uses native `min`/`max` with target-dependent NaN behavior, so it is not run against this oracle.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0x7fc00000], stride=4):name=inputBuffer

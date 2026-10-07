@@ -5,6 +5,8 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=EXTREMA-HLSL): -target hlsl -entry extremaMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=EXTREMA_HLSL_NO_ARTIFACT): -target hlsl -entry extremaMain -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=EXTREMA-GLSL): -target glsl -entry extremaMain -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=EXTREMA_GLSL_NO_EXPANSION): -target glsl -entry extremaMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=EXTREMA-SPIRV): -target spirv-asm -entry extremaMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=EXTREMA_SPIRV_NO_ARTIFACT): -target spirv-asm -entry extremaMain -stage compute -experimental-feature
 //TEST:SIMPLE: -target metal -entry computeMain -stage compute -o numeric-interfaces-codegen.metal -experimental-feature
@@ -37,11 +39,17 @@
 // Extrema calls made through the interface must specialize to native target operations. In
 // particular, no witness or numerics-module adapter should survive specialization.
 // EXTREMA-HLSL-COUNT-6: {{(min|max)}}(
+// EXTREMA-GLSL-COUNT-6: {{(min|max)}}(
 
 // Keep whole-output negative assertions in dedicated prefixes: when a negative directive shares a
 // prefix with positive checks, FileCheck only applies it to the region before the next match.
 // EXTREMA_HLSL_NO_ARTIFACT-NOT: INumericExtrema
 // EXTREMA_HLSL_NO_ARTIFACT-NOT: __numericsBuiltin
+
+// Native GLSL extrema calls need no NaN classification or selection expansion. These assertions
+// cover the whole output so an added helper cannot hide outside the native-operation matches.
+// EXTREMA_GLSL_NO_EXPANSION-NOT: isnan(
+// EXTREMA_GLSL_NO_EXPANSION-NOT: mix(
 
 // EXTREMA-SPIRV-DAG: %[[V3_INT:[A-Za-z0-9_]+]] = OpTypeVector %int 3
 // EXTREMA-SPIRV-DAG: %[[V2_UINT:[A-Za-z0-9_]+]] = OpTypeVector %uint 2

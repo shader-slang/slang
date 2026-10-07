@@ -13382,12 +13382,7 @@ T __max_impl(T x, T y)
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
-    case glsl:
-        // GLSL's `max` alone does not guarantee the numeric operand when the other is NaN.
-        if (__isFloat<T>())
-            __intrinsic_asm "mix(mix(max($0, $1), $0, isnan($1)), $1, isnan($0))";
-        else
-            __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
     case wgsl: __intrinsic_asm "max";
     case cuda: __intrinsic_asm "$P_max($0, $1)";
@@ -13499,12 +13494,7 @@ vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
     __target_switch
     {
     case hlsl: __intrinsic_asm "max";
-    case glsl:
-        // Boolean `mix` selects components without arithmetic on the unselected NaN values.
-        if (__isFloat<T>())
-            __intrinsic_asm "mix(mix(max($0, $1), $0, isnan($1)), $1, isnan($0))";
-        else
-            __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
     case spirv:
     {
@@ -13718,9 +13708,10 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @param x The first value to compare.
 /// @param y The second value to compare.
 /// @return The larger of the two values, element-wise if vector typed.
-/// @remarks With NaN-preserving target modes, one NaN returns the other operand, and two return
-/// a NaN. Either operand may be returned when both are zeros. Target floating-point modes may
-/// relax special-value behavior.
+/// @remarks HLSL/DXIL returns the numeric operand for one NaN, and a NaN for two NaNs.
+/// SPIR-V uses the corresponding `NMin`/`NMax` operations; target floating-point modes may relax
+/// special-value behavior. GLSL uses native `min`/`max`, which need not follow those NaN rules.
+/// Zero-sign selection also follows the target operation.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
@@ -13795,12 +13786,7 @@ T __min_impl(T x, T y)
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
-    case glsl:
-        // GLSL's `min` alone does not guarantee the numeric operand when the other is NaN.
-        if (__isFloat<T>())
-            __intrinsic_asm "mix(mix(min($0, $1), $0, isnan($1)), $1, isnan($0))";
-        else
-            __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
     case wgsl: __intrinsic_asm "min";
     case cuda: __intrinsic_asm "$P_min($0, $1)";
@@ -13857,12 +13843,7 @@ vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
     __target_switch
     {
     case hlsl: __intrinsic_asm "min";
-    case glsl:
-        // Boolean `mix` selects components without arithmetic on the unselected NaN values.
-        if (__isFloat<T>())
-            __intrinsic_asm "mix(mix(min($0, $1), $0, isnan($1)), $1, isnan($0))";
-        else
-            __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
     case wgsl: __intrinsic_asm "min";
     case spirv:
@@ -14132,9 +14113,10 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @param x The first value to compare.
 /// @param y The second value to compare.
 /// @return The smaller of the two values, element-wise if vector typed.
-/// @remarks With NaN-preserving target modes, one NaN returns the other operand, and two return
-/// a NaN. Either operand may be returned when both are zeros. Target floating-point modes may
-/// relax special-value behavior.
+/// @remarks HLSL/DXIL returns the numeric operand for one NaN, and a NaN for two NaNs.
+/// SPIR-V uses the corresponding `NMin`/`NMax` operations; target floating-point modes may relax
+/// special-value behavior. GLSL uses native `min`/`max`, which need not follow those NaN rules.
+/// Zero-sign selection also follows the target operation.
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]

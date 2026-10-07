@@ -383,8 +383,9 @@ bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 
 The `INumericExtrema` interface provides element-wise minimum and maximum operations for numeric types.
 Its built-in conformances include integer scalars, vectors, matrices, and cooperative vectors, as well as floating-point scalars, vectors, matrices, and cooperative vectors.
-For builtin floating-point representations, these operations select the numeric operand when exactly one input is a NaN, and return a NaN when both inputs are NaNs.
-This matches HLSL/DXIL and the `NMin`/`NMax` SPIR-V operations, including when a generic call reaches the operations through an interface witness.
+On HLSL/DXIL, these operations select the numeric operand when exactly one input is a NaN, and return a NaN when both inputs are NaNs.
+Slang selects the corresponding `NMin`/`NMax` SPIR-V operations, including when a generic call reaches the operations through an interface witness.
+GLSL uses native `min`/`max` without additional NaN checks or selections, so its NaN behavior can differ from HLSL/DXIL.
 Floating-point modes that allow the target compiler to assume finite inputs can relax this behavior.
 SPIR-V's extended instructions require `SPV_KHR_float_controls2` for reliable observation of special values.
 Slang currently matches DXC's `NMin`/`NMax` lowering without enabling those controls, so even precise mode does not guarantee every NaN result on Vulkan.
