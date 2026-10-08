@@ -252,9 +252,11 @@ out the represented commit.
 `edit advance` looks for canonical release tags on one line of history: from the branch tip back
 to the commit of the release the row is representing. At a merge, a parent that does not contain
 that commit is skipped. When more than one parent contains it, the walk takes the first parent.
-The greatest canonical tag on that walk that is newer than the stored version and that still
-satisfies incoming constraints replaces the version, the tag, and the commit. The branch stays,
-and the checkout does not move. When no such tag exists, or the walk never visits that commit, the
+One `edit advance` replaces the version, the tag, and the commit with the greatest canonical
+tag on that walk that is newer than the stored version and that still satisfies incoming
+constraints. When `v1.3` and `v1.4` are both on the line, the row becomes `1.4`. The command
+does not stop at the next tag and wait for another advance. The branch stays, and the checkout
+does not move. When no such tag exists, or the walk never visits that commit, the
 command says so and leaves the row unchanged. `update` does not run this, and it does not change
 an edited checkout.
 

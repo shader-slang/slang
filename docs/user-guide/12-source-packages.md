@@ -410,9 +410,10 @@ under `deps/`. Fetched source remains visible there; generated files go under `o
 `deps/NAME` checkout. `--create` creates a missing branch from the commit the dependency is
 resolved to and does not reset a branch that already exists. The lock keeps the version, tag, and
 commit it already had, and records the branch beside them. The pin boolean is unchanged.
-`edit advance NAME` moves that version, tag, and commit to the greatest newer canonical tag on the
-line of history from the branch tip back to the commit the row is representing. The checkout does
-not move.
+`edit advance NAME` moves that version, tag, and commit, in one step, to the greatest canonical
+tag on the line of history from the branch tip back to the commit the row is representing. A tag
+between the represented release and that latest tag is not a separate step. The tag must still
+satisfy incoming constraints. The checkout does not move.
 
 `slang package unedit NAME` ends the edit on a release tag. `--advance`, `--restore`, and
 `--tag VERSION` select one ending and cannot be combined. There is no `--yes`. Declining a prompt

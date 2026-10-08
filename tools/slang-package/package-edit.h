@@ -38,10 +38,12 @@ SlangResult beginPackageEdit(
     bool create,
     String& outError);
 
-/// Move an edit's stored version to the greatest newer canonical tag on its restore line.
+/// Move an edit's stored version to the latest canonical tag on its edit line.
 ///
-/// The checkout is not moved. When no such tag satisfies the incoming constraints, the row is
-/// left unchanged.
+/// The line runs from the branch tip back to the represented commit. When several newer tags on
+/// that line satisfy the constraints, this stores the greatest one, not the next tag after the
+/// represented version. The checkout is not moved. When no such tag exists, the row is left
+/// unchanged.
 SlangResult advancePackageEdit(const String& projectRoot, const String& name, String& outError);
 
 /// End an edit on a release row. Declining a prompt leaves the edit in place.
