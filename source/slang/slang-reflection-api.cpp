@@ -641,6 +641,10 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         return 0;
     }
 
+    // An unsized array's element count is a placeholder constant, so it must not be folded.
+    if (isUnsized)
+        return SLANG_UNBOUNDED_SIZE;
+
     if (const auto program = convert(reflection))
     {
         if (const auto componentType = program->getProgram())
@@ -650,9 +654,7 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         }
     }
 
-    return isUnsized                       ? 0
-           : elementCount->isLinkTimeVal() ? SLANG_UNKNOWN_SIZE
-                                           : (size_t)getIntVal(elementCount);
+    return elementCount->isLinkTimeVal() ? SLANG_UNKNOWN_SIZE : (size_t)getIntVal(elementCount);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* inType)
