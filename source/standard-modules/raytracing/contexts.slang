@@ -32,9 +32,11 @@ public interface ITraceContext
 
 /// Describes the context shared by closest-hit, any-hit, intersection, miss, and callable stages.
 ///
-/// `Record` is the application-defined data selected with the stage's SBT entry. A target may store
-/// those bytes in the native record or address backend-owned storage through a local binding.
-/// Different stage contexts may share the same `TraceContext` while using different records.
+/// It defines two associated-type requirements:
+/// - `TraceContext`: the type that selects the acceleration-structure topology and motion model
+///   for the trace program. It must conform to `ITraceContext`.
+/// - `Record`: the type of application-defined data associated with this stage's shader binding
+///   table (SBT) entry and read through `input.record`. Use `void` when no record data is needed.
 public interface IStageContext
 {
     /// Names the trace call's context type, carried into each stage's type-level contract.
