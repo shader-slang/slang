@@ -1,6 +1,7 @@
 // unit-test-coverage-cpu-runtime.cpp
 
 #include "core/slang-array-view.h"
+#include "core/slang-dictionary.h"
 #include "core/slang-list.h"
 #include "core/slang-string.h"
 #include "slang-com-ptr.h"
@@ -398,7 +399,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     bool both = (t != 0u) && andRhs(t);
     bool either = (t == 1u) || orRhs(t);
     bool chained = (t >= 1u) && (t == 3u) || (t == 0u);
-    outputBuffer[t] = picked + uint(both) * 100u + uint(either) * 1000u + uint(chained) * 10000u;
+    bool negated = !((t >= 2u) && (t <= 2u));
+    outputBuffer[t] = picked + uint(both) * 100u + uint(either) * 1000u + uint(chained) * 10000u +
+                      uint(negated) * 100000u;
 }
 )";
 
@@ -536,7 +539,7 @@ static void runCoverageCpuExpressionBranchTest(
         dispatch);
 
     // The instrumented kernel must still compute correct results.
-    const uint32_t expectedOutput[kThreadCount] = {10020u, 1120u, 1020u, 10110u};
+    const uint32_t expectedOutput[kThreadCount] = {110020u, 101120u, 1020u, 110110u};
     for (uint32_t t = 0; t < kThreadCount; ++t)
         SLANG_CHECK(dispatch.outputValues[t] == expectedOutput[t]);
 
@@ -558,6 +561,27 @@ static void runCoverageCpuExpressionBranchTest(
     checkExpressionBranchSite(dispatch, ">= 1u)", 3, 1);
     checkExpressionBranchSite(dispatch, "== 3u) ||", 1, 2);
     checkExpressionBranchSite(dispatch, "== 0u);", 1, 2);
+
+    // A negated short-circuit condition is the merged result of its operands:
+    // `t >= 2u` is true for t = 2, 3 and false for t = 0, 1, and `t <= 2u` is
+    // evaluated only for t = 2, 3. The negation adds no decision of its own,
+    // so exactly two sites sit on that line.
+    checkExpressionBranchSite(dispatch, ">= 2u)", 2, 2);
+    checkExpressionBranchSite(dispatch, "<= 2u)", 1, 1);
+    {
+        uint32_t line = 0;
+        uint32_t column = 0;
+        findSourcePosition(kExpressionBranchShaderSource, "<= 2u)", line, column);
+        HashSet<uint32_t> sites;
+        for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK_ABORT(dispatch.coverage->getEntryInfo(i, &entry) == SLANG_OK);
+            if (entry.kind == slang::CoverageEntryKind::Branch && entry.line == line)
+                sites.add(entry.branchSiteID);
+        }
+        SLANG_CHECK(sites.getCount() == 2);
+    }
 }
 
 // Create a private global session whose host-callable transition uses a real
@@ -655,7 +679,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     }
     bool skipped = t > 100 && t < 200; // skipped
     value += t == 0 ? (t < 2 ? 3 : 4) : ((t == 1 || t == 3) ? 5 : 6); // nested
-    outputBuffer[t] = value + choose(t) + uint(skipped);
+    uint arm = (t > 1u)
+        ? t + 1u // armTrue
+        : t + 2u; // armFalse
+    outputBuffer[t] = value + choose(t) + uint(skipped) + arm;
 }
 )";
     struct ExpectedLine
@@ -673,6 +700,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         {"// innerBody", 8},
         {"// skipped", 4},
         {"// nested", 4},
+        {"// armTrue", 2},
+        {"// armFalse", 2},
     };
     for (int width : {4, 8})
     {
@@ -692,7 +721,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                 modes.getArrayView(),
                 width,
                 dispatch);
-            const uint32_t expectedOutput[] = {30, 33, 35, 35};
+            const uint32_t expectedOutput[] = {32, 36, 38, 39};
             for (uint32_t t = 0; t < kThreadCount; ++t)
                 SLANG_CHECK(dispatch.outputValues[t] == expectedOutput[t]);
             for (auto expected : expectedLines)

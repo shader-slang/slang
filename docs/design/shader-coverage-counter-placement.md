@@ -118,10 +118,10 @@ void someFunction(uint N)
     // probe covers both, and it sits at the last of the two.
     uint i = 0;
     coverageAtomic("region: i = 0, while");
-    // The loop header block holds the evaluated condition: N + 1 times.
-    while (i < N)
+    // The probe of the loop header block runs before each evaluation of
+    // the condition, N + 1 times; a comma expression stands in for it.
+    while (coverageAtomic("region: while condition"), i < N)
     {
-        coverageAtomic("region: while condition");
         // The four body statements are one straight-line region.
         buf[0] = buf[1] + buf[2];
         buf[3] = buf[4] + buf[5];
@@ -223,7 +223,10 @@ and `0` for an untaken arm of an evaluated decision. Both consumers must use
 the same line/function/branch identities so totals agree. `genhtml` should run
 without `--ignore-errors`.
 
-The executable reference gate is:
+The executable reference gate is a manual check. It needs GCC 15, a matching
+gcov, genhtml, and a built `slangc`, so it is not part of CI; the unit tests
+described below cover the same semantics without those tools.
+It is run as:
 
 ```sh
 python3 tools/shader-coverage/test_gcov_semantics.py \
