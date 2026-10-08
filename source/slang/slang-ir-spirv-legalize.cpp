@@ -2885,7 +2885,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    void processModule()
+    SlangResult processModule()
     {
         determineSpirvVersion();
 
@@ -3041,9 +3041,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
-        // invalid SPIR-V.
+        // invalid SPIR-V. An atomic that failed validation cannot be emitted (e.g. its memory
+        // order is not a constant), so we stop here instead of reaching the SPIR-V emitter.
         bool skipFuncParamValidation = false;
-        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+        if (!validateAtomicOperations(
+                m_module,
+                skipFuncParamValidation,
+                m_sharedContext->m_targetRequest->getTarget(),
+                m_sink))
+            return SLANG_FAIL;
+        return SLANG_OK;
     }
 
     void updateFunctionTypes()
@@ -3119,7 +3126,7 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-void legalizeSPIRV(
+SlangResult legalizeSPIRV(
     SPIRVEmitSharedContext* sharedContext,
     IRModule* module,
     CodeGenContext* codeGenContext)
@@ -3129,7 +3136,7 @@ void legalizeSPIRV(
         module,
         codeGenContext,
         codeGenContext->getSink());
-    context.processModule();
+    return context.processModule();
 }
 
 void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink, IRModule* module)
@@ -3427,14 +3434,14 @@ static void widenNarrowAccessChainIndices(IRModule* module, TargetRequest* targe
     }
 }
 
-void legalizeIRForSPIRV(
+SlangResult legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    legalizeSPIRV(context, module, codeGenContext);
+    SLANG_RETURN_ON_FAIL(legalizeSPIRV(context, module, codeGenContext));
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
     // Widen any sub-32-bit access-chain index to 32 bits now that every producer -- including the
@@ -3454,6 +3461,7 @@ void legalizeIRForSPIRV(
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);
+    return SLANG_OK;
 }
 
 } // namespace Slang

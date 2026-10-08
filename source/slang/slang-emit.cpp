@@ -2303,7 +2303,7 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
+        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, target, sink);
     }
 
     // For CUDA targets only, we will need to turn operations

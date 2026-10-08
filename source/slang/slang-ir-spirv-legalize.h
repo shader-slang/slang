@@ -65,7 +65,7 @@ struct SPIRVEmitSharedContext
     SpvSnippet* getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic);
 };
 
-void legalizeIRForSPIRV(
+SlangResult legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,

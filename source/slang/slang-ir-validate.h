@@ -3,6 +3,7 @@
 
 namespace Slang
 {
+enum class CodeGenTarget;
 struct CodeGenContext;
 class CompileRequestBase;
 class DiagnosticSink;
@@ -78,10 +79,23 @@ private:
 //   [numthreads(1, 1, 1)] void main() { atomicOp(gArray); }
 // If 'skipFuncParamValidation' is true, then the validation allows destinations that
 // lead back to in/inout parameters that we can't validate.
-void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
+//
+// The memory order operands are also validated against the operation (e.g. a load cannot
+// release). Orders must be compile-time constants only on targets that encode them (SPIR-V and
+// Metal); other targets ignore the order, so a non-constant order is accepted there.
+void validateAtomicOperations(
+    bool skipFuncParamValidation,
+    CodeGenTarget target,
+    DiagnosticSink* sink,
+    IRInst* inst);
 
-// Overload that takes IRModule* first for use with SLANG_PASS macro
-void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink);
+// Overload that takes IRModule* first for use with SLANG_PASS macro. Returns false if any atomic
+// operation in the module was diagnosed as an error.
+bool validateAtomicOperations(
+    IRModule* module,
+    bool skipFuncParamValidation,
+    CodeGenTarget target,
+    DiagnosticSink* sink);
 
 void validateVectorsAndMatrices(
     IRModule* module,

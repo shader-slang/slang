@@ -614,7 +614,192 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     return false;
 }
 
-void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+static const char* getMemoryOrderName(IRMemoryOrder order)
+{
+    switch (order)
+    {
+    case kIRMemoryOrder_Relaxed:
+        return "MemoryOrder.Relaxed";
+    case kIRMemoryOrder_Acquire:
+        return "MemoryOrder.Acquire";
+    case kIRMemoryOrder_Release:
+        return "MemoryOrder.Release";
+    case kIRMemoryOrder_AcquireRelease:
+        return "MemoryOrder.AcquireRelease";
+    case kIRMemoryOrder_SeqCst:
+        return "MemoryOrder.SeqCst";
+    }
+    SLANG_UNEXPECTED("unknown memory order");
+    UNREACHABLE_RETURN(nullptr);
+}
+
+// Return the operand index of the memory order of the atomic operation `inst`. A
+// compare-exchange carries two orders, the success order at this index followed by the failure
+// order; every other atomic operation carries exactly one.
+static UInt getFirstMemoryOrderOperandIndex(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        return 1;
+    case kIROp_AtomicStore:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        return 2;
+    case kIROp_AtomicCompareExchange:
+        return 3;
+    default:
+        SLANG_UNEXPECTED("not an atomic operation");
+        UNREACHABLE_RETURN(0);
+    }
+}
+
+// Return whether `target` encodes the memory order of an atomic operation in its output, and so
+// needs it to be a valid compile-time constant. The other targets drop the order.
+static bool doesTargetEncodeAtomicMemoryOrder(CodeGenTarget target)
+{
+    return isSPIRV(target) || isMetalTarget(target);
+}
+
+// Read the memory order operand `operandIndex` of the atomic operation `inst` into `outOrder`.
+// Return false when the operand is not a constant `MemoryOrder` value; that is an error only on
+// targets that encode the order, because the other targets never read it.
+static bool tryGetAtomicMemoryOrder(
+    IRInst* inst,
+    UInt operandIndex,
+    CodeGenTarget target,
+    DiagnosticSink* sink,
+    IRMemoryOrder& outOrder)
+{
+    SLANG_RELEASE_ASSERT(operandIndex < inst->getOperandCount());
+    auto orderLit = as<IRIntLit>(inst->getOperand(operandIndex));
+    if (!orderLit)
+    {
+        if (doesTargetEncodeAtomicMemoryOrder(target))
+            sink->diagnose(Diagnostics::AtomicMemoryOrderNotConstant{
+                .target = target,
+                .location = inst->sourceLoc,
+            });
+        return false;
+    }
+    auto value = orderLit->getValue();
+    if (value < kIRMemoryOrder_Relaxed || value > kIRMemoryOrder_SeqCst)
+    {
+        if (doesTargetEncodeAtomicMemoryOrder(target))
+            sink->diagnose(Diagnostics::InvalidAtomicMemoryOrderValue{
+                .value = value,
+                .location = inst->sourceLoc,
+            });
+        return false;
+    }
+    outOrder = IRMemoryOrder(value);
+    return true;
+}
+
+// Return whether `order` is valid for an operation that only reads: an atomic load, or the
+// failure case of a compare-exchange. A read has no prior write to publish, so it cannot release.
+static bool isMemoryOrderValidForRead(IRMemoryOrder order)
+{
+    return order != kIRMemoryOrder_Release && order != kIRMemoryOrder_AcquireRelease;
+}
+
+// Return whether `order` is valid for an atomic store. A store reads nothing, so it cannot acquire.
+static bool isMemoryOrderValidForStore(IRMemoryOrder order)
+{
+    return order != kIRMemoryOrder_Acquire && order != kIRMemoryOrder_AcquireRelease;
+}
+
+// Return whether the failure order of a compare-exchange is stronger than its success order.
+// `failOrder` must already be valid for a read. We compare the orders as C++11 does: a
+// failure order that acquires needs a success order that also acquires, and `SeqCst` on failure
+// needs `SeqCst` on success.
+static bool isCompareExchangeFailOrderStronger(IRMemoryOrder successOrder, IRMemoryOrder failOrder)
+{
+    switch (failOrder)
+    {
+    case kIRMemoryOrder_Relaxed:
+        return false;
+    case kIRMemoryOrder_Acquire:
+        return successOrder == kIRMemoryOrder_Relaxed || successOrder == kIRMemoryOrder_Release;
+    case kIRMemoryOrder_SeqCst:
+        return successOrder != kIRMemoryOrder_SeqCst;
+    default:
+        SLANG_UNEXPECTED("compare-exchange failure order that releases");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
+static void diagnoseInvalidMemoryOrderForAtomicOperation(
+    IRInst* inst,
+    IRMemoryOrder order,
+    const char* operation,
+    DiagnosticSink* sink)
+{
+    sink->diagnose(Diagnostics::InvalidMemoryOrderForAtomicOperation{
+        .order = getMemoryOrderName(order),
+        .operation = operation,
+        .location = inst->sourceLoc,
+    });
+}
+
+// Diagnose memory orders that are invalid for the atomic operation `inst`. We follow the C++
+// `std::atomic` rules, which SPIR-V also enforces: a load cannot release, a store cannot acquire,
+// and the failure order of a compare-exchange can neither release nor be stronger than its
+// success order.
+static void validateAtomicMemoryOrders(IRInst* inst, CodeGenTarget target, DiagnosticSink* sink)
+{
+    UInt orderIndex = getFirstMemoryOrderOperandIndex(inst);
+    IRMemoryOrder order;
+    if (!tryGetAtomicMemoryOrder(inst, orderIndex, target, sink, order))
+        return;
+
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+        if (!isMemoryOrderValidForRead(order))
+            diagnoseInvalidMemoryOrderForAtomicOperation(inst, order, "an atomic load", sink);
+        break;
+    case kIROp_AtomicStore:
+        if (!isMemoryOrderValidForStore(order))
+            diagnoseInvalidMemoryOrderForAtomicOperation(inst, order, "an atomic store", sink);
+        break;
+    case kIROp_AtomicCompareExchange:
+        {
+            IRMemoryOrder failOrder;
+            if (!tryGetAtomicMemoryOrder(inst, orderIndex + 1, target, sink, failOrder))
+                return;
+            if (!isMemoryOrderValidForRead(failOrder))
+                diagnoseInvalidMemoryOrderForAtomicOperation(
+                    inst,
+                    failOrder,
+                    "a compareExchange failure",
+                    sink);
+            else if (isCompareExchangeFailOrderStronger(order, failOrder))
+                sink->diagnose(Diagnostics::AtomicCompareExchangeFailOrderStrongerThanSuccessOrder{
+                    .failOrder = getMemoryOrderName(failOrder),
+                    .successOrder = getMemoryOrderName(order),
+                    .location = inst->sourceLoc,
+                });
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void validateAtomicOperations(
+    bool skipFuncParamValidation,
+    CodeGenTarget target,
+    DiagnosticSink* sink,
+    IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -637,6 +822,7 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
                 sink->diagnose(Diagnostics::InvalidAtomicDestinationPointer{
                     .location = inst->sourceLoc,
                 });
+            validateAtomicMemoryOrders(inst, target, sink);
         }
         break;
 
@@ -646,7 +832,7 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
 
     for (auto child : inst->getModifiableChildren())
     {
-        validateAtomicOperations(skipFuncParamValidation, sink, child);
+        validateAtomicOperations(skipFuncParamValidation, target, sink, child);
     }
 }
 
@@ -951,9 +1137,15 @@ bool validateStructuredBufferResourceTypes(
     return context.validate(module);
 }
 
-void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
+bool validateAtomicOperations(
+    IRModule* module,
+    bool skipFuncParamValidation,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
 {
-    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
+    auto errorCountBefore = sink->getErrorCount();
+    validateAtomicOperations(skipFuncParamValidation, target, sink, module->getModuleInst());
+    return sink->getErrorCount() == errorCountBefore;
 }
 
 static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)
