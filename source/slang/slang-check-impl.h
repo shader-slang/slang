@@ -3785,6 +3785,10 @@ public:
     //
     // If the candidate isn't actually applicable, this is
     // where we'd start reporting the issue(s).
+    //
+    // A call whose callee expression has an `ErrorType` is itself returned with an
+    // `ErrorType`, as in `ResolveInvoke`, so consumers such as `visitTryExpr` can rely
+    // on any call that is not an error having a `FuncType`-typed callee.
     Expr* CompleteOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
 
     // Implement a comparison operation between overload candidates,

@@ -2,7 +2,8 @@
 
 // A `try` on a callee whose error type is generic checks the caller and any `catch` against
 // the error type substituted at the call site: `g<MyError>` propagates and is caught as
-// `MyError`, and so does `viaAssoc<Thrower>`, whose `throws U.E` becomes `MyError`.
+// `MyError`, and so do `viaAssoc<Thrower>`, whose `throws U.E` becomes `MyError`, and a
+// method of `Box<MyError>` declared `throws E` in its generic parent.
 
 enum MyError
 {
@@ -33,11 +34,28 @@ int g<E>(E e, int x) throws E
     return x + 1;
 }
 
+struct Box<E>
+{
+    E err;
+    int get(int x) throws E
+    {
+        if (x < 0)
+            throw err;
+        return x + 3;
+    }
+}
+
 int viaGeneric(int x) throws MyError { return try g<MyError>(MyError.Failed, x); }
 
 int viaAssoc<U : IThrower>(U u, int x) throws U.E { return try u.get(x); }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+int viaBox(int x) throws MyError
+{
+    Box<MyError> b = { MyError.Failed };
+    return try b.get(x);
+}
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -48,6 +66,9 @@ void computeMain()
     do { outputBuffer[2] = try g<MyError>(MyError.Failed, -5); } catch (e: MyError) { outputBuffer[2] = 100 + int(e); }
     Thrower t;
     do { outputBuffer[3] = try viaAssoc(t, -3); } catch (e: MyError) { outputBuffer[3] = 200 + int(e); }
+    do { outputBuffer[4] = try viaBox(1); } catch (e: MyError) { outputBuffer[4] = -1; }
+    Box<MyError> b2 = { MyError.Failed };
+    do { outputBuffer[5] = try b2.get(-1); } catch (e: MyError) { outputBuffer[5] = 300 + int(e); }
 }
 
 // CHECK: type: int32_t
@@ -55,3 +76,5 @@ void computeMain()
 // CHECK-NEXT: 7
 // CHECK-NEXT: 107
 // CHECK-NEXT: 207
+// CHECK-NEXT: 4
+// CHECK-NEXT: 307

@@ -3,6 +3,9 @@
 // (user, buffer, interface, setter form) and values of function type. The error type of a
 // generic callee is checked against the caller after substitution. Throwing callees reached
 // through functions, methods, generic constraints and existentials are accepted.
+//
+// E30091 keeps the wording it has for functions. Its hint to mark the callee 'throws' cannot
+// yet be followed for constructors and subscripts (#13492), nor for a `functype` value.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
@@ -169,7 +172,8 @@ int substitutedErrorTypeMismatch() throws OtherError
 }
 
 // Positive controls: throwing callees reached through a function, a method, a generic
-// constraint and an existential, with the error propagated or caught.
+// constraint and an existential, a throwing call in a constructor argument, and a generic
+// error type substituted to the caller's, with the error propagated or caught.
 int throwingCallees<U : I>(U u, I i) throws MyError
 {
     S s = S(try throwing(1));

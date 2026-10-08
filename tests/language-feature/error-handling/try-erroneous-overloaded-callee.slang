@@ -1,12 +1,17 @@
-// A `try` whose callee is an overloaded instance method named from a static function
-// reports only the error for the invalid member reference. The call to the erroneous
-// callee is itself erroneous, so the `try` checks do not run on it.
+// A call to an overloaded instance method named from a static function reports only the
+// error for the invalid member reference. The call to the erroneous callee is itself
+// erroneous, so neither the `try` checks nor a member access on its result report more.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 enum MyError
 {
     Failed
+}
+
+struct R
+{
+    int x;
 }
 
 struct Test
@@ -16,6 +21,9 @@ struct Test
 
     int n(int x) { return x; }
     int n(float x) { return 0; }
+
+    R r(int x) { R v; v.x = x; return v; }
+    R r(float x) { R v; v.x = 0; return v; }
 
     static int viaName() throws MyError
     {
@@ -41,6 +49,15 @@ struct Test
 /*CHECK:
                    ^ E30100
                    ^ type 'Test' cannot be used to refer to non-static member 'n'
+*/
+    }
+
+    static int memberOfErroneousCall()
+    {
+        return r(1).y;
+/*CHECK:
+               ^ E30100
+               ^ type 'Test' cannot be used to refer to non-static member 'r'
 */
     }
 }
