@@ -392,8 +392,7 @@ struct BitCastLoweringContext
         // legalize resource types (a struct cast `lowerOpaqueBitCast` could not match), or as an
         // array of handles, which that pass leaves alone. A bare handle destination returned
         // early above. We report one error per cast: E41202 already covers a size mismatch.
-        // A handle in the source alone is left to byte lowering; whether those casts should stay
-        // byte-level is an open question.
+        // We leave casts with a handle only in the source to byte lowering.
         if (isOpaqueType(toType, nullptr))
         {
             if (sizesMatch)
@@ -437,8 +436,9 @@ static bool areBothOpaqueFree(IRType* a, IRType* b)
 }
 
 // Return true if two opaque-free types have the same natural size and alignment. Equal size makes
-// the `BitCast` between them valid; equal alignment is what makes the next field of the enclosing
-// struct start at the same offset in both types (see `isOpaqueBitCastMatch`).
+// the `BitCast` between them valid. A field starts at the end of the previous field rounded up to
+// its own alignment, so equal sizes and alignments at every earlier position, and here, make the
+// two fields start at the same offset unless `[[vk::offset]]` overrides it.
 static bool haveSameNaturalLayout(TargetProgram* targetProgram, IRType* a, IRType* b)
 {
     auto targetReq = targetProgram->getTargetReq();
@@ -578,8 +578,12 @@ static IRInst* emitOpaqueBitCast(IRBuilder& builder, IRInst* src, IRType* fromTy
     if (auto fromArray = as<IRArrayType>(fromType))
     {
         auto toArray = as<IRArrayType>(toType);
+        SLANG_RELEASE_ASSERT(toArray);
         auto elementCount = as<IRIntLit>(fromArray->getElementCount());
-        SLANG_RELEASE_ASSERT(toArray && elementCount);
+        auto toElementCount = as<IRIntLit>(toArray->getElementCount());
+        SLANG_RELEASE_ASSERT(
+            elementCount && toElementCount &&
+            elementCount->getValue() == toElementCount->getValue());
         auto fromElementType = fromArray->getElementType();
         List<IRInst*> elements;
         for (IRIntegerValue i = 0; i < elementCount->getValue(); i++)

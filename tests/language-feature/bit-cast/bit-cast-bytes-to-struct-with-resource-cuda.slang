@@ -2,6 +2,7 @@
 // a diagnostic instead of an internal error (issue #13480).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
 
 struct A
 {
