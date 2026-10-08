@@ -57,6 +57,18 @@ struct SubscriptSetterThrow
     }
 }
 
+struct SubscriptRefThrow
+{
+    int x;
+    __subscript(int i) -> int
+    {
+        get { return x; }
+        ref { throw MyError.Failed; }
+//CHECK:      ^^^^^ uncaught 'throw' in non-throwing function
+//CHECK:      ^^^^^ the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.
+    }
+}
+
 struct GetterTry
 {
     property int p
@@ -79,6 +91,17 @@ struct SetterTry
     }
 }
 
+struct SubscriptGetterTry
+{
+    __subscript(int i) -> int
+    {
+        get { return try f(); }
+//CHECK:             ^^^ uncaught 'try' in non-throwing function
+//CHECK:             ^^^ the current function or environment is not declared to throw any errors, but the 'try' clause is not caught
+    }
+}
+
+// A `catch` of a different type does not handle `MyError`, so the error still escapes the getter.
 struct GetterCatchesOtherType
 {
     property int p
@@ -99,6 +122,7 @@ struct GetterCatchesOtherType
     }
 }
 
+// A matching `catch` handles the error inside the getter, so this case reports no diagnostic.
 struct GetterCatches
 {
     property int p

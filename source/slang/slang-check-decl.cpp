@@ -16257,10 +16257,13 @@ void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl*
     getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
-// We give each function, constructor, subscript and accessor an error type when its header is
-// checked: the type named by its `throws` clause, or `Bottom` when there is none. Accessors have
-// no `throws` syntax and so always get `Bottom`. Checking of `throw` statements and `try`
-// expressions reads the enclosing callable's `errorType` directly and relies on it being set.
+// We set a callable's error type when its header is checked. A `throws` clause, which only
+// function declarations can spell, is checked; a type already filled in by witness synthesis is
+// kept; otherwise the callable gets `Bottom`, the type with no values, meaning it cannot throw.
+// Checking of `throw` and `try` reads `errorType` on the function whose body is being checked and
+// relies on it being set, so every `FunctionDeclBase` with a body passes through here. Accessors
+// take their signature from the enclosing property or subscript and skip the rest of
+// `checkCallableDeclCommon`, so their header visitors call this directly.
 void SemanticsDeclHeaderVisitor::checkCallableErrorType(CallableDecl* decl)
 {
     auto errorType = decl->errorType;
