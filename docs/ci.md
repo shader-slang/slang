@@ -10,21 +10,43 @@ the new slang build.
 
 ## Building LLVM
 
-We require a static build of LLVM for building slang-llvm, we build and cache
-this in all workflow runs. Since this changes infrequently, the cache is almost
-always hit. A cold build takes about an hour on the slowest platform. The
-cached output is a few hundred MB, so conceivably if we add many more platforms
-we might be caching more than the 10GB github allowance, which would
-necessitate being a bit more complicated in building and tracking outputs here.
+We require a static build of LLVM for building slang-llvm. CI downloads the installed
+LLVM libraries from the publicly readable `slang-ci-cache` Google Cloud Storage
+bucket. The key is `llvm-{os}-{compiler}-{platform}-{hash}`, where the hash includes
+`external/build-llvm.sh` and `external/llvm-*.patch`. Downloads need no credentials,
+including for fork PRs. A missing prebuilt falls back to building LLVM from source;
+native Windows ARM64 cold builds can take nearly two hours.
 
-For slang-llvm, this is handled the same as any other dependency, except on
-Windows Debug builds, where we are required by the differences in Debug/Release
-standard libraries to always make a release build, this is noted in the ci
-action yaml file.
+The [Populate LLVM prebuilts workflow](../.github/workflows/llvm-populate.yml)
+runs when the LLVM build script or patches change on `master`, and when the
+population workflow or cache action changes. It checks the six main CI keys:
+Linux GCC x86_64, ARM64, and WASM; macOS Clang ARM64; and Windows MSVC x86_64 and
+ARM64. The WASM entry builds host LLVM, preserving the key requested by the WASM
+Slang build. Each native builder has a four-hour timeout and stages an archive
+only on a cache miss. A separate Ubuntu job authenticates, installs the Cloud
+SDK, publishes completed archives, and checks their public URLs. Publication is
+restricted to the upstream repository's `master` ref.
 
-Note that we don't use sccache while building LLVM, as it changes very
-infrequently. The caching of LLVM is done by caching the final build product
-only.
+To repair missing prebuilts, a maintainer can select **Populate LLVM prebuilts**
+in GitHub Actions and run it on `master`, or use:
+
+```sh
+gh workflow run llvm-populate.yml --repo shader-slang/slang --ref master
+```
+
+Check the platform build jobs and the **Publish and verify new prebuilts** step.
+The restore step logs the full key and public URL under
+`https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/`. A cache hit
+requires no upload. If one platform fails, completed platform archives can still
+be published; fix the failed build or upload and dispatch the workflow again.
+Rerunning a PR cannot publish a missing prebuilt, because its ref is not `master`.
+Recipe changes on a PR can still require a cold build before they reach `master`.
+
+LLVM itself is built in Release mode, including for Windows Debug Slang builds
+because of the differences in Debug/Release standard libraries. We cache the
+installed build product rather than using sccache for LLVM compilation. See the
+[Slang CI LLVM-cache documentation](https://slang.gitlab-master-pages.nvidia.com/slang-ci-docs/caching/llvm-cache)
+for the infrastructure details.
 
 ## sccache
 

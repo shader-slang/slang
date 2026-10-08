@@ -1,0 +1,155 @@
+name: Populate LLVM prebuilts
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - external/build-llvm.sh
+      - external/llvm-*.patch
+      - .github/workflows/llvm-populate.yml
+      - .github/actions/setup-llvm-from-gcs/action.yml
+  workflow_dispatch:
+
+# Let each master revision finish publishing, even if another revision arrives.
+concurrency:
+  group: llvm-populate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.repository == 'shader-slang/slang' && github.ref == 'refs/heads/master'
+    name: LLVM ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    # A native Windows ARM64 LLVM build can take nearly two hours by itself.
+    # Population needs time for that cold build and compression, without Slang.
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            compiler: gcc
+            platform: x86_64
+            runner: ubuntu-22.04
+          - os: linux
+            compiler: gcc
+            platform: aarch64
+            runner: ubuntu-24.04-arm
+          # The WASM job builds host LLVM, but requests its own cache key.
+          - os: linux
+            compiler: gcc
+            platform: wasm
+            runner: ubuntu-22.04
+          - os: macos
+            compiler: clang
+            platform: aarch64
+            runner: macos-latest
+          - os: windows
+            compiler: cl
+            platform: x86_64
+            runner: windows-2022
+          - os: windows
+            compiler: cl
+            platform: aarch64
+            runner: windows-11-vs2026-arm
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up native build tools
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          config: release
+          build-llvm: false
+
+      - name: Restore or build LLVM
+        id: llvm
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+          upload-if-missing: "false"
+
+      - name: Archive new prebuilt
+        if: steps.llvm.outputs.cache-hit != 'true'
+        id: archive
+        shell: bash
+        env:
+          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+        run: |
+          archive_path="${RUNNER_TEMP}/${LLVM_KEY}.tar.gz"
+          tar -czf "$archive_path" -C build/llvm-project-install .
+          echo "path=$archive_path" >> "$GITHUB_OUTPUT"
+
+      - name: Stage new prebuilt for publication
+        if: steps.llvm.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  upload:
+    needs: build
+    # Publish successful platforms even if another platform's cold build fails.
+    if: ${{ !cancelled() && github.repository == 'shader-slang/slang' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Download new prebuilts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: llvm-*
+          path: llvm-prebuilts
+          merge-multiple: true
+
+      - name: Check for new prebuilts
+        id: archives
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(llvm-prebuilts/*.tar.gz)
+          if [ "${#archives[@]}" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "All available LLVM prebuilts are already cached."
+          fi
+
+      # Upload from Ubuntu so native builders, including Windows ARM64, do not
+      # need the Cloud SDK. Authenticate after the hours-long builds finish.
+      - name: Authenticate to Google Cloud
+        if: steps.archives.outputs.found == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Set up Google Cloud SDK
+        if: steps.archives.outputs.found == 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Publish and verify new prebuilts
+        if: steps.archives.outputs.found == 'true'
+        shell: bash
+        run: |
+          gcloud config set storage/parallel_composite_upload_enabled False
+          for archive in llvm-prebuilts/*.tar.gz; do
+            filename=$(basename "$archive")
+            gcloud storage cp "$archive" "gs://slang-ci-cache/llvm-prebuilts/${filename}"
+            curl --fail --head --retry 3 --retry-delay 5 \
+              "https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${filename}"
+          done
