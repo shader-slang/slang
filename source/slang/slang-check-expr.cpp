@@ -7775,8 +7775,10 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
     }
 
-    // Every resolved callee, whatever kind of declaration or value it names, is typed as a
-    // `FuncType` whose error type is substituted for this call site; E30094 reads the same type.
+    // A call that reaches this point has a callee that resolved without error, and overload
+    // resolution types every such callee, whatever kind of declaration or value it names, as
+    // a `FuncType` whose error type is substituted for this call site. A call to an erroneous
+    // callee has an `ErrorType` and returned above. E30094 reads the same `FuncType`.
     auto calleeFuncType = as<FuncType>(callee->type);
     SLANG_RELEASE_ASSERT(calleeFuncType);
     auto calleeDecl = callee->declRef.getDecl();
