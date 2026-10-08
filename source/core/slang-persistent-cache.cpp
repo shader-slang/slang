@@ -188,7 +188,9 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
         // An index written before rewrites were refreshed in place can hold the same key more
         // than once. All copies refer to the one entry file just written, so keep only the
         // refreshed entry: a leftover copy would count against the entry limit, and evicting it
-        // later would delete the file that the kept entry refers to.
+        // later would delete the file that the kept entry refers to. Only the entries after
+        // existingEntryIndex need to be checked: the aging loop above records the first entry
+        // with this key, so every other copy comes after it.
         for (Index entryIndex = cacheIndex.getCount() - 1; entryIndex > existingEntryIndex;
              --entryIndex)
         {
