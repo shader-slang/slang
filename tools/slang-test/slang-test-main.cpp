@@ -2883,10 +2883,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return startPos;
     };
     int callId = 2;
-    // Items of the most recent COMPLETE, and the item picked by SAVE_COMPLETION_ITEM, so that a
-    // later RESOLVE_SAVED_ITEM can resolve an item that belongs to an earlier completion request.
+    // Items of the most recent COMPLETE (empty if it returned null or nothing), and the item picked
+    // by SAVE_COMPLETION_ITEM, so that a later RESOLVE_SAVED_ITEM can resolve an item that belongs
+    // to an earlier completion request. SAVE_COMPLETION_ITEM fails the test if the most recent
+    // COMPLETE has no item with that label, and RESOLVE_SAVED_ITEM fails it if no item was saved.
     List<LanguageServerProtocol::CompletionItem> lastCompletionItems;
     LanguageServerProtocol::CompletionItem savedCompletionItem;
+    bool hasSavedCompletionItem = false;
     for (auto line : lines)
     {
         line = line.trimStart();
@@ -2903,6 +2906,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             params.position.line = int(linePos - 1);
             params.position.character = int(colPos - 1);
             params.textDocument.uri = openDocParams.textDocument.uri;
+            lastCompletionItems.clear();
             if (SLANG_FAILED(connection->sendCall(
                     LanguageServerProtocol::CompletionParams::methodName,
                     &params,
@@ -2946,6 +2950,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 if (item.label.getUnownedSlice() == label)
                 {
                     savedCompletionItem = item;
+                    hasSavedCompletionItem = true;
                     found = true;
                     break;
                 }
@@ -2959,6 +2964,8 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             // completion request than the most recent one. The directive is matched with its
             // trailing colon like the other directives, so that it cannot collide with a
             // directive that merely shares a prefix; it takes no argument.
+            if (!hasSavedCompletionItem)
+                return TestResult::Fail;
             if (SLANG_FAILED(connection->sendCall(
                     UnownedStringSlice("completionItem/resolve"),
                     &savedCompletionItem,

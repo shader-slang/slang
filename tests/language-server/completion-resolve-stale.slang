@@ -9,11 +9,11 @@ struct B { double gamma; int delta; };
 
 void test(A a, B b)
 {
-//COMPLETE:17,7
-//SAVE_COMPLETION_ITEM:beta
-//RESOLVE_SAVED_ITEM:
-//COMPLETE:18,7
-//RESOLVE_SAVED_ITEM:
+    //COMPLETE:17,7
+    //SAVE_COMPLETION_ITEM:beta
+    //RESOLVE_SAVED_ITEM:
+    //COMPLETE:18,7
+    //RESOLVE_SAVED_ITEM:
     a.;
     b.;
 }
