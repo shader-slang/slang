@@ -252,7 +252,24 @@ out the represented commit.
 `edit <name> --advance` looks for canonical release tags on one line of history: from the branch
 tip back to the commit of the release the row is representing. At a merge, a parent that does not
 contain that commit is skipped. When more than one parent contains it, the walk takes the first
-parent. One `edit <name> --advance` replaces the version, the tag, and the commit with the
+parent.
+
+Consider a branch created at the `v1.2` commit, then updated by merging `main`:
+
+```text
+v1.2 -- fix -- M (tip)
+         \    /
+          v1.4
+```
+
+`M` lists `fix` as its first parent and the `v1.4` commit as its second. Both parents contain the
+`v1.2` commit, so the ancestor test does not separate them. Parent order does: the walk takes
+`fix` and never visits `v1.4`. A tag created on `fix` after `v1.2` is the one `--advance` can
+adopt. The same merge performed the other way around, with `main` checked out, would record
+`v1.4` as the first parent, and the walk would see `v1.4` on its way back to `v1.2`. The result
+follows whichever line was current at the merge.
+
+One `edit <name> --advance` replaces the version, the tag, and the commit with the
 greatest canonical tag on that walk that is newer than the stored version and that still satisfies
 incoming constraints. When `v1.3` and `v1.4` are both on the line, the row becomes `1.4`. The
 command does not stop at the next tag and wait for another advance. The branch stays, and the
