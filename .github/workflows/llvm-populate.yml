@@ -85,7 +85,13 @@ jobs:
           LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         run: |
           archive_path="${RUNNER_TEMP}/${LLVM_KEY}.tar.gz"
-          tar -czf "$archive_path" -C build/llvm-project-install .
+          tar_path="$archive_path"
+          # Git Bash's GNU tar interprets a Windows drive-letter colon as a
+          # remote archive. Keep the native path for upload-artifact below.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            tar_path=$(cygpath -u "$archive_path")
+          fi
+          tar -czf "$tar_path" -C build/llvm-project-install .
           echo "path=$archive_path" >> "$GITHUB_OUTPUT"
 
       - name: Stage new prebuilt for publication
