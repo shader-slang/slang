@@ -16257,13 +16257,12 @@ void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl*
     getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
-// We set a callable's error type when its header is checked. A `throws` clause, which only
-// function declarations can spell, is checked; a type already filled in by witness synthesis is
-// kept; otherwise the callable gets `Bottom`, the type with no values, meaning it cannot throw.
-// Checking of `throw` and `try` reads `errorType` on the function whose body is being checked and
-// relies on it being set, so every `FunctionDeclBase` with a body passes through here. Accessors
-// take their signature from the enclosing property or subscript and skip the rest of
-// `checkCallableDeclCommon`, so their header visitors call this directly.
+// We set a callable's error type when its header is checked. If one is present, either a
+// `throws` clause (only `FuncDecl`s can spell one) or a type filled in by witness synthesis, it is
+// checked, and `CheckProperType` leaves an already-resolved type as it is. Otherwise the callable
+// gets `Bottom`, the type with no values, meaning it cannot throw. Checking of `throw` and `try`
+// reads `errorType` on the function whose body is being checked and relies on it being set, so
+// every `FunctionDeclBase` with a body passes through here.
 void SemanticsDeclHeaderVisitor::checkCallableErrorType(CallableDecl* decl)
 {
     auto errorType = decl->errorType;
@@ -17815,6 +17814,8 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
         }
     }
 
+    // Accessors skip `checkCallableDeclCommon` and cannot spell `throws`, so this gives the body
+    // the `Bottom` error type that `throw`/`try` checking reads.
     checkCallableErrorType(decl);
     checkDifferentiableCallableSignature(decl);
 }
@@ -17918,6 +17919,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
             .mode = newValueMode,
             .param = newValueParam});
     }
+    // As for the other accessors in `visitAccessorDecl`.
     checkCallableErrorType(decl);
     checkDifferentiableCallableSignature(decl);
 }

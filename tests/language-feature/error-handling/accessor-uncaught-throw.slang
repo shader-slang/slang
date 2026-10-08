@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// Accessors cannot be declared `throws`, so an error escaping a getter or setter body is
-// diagnosed the same way as in any other non-throwing function (#13489).
+// Accessors cannot be declared `throws`, so an error escaping a `get`, `set` or `ref` accessor
+// body is diagnosed the same way as in any other non-throwing function (#13489).
 
 enum MyError
 {
