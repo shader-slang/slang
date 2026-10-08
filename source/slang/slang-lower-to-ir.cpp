@@ -4142,6 +4142,15 @@ static void emitBranchCoverageMarker(
         IRIntegerValue(uint32_t(branchArmKind)));
 }
 
+// The source location of the decision a condition makes: that of the condition itself, not of
+// any parentheses around it.
+static SourceLoc getConditionLoc(Expr* expr)
+{
+    while (auto paren = as<ParenExpr>(expr))
+        expr = paren->base;
+    return expr->loc;
+}
+
 // Record evaluation of an expression at its own source location. Conditions and conditional
 // arms are not statements: without this marker, a multiline conditional can have branch coverage
 // on a line for which no line coverage exists. `dominatingExpr` is an expression whose marker
@@ -4152,29 +4161,22 @@ static void emitExpressionLineCoverage(
     Expr* expr,
     Expr* dominatingExpr = nullptr)
 {
+    auto exprLoc = getConditionLoc(expr);
     if (dominatingExpr)
     {
+        auto dominatingLoc = getConditionLoc(dominatingExpr);
         auto sourceManager = context->getLinkage()->getSourceManager();
-        if (expr->loc.isValid() && dominatingExpr->loc.isValid() &&
-            sourceManager->getHumaneLoc(expr->loc, SourceLocType::Emit).line ==
-                sourceManager->getHumaneLoc(dominatingExpr->loc, SourceLocType::Emit).line)
+        if (exprLoc.isValid() && dominatingLoc.isValid() &&
+            sourceManager->getHumaneLoc(exprLoc, SourceLocType::Emit).line ==
+                sourceManager->getHumaneLoc(dominatingLoc, SourceLocType::Emit).line)
             return;
     }
-    if ((context->traceCoverage || context->traceBranchCoverage) && expr->loc.isValid() &&
+    if ((context->traceCoverage || context->traceBranchCoverage) && exprLoc.isValid() &&
         getParentFunc(context->irBuilder->getInsertLoc().getInst()))
     {
-        IRBuilderSourceLocRAII loc(context->irBuilder, expr->loc);
+        IRBuilderSourceLocRAII loc(context->irBuilder, exprLoc);
         context->irBuilder->emitIncrementCoverageCounter();
     }
-}
-
-// The source location of the decision a condition makes: that of the condition itself, not of
-// any parentheses around it.
-static SourceLoc getConditionLoc(Expr* expr)
-{
-    while (auto paren = as<ParenExpr>(expr))
-        expr = paren->base;
-    return expr->loc;
 }
 
 // Whether `expr`, seen through parentheses and logical negation, is a short-circuiting `&&` or
