@@ -253,18 +253,18 @@ void SourceWriter::emit(double value)
 
     int expBase2;
     std::frexp(value, &expBase2);
-    // frexp writes value = mantissa * 2^expBase2 with |mantissa| in [0.5, 1), so
-    // expBase2 < 0 means a nonzero magnitude below 0.5. Fixed precision counts fractional
-    // digits; at magnitude 0.5 or above, max_digits10 fractional digits are sufficient.
-    // Consider (1 + 2^-30) / 65536: fixed precision would discard low significand
-    // bits after its leading fractional zeros. Scientific notation preserves those bits.
-    // frexp gives zero exponent 0, keeping zero in fixed format. Retain the large-value
-    // cutoff at expBase2 >= 17 (magnitude >= 2^16) to keep large literals compact. This
-    // cutoff controls presentation; unlike the small-value cutoff, it is not needed for precision.
+    // General formatting counts significant digits, so small values round-trip without
+    // spending their precision budget on leading fractional zeros. It also keeps simple
+    // fractions like 0.25 in fixed notation. Retain the existing scientific-format cutoffs
+    // for very small and large values; frexp normalizes the mantissa to [0.5, 1) in magnitude.
     std::ios::fmtflags flags =
-        (expBase2 < 0 || expBase2 >= 17) ? std::ios::scientific : std::ios::fixed;
+        std::abs(expBase2) >= 17 ? std::ios::scientific : std::ios::fmtflags(0);
 
     stream.setf(flags, std::ios::floatfield);
+    // General formatting can otherwise produce integers such as "10000". Keep a decimal
+    // point so the result is a floating-point literal and zero trimming only removes
+    // fractional zeros ("10000.000000000000" becomes "10000.0", not "1").
+    stream.setf(std::ios::showpoint);
     stream.precision(std::numeric_limits<double>::max_digits10);
     stream << value;
     auto str = stream.str();
@@ -273,8 +273,8 @@ void SourceWriter::emit(double value)
     found = (found == std::string::npos) ? str.length() : found;
 
     // separate the mantissa and exponent part, as we want to remove the
-    // trailing 0s from the mantissa part. If we selected the fixed format
-    // above, the 'exponentStr' will be empty.
+    // trailing 0s from the mantissa part. If the result uses fixed notation,
+    // the 'exponentStr' will be empty.
     std::string mantissaStr = str.substr(0, found);
     std::string exponentStr = str.substr(found, str.length());
 
