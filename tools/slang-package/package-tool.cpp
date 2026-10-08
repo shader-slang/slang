@@ -259,6 +259,12 @@ static SlangResult _clearSearchPaths(const String& projectRoot, String& outError
     return SLANG_OK;
 }
 
+struct DisclosedGitDeletion
+{
+    String path;
+    String report;
+};
+
 static SlangResult _materialize(
     const String& projectRoot,
     const Manifest& manifest,
@@ -267,6 +273,8 @@ static SlangResult _materialize(
     const List<LocalPackage>& localPackages,
     bool allowClean,
     const List<String>& movingRefPackages,
+    const List<DisclosedGitDeletion>& disclosedDeletions,
+    bool unpushedDeletionApproved,
     List<String>* outChangedPackageNames,
     String& outError)
 {
@@ -356,8 +364,20 @@ static SlangResult _materialize(
             }
         }
         bool didMaterialize = false;
-        String cachePath =
+        String canonicalCache =
             Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+        String cachePath;
+        SLANG_RETURN_ON_FAIL(
+            locatePreparedPackageCache(canonicalCache, package.git, cachePath, outError));
+        String disclosedReport;
+        for (const auto& disclosed : disclosedDeletions)
+        {
+            if (disclosed.path == destination)
+            {
+                disclosedReport = disclosed.report;
+                break;
+            }
+        }
         SLANG_RETURN_ON_FAIL(materializeLockedRevision(
             package.git,
             currentCommit,
@@ -367,7 +387,9 @@ static SlangResult _materialize(
             movingRefPackages.indexOf(package.name) >= 0,
             didMaterialize,
             outError,
-            cachePath));
+            cachePath,
+            disclosedReport,
+            unpushedDeletionApproved));
         if (didMaterialize)
         {
             if (outChangedPackageNames)
@@ -501,13 +523,13 @@ static SlangResult _collectMovingPackageRefs(
             continue;
         }
 
+        String canonicalCache = Path::combine(cacheRoot, package.name);
+        String cachePath;
+        SLANG_RETURN_ON_FAIL(
+            locatePreparedPackageCache(canonicalCache, package.git, cachePath, outError));
         String destination = Path::combine(depsRoot, package.name);
         List<String> refs;
-        SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(
-            Path::combine(cacheRoot, package.name),
-            destination,
-            refs,
-            outError));
+        SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(cachePath, destination, refs, outError));
         if (!refs.getCount())
             continue;
 
@@ -529,6 +551,60 @@ static void _printMovingRefWarning(const List<String>& facts)
     for (const auto& fact : facts)
         fprintf(stdout, "  %s\n", fact.getBuffer());
 }
+
+static void _printUnpushedDeletion(const String& path, const String& report)
+{
+    if (!report.getLength())
+        return;
+    fprintf(
+        stdout,
+        "Deleting %s would drop commits or tags that are not on a remote:\n%s",
+        path.getBuffer(),
+        report.getBuffer());
+}
+
+static SlangResult _collectUnpushedCheckoutReports(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const List<String>& packageNames,
+    List<DisclosedGitDeletion>& outDeletions,
+    String& outError)
+{
+    outDeletions.clear();
+    String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
+    for (const auto& packageName : packageNames)
+    {
+        String destination = Path::combine(depsRoot, packageName);
+        if (!File::exists(Path::combine(destination, ".git")))
+            continue;
+        DisclosedGitDeletion deletion;
+        deletion.path = destination;
+        SLANG_RETURN_ON_FAIL(
+            collectUnpushedRepositoryReport(destination, deletion.report, outError));
+        if (deletion.report.getLength())
+            outDeletions.add(deletion);
+    }
+    return SLANG_OK;
+}
+
+struct ReplacementCacheCleanup
+{
+    const List<DeferredCacheReplacement>* replacements = nullptr;
+    bool released = false;
+
+    ~ReplacementCacheCleanup()
+    {
+        if (released || !replacements)
+            return;
+        for (const auto& replacement : *replacements)
+        {
+            if (!File::exists(Path::combine(replacement.canonicalPath, ".git")))
+                continue;
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+    }
+};
 
 static void _appendIncompleteMaterializationAdvice(String& ioError, bool previousLockExists)
 {
@@ -1308,7 +1384,8 @@ static SlangResult _fetch(
     SLANG_RETURN_ON_FAIL(
         _validateLocalPackages(projectRoot, manifest, lock, localPackages, outError, &warnings));
     SLANG_RETURN_ON_FAIL(validateLockedWorkspaceExclusions(manifest, lock, outError));
-    SLANG_RETURN_ON_FAIL(refreshAndValidateUpstreamResolvedProject(projectRoot, lock, outError));
+    SLANG_RETURN_ON_FAIL(
+        refreshAndValidateUpstreamResolvedProject(projectRoot, lock, outError, assumeYes));
     SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
         projectRoot,
         manifest,
@@ -1346,7 +1423,20 @@ static SlangResult _fetch(
         movingRefFacts,
         outError));
     _printMovingRefWarning(movingRefFacts);
-    if (cleanReplacements.getCount() || movingRefFacts.getCount())
+    List<DisclosedGitDeletion> unpushedCheckouts;
+    if (allowClean)
+    {
+        SLANG_RETURN_ON_FAIL(_collectUnpushedCheckoutReports(
+            projectRoot,
+            manifest,
+            cleanReplacements,
+            unpushedCheckouts,
+            outError));
+    }
+    for (const auto& deletion : unpushedCheckouts)
+        _printUnpushedDeletion(deletion.path, deletion.report);
+    bool unpushedDeletionApproved = false;
+    if (cleanReplacements.getCount() || movingRefFacts.getCount() || unpushedCheckouts.getCount())
     {
         bool approved = false;
         SLANG_RETURN_ON_FAIL(_confirmApply(
@@ -1356,6 +1446,7 @@ static SlangResult _fetch(
             outError));
         if (!approved)
             return SLANG_OK;
+        unpushedDeletionApproved = true;
     }
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, outError));
     List<String> changedPackageNames;
@@ -1367,6 +1458,8 @@ static SlangResult _fetch(
             localPackages,
             allowClean,
             movingRefPackages,
+            unpushedCheckouts,
+            unpushedDeletionApproved,
             &changedPackageNames,
             outError)))
     {
@@ -1634,6 +1727,8 @@ static SlangResult _update(
             previousLockPtr,
             remapUrls));
     }
+    ReplacementCacheCleanup replacementCleanup;
+    replacementCleanup.replacements = &report.deferredCacheReplacements;
     lock.remapIndex = activeRemapIndex;
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(
         projectRoot,
@@ -1700,6 +1795,16 @@ static SlangResult _update(
         movingRefFacts,
         outError));
     _printMovingRefWarning(movingRefFacts);
+    List<DisclosedGitDeletion> unpushedCheckouts;
+    if (allowClean)
+    {
+        SLANG_RETURN_ON_FAIL(_collectUnpushedCheckoutReports(
+            projectRoot,
+            manifest,
+            cleanReplacements,
+            unpushedCheckouts,
+            outError));
+    }
     if (dryRun)
     {
         for (const auto& warning : warnings)
@@ -1707,6 +1812,10 @@ static SlangResult _update(
         if (skipValidate)
             _warnSkippedSourceValidation();
         fprintf(stdout, "%s", reportText.getBuffer());
+        for (const auto& replacement : report.deferredCacheReplacements)
+            _printUnpushedDeletion(replacement.canonicalPath, replacement.report);
+        for (const auto& deletion : unpushedCheckouts)
+            _printUnpushedDeletion(deletion.path, deletion.report);
         fprintf(stdout, "Dry run: lock and dependency checkouts were not modified.\n");
         return SLANG_OK;
     }
@@ -1716,19 +1825,32 @@ static SlangResult _update(
     if (skipValidate)
         _warnSkippedSourceValidation();
     fprintf(stdout, "%s", reportText.getBuffer());
+    for (const auto& replacement : report.deferredCacheReplacements)
+        _printUnpushedDeletion(replacement.canonicalPath, replacement.report);
+    for (const auto& deletion : unpushedCheckouts)
+        _printUnpushedDeletion(deletion.path, deletion.report);
     // Only ask when there is a decision to make. A different committed lock is a change the user
     // should review, and `--clean` discards local checkout state, but re-running `update` on an
     // already-current graph only checks and validates what the lock already says.
     const bool lockChanges = !previousLockPtr || !lockFilesEqual(*previousLockPtr, lock);
     const bool adoptingRepositories = report.repositoryAdoptions.getCount() != 0;
+    const bool unpushedDeletions =
+        report.deferredCacheReplacements.getCount() != 0 || unpushedCheckouts.getCount() != 0;
+    bool unpushedDeletionApproved = false;
     if (lockChanges || cleanReplacements.getCount() || movingRefFacts.getCount() ||
-        adoptingRepositories)
+        adoptingRepositories || unpushedDeletions)
     {
         bool approved = false;
         SLANG_RETURN_ON_FAIL(_confirmApply(assumeYes, "Apply this update?", approved, outError));
         if (!approved)
             return SLANG_OK;
+        unpushedDeletionApproved = true;
     }
+    for (const auto& replacement : report.deferredCacheReplacements)
+    {
+        SLANG_RETURN_ON_FAIL(commitDeferredCacheReplacement(projectRoot, replacement, outError));
+    }
+    replacementCleanup.released = true;
     SLANG_RETURN_ON_FAIL(_clearSearchPaths(projectRoot, outError));
     List<String> changedPackageNames;
     if (SLANG_FAILED(_materialize(
@@ -1739,6 +1861,8 @@ static SlangResult _update(
             effectiveLocalPackages,
             allowClean,
             movingRefPackages,
+            unpushedCheckouts,
+            unpushedDeletionApproved,
             &changedPackageNames,
             outError)))
     {

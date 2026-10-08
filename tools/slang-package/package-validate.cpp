@@ -700,10 +700,19 @@ static SlangResult _loadResolvedPackage(
     // working-tree edits change the graph. A cache is the fallback for a newly selected commit
     // that has not been staged into `deps/NAME` yet.
     String depsRoot = Path::combine(projectRoot, depsDirectory, package.name);
-    String cachePath = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    String canonicalCache =
+        Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    String cachePath = canonicalCache;
     String gitError;
     String manifestText;
     String gitRepositoryPath;
+    if (package.git.getLength())
+    {
+        String located;
+        if (SLANG_SUCCEEDED(
+                locatePreparedPackageCache(canonicalCache, package.git, located, gitError)))
+            cachePath = located;
+    }
     if (SLANG_SUCCEEDED(
             readFileAtRevision(depsRoot, package.commit, kPackageFileName, manifestText, gitError)))
     {
@@ -803,6 +812,7 @@ static SlangResult _validateUpstreamResolvedProject(
     const String& projectRoot,
     const LockFile& lock,
     CacheRefreshMode refreshMode,
+    bool assumeYes,
     String& outError)
 {
     for (const auto& package : lock.packages)
@@ -811,12 +821,20 @@ static SlangResult _validateUpstreamResolvedProject(
             isEditedLockedPackage(package))
             continue;
 
-        String cachePath =
+        String canonicalCache =
             Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+        String cachePath;
         String packageError;
+        if (SLANG_FAILED(
+                locatePreparedPackageCache(canonicalCache, package.git, cachePath, packageError)))
+        {
+            outError = String("Upstream cache for package '") + package.name +
+                       "' does not contain locked commit " + package.commit + ". " + packageError;
+            return SLANG_FAIL;
+        }
         SlangResult cacheResult =
             refreshMode == CacheRefreshMode::FromOrigin
-                ? refreshPackageCache(projectRoot, package.git, cachePath, packageError)
+                ? refreshPackageCache(projectRoot, package.git, cachePath, packageError, assumeYes)
                 : requirePackageCache(package.git, cachePath, packageError);
         if (SLANG_SUCCEEDED(cacheResult))
         {
@@ -848,18 +866,25 @@ SlangResult validateCachedResolvedProject(
     const LockFile& lock,
     String& outError)
 {
-    return _validateUpstreamResolvedProject(projectRoot, lock, CacheRefreshMode::None, outError);
+    return _validateUpstreamResolvedProject(
+        projectRoot,
+        lock,
+        CacheRefreshMode::None,
+        false,
+        outError);
 }
 
 SlangResult refreshAndValidateUpstreamResolvedProject(
     const String& projectRoot,
     const LockFile& lock,
-    String& outError)
+    String& outError,
+    bool assumeYes)
 {
     return _validateUpstreamResolvedProject(
         projectRoot,
         lock,
         CacheRefreshMode::FromOrigin,
+        assumeYes,
         outError);
 }
 

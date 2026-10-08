@@ -74,6 +74,7 @@ public:
     bool allowRemote = true;
     List<String>* warnings = nullptr;
     List<String> preparedPackages;
+    List<DeferredCacheReplacement> deferredCacheReplacements;
 
     SlangResult initialize(String& outError)
     {
@@ -95,11 +96,37 @@ public:
         outRepositoryPath = Path::combine(cacheRoot, packageName);
         String cacheKey = packageName + "\n" + git;
         if (preparedPackages.indexOf(cacheKey) >= 0)
+        {
+            String located;
+            SLANG_RETURN_ON_FAIL(
+                locatePreparedPackageCache(outRepositoryPath, git, located, outError));
+            outRepositoryPath = located;
             return SLANG_OK;
+        }
         if (allowRemote)
         {
-            SLANG_RETURN_ON_FAIL(
-                refreshPackageCache(projectRoot, git, outRepositoryPath, outError));
+            String activePath;
+            String unpushedReport;
+            SLANG_RETURN_ON_FAIL(refreshPackageCache(
+                projectRoot,
+                git,
+                outRepositoryPath,
+                outError,
+                false,
+                &activePath,
+                &unpushedReport));
+            if (activePath.getLength())
+                outRepositoryPath = activePath;
+            if (unpushedReport.getLength())
+            {
+                DeferredCacheReplacement replacement;
+                replacement.packageName = packageName;
+                replacement.gitURL = git;
+                replacement.canonicalPath = Path::combine(cacheRoot, packageName);
+                replacement.replacementPath = activePath;
+                replacement.report = unpushedReport;
+                deferredCacheReplacements.add(replacement);
+            }
         }
         else
         {
@@ -1613,7 +1640,33 @@ SlangResult resolveDependencies(
     resolver.remapUrls = remapUrls;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
-    return resolver.resolve(manifest, outLock, outError);
+    SlangResult result = resolver.resolve(manifest, outLock, outError);
+    if (SLANG_FAILED(result))
+    {
+        for (const auto& replacement : source.deferredCacheReplacements)
+        {
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        return result;
+    }
+    if (outReport)
+        outReport->deferredCacheReplacements = source.deferredCacheReplacements;
+    else if (source.deferredCacheReplacements.getCount())
+    {
+        StringBuilder message;
+        message << "Refusing to replace a package cache that has commits or tags that are not on "
+                   "a remote:\n";
+        for (const auto& replacement : source.deferredCacheReplacements)
+        {
+            message << replacement.canonicalPath << "\n" << replacement.report;
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        outError = message.produceString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 SlangResult resolveDependenciesFromLocalPackages(
@@ -1642,7 +1695,33 @@ SlangResult resolveDependenciesFromLocalPackages(
     resolver.remapUrls = remapUrls;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
-    return resolver.resolve(manifest, outLock, outError);
+    SlangResult result = resolver.resolve(manifest, outLock, outError);
+    if (SLANG_FAILED(result))
+    {
+        for (const auto& replacement : source.gitSource.deferredCacheReplacements)
+        {
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        return result;
+    }
+    if (outReport)
+        outReport->deferredCacheReplacements = source.gitSource.deferredCacheReplacements;
+    else if (source.gitSource.deferredCacheReplacements.getCount())
+    {
+        StringBuilder message;
+        message << "Refusing to replace a package cache that has commits or tags that are not on "
+                   "a remote:\n";
+        for (const auto& replacement : source.gitSource.deferredCacheReplacements)
+        {
+            message << replacement.canonicalPath << "\n" << replacement.report;
+            String ignored;
+            discardReplacementPackageCache(replacement.replacementPath, ignored);
+        }
+        outError = message.produceString();
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 } // namespace PackageTool

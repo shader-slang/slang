@@ -434,10 +434,14 @@ After materialization, update checks publishability for new or changed Git trees
 module layout and import-path uniqueness across the complete selected graph. The
 new lock is written only after those checks succeed.
 
-When the proposed lock differs, a package Git URL would change, local checkout state would be
-discarded, or an existing named Git ref in `deps/` would move, update asks for confirmation.
-Declining interactively changes nothing and succeeds. A non-interactive invocation that requires
-confirmation fails unless `--yes` is given.
+When the proposed lock differs, a package Git URL would change, a Git repository would be deleted,
+local checkout state would be discarded, or an existing named Git ref in `deps/` would move,
+update asks for confirmation. Declining interactively changes nothing and succeeds. A
+non-interactive invocation that requires confirmation fails unless `--yes` is given.
+
+A Git repository is not deleted while it has commits or tags that are not on one of its remotes.
+The command lists those commits and tags with the confirmation. `--yes` approves that deletion
+after the list is printed. If the remotes cannot be contacted, the repository is left in place.
 
 When the lock records a remap index, `update` reads that index and resolves every listed package
 name from its Git URL. Names the index does not list keep the manifest URL. The manifest itself is
@@ -463,7 +467,8 @@ package is not moved onto another URL.
 
 `--clean`
 : Permit replacement of dirty or otherwise mismatched tool-owned checkouts. The affected
-checkouts are listed for confirmation. It cannot be combined with `--dry-run`.
+checkouts are listed for confirmation. Commits and tags that are not on a remote are listed
+before that repository is deleted. It cannot be combined with `--dry-run`.
 
 `--dry-run`
 : Resolve and validate the candidate graph and print the proposed lock changes without writing the
@@ -744,6 +749,7 @@ Confirmation can cover:
 - a new or changed lock during `update`;
 - a package Git URL changed by a remap index, or restored by `update --no-remap`;
 - checkout state discarded by `--clean`;
+- commits or tags that are not on a remote, before the Git repository that holds them is deleted;
 - existing tags or origin-tracking branches in `deps/` that would move; and
 - an `unedit` ending that would leave the branch or move `HEAD`. `unedit` has no `--yes`.
 

@@ -25,12 +25,86 @@ SlangResult resolveCachedReference(
     TagCandidate& outCandidate,
     String& outError);
 
+/// A package cache kept beside `.slang/cache/<name>` until the user agrees to replace it.
+///
+/// `canonicalPath` is the cache a later command will read. `replacementPath` is a clone of
+/// `gitURL` used to resolve versions while `canonicalPath` still holds the previous repository.
+/// `report` lists commits and tags in the canonical repository that are not on a remote. A cache
+/// with an empty report is replaced immediately and is not recorded here.
+struct DeferredCacheReplacement
+{
+    String packageName;
+    String gitURL;
+    String canonicalPath;
+    String replacementPath;
+    String report;
+};
+
+/// Describe commits and tags in `repositoryPath` that are not on any of its remotes.
+///
+/// Local branch tips, a detached `HEAD`, and stashes are compared with remote-tracking refs after
+/// those refs are updated. A tag is included when no remote has the same name and the same peeled
+/// object. `outReport` is empty when deleting the repository would not drop unique history. The
+/// repository is not deleted. Contacting a remote is required when one is configured; if that
+/// check cannot be completed, the error says the repository was left in place.
+SlangResult collectUnpushedRepositoryReport(
+    const String& repositoryPath,
+    String& outReport,
+    String& outError);
+
+/// Delete a Git repository whose unpushed commits and tags were shown to the user.
+///
+/// An empty current report is deleted, because every commit and tag was found on a remote.
+/// A non-empty report is deleted only when `unpushedDeletionApproved` is true and the report still
+/// equals `disclosedReport`, the text shown before the user agreed. Any other unpushed state is
+/// left on disk and copied into `outError`.
+SlangResult deleteDisclosedGitRepository(
+    const String& repositoryPath,
+    const String& disclosedReport,
+    bool unpushedDeletionApproved,
+    String& outError);
+
+/// Return the cache directory that already has `gitURL` as its origin.
+///
+/// This is `canonicalPath` when that repository's origin matches. Otherwise it is the deferred
+/// replacement clone beside the cache, when that clone's origin matches. When neither matches,
+/// `outPath` is `canonicalPath` so the caller reports the ordinary cache mismatch.
+SlangResult locatePreparedPackageCache(
+    const String& canonicalPath,
+    const String& gitURL,
+    String& outPath,
+    String& outError);
+
+/// Remove a deferred replacement clone that does not itself hold unpushed commits or tags.
+///
+/// The canonical cache is not touched. A replacement that has its own unpushed state is left in
+/// place, because that directory is no longer a scratch clone.
+SlangResult discardReplacementPackageCache(const String& replacementPath, String& outError);
+
+/// Replace `canonicalPath` with a clone of the deferred repository's URL.
+///
+/// The canonical repository is deleted only when its unpushed report still matches the report
+/// that was shown. The replacement clone is removed after the canonical path has been recloned.
+SlangResult commitDeferredCacheReplacement(
+    const String& workingDirectory,
+    const DeferredCacheReplacement& replacement,
+    String& outError);
+
 /// Clone or refresh a package cache from its origin.
+///
+/// When the cache exists but its origin is not `gitURL`, a repository with commits or tags that
+/// are not on a remote is left in place. If `outUnpushedReport` is set, that report is returned
+/// and `outActivePath` is a replacement clone of `gitURL`. Otherwise `--yes` (`assumeYes`) prints
+/// the report and replaces the cache; without it the call fails and deletes nothing. A cache whose
+/// history is already on a remote is replaced without an extra report.
 SlangResult refreshPackageCache(
     const String& workingDirectory,
     const String& gitURL,
     const String& repositoryPath,
-    String& outError);
+    String& outError,
+    bool assumeYes = false,
+    String* outActivePath = nullptr,
+    String* outUnpushedReport = nullptr);
 
 /// Require an existing package cache with the expected origin, without contacting that origin.
 SlangResult requirePackageCache(
@@ -205,7 +279,9 @@ SlangResult materializeLockedRevision(
     bool allowMovingRefs,
     bool& outDidMaterialize,
     String& outError,
-    const String& cachePath);
+    const String& cachePath,
+    const String& disclosedUnpushedReport = String(),
+    bool unpushedDeletionApproved = false);
 
 /// List cache refs whose existing names would move when staged into `destination`.
 ///

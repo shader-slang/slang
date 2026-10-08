@@ -67,7 +67,8 @@ SlangResult validateCachedResolvedProject(
 SlangResult refreshAndValidateUpstreamResolvedProject(
     const String& projectRoot,
     const LockFile& lock,
-    String& outError);
+    String& outError,
+    bool assumeYes = false);
 
 /// Load the manifest used as the source of declared dependencies and exports for one lock row.
 SlangResult loadLockedPackageGraphManifest(

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "package-git.h"
 #include "package-lock.h"
 #include "package-types.h"
 
@@ -95,6 +96,11 @@ struct ResolveReport
     ResolveFailure failure;
     /// Git URL substitutions caused by the lock's remap index during this solve.
     List<RepositoryAdoption> repositoryAdoptions;
+    /// Caches whose origin would change and that still hold commits or tags absent from a remote.
+    ///
+    /// The canonical directory is unchanged until the caller commits the replacement. Declining the
+    /// update discards the replacement clone instead.
+    List<DeferredCacheReplacement> deferredCacheReplacements;
 };
 
 /// Format the package conflict that prevented dependency resolution from succeeding.

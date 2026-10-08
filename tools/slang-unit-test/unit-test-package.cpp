@@ -3,6 +3,7 @@
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
+#include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
 #include "package-lock.h"
@@ -1018,6 +1019,30 @@ static SlangResult _initializeGitRepository(const String& repository)
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(commandLine, result));
     return result.resultCode == 0 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _runPackageGit(
+    const String& repository,
+    const List<String>& arguments,
+    String& outError)
+{
+    CommandLine commandLine;
+    commandLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "git"));
+    commandLine.addArg("-C");
+    commandLine.addArg(repository);
+    commandLine.addArg("-c");
+    commandLine.addArg("user.email=package-test@example.com");
+    commandLine.addArg("-c");
+    commandLine.addArg("user.name=package-test");
+    for (const auto& argument : arguments)
+        commandLine.addArg(argument);
+    ExecuteResult result;
+    if (SLANG_FAILED(ProcessUtil::execute(commandLine, result)) || result.resultCode != 0)
+    {
+        outError = result.standardError.getLength() ? result.standardError : result.standardOutput;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
 }
 
 SLANG_UNIT_TEST(PackageToolDiscoversRootFromSubdirectory)
@@ -4536,4 +4561,125 @@ SLANG_UNIT_TEST(PackageResolverRejectsUnsatisfiableCycle)
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("Could not select a version")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageGitDeletionReportsUnpushedCommitsAndTags)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String bare = Path::combine(temp.path, "bare.git");
+    String checkout = Path::combine(temp.path, "checkout");
+    String pushed = Path::combine(temp.path, "pushed");
+    String error;
+    CommandLine bareInit;
+    bareInit.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "git"));
+    bareInit.addArg("-c");
+    bareInit.addArg("init.defaultBranch=main");
+    bareInit.addArg("-c");
+    bareInit.addArg("init.templateDir=");
+    bareInit.addArg("init");
+    bareInit.addArg("--bare");
+    bareInit.addArg("-q");
+    bareInit.addArg(bare);
+    ExecuteResult bareResult;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(ProcessUtil::execute(bareInit, bareResult)));
+    SLANG_CHECK_ABORT(bareResult.resultCode == 0);
+
+    List<String> arguments;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(checkout)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(checkout, "readme.txt"), "one\n")));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add("readme.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("initial");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("remote");
+    arguments.add("add");
+    arguments.add("origin");
+    arguments.add(bare);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("push");
+    arguments.add("-q");
+    arguments.add("origin");
+    arguments.add("main");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("pushed-tag");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("push");
+    arguments.add("-q");
+    arguments.add("origin");
+    arguments.add("pushed-tag");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+
+    arguments.clear();
+    arguments.add("clone");
+    arguments.add("-q");
+    arguments.add(bare);
+    arguments.add(pushed);
+    CommandLine clone;
+    clone.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "git"));
+    clone.addArg("-c");
+    clone.addArg("init.templateDir=");
+    for (const auto& argument : arguments)
+        clone.addArg(argument);
+    ExecuteResult cloneResult;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(ProcessUtil::execute(clone, cloneResult)));
+    SLANG_CHECK_ABORT(cloneResult.resultCode == 0);
+    String pushedReport;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(collectUnpushedRepositoryReport(pushed, pushedReport, error)));
+    SLANG_CHECK(pushedReport.getLength() == 0);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(deleteDisclosedGitRepository(pushed, String(), false, error)));
+    SLANG_CHECK(!File::exists(pushed));
+
+    arguments.clear();
+    arguments.add("checkout");
+    arguments.add("-q");
+    arguments.add("-b");
+    arguments.add("local-only");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(checkout, "local.txt"), "local\n")));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add("local.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("local work");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("-a");
+    arguments.add("local-tag");
+    arguments.add("-m");
+    arguments.add("not pushed");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+
+    String report;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(collectUnpushedRepositoryReport(checkout, report, error)));
+    SLANG_CHECK(report.getUnownedSlice().indexOf(UnownedStringSlice("branch local-only:")) >= 0);
+    SLANG_CHECK(report.getUnownedSlice().indexOf(UnownedStringSlice("not on any remote")) >= 0);
+    SLANG_CHECK(report.getUnownedSlice().indexOf(UnownedStringSlice("tag local-tag")) >= 0);
+    SLANG_CHECK(report.getUnownedSlice().indexOf(UnownedStringSlice("tag pushed-tag")) < 0);
+    SLANG_CHECK(report.getUnownedSlice().indexOf(UnownedStringSlice("branch main:")) < 0);
+    SLANG_CHECK(SLANG_FAILED(deleteDisclosedGitRepository(checkout, report, false, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("left in place")) >= 0);
+    SLANG_CHECK(File::exists(Path::combine(checkout, ".git")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(deleteDisclosedGitRepository(checkout, report, true, error)));
+    SLANG_CHECK(!File::exists(checkout));
 }

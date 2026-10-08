@@ -260,7 +260,8 @@ requirement that cannot change. It does not look for newer Git tags; that is `up
 Dependency checkouts stay at `deps/NAME`. Fetch and update do not replace an edited checkout, and
 they refuse to replace a tool-owned checkout that has changed files, extra commits, or stashes.
 Pass `--clean` explicitly to permit replacement of a tool-owned checkout. `--clean` does not move
-an edit.
+an edit. Deleting that checkout, or a package cache, still lists any commits or tags that are not
+on a remote and waits for the same confirmation.
 
 That refusal happens first, before any other work: both commands inspect every checkout the
 current lock owns up front, and update stops before resolving rather than after printing a plan it
