@@ -565,6 +565,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             // coercion is not possible)
             //
             arg = matchedArgs[aa++].argExpr;
+            auto sourceArg = arg;
             if (context.mode == OverloadResolveContext::Mode::JustTrying)
             {
                 ConversionCost cost = kConversionCost_None;
@@ -576,11 +577,32 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             }
             else
             {
+                CoercionSourceAccess sourceAccess;
                 arg = coerce(
                     CoercionSite::Argument,
                     getType(m_astBuilder, valParamRef),
                     arg,
-                    getSink());
+                    getSink(),
+                    CoercionSourceAccessCheck::Skip,
+                    context.shouldAccountForArgumentStorageAccess ? &sourceAccess : nullptr);
+                if (context.shouldAccountForArgumentStorageAccess &&
+                    sourceAccess.needsFallbackCheck() && arg && !as<ErrorType>(arg->type))
+                {
+                    sourceAccess =
+                        CoercionSourceAccess::makeAccess(sourceArg, ParamPassingMode::In);
+                }
+                if (!sourceAccess.needsFallbackCheck())
+                {
+                    if (context.outSourceAccess)
+                        context.recordSourceAccess(sourceAccess);
+                    else if (sourceAccess.hasAccess())
+                    {
+                        checkStorageExpressionAccess(
+                            sourceAccess.getExpression(),
+                            sourceAccess.getMode(),
+                            sourceAccess.getExpression()->loc);
+                    }
+                }
             }
 
             // If we have an argument to work with, then we will
@@ -805,14 +827,299 @@ static QualType getParamQualType(Type* paramType)
     return QualType(unwrapModifiedType(valueType), isLVal);
 }
 
+/// An `OverloadArgument` is one call argument together with its position in the argument list.
+///
+/// The position remains part of the record because one concrete type-pack parameter can consume
+/// several arguments, and a failed conversion must identify which argument was consumed.
+struct OverloadArgument
+{
+    Expr* expression;
+    Type* type;
+    Index index;
+};
+
+/// An `OverloadParameter` is the parameter information used to check one call argument against an
+/// overload candidate.
+///
+/// The record created for a concrete type-pack parameter contains the pack type. When checking one
+/// element, `TryCheckOverloadCandidateTypes` copies that record and replaces `type` with the
+/// element type. The copy retains the declaration and index of the enclosing parameter. An
+/// `OverloadCandidate::Flavor::Expr` candidate is represented by a `FuncType` and has no
+/// `ParamDecl`, so `declaration` is null for that candidate flavor.
+struct OverloadParameter
+{
+    QualType type;
+    ParamPassingMode mode;
+    DeclRef<ParamDecl> declaration;
+    Index index;
+};
+
+/// Records the first argument whose type cannot be converted to the corresponding parameter type.
+///
+/// Qualifier-only failures have dedicated diagnostics, so `candidate` records a mismatch only when
+/// the underlying types differ. One concrete type-pack parameter can consume several arguments, so
+/// `argumentIndex` identifies the call argument rather than the enclosing parameter.
+static void recordOverloadArgumentMismatch(
+    OverloadCandidate& candidate,
+    Index argumentIndex,
+    QualType parameterType,
+    QualType argumentType)
+{
+    if (candidate.argMismatchArgIndex >= 0)
+        return;
+    if (!parameterType.type || !argumentType.type)
+        return;
+    if (parameterType.type->equals(argumentType.type))
+        return;
+
+    candidate.argMismatchArgIndex = argumentIndex;
+    candidate.argMismatchExpectedType = parameterType.type;
+    candidate.argMismatchActualType = argumentType.type;
+}
+
+/// Tests one argument conversion while overload resolution is in `JustTrying` mode.
+///
+/// This operation records the conversion cost on `candidate`. A failed conversion also records the
+/// first mismatched argument so that the eventual no-applicable-overload diagnostic can identify
+/// it. The return value indicates whether the conversion is viable.
+static bool tryProbeOverloadArgumentConversion(
+    SemanticsVisitor* semantics,
+    const SemanticsVisitor::OverloadResolveContext& context,
+    OverloadCandidate& candidate,
+    Index argumentIndex,
+    Expr* argumentExpr,
+    QualType argumentType,
+    QualType parameterType)
+{
+    ConversionCost cost = kConversionCost_None;
+    if (context.disallowNestedConversions)
+    {
+        if (!parameterType->equals(argumentType))
+        {
+            recordOverloadArgumentMismatch(candidate, argumentIndex, parameterType, argumentType);
+            return false;
+        }
+    }
+    else if (!semantics->canCoerce(parameterType, argumentType, argumentExpr, &cost))
+    {
+        recordOverloadArgumentMismatch(candidate, argumentIndex, parameterType, argumentType);
+        return false;
+    }
+
+    candidate.conversionCostSum += cost;
+    return true;
+}
+
+/// Returns the storage access that an argument coercion performs on its original expression.
+///
+/// `SemanticsVisitor::coerce` leaves `sourceAccess` in its fallback state for ordinary coercions,
+/// so this function derives their access from `parameterMode`. `OutImplicitCastExpr` skips the
+/// conversion's input read, while `InOutImplicitCastExpr` reads and writes the original storage.
+/// For either reversible conversion, the declared parameter mode describes the complete operation
+/// unless lowering can address a `ref` accessor directly and bypass the get/set path. A null or
+/// error expression leaves `sourceAccess` unchanged for recovery.
+static CoercionSourceAccess getOverloadArgumentSourceAccess(
+    SemanticsVisitor* semantics,
+    Expr* argumentExpr,
+    ParamPassingMode parameterMode,
+    Expr* coercedExpr,
+    CoercionSourceAccess sourceAccess)
+{
+    if (!coercedExpr || as<ErrorType>(coercedExpr->type))
+        return sourceAccess;
+
+    const bool parameterWritesBack =
+        parameterMode == ParamPassingMode::Out || parameterMode == ParamPassingMode::BorrowInOut;
+    bool usesImplicitCastWriteback = false;
+    if (parameterWritesBack)
+    {
+        auto implicitCastExpr = as<ImplicitCastExpr>(coercedExpr);
+        usesImplicitCastWriteback =
+            semantics->classifyImplicitCastForWritableArgument(implicitCastExpr) ==
+            SemanticsVisitor::WritableArgumentImplicitCastKind::ReversibleIntrinsicConversion;
+    }
+
+    if (!usesImplicitCastWriteback && !sourceAccess.needsFallbackCheck())
+        return sourceAccess;
+
+    const auto sourceMode =
+        usesImplicitCastWriteback &&
+                semantics->willStorageExpressionAddressUseRefAccessor(argumentExpr)
+            ? ParamPassingMode::Ref
+            : parameterMode;
+    return CoercionSourceAccess::makeAccess(argumentExpr, sourceMode);
+}
+
+/// Validates or records the storage access performed by one `ForReal` argument coercion.
+///
+/// Ordinary calls validate the access immediately. A user-defined conversion records the access
+/// in `context.outSourceAccess` so that its enclosing coercion can decide how the original argument
+/// is used.
+///
+/// `CompleteOverloadCandidate` builds a call to the selected conversion initializer without passing
+/// it through `visitInvokeExpr`. This function therefore validates a `ref` argument before
+/// recording the access because no later invocation check will validate the required direct
+/// address. The return value indicates whether that validation succeeded.
+static bool tryValidateOrRecordOverloadArgumentStorageAccess(
+    SemanticsVisitor* semantics,
+    SemanticsVisitor::OverloadResolveContext& context,
+    const OverloadParameter& parameter,
+    const CoercionSourceAccess& sourceAccess)
+{
+    if (sourceAccess.needsFallbackCheck())
+        return true;
+
+    if (context.outSourceAccess)
+    {
+        if (parameter.mode == ParamPassingMode::Ref && sourceAccess.hasAccess())
+        {
+            auto sourceExpr = sourceAccess.getExpression();
+            const auto sourceMode = sourceAccess.getMode();
+            auto accessResult = semantics->analyzeStorageExpressionAccess(sourceExpr, sourceMode);
+            if (!accessResult.canEvaluate())
+            {
+                semantics->checkStorageExpressionAccess(sourceExpr, sourceMode, sourceExpr->loc);
+                return false;
+            }
+            if (!accessResult.canProvideRequestedStorage)
+            {
+                if (auto sink = semantics->getSink())
+                {
+                    sink->diagnose(Diagnostics::ArgumentExpectedLvalue{
+                        .param = String(parameter.index),
+                        .arg = sourceExpr});
+                }
+                return false;
+            }
+        }
+        context.recordSourceAccess(sourceAccess);
+    }
+    else if (sourceAccess.hasAccess())
+    {
+        auto sourceExpr = sourceAccess.getExpression();
+        semantics->checkStorageExpressionAccess(
+            sourceExpr,
+            sourceAccess.getMode(),
+            sourceExpr->loc);
+    }
+    return true;
+}
+
+/// Returns whether coercing `argument` loses an l-value required by an output interface parameter.
+///
+/// Converting a concrete value to an interface creates a new value. Even when the concrete argument
+/// is an l-value, that new interface value cannot provide storage to an output parameter.
+static bool doesArgumentCoercionLoseRequiredLValue(
+    Expr* coercedExpr,
+    const OverloadArgument& argument,
+    const OverloadParameter& parameter)
+{
+    if (!coercedExpr)
+        return false;
+    if (coercedExpr->type.isLeftValue)
+        return false;
+    if (!parameter.type.isLeftValue)
+        return false;
+    if (isInterfaceType(argument.type))
+        return false;
+    return isInterfaceType(parameter.type.type);
+}
+
+/// Checks one argument against one parameter of an overload candidate.
+///
+/// A `JustTrying` check only tests conversion viability and records its cost. A `ForReal` check
+/// creates the coerced expression, rejects concrete values that lose the l-value required by an
+/// output interface parameter, and accounts for how the coercion reads or writes the original
+/// argument.
+///
+/// On success, `outCoercedArgument` receives the original expression during `JustTrying` or the
+/// coerced expression during `ForReal`. The return value reports whether the candidate remains
+/// applicable; it does not depend on whether a diagnostic recovery path produced a null expression.
+static bool tryCoerceOverloadArgument(
+    SemanticsVisitor* semantics,
+    SemanticsVisitor::OverloadResolveContext& context,
+    OverloadCandidate& candidate,
+    const OverloadArgument& argument,
+    const OverloadParameter& parameter,
+    Expr*& outCoercedArgument)
+{
+    outCoercedArgument = argument.expression;
+    auto argumentQualType = QualType(argument.type, parameter.type.isLeftValue);
+    if (!parameter.type.type || !argumentQualType)
+        return false;
+
+    if (context.mode == SemanticsVisitor::OverloadResolveContext::Mode::JustTrying)
+    {
+        if (!tryProbeOverloadArgumentConversion(
+                semantics,
+                context,
+                candidate,
+                argument.index,
+                argument.expression,
+                argumentQualType,
+                parameter.type))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    CoercionSourceAccess sourceAccess;
+    Expr* coercedExpr = semantics->coerce(
+        CoercionSite::Argument,
+        parameter.type.type,
+        argument.expression,
+        semantics->getSink(),
+        CoercionSourceAccessCheck::Skip,
+        context.shouldAccountForArgumentStorageAccess ? &sourceAccess : nullptr);
+
+    if (doesArgumentCoercionLoseRequiredLValue(coercedExpr, argument, parameter))
+    {
+        String parameterName;
+        if (candidate.flavor == OverloadCandidate::Flavor::Func)
+            parameterName = getText(parameter.declaration.getName());
+        else
+            parameterName.append(parameter.index, 10);
+
+        semantics->getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
+            .paramName = parameterName,
+            .argType = argument.type,
+            .paramType = parameter.type.type,
+            .location = context.loc});
+        return false;
+    }
+
+    if (context.shouldAccountForArgumentStorageAccess)
+    {
+        sourceAccess = getOverloadArgumentSourceAccess(
+            semantics,
+            argument.expression,
+            parameter.mode,
+            coercedExpr,
+            sourceAccess);
+        if (!tryValidateOrRecordOverloadArgumentStorageAccess(
+                semantics,
+                context,
+                parameter,
+                sourceAccess))
+        {
+            return false;
+        }
+    }
+    outCoercedArgument = coercedExpr;
+    return true;
+}
+
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
 {
-    Index argCount = context.getArgCount();
+    const Index argumentCount = context.getArgCount();
 
-    List<QualType> paramTypes;
-    List<DeclRef<ParamDecl>> paramDecls;
+    // The candidate flavor determines where its parameter information is stored. We normalize each
+    // flavor into `OverloadParameter` records so that the argument-matching loop has one
+    // representation to use.
+    List<OverloadParameter> parameters;
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
@@ -820,19 +1127,27 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                  m_astBuilder,
                  candidate.item.declRef.as<CallableDecl>()))
         {
-            paramDecls.add(param);
-            paramTypes.add(getParamQualType(m_astBuilder, param));
+            parameters.add(OverloadParameter{
+                .type = getParamQualType(m_astBuilder, param),
+                .mode = getParamPassingMode(param.getDecl()),
+                .declaration = param,
+                .index = parameters.getCount(),
+            });
         }
         break;
 
     case OverloadCandidate::Flavor::Expr:
         {
             auto funcType = candidate.funcType;
-            Count paramCount = funcType->getParamCount();
-            for (Index i = 0; i < paramCount; ++i)
+            Count parameterCount = funcType->getParamCount();
+            for (Index i = 0; i < parameterCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
-                paramTypes.add(paramType);
+                auto paramTypeWithMode = funcType->getParamTypeWithModeWrapper(i);
+                parameters.add(OverloadParameter{
+                    .type = getParamQualType(paramTypeWithMode),
+                    .mode = getParamInfoFromTypeWithModeWrapper(paramTypeWithMode).mode,
+                    .index = i,
+                });
             }
         }
         break;
@@ -846,293 +1161,165 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         break;
     }
 
-    Index paramIndex = 0;
-    Index argIndex = 0;
-    struct Arg
+    // We consume arguments in order. A concrete type-pack parameter can consume several call
+    // arguments, so each argument retains its own index for mismatch diagnostics.
+    Index parameterIndex = 0;
+    Index argumentIndex = 0;
+    auto readArgument = [&]() -> OverloadArgument
     {
-        Expr* argExpr;
-        Type* type;
-    };
-    auto readArg = [&]() -> Arg
-    {
-        if (argIndex >= argCount)
-            return {nullptr, nullptr};
-        auto arg = context.getArg(argIndex);
-        Arg result = {arg, context.getArgType(argIndex)};
-        argIndex++;
+        SLANG_ASSERT(argumentIndex < argumentCount);
+        const Index index = argumentIndex;
+        auto argument = context.getArg(index);
+        OverloadArgument result = {argument, context.getArgType(index), index};
+        argumentIndex++;
         return result;
     };
+    ShortList<Expr*> coercedArguments;
 
-    // Record the first argument that fails to match, so that a "no applicable
-    // overload" diagnostic can point at the offending argument (issue #7857).
-    // Only the first failure is kept, since type checking of a candidate stops at
-    // that point.
-    //
-    // The reported index is the *argument* index (`argIndex - 1`: `readArg` has
-    // already advanced `argIndex` past the just-read argument), not `paramIndex`.
-    // These differ for a `ConcreteTypePack` parameter, where several arguments
-    // are consumed against a single fixed `paramIndex` -- using `paramIndex`
-    // there would point at the wrong argument number.
-    //
-    // Only record when the underlying types actually differ. A failure where the
-    // types are equal but the qualifiers differ (e.g. an l-value/`inout`
-    // mismatch) has its own dedicated diagnostics; recording it here would
-    // produce a confusing "expected 'T', got 'T'" note that names only the bare
-    // types.
-    auto recordArgMismatch = [&](QualType paramType, QualType argType)
+    while (parameterIndex < parameters.getCount())
     {
-        if (candidate.argMismatchArgIndex < 0 && paramType.type && argType.type &&
-            !paramType.type->equals(argType.type))
+        const auto& parameter = parameters[parameterIndex];
+        if (auto parameterTypePack = as<ConcreteTypePack>(parameter.type.type))
         {
-            candidate.argMismatchArgIndex = argIndex - 1;
-            candidate.argMismatchExpectedType = paramType.type;
-            candidate.argMismatchActualType = argType.type;
-        }
-    };
-
-    auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Arg
-    {
-        auto argType = QualType(arg.type, paramType.isLeftValue);
-        if (!paramType)
-            return {nullptr, nullptr};
-        if (!argType)
-            return {nullptr, nullptr};
-        if (context.mode == OverloadResolveContext::Mode::JustTrying)
-        {
-            ConversionCost cost = kConversionCost_None;
-            if (context.disallowNestedConversions)
+            ShortList<Expr*> coercedPackElements;
+            for (Index i = 0; i < parameterTypePack->getTypeCount(); i++)
             {
-                // We need an exact match in this case.
-                if (!paramType->equals(argType))
-                {
-                    recordArgMismatch(paramType, argType);
-                    return {nullptr, nullptr};
-                }
-            }
-            else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
-            {
-                recordArgMismatch(paramType, argType);
-                return {nullptr, nullptr};
-            }
-            candidate.conversionCostSum += cost;
-        }
-        else
-        {
-            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
-
-            // Check if concrete-to-interface coercion caused loss of l-valueness.
-            if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
-                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
-            {
-                if (context.mode != OverloadResolveContext::Mode::JustTrying)
-                {
-                    String name;
-                    if (candidate.flavor == OverloadCandidate::Flavor::Func)
-                    {
-                        auto decl = paramDecls[paramIndex];
-                        name = getText(decl.getName());
-                    }
-                    else
-                        name.append(paramIndex, 10);
-
-                    getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
-                        .paramName = name,
-                        .argType = arg.type,
-                        .paramType = paramType.type,
-                        .location = context.loc});
-                }
-                return {nullptr, nullptr};
-            }
-            arg.argExpr = coercedExpr;
-        }
-        return arg;
-    };
-    ShortList<Expr*> resultArgs;
-
-    while (paramIndex < paramTypes.getCount())
-    {
-        auto paramType = paramTypes[paramIndex];
-        if (auto paramTypePack = as<ConcreteTypePack>(paramType))
-        {
-            ShortList<Expr*> innerArgs;
-            for (Index i = 0; i < paramTypePack->getTypeCount(); i++)
-            {
-                auto arg = readArg();
-                auto coercedArg = coerceArgToParam(
-                    arg,
-                    QualType(paramTypePack->getElementType(i), paramType.isLeftValue));
-                if (!coercedArg.type)
+                auto argument = readArgument();
+                Expr* coercedArgument = nullptr;
+                auto elementParameter = parameter;
+                elementParameter.type =
+                    QualType(parameterTypePack->getElementType(i), parameter.type.isLeftValue);
+                if (!tryCoerceOverloadArgument(
+                        this,
+                        context,
+                        candidate,
+                        argument,
+                        elementParameter,
+                        coercedArgument))
                 {
                     return false;
                 }
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
-                    innerArgs.add(coercedArg.argExpr);
+                    coercedPackElements.add(coercedArgument);
             }
             if (context.mode == OverloadResolveContext::Mode::ForReal)
             {
-                auto packArg = m_astBuilder->create<PackExpr>();
-                for (auto aa : innerArgs)
-                    packArg->args.add(aa);
-                packArg->type = paramType;
-                resultArgs.add(packArg);
+                auto packArgument = m_astBuilder->create<PackExpr>();
+                for (auto coercedElement : coercedPackElements)
+                    packArgument->args.add(coercedElement);
+                packArgument->type = parameter.type;
+                coercedArguments.add(packArgument);
             }
 
-            // Always add a flat cost for using an argument pack,
-            // so that we prefer non-pack overloads when possible.
+            // A flat parameter-pack cost makes overload resolution prefer a non-pack candidate
+            // when the argument conversions are otherwise equivalent.
             candidate.conversionCostSum += kConversionCost_ParameterPack;
         }
         else
         {
-            auto arg = readArg();
-            if (!arg.type)
+            if (argumentIndex >= argumentCount)
             {
-                // If we run out of arguments, we can exit the loop now.
-                // Note that in this type we don't need to worry about
-                // default arguments, because we already checked that
-                // the number of arguments was correct in `TryCheckOverloadCandidateArity`.
+                // `TryCheckOverloadCandidateArity` has already established that any remaining
+                // parameters have default arguments, so type checking is complete.
                 break;
             }
-            auto coercedArg = coerceArgToParam(arg, paramType);
-            if (!coercedArg.type)
+            auto argument = readArgument();
+            Expr* coercedArgument = nullptr;
+            if (!tryCoerceOverloadArgument(
+                    this,
+                    context,
+                    candidate,
+                    argument,
+                    parameter,
+                    coercedArgument))
             {
                 return false;
             }
             if (context.mode == OverloadResolveContext::Mode::ForReal)
-                resultArgs.add(coercedArg.argExpr);
+                coercedArguments.add(coercedArgument);
         }
-        paramIndex++;
+        parameterIndex++;
     }
+
+    // A `ForReal` check replaces the call arguments with expressions coerced for the selected
+    // candidate. A `JustTrying` check leaves the call unchanged.
     if (context.mode == OverloadResolveContext::Mode::ForReal)
     {
-        SLANG_ASSERT(context.args || (context.argCount == 0 && resultArgs.getCount() == 0));
-        context.argCount = resultArgs.getCount();
+        const bool callHasNoArguments = context.argCount == 0 && coercedArguments.getCount() == 0;
+        SLANG_ASSERT(context.args || callHasNoArguments);
+        context.argCount = coercedArguments.getCount();
         if (context.args)
         {
             context.args->setCount(context.argCount);
             for (Index i = 0; i < context.argCount; i++)
-                (*context.args)[i] = resultArgs[i];
+                (*context.args)[i] = coercedArguments[i];
         }
     }
     return true;
 }
 
-ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
-{
-    auto expr = inExpr;
-    for (;;)
-    {
-        if (auto declRefExpr = as<DeclRefExpr>(expr))
-        {
-            auto declRef = declRefExpr->declRef;
-            if (auto paramDeclRef = declRef.as<ParamDecl>())
-            {
-                if (paramDeclRef.as<ModernParamDecl>())
-                {
-                    // functions declared in our "modern" style (using
-                    // the `func` keyword) never have mutable `in`
-                    // parameters.
-                    //
-                    return nullptr;
-                }
-
-                if (doesParamPassingModeIndicateWritableStorage(
-                        getParamPassingMode(paramDeclRef.getDecl())))
-                {
-                    // Writable-storage modes are mutable in a way where the result of mutations
-                    // will be visible to the caller.
-                    //
-                    return nullptr;
-                }
-
-                // At this point we have an l-value decl-ref to a
-                // function parameter that is (implicitly or
-                // explicitly) declared `in`.
-                //
-                return paramDeclRef.getDecl();
-            }
-        }
-        else if (auto memberExpr = as<MemberExpr>(expr))
-        {
-            expr = memberExpr->baseExpression;
-            continue;
-        }
-        else if (auto indexExpr = as<IndexExpr>(expr))
-        {
-            expr = indexExpr->baseExpression;
-            continue;
-        }
-
-        return nullptr;
-    }
-}
-
-bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
+bool SemanticsVisitor::checkSelectedCallableReceiver(
     OverloadResolveContext& context,
-    OverloadCandidate const& candidate)
+    Expr* callableExpr)
 {
-    if (candidate.flavor != OverloadCandidate::Flavor::Func)
+    // Receiver mutability does not participate in overload selection. After overload resolution
+    // selects a callable, lookup reconstruction builds its `MemberExpr`. That expression's complete
+    // base-storage path is then analyzed using the selected callable's receiver mode: intermediate
+    // accessors must accept their receivers, and the final expression must provide any requested
+    // writable storage.
+    auto memberExpr = as<MemberExpr>(callableExpr);
+    if (!memberExpr)
+        return true;
+    auto funcDeclRef = memberExpr->declRef.as<CallableDecl>();
+    if (!funcDeclRef)
+        return true;
+    auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef);
+    if (!thisParamInfo)
         return true;
 
-    auto funcDeclRef = candidate.item.declRef.as<CallableDecl>();
-    SLANG_ASSERT(funcDeclRef);
+    auto accessResult =
+        checkStorageExpressionAccess(memberExpr->baseExpression, thisParamInfo->mode, context.loc);
+    if (!accessResult.canEvaluate())
+        return false;
 
-    // Note: This operation was originally introduced as
-    // a place to add checking around l-value-ness of arguments
-    // and parameters, but currently that checking is being
-    // done in other places.
-    //
-    // For now we will only use this step to check the
-    // mutability of the effective `this` parameter where necessary.
-    //
-    if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
+    if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode) &&
+        !accessResult.canProvideRequestedStorage)
     {
-        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+        getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
+            .methodName = funcDeclRef.getName(),
+            .location = context.loc});
+        maybeDiagnoseConstVariableAssignment(memberExpr->baseExpression);
+        return false;
+    }
+
+    // The storage-path check already diagnoses a mutating getter, `ref` accessor, or non-copyable
+    // setter writeback. The selected method remains responsible for direct receiver mutation and
+    // copyable setter writeback.
+    if (!accessResult.inputParameterMutation)
+        return true;
+
+    const auto& mutation = *accessResult.inputParameterMutation;
+    auto paramDecl = mutation.getParameter();
+    const bool methodOwnsMutation =
+        mutation.getSource() == InputParameterMutationSource::DirectStorage ||
+        (mutation.getSource() == InputParameterMutationSource::SetterWriteback &&
+         !isNonCopyableType(paramDecl->getType()));
+    if (methodOwnsMutation)
+    {
+        const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
+        if (isNonCopyable)
         {
-            if (context.baseExpr && !context.baseExpr->type.isLeftValue)
-            {
-                if (context.mode == OverloadResolveContext::Mode::ForReal)
-                {
-                    getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
-                        .methodName = funcDeclRef.getName(),
-                        .location = context.loc});
-                    maybeDiagnoseConstVariableAssignment(context.baseExpr);
-                }
-                return false;
-            }
-
-            // The parameters of functions declared using traditional/legacy
-            // syntax are currently exposed as mutable locals within the body
-            // of the relevant function. As such, it is legal to call `[mutating]`
-            // methods on such a function parameter. However, doing so is typically
-            // indicative of an error on the programmer's part.
-            //
-            // We will detect such cases here and issue a diagnostic that explains
-            // the situation.
-            //
-            if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
-            {
-                if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
-                {
-                    const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
-
-                    if (isNonCopyable)
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                    else
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                }
-            }
+            getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterError{
+                .method = funcDeclRef.getName(),
+                .param = paramDecl->getName(),
+                .location = context.loc});
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                .method = funcDeclRef.getName(),
+                .param = paramDecl->getName(),
+                .location = context.loc});
         }
     }
 
@@ -1414,27 +1601,34 @@ void SemanticsVisitor::TryCheckOverloadCandidate(
     OverloadCandidate& candidate)
 {
     if (!TryCheckOverloadCandidateArity(context, candidate))
+    {
+        candidate.status = OverloadCandidate::Status::ArityFailed;
         return;
+    }
 
-    candidate.status = OverloadCandidate::Status::ArityChecked;
     if (!TryCheckOverloadCandidateFixity(context, candidate))
+    {
+        candidate.status = OverloadCandidate::Status::FixityFailed;
         return;
+    }
 
-    candidate.status = OverloadCandidate::Status::FixityChecked;
     if (!TryCheckOverloadCandidateTypes(context, candidate))
+    {
+        candidate.status = OverloadCandidate::Status::TypeFailed;
         return;
+    }
 
-    candidate.status = OverloadCandidate::Status::TypeChecked;
-    if (!TryCheckOverloadCandidateDirections(context, candidate))
-        return;
-
-    candidate.status = OverloadCandidate::Status::DirectionChecked;
     if (!TryCheckOverloadCandidateConstraints(context, candidate))
+    {
+        candidate.status = OverloadCandidate::Status::ConstraintFailed;
         return;
+    }
 
-    candidate.status = OverloadCandidate::Status::VisibilityChecked;
     if (!TryCheckOverloadCandidateVisibility(context, candidate))
+    {
+        candidate.status = OverloadCandidate::Status::VisibilityFailed;
         return;
+    }
 
     candidate.status = OverloadCandidate::Status::Applicable;
 }
@@ -1481,8 +1675,11 @@ Expr* SemanticsVisitor::createGenericDeclRef(
 
 Expr* SemanticsVisitor::CompleteOverloadCandidate(
     OverloadResolveContext& context,
-    OverloadCandidate& candidate)
+    OverloadCandidate& candidate,
+    OverloadCandidateCompletionMode completionMode)
 {
+    Expr* completedCallableExpr = nullptr;
+
     // special case for generic argument inference failure
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
@@ -1611,6 +1808,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     }
 
     context.mode = OverloadResolveContext::Mode::ForReal;
+    context.shouldAccountForArgumentStorageAccess =
+        context.mayAccountForArgumentStorageAccess &&
+        completionMode == OverloadCandidateCompletionMode::Selected;
 
     if (!TryCheckOverloadCandidateClassNewMatchUp(context, candidate))
         goto error;
@@ -1622,9 +1822,6 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
         goto error;
 
     if (!TryCheckOverloadCandidateTypes(context, candidate))
-        goto error;
-
-    if (!TryCheckOverloadCandidateDirections(context, candidate))
         goto error;
 
     if (!TryCheckOverloadCandidateConstraints(context, candidate))
@@ -1647,9 +1844,38 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 context.originalExpr);
             break;
         case OverloadCandidate::Flavor::Expr:
+            if (!candidate.exprVal && candidate.item.declRef)
+            {
+                // A declaration with an explicit function type is represented as an expression
+                // candidate, but its lookup path must remain lazy while overloads are speculative.
+                // Only the selected declaration is reconstructed, so losing candidates cannot
+                // diagnose or register captures.
+                baseExpr = ConstructLookupResultExpr(
+                    candidate.item,
+                    context.baseExpr,
+                    candidate.item.declRef.getName(),
+                    context.funcLoc,
+                    context.originalExpr);
+                baseExpr->type = candidate.funcType;
+            }
+            else
+            {
+                baseExpr = nullptr;
+            }
+            break;
         default:
             baseExpr = nullptr;
             break;
+        }
+
+        completedCallableExpr = candidate.flavor == OverloadCandidate::Flavor::Expr
+                                    ? (candidate.exprVal ? candidate.exprVal : baseExpr)
+                                    : baseExpr;
+        if (completionMode == OverloadCandidateCompletionMode::Selected)
+        {
+            completedCallableExpr = maybeRegisterLambdaCaptures(completedCallableExpr);
+            if (!checkSelectedCallableReceiver(context, completedCallableExpr))
+                goto error;
         }
 
         switch (candidate.flavor)
@@ -1666,7 +1892,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 }
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
-                callExpr->functionExpr = baseExpr;
+                callExpr->functionExpr = completedCallableExpr;
                 callExpr->type = QualType(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
@@ -1678,43 +1904,32 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                     {
                         if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
                         {
-                            // If the subscript decl has a setter,
-                            // then the call is an l-value if base is l-value.
-                            //
-                            // If Ptr<T, Access> we only need to check for ReadWrite
-                            // Access (if ReadWrite result is an LValue. By default a
-                            // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
-                            if (auto base = GetBaseExpr(baseExpr))
+                            if (auto base = GetBaseExpr(completedCallableExpr))
                             {
+                                // `Ptr.__subscript` has a `ref` accessor for every access
+                                // qualifier, even though a read-only pointer cannot produce
+                                // writable element storage. Receiver validation below answers
+                                // whether the accessor can consume `base`; preserve the separate
+                                // pointer-access check that determines whether its result is an
+                                // l-value.
                                 if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
                                 {
                                     auto accessQualifier =
-                                        as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
-                                    if (!accessQualifier ||
-                                        AccessQualifier(accessQualifier->getValue()) ==
-                                            AccessQualifier::ReadWrite)
+                                        ptrTypeBase->tryGetAccessQualifierValue();
+                                    if (accessQualifier &&
+                                        *accessQualifier != AccessQualifier::ReadWrite)
                                     {
-                                        callExpr->type.isLeftValue = true;
+                                        break;
                                     }
-                                    break;
                                 }
 
-                                if (base->type.isLeftValue)
+                                auto accessorDeclRef =
+                                    m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+                                if (canStorageAccessorUseBase(accessorDeclRef, base))
                                 {
                                     callExpr->type.isLeftValue = true;
                                     break;
                                 }
-                            }
-                            // Otherwise, an accessor that does not require writable receiver
-                            // storage can produce an l-value regardless of the base.
-                            auto accessorDeclRef =
-                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
-                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
-                            if (thisParamInfo &&
-                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
-                            {
-                                callExpr->type.isLeftValue = true;
-                                break;
                             }
                         }
                     }
@@ -1740,7 +1955,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->type = QualType(candidate.resultType);
-                callExpr->functionExpr = candidate.exprVal;
+                callExpr->functionExpr = completedCallableExpr;
                 return callExpr;
             }
             break;
@@ -1755,8 +1970,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                 expr->loc = context.loc;
                 expr->originalExpr = context.originalExpr;
-                expr->baseExpr = baseExpr;
-                expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
+                expr->baseExpr = completedCallableExpr;
+                expr->baseGenericDeclRef =
+                    as<DeclRefExpr>(completedCallableExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
                 // Store only the ordinary argument prefix. The later call-site
@@ -1767,7 +1983,10 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 return expr;
             }
 
-            return createGenericDeclRef(baseExpr, context.originalExpr, candidate.subst);
+            return createGenericDeclRef(
+                completedCallableExpr,
+                context.originalExpr,
+                candidate.subst);
             break;
 
         default:
@@ -1784,7 +2003,14 @@ error:
         // Even when there is an error, we still want to update
         // the expr we return to refer to the candidate we found so far
         // so language server can still provide info on the potential callee.
-        if (candidate.flavor == OverloadCandidate::Flavor::Func)
+        if (completedCallableExpr)
+        {
+            if (auto invokeExpr = as<InvokeExpr>(context.originalExpr))
+            {
+                invokeExpr->functionExpr = completedCallableExpr;
+            }
+        }
+        else if (candidate.flavor == OverloadCandidate::Flavor::Func)
         {
             if (auto invokeExpr = as<InvokeExpr>(context.originalExpr))
             {
@@ -2255,6 +2481,9 @@ int getScopeRank(
 
 int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right)
 {
+    SLANG_ASSERT(left->status != OverloadCandidate::Status::Unchecked);
+    SLANG_ASSERT(right->status != OverloadCandidate::Status::Unchecked);
+
     // If one candidate got further along in validation, pick it
     if (left->status != right->status)
         return int(right->status) - int(left->status);
@@ -2607,20 +2836,10 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
             return;
         }
 
-        auto funcExpr = ConstructLookupResultExpr(
-            item,
-            context.baseExpr,
-            item.declRef.getName(),
-            item.declRef.getLoc(),
-            context.originalExpr);
-
-        funcExpr->type = resolvedFuncType;
-
         OverloadCandidate candidate;
         candidate.flavor = OverloadCandidate::Flavor::Expr;
         candidate.funcType = resolvedFuncType;
         candidate.resultType = resolvedFuncType->getResultType();
-        candidate.exprVal = funcExpr;
         candidate.item = item;
 
         AddOverloadCandidate(context, candidate, baseCost);
@@ -2677,6 +2896,7 @@ void SemanticsVisitor::AddCtorOverloadCandidate(
     ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(
         LookupResultItem::Breadcrumb::Kind::Member,
         typeItem.declRef,
+        nullptr,
         nullptr,
         typeItem.breadcrumbs);
 
@@ -3537,6 +3757,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
+                CoercionSourceAccess sourceAccess;
 
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
@@ -3547,7 +3768,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0],
                                             &collectedErrorsSink,
                                             &conversionCost,
-                                            nullptr);
+                                            nullptr,
+                                            &sourceAccess);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
@@ -3555,7 +3777,22 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     resultInvokeExpr->loc = expr->loc;
                 }
                 if (coerceResult)
+                {
+                    if (sourceAccess.hasAccess())
+                    {
+                        // The speculative coercion recorded the normalized expression and mode to
+                        // validate. Replay that exact pair after committing the conversion;
+                        // reconstructing the access from the original argument could select
+                        // different abstract-storage accessors.
+                        checkStorageExpressionAccess(
+                            sourceAccess.getExpression(),
+                            sourceAccess.getMode(),
+                            sourceAccess.getExpression()->loc);
+                    }
+                    else if (sourceAccess.needsFallbackCheck())
+                        checkStorageExpressionValue(expr->arguments[0]);
                     return resultExpr;
+                }
                 typeOverloadChecked = true;
             }
         }
@@ -3768,7 +4005,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 for (const auto& candidate : context.bestCandidates)
                 {
                     // Only include visible candidates (skip invisible ones for now)
-                    if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
+                    if (candidate.status != OverloadCandidate::Status::VisibilityFailed)
                     {
                         String declString =
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
@@ -3825,7 +4062,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                         String declString =
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
 
-                        if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                        if (candidate.status == OverloadCandidate::Status::VisibilityFailed)
                             getSink()->diagnose(Diagnostics::InvisibleOverloadCandidate{
                                 .candidate = declString,
                                 .location = candidate.item.declRef.getLoc()});
@@ -4089,7 +4326,13 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             overloadedExpr->base = context.baseExpr;
             for (auto candidate : context.bestCandidates)
             {
-                auto candidateExpr = CompleteOverloadCandidate(context, candidate);
+                // The generic application is still ambiguous. Each candidate is completed far
+                // enough to represent it, while capture registration and receiver validation wait
+                // until the enclosing call selects one.
+                auto candidateExpr = CompleteOverloadCandidate(
+                    context,
+                    candidate,
+                    OverloadCandidateCompletionMode::RetainedForFurtherResolution);
                 overloadedExpr->candidateExprs.add(candidateExpr);
             }
             if (!overloadedExpr->base)

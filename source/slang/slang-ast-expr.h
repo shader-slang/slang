@@ -890,7 +890,7 @@ class LambdaExpr : public Expr
     FIDDLE() Stmt* bodyStmt;
 };
 
-/// An express to mark its inner expression as an intended non-differential call.
+/// An expression that controls how automatic differentiation treats its inner call or subscript.
 FIDDLE()
 class TreatAsDifferentiableExpr : public Expr
 {

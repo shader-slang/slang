@@ -57,7 +57,8 @@ Walk the algorithm step by step:
    inheritance chain, and any active extensions.
 5. Inject transparent members (see below).
 6. Apply the `LookupMask` filter.
-7. Deduplicate by `DeclRef`.
+7. Preserve each distinct lookup path; `LookupResult` does not
+   deduplicate entries by `DeclRef`.
 8. Return a `LookupResult` that is empty / single / overloaded.
 
 Cite the controlling function for each step (the name in `slang-lookup.cpp`).
@@ -65,7 +66,7 @@ Cite the controlling function for each step (the name in `slang-lookup.cpp`).
 Include a mermaid flowchart of the pipeline. Suggested shape:
 
 ```
-identifier+startScope -> walkScopeChain -> directMembers -> inheritance -> extensions -> transparentMembers -> maskFilter -> dedupe -> LookupResult
+identifier+startScope -> walkScopeChain -> directMembers -> inheritance -> extensions -> transparentMembers -> maskFilter -> LookupResult
 ```
 
 ### Member lookup
@@ -90,10 +91,17 @@ the injection. Mention `IgnoreTransparentMembers` as the opt-out path.
 ### Breadcrumbs
 
 Explain how breadcrumbs reconstruct the canonical expression. For an
-unqualified `f` that turns out to be a member of `this`, the breadcrumb
-chain records `Member` + `Deref`; the checker uses this to materialize
-`(*this).f` as the rewritten expression. List the
-`Breadcrumb::Kind` (or equivalent) values present at `source_commit`.
+unqualified `f` that resolves to an instance member, lookup starts the
+reconstruction path with `ThisValue`; `ThisType` is used instead when
+the lookup occurs without an instance. Later `Member`, `Deref`, and
+other breadcrumbs record their own structural navigation steps; do not
+describe every implicit-`this` lookup as a fixed `Member` + `Deref`
+pair. List the `Breadcrumb::Kind` (or equivalent) values present at
+`source_commit`. Explain that `ThisValue` retains the lexical scope
+needed to check the reconstructed `ThisExpr`, while `ThisType` records
+that no instance is available. Breadcrumbs do not store or infer
+receiver mutability. The reconstructed `ThisExpr` reads the containing
+callable's checked `ThisParamInfoAttribute` instead.
 
 ## Shadowing rules
 
@@ -134,8 +142,12 @@ The `## Edge cases and failure modes` section must cover:
   `Diagnostics::ambiguousReference` (or its actual identifier at
   `source_commit`) from
   [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
-- Transparent-member chains creating multiple paths to the same decl;
-  how `LookupResult` dedupes.
+- Member lookup through multiple facets can discover the same declaration
+  more than once; explain the facet-origin deduplication performed during
+  member lookup. Also state that `LookupResult` does not deduplicate items
+  reached through independent lookup paths, and explain which caller-side
+  narrowing step consumes equivalent paths before they become a user-visible
+  ambiguity.
 - Forward reference inside a `BlockStmt` (`hiddenFromLookup` is set
   -> diagnostic `useOfUndeclaredIdentifier`).
 - Member lookup on `ErrorType` is silently empty.

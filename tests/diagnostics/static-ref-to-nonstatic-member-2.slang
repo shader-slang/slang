@@ -5,7 +5,7 @@ struct Foo {
 
     static int func() {
         return this.a;
-//CHECK:            ^ static function cannot refer to non-static member via `this`
-//CHECK:            ^ static function cannot refer to non-static member `a` via `this`
+//CHECK:       ^^^^ 'this' used in callable without an instance receiver
+//CHECK:       ^^^^ 'this' expression cannot be used in a callable that has no instance receiver
     }
 }

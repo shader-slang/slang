@@ -1,8 +1,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/12923
 // A lambda inside an interface default method may capture `this`: the receiver is
 // registered as a closure capture, and the synthesized closure field is named so it
-// does not collide with the reserved `This` name during constructor synthesis. The
-// captured `this` must reach the lambda body, so `f()` returns getVal() * 2 == 42.
+// does not collide with the reserved `This` name during constructor synthesis. Both
+// explicit `this.getVal()` and unqualified `getVal()` lookup must reach the captured
+// receiver in the lambda body.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
@@ -18,6 +19,12 @@ interface IFoo
         let f = () => this.getVal() * 2;
         return f();
     }
+
+    int computeThroughUnqualifiedLookup()
+    {
+        let f = () => getVal() * 3;
+        return f();
+    }
 }
 
 struct Impl : IFoo
@@ -30,10 +37,17 @@ int test<T : IFoo>(T v)
     return v.compute();
 }
 
+int testUnqualifiedLookup<T : IFoo>(T v)
+{
+    return v.computeThroughUnqualifiedLookup();
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     Impl impl = {};
     outputBuffer[0] = test(impl);
     // CHECK: 42
+    outputBuffer[1] = testUnqualifiedLookup(impl);
+    // CHECK: 63
 }

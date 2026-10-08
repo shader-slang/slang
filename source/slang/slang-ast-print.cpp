@@ -1622,6 +1622,10 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         }
 
         sb << ")";
+        if (funcDeclRef.getDecl()->hasModifier<CppStyleTrailingThisParamConstModifier>())
+        {
+            sb << " const";
+        }
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
@@ -1640,6 +1644,12 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     for (auto modifier : decl->modifiers)
     {
+        // We do not print a C++-style trailing `const` modifier here because it belongs after the
+        // parameter list, rather than before the declaration with the other modifiers in this
+        // loop. `addDeclParams` prints it in the trailing position.
+        if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+            continue;
+
         if (modifier->getKeywordName())
         {
             if (m_optionFlags & OptionFlag::NoInternalKeywords)

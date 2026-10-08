@@ -243,6 +243,227 @@ inline FilteredMemberRefList<T> getMembersOfType(
         filterStyle);
 }
 
+/// Returns the `ref` accessor of an abstract storage declaration, if it has one.
+inline DeclRef<RefAccessorDecl> getRefAccessorForStorage(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef)
+{
+    auto refAccessors =
+        getMembersOfType<RefAccessorDecl>(astBuilder, storageDeclRef, MemberFilterStyle::Instance);
+    return refAccessors.isNonEmpty() ? *refAccessors.begin() : DeclRef<RefAccessorDecl>();
+}
+
+/// Returns the accessor used to read a property or subscript value.
+///
+/// Reading prefers a getter and falls back to a `ref` accessor only when no getter is present.
+inline DeclRef<AccessorDecl> getAccessorForStorageRead(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef)
+{
+    auto getters =
+        getMembersOfType<GetterDecl>(astBuilder, storageDeclRef, MemberFilterStyle::Instance);
+    if (getters.isNonEmpty())
+        return *getters.begin();
+
+    return getRefAccessorForStorage(astBuilder, storageDeclRef);
+}
+
+/// Returns the accessor used to write a property or subscript value.
+///
+/// Writing prefers a setter and falls back to a `ref` accessor only when no setter is present.
+inline DeclRef<AccessorDecl> getAccessorForStorageWrite(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef)
+{
+    auto setters =
+        getMembersOfType<SetterDecl>(astBuilder, storageDeclRef, MemberFilterStyle::Instance);
+    if (setters.isNonEmpty())
+        return *setters.begin();
+
+    return getRefAccessorForStorage(astBuilder, storageDeclRef);
+}
+
+/// Identifies an operation that may select an accessor of abstract storage.
+enum class StorageAccessorOperation
+{
+    /// A value read that prefers `get` to `ref`.
+    ReadValue,
+
+    /// A value replacement that prefers `set` to `ref`.
+    WriteValue,
+
+    /// An address request that preserves an available `set`-based writeback path.
+    TryAddressDefault,
+
+    /// An address request that may bypass an available `set` accessor.
+    TryAddressAggressive,
+
+    /// A required address for an operation that cannot use value-based writeback.
+    RequireAddress,
+};
+
+/// Describes how a storage-access operation proceeds after accessor selection.
+enum class StorageAccessorSelectionStrategy
+{
+    /// The abstract storage declaration cannot support the requested operation.
+    Invalid,
+
+    /// The optional address request leaves the abstract storage value unresolved.
+    Deferred,
+
+    /// A call to the selected `get` or `set` accessor implements the operation.
+    ValueAccessorCall,
+
+    /// A call to the selected `ref` accessor produces the required address.
+    DirectRef,
+};
+
+/// A `StorageAccessorSelection` is the accessor and strategy for one storage-access operation.
+///
+/// `ValueAccessorCall` and `DirectRef` selections contain a non-null accessor. `Invalid` and
+/// `Deferred` selections do not contain an accessor.
+class StorageAccessorSelection
+{
+public:
+    static StorageAccessorSelection makeInvalid()
+    {
+        return StorageAccessorSelection(StorageAccessorSelectionStrategy::Invalid);
+    }
+
+    static StorageAccessorSelection makeDeferred()
+    {
+        return StorageAccessorSelection(StorageAccessorSelectionStrategy::Deferred);
+    }
+
+    static StorageAccessorSelection makeValueAccessorCall(DeclRef<AccessorDecl> accessor)
+    {
+        SLANG_RELEASE_ASSERT(accessor);
+        SLANG_RELEASE_ASSERT(as<GetterDecl>(accessor) || as<SetterDecl>(accessor));
+        return StorageAccessorSelection(
+            StorageAccessorSelectionStrategy::ValueAccessorCall,
+            accessor);
+    }
+
+    static StorageAccessorSelection makeDirectRef(DeclRef<RefAccessorDecl> accessor)
+    {
+        SLANG_RELEASE_ASSERT(accessor);
+        return StorageAccessorSelection(StorageAccessorSelectionStrategy::DirectRef, accessor);
+    }
+
+    StorageAccessorSelectionStrategy getStrategy() const { return m_strategy; }
+
+    /// Returns the selected accessor for a `ValueAccessorCall` or `DirectRef` strategy.
+    DeclRef<AccessorDecl> getAccessor() const
+    {
+        SLANG_RELEASE_ASSERT(m_accessor);
+        return m_accessor;
+    }
+
+private:
+    explicit StorageAccessorSelection(StorageAccessorSelectionStrategy strategy)
+        : m_strategy(strategy)
+    {
+    }
+
+    StorageAccessorSelection(
+        StorageAccessorSelectionStrategy strategy,
+        DeclRef<AccessorDecl> accessor)
+        : m_strategy(strategy), m_accessor(accessor)
+    {
+    }
+
+    StorageAccessorSelectionStrategy m_strategy;
+    DeclRef<AccessorDecl> m_accessor;
+};
+
+/// Selects the accessor and access strategy for one operation on abstract storage.
+///
+/// The operation identifies the exact choice made by value materialization, assignment, or address
+/// formation. Keeping that choice independent of parameter-passing modes lets semantic checking
+/// compose the same primitive operations that lowering performs.
+inline StorageAccessorSelection getStorageAccessorSelection(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef,
+    StorageAccessorOperation operation)
+{
+    switch (operation)
+    {
+    case StorageAccessorOperation::ReadValue:
+        {
+            auto accessor = getAccessorForStorageRead(astBuilder, storageDeclRef);
+            if (!accessor)
+                return StorageAccessorSelection::makeInvalid();
+            if (auto refAccessor = accessor.as<RefAccessorDecl>())
+                return StorageAccessorSelection::makeDirectRef(refAccessor);
+            return StorageAccessorSelection::makeValueAccessorCall(accessor);
+        }
+
+    case StorageAccessorOperation::WriteValue:
+        {
+            auto accessor = getAccessorForStorageWrite(astBuilder, storageDeclRef);
+            if (!accessor)
+                return StorageAccessorSelection::makeInvalid();
+            if (auto refAccessor = accessor.as<RefAccessorDecl>())
+                return StorageAccessorSelection::makeDirectRef(refAccessor);
+            return StorageAccessorSelection::makeValueAccessorCall(accessor);
+        }
+
+    case StorageAccessorOperation::TryAddressDefault:
+        {
+            auto writeAccessor = getAccessorForStorageWrite(astBuilder, storageDeclRef);
+            if (writeAccessor.as<SetterDecl>())
+                return StorageAccessorSelection::makeDeferred();
+            if (auto refAccessor = writeAccessor.as<RefAccessorDecl>())
+                return StorageAccessorSelection::makeDirectRef(refAccessor);
+            return StorageAccessorSelection::makeDeferred();
+        }
+
+    case StorageAccessorOperation::TryAddressAggressive:
+        if (auto refAccessor = getRefAccessorForStorage(astBuilder, storageDeclRef))
+            return StorageAccessorSelection::makeDirectRef(refAccessor);
+        return StorageAccessorSelection::makeDeferred();
+
+    case StorageAccessorOperation::RequireAddress:
+        if (auto refAccessor = getRefAccessorForStorage(astBuilder, storageDeclRef))
+            return StorageAccessorSelection::makeDirectRef(refAccessor);
+        return StorageAccessorSelection::makeInvalid();
+
+    default:
+        SLANG_UNEXPECTED("unhandled storage-access operation");
+        UNREACHABLE_RETURN(StorageAccessorSelection::makeInvalid());
+    }
+}
+
+/// Returns the source keyword that identifies an accessor declaration.
+inline Name* getStorageAccessorKindName(
+    ASTBuilder* astBuilder,
+    DeclRef<AccessorDecl> accessorDeclRef)
+{
+    const char* text = nullptr;
+    if (as<GetterDecl>(accessorDeclRef))
+        text = "get";
+    else if (as<SetterDecl>(accessorDeclRef))
+        text = "set";
+    else
+    {
+        SLANG_RELEASE_ASSERT(as<RefAccessorDecl>(accessorDeclRef));
+        text = "ref";
+    }
+    return astBuilder->getNamePool()->getName(text);
+}
+
+/// Returns `property` or `subscript` for an abstract storage declaration.
+inline Name* getStorageDeclarationKindName(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef)
+{
+    if (storageDeclRef.as<PropertyDecl>())
+        return astBuilder->getNamePool()->getName("property");
+
+    SLANG_RELEASE_ASSERT(storageDeclRef.as<SubscriptDecl>());
+    return astBuilder->getNamePool()->getName("subscript");
+}
+
 inline bool hasDirectFuncType(DeclRef<CallableDecl> declRef)
 {
     return declRef.getDecl()->funcType.type != nullptr;
@@ -323,6 +544,12 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 /// mode, because doing so would make specialized call sites disagree with the callee's declared
 /// ABI.
 ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
+
+/// Returns the semantic information for a setter's single new-value parameter.
+///
+/// The returned mode is the checked effective mode. An explicit `__constref` produces `BorrowIn`,
+/// and an ordinary `In` parameter is adjusted to `BorrowIn` when its value type is non-copyable.
+ParamInfo getSetterNewValueParamInfo(ASTBuilder* astBuilder, DeclRef<SetterDecl> setterDeclRef);
 
 /// Get the type of a parameter including any wrapper type necessary to convey its parameter-passing
 /// mode.

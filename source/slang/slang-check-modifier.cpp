@@ -2017,6 +2017,20 @@ Modifier* SemanticsVisitor::checkModifier(
             getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
         }
     }
+    if (as<CppStyleTrailingThisParamConstModifier>(m))
+    {
+        // The parser preserves this spelling in every dialect so that recovery and later
+        // semantic checks see the user's requested receiver mode. Only HLSL accepts the spelling;
+        // a missing translation-unit request occurs on reflection and specialization paths and
+        // does not establish which source-language dialect parsed the declaration. When a request
+        // is present, every source-language dialect other than HLSL is diagnosed.
+        if (auto translationUnit = getShared()->getTranslationUnitRequest();
+            translationUnit && translationUnit->sourceLanguage != SourceLanguage::HLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::CppStyleTrailingThisParamConstRequiresHlsl{.modifier = m});
+        }
+    }
     if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))

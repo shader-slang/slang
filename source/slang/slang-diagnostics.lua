@@ -1590,17 +1590,52 @@ err(
 )
 
 err(
-    "this-param-mode-attribute-without-effective-this-param",
+    "this-param-mode-specifier-without-effective-this-param",
     30428,
-    "attribute requires an effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+    "receiver-mode specifier requires an instance receiver",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is only allowed on an instance member that has a `this` parameter." }
 )
 
 err(
-    "this-param-mode-attribute-on-class-member",
+    "this-param-mode-specifier-on-class-member",
     30429,
-    "attribute cannot change a source-declared class member's effective `this` parameter",
-    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+    "receiver-mode specifier is not allowed on a class member",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' is not allowed on a class member; a class receiver always uses the `in` parameter-passing mode." }
+)
+
+err(
+    "cpp-style-trailing-this-param-const-requires-hlsl",
+    30443,
+    "trailing `const` is only allowed in the HLSL dialect",
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`); in Slang, use `[nonmutating]` or `[mutating]` to state receiver mutability." }
+)
+
+err(
+    "mutating-accessor-on-immutable-value",
+    30444,
+    "mutating storage accessor cannot be called on an immutable value",
+    span { loc = "location", message = "mutating '~accessor:Name' accessor cannot be called on an immutable value" }
+)
+
+err(
+    "mutating-accessor-on-function-input-parameter-error",
+    30445,
+    "mutating storage accessor called on `in` parameter",
+    span { loc = "location", message = "mutating '~accessor:Name' accessor called on `in` parameter '~param:Name'; changes will not be visible to the caller. Copy the parameter into a local variable if this behavior is intended" }
+)
+
+warning(
+    "mutating-accessor-on-function-input-parameter-warning",
+    30446,
+    "mutating storage accessor called on `in` parameter",
+    span { loc = "location", message = "mutating '~accessor:Name' accessor called on `in` parameter '~param:Name'; changes will not be visible to the caller. Copy the parameter into a local variable if this behavior is intended" }
+)
+
+err(
+    "abstract-storage-cannot-be-read",
+    30447,
+    "property or subscript cannot be read",
+    span { loc = "location", message = "cannot read this ~storageKind:Name because it has no `get` or `ref` accessor" }
 )
 
 err(
@@ -1808,6 +1843,20 @@ err(
 )
 
 err(
+    "function-redeclaration-with-different-this-parameter",
+    30203,
+    "function receiver mismatch",
+    span { loc = "decl:Decl", message = "function '~decl' has receiver type '~newThisType:Type' with parameter-passing mode '~newThisMode:ParamPassingMode', but its previous declaration has receiver type '~prevThisType:Type' with parameter-passing mode '~prevThisMode:ParamPassingMode'" }
+)
+
+err(
+    "function-redeclaration-with-different-receiver-presence",
+    30204,
+    "function receiver mismatch",
+    span { loc = "decl:Decl", message = "function '~decl' and its previous declaration disagree on whether they have an instance receiver" }
+)
+
+err(
     "is-operator-value-must-be-interface-type",
     30300,
     "'is'/'as' operator requires interface-typed expression",
@@ -1888,10 +1937,10 @@ err(
 )
 
 err(
-    "cannot-have-mutating-method-in-dyn-interface",
+    "cannot-have-writable-receiver-in-dyn-interface",
     33075,
-    "dyn interfaces cannot have [mutating] methods",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have [mutating] methods." }
+    "dyn interfaces cannot have methods with writable receivers",
+    span { loc = "member:Decl", message = "`dyn` interface member '~member' has a writable receiver; make it non-mutating with `[nonmutating]` (or trailing `const` in HLSL)." }
 )
 
 err(
@@ -4663,6 +4712,13 @@ err(
     38101,
     "'this' used outside aggregate type",
     span { loc = "expr:Expr", message = "'this' expression can only be used in members of an aggregate type" }
+)
+
+err(
+    "this-expression-without-receiver",
+    38102,
+    "'this' used in callable without an instance receiver",
+    span { loc = "expr:Expr", message = "'this' expression cannot be used in a callable that has no instance receiver" }
 )
 
 err(

@@ -4723,11 +4723,15 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 //@public:
-/// Mark a function or a property or subscript accessor as mutating. A mutating function receives the implicit `this` parameter
-/// as an `inout` parameter, so that mutations to members access from `this` argument will be visible to the caller.
+/// Marks a method, property accessor, or subscript accessor as mutating. A mutating declaration
+/// receives its implicit `this` parameter as an `inout` parameter, so changes made through `this`
+/// are visible to the caller.
 ///
 /// @remarks
-/// By default, Slang treats all member functions as non-mutating. For example, consider the following function:
+/// The `this` parameter of a method declared on a Slang value type uses `in` by default.
+/// This attribute is not allowed on a method or accessor declared on a class, because a class
+/// receiver always uses the `in` parameter-passing mode.
+/// For example:
 /// ```csharp
 /// struct S
 /// {
@@ -4739,8 +4743,8 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 /// }
 ///
 /// ```
-/// The line `x = 1` will lead to a compile time error because by-default, all member methods in Slang are non-mutating. To
-/// allow `foo` to modify `x`, you can use `[mutating]` to mark the function as such:
+/// The line `x = 1` produces a compile-time error because `this` is immutable.
+/// To allow `foo` to modify `x`, apply `[mutating]` to the method:
 /// ```csharp
 /// struct S
 /// {
@@ -4757,11 +4761,15 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
-/// Marks a function or a property and subscript accessor as non-mutating. A non-mutating function receives the implicit `this` parameter
-/// as an `in` parameter, so mutations to members accessed from `this` argument will be prohibited by the compiler.
+/// Marks a method, property accessor, or subscript accessor as non-mutating. A non-mutating
+/// declaration receives its implicit `this` parameter as an `in` parameter, so it cannot modify
+/// fields stored in the receiver.
 /// @remarks
-/// Member functions of a type are non-mutating by default, so this attribute is not necessary in most cases.
-/// However, the `set` accessor of a property or subscript is mutating by default, and you can use `[nonmutating]` to mark it as non-mutating.
+/// The `this` parameter of a method declared on a Slang value type uses `in` by default. The
+/// attribute can still state that intent explicitly. A `set` accessor declared on a value type is
+/// mutating by default; apply `[nonmutating]` when such an accessor does not modify the receiver
+/// value. This attribute is not allowed on a method or accessor declared on a class, because a
+/// class receiver always uses the `in` parameter-passing mode.
 /// For example:
 /// ```csharp
 /// struct S
@@ -4778,12 +4786,13 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// uniform S s; // `s` is not mutable.
 /// void test() { s.x = 1; } // OK, because the `set` accessor is non-mutating.
 /// ```
-/// In the above example, the property `x` reads and writes to a memory location pointed to by `ptr_x`. Therefore, the `set` accessor is not actually
-/// modifying any field of `S`, and does not need to take `this` as an `inout` parameter. Using `[nonmutating]` here on the set accessor will allow
-/// it to be called with a non-mutating value of `S`.
+/// In this example, the property `x` reads and writes the memory location addressed by `ptr_x`.
+/// The `set` accessor writes the pointee but does not modify the `ptr_x` field stored in `S`, so it
+/// does not need an `inout` `this` parameter. Applying `[nonmutating]` lets the accessor be called
+/// on an immutable `S` value.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a

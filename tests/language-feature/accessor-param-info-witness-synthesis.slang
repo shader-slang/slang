@@ -42,6 +42,40 @@ struct BorrowingSubscriptImpl : IBorrowingSubscript
     }
 }
 
+// A wrapper with a writable receiver can safely forward to an implementation with a nonmutating
+// receiver. The following property and subscript declarations exercise that adaptation.
+interface IMutatingPropertyGetter
+{
+    property int item
+    {
+        [mutating] get;
+    }
+}
+
+struct NonmutatingPropertyGetterImpl : IMutatingPropertyGetter
+{
+    property int item
+    {
+        [nonmutating] get { return 0; }
+    }
+}
+
+interface IMutatingSubscriptGetter
+{
+    __subscript(int index) -> int
+    {
+        [mutating] get;
+    }
+}
+
+struct NonmutatingSubscriptGetterImpl : IMutatingSubscriptGetter
+{
+    __subscript(int index) -> int
+    {
+        [nonmutating] get { return index; }
+    }
+}
+
 // The synthesized property setter preserves the requirement's BorrowIn value parameter and loads
 // it before forwarding to the implementation's In parameter.
 // CHECK-LABEL: [nameHint("BorrowingPropertyImpl")]
@@ -57,3 +91,29 @@ struct BorrowingSubscriptImpl : IBorrowingSubscript
 // CHECK: param [[SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : BorrowInParam(Int,
 // CHECK: let [[LOADED_SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : Int = load([[SUBSCRIPT_INDEX]])
 // CHECK: call {{.*}}({{.*}}, [[LOADED_SUBSCRIPT_INDEX]])
+
+// The implementation getter retains its nonmutating, by-value receiver ABI. The synthesized
+// witness wrapper keeps the requirement's writable receiver ABI, loads that receiver, and forwards
+// the resulting value to the implementation getter.
+// CHECK-LABEL: [nameHint("NonmutatingPropertyGetterImpl")]
+// CHECK: [nameHint("NonmutatingPropertyGetterImpl.item.get")]
+// CHECK-NEXT: func [[PROPERTY_GETTER:%[A-Za-z0-9_]+]] : Func(Int, %NonmutatingPropertyGetterImpl)
+// CHECK: func {{.*}} : Func(Int, BorrowInOutParam(%NonmutatingPropertyGetterImpl))
+// CHECK: param [[PROPERTY_THIS:%[A-Za-z0-9_]+]] : BorrowInOutParam(%NonmutatingPropertyGetterImpl)
+// CHECK: let [[LOADED_PROPERTY_THIS:%[A-Za-z0-9_]+]] : %NonmutatingPropertyGetterImpl =
+// CHECK-SAME: load([[PROPERTY_THIS]])
+// CHECK: call [[PROPERTY_GETTER]]([[LOADED_PROPERTY_THIS]])
+
+// The subscript getter performs the same adaptation while forwarding its ordinary index parameter
+// unchanged.
+// CHECK-LABEL: [nameHint("NonmutatingSubscriptGetterImpl")]
+// CHECK: [nameHint("NonmutatingSubscriptGetterImpl.operator[].get")]
+// CHECK-NEXT: func [[SUBSCRIPT_GETTER:%[A-Za-z0-9_]+]] :
+// CHECK-SAME: Func(Int, %NonmutatingSubscriptGetterImpl, Int)
+// CHECK: func {{.*}} : Func(Int, BorrowInOutParam(%NonmutatingSubscriptGetterImpl), Int)
+// CHECK: param [[SUBSCRIPT_THIS:%[A-Za-z0-9_]+]] :
+// CHECK-SAME: BorrowInOutParam(%NonmutatingSubscriptGetterImpl)
+// CHECK: param [[ORDINARY_SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : Int
+// CHECK: let [[LOADED_SUBSCRIPT_THIS:%[A-Za-z0-9_]+]] : %NonmutatingSubscriptGetterImpl =
+// CHECK-SAME: load([[SUBSCRIPT_THIS]])
+// CHECK: call [[SUBSCRIPT_GETTER]]([[LOADED_SUBSCRIPT_THIS]], [[ORDINARY_SUBSCRIPT_INDEX]])

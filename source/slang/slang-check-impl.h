@@ -50,12 +50,6 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
-/// Apply one declaration's source-level policy for its effective `this` parameter mode.
-///
-/// This operation only interprets declaration kind and modifiers. It does not apply the declared
-/// receiver type's copyability adjustment or any specialization.
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode);
-
 bool isGlobalDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -399,15 +393,21 @@ struct OverloadCandidate
     };
     Flavor flavor;
 
+    /// Records the result of checking a candidate.
+    ///
+    /// `Unchecked` is only the construction state; every other value is a terminal result. The
+    /// failure values are ordered by the stage that rejected the candidate, so a greater value
+    /// means that the candidate progressed farther. Every value below `Applicable` represents a
+    /// candidate that cannot be called.
     enum class Status
     {
-        GenericArgumentInferenceFailed,
         Unchecked,
-        ArityChecked,
-        FixityChecked,
-        TypeChecked,
-        DirectionChecked,
-        VisibilityChecked,
+        GenericArgumentInferenceFailed,
+        ArityFailed,
+        FixityFailed,
+        TypeFailed,
+        ConstraintFailed,
+        VisibilityFailed,
         Applicable,
     };
     Status status = Status::Unchecked;
@@ -470,6 +470,14 @@ struct OverloadCandidate
     Type* argMismatchActualType = nullptr;
 };
 
+/// Controls whether candidate completion performs receiver validation and capture rewriting for
+/// the selected call, or only constructs an expression retained in an unresolved overload set.
+enum class OverloadCandidateCompletionMode
+{
+    Selected,
+    RetainedForFurtherResolution,
+};
+
 struct ResolvedOperatorOverload
 {
     // The resolved decl.
@@ -498,6 +506,72 @@ enum class CoercionSite
     Return,
     Initializer,
     ExplicitCoercion
+};
+
+/// Controls when coercion validates the storage operations needed to read its source expression.
+enum class CoercionSourceAccessCheck
+{
+    /// Checks the source as an ordinary value unless the selected coercion reports a more precise
+    /// access or reports that it does not evaluate the source value.
+    CheckAsValue,
+
+    /// Omits the fallback value check. A selected coercion can still report a more precise source
+    /// access through `outSourceAccess`.
+    Skip,
+};
+
+/// Describes how a coercion accounted for its source expression's storage access.
+///
+/// Most coercions leave the source access for their caller to check. Some coercions introduce a
+/// source-evaluation boundary and report a more precise expression and mode. A few
+/// conversions, such as converting a lambda to a function value, do not evaluate the source value
+/// at all. Representing all three cases explicitly keeps callers from inventing a value read for a
+/// conversion that deliberately performs no source access.
+struct CoercionSourceAccess
+{
+    enum class State
+    {
+        NeedsFallbackCheck,
+        NoAccess,
+        Access,
+    };
+
+    static CoercionSourceAccess makeNoAccess()
+    {
+        CoercionSourceAccess result;
+        result.m_state = State::NoAccess;
+        return result;
+    }
+
+    static CoercionSourceAccess makeAccess(Expr* expression, ParamPassingMode mode)
+    {
+        SLANG_RELEASE_ASSERT(expression);
+        CoercionSourceAccess result;
+        result.m_state = State::Access;
+        result.m_expression = expression;
+        result.m_mode = mode;
+        return result;
+    }
+
+    bool needsFallbackCheck() const { return m_state == State::NeedsFallbackCheck; }
+    bool hasAccess() const { return m_state == State::Access; }
+
+    Expr* getExpression() const
+    {
+        SLANG_RELEASE_ASSERT(hasAccess());
+        return m_expression;
+    }
+
+    ParamPassingMode getMode() const
+    {
+        SLANG_RELEASE_ASSERT(hasAccess());
+        return m_mode;
+    }
+
+private:
+    State m_state = State::NeedsFallbackCheck;
+    Expr* m_expression = nullptr;
+    ParamPassingMode m_mode = ParamPassingMode::In;
 };
 
 struct FacetImpl;
@@ -1810,6 +1884,183 @@ struct RequirementSynthesisResult
     operator bool() const { return suceeded; }
 };
 
+/// How an expression derives its storage or value from a base expression.
+enum class StorageExpressionBaseAccess
+{
+    /// The expression preserves the base storage identity.
+    Identity,
+
+    /// Lowering can update this subobject by reading and writing the complete base value.
+    SupportsReadModifyWrite,
+
+    /// Lowering needs a direct address to update this subobject.
+    RequiresDirectAddressForWrite,
+
+    /// Evaluating the base reads a value that identifies different storage.
+    Read,
+};
+
+/// Identifies the operation that mutates the local copy of an `in` parameter written as `T p`.
+///
+/// The parser represents a parameter written as `p: T` with `ModernParamDecl`; that spelling has an
+/// immutable binding and therefore cannot produce one of these mutations.
+enum class InputParameterMutationSource
+{
+    /// The final assignment, argument, or method call writes the parameter storage directly.
+    DirectStorage,
+
+    /// A setter writes back a value changed by the final operation.
+    SetterWriteback,
+
+    /// Evaluating a mutating getter or `ref` accessor has its own mutation side effect.
+    AccessorSideEffect,
+};
+
+/// Why evaluating a storage expression fails before its final storage requirement is considered.
+struct StorageExpressionEvaluationFailure
+{
+    enum class Kind
+    {
+        UnsupportedOperation,
+        InvalidAccessorReceiver,
+    };
+
+    static StorageExpressionEvaluationFailure forUnsupportedOperation(
+        StorageAccessorOperation operation,
+        DeclRef<ContainerDecl> storage)
+    {
+        return StorageExpressionEvaluationFailure(operation, storage);
+    }
+
+    static StorageExpressionEvaluationFailure forInvalidAccessorReceiver(
+        DeclRef<AccessorDecl> accessor,
+        Expr* receiver)
+    {
+        return StorageExpressionEvaluationFailure(accessor, receiver);
+    }
+
+    Kind getKind() const { return m_kind; }
+
+    StorageAccessorOperation getUnsupportedOperation() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::UnsupportedOperation);
+        return m_unsupportedOperation;
+    }
+
+    DeclRef<ContainerDecl> getUnsupportedStorage() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::UnsupportedOperation);
+        return m_unsupportedStorage;
+    }
+
+    DeclRef<AccessorDecl> getInvalidAccessor() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::InvalidAccessorReceiver);
+        return m_invalidAccessor;
+    }
+
+    Expr* getInvalidAccessorReceiver() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::InvalidAccessorReceiver);
+        return m_invalidAccessorReceiver;
+    }
+
+private:
+    StorageExpressionEvaluationFailure(
+        StorageAccessorOperation operation,
+        DeclRef<ContainerDecl> storage)
+        : m_kind(Kind::UnsupportedOperation)
+        , m_unsupportedOperation(operation)
+        , m_unsupportedStorage(storage)
+    {
+        SLANG_RELEASE_ASSERT(storage);
+    }
+
+    StorageExpressionEvaluationFailure(DeclRef<AccessorDecl> accessor, Expr* receiver)
+        : m_kind(Kind::InvalidAccessorReceiver)
+        , m_invalidAccessor(accessor)
+        , m_invalidAccessorReceiver(receiver)
+    {
+        SLANG_RELEASE_ASSERT(accessor && receiver);
+    }
+
+    Kind m_kind;
+    StorageAccessorOperation m_unsupportedOperation = StorageAccessorOperation::ReadValue;
+    DeclRef<ContainerDecl> m_unsupportedStorage;
+    DeclRef<AccessorDecl> m_invalidAccessor;
+    Expr* m_invalidAccessorReceiver = nullptr;
+};
+
+/// A mutation of the local copy of an `in` parameter written as `T p`.
+struct StorageExpressionInputParameterMutation
+{
+    static StorageExpressionInputParameterMutation fromDirectStorage(ParamDecl* parameter)
+    {
+        return StorageExpressionInputParameterMutation(parameter);
+    }
+
+    static StorageExpressionInputParameterMutation fromAccessor(
+        ParamDecl* parameter,
+        InputParameterMutationSource source,
+        DeclRef<AccessorDecl> accessor)
+    {
+        return StorageExpressionInputParameterMutation(parameter, source, accessor);
+    }
+
+    ParamDecl* getParameter() const { return m_parameter; }
+    InputParameterMutationSource getSource() const { return m_source; }
+
+    DeclRef<AccessorDecl> getAccessor() const
+    {
+        SLANG_RELEASE_ASSERT(m_source != InputParameterMutationSource::DirectStorage);
+        return m_accessor;
+    }
+
+private:
+    explicit StorageExpressionInputParameterMutation(ParamDecl* parameter)
+        : m_parameter(parameter), m_source(InputParameterMutationSource::DirectStorage)
+    {
+        SLANG_RELEASE_ASSERT(parameter);
+    }
+
+    StorageExpressionInputParameterMutation(
+        ParamDecl* parameter,
+        InputParameterMutationSource source,
+        DeclRef<AccessorDecl> accessor)
+        : m_parameter(parameter), m_source(source), m_accessor(accessor)
+    {
+        SLANG_RELEASE_ASSERT(parameter);
+        SLANG_RELEASE_ASSERT(
+            source == InputParameterMutationSource::SetterWriteback ||
+            source == InputParameterMutationSource::AccessorSideEffect);
+        SLANG_RELEASE_ASSERT(accessor);
+    }
+
+    ParamDecl* m_parameter;
+    InputParameterMutationSource m_source;
+    DeclRef<AccessorDecl> m_accessor;
+};
+
+/// The independent outcomes of checking one use of a storage expression.
+struct StorageExpressionAccessResult
+{
+    /// Returns whether every operation needed to evaluate the expression is available and valid.
+    bool canEvaluate() const { return !evaluationFailure; }
+
+    /// Whether the final expression can provide the requested parameter-passing mode.
+    bool canProvideRequestedStorage = true;
+
+    /// Whether `canProvideRequestedStorage` is false because lowering cannot obtain the direct
+    /// address needed to write a projected subobject of abstract storage.
+    bool projectedWriteRequiresUnavailableDirectAddress = false;
+
+    /// The first operation that prevents evaluation, if any.
+    std::optional<StorageExpressionEvaluationFailure> evaluationFailure;
+
+    /// The first mutation of the local copy of an `in` parameter written as `T p`, if any.
+    std::optional<StorageExpressionInputParameterMutation> inputParameterMutation;
+};
+
 struct SemanticsVisitor : public SemanticsContext
 {
     typedef SemanticsContext Super;
@@ -2213,11 +2464,20 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
-    /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
-    /// references an outer-scope variable that needs to be captured into the lambda struct.
-    /// This handles the case where an expression was already checked by the parser's
-    /// two-phase generic disambiguation before the lambda capture context was established.
-    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
+    /// Registers any lambda captures referenced by a checked expression.
+    ///
+    /// The parser can check an expression during generic disambiguation before it establishes the
+    /// surrounding lambda's capture context. Walking the already-checked expression here replaces
+    /// any outer-scope variable references with fields of the synthesized lambda struct. An
+    /// unresolved overload set remains unchanged until overload selection provides a single
+    /// expression path.
+    Expr* maybeRegisterLambdaCaptures(Expr* exprIn);
+
+    /// Checks `expr` but defers lambda-capture rewriting.
+    ///
+    /// Lookup reconstruction may replace an implicit `this` with a type when the selected member
+    /// is static. The caller registers captures only after that final expression path is known.
+    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
 
     Expr* CreateErrorExpr(Expr* expr);
 
@@ -2225,6 +2485,47 @@ public:
 
     // Capture the "base" expression in case this is a member reference
     Expr* GetBaseExpr(Expr* expr);
+
+    /// Returns whether `accessorDeclRef` can evaluate and use `baseExpr` as its receiver.
+    bool canStorageAccessorUseBase(DeclRef<AccessorDecl> accessorDeclRef, Expr* baseExpr);
+
+    /// Analyzes the storage operations required to use `expr` with parameter-passing mode `mode`.
+    ///
+    /// The analysis follows the expression's projections, selects the same accessor operations as
+    /// lowering, validates the receiver of each selected accessor, and records mutations that would
+    /// be discarded because they target the local copy of an `in` parameter written as `T p`.
+    StorageExpressionAccessResult analyzeStorageExpressionAccess(Expr* expr, ParamPassingMode mode);
+
+    /// Checks one use of `expr` and diagnoses failures caused while evaluating its storage path.
+    ///
+    /// The caller remains responsible for diagnosing whether the final expression can provide
+    /// `mode`, because that diagnostic depends on whether the use is an argument, assignment, or
+    /// method receiver.
+    StorageExpressionAccessResult checkStorageExpressionAccess(
+        Expr* expr,
+        ParamPassingMode mode,
+        SourceLoc location);
+
+    /// Checks the storage operations needed to evaluate `expr` as an ordinary value.
+    void checkStorageExpressionValue(Expr* expr);
+
+    /// Returns whether an aggressive address request for `expr` selects a `ref` accessor.
+    bool willStorageExpressionAddressUseRefAccessor(Expr* expr);
+
+    /// Extracts the abstract storage declaration and receiver from a property or subscript
+    /// reference. Returns false for expressions that do not directly name abstract storage.
+    bool tryGetStorageReference(
+        Expr* expr,
+        DeclRef<ContainerDecl>& outStorageDeclRef,
+        Expr*& outBaseExpr);
+
+    /// Returns the base storage expression and how reads or writes of `expr` propagate to it.
+    ///
+    /// The returned classification distinguishes projections that support whole-value
+    /// read-modify-write from those that require an address, and expressions whose evaluation only
+    /// reads the base to identify independent storage. Properties and user-defined subscripts
+    /// return null because their accessor plans are handled separately.
+    Expr* tryGetStorageExpressionBase(Expr* expr, StorageExpressionBaseAccess& outAccess);
 
     /// Validate a declaration to ensure that it doesn't introduce a circularly-defined constant
     ///
@@ -2285,6 +2586,23 @@ public:
 
 
     BuiltinConversionKind getImplicitConversionBuiltinKind(Decl* decl);
+
+    /// Classifies an implicit cast for writable-argument lowering and diagnostics.
+    enum class WritableArgumentImplicitCastKind
+    {
+        UnsupportedTypePair,
+        UnsupportedConversion,
+        ReversibleIntrinsicConversion,
+    };
+
+    /// Returns how writable-argument lowering can handle `castExpr`.
+    ///
+    /// Lowering implements same-width integer scalar, vector, and matrix conversions by creating a
+    /// temporary and casting it back after the call. That transformation may replace only an
+    /// intrinsic conversion whose semantics it preserves; replacing a user-defined initializer
+    /// would silently discard the initializer body.
+    WritableArgumentImplicitCastKind classifyImplicitCastForWritableArgument(
+        ImplicitCastExpr* castExpr);
 
     bool isEffectivelyScalarForInitializerLists(Type* type);
 
@@ -2404,6 +2722,11 @@ public:
     /// via a user-definition.
     /// (3) `nullptr` to signify that the case is unhandled and should be handled
     ///
+    /// When `ioSourceAccess` is non-null, the caller initializes it to `NeedsFallbackCheck`. A
+    /// materialized coercion changes it to `Access` after reporting its precise source access, or
+    /// to `NoAccess` when it deliberately does not evaluate the source. Leaving it unchanged tells
+    /// the caller to apply the enclosing operation's fallback check.
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -2412,7 +2735,12 @@ public:
         Expr* fromExpr,
         DiagnosticSink* sink,
         ConversionCost* outCost,
-        TypeCoercionWitness** outWitnessOfConversion);
+        TypeCoercionWitness** outWitnessOfConversion,
+        CoercionSourceAccess* ioSourceAccess = nullptr);
+
+    /// Records a coercion producer's direct value read unless a nested conversion already reported
+    /// a more specific source access.
+    void _recordCoercionSourceValueAccess(Expr* sourceExpr, CoercionSourceAccess* ioSourceAccess);
 
     /// Determine whether an unscoped enum may implicitly convert to the builtin
     /// scalar type `toType`. This is an HLSL-compatibility widening: it holds
@@ -2444,8 +2772,21 @@ public:
     ///
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
+    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible.
+    ///
+    /// Ordinary value conversions check the source as an `In` use. A coercion with its own
+    /// source-evaluation boundary instead reports the precise access it performs. A caller can
+    /// skip the ordinary fallback when it will validate the enclosing operation directly.
+    /// `outSourceAccess` reports whether coercion left the access for its caller, identified a more
+    /// precise expression and mode, or deliberately performed no source access. With `Skip`, an
+    /// ordinary coercion leaves the fallback check to its caller.
+    Expr* coerce(
+        CoercionSite site,
+        Type* toType,
+        Expr* fromExpr,
+        DiagnosticSink* sink,
+        CoercionSourceAccessCheck sourceAccessCheck = CoercionSourceAccessCheck::CheckAsValue,
+        CoercionSourceAccess* outSourceAccess = nullptr);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -3212,24 +3553,25 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
-    /// Compute the effective `this` parameter information for `decl`, if it has one.
+    /// Computes the effective `this` parameter information for `decl`, if it has one.
     ///
     /// This operation is only used while advancing a declaration to
-    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code should use the queries
-    /// below so that it reads the information attached to the declaration. A `this` expression in
-    /// the declaration's own signature is the exception: it needs this computation before the
-    /// transition can finish, but leaves diagnostics to the final call that publishes the result.
-    std::optional<ParamInfo> checkEffectiveThisParamInfo(
-        Decl* decl,
-        bool shouldDiagnoseModeAttributes);
+    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code reads the result attached
+    /// to the declaration by `checkAndAttachEffectiveThisParamInfo`.
+    std::optional<ParamInfo> checkEffectiveThisParamInfo(Decl* decl);
 
-    /// Compute and attach the effective `this` parameter information owned by `decl`.
+    /// Computes and attaches the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);
 
-    /// Return the effective `this` parameter information for `decl`, if it has one.
+    /// Returns the effective `this` parameter information for `decl`, if it has one.
     ///
-    /// These wrappers first ensure that the declaration has completed signature checking. The
-    /// underlying passive queries assert that precondition themselves.
+    /// This operation normally advances `decl` through `SignatureChecked` before reading the
+    /// attached `ThisParamInfoAttribute`. While a callable's signature is being checked, one of its
+    /// parameter or result type expressions can refer to `this`. Advancing that same declaration
+    /// again would recursively restart its signature check, so the direct-declaration case reads
+    /// the attribute that `checkAndAttachEffectiveThisParamInfo` attached before checking the rest
+    /// of the signature. A callable-as-type lookup can delegate to another declaration, so that
+    /// case advances both declarations before reading the attribute.
     std::optional<ParamInfo> findEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
     ParamInfo getEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
 
@@ -3743,6 +4085,35 @@ public:
 
         Expr* baseExpr = nullptr;
 
+        /// Whether selected-candidate completion may account for argument storage access.
+        ///
+        /// A conversion cost probe disables this policy because it has no committed expression.
+        /// Ordinary calls and materialized conversions enable it even when diagnostics are
+        /// disabled, because an enclosing operation can still request the resulting access.
+        bool mayAccountForArgumentStorageAccess = true;
+
+        /// Whether this candidate completion must account for its arguments' storage access.
+        ///
+        /// Candidate completion also coerces speculative candidates. Only the selected candidate
+        /// reaches this state. An ordinary call validates access immediately; a user-defined
+        /// conversion records it in `outSourceAccess` for its enclosing coercion to validate.
+        bool shouldAccountForArgumentStorageAccess = false;
+
+        /// Receives how coercion accounted for the sole source argument of a user-defined
+        /// conversion.
+        ///
+        /// Ordinary calls leave this null. Conversion overload resolution supplies one result
+        /// because it always has exactly one source argument.
+        CoercionSourceAccess* outSourceAccess = nullptr;
+
+        void recordSourceAccess(const CoercionSourceAccess& sourceAccess)
+        {
+            if (!outSourceAccess)
+                return;
+            SLANG_RELEASE_ASSERT(argCount == 1);
+            *outSourceAccess = sourceAccess;
+        }
+
         // Are we still trying out candidates, or are we
         // checking the chosen one for real?
         Mode mode = Mode::JustTrying;
@@ -3798,19 +4169,15 @@ public:
         OverloadResolveContext& context,
         OverloadCandidate& candidate);
 
-    bool TryCheckOverloadCandidateDirections(
-        OverloadResolveContext& /*context*/,
-        OverloadCandidate const& /*candidate*/
-    );
-
-    /// Check if the given `expr` refers to an `in` function
-    /// parameter, or part of one (through field reference, etc.).
+    /// Validates the reconstructed receiver of the selected callable.
     ///
-    /// If the expression refers into a parameter, returns
-    /// the declaration of the parameter. Otherwise returns
-    /// null.
-    ///
-    ParamDecl* isReferenceIntoFunctionInputParameter(Expr* expr);
+    /// Lookup records only whether a value receiver exists. After overload resolution selects one
+    /// callable, this operation analyzes the complete receiver storage path using the callable's
+    /// checked receiver mode. Failure can mean that an intermediate accessor cannot use its own
+    /// receiver, or that the final expression cannot provide the requested storage. A writable call
+    /// rooted in an `in` parameter passes validation, but discarded mutation is diagnosed as a
+    /// warning for copyable inputs and an error for non-copyable inputs.
+    bool checkSelectedCallableReceiver(OverloadResolveContext& context, Expr* callableExpr);
 
     // Create a witness that attests to the fact that `type`
     // is equal to itself.
@@ -3835,13 +4202,17 @@ public:
     // Create the representation of a given generic applied to some arguments
     Expr* createGenericDeclRef(Expr* baseExpr, Expr* originalExpr, SubstitutionSet substSet);
 
-    // Take an overload candidate that previously got through
-    // `TryCheckOverloadCandidate` above, and try to finish
-    // up the work and turn it into a real expression.
+    // This operation turns a candidate accepted by `TryCheckOverloadCandidate` into an expression.
+    // `completionMode` distinguishes the selected callable, which runs receiver validation and
+    // capture rewriting, from an expression retained in an unresolved overload set. Callers omit
+    // the argument for the selected case; the retained case must be explicit.
     //
-    // If the candidate isn't actually applicable, this is
-    // where we'd start reporting the issue(s).
-    Expr* CompleteOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
+    // If completion discovers that the candidate is inapplicable, the error path emits its
+    // diagnostics.
+    Expr* CompleteOverloadCandidate(
+        OverloadResolveContext& context,
+        OverloadCandidate& candidate,
+        OverloadCandidateCompletionMode completionMode = OverloadCandidateCompletionMode::Selected);
 
     // Implement a comparison operation between overload candidates,
     // so that the better candidate compares as less-than the other
@@ -4228,7 +4599,36 @@ public:
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
 
-    bool createInvokeExprForSynthesizedCtor(
+    /// Describes whether synthesized-constructor handling owns an initializer-list coercion.
+    enum class SynthesizedConstructorCoercionResult
+    {
+        /// No synthesized constructor owns this coercion, so the caller may try other forms.
+        NotApplicable,
+
+        /// The synthesized constructor accepted the initializer list.
+        Succeeded,
+
+        /// A non-C-style struct owns the initializer list but cannot accept it.
+        Rejected,
+    };
+
+    /// Attempts to coerce an initializer list through a struct's synthesized constructor.
+    ///
+    /// A non-null `outExpr` requests the checked conversion expression. On `Succeeded`, the
+    /// function stores the synthesized-constructor invocation. On `Rejected`, it diagnoses the
+    /// invalid initializer-list form and stores an error expression so that the caller does not
+    /// retry the list as a legacy aggregate initialization.
+    ///
+    /// A null `outExpr` probes whether the conversion is viable without emitting diagnostics. The
+    /// function still returns `Succeeded` when the constructor matches, but it does not store an
+    /// expression.
+    ///
+    /// `NotApplicable` means that no synthesized constructor owns the conversion and the caller may
+    /// try the legacy initializer-list rules. `Succeeded` means the synthesized constructor
+    /// accepted the list. `Rejected` means a non-C-style struct owned the list but could not accept
+    /// it, either because no synthesized constructor was available or because its constructor
+    /// rejected the arguments. The caller must not try the legacy rules.
+    SynthesizedConstructorCoercionResult createInvokeExprForSynthesizedCtor(
         Type* toType,
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
@@ -4445,14 +4845,18 @@ private:
     // type. Each operand is converted to its *own* shape with the common element base (so e.g. a
     // `vector * scalar` stays a two-shape operation that backends can lower to a vector-times-
     // scalar instruction). `outLeftArg`/`outRightArg` receive the (possibly coerced) operand
-    // expressions. Operands that are already the same type are returned unchanged. Returns null
-    // when the operands are not broadcast-compatible builtin numeric types or a coercion fails,
-    // signalling that the fast-path conversion should be abandoned.
+    // expressions. Operands that are already the same type are returned unchanged. Each
+    // `out*SourceAccess` value says whether coercion identified a precise access, performed no
+    // source access, or left the ordinary value check to the caller. Returns null when the operands
+    // are not broadcast-compatible builtin numeric types or a coercion fails, signalling that the
+    // fast-path conversion should be abandoned.
     Type* coerceOperandsOfBuiltinBinaryExpr(
         Expr* leftArg,
         Expr* rightArg,
         Expr*& outLeftArg,
-        Expr*& outRightArg);
+        Expr*& outRightArg,
+        CoercionSourceAccess& outLeftSourceAccess,
+        CoercionSourceAccess& outRightSourceAccess);
 
     /// The scalar family (integer, floating-point, or boolean) that an operand element type is
     /// known to belong to for the purposes of the builtin-operator fast path. All three fields

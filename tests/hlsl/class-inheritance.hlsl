@@ -7,14 +7,14 @@
 // An HLSL class must satisfy a generic constraint through the same checking as a struct.
 interface IGetValue
 {
-    int getValue();
+    int getValue() const;
 }
 
 class Element : IGetValue
 {
     int value;
 
-    int getValue()
+    int getValue() const
     {
         return value;
     }

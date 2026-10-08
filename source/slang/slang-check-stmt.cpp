@@ -88,7 +88,7 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
     if (auto varDecl = as<VarDeclBase>(decl))
     {
         if (varDecl->initExpr)
-            varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
+            varDecl->initExpr = maybeRegisterLambdaCaptures(varDecl->initExpr);
     }
 }
 
@@ -292,7 +292,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = maybeRegisterLambdaCapture(e);
+    e = maybeRegisterLambdaCaptures(e);
     e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
@@ -325,6 +325,7 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         SemanticsContext sideEffectContext = withInForLoopSideEffect();
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+        subExprVisitor.checkStorageExpressionValue(stmt->sideEffectExpression);
 
         // A `for` loop's side-effect expression also discards its result.
         maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
@@ -434,6 +435,7 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     WithOuterStmt subContext(this, stmt);
 
     stmt->condition = CheckExpr(stmt->condition);
+    checkStorageExpressionValue(stmt->condition);
 
     // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
     // lowering; skip when the condition already failed to check to avoid a cascade.
@@ -550,7 +552,11 @@ void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
     for (auto& arg : stmt->args)
+    {
         arg = subContext.CheckExpr(arg);
+        if (!as<TypeType>(arg->type.type))
+            subContext.checkStorageExpressionValue(arg);
+    }
 }
 
 void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
@@ -624,6 +630,10 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
                 stmt->expression =
                     coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
             }
+            else
+            {
+                checkStorageExpressionValue(stmt->expression);
+            }
         }
     }
     if (m_parentLambdaDecl)
@@ -666,6 +676,7 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
+    checkStorageExpressionValue(stmt->expression);
     Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
     auto parentFunc = getParentFunc();
@@ -714,6 +725,7 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
+    checkStorageExpressionValue(stmt->expression);
     // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
     // comparison may be either a resolved `operator==` call or a builtin fast-path
     // `BuiltinOperatorExpr` (the common scalar case).
@@ -1122,7 +1134,9 @@ void SemanticsStmtVisitor::checkLoopInDifferentiableFunc(Stmt* stmt)
 void SemanticsStmtVisitor::visitGpuForeachStmt(GpuForeachStmt* stmt)
 {
     stmt->device = CheckExpr(stmt->device);
+    checkStorageExpressionValue(stmt->device);
     stmt->gridDims = CheckExpr(stmt->gridDims);
+    checkStorageExpressionValue(stmt->gridDims);
     ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::DefinitionChecked, this);
     WithOuterStmt subContext(this, stmt);
     stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);

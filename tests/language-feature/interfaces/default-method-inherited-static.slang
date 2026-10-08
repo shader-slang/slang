@@ -39,8 +39,9 @@ struct Value : IDerived
 
 T combine<T : IBase>(T left, T right)
 {
-    left.combineInPlace(right);
-    return left;
+    T result = left;
+    result.combineInPlace(right);
+    return result;
 }
 
 // SPV: OpEntryPoint

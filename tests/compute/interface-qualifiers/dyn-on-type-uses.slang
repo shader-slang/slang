@@ -44,7 +44,7 @@ dyn interface interface3
 	}
 };
 
-// `dyn` interfaces must not define any mutating methods
+// `dyn` interfaces must not define methods with writable receivers
 // CHECK_2026-DAG: error[E33075]
 dyn interface interface4
 {

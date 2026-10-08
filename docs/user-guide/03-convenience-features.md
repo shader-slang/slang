@@ -114,9 +114,10 @@ using namespace ns1.ns2; // alternative syntax.
 void test() { f(); } // OK.
 ```
 
-## Member functions
+## Methods
 
-Slang supports defining member functions in `struct`s. For example, it is allowed to write:
+Slang lets a type declare methods.
+For example, a `struct` can declare a method that operates on an instance of that type:
 
 ```slang
 struct Foo
@@ -128,14 +129,14 @@ struct Foo
 }
 ```
 
-You can use the `.` syntax to invoke member functions:
+Use `.` to invoke a method:
 
 ```slang
 Foo foo;
 int rs = foo.compute(1,2);
 ```
 
-Slang also supports static member functions. For example:
+Slang also supports static methods:
 
 ```slang
 struct Foo
@@ -147,7 +148,7 @@ struct Foo
 }
 ```
 
-Static member functions are accessed the same way as other static members, via either the type name or an instance of the type:
+Access a static method in the same way as another static member: through either the type name or an instance of the type.
 
 ```slang
 int rs = Foo.staticMethod(a, b);
@@ -161,9 +162,13 @@ Foo foo;
 int rs = foo.staticMethod(a,b);
 ```
 
-### Mutability of member functions
+### Receiver mutability
 
-For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
+An instance method, or an accessor of an instance property or subscript, has an implicit `this` parameter for the receiver of the member call.
+A module-scope accessor, or an accessor nested in a `static` property or subscript, has no instance receiver.
+
+For a method declared on a value type such as a `struct`, the `this` parameter uses the `in` parameter-passing mode by default and is immutable in the method body.
+Apply `[mutating]` to change the mode to `inout`, which lets the method modify the receiver:
 
 ```slang
 struct Foo
@@ -173,8 +178,7 @@ struct Foo
     [mutating]
     void setCount(int x) { count = x; }
 
-    // This would fail to compile.
-    // void setCount2(int x) { count = x; }
+    int getCount() { return count; }
 }
 
 void test()
@@ -183,6 +187,16 @@ void test()
     f.setCount(1); // Compiles
 }
 ```
+
+Apply `[nonmutating]` to state explicitly that the `this` parameter uses the `in` mode.
+
+The `this` parameter of a `set` accessor declared on a value type uses the `inout` mode by default.
+Apply `[nonmutating]` to a `set` accessor that does not modify the receiver and should instead use the `in` mode.
+
+For a method or accessor declared on a reference type such as a `class`, the `this` parameter always uses the `in` mode.
+Receiver-mode attributes are not allowed on those declarations.
+
+The [HLSL-flavored dialect](a1-06-hlsl-flavored-dialect.md#receiver-mutability) uses HLSL's receiver-mutability syntax and defaults.
 
 ## Properties
 

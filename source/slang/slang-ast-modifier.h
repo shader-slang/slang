@@ -33,6 +33,17 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Represents `const` written after a function parameter list.
+///
+/// Semantic checking interprets this spelling as an explicit mode request for the effective
+/// `this` parameter. A dedicated modifier keeps the spelling distinct from `ConstModifier`, which
+/// represents prefix `const`.
+FIDDLE()
+class CppStyleTrailingThisParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {
@@ -193,8 +204,8 @@ class SynthesizedModifier : public Modifier
 ///
 /// Requirement-witness synthesis creates new declarations after applying substitutions to their
 /// value types. Recomputing a mode from those substituted types can change the ABI promised by the
-/// original declaration. This internal modifier makes the required mode declaration-owned on the
-/// synthesized `ParamDecl`, or on a synthesized callable for its effective `this` parameter.
+/// original declaration. This internal modifier records that fixed mode on the synthesized
+/// `ParamDecl`, or on a synthesized callable for its effective `this` parameter.
 /// Signature checking consumes it before attaching any checked semantic attributes. It has no
 /// source-language spelling.
 FIDDLE()
@@ -1413,9 +1424,8 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
-// A `[mutating]` attribute, which indicates that a member
-// function is allowed to modify things through its `this`
-// argument.
+// A `[mutating]` attribute, which indicates that the `this` parameter of a declaration should have
+// the `inout` parameter-passing mode.
 //
 FIDDLE()
 class MutatingAttribute : public Attribute
@@ -1423,9 +1433,8 @@ class MutatingAttribute : public Attribute
     FIDDLE(...)
 };
 
-// A `[nonmutating]` attribute, which indicates that a
-// `set` accessor does not need to modify anything through
-// its `this` parameter.
+// A `[nonmutating]` attribute, which indicates that the `this` parameter of a declaration should
+// have the `in` parameter-passing mode.
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute

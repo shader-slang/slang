@@ -175,16 +175,16 @@
       "watched_paths_digest": "72a044750f16ee568ed10e5ff69b61b5ea6375face99fa3b5ef2ad7f032543fd"
     },
     "name-resolution/lookup.md": {
-      "generated_at": "2026-09-11T12:40:09+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "2336e319fa15cdc524950d5da1d4ef153c1c96105f931dc9fee17d22569555fa"
+      "generated_at": "2026-10-08T14:15:55+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "efdf7f4eb66432683c1cf2cb5329ad664773feb1",
+      "watched_paths_digest": "75e806be7dea7ab95a3888ba42f7c1fef63533c470f75ec5845b07f0e0ae91d3"
     },
     "name-resolution/overload-resolution.md": {
-      "generated_at": "2026-09-11T12:42:01+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "3430e318c84850ecbd8583883611e931f19649c0511c6ba1b36f13c047335116"
+      "generated_at": "2026-10-08T14:15:56+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "efdf7f4eb66432683c1cf2cb5329ad664773feb1",
+      "watched_paths_digest": "54a148fc17c1a53a8f3e4bef92a3b3f2addcf5dc22d5251469414bbc4d3fcf42"
     },
     "name-resolution/scopes.md": {
       "generated_at": "2026-09-11T12:37:50+00:00",

@@ -13,12 +13,12 @@ Test test;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // test[0,0] is not an l-value because `test` is a read-only parameter,
-    // and the `set` accessor is by-default `mutating`, which means that it is
-    // only callable when `test` itself is l-value.
+    // `test` is a read-only parameter, so the subscript's mutating `set` accessor cannot use it as
+    // a receiver. Diagnose that selected accessor rather than only classifying the expression as a
+    // non-l-value.
 
     test[0,0] = 1;
-//CHECK:      ^ left of '=' is not an l-value
-//CHECK:      ^ left of '=' is not an l-value.
+//CHECK:      ^ mutating storage accessor cannot be called on an immutable value
+//CHECK:      ^ mutating 'set' accessor cannot be called on an immutable value
 
 }
