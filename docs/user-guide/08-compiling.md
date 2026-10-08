@@ -1184,12 +1184,21 @@ The temporary has the parameter's type.
 For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
 This type selection also applies when the struct contains a resource.
 
-Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
-Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
-The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
-Reading these parameters with `-Gec` does not allocate mutable resource storage.
+The compiler can provide a mutable temporary for one non-combined texture or typed-buffer resource, one sampler state, one structured buffer other than an append or consume buffer, or one byte-address buffer.
+Fixed-size arrays of these resource types are also supported.
+For a resource temporary, assignment changes which bound resource the temporary denotes during the current shader invocation; it does not rebind the original shader parameter.
+An operation through the temporary still accesses the selected resource's contents normally.
+When a target cannot represent the selected resource type in mutable local storage, Slang accepts the temporary only when it can replace the temporary with direct uses of the selected resource.
+Compilation fails if specialization cannot perform that replacement.
+Control-flow merging and operations that expose the temporary's address are common reasons why replacement may not be possible.
+
+A parameter remains an immutable alias when its type or declaration qualifiers require semantics that the mutable temporary cannot preserve.
+The unsupported type forms include explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, structs containing resources, combined texture-sampler types, append and consume buffers, acceleration structures, and `__DynamicResource`.
+A memory-access qualifier such as `globallycoherent` also prevents creation of a mutable shadow.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct because the buffer shadow has that struct type.
+Using any of these parameters with `-Gec` does not allocate mutable storage.
 A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
-If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
+If the linked definition requires unsupported opaque storage or unsized storage, the compiler reports that limitation after linking.
 Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability

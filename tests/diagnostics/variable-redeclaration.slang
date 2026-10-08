@@ -15,9 +15,6 @@ static int gA;
 static Texture2D gA;
 //diag:          ^^ conflicting declaration
 //diag:          ^^ declaration of 'gA' conflicts with existing declaration
-//diag:          ^^ global variable cannot have opaque type
-//diag:          ^^ global variable cannot have opaque type.
-//diag:          ^^ do you intend to define a `uniform` parameter instead?
 
 // Local variables
 

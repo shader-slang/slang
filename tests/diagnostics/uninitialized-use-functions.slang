@@ -104,6 +104,45 @@ void ok_generic_use()
     ordinary_generic(x);
 }
 
+// A generic interface method lowers through an unresolved witness-method specialization while this
+// diagnostic pass runs. Its call-site type still records each parameter direction. We use that
+// signature to classify the first argument as a possible write and the second argument as a read,
+// without requiring a concrete method body.
+interface IGenericWriter
+{
+    __generic<T>
+    void writeOut(out int value, T tag);
+
+    __generic<T>
+    void writeInOut(inout int value, T tag);
+
+    __generic<T>
+    void writeRef(__ref int value, T tag);
+}
+
+__generic<TWriter : IGenericWriter>
+int useGenericInterfaceWriter(TWriter writer)
+{
+    float initializedInput = 0.0;
+
+    float uninitializedInput;
+    int valueFromUninitializedInput;
+    writer.writeOut(valueFromUninitializedInput, uninitializedInput);
+//CHK:             ^ use of uninitialized variable
+//CHK:             ^ use of uninitialized variable 'uninitializedInput'
+
+    int outValue;
+    writer.writeOut(outValue, initializedInput);
+
+    int inOutValue;
+    writer.writeInOut(inOutValue, initializedInput);
+
+    int refValue;
+    writer.writeRef(refValue, initializedInput);
+
+    return outValue + inOutValue + refValue;
+}
+
 // Check proper handling of aliases passed
 void f()
 {

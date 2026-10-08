@@ -351,10 +351,11 @@ class VarDecl : public VarDeclBase
 //
 // Header checking sets the shadow's type from the parameter; for a legacy `cbuffer`, it uses
 // the buffer's element struct. The same type restriction as for mutable `static` globals applies.
-// For an unsupported type, the compiler preserves read access through an immutable alias
-// without allocating unsupported mutable storage. Semantic checking rejects writes through
-// that alias. The shadow retains its computed type on both the mutable and immutable paths.
-// Specialization constants also require immutable aliases so checking can retain their identity.
+// For a type or memory qualifier that a mutable copy cannot preserve, the compiler uses an
+// immutable alias instead of allocating mutable storage. The alias preserves the accesses allowed
+// by the original parameter but cannot be assigned or rebound through the shadow. The shadow
+// retains its computed type on both the mutable and immutable paths. Specialization constants also
+// require immutable aliases so checking can retain their identity.
 //
 // A shadow has no written type or initializer expression. Checking reads the parameter's type,
 // and lowering constructs initialization from its value. Both phases dispatch separately

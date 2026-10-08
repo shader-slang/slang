@@ -131,8 +131,30 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
-// True if inst produces a derived address from another base address.
+/// Return whether `inst` projects a field, element, or pointer-offset address from operand zero.
 bool isAddressInst(IRInst* inst);
+
+/// Return whether the result of `use->getUser()` may transfer a later storage access to or from the
+/// storage supplied through `use`.
+///
+/// This predicate recognizes only operand zero of address projections, pointer-to-pointer casts,
+/// `GetAddress`, `AssumeAddress`, and l-value implicit casts. Address operations and pointer casts
+/// can make a later access through the result affect storage reached from operand zero. The
+/// predicate therefore treats both reads and writes as transferable; a caller that needs an exact
+/// whole-value, subobject, or unknown relation must classify that relation separately.
+/// `InOutImplicitCast` transfers reads into its temporary and writes back to the source;
+/// `OutImplicitCast` transfers only writes back. A caller that does not track direction must treat
+/// every later access conservatively.
+bool doesUserResultTransferStorageAccessFromUse(IRUse* use);
+
+/// Return the function-type operand for the formal parameter corresponding to `argumentUse`, after
+/// removing outer attributed and rate-qualified wrappers. Parameter-direction wrappers such as
+/// `BorrowIn` and `Out` are preserved. A generic type parameter need not derive from `IRType`, so
+/// callers must test the returned instruction for the specific wrapper they need.
+///
+/// Return null when `argumentUse` does not belong to `call`, when the callee's data type is not a
+/// function type, or when that function type has no corresponding parameter.
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
@@ -212,6 +234,50 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
+
+/// Return whether `inst` may inspect operand types but cannot observe operand runtime values.
+///
+/// A value-use analysis may ignore these instructions without treating their operands as read.
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
+
+/// Return whether `type`, after removing attributed and rate wrappers, structurally represents one
+/// resource value rather than an aggregate containing resource values.
+///
+/// This predicate recognizes texture, sampler, structured-buffer, and byte-address-buffer IR
+/// types. It does not recursively inspect arrays, structs, or other aggregate types, and it does
+/// not decide whether a particular resource type is legal in a language construct. An unresolved
+/// type instruction, including `IRSymbolAlias`, does not match.
+bool isSingleResourceValueType(IRInst* type);
+
+/// Return whether `type` is one resource value, or a fixed-size homogeneous array of resource
+/// values, that the per-invocation replacement pass can represent with one local per affected
+/// function and one generated parameter per non-entry-point function with runtime access.
+///
+/// This predicate inspects only the IR type structure. An unresolved type instruction, including
+/// `IRSymbolAlias`, does not match.
+bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type);
+
+/// Return the value type stored by `globalVar`.
+///
+/// The module must have been linked, so removing attributed and rate wrappers from the variable's
+/// data type must expose a concrete pointer type with a type instruction as its pointee. Attributes
+/// on the pointee remain part of the returned type.
+IRType* getGlobalVarValueType(IRGlobalVar* globalVar);
+
+/// Return whether `globalVar` is a candidate for replacing mutable resource state with
+/// function-local storage.
+///
+/// This predicate checks the marker, rate, and value-type conditions that make a global eligible
+/// for further analysis. It does not inspect the global's uses, linkage, or other requirements that
+/// can prevent replacement. The module must have been linked, so the global's pointer and value
+/// types are concrete type instructions rather than unresolved `IRSymbolAlias` instructions.
+bool isResourceGlobalCandidateForPerInvocationReplacement(IRGlobalVar* globalVar);
+
+/// Return whether `func` is a shader entry point or a CUDA kernel.
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func);
+
+/// Return whether generic target assembly supplies any part of `func`'s emitted implementation.
+bool hasGenericAssemblyImplementation(IRFunc* func);
 
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
@@ -672,6 +738,15 @@ IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 // into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
 // group") should peel with this function first, then test the terminal instruction.
 IRInst* peelAddressForwardingOps(IRInst* addr);
+
+/// Return whether `inst` records source-level debug information without affecting execution.
+bool isDebugInfoInst(IRInst* inst);
+
+/// Return whether `op` is a dedicated IR operation that reads resource contents.
+bool doesOpReadResourceContents(IROp op);
+
+/// Return whether `op` directly produces an address into a resource's contents.
+bool doesOpProduceResourceContentAddress(IROp op);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.

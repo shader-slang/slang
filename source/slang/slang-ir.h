@@ -2249,8 +2249,10 @@ public:
     // Adding `UniformParameterShadowVarDecl` shifts the sequential `ASTNodeType` values.
     // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
     // Version 34 is the earliest module version with the updated AST node numbering.
+    // Version 35 adds `IRUninitializedGlobalCheckFoundPossibleWriteDecoration`. Its stable opcode
+    // is appended, so the reader can continue to load version-34 modules.
     const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 34;
+    const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

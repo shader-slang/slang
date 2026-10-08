@@ -90,10 +90,12 @@ void validateVectorsAndMatrices(
 
 /// Reject mutable globals whose linked types require unsupported storage.
 ///
-/// Requires a linked `module` at the pipeline checkpoint after `specializeModule` and before
-/// `legalizeResourceTypes`. Checks file- or namespace-scope `static` variables and uniform
-/// shadows marked with `IRFileOrNamespaceScopeStaticVarDecoration`. Returns `false` after
-/// diagnosing any such variable that contains opaque values or unsized arrays by value.
+/// `module` must be linked and at the pipeline checkpoint after `specializeModule` and before
+/// `legalizeResourceTypes`. The operation checks mutable `static` variables declared at file or
+/// namespace scope and mutable uniform-parameter shadows synthesized for `-Gec`; AST-to-IR lowering
+/// marks both with `IRFileOrNamespaceScopeMutableVarDecoration`. Return `false` after diagnosing a
+/// marked variable whose linked type contains an opaque value for which per-invocation resource
+/// replacement is unavailable, or an unsized array stored by value.
 bool validateMutableGlobalVariableTypes(IRModule* module, DiagnosticSink* sink);
 
 bool validateStructuredBufferResourceTypes(

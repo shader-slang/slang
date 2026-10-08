@@ -81,6 +81,70 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type)
     return findUnstorableOpaqueHandleType(type, visited);
 }
 
+/// Return the innermost element type stored by a local variable after removing attributed wrappers
+/// and homogeneous arrays.
+//
+// We do not inspect record fields because type legalization has already separated resources from
+// programmer-declared aggregates before this check runs. Metal's `introduceExplicitGlobalContext`
+// pass also creates a compiler-owned `KernelContext` local whose resource fields are valid in that
+// record.
+static IRType* getInnermostHomogeneousArrayElementType(IRType* type)
+{
+    type = as<IRType>(unwrapAttributedType(type));
+    SLANG_RELEASE_ASSERT(type);
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        type = as<IRType>(unwrapAttributedType(arrayType->getElementType()));
+        SLANG_RELEASE_ASSERT(type);
+    }
+    return type;
+}
+
+/// Find a resource type supported by per-invocation replacement that DXBC or DXIL cannot represent
+/// in mutable local storage.
+//
+// We descend through array layers because the downstream D3D compilers reject the local when its
+// innermost element has an affected resource type. We then reuse the replacement predicate to
+// recognize the resource categories supported by per-invocation replacement.
+static IRType* findD3DUnsupportedLocalStorageType(IRType* type)
+{
+    type = getInnermostHomogeneousArrayElementType(type);
+    if (isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(type))
+        return type;
+    return nullptr;
+}
+
+/// Find a resource or sampler type that Metal cannot place in mutable local storage.
+//
+// Metal rejects a resource or sampler stored directly in `thread` storage. It permits a fixed-size
+// array with a resource or sampler as its immediate element. The `transformParamsToConstRef` pass
+// uses this allowed form when a caller cannot supply an immutable address for a by-value array
+// argument. It copies the argument into a local array and passes that array to the callee. An
+// unsized array has no fixed amount of local storage. The current Metal storage contract permits
+// exactly one fixed-size array layer and rejects nested arrays. For unsized and nested arrays, we
+// inspect the innermost element. A resource or sampler element makes the local storage invalid. We
+// remove attributed-type wrappers because they do not change the storage representation.
+//
+// TODO: Compile generated nested-array locals with metallib, and permit that form if the backend
+// accepts its emitted representation.
+static IRType* findMetalUnsupportedLocalStorageType(IRType* type)
+{
+    auto storageType = as<IRType>(unwrapAttributedType(type));
+    SLANG_RELEASE_ASSERT(storageType);
+    if (auto arrayType = as<IRArrayType>(storageType))
+    {
+        auto elementType = as<IRType>(unwrapAttributedType(arrayType->getElementType()));
+        SLANG_RELEASE_ASSERT(elementType);
+        if (as<IRResourceTypeBase>(elementType) || as<IRSamplerStateTypeBase>(elementType))
+            return nullptr;
+    }
+
+    type = getInnermostHomogeneousArrayElementType(storageType);
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+        return type;
+    return nullptr;
+}
+
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
 // implemented in terms of the Slang core runtime (`Slang::String`), which is
 // available for host C++ output and for the LLVM-backed CPU path, but not in the
@@ -176,15 +240,29 @@ static bool instReferencesStringType(IRInst* inst)
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
-    // image/sampler/subpass/acceleration-structure handle in a function-local
-    // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, GLSL
-    // likewise forbids opaque-typed locals, and WGSL requires handle-address-space
-    // variables (textures/samplers) to be module-scope. A local variable of one
-    // of those types reaching here is invalid output we cannot legalize yet
-    // (issue #10526, typically from selecting or returning a resource through
-    // control flow); reject it with a diagnostic rather than emitting invalid code.
-    const bool rejectOpaqueLocals = isKhronosTarget(target) || isWGPUTarget(target);
+    // We perform four independent checks. We diagnose unsupported function-typed values,
+    // `GetArrayLength`, target-specific opaque local storage and default construction, and `String`
+    // values on kernel C++ or CUDA targets. We establish the target rules first, then scan the
+    // function parameters and instructions once.
+
+    // Resource specialization and SSA simplification run before this check. A resource value may
+    // remain as an SSA instruction, which needs no local storage, or phi elimination may place it
+    // in an `IRVar`. SPIR-V, GLSL, WGSL, DXBC, DXIL, and Metal cannot represent particular resource
+    // types in that local storage. The HLSL emitter can print the local without losing information,
+    // so we allow HLSL source emission and let the compiler that receives that source decide
+    // whether to accept it.
+    const bool shouldUseKhronosOrWGSLOpaqueDiagnostic =
+        isKhronosTarget(target) || isWGPUTarget(target);
+    const bool shouldUseD3DOpaqueDiagnostic =
+        isD3DTarget(target) && target->getTarget() != CodeGenTarget::HLSL;
+    const bool shouldRejectOpaqueLocalStorage = shouldUseKhronosOrWGSLOpaqueDiagnostic ||
+                                                shouldUseD3DOpaqueDiagnostic ||
+                                                isMetalTarget(target);
+
+    // Several unsupported locals can carry the same source location. We report only one
+    // D3D or Metal error at each location so that the user does not receive duplicate diagnostics
+    // there. The location is only a presentation key; it does not identify the IR instruction.
+    HashSet<SourceLoc::RawValue> diagnosedOpaqueLocalStorageLocations;
 
     // The `String` type has no runtime representation in kernel C++/CUDA output;
     // a use there (e.g. `let s : String = "1"; s.getLength();`) would otherwise
@@ -229,24 +307,55 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             case kIROp_Var:
-                if (rejectOpaqueLocals)
+                if (shouldRejectOpaqueLocalStorage)
                 {
-                    auto valueType = as<IRVar>(inst)->getDataType()->getValueType();
-                    if (auto handleType = findUnstorableOpaqueHandleType(valueType))
+                    auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(inst->getDataType()));
+                    SLANG_RELEASE_ASSERT(pointerType);
+                    auto valueType = pointerType->getValueType();
+                    SLANG_RELEASE_ASSERT(valueType);
+                    IRType* opaqueType = nullptr;
+                    if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
+                        opaqueType = findUnstorableOpaqueHandleType(valueType);
+                    else if (shouldUseD3DOpaqueDiagnostic)
+                        opaqueType = findD3DUnsupportedLocalStorageType(valueType);
+                    else
+                        opaqueType = findMetalUnsupportedLocalStorageType(valueType);
+
+                    if (opaqueType)
                     {
-                        // The variable is usually synthesized (e.g. by phi
-                        // elimination) and has no source location of its own, so
-                        // fall back to the location of a use.
+                        // A synthesized variable, such as one created by phi elimination, may have
+                        // no source location. In that case we report the first operation that uses
+                        // the storage so that the diagnostic still identifies relevant user code.
                         auto loc =
                             inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-                        sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
-                            .type = handleType,
-                            .location = loc});
+                        if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
+                        {
+                            sink->diagnose(
+                                Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
+                                    .type = opaqueType,
+                                    .location = loc});
+                        }
+                        else
+                        {
+                            bool shouldDiagnose = !loc.isValid();
+                            if (loc.isValid())
+                            {
+                                shouldDiagnose =
+                                    diagnosedOpaqueLocalStorageLocations.add(loc.getRaw());
+                            }
+                            if (shouldDiagnose)
+                            {
+                                sink->diagnose(Diagnostics::OpaqueLocalStorageNotSupportedForTarget{
+                                    .type = opaqueType,
+                                    .target = target->getTarget(),
+                                    .location = loc});
+                            }
+                        }
                     }
                 }
                 break;
             case kIROp_DefaultConstruct:
-                if (rejectOpaqueLocals)
+                if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
                 {
                     // There is no default/zero value for an opaque handle (an
                     // image/sampler/subpass/acceleration-structure has no bit

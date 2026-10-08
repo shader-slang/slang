@@ -6,10 +6,19 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
 {
+
+// `specializeResourceUsage` prepares resource-valued function inputs and outputs for target
+// emission. We first specialize call sites whose resource arguments or results have a target-
+// supported form. When callers cannot reconstruct a resource output, we try to inline direct calls
+// to the nonrecursive callee, simplify after a successful attempt, and retry specialization. Once
+// that step makes no more progress, D3D targets also try to inline a nonrecursive call when a
+// resource argument has no HLSL form that the emitter can pass directly. Each successful inlining
+// or specialization round is followed by simplification before the process repeats.
 
 // True for the texture access modes that lower to writable surface accesses
 // (RW / write-only / rasterizer-ordered). Read-only (sampled) and sampler-feedback
@@ -29,6 +38,64 @@ static bool isWritableTextureType(IRType* type)
     default:
         return false;
     }
+}
+
+/// Return whether `type` can require D3D resource-input inlining.
+//
+// Resource-global replacement and a resource local lowered from a declaration in the input program
+// can both produce the same `IRLoad` argument. D3D legality depends on that IR form rather than the
+// local's origin. We reuse the replacement pass's type contract to bound the policy without
+// extending it to unrelated parameter-group or resource forms.
+static bool isD3DResourceInputInliningCandidateType(IRType* type)
+{
+    return isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(type);
+}
+
+/// Return whether following direct calls from `func` can reach `target`.
+//
+// Once we have searched every path from a function without reaching `target`, revisiting that
+// function through a cycle cannot reveal a new path. Calls through function values are not
+// candidates for either inlining step, so the same direct-call graph is the relevant
+// graph for this test.
+static bool canReachFunctionThroughDirectCalls(
+    IRFunc* func,
+    IRFunc* target,
+    HashSet<IRFunc*>& visitedFuncs)
+{
+    if (!visitedFuncs.add(func))
+        return false;
+
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            auto call = as<IRCall>(inst);
+            auto callee = call ? as<IRFunc>(call->getCallee()) : nullptr;
+            if (!callee || !callee->isDefinition())
+                continue;
+            if (callee == target)
+                return true;
+            if (canReachFunctionThroughDirectCalls(callee, target, visitedFuncs))
+                return true;
+        }
+    }
+    return false;
+}
+
+/// Return whether `func` belongs to a cycle in the current direct-call graph.
+//
+// The resource-output and D3D resource-input inlining steps rescan the module after a successful
+// change. If a selected callee is recursive, inlining an external call copies another call into the
+// same cycle, and every retry can repeat that expansion. Resource-output specialization can also
+// inspect callees recursively before it reaches either inlining step. We therefore exclude
+// recursive functions from output specialization and both inliners. We query the current graph at
+// each decision because parameter specialization can create new functions and new cycles during
+// this pass. GPU targets normally diagnose recursion before this pass; this exclusion also
+// guarantees termination when non-essential validation is disabled.
+static bool isFunctionRecursive(IRFunc* func)
+{
+    HashSet<IRFunc*> visitedFuncs;
+    return func->isDefinition() && canReachFunctionThroughDirectCalls(func, func, visitedFuncs);
 }
 
 struct ResourceParameterSpecializationCondition : FunctionCallSpecializeCondition
@@ -131,8 +198,18 @@ bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* modu
     return result;
 }
 
-void inlineAllCallsOfFunction(IRFunc* func)
+/// Try to inline each direct call to a nonrecursive `func` and return whether any call was changed.
+//
+// Resource-output specialization records a function when it cannot describe the function's
+// resource return or output parameter in a form that callers can reconstruct. Inlining each direct
+// call moves that computation into the caller, where SSA simplification can remove intermediate
+// storage.
+static bool tryInlineDirectCallsOfNonrecursiveFunction(IRFunc* func)
 {
+    if (isFunctionRecursive(func))
+        return false;
+
+    bool changed = false;
     traverseUses(
         func,
         [&](IRUse* use)
@@ -143,8 +220,156 @@ void inlineAllCallsOfFunction(IRFunc* func)
                 return;
             if (call->getCallee() != func)
                 return;
-            inlineCall(call);
+            changed |= inlineCall(call);
         });
+    return changed;
+}
+
+/// Return whether `argument` is an ordinary parameter of the function that contains `call`.
+//
+// HLSL permits one function to forward a resource parameter to another function. An `IRParam` on a
+// later block has a different meaning: it merges values selected by control flow and may therefore
+// represent several resource bindings. We accept only parameters on the caller's entry block.
+static bool isResourceArgumentForwardedFromCallerParameter(IRCall* call, IRInst* argument)
+{
+    auto argumentParameter = as<IRParam>(argument);
+    if (!argumentParameter)
+        return false;
+
+    auto caller = getParentFunc(call);
+    if (!caller)
+        return false;
+
+    return argumentParameter->getParent() == caller->getFirstBlock();
+}
+
+/// Return whether `call` is eligible for an inlining attempt that may eliminate an unsupported D3D
+/// resource argument.
+//
+// Consider this source-level shape after a mutable resource global is replaced with per-entry
+// storage:
+//
+//     Texture2D selected = ResourceDescriptorHeap[index];
+//     return loadSelected(selected);
+//
+// HLSL can pass certain resource expressions directly, including global parameters, indexed
+// global resource arrays, and descriptor-heap conversions. Lowering represents the argument above
+// as an `IRLoad` from the generated entry-point `IRVar`, so it no longer has one of those
+// recognized forms. We inline `loadSelected` and let SSA simplification substitute the
+// descriptor-heap conversion at each use.
+static bool isD3DCallEligibleForResourceInputInlining(
+    CodeGenContext* codeGenContext,
+    ResourceParameterSpecializationCondition& specializationCondition,
+    IRCall* call)
+{
+    auto callee = as<IRFunc>(call->getCallee());
+    if (!callee || !callee->isDefinition())
+        return false;
+
+    // A target-intrinsic decoration selects emitted code in place of the IR body. Inlining that
+    // body would silently discard the selected implementation.
+    UnownedStringSlice targetIntrinsicDefinition;
+    IRInst* targetIntrinsicInst = nullptr;
+    if (findTargetIntrinsicDefinition(
+            callee,
+            codeGenContext->getTargetReq()->getTargetCaps(),
+            targetIntrinsicDefinition,
+            targetIntrinsicInst))
+    {
+        return false;
+    }
+
+    // Generic assembly supplies the emitted implementation instead of an ordinary IR body.
+    // `inlineCall` cannot inline such a function. We leave the call unchanged so that the late
+    // check can diagnose its argument if unsupported mutable storage survives.
+    if (hasGenericAssemblyImplementation(callee))
+        return false;
+
+    UInt argumentIndex = 0;
+    for (auto parameter : callee->getParams())
+    {
+        SLANG_ASSERT(argumentIndex < call->getArgCount());
+        auto argument = call->getArg(argumentIndex++);
+
+        // D3D can pass a resource argument when it is forwarded from the caller's own parameter or
+        // when `isParamSuitableForSpecialization` recognizes its IR form. We inline only a by-value
+        // resource argument that satisfies neither condition.
+        if (!isD3DResourceInputInliningCandidateType(parameter->getDataType()))
+            continue;
+        if (specializationCondition.isParamSuitableForSpecialization(parameter, argument) ||
+            isResourceArgumentForwardedFromCallerParameter(call, argument))
+        {
+            continue;
+        }
+
+        // Inlining a recursive callee would copy another call from the same cycle. Ordinary
+        // validation diagnoses that cycle before specialization; when validation is disabled,
+        // leaving the call unchanged still guarantees that this inlining step terminates.
+        return !isFunctionRecursive(callee);
+    }
+    return false;
+}
+
+/// Collect each direct D3D call eligible for resource-input inlining.
+//
+// We collect before mutating the IR because inlining can add blocks and clone calls. The outer
+// fixed-point loop rescans the resulting module after simplification, so calls introduced by one
+// inlining step are considered on the next iteration.
+static void collectD3DCallsEligibleForResourceInputInlining(
+    CodeGenContext* codeGenContext,
+    ResourceParameterSpecializationCondition& specializationCondition,
+    IRInst* inst,
+    List<IRCall*>& outCalls)
+{
+    if (auto call = as<IRCall>(inst))
+    {
+        if (isD3DCallEligibleForResourceInputInlining(
+                codeGenContext,
+                specializationCondition,
+                call))
+        {
+            outCalls.add(call);
+        }
+    }
+
+    for (auto child : inst->getChildren())
+    {
+        collectD3DCallsEligibleForResourceInputInlining(
+            codeGenContext,
+            specializationCondition,
+            child,
+            outCalls);
+    }
+}
+
+/// Try to inline eligible D3D calls whose resource arguments cannot be emitted directly as HLSL.
+//
+// We return whether at least one call was inlined. Calls that `inlineCall` cannot transform remain
+// unchanged.
+static bool tryInlineD3DCallsWithUnsupportedResourceInputs(
+    CodeGenContext* codeGenContext,
+    IRModule* module)
+{
+    if (!isD3DTarget(codeGenContext->getTargetReq()))
+        return false;
+
+    ResourceParameterSpecializationCondition specializationCondition;
+    specializationCondition.targetProgram = codeGenContext->getTargetProgram();
+    specializationCondition.targetRequest = codeGenContext->getTargetReq();
+
+    List<IRCall*> callsToInline;
+    collectD3DCallsEligibleForResourceInputInlining(
+        codeGenContext,
+        specializationCondition,
+        module->getModuleInst(),
+        callsToInline);
+
+    bool changed = false;
+    for (auto call : callsToInline)
+    {
+        changed |= inlineCall(call);
+    }
+    return changed;
 }
 
 /// A pass to specialize resource-typed function outputs
@@ -212,6 +437,14 @@ struct ResourceOutputSpecializationPass
         // the given function.
         //
         if (!shouldSpecializeFunc(oldFunc))
+            return false;
+
+        // Specializing a resource output recursively inspects callees before recording success.
+        // A function in a call-graph cycle could therefore re-enter this operation indefinitely.
+        // We leave recursive functions unchanged by this output transformation; supported GPU
+        // pipelines have already diagnosed recursion, and the pass must still terminate when
+        // that validation is disabled.
+        if (isFunctionRecursive(oldFunc))
             return false;
 
         // It is possible that we have a function that we *should* specialize
@@ -1239,48 +1472,37 @@ struct ResourceOutputSpecializationPass
             // need to add corresponding cases here.
         }
     }
-
-    // TODO: A really important mising step here is that we need AST-level rules
-    // that express the constraints on how resource-bearing types can and
-    // cannot be used for local variables, `out` parameters, etc.
-
-    // TODO: We should add another pass that takes any global variables
-    // of resource type and transforms them into `in`/`out`/`inout` parameters
-    // in any function that accesses them (and proceeds transitively up
-    // the call stack), with a special rule that the globals translate into
-    // local variables in each entry point function that needs them.
-    //
-    // Such a pass would reduce the problem of supporting global variables
-    // with resource types to that of supporting locals and return values of
-    // resource type.
-    //
-    // Note: that same pass could just apply to *all* globals for targets where
-    // HLSL-style thread-local globals aren't supported. The main challenge that
-    // would need to be worked out there is interaction with separate compilation,
-    // but transforming them so that the function signatures are changed makes
-    // the challenge more explicit and thus perhaps easier to tackle.
 };
 
-bool specializeResourceOutputs(
+/// Return whether the target backend relies on this pass to remove resource-valued returns and
+/// `out` or `inout` parameters before emission.
+static bool doesTargetRequireResourceOutputSpecialization(TargetRequest* targetRequest)
+{
+    if (isD3DTarget(targetRequest))
+        return true;
+    if (isKhronosTarget(targetRequest))
+        return true;
+    if (isWGPUTarget(targetRequest))
+        return true;
+    if (isMetalTarget(targetRequest))
+        return true;
+    return false;
+}
+
+/// Try to replace resource-valued returns and `out` or `inout` parameters, and return whether any
+/// function was changed.
+//
+// We add each function whose resource return or output parameter cannot be reconstructed at its
+// call sites to `unspecializableFuncs` without changing that function. `specializeResourceUsage`
+// can then try to inline each direct call to it, simplify the module, and retry.
+static bool specializeResourceOutputs(
     CodeGenContext* codeGenContext,
     IRModule* module,
     HashSet<IRFunc*>& unspecializableFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
-    {
-    }
-    else
-    {
-        // Don't bother applying this pass on targets that won't
-        // benefit from it.
-        //
-        // TODO: it would be good if we could express this kind
-        // of conditional in a way that doesn't involve explicitly
-        // enumerating matching targets.
-        //
+    if (!doesTargetRequireResourceOutputSpecialization(targetRequest))
         return false;
-    }
 
     ResourceOutputSpecializationPass pass;
     pass.codeGenContext = codeGenContext;
@@ -1292,40 +1514,30 @@ bool specializeResourceOutputs(
 
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
+    // Simplification after either specialization can remove intermediate loads and stores. We
+    // therefore apply both transformations and simplify their results until none of those steps
+    // changes the module.
+    //
+    // Output specialization records a function when callers cannot reconstruct its resource return
+    // or output parameter. We then try to inline direct calls to that function, simplify, and retry
+    // both transformations. Once output inlining makes no progress, the D3D resource-input step
+    // tries to inline calls whose resource arguments do not have a recognized HLSL form.
     bool result = false;
-    // We apply two kinds of specialization to clean up resource value usage:
-    //
-    // * Specalize call sites based on the actual resources
-    //   that a called function will return/output.
-    //
-    // * Specialize called functions based on the actual resources
-    //   passed as input at specific call sites.
-    //
-    // We need to run the two passes in an iterative fashion (combined with IR
-    // simplification passes), because each optimization may open up opportunties
-    // for the other to apply.
-    //
     for (;;)
     {
         bool changed = true;
         HashSet<IRFunc*> unspecializableFuncs;
+
+        // We first apply input and output specialization without removing call boundaries.
+        // Simplification after each successful round exposes resource values hidden behind
+        // temporary loads and stores.
         while (changed)
         {
             changed = false;
             unspecializableFuncs.clear();
-            // Because the legalization may depend on what target
-            // we are compiling for (certain things might be okay
-            // for D3D targets that are not okay for Vulkan), we
-            // pass down the target request along with the IR.
-            //
             changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
-            // After specialization of function outputs, we may find that there
-            // are cases where opaque-typed local variables can now be eliminated
-            // and turned into SSA temporaries. Such optimization may enable
-            // the following passes to "see" and specialize more cases.
-            //
             if (changed)
             {
                 simplifyIR(
@@ -1335,19 +1547,42 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             }
             result |= changed;
         }
-        if (unspecializableFuncs.getCount() == 0)
-            break;
 
-        // Inline unspecializable resource output functions and then continue trying.
-        for (auto func : unspecializableFuncs)
-            inlineAllCallsOfFunction(func);
+        // If callers could not reconstruct a resource return or output parameter, we try to inline
+        // each direct call to the callee, simplify the result, and retry input and output
+        // specialization.
+        if (unspecializableFuncs.getCount() != 0)
+        {
+            bool inlinedOutputCall = false;
+            for (auto func : unspecializableFuncs)
+                inlinedOutputCall |= tryInlineDirectCallsOfNonrecursiveFunction(func);
 
-        simplifyIR(
-            irModule,
-            codeGenContext->getTargetProgram(),
-            IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
+            if (inlinedOutputCall)
+            {
+                simplifyIR(
+                    irModule,
+                    codeGenContext->getTargetProgram(),
+                    IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
+                result = true;
+                continue;
+            }
+        }
+
+        // After output inlining makes no progress, we try to inline the D3D calls whose resource
+        // inputs cannot be emitted directly as HLSL. We simplify each successful inlining round and
+        // then retry input and output specialization.
+        if (tryInlineD3DCallsWithUnsupportedResourceInputs(codeGenContext, irModule))
+        {
+            simplifyIR(
+                irModule,
+                codeGenContext->getTargetProgram(),
+                IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
+            result = true;
+            continue;
+        }
+
+        return result;
     }
-    return result;
 }
 
 bool isIllegalGLSLParameterType(IRType* type)

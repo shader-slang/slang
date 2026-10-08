@@ -52,6 +52,137 @@ bool isEmptyType(IRType* type)
     return isStructEmpty(type, isEmptyType);
 }
 
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
+{
+    // Some static type queries take a runtime value and inspect only its static type. Others
+    // compare types directly or query their layout. We enumerate both forms so that value-use
+    // analyses can ignore their operands while conservatively treating every unlisted instruction
+    // as a value use.
+    switch (inst->getOp())
+    {
+    case kIROp_IsBool:
+    case kIROp_IsInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsVector:
+    case kIROp_IsBindlessTextureNVEncodable:
+    case kIROp_GetNaturalStride:
+    case kIROp_GetNaturalAlignment:
+    case kIROp_TypeEquals:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isSingleResourceValueType(IRInst* type)
+{
+    // We first remove attributed and rate wrappers. We then accept exactly the four IR type
+    // families that represent one texture or typed-buffer, sampler, structured-buffer, or
+    // byte-address-buffer value. Pass-specific restrictions on individual members of those
+    // families belong in the caller.
+    type = unwrapAttributedType(type);
+    if (!type)
+        return false;
+    if (as<IRResourceTypeBase>(type))
+        return true;
+    if (as<IRSamplerStateTypeBase>(type))
+        return true;
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+        return true;
+    return as<IRByteAddressBufferTypeBase>(type) != nullptr;
+}
+
+bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type)
+{
+    // We strip attributed and rate wrappers at every level because either wrapper may surround an
+    // array or its element. `IRArrayType` identifies a fixed-size array; we reject
+    // `IRUnsizedArrayType` without asking a separate recursive type query to infer that fact.
+    for (;;)
+    {
+        type = unwrapAttributedType(type);
+        if (!type || as<IRUnsizedArrayType>(type))
+            return false;
+
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            type = arrayType->getOperand(0);
+            continue;
+        }
+
+        break;
+    }
+
+    // The replacement pass creates one local for the whole value in each affected function. A
+    // non-entry-point function with runtime access also receives one generated parameter. We
+    // therefore require a type with one target-independent value. We reject aggregate and
+    // container forms, combined texture-samplers, and append or consume buffers because some
+    // target pipelines split them into several values.
+    if (!isSingleResourceValueType(type))
+        return false;
+
+    if (auto resourceType = as<IRResourceTypeBase>(type))
+        return !resourceType->isCombined();
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        return false;
+    default:
+        return true;
+    }
+}
+
+IRType* getGlobalVarValueType(IRGlobalVar* globalVar)
+{
+    // IR transformations may retain attributes by wrapping the pointer type of a global variable.
+    // After removing those wrappers, the linked representation must contain a concrete pointer and
+    // pointee type. We retain wrappers on the pointee because they remain part of the stored value.
+    auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(globalVar->IRInst::getDataType()));
+    SLANG_RELEASE_ASSERT(pointerType);
+    auto valueType = as<IRType>(pointerType->getOperand(0));
+    SLANG_RELEASE_ASSERT(valueType);
+    return valueType;
+}
+
+bool isResourceGlobalCandidateForPerInvocationReplacement(IRGlobalVar* globalVar)
+{
+    // AST-to-IR lowering marks file- or namespace-scope mutable `static` variables and mutable
+    // uniform-parameter shadows synthesized for `-Gec`. The marker records those declaration
+    // categories but does not determine their storage rate. We therefore also require the absence
+    // of an explicit rate. For example, `groupshared` storage is shared among threads, and
+    // `actual-global` storage persists across entry-point invocations.
+    if (globalVar->getRate() ||
+        !globalVar->findDecoration<IRFileOrNamespaceScopeMutableVarDecoration>())
+        return false;
+
+    return isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(
+        getGlobalVarValueType(globalVar));
+}
+
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func)
+{
+    return func->findDecoration<IREntryPointDecoration>() != nullptr ||
+           func->findDecoration<IRCudaKernelDecoration>() != nullptr;
+}
+
+bool hasGenericAssemblyImplementation(IRFunc* func)
+{
+    // `IRGenericAsm` is a block terminator whose text supplies emitted target code instead of
+    // ordinary instructions in that block. Translation-unit lowering has already removed
+    // error-handling and `defer` terminators, so no other terminator represents generic assembly.
+    for (auto block : func->getBlocks())
+    {
+        if (as<IRGenericAsm>(block->getTerminator()))
+            return true;
+    }
+    return false;
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -82,6 +213,72 @@ bool isAddressInst(IRInst* inst)
     default:
         return false;
     }
+}
+
+bool doesUserResultTransferStorageAccessFromUse(IRUse* use)
+{
+    // We ask whether a later access through the user's result can transfer to or from storage
+    // supplied by this exact operand use. Every supported transfer operation takes that storage in
+    // operand zero; another operand may instead supply an index, a type, or a stored value.
+    auto user = use->getUser();
+    if (user->getOperandCount() == 0 || user->getOperandUse(0) != use)
+        return false;
+
+    // An address projection derives its result from the storage named by operand zero.
+    if (isAddressInst(user))
+        return true;
+
+    switch (user->getOp())
+    {
+    case kIROp_GetAddress:
+    case kIROp_AssumeAddress:
+        // These operations expose the address represented by operand zero.
+        return true;
+    case kIROp_BitCast:
+    case kIROp_Reinterpret:
+    case kIROp_PtrCast:
+    case kIROp_OutImplicitCast:
+    case kIROp_InOutImplicitCast:
+        // Only the pointer-to-pointer form can transfer access to operand-zero storage. An `inout`
+        // cast transfers reads into its temporary and writes back; an `out` cast transfers only
+        // writes back. This direction-independent predicate accepts either relation. Type
+        // attributes do not change the pointer relation, so we remove them before testing it.
+        return as<IRPtrTypeBase>(unwrapAttributedType(use->get()->getDataType())) != nullptr &&
+               as<IRPtrTypeBase>(unwrapAttributedType(user->getDataType())) != nullptr;
+    default:
+        return false;
+    }
+}
+
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
+{
+    // We match the exact operand use rather than its value, because one value may be passed to
+    // multiple parameters with different direction contracts. Operand zero is the callee, and the
+    // remaining operands correspond positionally to the function-type parameters.
+    if (argumentUse == call->getCalleeUse())
+        return nullptr;
+
+    Index argumentIndex = -1;
+    for (UInt i = 0; i < call->getArgCount(); ++i)
+    {
+        if (call->getOperandUse(i + 1) == argumentUse)
+        {
+            argumentIndex = Index(i);
+            break;
+        }
+    }
+    if (argumentIndex < 0)
+        return nullptr;
+
+    // The callee's data type is the signature at this call site. It already contains generic
+    // substitutions and also covers indirect function-valued callees.
+    auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
+    if (!funcType || UInt(argumentIndex) >= funcType->getParamCount())
+        return nullptr;
+    // `IRFuncType::getParamType` assumes that every parameter operand derives from `IRType`.
+    // Generic functions can instead use a type parameter directly as a parameter type. We only
+    // need to inspect direction wrappers, so we retain the more general `IRInst*` representation.
+    return unwrapAttributedType(funcType->getOperand(UInt(argumentIndex) + 1));
 }
 
 IRType* getVectorElementType(IRType* type)
@@ -3284,6 +3481,76 @@ IRInst* peelAddressForwardingOps(IRInst* addr)
         default:
             return addr;
         }
+    }
+}
+
+bool isDebugInfoInst(IRInst* inst)
+{
+    // Debug instructions describe source locations, variables, and scopes rather than executing at
+    // runtime. This classification lets an analysis ignore them when they do not affect the
+    // question it answers. An optimization must still preserve required debug information.
+    switch (inst->getOp())
+    {
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
+    case kIROp_DebugFuncDecoration:
+    case kIROp_DebugSource:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
+    case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool doesOpReadResourceContents(IROp op)
+{
+    // These dedicated operations produce results that depend on resource contents. A resource
+    // method represented as an `IRCall` is classified through its callee instead. Operations that
+    // only query resource dimensions or other metadata do not read the contents.
+    switch (op)
+    {
+    case kIROp_ImageGatherOffset:
+    case kIROp_ImageLoad:
+    case kIROp_Sample:
+    case kIROp_SampleGrad:
+    case kIROp_StructuredBufferLoad:
+    case kIROp_ByteAddressBufferLoad:
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_StructuredBufferConsume:
+    case kIROp_SubpassLoad:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool doesOpProduceResourceContentAddress(IROp op)
+{
+    // These operations create an address whose storage belongs to a resource. Analyses should
+    // classify them as resource-content roots before applying the general rule that follows operand
+    // zero through other address projections and pointer casts.
+    switch (op)
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_ImageSubscript:
+    case kIROp_ImageTexelPointer:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
+        return true;
+    default:
+        return false;
     }
 }
 

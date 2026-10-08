@@ -19,9 +19,13 @@ struct IRType;
 ///
 bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* module);
 
-bool specializeResourceOutputs(CodeGenContext* codeGenContext, IRModule* module);
-
-/// Combined iterative passes of `specializeResourceParameters` and `specializeResourceOutputs`.
+/// Specialize resource input and output uses until no transformation can make further progress.
+///
+/// The operation simplifies the module after each successful specialization or inlining round. If
+/// a resource output cannot be reconstructed at its call sites, it tries to inline direct calls to
+/// the function and retry specialization. On D3D targets, it also tries to inline a call when a
+/// resource input has no IR form that can be emitted directly as HLSL. Return whether the module
+/// changed.
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext);
 
 /// Convert parameter-passing modes for non-copyable types to ones that are valid for GLSL.

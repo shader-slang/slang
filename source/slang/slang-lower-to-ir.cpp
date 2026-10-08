@@ -11569,7 +11569,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalDecl(decl))
         {
             if (decl->hasModifier<HLSLStaticModifier>())
-                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeMutableVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
@@ -11640,12 +11640,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Mutable shadows have the storage rules of file/namespace `static` variables.
         // We record that category for validation of types resolved during linking.
-        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
-        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
-        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`. If this shadow
+        // holds a resource value that supports per-invocation replacement, the resource-specific
+        // initializer pass moves the value into each entry point before replacing the global.
+        // Otherwise, the later general initializer pass follows the target's module-scope
+        // initialization policy.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 

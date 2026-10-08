@@ -2677,18 +2677,102 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     _validateCircularVarDefinition(varDecl);
 }
 
-// Test whether `typeTags` permit mutable file or namespace variable storage.
+/// Return whether `type` is a resource value, or a fixed-size array of resource values, that
+/// per-invocation replacement can keep intact in each generated local or parameter.
+static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
+{
+    // A modifier does not change the resource category of the type that it wraps. We remove type
+    // modifiers as we walk through each array dimension. We reject an unbounded array at the point
+    // where we see it, so this predicate enforces its fixed-size-array contract independently of
+    // its callers.
+    for (;;)
+    {
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            type = modifiedType->getBase();
+            continue;
+        }
+
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            if (arrayType->isUnsized())
+                return false;
+            type = arrayType->getElementType();
+            continue;
+        }
+
+        break;
+    }
+
+    // The replacement pass creates one local for the whole value in each affected function. A
+    // non-entry-point function with runtime access also receives one generated parameter. The pass
+    // does not split an aggregate or coordinate separate replacements for its fields, so we reject
+    // structs and parameter groups. We also reject combined texture-samplers and append or consume
+    // buffers because some target pipelines split those types into several values. Textures,
+    // samplers, structured buffers, and byte-address buffers have one target-independent value and
+    // satisfy the replacement contract.
+    //
+    // An acceleration structure remains one value, but replacement would create a function-local
+    // acceleration-structure variable that Khronos and WGSL targets reject. `__DynamicResource`
+    // also remains one value, but its Khronos legalization requires each cast to identify one
+    // module-scope parameter or one indexed element. A mutable local could combine values from
+    // several such inputs and lose that identity. We reject both forms on every target until the
+    // replacement pass can preserve their target-specific requirements.
+    if (auto resourceType = as<ResourceType>(type))
+        return !resourceType->isCombined();
+
+    if (as<SamplerStateType>(type))
+        return true;
+    if (as<HLSLStructuredBufferType>(type))
+        return true;
+    if (as<HLSLRWStructuredBufferType>(type))
+        return true;
+    if (as<HLSLRasterizerOrderedStructuredBufferType>(type))
+        return true;
+    if (as<HLSLByteAddressBufferType>(type))
+        return true;
+    if (as<HLSLRWByteAddressBufferType>(type))
+        return true;
+    return as<HLSLRasterizerOrderedByteAddressBufferType>(type) != nullptr;
+}
+
+/// Return whether `decl` is a mutable `static` variable declared at file or namespace scope.
+static bool _isMutableFileOrNamespaceScopeStaticVariable(VarDeclBase* decl)
+{
+    if (!isGlobalDecl(decl))
+        return false;
+    if (!decl->hasModifier<HLSLStaticModifier>())
+        return false;
+    return !decl->hasModifier<ConstModifier>();
+}
+
+/// Return whether `decl` requests storage or memory-access semantics that per-invocation resource
+/// replacement cannot preserve.
+static bool _hasStorageModifierUnsupportedForPerInvocationResourceReplacement(VarDeclBase* decl)
+{
+    // `groupshared` requires one value shared by a thread group. A memory qualifier such as
+    // `globallycoherent` or `volatile` constrains accesses to the declared storage. Replacing
+    // either declaration with ordinary function-local storage would discard the requested
+    // semantics.
+    if (decl->hasModifier<HLSLGroupSharedModifier>())
+        return true;
+    return decl->hasModifier<MemoryQualifierSetModifier>();
+}
+
+// Test whether `type` can use ordinary mutable variable storage or per-invocation resource
+// replacement.
 //
 // This is the shared type restriction for ordinary `static` globals and uniform shadows.
-// Requires the tags of the checked variable type. A true result means no currently known
-// storage restriction applies. Ordinary type checking still validates the type; after linking,
-// shared IR validation rejects opaque or unsized storage that a replacement definition introduces.
-static bool isTypeAllowedForMutableGlobalVariable(TypeTag typeTags)
+// Requires `typeTags` to describe the checked `type`. A true result means either that ordinary
+// mutable storage is supported or that resource-global legalization can replace the storage after
+// linking. Shared IR validation checks the linked type before that replacement occurs.
+static bool isTypeSupportedForMutableGlobalVariable(Type* type, TypeTag typeTags)
 {
-    // We need to reject resource storage until the back end can legalize mutable resource
-    // globals. `TypeTag::Opaque` includes structs and arrays containing such resources.
+    // Opaque types need a separate representation rather than ordinary mutable storage. Resource
+    // replacement provides that representation only for the resource values and fixed-size arrays
+    // recognized by the semantic predicate.
     if ((int)typeTags & (int)TypeTag::Opaque)
-        return false;
+        return _isResourceTypeSupportedForPerInvocationReplacement(type);
 
     // We cannot allocate a private variable containing an array with an absent or unbounded
     // element count. A count that will be resolved by linking is a separate, allowed case.
@@ -2701,54 +2785,72 @@ static bool isTypeAllowedForMutableGlobalVariable(TypeTag typeTags)
     if ((int)typeTags & (int)TypeTag::NonAddressable)
         return false;
 
-    // No known storage restriction applies. We allow the general case, including types
-    // whose final definition or array size will be supplied during linking. After linking
-    // and specialization, `validateMutableGlobalVariableTypes` checks opaque and unsized storage.
+    // No known storage restriction applies. We allow the general case, including types whose final
+    // definition or array size will be supplied during linking. After linking and specialization,
+    // `validateMutableGlobalVariableTypes` checks opaque and unsized storage.
     return true;
 }
 
-// Check the type of a mutable file or namespace `static` variable.
+// Check the storage requirements of a mutable file- or namespace-scope `static` variable.
 //
-// Requires `typeTags` to describe `decl`'s checked type. Diagnoses opaque and non-addressable
-// storage; `SemanticsDeclBodyVisitor::checkVarDeclCommon` reports unsized storage before calling.
-static void checkMutableGlobalVariableType(
+// Requires `typeTags` to describe `decl`'s checked type. Diagnoses an unsupported opaque or
+// non-addressable type, and diagnoses a supported resource type when a storage or memory-access
+// modifier prevents per-invocation replacement. `SemanticsDeclBodyVisitor::checkVarDeclCommon`
+// reports unsized storage before calling.
+static void checkMutableGlobalVariableStorage(
     SemanticsVisitor* visitor,
     VarDeclBase* decl,
     TypeTag typeTags)
 {
-    // We only apply the mutable-global restriction to file and namespace `static` variables.
-    // Function locals and shader parameters have different storage rules.
-    if (!isGlobalDecl(decl))
-        return;
-    if (!decl->hasModifier<HLSLStaticModifier>())
-        return;
-
-    // A `const` global does not need mutable storage, so the restriction does not apply.
-    if (decl->hasModifier<ConstModifier>())
-        return;
-    if (isTypeAllowedForMutableGlobalVariable(typeTags))
+    // We answer three questions in order. First, is `decl` a mutable `static` variable at file or
+    // namespace scope? Second, can its type use ordinary mutable storage or resource replacement?
+    // Third, if replacement supports the resource value or fixed-size resource array, do the
+    // declaration's modifiers require storage semantics that a function-local value cannot
+    // preserve?
+    if (!_isMutableFileOrNamespaceScopeStaticVariable(decl))
         return;
 
-    // We diagnose attempts to allocate mutable resource globals, including arrays and structs
-    // containing resources. Removing mutability or declaring a shader parameter can be valid
-    // alternatives, depending on whether the declaration has an initializer.
-    if ((int)typeTags & (int)TypeTag::Opaque)
-    {
-        visitor->getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = decl});
-        if (decl->initExpr)
-            visitor->getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = decl});
-        else
-            visitor->getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = decl});
-        return;
-    }
-
-    // `SemanticsDeclBodyVisitor::checkVarDeclCommon` already reported unsized storage.
-    // We avoid reporting a second error for the same storage restriction.
+    // `checkVarDeclCommon` has already diagnosed an unsized variable. We stop before applying the
+    // opaque-type policy so that an unbounded resource array produces one storage diagnostic.
     if ((int)typeTags & (int)TypeTag::Unsized)
         return;
 
-    // The remaining unsupported form is a non-addressable value, such as `ParameterBlock<T>`.
-    // We diagnose it before lowering attempts to allocate mutable global storage.
+    if ((int)typeTags & (int)TypeTag::Opaque)
+    {
+        if (!_isResourceTypeSupportedForPerInvocationReplacement(decl->getType()))
+        {
+            // The type itself cannot be represented by resource replacement. We suggest a shader
+            // parameter only when the declaration has no initializer and uses neither
+            // `groupshared` nor a memory-access qualifier. A uniform parameter cannot provide the
+            // semantics requested by either kind of modifier.
+            visitor->getSink()->diagnose(Diagnostics::OpaqueTypeNotSupportedForMutableStatic{
+                .type = decl->getType(),
+                .decl = decl});
+            if (!decl->initExpr)
+            {
+                if (!_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(decl))
+                    visitor->getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = decl});
+            }
+            return;
+        }
+
+        // At this point the value has a supported resource representation. A storage or
+        // memory-access modifier is therefore the only remaining front-end condition that can
+        // prevent replacement.
+        if (_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(decl))
+        {
+            visitor->getSink()->diagnose(
+                Diagnostics::MutableStaticResourceCannotUseSharedOrQualifiedStorage{.decl = decl});
+        }
+        return;
+    }
+
+    // A non-opaque type with no storage restriction uses ordinary mutable global storage.
+    if (isTypeSupportedForMutableGlobalVariable(decl->getType(), typeTags))
+        return;
+
+    // We returned above for unsized and opaque types. Only a non-addressable value such as
+    // `ParameterBlock<T>` can reach this point.
     SLANG_RELEASE_ASSERT((int)typeTags & (int)TypeTag::NonAddressable);
     visitor->getSink()->diagnose(Diagnostics::MutableGlobalRequiresAddressableType{.decl = decl});
 }
@@ -2798,11 +2900,16 @@ void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
     }
     decl->type.type = valueType;
 
-    // We apply the same type restriction as for an ordinary mutable `static` global.
-    // `GetTypeForDeclRef` uses the flag to reject writes to an unsupported type, while reads
-    // remain valid. IR lowering aliases the parameter value without allocating unsupported
-    // storage. We keep the computed `valueType` in either case.
-    decl->shouldBeImmutableAlias = !isTypeAllowedForMutableGlobalVariable(getTypeTags(valueType));
+    // A mutable shadow must be able to represent both the parameter's value and the semantics of
+    // its storage. We therefore use an immutable alias when either the value type cannot use
+    // mutable global storage or the parameter has a memory qualifier. Aliasing a qualified
+    // parameter keeps operations on the resource attached to the original declaration; copying
+    // the resource value into ordinary storage would discard qualifiers such as
+    // `globallycoherent`.
+    decl->shouldBeImmutableAlias =
+        !isTypeSupportedForMutableGlobalVariable(valueType, getTypeTags(valueType));
+    if (_hasStorageModifierUnsupportedForPerInvocationResourceReplacement(parameter))
+        decl->shouldBeImmutableAlias = true;
 
     // References to specialization constants must retain their identity as compile-time
     // constants, for example when used in `numthreads`. We alias these parameters even when
@@ -3799,7 +3906,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
         }
 
-        checkMutableGlobalVariableType(this, varDecl, varTypeTags);
+        checkMutableGlobalVariableStorage(this, varDecl, varTypeTags);
     }
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
