@@ -1,26 +1,19 @@
-// `cachedTexture` is initialized after `before` and before `after`. Moving its initializer into
-// `main` would move its increment past `after`. We reject the resource initializer rather than
-// change that observable order.
-//
+// `cachedTexture` is initialized before `after`, whose initializer writes `output[0]`. If the first
+// initializer cannot return, the original order prevents that write. Moving the resource
+// initializer into `main` could instead make the write observable, so we reject the move unless the
+// initializer and every function it can call return normally for all possible inputs.
+
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage compute -O0 -validate-ir
 
-static uint sequence = 0;
-
-[noinline]
-uint initializeBefore()
-{
-    return ++sequence;
-}
-
-static uint before = initializeBefore();
-
 Texture2D<float4> inputTexture;
+RWStructuredBuffer<uint> output;
 
 [noinline]
 Texture2D<float4> initializeTexture()
 {
-    ++sequence;
-    return inputTexture;
+    for (;;)
+    {
+    }
 }
 
 static Texture2D<float4> cachedTexture = initializeTexture();
@@ -30,18 +23,14 @@ static Texture2D<float4> cachedTexture = initializeTexture();
 [noinline]
 uint initializeAfter()
 {
-    return ++sequence;
+    output[0] = 1;
+    return 0;
 }
 
 static uint after = initializeAfter();
 
-RWStructuredBuffer<uint> output;
-
 [numthreads(1, 1, 1)]
 void main()
 {
-    output[0] = before;
-    output[1] = after;
-    output[2] = sequence;
-    output[3] = uint(cachedTexture.Load(int3(0, 0, 0)).x);
+    output[1] = after + uint(cachedTexture.Load(int3(0, 0, 0)).x);
 }

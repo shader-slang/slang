@@ -20,6 +20,17 @@ globallycoherent static RWStructuredBuffer<uint> coherentBuffer = inputBuffer;
 //CHECK:                                         ^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
 //CHECK:                                         ^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
 
+// Type or array-bound inference can complete a declaration during header checking, so semantic
+// body checking does not run. Header checking must still reject the unsupported memory qualifier
+// in either case.
+globallycoherent static var inferredCoherentBuffer = inputBuffer;
+//CHECK:                    ^^^^^^^^^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                    ^^^^^^^^^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
+
+globallycoherent static RWStructuredBuffer<uint> inferredCoherentBuffers[] = {inputBuffer};
+//CHECK:                                         ^^^^^^^^^^^^^^^^^^^^^^^ mutable static resource cannot use shared or memory-qualified storage
+//CHECK:                                         ^^^^^^^^^^^^^^^^^^^^^^^ a resource-valued `static` variable declared at file or namespace scope cannot use `groupshared` or a memory-access qualifier
+
 struct Stuff
 {
     __init(RWStructuredBuffer<uint> a1, RWStructuredBuffer<uint> b2)

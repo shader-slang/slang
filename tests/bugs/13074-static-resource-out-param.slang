@@ -1,6 +1,11 @@
 //TEST:SIMPLE: -target spirv -entry main -stage fragment -capability spvDescriptorHeapEXT -o 13074-static-resource-out-param.spv
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage fragment -capability spvDescriptorHeapEXT
 
+// `main` first selects heap resource 0. The nested `loadThenSelectGlobalTexture` call must read that
+// binding before changing the selection to heap resource 1, and the final read must use resource 1.
+// The checks distinguish the two loads and prove that legalization threads both the current value
+// and the `out` update through the helper calls.
+
 //CHECK-LABEL: ; Function main
 //CHECK: %[[ADDRESS0:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_0
 //CHECK: %[[TEXTURE0:[A-Za-z0-9_]+]] = OpLoad {{.*}} %[[ADDRESS0]]

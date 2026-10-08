@@ -15,8 +15,13 @@ SamplerState textureSampler;
 ByteAddressBuffer bytes;
 RWStructuredBuffer<float4> output;
 
-static Texture2D<float4> cachedTextures[1] = textures;
-static SamplerState cachedSampler = textureSampler;
+// We use array-bound and type inference for the first two declarations because those forms become
+// `DefinitionChecked` during header checking and skip `SemanticsDeclBodyVisitor`. Header checking
+// must accept both inferred declarations for resource-global legalization, just as body checking
+// accepts the explicit `cachedBytes` declaration. The `CHECK-NOT` directives prove that
+// legalization replaces all three globals.
+static Texture2D<float4> cachedTextures[] = {textures[0]};
+static var cachedSampler = textureSampler;
 static ByteAddressBuffer cachedBytes = bytes;
 
 [numthreads(1, 1, 1)]

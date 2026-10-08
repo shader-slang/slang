@@ -45,10 +45,11 @@ namespace Slang
 // `legalizeResourceGlobalVars` will replace. A marked global represents either a mutable resource
 // variable declared by the programmer at file or namespace scope, or a mutable uniform-parameter
 // shadow synthesized for `-Gec`. This policy also injects the selected initializers into CUDA
-// kernels. We move a resource initializer only after proving that it has no externally observable
-// side effects and does not read preexisting mutable storage, resource contents, or non-resource
-// data from an explicit parameter group. Those restrictions ensure that evaluating the initializer
-// at the start of each entry point cannot change observable behavior.
+// kernels. We move a resource initializer only after proving that the initializer and every
+// function it can call return normally for all possible inputs, that they have no externally
+// observable side effects, and that they do not read preexisting mutable storage, resource
+// contents, or non-resource data from an explicit parameter group. Those restrictions ensure that
+// evaluating the initializer at the start of each entry point cannot change observable behavior.
 
 /// A `GlobalInitializerSelection` identifies why an initializer body is selected for execution
 /// inside an entry point.
@@ -156,6 +157,83 @@ struct MoveGlobalVarInitializationToEntryPointsPass
 
         return isInitializerRequiredByTarget(globalVar);
     }
+
+    /// Return whether every CFG path from `block` reaches an `IRReturn`, assuming each ordinary
+    /// instruction completes.
+    ///
+    /// `blocksBeingAnalyzed` is the gray set for cycle detection, and `blocksProvenToReturn` is the
+    /// black set. On success, the black set includes every block reachable from `block`; its
+    /// contents are incomplete after failure.
+    bool canProveEveryControlFlowPathFromBlockReachesReturn(
+        IRBlock* block,
+        HashSet<IRBlock*>& blocksBeingAnalyzed,
+        HashSet<IRBlock*>& blocksProvenToReturn)
+    {
+        // An already-proved suffix needs no second traversal. Encountering a block that is still
+        // being analyzed instead finds a reachable cycle. The cycle may terminate for particular
+        // runtime values, but the CFG alone does not prove that every execution leaves it.
+        if (blocksProvenToReturn.contains(block))
+            return true;
+        if (!blocksBeingAnalyzed.add(block))
+            return false;
+
+        // We require every successor path to reach `IRReturn`. A block with no successor must end
+        // in an `IRReturn`; `IRUnreachable`, generic assembly, and every other terminal form fail
+        // the proof.
+        bool reachesReturn = true;
+        bool hasSuccessor = false;
+        for (auto successor : block->getSuccessors())
+        {
+            hasSuccessor = true;
+            if (!canProveEveryControlFlowPathFromBlockReachesReturn(
+                    successor,
+                    blocksBeingAnalyzed,
+                    blocksProvenToReturn))
+            {
+                reachesReturn = false;
+                break;
+            }
+        }
+        if (!hasSuccessor && !as<IRReturn>(block->getTerminator()))
+            reachesReturn = false;
+
+        blocksBeingAnalyzed.remove(block);
+        if (reachesReturn)
+            blocksProvenToReturn.add(block);
+        return reachesReturn;
+    }
+
+    /// Return whether every reachable CFG path in `code` reaches an `IRReturn`, assuming each
+    /// ordinary instruction completes.
+    ///
+    /// On success, `reachableBlocksProvenToReturn` contains all and only the blocks reachable from
+    /// `code`'s entry. Its contents are unspecified after failure. The caller uses this set to
+    /// exclude unreachable instructions from the later effect and call analysis.
+    bool canProveEveryControlFlowPathReachesReturn(
+        IRGlobalValueWithCode* code,
+        HashSet<IRBlock*>& reachableBlocksProvenToReturn)
+    {
+        // We start at the entry block so that unreachable blocks do not affect the result. We
+        // reject every reachable cycle because the IR has no termination proof that would let us
+        // distinguish a bounded loop from a diverging one. The later instruction scan separately
+        // proves that every call on these paths returns normally.
+        auto entryBlock = code->getFirstBlock();
+        if (!entryBlock)
+            return false;
+
+        HashSet<IRBlock*> blocksBeingAnalyzed;
+        return canProveEveryControlFlowPathFromBlockReachesReturn(
+            entryBlock,
+            blocksBeingAnalyzed,
+            reachableBlocksProvenToReturn);
+    }
+
+    /// Cache the functions whose initializer-safety proofs are complete and detect call cycles.
+    struct InitializerSafetyAnalysis
+    {
+        HashSet<IRFunc*> functionsBeingAnalyzed;
+        HashSet<IRFunc*> functionsProvenSafe;
+    };
 
     /// The facts about storage that an address may identify.
     struct AddressProvenance
@@ -365,42 +443,14 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         return {.mayReferToPreexistingMutableStorage = true};
     }
 
-    /// Return whether `type` is opaque after removing pointer and parameter-direction wrappers.
-    bool isOpaqueValueOrAddressType(IRType* type)
-    {
-        // An argument's calling convention may wrap its value in several pointer layers. We remove
-        // every layer so that the caller can detect an opaque argument to any callee whose
-        // implementation it cannot inspect.
-        type = as<IRType>(unwrapAttributedType(type));
-        while (auto pointerType = as<IRPtrTypeBase>(type))
-            type = as<IRType>(unwrapAttributedType(pointerType->getValueType()));
-        return type && isOpaqueType(type, nullptr);
-    }
-
-    /// Return whether an argument to `call` is, or points to, an opaque value.
-    bool doesCallPassOpaqueValue(IRCall* call)
-    {
-        // When a callee has no body of ordinary IR instructions that we can inspect, its `ReadNone`
-        // decoration does not tell us whether it reads an opaque value passed as an argument. For
-        // example, `Texture.Load` is a `ReadNone` target intrinsic but reads through its texture
-        // argument. We therefore reject an opaque value passed either directly or through an
-        // address, including an aggregate that contains an opaque value.
-        for (auto argument : call->getArgsList())
-        {
-            auto type = as<IRType>(unwrapAttributedType(argument->getDataType()));
-            if (isOpaqueValueOrAddressType(type))
-                return true;
-        }
-        return false;
-    }
-
-    /// Return whether `function` has an ordinary body that this analysis can inspect for the
-    /// current target.
+    /// Return whether `function` has an ordinary body that completely describes its behavior for
+    /// the current target.
     bool canInspectFunctionBodyForInitializerSafety(IRFunc* function)
     {
-        // A declaration has no body to inspect. An applicable target intrinsic or generic-assembly
-        // implementation replaces the ordinary body during emission, so inspecting that body
-        // would not establish the effects of the emitted program.
+        // A declaration has no body from which we can prove effects or normal completion. An
+        // applicable target intrinsic or generic-assembly implementation replaces the ordinary
+        // body during emission, so inspecting that body would not establish either property of the
+        // emitted program.
         if (!function)
             return false;
         if (!function->getFirstBlock())
@@ -437,19 +487,30 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// could change observable behavior.
     bool mayComputationDependOnExecutionOrder(
         IRGlobalValueWithCode* code,
-        HashSet<IRFunc*>& visitedFunctions)
+        InitializerSafetyAnalysis& analysis)
     {
-        // We reject an instruction unless its existing effect information is sufficient to prove
-        // that moving it is safe. In particular, we reject reads from preexisting mutable storage,
-        // reads of resource contents, reads of non-resource data from an explicit parameter group,
-        // and every side effect except the local-store forms recognized above.
+        // Moving a computation can change which later initializers execute when that computation
+        // fails to return. We first require every reachable CFG path to reach `IRReturn`. This
+        // intraprocedural proof assumes ordinary instructions complete; the call analysis below
+        // recursively proves that assumption for each reachable call.
+        HashSet<IRBlock*> reachableBlocks;
+        if (!canProveEveryControlFlowPathReachesReturn(code, reachableBlocks))
+            return true;
+
+        // We then reject an instruction unless its existing effect information is sufficient to
+        // prove that moving it is safe. In particular, we reject reads from preexisting mutable
+        // storage, reads of resource contents, reads of non-resource data from an explicit
+        // parameter group, and every side effect except the local-store forms recognized above.
         //
         // A defined callee gives us more information than its effect decoration alone. We inspect
         // its body so that a resource-content read cannot hide behind a `ReadNone` decoration. If
-        // we cannot inspect the callee, we treat an opaque resource argument as a possible content
-        // read.
+        // we cannot inspect the callee, we cannot prove either its effects or its completion
+        // behavior, so we reject the initializer.
         for (auto block : code->getBlocks())
         {
+            if (!reachableBlocks.contains(block))
+                continue;
+
             auto terminator = block->getTerminator();
             for (auto inst = block->getFirstOrdinaryInst(); inst && inst != terminator;
                  inst = inst->getNextInst())
@@ -493,24 +554,29 @@ struct MoveGlobalVarInitializationToEntryPointsPass
                     // assembly supply a different implementation, and neither representation
                     // exposes effects this analysis can classify.
                     auto callee = as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
-                    if (canInspectFunctionBodyForInitializerSafety(callee))
+                    if (!canInspectFunctionBodyForInitializerSafety(callee))
                     {
-                        // We inspect each defined callee once. Revisiting a recursive cycle cannot
-                        // reveal an instruction that the first visit did not inspect.
-                        if (!visitedFunctions.add(callee))
-                            continue;
-                        if (mayComputationDependOnExecutionOrder(callee, visitedFunctions))
-                            return true;
-                        continue;
+                        // Effect decorations do not promise that a call returns. Without the
+                        // emitted body, we cannot prove both the effects and completion behavior
+                        // needed to move the initializer.
+                        return true;
                     }
 
-                    // Without an inspectable body, only `ReadNone` guarantees that the call does
-                    // not read or change mutable state. Even a `ReadNone` target intrinsic can read
-                    // resource contents through an opaque argument, so we reject that case too.
-                    if (!isPureFunctionalCall(call))
+                    if (analysis.functionsProvenSafe.contains(callee))
+                        continue;
+
+                    // Re-entering a function finds a recursive call cycle. The cycle may terminate
+                    // for particular arguments, but the IR supplies no proof that every invocation
+                    // returns.
+                    if (!analysis.functionsBeingAnalyzed.add(callee))
                         return true;
-                    if (doesCallPassOpaqueValue(call))
+                    bool calleeMayDependOnExecutionOrder =
+                        mayComputationDependOnExecutionOrder(callee, analysis);
+                    analysis.functionsBeingAnalyzed.remove(callee);
+                    if (calleeMayDependOnExecutionOrder)
                         return true;
+
+                    analysis.functionsProvenSafe.add(callee);
                     continue;
                 }
                 if (inst->mightHaveSideEffects() &&
@@ -527,10 +593,10 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// than during global initialization could change observable behavior.
     bool mayResourceInitializerMovementChangeObservableBehavior(IRGlobalVar* globalVar)
     {
-        // We inspect every reachable defined callee at most once. Revisiting a function through a
-        // recursive cycle cannot reveal an instruction that its first visit did not inspect.
-        HashSet<IRFunc*> visitedFunctions;
-        return mayComputationDependOnExecutionOrder(globalVar, visitedFunctions);
+        // The analysis proves each reachable defined callee once and rejects a recursive call cycle
+        // instead of assuming that the re-entered call returns.
+        InitializerSafetyAnalysis analysis;
+        return mayComputationDependOnExecutionOrder(globalVar, analysis);
     }
 
     /// Diagnose resource initializers that the analysis cannot prove safe to move, and return

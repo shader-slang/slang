@@ -1,26 +1,19 @@
-// `cachedTexture` is initialized after `before` and before `after`. Moving its initializer into
-// `main` would move its increment past `after`. We reject the resource initializer rather than
-// change that observable order.
-//
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage compute -O0 -validate-ir
+// `initializeTexture` has an acyclic CFG, but its self-call can prevent it from returning. The
+// initializer for `after` writes `output[0]` and follows `cachedTexture` in source order. Moving the
+// resource initializer to an entry point could make that write observable, so we reject the move
+// when the call-graph analysis finds the recursive cycle.
+// We disable non-essential validation so that the ordinary recursion diagnostic does not stop
+// compilation before the initializer-safety analysis runs.
 
-static uint sequence = 0;
-
-[noinline]
-uint initializeBefore()
-{
-    return ++sequence;
-}
-
-static uint before = initializeBefore();
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage compute -O0 -validate-ir -disable-non-essential-validations
 
 Texture2D<float4> inputTexture;
+RWStructuredBuffer<float4> output;
 
 [noinline]
 Texture2D<float4> initializeTexture()
 {
-    ++sequence;
-    return inputTexture;
+    return initializeTexture();
 }
 
 static Texture2D<float4> cachedTexture = initializeTexture();
@@ -30,18 +23,14 @@ static Texture2D<float4> cachedTexture = initializeTexture();
 [noinline]
 uint initializeAfter()
 {
-    return ++sequence;
+    output[0] = float4(1.0);
+    return 0;
 }
 
 static uint after = initializeAfter();
 
-RWStructuredBuffer<uint> output;
-
 [numthreads(1, 1, 1)]
 void main()
 {
-    output[0] = before;
-    output[1] = after;
-    output[2] = sequence;
-    output[3] = uint(cachedTexture.Load(int3(0, 0, 0)).x);
+    output[1] = cachedTexture.Load(int3(0, 0, 0)) + float(after);
 }

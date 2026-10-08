@@ -6144,7 +6144,7 @@ err(
     "cannot-prove-mutable-resource-initializer-safe-to-move",
     56013,
     "cannot prove that a mutable resource initializer can be moved safely",
-    span { loc = "location", message = "Slang cannot prove that moving the initializer for the mutable resource variable '~variable:IRInst' to each entry point preserves observable behavior. The initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group; initialize the resource explicitly in an entry point instead" }
+    span { loc = "location", message = "Slang cannot prove that moving the initializer for the mutable resource variable '~variable:IRInst' to each entry point preserves observable behavior. The initializer may fail to return normally, may have externally observable side effects, or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group; initialize the resource explicitly in an entry point instead" }
 )
 
 err(

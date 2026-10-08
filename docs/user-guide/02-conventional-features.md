@@ -601,6 +601,30 @@ A global-scope `static const` variable defines a compile-time constant for use i
 A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
 Each logical thread of shader execution initiated by the GPU will be allocated fresh storage for these `static` variables, and values written to those variables will be lost when a shader thread terminates.
 
+#### Resource-Valued Static Variables
+
+A mutable file- or namespace-scope `static` variable may hold one non-combined texture or typed-buffer resource, one sampler state, one structured buffer other than an append or consume buffer, or one byte-address buffer.
+A fixed-size homogeneous array of any of these resource types is also supported.
+
+The variable stores a resource binding separately for each shader invocation.
+Assigning the variable changes which bound resource later operations use during that invocation; it does not rebind the shader parameter that supplied the value or copy the resource's contents.
+An operation through the variable accesses the selected resource normally.
+
+Slang must be able to represent the variable as per-invocation state in the entry point and every helper function that uses it.
+The declaration therefore cannot use `groupshared` or a memory-access qualifier such as `globallycoherent`.
+Slang also reports an error when the program requires persistent or externally visible storage, observes the storage identity through an address, or accesses the variable from a function that cannot receive the per-invocation state.
+Some targets cannot represent resource-valued local variables or function parameters.
+Slang accepts those targets only when it can eliminate the unsupported forms during compilation.
+
+The supported forms do not include explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, structs containing resources, combined texture-sampler types, append and consume buffers, acceleration structures, or `__DynamicResource`.
+When code assigns individual elements of a resource array, Slang must be able to prove that no read can occur before a whole-array assignment; otherwise it reports that complete initialization has not been established.
+
+An initializer for a supported resource-valued `static` variable must be safe to evaluate at the start of each entry point.
+Slang must prove that the initializer and every function it can call return normally for all possible inputs.
+The current analysis cannot establish that proof across a loop or recursive call cycle that remains after optimization, even when the programmer knows that it terminates.
+Slang also reports an error when the initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group.
+When Slang cannot prove the initializer safe to move, initialize the variable explicitly in an entry point instead.
+
 > #### Note ####
 > Some target platforms do not support `static` global variables in all use cases.
 > Support for `static` global variables should be seen as a legacy feature, and further use is discouraged.

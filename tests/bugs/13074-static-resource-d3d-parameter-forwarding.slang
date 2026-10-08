@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -O0 -target hlsl -entry main -stage compute -validate-ir
 
-// HLSL can forward a by-value resource parameter through ordinary function calls. The D3D
-// resource-input inlining step considers a call only when an argument has neither a form accepted
-// by resource specialization nor a direct origin in the caller's parameters. This test passes a
-// supported global resource, so both call boundaries must remain intact.
+// Generated HLSL can pass `inputTexture` to `forwardTexture`, which can in turn pass its parameter
+// to `readTexture`. Neither argument is loaded from mutable local resource storage, so the D3D
+// resource-input inlining in `specializeResourceUsage` must leave both call boundaries intact. The
+// checks pin both definitions and both calls.
 
 Texture2D<float4> inputTexture;
 RWStructuredBuffer<float4> output;

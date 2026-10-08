@@ -337,30 +337,41 @@ static void collectPhiMergePossibleWrites(
     }
 }
 
-/// An `OperandUseEffect` states how one exact operand use affects the tracked value.
-enum class OperandUseEffect
+/// A `ModuleWideOperandUseClassification` records how the module-wide uninitialized-value
+/// heuristic treats one exact operand use.
+///
+/// This is not an exhaustive effect set. The legacy analysis assigns each use to one category. If
+/// a use may both read and write, or if its effects are opaque, it records only `PossibleWrite`.
+/// That choice makes the no-write proof inconclusive and treats the instruction as a propagation
+/// boundary, favoring suppression of a warning over diagnosing a possible read. The generated-
+/// resource-local analysis uses `GeneratedResourceLocalUseEffect` when it needs independent read,
+/// write, and propagation-boundary facts.
+enum class ModuleWideOperandUseClassification
 {
-    NoEffect,                  // The use neither reads nor may write the tracked value.
-    MayWrite,                  // The instruction may write the tracked value.
-    EnclosingSPIRVAsmMayWrite, // The enclosing SPIR-V assembly may write the value.
-    Read,                      // The instruction reads the tracked value.
+    Ignored,
+    PossibleWrite,
+    EnclosingSPIRVAsmPossibleWrite,
+    Read,
 };
 
-/// Return how `argumentUse` accesses the tracked value at one call site.
+/// Classify `argumentUse` for the module-wide uninitialized-value heuristic.
 ///
 /// A call may pass the same value to parameters with different directions. We therefore inspect
 /// the parameter that corresponds to this exact argument use instead of searching for the first
 /// argument with the same value.
-static OperandUseEffect getCallArgumentOperandUseEffect(IRCall* call, IRUse* argumentUse)
+static ModuleWideOperandUseClassification classifyModuleWideCallArgumentUse(
+    IRCall* call,
+    IRUse* argumentUse)
 {
     SLANG_ASSERT(argumentUse != call->getCalleeUse());
     IRInst* callee = call->getCallee();
 
     // Before automatic-differentiation lowering, an `IRTranslateBase` callee does not expose the
-    // translated function's parameter directions. We conservatively treat each argument as a
-    // possible write.
+    // translated function's parameter directions. We retain the legacy `PossibleWrite`
+    // classification, which prevents an unsupported translated call from causing a speculative
+    // uninitialized-read diagnostic.
     if (as<IRTranslateBase>(callee))
-        return OperandUseEffect::MayWrite;
+        return ModuleWideOperandUseClassification::PossibleWrite;
 
     // `findCallArgumentParameterType` preserves the identity of `argumentUse`, including when
     // another argument uses the same value. When the call-site type provides no corresponding
@@ -368,43 +379,45 @@ static OperandUseEffect getCallArgumentOperandUseEffect(IRCall* call, IRUse* arg
     // argument as a read so that an unknown call contract cannot hide an uninitialized use.
     auto parameterType = findCallArgumentParameterType(call, argumentUse);
     if (!parameterType)
-        return OperandUseEffect::Read;
+        return ModuleWideOperandUseClassification::Read;
 
-    // `out`, `inout`, and `ref` parameters may write the tracked value. Supplying every other
-    // parameter evaluates the argument as an input, so the call reads the tracked value. This
-    // classification depends on the call-site signature, not on whether specialization has already
-    // selected a concrete callee body.
+    // `out`, `inout`, and `ref` parameters may write the tracked value, so the module-wide
+    // heuristic classifies them as `PossibleWrite`. An `inout` or `ref` parameter may also read the
+    // incoming value, but this one-category heuristic deliberately omits that read and treats the
+    // call as a propagation boundary. Every other parameter evaluates the argument as an input and
+    // is classified as `Read`. These classifications use the call-site signature rather than a
+    // specialized callee body.
     if (as<IROutParamType>(parameterType))
-        return OperandUseEffect::MayWrite;
+        return ModuleWideOperandUseClassification::PossibleWrite;
     if (as<IRBorrowInOutParamType>(parameterType))
-        return OperandUseEffect::MayWrite;
+        return ModuleWideOperandUseClassification::PossibleWrite;
     if (as<IRRefParamType>(parameterType))
-        return OperandUseEffect::MayWrite;
-    return OperandUseEffect::Read;
+        return ModuleWideOperandUseClassification::PossibleWrite;
+    return ModuleWideOperandUseClassification::Read;
 }
 
-/// Return how the instruction that owns `use` accesses the tracked value supplied by that use.
+/// Classify the instruction that owns `use` for the module-wide uninitialized-value heuristic.
 ///
 /// We retain the exact operand use because one instruction can use the same value in roles with
-/// different read and write effects. For a call operand, we use the corresponding parameter
-/// direction when one exists. Every other opcode without a more precise operand contract receives
-/// a conservative read or write effect.
-static OperandUseEffect getOperandUseEffect(IRUse* use)
+/// different classifications. For a call operand, we use the corresponding parameter direction
+/// when one exists. Every other opcode without a more precise rule receives the legacy
+/// read-or-possible-write classification described above.
+static ModuleWideOperandUseClassification classifyModuleWideOperandUse(IRUse* use)
 {
     auto user = use->getUser();
 
     // Type-only queries do not observe whether the value is initialized.
     if (doesInstOnlyDependOnOperandTypes(user))
-        return OperandUseEffect::NoEffect;
+        return ModuleWideOperandUseClassification::Ignored;
 
     // Debug records describe the program without reading or writing its runtime values.
     if (isDebugInfoInst(user))
-        return OperandUseEffect::NoEffect;
+        return ModuleWideOperandUseClassification::Ignored;
 
     // `getAliasableInstructions` follows each alias-producing instruction to its eventual users.
     // We therefore defer read/write classification until one of those users consumes the alias.
     if (isAliasable(user))
-        return OperandUseEffect::NoEffect;
+        return ModuleWideOperandUseClassification::Ignored;
 
     switch (user->getOp())
     {
@@ -412,7 +425,7 @@ static OperandUseEffect getOperandUseEffect(IRUse* use)
     case kIROp_UnconditionalBranch:
         // The alias walk follows each branch argument to the corresponding block parameter. The
         // branch itself adds no read or write beyond that value transfer.
-        return OperandUseEffect::NoEffect;
+        return ModuleWideOperandUseClassification::Ignored;
 
     case kIROp_Call:
         {
@@ -422,8 +435,8 @@ static OperandUseEffect getOperandUseEffect(IRUse* use)
             // direction determines whether this particular operand reads or may write the tracked
             // value.
             if (use == call->getCalleeUse())
-                return OperandUseEffect::Read;
-            return getCallArgumentOperandUseEffect(call, use);
+                return ModuleWideOperandUseClassification::Read;
+            return classifyModuleWideCallArgumentUse(call, use);
         }
 
     case kIROp_Store:
@@ -435,36 +448,44 @@ static OperandUseEffect getOperandUseEffect(IRUse* use)
         // same instruction. When operand one has pointer type, the store copies the address without
         // reading the pointee, so it does not read the tracked value.
         if (use == user->getOperandUse(1) && !as<IRPtrTypeBase>(use->get()->getDataType()))
-            return OperandUseEffect::Read;
-        return OperandUseEffect::MayWrite;
+            return ModuleWideOperandUseClassification::Read;
+        return ModuleWideOperandUseClassification::PossibleWrite;
 
     case kIROp_SPIRVAsm:
-        // A SPIR-V assembly instruction is opaque, so we treat each direct operand as a possible
-        // write.
-        return OperandUseEffect::MayWrite;
+        // A SPIR-V assembly instruction is opaque. We retain the legacy `PossibleWrite`
+        // classification so that the module-wide heuristic does not diagnose a possible read whose
+        // assembly-level effect it cannot inspect.
+        return ModuleWideOperandUseClassification::PossibleWrite;
 
     case kIROp_SPIRVAsmOperandInst:
         // A SPIR-V assembly operand record belongs to an enclosing assembly instruction. The
         // assembly instruction is the executable operation, so we record the possible write there.
-        return OperandUseEffect::EnclosingSPIRVAsmMayWrite;
+        return ModuleWideOperandUseClassification::EnclosingSPIRVAsmPossibleWrite;
 
     case kIROp_MakeExistential:
     case kIROp_MakeExistentialWithRTTI:
-        // Existential construction may copy the tracked value into its result, which the generic
-        // specialization logic can later expose as mutable storage.
-        return OperandUseEffect::MayWrite;
+        // Existential construction packages and therefore reads the tracked value. The legacy
+        // heuristic nevertheless records `PossibleWrite` for this opcode. We preserve that
+        // classification to avoid changing warning results as part of this refactor; because the
+        // heuristic stores only one category, it consequently omits the known read.
+        return ModuleWideOperandUseClassification::PossibleWrite;
 
     case kIROp_ManagedPtrAttach:
     case kIROp_Unmodified:
-        // These marker instructions may preserve writable access to the tracked value.
-        return OperandUseEffect::MayWrite;
+        // These marker instructions preserve the tracked pointer for later uses that this
+        // module-wide heuristic does not follow. We record `PossibleWrite` so that the no-write
+        // proof becomes inconclusive and suppresses a warning. Because the heuristic stores only
+        // one category, this choice may omit a simultaneous read.
+        return ModuleWideOperandUseClassification::PossibleWrite;
 
     default:
-        // For every remaining opcode, we conservatively classify a pointer-producing instruction
-        // as a possible write through its result. A non-pointer result reads the tracked value.
+        // For every remaining opcode, the legacy policy classifies a pointer-producing instruction
+        // as a possible write through its result and a non-pointer result as a read. The
+        // possible-write choice intentionally follows the warning-suppression policy above rather
+        // than claiming that the instruction cannot also read the pointee.
         if (as<IRPtrTypeBase>(user->getDataType()))
-            return OperandUseEffect::MayWrite;
-        return OperandUseEffect::Read;
+            return ModuleWideOperandUseClassification::PossibleWrite;
+        return ModuleWideOperandUseClassification::Read;
     }
 }
 
@@ -480,26 +501,29 @@ static void collectGenericAssemblyPossibleWrites(List<IRInst*>& possibleWrites, 
     }
 }
 
-/// Append the instruction that owns `use` to the list selected by the use's access classification.
+/// Append the instruction that owns `use` to the list selected by the module-wide classification.
 ///
-/// We pass the exact `IRUse` to `getOperandUseEffect` so two occurrences of the same value in
-/// one instruction can contribute different effects.
-static void appendOperandUseEffect(List<IRInst*>& possibleWrites, List<IRInst*>& reads, IRUse* use)
+/// We pass the exact `IRUse` to `classifyModuleWideOperandUse` so two occurrences of the same value
+/// in one instruction can receive different classifications.
+static void appendModuleWideOperandUseClassification(
+    List<IRInst*>& possibleWrites,
+    List<IRInst*>& reads,
+    IRUse* use)
 {
-    // We classify the exact operand and append the instruction where its effect occurs. A SPIR-V
-    // assembly operand reports its parent assembly instruction because reachability is defined for
-    // that instruction rather than for the operand record.
+    // We classify the exact operand and append the instruction where the heuristic applies that
+    // classification. A SPIR-V assembly operand reports its parent assembly instruction because
+    // reachability is defined for that instruction rather than for the operand record.
     auto user = use->getUser();
-    OperandUseEffect effect = getOperandUseEffect(use);
-    switch (effect)
+    auto classification = classifyModuleWideOperandUse(use);
+    switch (classification)
     {
-    case OperandUseEffect::NoEffect:
+    case ModuleWideOperandUseClassification::Ignored:
         return;
-    case OperandUseEffect::Read:
+    case ModuleWideOperandUseClassification::Read:
         return reads.add(user);
-    case OperandUseEffect::MayWrite:
+    case ModuleWideOperandUseClassification::PossibleWrite:
         return possibleWrites.add(user);
-    case OperandUseEffect::EnclosingSPIRVAsmMayWrite:
+    case ModuleWideOperandUseClassification::EnclosingSPIRVAsmPossibleWrite:
         return possibleWrites.add(user->getParent());
     }
 }
@@ -1036,9 +1060,9 @@ static void collectAliasableReadsAndPossibleWrites(
     List<IRInst*>& possibleWrites,
     List<IRInst*>& reads)
 {
-    // We collect every read and possible write reached through an alias of `inst`. We follow the
-    // address-preserving instructions, classify each exact use, and treat a defined value entering
-    // an aliasing phi as an initialized value at that merge.
+    // We follow address-preserving instructions and collect the read or possible-write category
+    // that the module-wide heuristic assigns to each exact use. We also treat a defined value
+    // entering an aliasing phi as an initialized value at that merge.
     HashSet<IRInst*> aliasSet;
     auto addresses = getAliasableInstructions(inst, aliasSet);
 
@@ -1047,7 +1071,7 @@ static void collectAliasableReadsAndPossibleWrites(
         // TODO: We should record which parts are written so partial-initialization checks can use
         // that information.
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            appendOperandUseEffect(possibleWrites, reads, use);
+            appendModuleWideOperandUseClassification(possibleWrites, reads, use);
     }
 
     // A defined value flowing into a phi alias is a possible write at that merge. We record it so
@@ -1295,7 +1319,7 @@ static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* referenc
     for (auto alias : getAliasableInstructions(inst))
     {
         for (auto use = alias->firstUse; use; use = use->nextUse)
-            appendOperandUseEffect(possibleWrites, ignoredReads, use);
+            appendModuleWideOperandUseClassification(possibleWrites, ignoredReads, use);
     }
 
     for (auto possibleWrite : possibleWrites)
@@ -1334,14 +1358,14 @@ static bool isReturnedValue(IRInst* inst)
 
 static bool isDirectlyWrittenTo(IRInst* inst)
 {
-    // We ask whether an immediate use of `inst` may write the tracked value. A write can be
-    // associated with either the user itself or its parent instruction, so both classifications
-    // answer the question.
+    // We ask whether the module-wide heuristic classifies an immediate use as a possible write. A
+    // SPIR-V assembly operand records that classification on its enclosing instruction, so both
+    // possible-write categories answer the question.
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
-        OperandUseEffect effect = getOperandUseEffect(use);
-        if (effect == OperandUseEffect::MayWrite ||
-            effect == OperandUseEffect::EnclosingSPIRVAsmMayWrite)
+        auto classification = classifyModuleWideOperandUse(use);
+        if (classification == ModuleWideOperandUseClassification::PossibleWrite ||
+            classification == ModuleWideOperandUseClassification::EnclosingSPIRVAsmPossibleWrite)
             return true;
     }
 
@@ -1633,9 +1657,10 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
     {
         for (auto use = alias->firstUse; use; use = use->nextUse)
         {
-            OperandUseEffect effect = getOperandUseEffect(use);
-            if (effect == OperandUseEffect::MayWrite ||
-                effect == OperandUseEffect::EnclosingSPIRVAsmMayWrite)
+            auto classification = classifyModuleWideOperandUse(use);
+            if (classification == ModuleWideOperandUseClassification::PossibleWrite ||
+                classification ==
+                    ModuleWideOperandUseClassification::EnclosingSPIRVAsmPossibleWrite)
             {
                 if (variable->findDecoration<IRFileOrNamespaceScopeMutableVarDecoration>())
                 {
@@ -1647,7 +1672,7 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
                 return;
             }
 
-            if (effect == OperandUseEffect::Read)
+            if (classification == ModuleWideOperandUseClassification::Read)
                 reads.add(use->getUser());
         }
     }

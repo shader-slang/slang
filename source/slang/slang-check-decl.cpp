@@ -2718,18 +2718,20 @@ static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
         break;
     }
 
-    // `ResourceType` covers textures and typed buffers. A non-combined resource stays in one IR
-    // value. HLSL, Metal, WGSL, and CPU-like targets split a combined texture-sampler into separate
-    // texture and sampler values, so we reject combined resources for every target.
+    // By default we allow a `ResourceType` as a per-invocation variable because values of that
+    // type remain one IR value when target-specific resource legalization runs. A combined
+    // texture-sampler can instead be split into separate texture and sampler values, so we exclude
+    // combined resources from a transformation that carries exactly one replacement value.
     if (auto resourceType = as<ResourceType>(type))
         return !resourceType->isCombined();
 
-    // A sampler also stays in one IR value.
+    // We allow a sampler state because target legalization also leaves it as one IR value.
     if (as<SamplerStateType>(type))
         return true;
 
-    // These structured-buffer types stay in one IR value. We list them instead of accepting their
-    // common base class because append and consume buffers also carry a counter.
+    // We allow the listed structured buffers because each remains one IR value. We name the
+    // variants individually because their common base class also includes append and consume
+    // buffers, whose counter requires additional state that this transformation cannot carry.
     if (as<HLSLStructuredBufferType>(type))
         return true;
     if (as<HLSLRWStructuredBufferType>(type))
@@ -2737,7 +2739,7 @@ static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
     if (as<HLSLRasterizerOrderedStructuredBufferType>(type))
         return true;
 
-    // These byte-address buffer types also stay in one IR value.
+    // We allow the listed byte-address buffers because each remains one IR value.
     if (as<HLSLByteAddressBufferType>(type))
         return true;
     if (as<HLSLRWByteAddressBufferType>(type))
@@ -2817,8 +2819,7 @@ static bool isTypeSupportedForMutableGlobalVariable(Type* type, TypeTag typeTags
 //
 // Requires `typeTags` to describe `decl`'s checked type. Diagnoses an unsupported opaque or
 // non-addressable type, and diagnoses a supported resource type when a storage or memory-access
-// modifier prevents per-invocation replacement. `SemanticsDeclBodyVisitor::checkVarDeclCommon`
-// reports unsized storage before calling.
+// modifier prevents per-invocation replacement. The caller reports unsized storage first.
 static void checkMutableGlobalVariableStorage(
     SemanticsVisitor* visitor,
     VarDeclBase* decl,
@@ -2832,8 +2833,9 @@ static void checkMutableGlobalVariableStorage(
     if (!_isMutableFileOrNamespaceScopeStaticVariable(decl))
         return;
 
-    // `checkVarDeclCommon` has already diagnosed an unsized variable. We stop before applying the
-    // opaque-type policy so that an unbounded resource array produces one storage diagnostic.
+    // `checkVariableStorageRequirements` has already diagnosed an unsized variable. We stop before
+    // applying the opaque-type policy so that an unbounded resource array produces one storage
+    // diagnostic.
     if ((int)typeTags & (int)TypeTag::Unsized)
         return;
 
@@ -2894,6 +2896,27 @@ static bool requiresSizedVariableType(VarDeclBase* decl)
         return isEffectivelyStatic(decl);
 
     return true;
+}
+
+// Apply the sized-type rule and mutable-global storage policy shared by header and body checking.
+static void checkVariableStorageRequirements(
+    SemanticsVisitor* visitor,
+    VarDeclBase* decl,
+    TypeTag typeTags)
+{
+    // Shader parameters receive their storage from the application, function parameters receive it
+    // from the caller, and a non-static field is stored as part of its enclosing aggregate. Those
+    // declarations have separate rules for unsized types.
+    if (!requiresSizedVariableType(decl))
+        return;
+
+    // Every other variable must have a sized type. We report that general requirement
+    // before applying the more specific policy for mutable file- or namespace-scope `static`
+    // variables.
+    if ((int)typeTags & (int)TypeTag::Unsized)
+        visitor->getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = decl});
+
+    checkMutableGlobalVariableStorage(visitor, decl, typeTags);
 }
 
 void SemanticsDeclHeaderVisitor::visitUniformParameterShadowVarDecl(
@@ -3243,10 +3266,16 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             varDecl->setCheckState(DeclCheckState::SignatureChecked);
     }
 
-    // Header checking has already advanced declarations with inferred types or array bounds
-    // to `DefinitionChecked`. We validate their array elements here because
-    // `SemanticsDeclBodyVisitor` will not run for those declarations.
-    validateArrayElementTypeForVariable(varDecl);
+    // Header checking advances declarations with inferred types or array bounds to
+    // `DefinitionChecked`, so `SemanticsDeclBodyVisitor` will not run for them. We therefore
+    // validate their array element type and variable storage requirements now that the header has
+    // finished adjusting the type. Declarations that remain at `SignatureChecked` receive these
+    // checks from the body visitor instead.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+    {
+        validateArrayElementTypeForVariable(varDecl);
+        checkVariableStorageRequirements(this, varDecl, getTypeTags(varDecl->getType()));
+    }
 }
 
 static void addAutoDiffModifiersToFunc(
@@ -3918,18 +3947,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     validateStructuredBufferElementType(this, varDecl);
 
-    // We reject unsized ordinary variables, while parameters and trailing aggregate fields
-    // have separate rules. Mutable `static` globals also use the shared type restriction.
-    if (requiresSizedVariableType(varDecl))
-    {
-        bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
-        if (isUnsized)
-        {
-            getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
-        }
-
-        checkMutableGlobalVariableStorage(this, varDecl, varTypeTags);
-    }
+    // Declarations that reach body checking have not yet received the storage checks that the
+    // header applies to declarations completed during type or array-bound inference.
+    checkVariableStorageRequirements(this, varDecl, varTypeTags);
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
