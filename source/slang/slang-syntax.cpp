@@ -184,6 +184,17 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
         sb << "init";
         return;
     }
+    // We need to print a name the user can recognize. Legacy `cbuffer` parsing and HLSL
+    // compatibility desugaring assign internal names to shader parameters, so we use the
+    // original name recorded in `ParameterGroupReflectionName` when it is available.
+    if (auto parameter = as<VarDecl>(decl))
+    {
+        if (auto reflectionName = parameter->findModifier<ParameterGroupReflectionName>())
+        {
+            sb << getText(reflectionName->nameAndLoc.name);
+            return;
+        }
+    }
     if (decl->getName() && decl->getName()->text.getLength())
         sb << getText(decl->getName());
     else
@@ -226,6 +237,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         break;
     case ASTNodeType::ClassDecl:
         sb << "class";
+        break;
+    case ASTNodeType::HLSLClassDecl:
+        sb << "HLSL-style class";
         break;
     case ASTNodeType::GLSLInterfaceBlockDecl:
         sb << "GLSL interface block";
