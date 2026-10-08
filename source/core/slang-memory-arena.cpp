@@ -1,6 +1,8 @@
 
 #include "slang-memory-arena.h"
 
+#include "slang-allocator.h"
+
 namespace Slang
 {
 
@@ -39,7 +41,7 @@ void MemoryArena::init(size_t blockPayloadSize, size_t blockAlignment)
 void MemoryArena::_initialize(size_t blockPayloadSize, size_t alignment)
 {
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     // Ensure it's alignment is at least kMinAlignment
     alignment = (alignment < kMinAlignment) ? kMinAlignment : alignment;
@@ -109,7 +111,7 @@ void MemoryArena::_setCurrentBlock(Block* block)
     m_start = block->m_start;
     m_current = m_start;
 
-    assert(m_usedBlocks == block);
+    SLANG_ASSERT(m_usedBlocks == block);
 }
 
 void MemoryArena::_deallocateBlocksPayload(Block* start)
@@ -118,7 +120,7 @@ void MemoryArena::_deallocateBlocksPayload(Block* start)
     while (cur)
     {
         // Deallocate the block
-        ::free(cur->m_alloc);
+        StandardAllocator::deallocate(cur->m_alloc);
         cur = cur->m_next;
     }
 }
@@ -130,7 +132,7 @@ void MemoryArena::_deallocateBlocks(Block* start)
     {
         Block* next = cur->m_next;
         // Deallocate the block
-        ::free(cur->m_alloc);
+        StandardAllocator::deallocate(cur->m_alloc);
 
         m_blockFreeList.deallocate(cur);
         cur = next;
@@ -157,7 +159,7 @@ void MemoryArena::_deallocateBlock(Block* block)
     else
     {
         // Must be odd sized so free it
-        ::free(block->m_alloc);
+        StandardAllocator::deallocate(block->m_alloc);
         // Free it in the block list
         m_blockFreeList.deallocate(block);
     }
@@ -240,15 +242,15 @@ MemoryArena::Block* MemoryArena::_newNormalBlock()
 
     Block* block = _newBlock(m_blockAllocSize, m_blockAlignment);
     // Check that every normal block has m_blockPayloadSize space
-    assert(size_t(block->m_end - block->m_start) >= m_blockPayloadSize);
+    SLANG_ASSERT(size_t(block->m_end - block->m_start) >= m_blockPayloadSize);
     return block;
 }
 
 MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
 {
-    assert(alignment >= m_blockAlignment);
+    SLANG_ASSERT(alignment >= m_blockAlignment);
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     // Allocate block
     Block* block = (Block*)m_blockFreeList.allocate();
@@ -258,7 +260,7 @@ MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
     }
 
     // Allocate the memory
-    uint8_t* alloc = (uint8_t*)::malloc(allocSize);
+    uint8_t* alloc = (uint8_t*)StandardAllocator::allocate(allocSize);
     if (!alloc)
     {
         m_blockFreeList.deallocate(block);
@@ -328,9 +330,9 @@ void* MemoryArena::_allocateAlignedFromNewBlockAndZero(size_t sizeInBytes, size_
 void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
 {
     // Make sure init has been called (or has been set up in parameterized constructor)
-    assert(m_blockAllocSize > 0);
+    SLANG_ASSERT(m_blockAllocSize > 0);
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     // Alignment must at a minimum be block alignment (such if reused the constraints hold)
     alignment = (alignment < m_blockAlignment) ? m_blockAlignment : alignment;
@@ -363,7 +365,7 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     else
     {
         // Must be allocatable within a normal block
-        assert(allocSize <= m_blockAllocSize);
+        SLANG_ASSERT(allocSize <= m_blockAllocSize);
         block = _newNormalBlock();
     }
 
@@ -380,11 +382,11 @@ void* MemoryArena::_allocateAlignedFromNewBlock(size_t size, size_t alignment)
     uint8_t* memory = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
 
     // It must be aligned
-    assert((size_t(memory) & alignMask) == 0);
+    SLANG_ASSERT((size_t(memory) & alignMask) == 0);
 
     // Do the aligned allocation (which must fit) by aligning the pointer
     // It must fit if the previous code is correct...
-    assert(memory + size <= m_end);
+    SLANG_ASSERT(memory + size <= m_end);
     // Move the current pointer
     m_current = memory + size;
     return memory;
@@ -423,7 +425,7 @@ void MemoryArena::_rewindToCursor(const void* cursorIn)
 
     // Find the block that contains the allocation
     Block* cursorBlock = _findNonCurrent(cursorIn);
-    assert(cursorBlock);
+    SLANG_ASSERT(cursorBlock);
     if (!cursorBlock)
     {
         // If not found it means this address is NOT part any of the active used heap!
@@ -448,7 +450,7 @@ void MemoryArena::_rewindToCursor(const void* cursorIn)
 
     const uint8_t* cursor = (const uint8_t*)cursorIn;
     // Must be in the range of the currently set block
-    assert(cursor >= m_start && cursor <= m_end);
+    SLANG_ASSERT(cursor >= m_start && cursor <= m_end);
 
     // Set the current position where the cursor is
     m_current = const_cast<uint8_t*>(cursor);

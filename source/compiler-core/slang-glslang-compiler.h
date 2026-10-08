@@ -1,7 +1,7 @@
 #ifndef SLANG_GLSLANG_COMPILER_UTIL_H
 #define SLANG_GLSLANG_COMPILER_UTIL_H
 
-#include "../core/slang-platform.h"
+#include "core/slang-platform.h"
 #include "slang-downstream-compiler-util.h"
 
 namespace Slang

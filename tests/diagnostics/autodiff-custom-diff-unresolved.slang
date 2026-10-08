@@ -12,6 +12,7 @@ void __d_f(float x, float.Differential dout)
 /*CHECK:
                     ^^^^^ undefined identifier
                     ^^^^^ undefined identifier '__d_g'.
+                    ^^^^^ did you mean '__d_f'?
  ^^^^^^^^^^^^^^^^^^ cannot resolve derivative function
  ^^^^^^^^^^^^^^^^^^ cannot resolve the custom derivative function
 */

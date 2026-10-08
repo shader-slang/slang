@@ -1,9 +1,9 @@
 #ifndef SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 #define SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 
-#include "../replay-context.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
 
 namespace SlangRecord
 {

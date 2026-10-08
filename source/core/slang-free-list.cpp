@@ -1,5 +1,7 @@
 #include "slang-free-list.h"
 
+#include "slang-allocator.h"
+
 // #include "list.h"
 
 namespace Slang
@@ -32,7 +34,7 @@ void FreeList::_init(size_t elementSize, size_t alignment, size_t elemsPerBlock)
     alignment = (alignment < sizeof(void*)) ? sizeof(void*) : alignment;
 
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     // The elementSize must at least be at least the same size as the alignment
     elementSize = (elementSize >= alignment) ? elementSize : alignment;
@@ -90,7 +92,7 @@ void FreeList::_deallocateBlocks(Block* block)
         Memory::set(block, 0xfd, m_blockAllocationSize);
 #endif
 
-        ::free(block); // deallocate(block, m_blockAllocationSize);
+        StandardAllocator::deallocate(block); // deallocate(block, m_blockAllocationSize);
         block = next;
     }
 }
@@ -150,7 +152,7 @@ void* FreeList::_allocate()
     else
     {
         // block = (Block*)m_allocator->allocate(m_blockAllocationSize);
-        block = (Block*)::malloc(m_blockAllocationSize);
+        block = (Block*)StandardAllocator::allocate(m_blockAllocationSize);
         if (!block)
         {
             // Allocation failed... doh

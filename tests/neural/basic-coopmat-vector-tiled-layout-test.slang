@@ -39,12 +39,12 @@ RWStructuredBuffer<uint> testResult;
 //
 // Bias = {9, 10} stored separately at offset 256.
 
-// Tiled layout weight buffer: 258 elements (one 16x16 tile + 2 bias).
-// Use stride=4 so the buffer is large enough for both half (258*2=516B) and float (258*4=1032B).
-//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
+// Tiled layout parameter buffer: one 16x16 tile plus a padded bias block.
+// Use stride=4 so the buffer is large enough for both half and float.
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=272)
 
 // Tiled layout dW buffer (same layout as parameters).
-//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=272)
 
 struct TestBuffers
 {
@@ -67,6 +67,8 @@ ParameterBlock<TestBuffers> buffers;
 
 static const int InputSize = 4;
 static const int OutputSize = 2;
+static const int BiasOffset = PadToTile<InputSize>.Value * PadToTile<OutputSize>.Value;
+static const int ParamBufferSize = BiasOffset + PadToTile<OutputSize>.Value;
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
@@ -90,7 +92,7 @@ void setupParameters(uint tid)
 {
     if (tid == 0)
     {
-        for (int i = 0; i < 258; i++)
+        for (int i = 0; i < ParamBufferSize; i++)
             buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
@@ -99,8 +101,8 @@ void setupParameters(uint tid)
         for (int col = 0; col < InputSize; col++)
             buffers.parameters[tiledWeightOffset<InputSize>(1, col)] = ElementType(InputSize + col + 1);
 
-        buffers.parameters[256] = ElementType(9);
-        buffers.parameters[257] = ElementType(10);
+        buffers.parameters[BiasOffset] = ElementType(9);
+        buffers.parameters[BiasOffset + 1] = ElementType(10);
     }
 
 }
@@ -109,7 +111,7 @@ void cleanupDParameters(uint tid)
 {
     if (tid == 0)
     {
-        for (int i = 0; i < 258; i++)
+        for (int i = 0; i < ParamBufferSize; i++)
             buffers.dParameters[i] = ElementType(0.0);
     }
 }
@@ -149,7 +151,7 @@ void ForwardTestWithBias(int tid, int resIndex)
     InVectorType input = InVectorType(inputData);
 
     Address weightAddress = Address(buffers.parameters);
-    Address biasAddress = weightAddress.getOffset(256);
+    Address biasAddress = weightAddress.getOffset(BiasOffset);
 
     let outputVec = input.linearTransform<Address, OptimalLayout, OutVectorType>(weightAddress, biasAddress);
 
@@ -239,9 +241,9 @@ void BackwardTestWithBias(int tid, int resIndex)
     InVectorType input = InVectorType(inputData);
 
     Address weightAddress = Address(buffers.parameters);
-    Address biasAddress = weightAddress.getOffset(256);
+    Address biasAddress = weightAddress.getOffset(BiasOffset);
     Address dWeightAddress = Address(buffers.dParameters);
-    Address dBiasAddress = dWeightAddress.getOffset(256);
+    Address dBiasAddress = dWeightAddress.getOffset(BiasOffset);
 
     let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightAddress, biasAddress);
 
@@ -270,7 +272,7 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // dBias = dOutput accumulated across 32 threads = [32, 32]
     isPassed = isPassed &&
-        equals(buffers.dParameters[256], ElementType(32.0)) && equals(buffers.dParameters[257], ElementType(32.0));
+        equals(buffers.dParameters[BiasOffset], ElementType(32.0)) && equals(buffers.dParameters[BiasOffset + 1], ElementType(32.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)

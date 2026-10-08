@@ -6,7 +6,7 @@ int badTypeUse<each T>()
 //CHECK:                 ^^^^^^^ cannot apply __first to a pack that may be empty
 //CHECK:                 ^^^^^^^ __first requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
 //CHECK:   ^^^^^^^ invalid countof argument
-//CHECK:   ^^^^^^^ argument to countof can only be a type pack or tuple
+//CHECK:   ^^^^^^^ argument to countof must be a type pack, tuple, value pack, or fixed-size array
 }
 
 int badValueUse<let each D : int>()
@@ -53,7 +53,7 @@ int badTypePackUse<each T>()
 //CHECK:                 ^^^^^^ cannot apply __last to a pack that may be empty
 //CHECK:                 ^^^^^^ __last requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
 //CHECK:   ^^^^^^^ invalid countof argument
-//CHECK:   ^^^^^^^ argument to countof can only be a type pack or tuple
+//CHECK:   ^^^^^^^ argument to countof must be a type pack, tuple, value pack, or fixed-size array
 }
 
 int goodTypePackUse<each T>() where nonempty(T)
@@ -110,7 +110,7 @@ void badMismatchedForward<let each P : int, let each Q : int>() where nonempty(P
 }
 
 int badSpecialization = goodValueUse<>();
-//CHECK:                              ^ could not specialize generic for arguments of type ()
+//CHECK:                              ^ could not satisfy the generic constraint 'nonempty(D)'
 
 interface IMarker {}
 

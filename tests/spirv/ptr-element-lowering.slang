@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2
 
 // CHECK: OpEntryPoint
 

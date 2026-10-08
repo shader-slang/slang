@@ -19,12 +19,16 @@ struct ShaderBinary
     List<uint8_t> code;
 };
 
-class ShaderProgramImpl : public ShaderProgramBase
+class ShaderProgramImpl : public ShaderProgramBase, public IShaderProgramD3D12
 {
 public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+
     RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     List<ShaderBinary> m_shaders;
 
+    virtual void* getInterface(const Slang::Guid& guid) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getRootSignature(void** outRootSignature) override;
     virtual Result createShaderModule(
         slang::EntryPointReflection* entryPointInfo,
         List<ComPtr<ISlangBlob>>& kernelCodes) override;

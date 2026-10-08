@@ -8,6 +8,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-options.h"
+#include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -45,14 +46,46 @@ private:
             {
                 checkOutputTopologyDecoration(outputTopologyDecoration, stage);
             }
+            else if (auto postDepthCoverage = as<IRPostDepthCoverageDecoration>(decoration))
+            {
+                checkPostDepthCoverageDecoration(postDepthCoverage);
+            }
         }
+    }
+
+    // `[postdepthcoverage]` only lowers to an execution mode on the Khronos targets (SPIR-V and
+    // GLSL). On any other target the decoration is silently dropped, which would leave a shader
+    // that reads `SV_Coverage` running with ordinary pre-depth coverage — a different result with
+    // no compile-time signal. Warn so that mismatch is visible rather than silent.
+    void checkPostDepthCoverageDecoration(IRPostDepthCoverageDecoration* decoration)
+    {
+        if (isKhronosTarget(m_target))
+            return;
+        m_sink->diagnose(Diagnostics::PostDepthCoverageTargetNotSupported{
+            .target = String(TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target))),
+            .location = decoration->sourceLoc});
     }
 
     void checkOutputTopologyDecoration(IROutputTopologyDecoration* decoration, Stage stage)
     {
+        const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
+        if (stage == Stage::Domain || stage == Stage::Hull)
+        {
+            if (outputTopologyType != OutputTopologyType::Point &&
+                outputTopologyType != OutputTopologyType::Line &&
+                outputTopologyType != OutputTopologyType::TriangleCW &&
+                outputTopologyType != OutputTopologyType::TriangleCCW)
+            {
+                diagnoseInvalidStageOutputTopology(
+                    decoration,
+                    stage,
+                    "'point', 'line', 'triangle_cw', 'triangle_ccw'");
+            }
+            return;
+        }
+
         if (stage == Stage::Mesh)
         {
-            const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
             if (isTargetGLSL() || isTargetSPIRV() || isTargetMetal())
             {
                 if (outputTopologyType != OutputTopologyType::Point &&
@@ -77,6 +110,19 @@ private:
                 SLANG_UNEXPECTED("Invalid compilation target for mesh stage");
             }
         }
+    }
+
+    void diagnoseInvalidStageOutputTopology(
+        IROutputTopologyDecoration* decoration,
+        Stage stage,
+        String validTopologies)
+    {
+        auto stageName = getStageName(stage);
+        m_sink->diagnose(Diagnostics::InvalidStageOutputTopology{
+            .topology = String(decoration->getTopology()->getStringSlice()),
+            .stage = String(stageName ? stageName : "unknown"),
+            .validTopologies = validTopologies,
+            .location = decoration->sourceLoc});
     }
 
     void diagnoseInvalidMeshStageOutputTopology(

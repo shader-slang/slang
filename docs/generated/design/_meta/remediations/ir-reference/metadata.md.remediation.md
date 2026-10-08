@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T13:35:00Z
 target_doc: ir-reference/metadata.md
 review_report: ../../reviews/ir-reference/metadata.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 2
+  fixed: 4
   rejected_bogus: 0
-  rejected_out_of_scope: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -17,16 +17,20 @@ actions:
 # Remediation report for ir-reference/metadata.md
 
 ## Summary
-
-Two major findings addressed: SPIR-V asm Opcode cells now use the
-Lua entry names (`__truncate`, `__entryPoint`, ...) and the three
-grouping-parent rows (`SemanticAttr`, `LayoutResourceInfoAttr`,
-`SPIRVAsmOperand`) have been replaced with inline notes alongside
-their concrete children.
+Four findings were fixed and one was rejected as out of scope, so the document
+was edited and `mark-fresh` is needed. The hand-written-wrapper count was
+verified mechanically as 38 of 59 and all 38 rows now carry a `‡`; all nine
+retired `AST origin` cells were converted, four to **no producer at HEAD** and
+five to named producers; the false debug-opcode sentence in `## Source` was
+replaced with the real per-pass split; and `## Manifest coverage` no longer
+lists the two already-watched emit files. The stale front-matter digest (F-004)
+is the operator's `mark-fresh` step, not a remediator edit.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:2823-2858` defines the asm operands by their `__truncate` / `__entryPoint` / `__sampledType` / `__imageType` / `__sampledImageType` Lua keys; the C++ wrapper names belong in the wrapper column. | Renamed the five Opcode cells in the SPIR-V inline-asm table to their Lua entry names; preserved the C++ wrapper column. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:2685-2694` and `:2756-2862` show `SemanticAttr`, `LayoutResourceInfoAttr`, and `SPIRVAsmOperand` as grouping-only parents with no IR opcode of their own. | Removed the three grouping-parent rows; folded their identity into a short parenthetical on the first concrete child row in each table (`userSemantic`, `size`, `SPIRVAsmOperandLiteral`). |
+| F-001 | fixed | Verified mechanically: matching each of the 59 wrapper names in the `## Opcodes` tables against `struct <name>` in `source/slang/slang-ir-insts.h` gives exactly 38 hand-written and 21 generated, matching the reviewer. Confirmed representative line numbers at HEAD: `struct IRAttr` 989, `IRParameterGroupTypeLayout` 1240, `IRVarLayout` 1677, `IRAlignedAttr` 1810, `IRSPIRVAsmOperand` 2836, `IRSPIRVAsm` 2901, `IREmbeddedDownstreamIR` 2959. The 21 generated ones are `IRTypeLayoutBase`, `IRUNormAttr`, `IRSNormAttr`, `IRNoDiffAttr`, `IRNonUniformAttr` and the sixteen concrete `IRSPIRVAsmOperand*` leaves. | Added a trailing `‡` to the 38 hand-written **C++ wrapper** cells; rewrote the `## Source` wrapper paragraph to state "38 of the 59", define the marker, and describe the 21 generated ones instead of an incomplete hand-written list. |
+| F-002 | fixed | Each producer re-verified at HEAD: `nonuniform` from `getAttr(kIROp_NonUniformAttr)` at `source/slang/slang-ir-specialize-function-call.cpp:618`; `DebugBuildIdentifier` from the only `emitDebugBuildIdentifier` call site, `source/slang/slang-emit.cpp:1032`, inside `linkAndOptimizeIR` (declared at line 970); `EmbeddedDownstreamIR` from `source/slang/slang-compiler-tu.cpp:230`. For `Aligned` and `MemoryScope` the reviewer's `slang-ir.cpp` citation is incomplete rather than wrong: the primary producer is the core module, which declares `__align_attr` with `__intrinsic_op($(kIROp_AlignedAttr))` at `source/slang/core.meta.slang:1515` and `__memoryscope_attr` at `:1556`, and `IRBuilder::emitLoad` / `emitStore` also attach the attrs at `source/slang/slang-ir.cpp:5557`, `:5626`, `:5640-5641`; both are named. No-producer status confirmed for `tupleTypeLayout` (nothing instantiates `IRTupleTypeLayout::Builder`, whose only member is `addAttrsImpl` at `source/slang/slang-ir.cpp:1209`), `caseLayout` (`getCaseTypeLayoutAttr` at `:7477` has no caller) and `DebugInlinedVariable` (`emitDebugInlinedVariable` at `:3665` has no caller; the remaining references are consumers in autodiff and SPIR-V emit). `tupleFieldLayout` does have a construction site, `source/slang/slang-ir.cpp:1214`, but it sits inside that uncalled builder, so the row says **no producer at HEAD** and the summary records the dead construction site rather than implying a live producer. | Nine `AST origin` cells rewritten: `tupleTypeLayout`, `tupleFieldLayout`, `caseLayout`, `DebugInlinedVariable` to **no producer at HEAD**; `nonuniform`, `Aligned`, `MemoryScope`, `DebugBuildIdentifier`, `EmbeddedDownstreamIR` to their named producers. The `(synthesized)` fallback suggestion was dropped from `## Manifest coverage` (see F-005). |
+| F-003 | fixed | Confirmed. `DebugBuildIdentifier` is created by `linkAndOptimizeIR` (`source/slang/slang-emit.cpp:1032`), not by inlining or the debug-value-store pass, and `DebugInlinedVariable` has no producer at all, so "inlining and the debug-value-store pass add the rest" was false for two of the eleven `Debug*` opcodes. The per-pass split now matches the `### Debug info family` table and paragraph, which the reviewer accepted. | Replaced the closing sentence of the third `## Source` paragraph with the explicit split: `slang-ir-inline.cpp` for `DebugScope` / `DebugNoScope` / `DebugInlinedAt` / extra `DebugFunction`s, the debug-value-store and type-legalization passes for extra `DebugVar` / `DebugValue`, `linkAndOptimizeIR` for `DebugBuildIdentifier`, and no producer for `DebugInlinedVariable`. |
+| F-004 | rejected-out-of-scope | Correct but not a remediator edit. `docs/generated/design/_meta/prompts/_remediate.md:97-100` states that `generated_at`, `source_commit`, and `watched_paths_digest` are refreshed by the operator running `regenerate.py mark-fresh` and instructs the remediator not to edit those three fields. Since this document was edited, `mark-fresh` will recompute the digest and resolve the finding without a hand-edited hash — which is also what the reviewer's own recommendation prefers. | — |
+| F-005 | fixed | Confirmed: `python3 docs/generated/design/_meta/regenerate.py show ir-reference/metadata.md` resolves eight watched paths including `source/slang/slang-emit.cpp` and `source/slang/slang-emit-spirv.cpp`, so listing them as unwatched was wrong. The count stays at six rather than dropping to four because the F-002 fix added two genuinely unwatched citations, `source/slang/core.meta.slang` (lines 1515, 1556) and `source/slang/slang-compiler-tu.cpp` (line 230); the four pass files remain. | Rewrote the `## Manifest coverage` paragraph: removed the two emit files from the unwatched list and added a sentence saying they are already watched, added the two new unwatched producer paths, and deleted the "or reduce the column to `(synthesized)`" alternative, which the amended column contract forbids. |

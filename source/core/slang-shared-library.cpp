@@ -6,7 +6,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#elif defined(__linux__) || defined(SLANG_OSX)
+#elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
 #include <dlfcn.h>
 #endif
 #include <sys/stat.h>
@@ -146,7 +146,7 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     }
     return String::fromWString(filenameBuffer);
 
-#elif defined(__linux__) || defined(SLANG_OSX)
+#elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
     Dl_info dllInfo;
     if (!dladdr(symbolInLib, &dllInfo))
     {
@@ -155,13 +155,13 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     return dllInfo.dli_fname;
 
 #else
+    // Platforms without dlfcn (e.g. WASM/console): no shared-library introspection.
     return String();
 #endif
 }
 
-uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
+uint64_t SharedLibraryUtils::getFileTimestamp(const String& fileName)
 {
-    auto fileName = getSharedLibraryFileName(symbolInLib);
     if (fileName.getLength() == 0)
         return 0;
     struct stat result;
@@ -171,6 +171,11 @@ uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
         return (uint64_t)mod_time;
     }
     return 0;
+}
+
+uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
+{
+    return getFileTimestamp(getSharedLibraryFileName(symbolInLib));
 }
 
 } // namespace Slang

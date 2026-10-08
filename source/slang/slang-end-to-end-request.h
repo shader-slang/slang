@@ -21,8 +21,8 @@
 // the public API.
 //
 
-#include "../compiler-core/slang-source-embed-util.h"
-#include "../core/slang-file-system.h"
+#include "compiler-core/slang-source-embed-util.h"
+#include "core/slang-file-system.h"
 #include "slang-compile-request.h"
 
 namespace Slang
@@ -167,6 +167,16 @@ public:
         int slotIndex,
         char const* typeName) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) SLANG_OVERRIDE;
+
+    /// Record whether this compile request uses the deprecated request-wide GLSL-input mode.
+    ///
+    /// This state intentionally does not live in the linkage option set. A linkage is also used to
+    /// load imported modules, while this compatibility option applies only to translation units
+    /// supplied directly to the compile request.
+    void setLegacyAllowGLSLInput(bool value) { m_legacyAllowGLSLInput = value; }
+
+    /// Return whether the deprecated request-wide GLSL-input mode is enabled on this request.
+    bool getLegacyAllowGLSLInput() const { return m_legacyAllowGLSLInput; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDiagnosticOutputBlob(ISlangBlob** outBlob)
@@ -381,18 +391,51 @@ public:
     CompilerOptionSet& getOptionSet() { return m_linkage->m_optionSet; }
 
 private:
+    /// Request-local storage for `-allow-glsl` and `setAllowGLSLInput()`.
+    bool m_legacyAllowGLSLInput = false;
+
+    struct ExistingOutputArtifact
+    {
+        TargetProgram* targetProgram = nullptr;
+        String path;
+        IArtifact* artifact = nullptr;
+    };
+
     String _getWholeProgramPath(TargetRequest* targetReq);
     String _getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex);
+    /// Collects the already-generated whole-program or per-entry-point artifacts that command-line
+    /// output validation and emission will consume.
+    void _collectExistingOutputArtifacts(List<ExistingOutputArtifact>& outArtifacts);
+    String _getExplicitCoverageManifestPath();
+    bool _hasExplicitCoverageManifestPath();
+    String _getExplicitSeparateDebugInfoOutputPath();
+    bool _hasExplicitSeparateDebugInfoOutputPath();
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
-    SlangResult _maybeWriteDebugArtifact(
+    /// Returns the explicit separate-debug path when one was requested; otherwise derives the
+    /// sidecar path from the main artifact path. Returns empty when separate debug info is disabled
+    /// or the target did not produce a separate debug-info artifact.
+    String _getSeparateDebugInfoOutputPath(
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
-    /// If the artifact carries shader-coverage tracing data, write
-    /// `<path>.coverage-mapping.json` next to the compiled output.
-    SlangResult _maybeWriteCoverageMapping(const String& path, IArtifact* artifact);
+    /// Preflight-validates separate-debug output before any artifact write, including stdout and
+    /// path-collision cases.
+    SlangResult _validateSeparateDebugInfoOutputPaths();
+    SlangResult _maybeWriteSeparateDebugInfoOutput(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
+    /// Preflight-validates explicit `-coverage-manifest-output` before any artifact write. Walks
+    /// the command-line whole-program or per-entry-point outputs for all targets and emits E45109,
+    /// E45110, or E45112 when the explicit sidecar path cannot be written unambiguously.
+    SlangResult _validateCoverageManifestOutputPaths();
+    /// If the artifact carries shader-coverage tracing data, write its JSON manifest sidecar. By
+    /// default writes `<path>.coverage-manifest.json` next to file outputs.
+    /// `-coverage-manifest-output <path>` overrides that location and also works for stdout
+    /// artifacts.
+    SlangResult _maybeWriteCoverageManifest(const String& path, IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest

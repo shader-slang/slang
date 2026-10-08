@@ -10,7 +10,10 @@ struct MyDiff : IDifferentiable
     typealias Differential = MyDiff;
     int flag; // non-differentiable field inside the Differential type itself
 
+    [Differentiable]
     static MyDiff dzero() { return { 0 }; }
+
+    [Differentiable]
     static MyDiff dadd(MyDiff a, MyDiff b) { return { 0 }; }
 };
 

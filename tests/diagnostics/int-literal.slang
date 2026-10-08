@@ -33,13 +33,8 @@ int doSomething(int a)
     uint64_t d1 = -9223372036854775809;
 //CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    // This is INT64_MIN and valid negative signed integer, but warning will be emitted as negative(-) is scanned
-    // separately in the lexer, and the positive literal portion will emit a warning.
-    // The final value will still be correctly set as INT64_MIN.
-    //
-    // To not have this warning the lexer must scan the negative operator and number together.
-    uint64_t d2 = -9223372036854775808;
-//CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    // This is INT64_MIN and valid negative signed integer, no warning will be emitted.
+    int64_t d2 = -9223372036854775808;
 
     // No warning: the type ladder for non-decimal integer literals admits
     // `uint64_t`, so `0xFFFFFFFFFFFFFFFF` is silently typed as `uint64_t`

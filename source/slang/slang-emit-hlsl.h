@@ -22,8 +22,7 @@ public:
     HLSLSourceEmitter(const Desc& desc)
         : Super(desc), m_extensionTracker(new HLSLExtensionTracker)
     {
-        auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-        m_sm610OrAbove = targetProfile.getVersion() > ProfileVersion::DX_6_9;
+        m_sm610OrAbove = m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9;
     }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
@@ -84,10 +83,16 @@ protected:
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
 
     void emitMappedCoopVecComponentType(
         IRInst* operand,
         IRInst* inputInterpretationPackingFactor = nullptr);
+    void emitWorkGraphRecordType(IRType* type);
+    /// Emits a parenthesized HLSL BarrierMemoryTypeFlags expression for a validated enum value.
+    void emitNamedMemoryTypeFlagSet(uint32_t flagVal);
+    /// Emits a parenthesized HLSL BarrierSemanticFlags expression for a validated enum value.
+    void emitNamedSemanticFlagSet(uint32_t flagVal);
     void emitMatrixLayoutEnum_sm609(IRInst* operand);
     void emitMatrixLayoutEnum_sm610(IRInst* memoryLayout, bool isTranspose);
     void emitCoopVecMatMulBufferType(IRInst* bufferPtrInst);

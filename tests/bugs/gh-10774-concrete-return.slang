@@ -5,7 +5,7 @@
 // the interface requirement and the satisfying method. It should compile, but
 // currently fails during interface conformance checking.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -O3
 
 // CHECK: OpCapability RayQueryKHR
 // CHECK: OpRayQueryInitializeKHR

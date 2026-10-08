@@ -2,6 +2,7 @@
 // Tests for isReproStateValid and the ReproStateValidator graph traversal.
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-blob.h"
 #include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-offset-container.h"
@@ -128,7 +129,14 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
     stream.swapContents(outRiff);
 }
 
-static void loadReproBlobState(ISlangBlob* reproBlob, List<uint8_t>& outBuffer)
+static ComPtr<ISlangBlob> createSentinelBlob()
+{
+    // Negative loadState tests use this to prove failure clears an existing out value.
+    static const uint8_t kSentinel = 0xff;
+    return RawBlob::create(&kSentinel, sizeof(kSentinel));
+}
+
+static void loadReproBlobState(ISlangBlob* reproBlob, ComPtr<ISlangBlob>& outBlob)
 {
     SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
 
@@ -137,12 +145,13 @@ static void loadReproBlobState(ISlangBlob* reproBlob, List<uint8_t>& outBuffer)
         static_cast<const uint8_t*>(reproBlob->getBufferPointer()),
         reproBlob->getBufferSize(),
         &sink,
-        outBuffer);
+        outBlob.writeRef());
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadResult));
     SLANG_CHECK_ABORT(sink.getErrorCount() == 0);
-    SLANG_CHECK_ABORT(isReproStateValid(outBuffer));
-    SLANG_CHECK_ABORT(ReproUtil::getRequest(outBuffer) != nullptr);
+    SLANG_CHECK_ABORT(outBlob && outBlob->getBufferSize() != 0);
+    SLANG_CHECK_ABORT(
+        ReproUtil::getRequest(outBlob->getBufferPointer(), outBlob->getBufferSize()) != nullptr);
 }
 
 static const char* getTranslationUnitSourceFilePath(
@@ -1037,17 +1046,19 @@ SLANG_UNIT_TEST(reproStateValidator)
         List<uint8_t> tooSmall;
         tooSmall.setCount(N - 1);
         memset(tooSmall.getBuffer(), 0, tooSmall.getCount());
-        SLANG_CHECK(ReproUtil::getRequest(tooSmall) == nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(nullptr, 0) == nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(nullptr, N) == nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(tooSmall.getBuffer(), tooSmall.getCount()) == nullptr);
 
         List<uint8_t> exact;
         exact.setCount(N);
         memset(exact.getBuffer(), 0, exact.getCount());
-        SLANG_CHECK(ReproUtil::getRequest(exact) != nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(exact.getBuffer(), exact.getCount()) != nullptr);
 
         List<uint8_t> oversize;
         oversize.setCount(N + 1);
         memset(oversize.getBuffer(), 0, oversize.getCount());
-        SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(oversize.getBuffer(), oversize.getCount()) != nullptr);
     }
 
     // 21. Exported loader helpers fail cleanly on null request pointers.
@@ -1062,8 +1073,9 @@ SLANG_UNIT_TEST(reproStateValidator)
 
         ComPtr<ISlangMutableFileSystem> mutableFileSystem(new MemoryFileSystem);
         SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, nullptr, mutableFileSystem)));
-        SLANG_CHECK(
-            SLANG_FAILED(ReproUtil::extractFiles(base, ReproUtil::getRequest(buf), nullptr)));
+        auto requestState = const_cast<ReproUtil::RequestState*>(
+            ReproUtil::getRequest(buf.getBuffer(), buf.getCount()));
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, requestState, nullptr)));
     }
 }
 
@@ -1077,16 +1089,15 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     List<uint8_t> riffData;
     buildStateRiff(invalidPayload, riffData);
 
-    OwnedMemoryStream stream(FileAccess::Read);
-    stream.setContent(riffData.getBuffer(), riffData.getCount());
-
     DiagnosticSink sink;
-    List<uint8_t> outBuffer;
-    outBuffer.add(0xff);
+    ComPtr<ISlangBlob> sentinelBlob = createSentinelBlob();
+    SLANG_CHECK_ABORT(sentinelBlob != nullptr);
+    ISlangBlob* outBlob = sentinelBlob.get();
 
-    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, &outBlob);
     SLANG_CHECK(SLANG_FAILED(result));
-    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
@@ -1097,18 +1108,32 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     List<uint8_t> riffData;
     buildStateRiff(emptyPayload, riffData);
 
-    OwnedMemoryStream stream(FileAccess::Read);
-    stream.setContent(riffData.getBuffer(), riffData.getCount());
-
     DiagnosticSink sink;
-    List<uint8_t> outBuffer;
-    outBuffer.add(0xff);
+    ComPtr<ISlangBlob> sentinelBlob = createSentinelBlob();
+    SLANG_CHECK_ABORT(sentinelBlob != nullptr);
+    ISlangBlob* outBlob = sentinelBlob.get();
 
-    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, &outBlob);
     SLANG_CHECK(SLANG_FAILED(result));
-    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
+}
+
+SLANG_UNIT_TEST(reproStateLoadStateRejectsNullBlobOutParam)
+{
+    List<uint8_t> payload;
+    buildMinimalValid(payload);
+    List<uint8_t> riffData;
+    buildStateRiff(payload, riffData);
+
+    DiagnosticSink sink;
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, nullptr);
+
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(sink.getErrorCount() == 0);
 }
 
 SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
@@ -1136,8 +1161,8 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(request, reproBlob.writeRef())));
     SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
 
-    List<uint8_t> outBuffer;
-    loadReproBlobState(reproBlob, outBuffer);
+    ComPtr<ISlangBlob> stateBlob;
+    loadReproBlobState(reproBlob, stateBlob);
 
     auto replayRequest = spCreateCompileRequest(session);
     SLANG_CHECK_ABORT(replayRequest != nullptr);
@@ -1200,8 +1225,10 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
 
     container[requestPtr]->translationUnits = translationUnits;
     container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1229,6 +1256,83 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     SLANG_CHECK(tu1AIndex < tu1BIndex);
 }
 
+SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
+    auto explicitSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto inferredSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto explicitSourceFile = addSourceFileState(container, "explicit-language.slang");
+    auto inferredSourceFile = addSourceFileState(container, "inferred-language.slang");
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceFiles = explicitSourceFiles;
+    container[explicitSourceFiles[0]] = explicitSourceFile;
+    container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
+    container[translationUnits[1]].sourceFiles = inferredSourceFiles;
+    container[inferredSourceFiles[0]] = inferredSourceFile;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    // The first serialized path deliberately has a `.slang` extension. Omitting `-lang glsl` would
+    // parse it under the wrong language. That option remains active, so the following inferred
+    // Slang translation unit needs an explicit reset in the extracted command even though binary
+    // replay preserves its inferred provenance.
+    String manifest = StringUtil::getString(manifestBlob);
+    SLANG_CHECK(
+        manifest.indexOf(UnownedStringSlice(
+            "-lang glsl explicit-language.slang -lang slang inferred-language.slang")) >= 0);
+}
+
+SLANG_UNIT_TEST(reproExtractFilesPreservesLegacyAllowGLSLInput)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
+    auto sourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto sourceFile = addSourceFileState(container, "legacy-glsl-input.slang");
+
+    container[requestPtr]->legacyAllowGLSLInput = true;
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceFiles = sourceFiles;
+    container[sourceFiles[0]] = sourceFile;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    // The compatibility bit is request-local rather than a serialized linkage option. Preserve it
+    // before the `.slang` input so an extracted command line selects GLSL just like binary replay.
+    String manifest = StringUtil::getString(manifestBlob);
+    SLANG_CHECK(manifest.indexOf(UnownedStringSlice("-allow-glsl legacy-glsl-input.slang")) >= 0);
+}
+
 SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 {
     typedef ReproUtil::RequestState RequestState;
@@ -1245,9 +1349,11 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     auto tu1SourceFileB = addSourceFileState(container, "load-tu1-b.slang");
 
     container[requestPtr]->translationUnits = translationUnits;
-    container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1268,18 +1374,30 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     ComPtr<ISlangBlob> savedReproBlob;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(externalRequest, savedReproBlob.writeRef())));
 
+    ComPtr<ISlangBlob> loadedBlob;
+    loadReproBlobState(savedReproBlob, loadedBlob);
+
     List<uint8_t> loadedBuffer;
-    loadReproBlobState(savedReproBlob, loadedBuffer);
+    loadedBuffer.setCount(loadedBlob->getBufferSize());
+    memcpy(loadedBuffer.getBuffer(), loadedBlob->getBufferPointer(), loadedBuffer.getCount());
 
     MemoryOffsetBase loadedBase;
     loadedBase.set(loadedBuffer.getBuffer(), loadedBuffer.getCount());
-    auto loadedRequestState = ReproUtil::getRequest(loadedBuffer);
+    auto loadedRequestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(loadedBuffer.getBuffer(), loadedBuffer.getCount()));
     SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
     const auto& loadedTu0 = loadedBase.asRaw(loadedRequestState->translationUnits[0]);
     const auto& loadedTu1 = loadedBase.asRaw(loadedRequestState->translationUnits[1]);
 
     SLANG_CHECK_ABORT(loadedTu0.sourceFiles.getCount() == 1);
     SLANG_CHECK_ABORT(loadedTu1.sourceFiles.getCount() == 2);
+    // Binary replay must preserve whether each language came from an explicit request. The first
+    // translation unit deliberately uses GLSL with a `.slang` path, while the second relies on
+    // inference, so changing either provenance would alter how a subsequent replay is interpreted.
+    SLANG_CHECK(loadedTu0.language == SourceLanguage::GLSL);
+    SLANG_CHECK(loadedTu0.sourceLanguageExplicitlyRequested == SourceLanguage::GLSL);
+    SLANG_CHECK(loadedTu1.language == SourceLanguage::Slang);
+    SLANG_CHECK(loadedTu1.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
     SLANG_CHECK(
         strcmp(
             getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 0, 0),
@@ -1292,6 +1410,57 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
         strcmp(
             getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 1, 1),
             "load-tu1-b.slang") == 0);
+
+    spDestroyCompileRequest(externalRequest);
+    spDestroySession(session);
+}
+
+SLANG_UNIT_TEST(reproLoadRejectsFileWithoutContents)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::FileState FileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    // A source-file entry whose file has no serialized contents must be
+    // rejected cleanly at load: `validateSourceFileState` requires contents,
+    // and `LoadContext::getSourceFile` relies on that invariant when it
+    // materializes the blob (it release-asserts a blob exists rather than
+    // tolerating the forbidden shape). This pins the rejection contract —
+    // the load fails, it does not crash, and it does not partially apply.
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
+    auto tuSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+
+    auto sourceFile = container.newObject<SourceFileState>();
+    auto file = container.newObject<FileState>();
+    auto pathString =
+        container.newString("repro-load-tolerates-file-without-contents-nonexistent.slang");
+
+    // Deliberately no `contents`: only the identity fields are recorded, and
+    // the path must not resolve on the real file system.
+    container[file]->foundPath = pathString;
+    container[file]->uniqueName = pathString;
+    container[file]->uniqueIdentity = pathString;
+    container[sourceFile]->foundPath = pathString;
+    container[sourceFile]->file = file;
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceFiles = tuSourceFiles;
+    container[tuSourceFiles[0]] = sourceFile;
+
+    List<uint8_t> payload;
+    containerToBuffer(container, payload);
+    List<uint8_t> riffData;
+    buildStateRiff(payload, riffData);
+
+    auto session = spCreateSession();
+    auto externalRequest = spCreateCompileRequest(session);
+    SLANG_CHECK(SLANG_FAILED(
+        spLoadRepro(externalRequest, nullptr, riffData.getBuffer(), riffData.getCount())));
+    SLANG_CHECK(spGetTranslationUnitCount(externalRequest) == 0);
 
     spDestroyCompileRequest(externalRequest);
     spDestroySession(session);

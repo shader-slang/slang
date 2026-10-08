@@ -1,9 +1,9 @@
 // d3d12-resource-views.h
 #pragma once
 
-#include "../d3d/d3d-util.h"
 #include "d3d12-base.h"
 #include "d3d12-buffer.h"
+#include "gfx/d3d/d3d-util.h"
 
 namespace gfx
 {

@@ -1582,7 +1582,7 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
         if (cursor->getType() != TokenType::StringLiteral)
             continue;
 
-        auto includedFileName = getStringLiteralTokenValue(cursor->getToken());
+        auto includedFileName = getStringLiteralTokenValue(cursor->getToken(), nullptr);
         if (includedFileName == outputFileName)
             return true;
     }

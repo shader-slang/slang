@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# run-tutorial.sh — execute every step of the Shader Execution Coverage
+# tutorial (docs/user-guide/a3-01-shader-coverage.md) in one go, from
+# this directory. Each step below is named after the chapter section it
+# comes from, so you can follow along in the text.
+#
+# Prerequisites: slangc (any Slang release, or a repo build), a C++
+# compiler, and Python 3. genhtml (from the lcov package) is optional — without it
+# the HTML report is rendered with the in-repo Python renderer.
+#
+# Usage:
+#   ./run-tutorial.sh
+#   SLANGC=/path/to/slangc ./run-tutorial.sh   # explicit compiler
+#   ./run-tutorial.sh --open-report            # also open the HTML report
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+open_report=""
+for arg in "$@"; do
+  case "$arg" in
+  --open-report) open_report="-OpenReport" ;;
+  *)
+    echo "usage: $0 [--open-report]" >&2
+    exit 2
+    ;;
+  esac
+done
+
+# Git Bash / MSYS / Cygwin: Windows toolchain discovery (vswhere, the
+# Visual Studio developer shell) lives in the PowerShell runner, so
+# delegate to it instead of duplicating that logic here.
+case "$(uname -s)" in
+MINGW* | MSYS* | CYGWIN*)
+  exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File run-tutorial.ps1 \
+    ${SLANGC:+-Slangc "$SLANGC"} ${open_report:+-OpenReport}
+  ;;
+esac
+
+# --- Step 0: find the tools ---------------------------------------------------
+# slangc is taken from $SLANGC, then PATH, then a sibling repo build
+# (convenient when running from a shader-slang/slang checkout). An old
+# slangc without coverage support is skipped: releases that predate the
+# feature reject -trace-coverage.
+supports_coverage() {
+  local help_text
+  help_text=$("$1" -h 2>&1) || true
+  [[ $help_text == *trace-coverage* ]]
+}
+
+if [[ -n "${SLANGC:-}" ]]; then
+  command -v "$SLANGC" >/dev/null || {
+    echo "error: slangc not found at '$SLANGC'" >&2
+    exit 1
+  }
+  supports_coverage "$SLANGC" || {
+    echo "error: $SLANGC does not support -trace-coverage; use a newer Slang release" >&2
+    exit 1
+  }
+else
+  for candidate in slangc ../../build/Release/bin/slangc ../../build/Debug/bin/slangc; do
+    command -v "$candidate" >/dev/null || continue
+    supports_coverage "$candidate" && SLANGC=$candidate && break
+  done
+fi
+[[ -n "${SLANGC:-}" ]] || {
+  echo "error: no slangc with -trace-coverage support found on PATH or in ../../build;" >&2
+  echo "install a recent Slang release or set SLANGC" >&2
+  exit 1
+}
+echo "using slangc: $SLANGC"
+
+# --- Step 1: "Compiling with coverage" ----------------------------------------
+# One flag, -trace-coverage, turns on line coverage. Two files appear:
+# the compiled shader and the .coverage-manifest.json sidecar that maps
+# counter slots back to source locations.
+"$SLANGC" hello-coverage.slang -target spirv -stage compute -entry computeMain \
+  -trace-coverage -o hello-coverage.spv
+echo "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.json"
+
+# --- Step 2: "Manifest structure" ---------------------------------------------
+# Show the sidecar. Note the buffer block: on SPIR-V the hidden
+# counter buffer binds at a descriptor (set, binding).
+cat hello-coverage.spv.coverage-manifest.json
+
+# Guard the manifest fields the chapter publishes: nine counter slots,
+# auto-allocated at (space 1, binding 0) — a new descriptor set after
+# the shader's own sets.
+python3 -c 'import json; m = json.load(open("hello-coverage.spv.coverage-manifest.json")); b = m["buffer"]; got = (m["counter_count"], b["space"], b["binding"]); assert got == (9, 1, 0), f"manifest drifted from the published values (counter_count, space, binding): {got}"'
+
+# --- Step 3: "Dispatching the precompiled kernel" -----------------------------
+# Compile the same shader once more, to a directly callable CPU shared
+# library. slangc drives the system C++ compiler; the new sidecar
+# reports uniform_offset instead of a descriptor location.
+"$SLANGC" hello-coverage.slang -target shader-sharedlib -stage compute -entry computeMain \
+  -trace-coverage -o hello-coverage-kernel.so
+echo "wrote hello-coverage-kernel.so and its sidecar manifest"
+
+# Guard the CPU manifest fields the chapter publishes — the same nine
+# counters, marshaled at uniform_offset 32 with a 16-byte (pointer,
+# count) slot. These are the values the host program's constants and
+# the chapter's manifest listing rely on.
+python3 -c 'import json; m = json.load(open("hello-coverage-kernel.so.coverage-manifest.json")); b = m["buffer"]; got = (m["counter_count"], b["uniform_offset"], b["uniform_stride"]); assert got == (9, 32, 16), f"CPU manifest drifted from the published values (counter_count, uniform_offset, uniform_stride): {got}"'
+
+# Build the host program — an ordinary C++ compile with no Slang SDK
+# paths — then dispatch. It loads the precompiled kernel, binds the
+# coverage buffer at the manifest-reported uniform_offset, runs one
+# thread group, prints the outputs and the raw counter slots, and
+# writes hello-coverage.counters.bin.
+# -ldl: dlopen lives in libdl on glibc older than 2.34; harmless elsewhere.
+c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
+./hello-coverage-host | tee host-output.txt
+
+# Guard the outputs and raw counter slots the chapter publishes. The
+# output[i] values never reach the LCOV report, so this is the only
+# check that catches a CPU-codegen regression in the computed results.
+if ! diff expected-host-output.txt host-output.txt >&2; then
+  echo "error: host output does not match expected-host-output.txt" >&2
+  exit 1
+fi
+
+# --- Step 4: "Generating a report" --------------------------------------------
+# The LCOV converter joins the raw counters with the manifest's source
+# attribution. Expect varied counts: applyGain's branches split 3/1
+# across the four threads, and the negative-input clamp never runs.
+python3 ../../tools/shader-coverage/slang-coverage-to-lcov.py \
+  --manifest hello-coverage-kernel.so.coverage-manifest.json \
+  --counters hello-coverage.counters.bin --output hello-coverage.lcov
+cat hello-coverage.lcov
+
+# Guard the numbers the chapter publishes: the LCOV records combine the
+# manifest's source attribution with the counter values, so this one
+# comparison catches instrumentation, attribution, or converter drift.
+# expected.lcov is the single checked-in copy both runner scripts use.
+# A byte-exact diff is safe here: on POSIX the converter writes LF, and
+# .gitattributes pins the golden to LF on every checkout. (Windows runs
+# delegate to the PowerShell runner, which tolerates CRLF instead.)
+if ! diff expected.lcov hello-coverage.lcov >&2; then
+  echo "error: hello-coverage.lcov does not match expected.lcov" >&2
+  exit 1
+fi
+echo "LCOV records match the tutorial published values"
+
+# Render HTML with genhtml (the de-facto LCOV tool) when installed;
+# otherwise fall back to the repository's own Python renderer.
+if command -v genhtml >/dev/null; then
+  genhtml hello-coverage.lcov --output-directory coverage-html >/dev/null
+else
+  python3 ../../tools/coverage-html/slang-coverage-html.py hello-coverage.lcov \
+    --output-dir coverage-html
+fi
+if [[ -n $open_report ]]; then
+  if command -v xdg-open >/dev/null; then
+    xdg-open coverage-html/index.html
+  elif command -v open >/dev/null; then
+    open coverage-html/index.html
+  else
+    echo "no xdg-open or open command found; open coverage-html/index.html manually" >&2
+  fi
+else
+  echo "open coverage-html/index.html to see the annotated source (or rerun with --open-report)"
+fi

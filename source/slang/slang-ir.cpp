@@ -1,11 +1,12 @@
 // slang-ir.cpp
 #include "slang-ir.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-platform.h"
+#include "core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
 
@@ -88,6 +89,11 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_PostDepthCoverageDecoration:
+    case kIROp_GLSLFragDepthGreaterDecoration:
+    case kIROp_GLSLFragDepthLessDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
@@ -167,7 +173,7 @@ void IRUse::init(IRInst* u, IRInst* v)
 
         v->firstUse = this;
     }
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 }
@@ -184,13 +190,13 @@ void IRUse::clear()
 {
     // This `IRUse` is part of the linked list
     // of uses for  `usedValue`.
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 
     if (usedValue)
     {
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         auto uv = usedValue;
 #endif
         *prevLink = nextUse;
@@ -204,7 +210,7 @@ void IRUse::clear()
         nextUse = nullptr;
         prevLink = nullptr;
 
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         if (uv->firstUse)
             uv->firstUse->debugValidate();
 #endif
@@ -870,7 +876,8 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getLine(),
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
-            funcType);
+            funcType,
+            oldDebugFunc->getParentScope());
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
@@ -899,6 +906,51 @@ void fixUpFuncType(IRFunc* func, IRType* resultType)
 void fixUpFuncType(IRFunc* func)
 {
     fixUpFuncType(func, func->getResultType());
+}
+
+IRFuncType* maybeExpandConcreteFuncTypePacks(IRBuilder* builder, IRFuncType* funcType)
+{
+    List<IRType*> paramTypes;
+    bool foundConcretePack = false;
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        if (auto typePack = as<IRTypePack>(paramType))
+        {
+            // Only flatten packs that specialization has already made concrete. Other pack-shaped
+            // IR must continue through the normal specialization/lowering path.
+            foundConcretePack = true;
+            for (UInt ii = 0; ii < typePack->getOperandCount(); ii++)
+                paramTypes.add((IRType*)typePack->getOperand(ii));
+        }
+        else
+        {
+            paramTypes.add(paramType);
+        }
+    }
+
+    if (!foundConcretePack)
+        return funcType;
+
+    if (auto attr = funcType->getAttr())
+        return builder->getFuncType(
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
+            funcType->getResultType(),
+            attr);
+
+    return builder->getFuncType(paramTypes, funcType->getResultType());
+}
+
+IRFuncType* maybeExpandConcreteFuncTypePacks(
+    IRBuilder* builder,
+    IRInst* funcValue,
+    IRFuncType* funcType)
+{
+    auto expandedFuncType = maybeExpandConcreteFuncTypePacks(builder, funcType);
+    if (expandedFuncType != funcType)
+        builder->replaceOperand(&funcValue->typeUse, expandedFuncType);
+    return expandedFuncType;
 }
 
 //
@@ -965,6 +1017,68 @@ IROperandList<IRTypeSizeAttr> IRTypeLayout::getSizeAttrs()
     return findAttrs<IRTypeSizeAttr>();
 }
 
+IRTypeAlignmentAttr* IRTypeLayout::findAlignmentAttr(LayoutResourceKind kind)
+{
+    for (auto alignmentAttr : getAlignmentAttrs())
+    {
+        if (alignmentAttr->getResourceKind() == kind)
+            return alignmentAttr;
+    }
+    return nullptr;
+}
+
+IROperandList<IRTypeAlignmentAttr> IRTypeLayout::getAlignmentAttrs()
+{
+    return findAttrs<IRTypeAlignmentAttr>();
+}
+
+IRIntegerValue IRTypeLayout::getAlignment(LayoutResourceKind kind)
+{
+    if (auto alignmentAttr = findAlignmentAttr(kind))
+        return alignmentAttr->getAlignment();
+    return 1;
+}
+
+LayoutSize IRTypeLayout::getSizeInBytes()
+{
+    if (auto sizeAttr = findSizeAttr(LayoutResourceKind::Uniform))
+        return sizeAttr->getSize();
+    return LayoutSize(0);
+}
+
+IRIntegerValue IRTypeLayout::getAlignmentInBytes()
+{
+    return getAlignment(LayoutResourceKind::Uniform);
+}
+
+// Round a byte size up to a byte alignment, preserving the zero and non-finite
+// cases: a zero size strides by zero regardless of alignment, and a non-finite
+// (unsized/infinite, or invalid) size has no finite stride and is returned
+// unchanged rather than collapsed to zero.
+static LayoutSize _strideInBytes(LayoutSize size, IRIntegerValue alignment)
+{
+    if (!size.isFinite())
+        return size;
+    IRIntegerValue byteSize = IRIntegerValue(size.getFiniteValue().getValidValue());
+    if (byteSize == 0)
+        return LayoutSize(0);
+    return LayoutSize(LayoutSize::RawValue(align(byteSize, int(alignment))));
+}
+
+LayoutSize IRTypeLayout::getStrideInBytes()
+{
+    return _strideInBytes(getSizeInBytes(), getAlignmentInBytes());
+}
+
+LayoutSize IRArrayTypeLayout::getElementStrideInBytes()
+{
+    // The element's in-array alignment is the array's byte alignment, which
+    // already incorporates the layout-rule rounding (e.g. std140 rounds array
+    // elements up to 16). The element type's own alignment does not, so it must
+    // not be used here.
+    return _strideInBytes(getElementTypeLayout()->getSizeInBytes(), getAlignmentInBytes());
+}
+
 IRTypeLayout::Builder::Builder(IRBuilder* irBuilder)
     : m_irBuilder(irBuilder)
 {
@@ -982,11 +1096,27 @@ void IRTypeLayout::Builder::addResourceUsage(IRTypeSizeAttr* sizeAttr)
     addResourceUsage(sizeAttr->getResourceKind(), sizeAttr->getSize());
 }
 
+void IRTypeLayout::Builder::addAlignment(LayoutResourceKind kind, IRIntegerValue alignment)
+{
+    auto& resInfo = m_resInfos[Int(kind)];
+    resInfo.kind = kind;
+    resInfo.alignment = alignment;
+}
+
+void IRTypeLayout::Builder::addAlignment(IRTypeAlignmentAttr* alignmentAttr)
+{
+    addAlignment(alignmentAttr->getResourceKind(), alignmentAttr->getAlignment());
+}
+
 void IRTypeLayout::Builder::addResourceUsageFrom(IRTypeLayout* typeLayout)
 {
     for (auto sizeAttr : typeLayout->getSizeAttrs())
     {
         addResourceUsage(sizeAttr);
+    }
+    for (auto alignmentAttr : typeLayout->getAlignmentAttrs())
+    {
+        addAlignment(alignmentAttr);
     }
 }
 
@@ -1007,19 +1137,40 @@ void IRTypeLayout::Builder::addOperands(List<IRInst*>& operands)
     addOperandsImpl(operands);
 }
 
+// Whether a unit that occupies `size` should carry an alignment attribute.
+// Alignment is meaningful whenever the unit occupies any bytes, which includes
+// an unsized (infinite) or unknown (invalid) extent; only a definitely-zero
+// size makes alignment irrelevant (and an absent attribute already means 1).
+static bool _occupiesLayoutUnit(LayoutSize size)
+{
+    return !size.isFinite() || size.getFiniteValue().getValidValue() != 0;
+}
+
 void IRTypeLayout::Builder::addAttrs(List<IRInst*>& operands)
 {
     auto irBuilder = getIRBuilder();
+
+    // Emit size and alignment attributes in two separate passes so that each
+    // attribute kind forms one contiguous run. `IRTypeLayout::getSizeAttrs`
+    // (and `getAlignmentAttrs`) rely on `findAttrs`, which stops at the first
+    // operand of a different type, so interleaving the two kinds would truncate
+    // the size-attribute enumeration for any layout that has both.
+    for (auto resInfo : m_resInfos)
+    {
+        if (resInfo.kind == LayoutResourceKind::None)
+            continue;
+        operands.add(irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size));
+    }
 
     for (auto resInfo : m_resInfos)
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
-
-        IRInst* sizeAttr = irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size);
-        operands.add(sizeAttr);
+        // An absent attribute already encodes alignment 1, so only a stronger
+        // alignment is worth recording, and only for a unit that occupies space.
+        if (resInfo.alignment > 1 && _occupiesLayoutUnit(resInfo.size))
+            operands.add(irBuilder->getTypeAlignmentAttr(resInfo.alignment, resInfo.kind));
     }
-
 
     addAttrsImpl(operands);
 }
@@ -1535,7 +1686,16 @@ IRInst* IRModule::_allocateInst(IROp op, Int operandCount, size_t minSizeInBytes
     // We handle the combination of the two cases by just taking the maximum of the two
     // different sizes.
     //
-    size_t defaultSize = sizeof(IRInst) + (operandCount) * sizeof(IRUse);
+    // The operand count is in-contract only when it is non-negative and small enough that the
+    // trailing operand array can be sized without wrapping `size_t`. That is trivially true for
+    // counts the compiler itself computes, but deserialization derives the count from a file, so
+    // we assert rather than silently allocating a buffer smaller than the operands written into
+    // it (`size_t` is 32 bits on WebAssembly and other 32-bit targets).
+    //
+    SLANG_RELEASE_ASSERT(operandCount >= 0);
+    SLANG_RELEASE_ASSERT(size_t(operandCount) <= (~size_t(0) - sizeof(IRInst)) / sizeof(IRUse));
+
+    size_t defaultSize = sizeof(IRInst) + size_t(operandCount) * sizeof(IRUse);
     size_t totalSize = minSizeInBytes > defaultSize ? minSizeInBytes : defaultSize;
 
     IRInst* inst = (IRInst*)m_memoryArena.allocateAndZero(totalSize);
@@ -2725,10 +2885,16 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             memoryArena.rewindToCursor(cursor);
 
             // If the found inst is defined in the same parent as current insert location but
-            // is located after the insert location, we need to move it to the insert location.
+            // is located after the insert location, we need to move it to the insert location,
+            // except for insts at the module level, where order does not matter.
+            //
+            // This last condition helps to accelerate the common case of emitting global hoistable
+            // insts (types, sets, etc.)
+            //
             auto foundInst = *found;
             if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
-                getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                getInsertLoc().getMode() == IRInsertLoc::Mode::Before &&
+                foundInst->getParent() != getModule()->getModuleInst())
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;
@@ -3138,7 +3304,7 @@ IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType
     return inst;
 }
 
-IRPoison* IRBuilder::emitPoison(IRType* type)
+IRPoison* IRBuilder::getPoison(IRType* type)
 {
     auto inst = createInst<IRPoison>(this, kIROp_Poison, type);
     addInst(inst);
@@ -3234,6 +3400,23 @@ static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
     return nullptr;
 }
 
+static void addCompilerDictionaryEntryKeys(
+    IRBuilder* builder,
+    List<IRInst*>& keyVals,
+    IRCompilerDictionaryScope* scope,
+    IRInst* translationInst)
+{
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    // Operand 1 is the opcode discriminator and is kept as a strong dictionary-entry operand so
+    // DCE cannot collect and recreate it between cache insertions/lookups.
+    keyVals.add(builder->getIntValue(builder->getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+}
+
 IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
     IRCompilerDictionary* dict,
     IRInst* translationInst)
@@ -3243,13 +3426,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -3281,13 +3458,7 @@ void IRBuilder::addCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     if (auto existingVal = entry->getValue(); existingVal)
@@ -3313,13 +3484,7 @@ IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -3451,18 +3616,31 @@ IRInst* IRBuilder::emitDebugVar(
     IRInst* source,
     IRInst* line,
     IRInst* col,
+    IRInst* scope,
     IRInst* argIndex)
 {
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope));
     if (argIndex)
     {
-        IRInst* args[] = {source, line, col, argIndex};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
+        IRInst* args[] = {source, line, col, scope, argIndex};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 5, args);
     }
     else
     {
-        IRInst* args[] = {source, line, col};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
+        IRInst* args[] = {source, line, col, scope};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
     }
+}
+
+IRInst* IRBuilder::emitDebugLexicalBlock(
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    IRInst* parentScope)
+{
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+    IRInst* args[] = {source, line, col, parentScope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 4, args);
 }
 
 IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
@@ -3502,8 +3680,16 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* line,
     IRInst* col,
     IRInst* file,
-    IRInst* debugType)
+    IRInst* debugType,
+    IRInst* parentScope)
 {
+    // The parent scope is an optional trailing operand: it is absent when no scope was recorded
+    // (Minimal debug level emits no compilation unit), so we never store a null operand.
+    if (parentScope)
+    {
+        IRInst* args[] = {name, line, col, file, debugType, parentScope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+    }
     IRInst* args[] = {name, line, col, file, debugType};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }
@@ -3517,7 +3703,8 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    SLANG_RELEASE_ASSERT(scope);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, inlinedAt ? 2 : 1, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
@@ -4225,6 +4412,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         SLANG_UNREACHABLE("cast from void type");
     }
 
+    if (toStyle == TypeCastStyle::Void)
+    {
+        // A cast to `void` discards `value` and yields the canonical void value
+        // (`IRVoidLit`). There is no data-carrying "cast to void" instruction:
+        // `void` has a single canonical spelling, and materializing a dedicated
+        // cast op would only create a second representation that no backend emits.
+        // Any side effects needed to produce `value` are already present as the
+        // instructions that computed it.
+        return getVoidValue();
+    }
+
     if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
     {
         if (fallbackToBuiltinCast)
@@ -4252,45 +4450,43 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         }
     };
 
-    static const OpSeq opMap[5][6] = {
-        /*      To:      Int, Float, Bool, Ptr, Enum, Void */
+    // Casts to `void` are handled above, so this table only covers the
+    // data-carrying target styles (Int, Float, Bool, Ptr, Enum).
+    static const OpSeq opMap[5][5] = {
+        /*      To:      Int, Float, Bool, Ptr, Enum */
         /* From Int   */ {
             kIROp_IntCast,
             kIROp_CastIntToFloat,
             kIROp_IntCast,
             kIROp_CastIntToPtr,
-            kIROp_CastIntToEnum,
-            kIROp_CastToVoid},
+            kIROp_CastIntToEnum},
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
          {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
-         {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastFloatToInt, kIROp_CastIntToEnum}},
         /* From Bool  */
-        {kIROp_IntCast,
-         kIROp_CastIntToFloat,
-         kIROp_Nop,
-         kIROp_CastIntToPtr,
-         kIROp_CastIntToEnum,
-         kIROp_CastToVoid},
+        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastIntToEnum},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
          kIROp_CastPtrToBool,
          kIROp_BitCast,
-         {kIROp_CastPtrToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastPtrToInt, kIROp_CastIntToEnum}},
         /* From Enum   */
         {kIROp_CastEnumToInt,
          {kIROp_CastEnumToInt, kIROp_CastIntToFloat},
          {kIROp_CastEnumToInt, kIROp_IntCast},
          {kIROp_CastEnumToInt, kIROp_CastIntToPtr},
-         kIROp_EnumCast,
-         kIROp_CastToVoid},
+         kIROp_EnumCast},
     };
 
+    // bounds checks
+    SLANG_ASSERT((int)fromStyle >= 0);
+    SLANG_ASSERT((int)fromStyle < 5);
+    SLANG_ASSERT((int)toStyle >= 0);
+    SLANG_ASSERT((int)toStyle < 5);
     auto op = opMap[(int)fromStyle][(int)toStyle];
     if (op.op0 == kIROp_Nop)
         return value;
@@ -4895,6 +5091,104 @@ RefPtr<IRModule> IRModule::create(Session* session)
     moduleInst->module = module;
 
     return module;
+}
+
+ModuleLinkingInfo::ModuleLinkingInfo(IRModule* module)
+{
+    _build(module);
+}
+
+void ModuleLinkingInfo::_build(IRModule* module)
+{
+    auto moduleInst = module->getModuleInst();
+    if (!moduleInst)
+        return;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto annotation = as<IRAnnotation>(inst);
+        if (annotation)
+        {
+            if (annotation->getParent() == moduleInst)
+                m_instAnnotationMap[annotation->getTarget()].add(annotation);
+            continue;
+        }
+
+        if (auto hashedStringLits = as<IRGlobalHashedStringLiterals>(inst))
+        {
+            SLANG_RELEASE_ASSERT(
+                !m_globalHashedStringLiterals || m_globalHashedStringLiterals == hashedStringLits);
+            m_globalHashedStringLiterals = hashedStringLits;
+        }
+
+        if (as<IRGlobalParam>(inst))
+            m_globalParams.add(inst);
+
+        bool isHLSLExported = false;
+        bool isKnownBuiltin = false;
+        for (auto decoration : inst->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DownstreamModuleExportDecoration:
+                isHLSLExported = true;
+                break;
+
+            case kIROp_KnownBuiltinDecoration:
+                isKnownBuiltin = true;
+                break;
+
+            default:
+                break;
+            }
+        }
+
+        if (isHLSLExported)
+            m_hlslExports.add(inst);
+        if (isKnownBuiltin)
+            m_knownBuiltins.add(inst);
+    }
+}
+
+ArrayView<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
+{
+    if (!target)
+        return {};
+
+    auto annotations = m_instAnnotationMap.tryGetValue(target);
+    if (!annotations)
+        return {};
+
+    return annotations->getArrayView();
+}
+
+void IRModule::_ensureLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+}
+
+ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+    return m_linkingInfo;
+}
+
+ModuleLinkingInfo* IRModule::_getLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    SLANG_RELEASE_ASSERT(m_linkingInfo);
+    return m_linkingInfo;
+}
+
+void IRModule::_invalidateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    m_linkingInfo = nullptr;
 }
 
 void IRModule::buildMangledNameToGlobalInstMap()
@@ -5582,6 +5876,15 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
     else if (auto vectorType = as<IRVectorType>(base->getDataType()))
     {
         type = vectorType->getElementType();
+    }
+    // CoopVec element extraction produces the element type just like vector extraction.
+    else if (auto coopVectorType = as<IRCoopVectorType>(base->getDataType()))
+    {
+        type = coopVectorType->getElementType();
+    }
+    else if (auto packedVectorType = as<IRMetalPackedVectorType>(base->getDataType()))
+    {
+        type = packedVectorType->getElementType();
     }
     else if (auto matrixType = as<IRMatrixType>(base->getDataType()))
     {
@@ -7133,6 +7436,33 @@ IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize s
         createIntrinsicInst(getVoidType(), kIROp_TypeSizeAttr, SLANG_COUNT_OF(operands), operands));
 }
 
+IRTypeAlignmentAttr* IRBuilder::getTypeAlignmentAttr(
+    IRIntegerValue alignment,
+    LayoutResourceKind kind)
+{
+    auto alignmentInst = getIntValue(getIntType(), alignment);
+
+    // The unit operand is omitted for the `Uniform` default so that the common
+    // byte-alignment case has a single canonical encoding.
+    if (kind == LayoutResourceKind::Uniform)
+    {
+        IRInst* operands[] = {alignmentInst};
+        return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TypeAlignmentAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
+    IRInst* operands[] = {alignmentInst, kindInst};
+    return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+        getVoidType(),
+        kIROp_TypeAlignmentAttr,
+        SLANG_COUNT_OF(operands),
+        operands));
+}
+
 IRVarOffsetAttr* IRBuilder::getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space)
 {
     IRInst* operands[3];
@@ -7262,6 +7592,59 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     getModule()->getContainerPool().free(sortedElements);
 
     return setBaseInst;
+}
+
+IRSetBase* IRBuilder::getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements)
+{
+    // Produces the same canonical form as `getSet`, but the caller has already
+    // put the elements in unique-ID order with duplicates removed, so neither
+    // the intermediate hash set nor the sort is needed.
+    //
+    // Violating the precondition is not benign: a non-canonical operand list
+    // produces a set inst that hash-consing cannot dedupe against its
+    // structural equals, which silently breaks the pointer-identity that
+    // `areInfosEqual` relies on. Each clause is checked as far as it can be,
+    // but the checks are best-effort and the clauses are not independent:
+    //
+    //   * globality is a cheap pointer-level test and its loop runs in every
+    //     build. It reports through `SLANG_ASSERT_FAILURE`, so it is silenced
+    //     under `SLANG_ASSERT=release-asserts-only`.
+    //   * duplicate-freedom also runs in every build, and reports through
+    //     `SLANG_RELEASE_ASSERT`, which still fires in that mode. But it
+    //     compares only *adjacent* elements, so it is a complete duplicate
+    //     check only given the ordering clause below. A mis-ordered list whose
+    //     duplicates are not adjacent passes both loops in a release build --
+    //     which is precisely the case this contract exists to warn about.
+    //   * strict ordering is checked in debug builds only, and only by
+    //     *reading* the module's unique-ID map. `getUniqueID` assigns IDs
+    //     lazily, so calling it here would hand out IDs earlier than the
+    //     normal path does and perturb the canonical order of unrelated sets.
+    //     Elements of an already-built set always have IDs, so for real
+    //     callers the read-only lookup is a hit.
+    //
+    // So the caller owns the contract: these checks catch the easy violations
+    // and cannot substitute for it.
+    for (UInt i = 0; i < count; ++i)
+        if (sortedElements[i]->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("getSetFromSortedElements called with non-global operands");
+
+    for (UInt i = 1; i < count; ++i)
+        SLANG_RELEASE_ASSERT(sortedElements[i] != sortedElements[i - 1]);
+
+#ifdef _DEBUG
+    {
+        auto uniqueIDMap = getModule()->getUniqueIdMap();
+        for (UInt i = 1; i < count; ++i)
+        {
+            auto prevID = uniqueIDMap->tryGetValue(sortedElements[i - 1]);
+            auto curID = uniqueIDMap->tryGetValue(sortedElements[i]);
+            if (prevID && curID)
+                SLANG_ASSERT(*prevID < *curID);
+        }
+    }
+#endif
+
+    return as<IRSetBase>(emitIntrinsicInst(nullptr, op, count, sortedElements));
 }
 
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
@@ -9073,10 +9456,14 @@ void IRInst::removeAndDeallocate()
 
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()
 {
-    IRInst* nextChild = nullptr;
-    for (IRInst* child = getFirstDecorationOrChild(); child; child = nextChild)
+    // We'll process the list of children and decorations in reverse order, since
+    // this way we deallocate fewer items that have uses (which hit slow
+    // corner-case logic when deallocating).
+    //
+    IRInst* prevChild = nullptr;
+    for (IRInst* child = getLastDecorationOrChild(); child; child = prevChild)
     {
-        nextChild = child->getNextInst();
+        prevChild = child->getPrevInst();
         child->removeAndDeallocate();
     }
 }
@@ -9090,7 +9477,9 @@ void IRInst::transferDecorationsTo(IRInst* target)
     }
 }
 
-bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
+bool IRInst::mightHaveSideEffects(
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // TODO: We should drive this based on flags specified
     // in `ir-inst-defs.yaml` isntead of hard-coding things here,
@@ -9144,7 +9533,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             //
             auto call = cast<IRCall>(this);
             return !(
-                isSideEffectFreeFunctionalCall(call, options) ||
+                isSideEffectFreeFunctionalCall(call, options, calleeSideEffectCache) ||
                 call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;
@@ -9158,6 +9547,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_RTTIType:
     case kIROp_Func:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_Generic:
     case kIROp_Var:
     case kIROp_Param:
@@ -9257,6 +9647,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_MakeVectorFromScalar:
     case kIROp_Swizzle:
     case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting
@@ -9334,6 +9725,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastDescriptorHandleToUInt64:
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
@@ -9423,6 +9818,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_IsSignedInt:
     case kIROp_IsUnsignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsBindlessTextureNVEncodable:
     case kIROp_IsType:
         return false;
     }
@@ -9808,6 +10204,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:
@@ -9879,6 +10276,25 @@ bool isMovableInst(IRInst* inst)
             default:
                 break;
             }
+            // A load of a resource *element* from `UniformConstant` memory is movable.
+            // `UniformConstant` is read-only opaque-resource storage that is never written from
+            // within the shader, so two loads of the same address always yield the same result and
+            // redundancy removal may safely CSE (and, when hoisting is enabled, hoist) them. This
+            // lets a descriptor read once from a heap/array and used many times (e.g. a hoisted
+            // `DescriptorHandle<T>` or a `Texture2D t[N]` element sampled in a loop) collapse to a
+            // single load, matching HLSL. Only SPIR-V legalization produces `UniformConstant`
+            // pointers, so this is a no-op on other targets.
+            //
+            // The address must be an element access (`kIROp_GetElementPtr`): the scope is
+            // descriptor-heap / resource-array element reuse. A combined sampler/texture that is
+            // its own scalar global is loaded directly from that global (no element access) and is
+            // deliberately left non-movable -- its per-use loads must stay distinct for the
+            // combined-sampler emit path.
+            if (auto ptrType = as<IRPtrTypeBase>(addrType);
+                ptrType && ptrType->hasAddressSpace() &&
+                ptrType->getAddressSpace() == AddressSpace::UniformConstant &&
+                load->getPtr()->getOp() == kIROp_GetElementPtr)
+                return true;
         }
         return false;
     default:

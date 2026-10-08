@@ -2,7 +2,7 @@
 #ifndef SLANG_IR_LIVENESS_H
 #define SLANG_IR_LIVENESS_H
 
-#include "../core/slang-list.h"
+#include "core/slang-list.h"
 #include "slang-ir.h"
 
 namespace Slang

@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import time
+from urllib.parse import urlencode
 
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2
@@ -125,6 +126,44 @@ def parse_merge_queue_pr_number(branch):
         if len(segments) >= 2:
             return segments[1]
     return ""
+
+
+def find_pr_number_by_head(repo, head_owner, head_branch):
+    """Look up an open PR's number by its head owner and branch name.
+
+    A workflow run's `pull_requests` field is only populated by GitHub when
+    the head branch lives in the same repo as the workflow. For a run
+    triggered from a fork (`head_repository.full_name` differs from `repo`),
+    `pull_requests` is always `[]`, so callers that need the PR number have
+    to look it up separately via `GET /repos/{repo}/pulls?head=owner:branch`.
+    Returns the PR number (int), or None if no open PR matches.
+    """
+    if not head_owner or not head_branch:
+        return None
+    query = urlencode({"head": f"{head_owner}:{head_branch}", "state": "open"})
+    data, err = gh_api(f"repos/{repo}/pulls?{query}")
+    if err or not data:
+        return None
+    return data[0].get("number")
+
+
+def get_pr_title(repo, pr_number):
+    """Look up a PR's title by number. Returns the title, or None on error.
+
+    GitHub only sets a workflow run's `display_title` to the PR's subject
+    line for the run triggered directly by the `pull_request` event. A
+    later `workflow_dispatch` rerun or a `merge_group` run of the same PR
+    carries no PR-title context at trigger time, so `display_title` falls
+    back to the workflow's `name:` field (e.g. "CI") even though the run is
+    still tied to that PR. Callers that already resolved `pr_number` for
+    such a run can use this to recover the real title.
+    """
+    if not pr_number:
+        return None
+    data, err = gh_api(f"repos/{repo}/pulls/{pr_number}")
+    if err or not data:
+        return None
+    return data.get("title")
 
 
 def coerce_jobs_data(data):

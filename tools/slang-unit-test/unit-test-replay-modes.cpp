@@ -1,7 +1,8 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
-#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
+#include "slang-record-replay/proxy/proxy-mutable-file-system.h"
 #include "unit-test-replay-common.h"
 
 // =============================================================================
@@ -572,3 +573,4 @@ SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
 
     checkReplayContextIsPristine();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

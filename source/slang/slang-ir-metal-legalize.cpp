@@ -172,7 +172,18 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             if (ptrType->hasAddressSpace())
-                return ptrType->getAddressSpace();
+            {
+                auto addrSpace = ptrType->getAddressSpace();
+                // Pointers into buffer elements (e.g. produced by
+                // lowerBufferElementTypeToStorageType) carry the abstract
+                // `StorageBuffer` address space. Metal has no distinct
+                // storage-buffer address space — such pointers live in
+                // `device` memory — so map them to `Global`, which the
+                // Metal emitter renders as `device*`.
+                if (addrSpace == AddressSpace::StorageBuffer)
+                    return AddressSpace::Global;
+                return addrSpace;
+            }
             return AddressSpace::Generic;
         }
         return AddressSpace::Generic;
@@ -199,6 +210,28 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         return getAddressSpaceFromVarType(type);
     }
 };
+
+// MSL rejects a direct cast between a vector and a pointer, but allows vector<->scalar
+// `as_type` and scalar<->pointer C-style casts — so split the bit-cast through a scalar
+// `uint64_t`. Such casts arise when a 64-bit value carried as `uint2` (a dynamic-dispatch
+// handle, or a pointer packed into an any-value payload) is reinterpreted as a pointer,
+// or when a pointer is packed into such a `uint2`.
+static void legalizeVectorPointerBitCast(IRInst* inst)
+{
+    auto toType = inst->getDataType();
+    auto fromType = inst->getOperand(0)->getDataType();
+    bool toIsPointer = as<IRPtrTypeBase>(toType) || as<IRRawPointerTypeBase>(toType);
+    bool fromIsPointer = as<IRPtrTypeBase>(fromType) || as<IRRawPointerTypeBase>(fromType);
+    bool toIsVector = as<IRVectorType>(toType) != nullptr;
+    bool fromIsVector = as<IRVectorType>(fromType) != nullptr;
+    if (!((toIsPointer && fromIsVector) || (toIsVector && fromIsPointer)))
+        return;
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto scalarHop = builder.emitBitCast(builder.getUInt64Type(), inst->getOperand(0));
+    inst->setOperand(0, scalarHop);
+}
 
 static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
@@ -227,6 +260,9 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
         break;
     case kIROp_MeshOutputRef:
         sink->diagnose(Diagnostics::AssignToRefNotSupported{.location = getDiagnosticPos(inst)});
+        break;
+    case kIROp_BitCast:
+        legalizeVectorPointerBitCast(inst);
         break;
     case kIROp_MetalCastToDepthTexture:
         {
@@ -358,7 +394,7 @@ static void legalizeSubpassInputsForMetal(
                 {
                     IRBuilder localBuilder(user);
                     localBuilder.setInsertBefore(user);
-                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                    user->replaceUsesWith(localBuilder.getPoison(resultType));
                 }
                 user->removeAndDeallocate();
                 continue;
@@ -382,7 +418,7 @@ static void legalizeSubpassInputsForMetal(
             {
                 IRBuilder localBuilder(user);
                 localBuilder.setInsertBefore(user);
-                user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                user->replaceUsesWith(localBuilder.getPoison(resultType));
             }
             user->removeAndDeallocate();
         }

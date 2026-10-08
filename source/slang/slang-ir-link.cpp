@@ -1,8 +1,8 @@
 // slang-ir-link.cpp
 #include "slang-ir-link.h"
 
-#include "../compiler-core/slang-artifact.h"
-#include "../core/slang-performance-profiler.h"
+#include "compiler-core/slang-artifact.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-capability.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-insts.h"
@@ -60,6 +60,29 @@ struct IRSharedSpecContext
 
     bool useAutodiff = false;
 
+    // True only for the final per-target code-generation link (`linkIR`). It is
+    // false for `prelinkIR`, which pulls imported definitions into a module that
+    // stays live past the link (and may be serialized, e.g. the core module) and
+    // must therefore remain complete and self-consistent.
+    bool isFinalCodegenLink = false;
+
+    // Returns true when auto-diff link artifacts — module-scope `IRAnnotation`s
+    // and the entries of differentiable-interface witness tables — may be left
+    // out of the linked module.
+    //
+    // A program that does not use auto-diff never reads those artifacts, so
+    // linking them in only bloats the module: each differentiable builtin the
+    // program references (e.g. `sin`) drags its derivative functions and
+    // `float`'s differential machinery through every downstream pass
+    // (specialize / simplifyIR / DCE) before DCE finally removes them — the
+    // compile-time regression introduced by PR #9808 (issue #11781). Pruning is
+    // only safe in the final code-generation link, whose output is a throw-away
+    // per-target copy: deferred witness-table entries are cloned on demand when
+    // referenced by mangled name, and anything unused is removed by later DCE.
+    // `prelinkIR` must never prune, because its output stays live and must
+    // remain complete (see `isFinalCodegenLink` above).
+    bool canPruneAutodiffLinkArtifacts() { return isFinalCodegenLink && !useAutodiff; }
+
     IRBuilder builderStorage;
 
     // The "global" specialization environment.
@@ -90,6 +113,8 @@ struct IRSpecContextBase
     List<IRModule*> irModules;
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
+    HashSet<IRInst*> globalsWithClonedAnnotations;
+    HashSet<AnnotationCacheKey> clonedAnnotationKeys;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
@@ -147,11 +172,19 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
     switch (clonedValue->getOp())
     {
     case kIROp_LookupWitnessMethod:
-
-        // If `originalVal` represents a witness table entry key, add the key
-        // to witnessTableEntryWorkList.
-        context->deferredWitnessTableEntryKeys.add(
-            getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
+        {
+            // If `originalVal` represents a witness table entry key, add the key
+            // to witnessTableEntryWorkList.
+            //
+            // Built-in requirement keys (`IRBuiltinRequirementKey`) are hoistable
+            // and carry no linkage/mangled name; their witness-table entries are
+            // cloned eagerly (see `cloneWitnessTableImpl`), so they must not enter
+            // the mangled-name-keyed deferred bookkeeping (every such key would
+            // otherwise collide on the empty mangled name).
+            auto reqKey = as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey();
+            if (!as<IRBuiltinRequirementKey>(reqKey))
+                context->deferredWitnessTableEntryKeys.add(getMangledName(reqKey));
+        }
         break;
     }
 }
@@ -195,21 +228,47 @@ IRInst* cloneInst(
 
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
-    SLANG_UNUSED(clonedInst);
+    // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
+    // derivative functions and differential type/zero/add/pair witnesses. Every
+    // `AnnotationKind` is differentiability-related (see the note at its
+    // definition in slang-type-system-shared.h), so when auto-diff link
+    // artifacts may be pruned we can skip cloning annotations wholesale instead
+    // of distinguishing kinds. This restores the pre-PR-#9808 behavior where
+    // derivative info was never linked into non-differentiating programs (see
+    // `canPruneAutodiffLinkArtifacts` for the full safety argument).
+    //
+    // If this static_assert fires, a new `AnnotationKind` was added: confirm it
+    // is auto-diff-related and bump the count, or teach this gate to
+    // distinguish kinds — otherwise the new annotations are silently dropped
+    // from every non-differentiating program.
+    static_assert(
+        int(AnnotationKind::CountOf) == 16,
+        "AnnotationKind changed: revisit cloneAnnotations' wholesale-skip gate");
+    if (context->getShared()->canPruneAutodiffLinkArtifacts())
+        return;
 
     // Local annotations will be cloned normally as part of cloning their parent function/generic
-    // body. Only explicitly chase use-list annotations for module-scope instructions, where the
-    // annotations are not children of the cloned instruction itself.
+    // body. For module-scope annotations, we need to look them up since they won't get
+    // automatically pulled in.
+
     if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
         return;
 
-    traverseUsers<IRAnnotation>(
-        originalInst,
-        [&](IRAnnotation* annotation)
-        {
-            if (annotation->getTarget() == originalInst)
-                cloneInst(context, context->builder, annotation, annotation);
-        });
+    if (!context->globalsWithClonedAnnotations.add(originalInst))
+        return;
+
+    auto annotations =
+        originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
+    // We clone at most one annotation per (cloned target, kind), because `tryLookupAnnotation`
+    // assumes a single value per (target, kind) and `cloneGlobalValueImpl` unions the
+    // annotations of several declarations of one symbol onto one clone.
+    for (auto annotation : annotations)
+    {
+        AnnotationCacheKey key = {clonedInst, AnnotationKind(annotation->getConformanceID())};
+        if (!context->clonedAnnotationKeys.add(key))
+            continue;
+        cloneInst(context, context->builder, annotation, annotation);
+    }
 }
 
 IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
@@ -676,7 +735,11 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
 
 bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
 {
-    SLANG_UNUSED(context);
+    // A table that carries an explicit keep-alive marking (user `export`, COM
+    // interface, dynamic-dispatch type conformance) must stay complete: its
+    // entries can never be pulled in on demand by mangled-name reference, so
+    // deferring them would drop them. This rule is checked first so that the
+    // differentiable-interface gate below can never override it.
     for (auto decor : table->getDecorations())
     {
         switch (decor->getOp())
@@ -696,16 +759,23 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
             return true;
         case kIROp_KnownBuiltinDecoration:
             {
+                // Witness tables for the differentiable builtin interfaces carry
+                // the auto-diff machinery (`Differential`, `dzero`/`dadd`,
+                // fwd/bwd derivative methods). Deep-cloning one drags the whole
+                // derivative-function closure of its concrete type (e.g. every
+                // derivative of `sin`/`cos`/`sqrt` for `float`) through every
+                // downstream pass, even when the program never differentiates —
+                // the compile-time regression from PR #9808 (issue #11781).
+                // Defer their entries instead, whenever pruning is allowed (see
+                // `canPruneAutodiffLinkArtifacts`). Note that deferral is not
+                // total: entries keyed by an `IRBuiltinRequirementKey` (e.g.
+                // `Differential`/`dzero`/`dadd`) have no mangled name to defer
+                // on, so `cloneWitnessTableImpl` still clones them eagerly;
+                // only the mangled-name-keyed entries (the fwd/bwd derivative
+                // methods) are pruned.
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                switch (name)
-                {
-                case KnownBuiltinDeclName::IDifferentiable:
-                case KnownBuiltinDeclName::IDifferentiablePtr:
-                case KnownBuiltinDeclName::IForwardDifferentiable:
-                case KnownBuiltinDeclName::IBackwardDifferentiable:
-                case KnownBuiltinDeclName::IBwdCallable:
-                    return true;
-                }
+                if (isDifferentiableInterfaceBuiltin(name))
+                    return !context->getShared()->canPruneAutodiffLinkArtifacts();
                 break;
             }
         default:
@@ -764,7 +834,14 @@ IRWitnessTable* cloneWitnessTableImpl(
     {
         if (auto entry = as<IRWitnessTableEntry>(child))
         {
-            if (!shouldDeepClone)
+            // Built-in requirement keys are hoistable and have no mangled name,
+            // so they cannot key the deferred-entry dictionary below (they would
+            // all collide on the empty name). Such entries are few (the
+            // `IDifferentiable` requirements), so clone them eagerly instead of
+            // deferring.
+            bool isBuiltinReqEntry =
+                as<IRBuiltinRequirementKey>(entry->getRequirementKey()) != nullptr;
+            if (!shouldDeepClone && !isBuiltinReqEntry)
             {
                 // Skip witness table entries during the first pass,
                 // and just add them to the deferred work list.
@@ -1473,7 +1550,24 @@ IRInst* cloneGlobalValueImpl(
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
+
+    // A linked symbol can have several same-mangled-name declarations across the input
+    // modules (e.g. an importing module's `[import]` and the defining module's `[export]`),
+    // which link collapses into this one inst. Any of them may carry module-scope auto-diff
+    // trait annotations, since the module that differentiates a symbol records them on its
+    // own declaration, which need not be the one selected as `originalInst`. We therefore
+    // recover the annotations from every declaration, not just `originalInst`. The selected
+    // declaration is cloned first and `cloneAnnotations` dedups per (cloned target, kind) with
+    // every call keyed on `clonedValue`, so the selected declaration's annotations take
+    // precedence and a sibling only supplies a kind it lacks. A declaration in the module we
+    // are linking into is skipped: its annotations stay in place, and its linking info is not
+    // prebuilt.
     cloneAnnotations(context, clonedValue, originalInst);
+    for (auto s = originalValues.sym; s; s = s->nextWithSameName)
+    {
+        if (s->irGlobalValue->getModule() != context->getModule())
+            cloneAnnotations(context, clonedValue, s->irGlobalValue);
+    }
     return clonedValue;
 }
 
@@ -1682,19 +1776,6 @@ struct IRSpecializationState
         sharedContextStorage = IRSharedSpecContext();
     }
 };
-
-static bool _isHLSLExported(IRInst* inst)
-{
-    for (auto decoration : inst->getDecorations())
-    {
-        const auto op = decoration->getOp();
-        if (op == kIROp_HLSLExportDecoration || op == kIROp_DownstreamModuleExportDecoration)
-        {
-            return true;
-        }
-    }
-    return false;
-}
 
 static bool doesFuncHaveDefinition(IRFunc* func)
 {
@@ -1978,11 +2059,17 @@ void convertAtomicToStorageBuffer(
     }
 }
 
-void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+/// Replace directly-declared GLSL atomic-counter globals with storage-buffer-backed globals.
+///
+/// The GLSL front end lowers each supported `atomic_uint` global to a global whose direct type is
+/// `kIROp_GLSLAtomicUintType` and whose layout carries its binding and byte offset. This pass
+/// groups those globals by binding and rewrites their direct uses to the representation shared by
+/// SPIR-V and HLSL emission. Aggregate types containing atomic counters are outside that existing
+/// lowering contract and are intentionally not rediscovered by recursively walking arbitrary type
+/// graphs. Source semantic checking rejects a direct global that lacks the required GLSL binding
+/// layout; the release assertions below enforce that producer contract for loaded serialized IR.
+static void replaceGLSLAtomicUintGlobals(IRSpecContext* context, IRModule* irModule)
 {
-    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-        return;
-
     Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
     for (auto inst : irModule->getGlobalInsts())
     {
@@ -1992,16 +2079,15 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
             {
             case kIROp_GLSLAtomicUintType:
                 {
-                    // atomic_uint are supported by GLSL->VK through converting to a different
-                    // type (GL_EXT_vulkan_glsl_relaxed). atomic_uint are not supported by
-                    // SPIR-V->VK; this means that to get SPIR-V to work we must convert the
-                    // type ourselves to an equivlent representation (storage buffer); the added
-                    // benifit is that then HLSL is possible to emit as a target as well since
-                    // atomic_uint is not an HLSL concept, but storageBuffer->RWBuffer is and
-                    // HLSL concept
-                    auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                    // GLSL drivers can implement `atomic_uint` through
+                    // `GL_EXT_vulkan_glsl_relaxed`, but the placeholder type cannot be emitted as
+                    // SPIR-V or HLSL. Use the existing storage-buffer representation for both.
+                    auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+                    SLANG_RELEASE_ASSERT(layoutDecoration);
+                    auto layout = layoutDecoration->getLayout();
+                    SLANG_RELEASE_ASSERT(layout->getOperandCount() > 1);
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
-                    SLANG_ASSERT(layoutVal != nullptr);
+                    SLANG_RELEASE_ASSERT(layoutVal);
                     bindingToInstMapUnsorted
                         .getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>())
                         .add(inst);
@@ -2027,15 +2113,41 @@ bool isDiffPairType(IRInst* type)
     return as<IRDifferentialPairTypeBase>(type) != nullptr;
 }
 
-bool doesModuleUseAutodiff(IRModule* module)
+// Returns true if `inst` or any inst nested under it is an `IRTranslateBase`
+// (`ForwardDifferentiate`, `BackwardDifferentiatePropagate`, ...) — the
+// representation of a `fwd_diff`/`bwd_diff` request before auto-diff
+// processing runs.
+static bool containsTranslateInst(IRInst* inst)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    if (as<IRTranslateBase>(inst))
+        return true;
+    for (auto child : inst->getChildren())
     {
-        if (as<IRTranslateBase>(globalInst))
+        if (containsTranslateInst(child))
             return true;
     }
-
     return false;
+}
+
+// Returns true if `module` requests any auto-diff translation, i.e. contains
+// an `IRTranslateBase` inst anywhere in its inst tree.
+//
+// This detector gates auto-diff link-time pruning in the final codegen link
+// (see `IRSharedSpecContext::canPruneAutodiffLinkArtifacts`), which makes its
+// completeness load-bearing: a false negative does not just skip extra link
+// work, it strips annotations and defers witness entries that auto-diff
+// processing would later need. The scan is therefore a full recursive walk,
+// not just a walk of module-scope insts: although `IRTranslateBase` is
+// hoistable, translation requests routinely sit inside function and generic
+// bodies rather than as direct module-scope insts (a request whose callee
+// depends on a generic parameter cannot hoist past the generic that owns it,
+// e.g. tests/autodiff/fwd-diff-nested-in-generic.slang). This is empirically
+// load-bearing: replacing this walk with a module-scope-children-only scan
+// fails ~240 tests under tests/autodiff/, including an ICE in DiffPair
+// lowering on tests/autodiff/no-diff-interface-subscript.slang.
+bool doesModuleUseAutodiff(IRModule* module)
+{
+    return containsTranslateInst(module->getModuleInst());
 }
 
 void cloneUsedWitnessTableEntries(IRSpecContext* context)
@@ -2072,6 +2184,11 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
+
+    // Once source modules have been lowered and linked, the IR is the complete definition of the
+    // program. Back-end transformations must be selected from IR operations/decorations or from
+    // target/code-generation options. An input source language, and especially a legacy front-end
+    // option such as `-allow-glsl`, is not a valid back-end policy switch.
 
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
@@ -2129,6 +2246,17 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     Index userModuleCount = irModules.getCount();
     irModules.addRange(builtinModules);
     ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
+
+    // Source/layout/builtin modules are fully built by this point. Build the module-owned linker
+    // global acceleration cache once here so the linker can avoid repeated global scans and
+    // high-fanout use-list walks.
+    for (auto irModule : irModules)
+        irModule->_ensureLinkingInfo();
+
+    // This is the final per-target code-generation link, so auto-diff artifacts
+    // the program never uses may be pruned (see
+    // `IRSharedSpecContext::canPruneAutodiffLinkArtifacts`).
+    sharedContext->isFinalCodegenLink = true;
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
@@ -2246,49 +2374,40 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
-    auto shouldCopy = [&](IRInst* inst) -> bool
+    HashSet<IRInst*> extraInstsToClone;
+    auto cloneAndKeepAlive = [&](IRInst* inst)
     {
-        // We need to copy over exported symbols,
-        // and any global parameters if preserve-params option is set.
-        //
-        if (_isHLSLExported(inst))
-        {
-            return true;
-        }
+        if (!inst || !extraInstsToClone.add(inst))
+            return;
 
-        if (shouldCopyGlobalParams && as<IRGlobalParam>(inst))
+        auto cloned = cloneValue(context, inst);
+        if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
         {
-            return true;
+            context->builder->addKeepAliveDecoration(cloned);
         }
-
-        if (auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>())
-        {
-            switch (knownBuiltin->getName())
-            {
-            case KnownBuiltinDeclName::NullDifferential:
-                return true;
-            default:
-                break;
-            }
-        }
-
-        return false;
     };
 
     for (IRModule* irModule : irModules)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        auto linkingInfo = irModule->_getOrCreateLinkingInfo();
+
+        // We need to copy over exported symbols, any global parameters if preserve-params option
+        // is set, and specific known builtins that must be present even when not referenced from
+        // the entry-point clone graph.
+        for (auto inst : linkingInfo->getHLSLExports())
+            cloneAndKeepAlive(inst);
+
+        if (shouldCopyGlobalParams)
         {
-            // We need to copy over exported symbols,
-            // and any global parameters if preserve-params option is set.
-            if (shouldCopy(inst))
-            {
-                auto cloned = cloneValue(context, inst);
-                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
-                {
-                    context->builder->addKeepAliveDecoration(cloned);
-                }
-            }
+            for (auto inst : linkingInfo->getGlobalParams())
+                cloneAndKeepAlive(inst);
+        }
+
+        for (auto inst : linkingInfo->getKnownBuiltins())
+        {
+            auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>();
+            if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
+                cloneAndKeepAlive(inst);
         }
     }
 
@@ -2345,10 +2464,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
-    // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
-    // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
-    // compiler magic tricks
-    GLSLReplaceAtomicUint(context, targetProgram, state->irModule);
+    // Rewrite direct GLSL atomic-counter globals that reached the linked IR. No target consumes
+    // this placeholder directly: SPIR-V cannot represent it, while targets such as HLSL need the
+    // equivalent storage-buffer representation. The direct global's type opcode selects this
+    // existing legalization path. Unlike the ray-location rewrite, detecting it requires only this
+    // cheap global-instruction scan, which is a no-op for every module without such a global.
+    replaceGLSLAtomicUintGlobals(context, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
@@ -2412,9 +2533,17 @@ struct IRPrelinkContext : IRSpecContext
                     mangledName = exportDecor->getMangledName();
                     decorsToRemove.add(exportDecor);
                 }
-                else if (as<IRImportDecoration>(decor))
+                else if (auto importDecor = as<IRImportDecoration>(decor))
                 {
                     hasImportDecor = true;
+                    // We register [Import]-origin clones too, not just [Export]-origin ones: a
+                    // helper cloned once under [Import] must be reused -- not re-cloned -- when a
+                    // later transitive closure in the same prelink pass reaches the same mangled
+                    // name, or checkIRDuplicate fires. When both decorations are present [Export]
+                    // wins the key independently of iteration order, because the [Export] branch
+                    // assigns unconditionally while this one assigns only when the key is unset.
+                    if (!mangledName.getLength())
+                        mangledName = importDecor->getMangledName();
                 }
             }
             if (mangledName.getLength() && !hasImportDecor)
@@ -2459,7 +2588,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
-                clonedInst = builder->createWitnessTable(
+                clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
                     cloneType(this, witnessTable->getConcreteType()));
                 break;
@@ -2524,6 +2653,28 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     List<IRModule*> builtinModules;
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
+
+    // Prelink can pull in dependencies from any available input module, not only the modules
+    // that directly own `externalSymbolsToLink`. Build linking info for all stable input modules
+    // before cloning. Do not build it for `irModule` itself here: prelink will mutate it by
+    // replacing declarations with cloned definitions, and linking info assumes the module does
+    // not change after it is built.
+    HashSet<IRModule*> inputModules;
+    for (auto inputModule : specContext.irModules)
+    {
+        if (inputModule)
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : builtinModules)
+    {
+        if (inputModule)
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : inputModules)
+    {
+        if (inputModule != irModule)
+            inputModule->_ensureLinkingInfo();
+    }
 
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);

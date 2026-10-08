@@ -1,8 +1,8 @@
 #include "slang-workspace-version.h"
 
-#include "../compiler-core/slang-lexer.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
+#include "compiler-core/slang-lexer.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
 #include "slang-check-impl.h"
 #include "slang-mangle.h"
 #include "slang-serialize-container.h"
@@ -153,6 +153,17 @@ bool Workspace::updateSearchInWorkspace(bool value)
     return changed;
 }
 
+bool Workspace::updatePredefinedLanguageVersion(SlangLanguageVersion version)
+{
+    bool changed = predefinedLanguageVersion != version;
+    predefinedLanguageVersion = version;
+    if (changed)
+    {
+        invalidate();
+    }
+    return changed;
+}
+
 void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 {
     for (auto uri : rootDirURI)
@@ -189,7 +200,9 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                 },
                 &context);
         }
-        workspaceSearchPaths = _Move(context.paths);
+        // Append every root's paths. OrderedHashSet removes duplicates and keeps first-root order.
+        for (auto& searchPath : context.paths)
+            workspaceSearchPaths.add(searchPath);
     }
     slangGlobalSession = globalSession;
 }
@@ -487,6 +500,8 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     targetDesc.profile = slangGlobalSession->findProfile("sm_6_6");
     desc.targets = &targetDesc;
     List<const char*> searchPathsRaw;
+    // SessionDesc borrows these buffers until createSession returns.
+    List<String> openedDocumentSearchPaths;
     for (auto& path : additionalSearchPaths)
         searchPathsRaw.add(path.getBuffer());
     if (searchInWorkspace)
@@ -501,8 +516,10 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         {
             auto dir = Path::getParentDirectory(docPath.getBuffer());
             if (set.add(dir))
-                searchPathsRaw.add(dir.getBuffer());
+                openedDocumentSearchPaths.add(dir);
         }
+        for (auto& path : openedDocumentSearchPaths)
+            searchPathsRaw.add(path.getBuffer());
     }
     desc.searchPaths = searchPathsRaw.getBuffer();
     desc.searchPathCount = searchPathsRaw.getCount();
@@ -517,6 +534,20 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
         macroDescs.add(macroDesc);
     }
     desc.preprocessorMacros = macroDescs.getBuffer();
+
+    // Inject the assumed language version (slang.predefinedLanguageVersion) as a session compiler
+    // option so directive-less files parse at that version; when unset (UNKNOWN) inject nothing and
+    // keep the compiler default. langVersionEntry must outlive the createSession call below, so it
+    // is declared in this scope (compilerOptionEntries borrows it by pointer).
+    slang::CompilerOptionEntry langVersionEntry;
+    if (predefinedLanguageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
+    {
+        langVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
+        langVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+        langVersionEntry.value.intValue0 = predefinedLanguageVersion;
+        desc.compilerOptionEntries = &langVersionEntry;
+        desc.compilerOptionEntryCount = 1;
+    }
 
     ComPtr<slang::ISession> session;
     slangGlobalSession->createSession(desc, session.writeRef());

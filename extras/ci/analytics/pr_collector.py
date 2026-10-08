@@ -31,6 +31,10 @@ DEFAULT_DAYS = 30
 DEFAULT_OUTPUT = "pr_merges.json"
 
 
+class DataCompletenessError(RuntimeError):
+    """Raised when GitHub API failures prevent complete PR collection."""
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Collect merged PR data from GitHub and save as JSON."
@@ -148,9 +152,9 @@ def fetch_merged_prs(repo, since_date, verbose=False):
         )
 
         if err:
-            print(f" error: {err}", file=sys.stderr)
-            current = next_window
-            continue
+            raise DataCompletenessError(
+                f"API error while fetching merged PRs for {from_str}..{to_str}: {err}"
+            )
 
         new_count = 0
         for pr in prs or []:
@@ -205,7 +209,11 @@ def main():
     start_date = get_start_date(args.days, existing, args.verbose)
     print(f"Collecting merged PRs since {start_date.isoformat()}")
 
-    raw_prs = fetch_merged_prs(args.repo, start_date, args.verbose)
+    try:
+        raw_prs = fetch_merged_prs(args.repo, start_date, args.verbose)
+    except DataCompletenessError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
     if not raw_prs:
         print("No merged PRs found in the specified time range.")
         if existing_count > 0:

@@ -463,25 +463,76 @@ convention for interface methods.
 #define SLANG_PROCESSOR_FAMILY_ARM (SLANG_PROCESSOR_ARM | SLANG_PROCESSOR_ARM_64)
 #define SLANG_PROCESSOR_FAMILY_POWER_PC (SLANG_PROCESSOR_POWER_PC_64 | SLANG_PROCESSOR_POWER_PC)
 
-// Pointer size
-#define SLANG_PTR_IS_64 \
-    (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
+// Pointer size: prefer the compiler's own width macros, which are correct on every target
+// (including architectures outside the SLANG_PROCESSOR_* whitelist below); the whitelist is only a
+// fallback for toolchains that predefine none of them. MSVC exposes only _WIN64/_WIN32, and 64-bit
+// Windows defines both, so _WIN64 is tested first.
+#ifndef SLANG_PTR_IS_64
+    #if defined(__LP64__) || defined(_LP64) || defined(_WIN64) || \
+        (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8))
+        #define SLANG_PTR_IS_64 1
+    #elif defined(_WIN32) || (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 4))
+        #define SLANG_PTR_IS_64 0
+    #elif (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
+        #define SLANG_PTR_IS_64 1
+    #elif (                                                                    \
+        SLANG_PROCESSOR_ARM | SLANG_PROCESSOR_X86 | SLANG_PROCESSOR_POWER_PC | \
+        SLANG_PROCESSOR_WASM)
+        #define SLANG_PTR_IS_64 0
+    #endif
+#endif
+
+// Fail loudly on an unresolved pointer size rather than silently choosing a 32-bit layout, which
+// would corrupt SlangInt/SlangUInt and every struct laid out under SLANG_PTR_IS_32.
+#ifndef SLANG_PTR_IS_64
+    #error "Couldn't determine pointer size; define SLANG_PTR_IS_64 (0 or 1) via SLANG_USER_CONFIG."
+#endif
+
+// SLANG_PTR_IS_32 is derived as the boolean negation, so SLANG_PTR_IS_64 must be exactly 0 or 1;
+// any other value (e.g. a stray user override of 2) would make both macros truthy.
+#if (SLANG_PTR_IS_64 != 0) && (SLANG_PTR_IS_64 != 1)
+    #error "SLANG_PTR_IS_64 must be defined to exactly 0 or 1."
+#endif
+
 #define SLANG_PTR_IS_32 (SLANG_PTR_IS_64 ^ 1)
 
-// Processor features
-#if SLANG_PROCESSOR_FAMILY_X86
-    #define SLANG_LITTLE_ENDIAN 1
-    #define SLANG_UNALIGNED_ACCESS 1
-#elif SLANG_PROCESSOR_FAMILY_ARM
-    #if defined(__ARMEB__)
+#ifdef __cplusplus
+// Cross-check the derived pointer size against what the compiler actually uses, so a wrong value
+// fails at compile time instead of silently corrupting the ABI.
+SLANG_COMPILE_TIME_ASSERT((SLANG_PTR_IS_64 ? 8 : 4) == sizeof(void*));
+#endif
+
+// Endianness: prefer the compiler's own byte-order macros, correct on every target (including
+// those outside the SLANG_PROCESSOR_* whitelist); MSVC predefines no __BYTE_ORDER__ but every
+// Windows target is little-endian, so _WIN32 is special-cased, and the whitelist is only a
+// fallback. Runs only when the user has forced neither macro.
+#if !defined(SLANG_LITTLE_ENDIAN) && !defined(SLANG_BIG_ENDIAN)
+    #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+        (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+        (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
         #define SLANG_BIG_ENDIAN 1
-    #else
+    #elif defined(_WIN32)
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif SLANG_PROCESSOR_FAMILY_X86
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif SLANG_PROCESSOR_FAMILY_ARM
+        #if defined(__ARMEB__)
+            #define SLANG_BIG_ENDIAN 1
+        #else
+            #define SLANG_LITTLE_ENDIAN 1
+        #endif
+    #elif SLANG_PROCESSOR_FAMILY_POWER_PC
+        #define SLANG_BIG_ENDIAN 1
+    #elif SLANG_WASM
         #define SLANG_LITTLE_ENDIAN 1
     #endif
-#elif SLANG_PROCESSOR_FAMILY_POWER_PC
-    #define SLANG_BIG_ENDIAN 1
-#elif SLANG_WASM
-    #define SLANG_LITTLE_ENDIAN 1
+#endif
+
+// Unaligned memory access is a processor feature independent of byte order; only x86/x64 permit it.
+#if SLANG_PROCESSOR_FAMILY_X86
+    #define SLANG_UNALIGNED_ACCESS 1
 #endif
 
 #ifndef SLANG_LITTLE_ENDIAN
@@ -508,9 +559,13 @@ convention for interface methods.
     #define SLANG_HAS_BACKTRACE 0
 #endif
 
-// One endianness must be set
-#if ((SLANG_BIG_ENDIAN | SLANG_LITTLE_ENDIAN) == 0)
+// Exactly one endianness must be set: neither means an undetected target, both means a
+// contradictory user override that would leave consumers disagreeing.
+#if !SLANG_BIG_ENDIAN && !SLANG_LITTLE_ENDIAN
     #error "Couldn't determine endianness"
+#endif
+#if SLANG_BIG_ENDIAN && SLANG_LITTLE_ENDIAN
+    #error "Both SLANG_BIG_ENDIAN and SLANG_LITTLE_ENDIAN are set"
 #endif
 
 #ifndef SLANG_NO_INTTYPES
@@ -583,6 +638,20 @@ typedef uint32_t SlangSizeT;
         SLANG_SEVERITY_INTERNAL =
             5, /**< An internal error, indicating a logic error in the compiler.
                 */
+    };
+
+    /* A warning "level" (group), modeled on the clang/gcc -Wall/-Wextra/-Wpedantic
+    groups. Each group is enabled independently: a warning tagged with a group is
+    emitted only when that group has been enabled, while warnings in the implicit
+    Default group are always emitted. */
+    typedef int SlangWarningLevelIntegral;
+    enum SlangWarningLevel : SlangWarningLevelIntegral
+    {
+        SLANG_WARNING_LEVEL_DEFAULT = 0,  /**< Always emitted; this is the baseline group and is not
+                                             something a caller enables explicitly. */
+        SLANG_WARNING_LEVEL_ALL = 1,      /**< Warnings enabled by -Wall. */
+        SLANG_WARNING_LEVEL_EXTRA = 2,    /**< Warnings enabled by -Wextra. */
+        SLANG_WARNING_LEVEL_PEDANTIC = 3, /**< Warnings enabled by -Wpedantic. */
     };
 
     typedef int SlangDiagnosticFlags;
@@ -851,6 +920,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_MESH = 13,
         SLANG_STAGE_AMPLIFICATION = 14,
         SLANG_STAGE_DISPATCH = 15,
+        SLANG_STAGE_NODE = 16,
         //
         SLANG_STAGE_COUNT,
 
@@ -946,11 +1016,19 @@ typedef uint32_t SlangSizeT;
         SLANG_DIAGNOSTIC_COLOR_NEVER = 2,  // Never use color
     };
 
+    // Selects the presentation of human-readable diagnostics. Machine-readable diagnostics
+    // take precedence over this setting.
+    enum SlangDiagnosticFormat
+    {
+        SLANG_DIAGNOSTIC_FORMAT_DEFAULT = 0,
+        SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO = 1,
+    };
+
     // All compiler option names supported by Slang.
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
     //
-    // Every enumerator has an explicit integer value. Rules:
+    // Every enumerator except the terminal CountOf sentinel has an explicit integer value. Rules:
     //   1. NEVER insert a new enumerator in the middle of the list.
     //   2. NEVER remove an enumerator; rename to REMOVED_<Name> and keep the value.
     //   3. NEVER reuse an integer value from a removed/deprecated entry.
@@ -961,6 +1039,16 @@ typedef uint32_t SlangSizeT;
     // compiled against an older version of this header.
     namespace slang
     {
+    enum class BitfieldPackingRules
+    {
+        // Uses LSB-first packing; fields may share storage across underlying type sizes.
+        Default = 0,
+        // Uses LSB-first packing; a type-size change starts new storage. Rejects zero-width fields.
+        MSVC = 1,
+        // Uses MSB-first packing and starts new storage on type-size changes. Not recommended.
+        LegacyMSBFirstMSVC = 2,
+    };
+
     enum class CompilerOptionName
     {
         MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
@@ -1133,7 +1221,8 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Bitfield options
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // packing and starts new storage on underlying type-size changes.
         UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
@@ -1166,7 +1255,7 @@ typedef uint32_t SlangSizeT;
 
         TraceCoverage = 145, // bool: insert per-statement line coverage counters
         TraceCoverageBinding =
-            146, // intValue0: register index; intValue1: register space — explicit
+            146, // intValue0: register index; intValue1: register space - explicit
                  //   binding for the synthesized __slang_coverage buffer. Consumed
                  //   only when any coverage mode is enabled; the slangc CLI spelling
                  //   also enables TraceCoverage.
@@ -1176,7 +1265,106 @@ typedef uint32_t SlangSizeT;
                  //   a repeatable hint consumed only when any coverage mode is enabled.
         TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
         TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
+        CoverageManifestOutput =
+            150, // stringValue0: explicit path for the slangc coverage manifest sidecar.
+                 //   When unset, slangc writes <output>.coverage-manifest.json next to
+                 //   file outputs that carry coverage metadata. This option is output
+                 //   policy only and is excluded from compiler cache keys. It requires
+                 //   at least one coverage tracing mode, is rejected for container
+                 //   outputs, and errors if the selected outputs produce no coverage
+                 //   metadata. Explicit paths are valid only when exactly one compiled
+                 //   artifact carries coverage metadata and must not overlap any emitted
+                 //   artifact path. Query/set with the string option APIs.
+        TraceCoverageCounterByteWidth =
+            151, // intValue0: per-slot byte width of the synthesized __slang_coverage
+                 //   buffer. Accepts 4 (uint32) or 8 (uint64). Omitting the option
+                 //   yields 8 when any coverage mode is enabled. Use 4 to opt down to
+                 //   uint32 when the runtime driver lacks 64-bit shader atomic support
+                 //   (notably MoltenVK on Apple Silicon, where Vulkan exposes
+                 //   shaderBufferInt64Atomics = false). uint32 counters wrap silently
+                 //   at 2^32 hits per slot; uint64 counters effectively do not wrap
+                 //   within any practical run. The corresponding CLI flag
+                 //   `-trace-coverage-counter-width <bits>` takes a bit count (32/64)
+                 //   and stores the matching byte width here.
+        TraceCoverageBoolean =
+            152, // bool: record boolean coverage (CoverageCounterMode::Boolean) instead of exact
+                 //   execution counts. Each counter is written with a plain non-atomic store
+                 //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
+                 //   watchdog timeouts heavy coverage can trigger) at the cost of exact
+                 //   counts. Off by default.
+        SPIRVUnifiedDescriptorHeapStride =
+            154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
+                 //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
+                 //   single heap shared by buffers and images is indexed at the device's unified
+                 //   stride. Opt-in; mutually exclusive with a non-zero
+                 //   `-spirv-resource-heap-stride` (combining the two is an error).
 
+        // intValue0: a SlangWarningLevel group to enable (e.g. SLANG_WARNING_LEVEL_PEDANTIC).
+        // Repeatable: enabling multiple groups is additive, matching how -Wall/-Wextra/-Wpedantic
+        // combine on the command line. CLI spellings: -Wall, -Wextra, -Wpedantic.
+        WarningLevel = 155,
+
+        SeparateDebugInfoOutput =
+            156, // stringValue0: explicit path for the slangc separate-debug-info sidecar.
+                 //   When unset, slangc derives the sidecar path from the main artifact path.
+                 //   This option is output policy only and is excluded from compiler cache keys.
+                 //   It requires EmitSeparateDebug and permits the main artifact to be written to
+                 //   stdout. A value of "-" writes the separate debug information to stdout when
+                 //   the main artifact is written to a file. Query/set with the string option APIs.
+
+        DebugInfoIncludeSource =
+            157, // bool: embed the shader source text into the debug information independently of
+                 //   the overall `-g` debug level. At `-g1` (Minimal) the source is embedded via
+                 //   the core `OpSource` File+Source operands (no NonSemantic extension); at
+                 //   `-g2`/`-g3` source is already embedded so the option is a no-op. Requires
+                 //   debug information: using it with `-g0`, or without any `-g` option (both
+                 //   resolve to no debug info), is an error. Only affects SPIR-V output.
+
+        TraceCoverageBindlessIndex =
+            158, // int: Synthesize `__slang_coverage` as an unbounded
+                 //   descriptor array of structured buffers rather than a single
+                 //   buffer, and index it with this value:
+                 //   `__slang_coverage[N][slot]`. Many separately compiled
+                 //   shaders sharing one pipeline then occupy a single
+                 //   descriptor binding instead of one binding each, and each
+                 //   shader's buffer is sized independently by the host.
+                 //
+                 //   Where the array itself lives is a separate decision, made
+                 //   with `TraceCoverageBinding` (or left to auto-allocation).
+                 //   Note for hosts: if the descriptor array is declared with
+                 //   `VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT`,
+                 //   Vulkan requires it to be the highest-numbered binding in
+                 //   its set. A fixed `descriptorCount` carries no such
+                 //   restriction. Either way it is the host's layout to satisfy
+                 //   and the compiler cannot see it.
+                 //
+                 //   The index is a compile-time constant and therefore part of
+                 //   the compiled artifact: a host that keys a shader cache on
+                 //   the compiled output must derive it from a stable shader
+                 //   identity rather than from load order, or an unchanged
+                 //   shader recompiles whenever that order shifts. Supplying it
+                 //   at pipeline creation instead would remove that constraint;
+                 //   see issue #12541. SPIR-V and GLSL only.
+
+        // CLI-only query option `-get-<compiler>-path`: prints the resolved on-disk path of the
+        // downstream <compiler> Slang would load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerPath), then continues. It takes no value and is
+        // never stored on an option set; it only drives the print-and-continue handler in the
+        // command-line parser.
+        GetCompilerPath = 159,
+
+        BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
+
+        DisableNotes = 161, // stringValue0: comma-separated note codes or names.
+
+        DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
+
+        // `bool`: Enables additional backwards-compatibility features for legacy HLSL inputs,
+        // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
+        EnableExtendedHLSLBackwardsCompatibility = 163,
+
+        // Do not assign an explicit value to CountOf. It must remain one past the last option,
+        // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
     };
 
@@ -2793,6 +2981,23 @@ struct TypeLayoutReflection
             (SlangReflectionTypeLayout*)this);
     }
 
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer it returns a
+     * variable layout at offset zero whose `getTypeLayout()` is an array type layout, so
+     * `getElementTypeLayout` / `getElementStride` on it behave as for any array. Returns null for
+     * type layouts that are not container-like.
+     */
+    VariableLayoutReflection* getContentVarLayout()
+    {
+        return (VariableLayoutReflection*)spReflectionTypeLayout_GetContentVarLayout(
+            (SlangReflectionTypeLayout*)this);
+    }
+
     // How is this type supposed to be bound?
     ParameterCategory getParameterCategory()
     {
@@ -3103,20 +3308,52 @@ struct VariableReflection
         return findAttributeByName(globalSession, name);
     }
 
-    bool hasDefaultValue()
+    /// Deprecated: call getDefaultValueBlob and check for a null blob instead.
+    SLANG_DEPRECATED bool hasDefaultValue()
     {
         return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
     }
 
-    SlangResult getDefaultValueInt(int64_t* value)
+    /// Deprecated: use getDefaultValueBlob instead.
+    /// Gets an integer default value. For specialized generic static constants,
+    /// the semantic value is resolved under the current specialization first;
+    /// literal initializers are used as a fallback when no integer value resolves.
+    SLANG_DEPRECATED SlangResult getDefaultValueInt(int64_t* value)
     {
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
-    SlangResult getDefaultValueFloat(float* value)
+    /// Deprecated: use getDefaultValueBlob instead.
+    /// Gets a floating-point default value from a literal initializer. Unlike
+    /// getDefaultValueInt, this API does not currently resolve specialized
+    /// generic semantic values before checking the initializer.
+    SLANG_DEPRECATED SlangResult getDefaultValueFloat(float* value)
     {
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
     }
+
+    /** Retrieves a variable's default initializer as a packed byte blob.
+     *
+     * If the variable has no explicit initializer, returns `SLANG_OK` and sets `*outBlob` to
+     * `nullptr`. Otherwise `*outBlob` receives an `ISlangBlob*` with an added reference holding the
+     * initializer's bytes; the caller owns that reference. Returns `SLANG_E_INVALID_ARG` for null
+     * arguments and `SLANG_E_NOT_AVAILABLE` when the initializer cannot be represented as a
+     * default-value blob.
+     *
+     * Scalars, vectors, matrices, fixed-size arrays, structs/aggregates, and enums are supported.
+     * Values are packed in natural scalar/field order with no aggregate padding: matrices
+     * row-by-row, base-class fields before derived fields, and a field with no explicit initializer
+     * as its zero/default representation. Encoding is target-independent: `bool` occupies 4 bytes
+     * to match Slang's GPU scalar layout, `intptr_t`/`uintptr_t` always occupy 8 bytes
+     * signed/unsigned (consumers on narrower-pointer targets must narrow explicitly), and enums use
+     * their underlying tag type.
+     *
+     * Scalars are stored in host byte order (little-endian on all supported platforms), and the
+     * buffer is aligned to at least `alignof(max_align_t)`, which covers every scalar type encoded
+     * by this API. After checking the blob size, callers may cast `getBufferPointer()` directly to
+     * the payload element type.
+     */
+    SLANG_API SlangResult getDefaultValueBlob(ISlangBlob** outBlob);
 
     GenericReflection* getGenericContainer()
     {
@@ -3726,8 +3963,15 @@ struct ShaderReflection
         return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
     }
 
-    /** Get the descriptor set/space index allocated for the bindless resource heap.
-     *  Returns -1 if the program does not use bindless resource heap.
+    /** Get the descriptor set/space index reserved for the bindless resource heap.
+     *
+     * This is a layout/reflection reservation made before final target lowering and
+     * optimization. It can remain non-negative even when the emitted target code no
+     * longer uses a bindless heap/resource-handle path. Query `IBindlessResourceMetadata`
+     * from target metadata to determine whether such a path survived in the compiled
+     * target IR.
+     *
+     * Returns -1 only when no bindless heap space was reserved for the program layout.
      */
     SlangInt getBindlessSpaceIndex()
     {
@@ -4007,7 +4251,7 @@ struct IGlobalSession : public ISlangUnknown
 
     /** Add new builtin declarations to be used in subsequent compiles.
      */
-    virtual SLANG_NO_THROW void SLANG_MCALL
+    [[deprecated]] virtual SLANG_NO_THROW void SLANG_MCALL
     addBuiltins(char const* sourcePath, char const* sourceString) = 0;
 
     /** Set the session shared library loader. If this changes the loader, it may cause shared
@@ -4152,6 +4396,32 @@ struct IGlobalSession : public ISlangUnknown
         BuiltinModuleName module,
         SlangArchiveType archiveType,
         ISlangBlob** outBlob) = 0;
+
+    /** Get the on-disk path of the downstream/pass-through compiler that Slang will actually load
+    and use for `passThrough`, applying the same lazy discovery and library search order used
+    during compilation. This lets a client locate the exact library Slang selected - for example,
+    the specific NVRTC that will compile CUDA - and load it itself to query capabilities (such as
+    the supported architectures) directly.
+
+    This is not a cheap accessor: the first call for a given `passThrough` performs discovery and
+    loads the downstream library into the process (then memoizes it for subsequent calls).
+
+    The path is recovered from the loaded shared library, so it is available for the shared-library
+    pass-throughs (e.g. NVRTC, DXC, FXC, glslang). A pass-through backed by an executable located
+    on `PATH` (e.g. Clang/GCC/VS) or a target without shared-library introspection (e.g. WASM) has
+    no such path and returns SLANG_E_NOT_AVAILABLE, which the client must keep distinct from
+    SLANG_E_NOT_FOUND (the compiler was not located at all).
+    @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
+    @param outPath Must be non-null. On SLANG_OK receives the resolved library path as a blob; left
+    untouched on any failure return.
+    @return SLANG_OK if the compiler was located, loaded, and its path recovered.
+    SLANG_E_NOT_FOUND if the compiler could not be located or loaded (and likewise for
+    SLANG_PASS_THROUGH_NONE or an out-of-range value). SLANG_E_NOT_AVAILABLE if the compiler was
+    loaded but has no recoverable on-disk path -- it is not backed by a shared library (an
+    executable-based command-line compiler such as Clang/GCC/VS, or Metal) or the platform has no
+    shared-library introspection (e.g. WASM). */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerPath(SlangPassThrough passThrough, ISlangBlob** outPath) = 0;
 };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
@@ -4308,6 +4578,11 @@ struct ISession : public ISlangUnknown
     loadModule(const char* moduleName, IBlob** outDiagnostics = nullptr) = 0;
 
     /** Load a module from Slang source code.
+
+        If `source` is null and `path` names a readable file, the module is
+        loaded from that file's contents. If `source` is null and `path` cannot
+        be read, the call returns null and (when `outDiagnostics` is provided)
+        writes a `CannotOpenFile` diagnostic.
      */
     virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
         const char* moduleName,
@@ -4449,6 +4724,12 @@ struct ISession : public ISlangUnknown
 
     /** Checks if a precompiled binary module is up-to-date with the current compiler
      *   option settings and the source file contents.
+     *
+     *   When the module's primary source file cannot be located on the search paths, the
+     *   binary module is treated as a standalone artifact and reported as up-to-date so
+     *   that callers distributing precompiled-only modules can load them. In that case the
+     *   compiler-version and option-set hash carried in the binary are NOT compared. If a
+     *   later (secondary) dependency is missing the module is still reported as stale.
      */
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
@@ -4533,6 +4814,39 @@ struct IMetadata : public ISlangCastable
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
+/** Bindless resource metadata produced for a compiled target.
+
+The bindless space index reported through program reflection is a frontend-predicted reserved
+descriptor space. It remains stable even when later optimization or target lowering removes all
+descriptor-handle heap use from the emitted shader. This metadata interface reports the
+post-lowering usage signal instead.
+
+`usesBindlessResourceHeap()` reports whether the final target IR still contains the
+descriptor-handle/bindless resource path after target-specific lowering. This is a code-generation
+signal, not a complete cross-target host binding policy: targets that lower descriptor handles to
+native resource handles or addresses may not require an explicit descriptor-heap binding even when
+this returns true. Hosts should combine this query with their target binding model when deciding
+whether to bind a heap.
+
+Cast from an artifact-associated `IMetadata*` using `castAs()`.
+*/
+struct IBindlessResourceMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0xeafa96d3,
+        0x2352,
+        0x4bf4,
+        {0x88, 0x64, 0x32, 0x28, 0xa4, 0x07, 0x7a, 0x83})
+
+    /// Returns true when the compiled target IR still contains a bindless
+    /// descriptor-heap/resource-handle path after target-specific lowering. This is a
+    /// code-generation signal, not a complete cross-target host binding policy; targets
+    /// that lower descriptor handles to native resource handles or addresses may not require
+    /// an explicit descriptor-heap binding even when this returns true.
+    virtual SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() = 0;
+};
+    #define SLANG_UUID_IBindlessResourceMetadata IBindlessResourceMetadata::getTypeGuid()
+
 /** Coverage tracing metadata produced when any shader coverage mode is active.
 
 The current implementation reports line, function-entry, and branch-arm
@@ -4595,7 +4909,15 @@ enum class CoverageEntryKind : uint32_t
 
 enum class CoverageCounterMode : uint32_t
 {
+    /// The counter holds the number of times the entry executed
+    /// (atomic add per execution).
     Count = 0,
+    /// The counter is a boolean flag: `0` if the entry never executed,
+    /// non-zero if it executed at least once. Written with a plain
+    /// (non-atomic) store of `1`, so it carries no execution count but
+    /// avoids all atomic contention. Selected by
+    /// `-trace-coverage-boolean`.
+    Boolean = 1,
 };
 
 enum class CoverageBranchArmKind : uint32_t
@@ -4608,6 +4930,16 @@ enum class CoverageBranchArmKind : uint32_t
 };
 
 inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+
+/// `SyntheticResourceInfo::arraySize` when the synthetic resource is an
+/// unbounded (runtime-sized) descriptor array, so the compiler cannot
+/// know how many descriptors the host will supply.
+///
+/// Spelled the same way as `SLANG_UNBOUNDED_SIZE` (`~size_t(0)`) rather
+/// than casting it down: both mean "every bit set" in their respective
+/// widths, but narrowing the 64-bit macro to 32 bits is a truncating
+/// conversion that MSVC rejects under warnings-as-errors (C4310).
+inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
@@ -4636,11 +4968,25 @@ struct CoverageEntryInfo
 
     /// Counter slot used by this entry, or
     /// `kInvalidCoverageCounterIndex` when the entry has no runtime
-    /// counter. The current line/function/branch producers use one
-    /// direct counter per entry. Future source-region coverage may use
-    /// `kInvalidCoverageCounterIndex` for entries whose count is
-    /// derived from other counters or represented through tail-extended
-    /// fields.
+    /// counter.
+    ///
+    /// This is NOT unique per entry. Line coverage coalesces entries
+    /// that provably execute together (those in one basic block with
+    /// nothing between them that can abandon the invocation) onto a
+    /// single counter, which is what keeps instrumented shader code
+    /// small. Several entries therefore report the same
+    /// `counterIndex`, and `getCounterCount()` is correspondingly
+    /// smaller than the entry count.
+    ///
+    /// Read results per entry (`counters[entry.counterIndex]` for each
+    /// entry), never per counter: a counter does not identify one
+    /// source location. Sizing a readback buffer from the entry count
+    /// rather than the counter count is a bug.
+    ///
+    /// Function and branch entries always use a dedicated counter.
+    /// Future coverage modes may use `kInvalidCoverageCounterIndex`
+    /// for entries whose count is derived from other counters or
+    /// represented through tail-extended fields.
     uint32_t counterIndex = kInvalidCoverageCounterIndex;
 
     /// Semantic kind of this source coverage entry.
@@ -4710,6 +5056,21 @@ struct CoverageBufferInfo
     /// `register`, Vulkan `binding`), or -1 if not assigned for
     /// this target.
     int32_t binding = -1;
+
+    /// Byte width of one counter slot in the synthesized buffer:
+    /// `4` for a `RWStructuredBuffer<uint>`, `8` for a
+    /// `RWStructuredBuffer<uint64_t>`. The host reads back
+    /// `getCounterCount() * elementByteWidth` bytes and interprets
+    /// each slot as a little-endian unsigned integer of this width.
+    /// Mirrored on the JSON sidecar as `buffer.element_stride`.
+    ///
+    /// A current in-process implementation always writes `4` or `8`;
+    /// the in-class default `4` only appears if the caller forgot to
+    /// pass the field to `getBufferInfo`. A sentinel `0` can only
+    /// arise when reading a metadata object from an older compiler
+    /// that pre-dates this field; both values should be treated as
+    /// the historical uint32 layout.
+    uint32_t elementByteWidth = 4;
 };
 
 struct ICoverageTracingMetadata : public ISlangCastable
@@ -4721,10 +5082,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
     /// Number of runtime counter slots in the synthesized coverage
-    /// buffer. This can differ from `getEntryCount()` once a coverage
-    /// mode has counterless metadata entries, shares one counter across
-    /// several source entries, or reports entries whose counts are
-    /// derived from other counters.
+    /// buffer. Never larger than `getEntryCount()`, and smaller when
+    /// line coverage shares one counter across the source entries of a
+    /// straight-line region. Function and branch entries always take a
+    /// dedicated counter, so the two counts are equal for a compile that
+    /// enables only those modes, or for line coverage where every marker
+    /// lands in its own basic block. Size the counter readback buffer
+    /// from this value, never from the entry count.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for source coverage
@@ -4753,10 +5117,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 
     /// Number of source coverage entries available through
-    /// `getEntryInfo`. The current line/function/branch producers have
-    /// one entry per counter, but future source-region coverage may
-    /// expose entries that do not map one-to-one with runtime counter
-    /// slots.
+    /// `getEntryInfo`. Every coverage marker produces one entry, so
+    /// this is NOT the number of runtime counters: several entries may
+    /// name the same `counterIndex`. Use `getCounterCount()` to size
+    /// the readback buffer.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
@@ -4832,7 +5196,23 @@ struct SyntheticResourceInfo
     BindingType bindingType = BindingType::Unknown;
 
     /// Number of logical resources in the synthetic binding. Most
-    /// current instrumentation resources are scalar (`1`).
+    /// instrumentation resources are scalar (`1`).
+    ///
+    /// `kUnboundedSyntheticResourceArraySize` when the resource is an
+    /// unbounded descriptor array whose descriptor count is a host
+    /// runtime decision the compiler cannot see -- the coverage buffer
+    /// under `-trace-coverage-bindless-index` is declared this way
+    /// deliberately, so that a shader does not constrain how many
+    /// shaders the host binds alongside it. A host sizing a descriptor
+    /// array must not read this as a count.
+    ///
+    /// For coverage, this sentinel and `bindlessIndex >= 0` are set
+    /// together and always agree, so testing either one identifies the
+    /// bindless form. They are separate fields because they answer
+    /// different questions -- `arraySize` describes the binding's shape
+    /// for any synthetic resource, while `bindlessIndex` says which
+    /// element this shader uses -- and a future synthetic resource
+    /// could be an unbounded array without having a per-shader index.
     uint32_t arraySize = 1;
 
     /// Whether the resource is global/root-scoped or attached to a
@@ -4879,6 +5259,22 @@ struct SyntheticResourceInfo
     /// returned pointer is valid for the lifetime of the metadata
     /// object.
     const char* debugName = nullptr;
+
+    /// Index of this shader's element within the synthetic resource's
+    /// descriptor array, or `-1` when the resource is bound as a single
+    /// descriptor rather than as an element of an array.
+    ///
+    /// Coverage sets this from `-trace-coverage-bindless-index`. In that
+    /// form `__slang_coverage` is an unbounded array of buffers, so a
+    /// single `(space, binding)` serves every shader in a pipeline and
+    /// each shader accesses `__slang_coverage[bindlessIndex]`. Reading it
+    /// back here saves a host from having to track the value it passed at
+    /// compile time in order to report on the result.
+    ///
+    /// This field is past the v1 struct size, so it is only written when
+    /// the caller's `structSize` covers it. A caller compiled against an
+    /// older header keeps its own struct layout and never sees it.
+    int32_t bindlessIndex = -1;
 };
 
 struct ISyntheticResourceMetadata : public ISlangCastable
@@ -5429,6 +5825,12 @@ struct IModulePrecompileService_Experimental : public ISlangUnknown
         0x433e,
         {0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5})
 
+    /// Precompile this module for a target and embed the resulting target library in the module.
+    ///
+    /// This function is experimental and not thread-safe since it mutates the module by adding
+    /// precompiled target IR and temporary export metadata. Callers must externally synchronize
+    /// access to the module and must not use this API concurrently with other operations on the
+    /// same module or session.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     precompileForTarget(SlangCompileTarget target, ISlangBlob** outDiagnostics) = 0;
 
@@ -5495,12 +5897,26 @@ enum SlangLanguageVersion
 {
     SLANG_LANGUAGE_VERSION_UNKNOWN = 0,
     SLANG_LANGUAGE_VERSION_LEGACY = 2018,
+
+    SLANG_LANGUAGE_VERSION_202A = 2025,
     SLANG_LANGUAGE_VERSION_2025 = 2025,
+
+    SLANG_LANGUAGE_VERSION_202B = 2026,
     SLANG_LANGUAGE_VERSION_2026 = 2026,
+
+    // Note: the numeric value may change when the language version is given an
+    // official name. For now, it's one past the latest stable version.
+    SLANG_LANGUAGE_VERSION_202C = 2027,
+
     /* Deprecated: retained for source compatibility; prefer SLANG_LANGUAGE_VERSION_DEFAULT. */
     SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
     SLANG_LANGUAGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
+
+    // The latest stable version
     SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
+
+    // Development version
+    SLANG_LANGUAGE_VERSION_NEXT = SLANG_LANGUAGE_VERSION_202C,
 };
 
 
@@ -5533,7 +5949,7 @@ struct SlangGlobalSessionDesc
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
 /* Serialize coverage metadata into the canonical
- * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
+ * `.coverage-manifest.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available
  * in-process for hosts compiling via the C++ API.
  *
@@ -5687,12 +6103,16 @@ SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
    Switches to playback mode on success.
    @param folderPath Path to the replay folder.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
 
 /* Load the most recent replay from the replay directory.
    Switches to playback mode on success.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 

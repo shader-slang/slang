@@ -418,8 +418,9 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
                     execOpernad.section = (uint8_t**)&m_currentWorkingSet;
                     break;
                 case kSlangByteCodeSectionStrings:
-                    execOpernad.section = (uint8_t**)&m_stringLitsPtr;
+                    execOpernad.section = reinterpret_cast<uint8_t**>(&m_stringLitsPtr);
                     execOpernad.offset *= sizeof(const char*);
+                    execOpernad.size = sizeof(const char*);
                     break;
                 case kSlangByteCodeSectionImmediate:
                 case kSlangByteCodeSectionFuncs:
@@ -971,8 +972,11 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
                 return false;
             for (uint32_t i = 0; i < func.m_header->parameterCount; i++)
             {
-                auto parameterSize = func.m_parameterOffsets[i + 1] - func.m_parameterOffsets[i];
-                if (!check(i + 2, parameterSize, OperandAccess::Read))
+                // Validate exactly the byte range the executor reads: getCallArgumentCopySize is
+                // the shared definition of that range (see ExecutableFunction in slang-vm.h), so
+                // validation and execution cannot drift apart about which bytes a Call touches.
+                uint32_t readSize = func.getCallArgumentCopySize(i, inst->getOperand(i + 2));
+                if (!check(i + 2, readSize, OperandAccess::Read))
                     return false;
             }
             return true;

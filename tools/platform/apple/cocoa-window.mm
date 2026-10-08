@@ -1,6 +1,6 @@
 #ifdef __APPLE__
 
-#include "../window.h"
+#include "platform/window.h"
 
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/CAMetalLayer.h>

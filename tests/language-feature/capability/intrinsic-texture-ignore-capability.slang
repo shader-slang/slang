@@ -1,8 +1,8 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -ignore-capabilities -capability GL_NV_compute_shader_derivatives
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage fragment -entry computeMain -target glsl -ignore-capabilities
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/language-feature/capability/intrinsic-texture-ignore-capability.slang -stage compute -entry computeMain -target glsl -DCOMPUTE -ignore-capabilities -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/language-feature/capability/intrinsic-texture-ignore-capability.slang -stage fragment -entry computeMain -target glsl -ignore-capabilities
 //RWStructuredBuffer<float> outputBuffer;
 //layout(location = 0) out vec4 o_color;
 
@@ -64,7 +64,7 @@ bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gs
 {
     typealias gvec4 = vector<T.Element,4>;
 
-    constexpr ivec2 ivec2_0 = ivec2(0);
+    const ivec2 ivec2_0 = ivec2(0);
 
     return true
         // 8.9.1. Texture Query Functions
@@ -373,7 +373,7 @@ bool itextureFuncs(_Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gs
 {
     typealias gvec4 = vector<T.Element, 4>;
 
-    constexpr ivec2 ivec2_0 = ivec2(0);
+    const ivec2 ivec2_0 = ivec2(0);
 
     return true
         // 8.9.1. Texture Query Functions

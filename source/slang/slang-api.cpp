@@ -1,17 +1,27 @@
 // slang-api.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-rtti-info.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-signal.h"
-#include "../slang-record-replay/proxy/proxy-base.h"
-#include "../slang-record-replay/proxy/proxy-macros.h"
-#include "../slang-record-replay/replay-context.h"
+// SLANG_ENABLE_RECORD_REPLAY is normally provided by the build system (see the top-level
+// CMakeLists.txt). Default it to enabled so a build that does not define it still compiles the
+// record-replay layer, matching the option's default.
+#ifndef SLANG_ENABLE_RECORD_REPLAY
+#define SLANG_ENABLE_RECORD_REPLAY 1
+#endif
+
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-builtin-module-cache.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#if SLANG_ENABLE_RECORD_REPLAY
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
+#endif
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -53,18 +63,16 @@ SlangResult tryLoadBuiltinModuleFromCache(
         return SLANG_FAIL;
     }
     Slang::ScopedAllocation cacheData;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(cacheFileName, cacheData));
-
-    // The first 8 bytes stores the timestamp of the slang dll that created this core module cache.
-    if (cacheData.getSizeInBytes() < sizeof(uint64_t))
-        return SLANG_FAIL;
-    auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
-    if (cacheTimestamp != currentLibTimestamp)
-        return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)cacheData.getData() + sizeof(uint64_t),
-        cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    const void* moduleData = nullptr;
+    size_t moduleSize = 0;
+    SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::read(
+        cacheFileName,
+        currentLibTimestamp,
+        cacheData,
+        moduleData,
+        moduleSize));
+    SLANG_RETURN_ON_FAIL(
+        globalSession->loadBuiltinModule(builtinModuleName, moduleData, moduleSize));
     return SLANG_OK;
 }
 
@@ -144,13 +152,11 @@ SlangResult trySaveBuiltinModuleToCache(
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
-        Slang::FileStream fileStream;
-        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
-
-        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(
+        SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::write(
+            cacheFilename,
+            dllTimestamp,
             coreModuleBlobPtr->getBufferPointer(),
-            coreModuleBlobPtr->getBufferSize()))
+            coreModuleBlobPtr->getBufferSize()));
     }
 
     return SLANG_OK;
@@ -261,6 +267,7 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
+#if SLANG_ENABLE_RECORD_REPLAY
     using namespace SlangRecord;
     RECORD_STATIC_CALL();
     RECORD_INPUT(*desc);
@@ -276,6 +283,12 @@ SLANG_API SlangResult slang_createGlobalSession2(
     _ctx.record(RecordFlag::ReturnValue, result);
 
     return result;
+#else
+    // Record-replay compiled out: there is no proxy to wrap the session in, so return the raw
+    // internal session directly.
+    Slang::GlobalSessionInternalDesc internalDesc = {};
+    return slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+#endif
 }
 
 SLANG_API void slang_shutdown()
@@ -284,8 +297,12 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+#if SLANG_ENABLE_RECORD_REPLAY
     SlangRecord::ReplayContext::destroySingleton();
+#endif
 }
+
+#if SLANG_ENABLE_RECORD_REPLAY
 
 SLANG_API void slang_enableRecordLayer(bool enable)
 {
@@ -329,6 +346,47 @@ SLANG_API void slang_replayMarker(const char* label)
 {
     SlangRecord::ReplayContext::get().marker(label);
 }
+
+#else
+
+// Record-replay is compiled out (SLANG_ENABLE_RECORD_REPLAY=0). We keep these eight public C API
+// entry points exported as disabled stubs so their ABI is unchanged — existing callers still
+// resolve the symbols and get well-defined inert behavior.
+SLANG_API void slang_enableRecordLayer(bool /*enable*/) {}
+
+SLANG_API bool slang_isRecordLayerEnabled()
+{
+    return false;
+}
+
+SLANG_API void slang_setReplayDirectory(const char* /*path*/) {}
+
+SLANG_API const char* slang_getReplayDirectory()
+{
+    // The enabled build never returns null here (ReplayContext defaults to ".slang-replays"), so
+    // the disabled stub returns the same default — a caller that dereferences the result must not
+    // crash.
+    return ".slang-replays";
+}
+
+SLANG_API const char* slang_getCurrentReplayPath()
+{
+    return nullptr;
+}
+
+SLANG_API SlangResult slang_loadReplay(const char* /*folderPath*/)
+{
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_API SlangResult slang_loadLatestReplay()
+{
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_API void slang_replayMarker(const char* /*label*/) {}
+
+#endif
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
@@ -382,7 +440,9 @@ SLANG_API void spAddBuiltins(
     char const* sourcePath,
     char const* sourceString)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
@@ -1002,16 +1062,18 @@ SLANG_API SlangResult spExtractRepro(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    List<uint8_t> buffer;
-    {
-        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, &sink, buffer));
-    }
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     return ReproUtil::extractFiles(base, requestState, fileSystem);
 }
 
@@ -1029,14 +1091,17 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, &sink, buffer));
-
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(
@@ -1165,6 +1230,8 @@ static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
     {
     case slang::CoverageCounterMode::Count:
         return "count";
+    case slang::CoverageCounterMode::Boolean:
+        return "boolean";
     default:
         return "unknown";
     }
@@ -1200,10 +1267,35 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     uint32_t counterCount = metadata->getCounterCount();
     uint32_t entryCount = metadata->getEntryCount();
     out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
+    // Resolve the per-slot byte width from the metadata's
+    // `CoverageBufferInfo`. The IR coverage pass restricts the
+    // synthesized element type to `{4, 8}` and the API path
+    // validates the option with `E45114`, so only those two widths
+    // should ever reach this writer. A `0` would only arise from a
+    // sufficiently old metadata object that pre-dates the field; we
+    // mirror the historical layout (uint32) for that legacy case.
+    // Anything else means an upstream invariant has been broken —
+    // assert rather than ship a malformed manifest.
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_FAILED(metadata->getBufferInfo(&bufferInfo)))
+        return SLANG_FAIL;
+    uint32_t elementByteWidth = bufferInfo.elementByteWidth == 0 ? 4 : bufferInfo.elementByteWidth;
+    const char* elementTypeName = nullptr;
+    switch (elementByteWidth)
+    {
+    case 4:
+        elementTypeName = "uint32";
+        break;
+    case 8:
+        elementTypeName = "uint64";
+        break;
+    default:
+        SLANG_RELEASE_ASSERT(!"coverage manifest writer: unexpected elementByteWidth");
+    }
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
-    out << "    \"element_type\": \"uint32\",\n";
-    out << "    \"element_stride\": 4";
+    out << "    \"element_type\": \"" << elementTypeName << "\",\n";
+    out << "    \"element_stride\": " << (int64_t)elementByteWidth;
     if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
             slang::ISyntheticResourceMetadata::getTypeGuid()))
     {
@@ -1219,6 +1311,12 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
                 out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
             if (resourceInfo.binding >= 0)
                 out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            // Present only in the bindless form, where the buffer is one
+            // element of an unbounded descriptor array. Emitted on the same
+            // >= 0 convention as space/binding so a single-buffer manifest
+            // is byte-identical to before.
+            if (resourceInfo.bindlessIndex >= 0)
+                out << ",\n    \"bindless_index\": " << (int64_t)resourceInfo.bindlessIndex;
             if (resourceInfo.uniformOffset >= 0)
                 out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
             if (resourceInfo.uniformStride > 0)

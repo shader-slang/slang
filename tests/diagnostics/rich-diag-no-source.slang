@@ -14,7 +14,7 @@ void computeMain()
     outputBuffer[0] = t2D.Sample(s, float2(0.0, 0.0));
 //CHK: static assertion failed
 //CHK: HLSL supports only float and half type textures
-//CHK: see call to 'Sample'
+//CHK: see call to '_Texture.Sample'
 }
 
 // FC: error[E41400]: static assertion failed

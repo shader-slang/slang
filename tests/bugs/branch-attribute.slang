@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry computeMain
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -O0
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

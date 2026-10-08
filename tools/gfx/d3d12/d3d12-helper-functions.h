@@ -1,8 +1,8 @@
 // d3d12-helper-functions.h
 #pragma once
 
-#include "../../../source/core/slang-list.h"
-#include "../../../source/core/slang-short-list.h"
+#include "core/slang-list.h"
+#include "core/slang-short-list.h"
 #include "d3d12-base.h"
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-submitter.h"

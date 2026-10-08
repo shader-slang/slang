@@ -213,6 +213,13 @@ Slang::ComPtr<IDevice> createTestingDevice(
     DeviceType deviceType,
     Slang::List<const char*> additionalSearchPaths)
 {
+    // Skip before any device creation attempt so no RHI error messages are
+    // emitted (which would be captured by CoreDebugCallback and override the
+    // Ignored result with Fail regardless of what the caller does afterward).
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
+    {
+        SLANG_IGNORE_TEST
+    }
     Slang::ComPtr<IDevice> device;
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
@@ -288,7 +295,7 @@ void initializeRenderDoc()
         pRENDERDOC_GetAPI RENDERDOC_GetAPI =
             (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
         int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
-        assert(ret == 1);
+        SLANG_ASSERT(ret == 1);
     }
 }
 void renderDocBeginFrame()

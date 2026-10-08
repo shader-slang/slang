@@ -1,0 +1,25 @@
+schema_version: 1
+id: wgsl-pointer-param-emits-empty-address-space
+bundle: conformance/types-pointer
+suspected_kind: wrong-codegen
+scope: wgsl
+title: WGSL emits `ptr<, i32>` (empty address space) for a `T*` parameter
+observed_at: 2026-08-05T08:57:06Z
+evidence:
+  command: build/RelWithDebInfo/bin/slangc -target wgsl -entry devicePtrMain -stage compute docs/generated/tests/conformance/types-pointer/declare-star-syntax-emission.slang
+  source_slang: docs/generated/tests/conformance/types-pointer/declare-star-syntax-emission.slang
+  observed_summary: "slangc succeeds and emits `@align(16) devPtr_0 : ptr<, i32>,` — a `ptr<>` with an empty address-space operand, which is not valid WGSL — and then `entryPointParams_outBuf_0[i32(0)] = entryPointParams_0.devPtr_0;`, assigning the pointer into an `i32` element."
+  exit_code: 0
+expected:
+  claim: "A `T*` entry-point parameter must either be legalized into a WGSL construct with a real address space, or be rejected with `error[E36107]: unavailable features in entry point` the way `&` already is for the wgsl target; slangc must not emit `ptr<, i32>` with an empty address-space operand."
+  citation_kind: doc
+  citation: docs/language-reference/types-pointer.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/language-reference/types-pointer.md#syntax
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "That `ptr<, i32>` is a legal shorthand — WGSL requires an address space as the first `ptr` template parameter, so an empty one cannot parse."
+    - "That the shader is malformed — the identical entry point emits valid `int device*` on metal and a valid `GL_EXT_buffer_reference` block on glsl."

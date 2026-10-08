@@ -20,8 +20,8 @@ struct PSout
 [shader("pixel")]
 PSout main(PSin stage, bool isFrontFacing : SV_IsFrontFace)
 {
-  // CHECK: %image{{.*}} = OpImage
-  // CHECK: OpImageQuerySizeLod %{{.*}} %image{{.*}} %uint_1
+  // CHECK: %[[IMG:[A-Za-z0-9_]+]] = OpImage
+  // CHECK: OpImageQuerySizeLod %{{.*}} %[[IMG]] %uint_1
   PSout output;
   // Find normal at position
   uint3 dim;

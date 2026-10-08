@@ -1,11 +1,10 @@
 // slang-ast-dump.cpp
 #include "slang-ast-dump.h"
 
-#include "../core/slang-string.h"
+#include "core/slang-string.h"
 #include "slang-ast-dispatch.h"
 #include "slang-compiler.h"
 
-#include <assert.h>
 #include <limits>
 
 namespace Slang
@@ -330,8 +329,10 @@ struct ASTDumpContext
     void dump(ImageFormat imageFormat) { m_writer->emit(getGLSLNameForImageFormat(imageFormat)); }
     void dump(TryClauseType clauseType) { m_writer->emit(getTryClauseTypeName(clauseType)); }
     void dump(BuiltinRequirementKind kind) { m_writer->emit((int)kind); }
+    void dump(BuiltinOperationKind op) { m_writer->emit(getBuiltinOperationOpText(op)); }
     void dump(MarkupVisibility v) { m_writer->emit((int)v); }
     void dump(TypeTag tag) { m_writer->emit((int)tag); }
+    void dump(ParamPassingMode mode) { m_writer->emit((int)mode); }
     void dump(const String& string) { dump(string.getUnownedSlice()); }
 
     void dump(const DiagnosticInfo* info)
@@ -488,6 +489,18 @@ struct ASTDumpContext
             m_writer->emit("rvalue ");
         }
         dump(qualType.type);
+    }
+
+    void dump(const ParamInfo& info)
+    {
+        m_writer->emit(" {\n");
+        m_writer->indent();
+
+        dumpField("type", info.type);
+        dumpField("mode", info.mode);
+
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     void dump(SyntaxParseCallback callback)

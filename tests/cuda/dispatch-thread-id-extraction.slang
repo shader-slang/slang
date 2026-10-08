@@ -20,7 +20,10 @@ void computeMain2(uint2 tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RW
 {
     dst[tid.x] = src[tid.y];
 }
-// CHECK: uint2 {{.*}} = uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y};
+// The multi-component swizzle base is hoisted to a temporary (evaluated once)
+// rather than re-emitted per component; see issue #12073.
+// CHECK: uint3 [[T2:_S[0-9]+]] = blockIdx * blockDim + threadIdx;
+// CHECK: uint2 {{.*}} = uint2 {[[T2]].x, [[T2]].y};
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -28,7 +31,8 @@ void computeMain3(int2 tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RWS
 {
     dst[tid.x] = src[tid.x];
 }
-// CHECK: uint2 {{.*}} = uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y};
+// CHECK: uint3 [[T3:_S[0-9]+]] = blockIdx * blockDim + threadIdx;
+// CHECK: uint2 {{.*}} = uint2 {[[T3]].x, [[T3]].y};
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

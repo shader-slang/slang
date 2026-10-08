@@ -25,6 +25,16 @@
 namespace Slang
 {
 
+static bool _isCoverageTracingEnabled(CompilerOptionSet& optionSet)
+{
+    // Returns true only when one of the coverage trace mode booleans is set.
+    // Binding and reserved-space options are inert without a coverage mode, so
+    // they are intentionally not treated as enabling coverage tracing here.
+    return optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
+}
+
 EndToEndCompileRequest::EndToEndCompileRequest(Session* session)
     : m_session(session), m_sink(nullptr, Lexer::sourceLocationLexer)
 {
@@ -87,7 +97,13 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
     return SLANG_E_NO_INTERFACE;
 }
 
-// Try to infer a single common source language for a request
+// Infer a common input language only for slangc's convenience target selection.
+//
+// This deliberately uses the request-level language available before preprocessing. The
+// command-line tool's target inference is a best-effort DWIM policy layered above the compiler,
+// not part of source-language resolution. A later `#version` or `#language` compatibility override
+// therefore does not revise an already inferred target; users relying on such an override should
+// select their target explicitly.
 static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 {
     SourceLanguage language = SourceLanguage::Unknown;
@@ -114,6 +130,17 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
+
+    // `-allow-glsl` used to enable an independent collection of parser, semantic, and IR
+    // behaviors without changing the declared language of any translation unit. Reduce it to the
+    // single meaning that this request's input translation units are GLSL. The compatibility bit
+    // is request-local because source modules loaded during semantic checking share the linkage
+    // but are not additional inputs governed by this option. `parseTranslationUnit()` separately
+    // handles the session-owned spelling stored in the front-end option set; the front-end
+    // request's once-only diagnostic guard makes both paths safe when a session supplies both.
+    if (getLegacyAllowGLSLInput())
+        getFrontEndReq()->applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
+
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -148,12 +175,36 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // The check lives here (not in `OptionsParser::_parse`) so that
     // C++ API callers using `setPassThrough()` are also covered —
     // OptionsParser only runs for the slangc CLI path.
-    if (m_passThrough != PassThroughMode::None &&
-        (getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage) ||
-         getOptionSet().getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
-         getOptionSet().getBoolOption(CompilerOptionName::TraceBranchCoverage)))
+    auto& optionSet = getOptionSet();
+    const bool coverageTracingEnabled = _isCoverageTracingEnabled(optionSet);
+
+    if (m_passThrough != PassThroughMode::None && coverageTracingEnabled)
     {
         getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
+        return SLANG_FAIL;
+    }
+
+    const bool hasExplicitCoverageManifestPath = _hasExplicitCoverageManifestPath();
+    if (hasExplicitCoverageManifestPath && !coverageTracingEnabled)
+    {
+        getSink()->diagnose(Diagnostics::CoverageManifestOutputWithoutCoverage{});
+        return SLANG_FAIL;
+    }
+    if (hasExplicitCoverageManifestPath && m_containerFormat != ContainerFormat::None)
+    {
+        getSink()->diagnose(Diagnostics::CoverageManifestOutputWithContainer{});
+        return SLANG_FAIL;
+    }
+
+    const bool hasExplicitSeparateDebugInfoOutputPath = _hasExplicitSeparateDebugInfoOutputPath();
+    if (hasExplicitSeparateDebugInfoOutputPath && !optionSet.shouldEmitSeparateDebugInfo())
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputWithoutSeparateDebugInfo{});
+        return SLANG_FAIL;
+    }
+    if (hasExplicitSeparateDebugInfoOutputPath && m_containerFormat != ContainerFormat::None)
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputWithContainer{});
         return SLANG_FAIL;
     }
 
@@ -380,9 +431,53 @@ String EndToEndCompileRequest::_getEntryPointPath(TargetRequest* targetReq, Inde
     return String();
 }
 
+void EndToEndCompileRequest::_collectExistingOutputArtifacts(
+    List<ExistingOutputArtifact>& outArtifacts)
+{
+    outArtifacts.clear();
+
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            if (auto artifact = targetProgram->getExistingWholeProgramResult())
+            {
+                ExistingOutputArtifact outputArtifact;
+                outputArtifact.targetProgram = targetProgram;
+                outputArtifact.path = _getWholeProgramPath(targetReq);
+                outputArtifact.artifact = artifact;
+                outArtifacts.add(outputArtifact);
+            }
+        }
+        else
+        {
+            for (Index entryPointIndex = 0; entryPointIndex < program->getEntryPointCount();
+                 ++entryPointIndex)
+            {
+                if (auto artifact = targetProgram->getExistingEntryPointResult(entryPointIndex))
+                {
+                    ExistingOutputArtifact outputArtifact;
+                    outputArtifact.targetProgram = targetProgram;
+                    outputArtifact.path = _getEntryPointPath(targetReq, entryPointIndex);
+                    outputArtifact.artifact = artifact;
+                    outArtifacts.add(outputArtifact);
+                }
+            }
+        }
+    }
+}
+
+static bool _isStdoutArtifactPath(const String& path)
+{
+    return path.getLength() == 0 || path == "-";
+}
+
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
-    if (path.getLength() > 0)
+    if (!_isStdoutArtifactPath(path))
     {
         SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
     }
@@ -395,34 +490,136 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
     return SLANG_OK;
 }
 
-// If the artifact carries coverage tracing metadata, write it to
-// `<path>.coverage-mapping.json` alongside the compiled code. Hosts
-// can read this sidecar to attribute runtime counter values back to
-// source entries. The JSON content is produced by the
-// public `slang_writeCoverageManifestJson` API; both that API and
-// this sidecar writer emit byte-identical output, so customers
-// working in-process can pipe the API output through the same
-// downstream tooling that consumes the sidecar.
-SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
+String EndToEndCompileRequest::_getExplicitCoverageManifestPath()
+{
+    return getOptionSet().getStringOption(CompilerOptionName::CoverageManifestOutput);
+}
+
+bool EndToEndCompileRequest::_hasExplicitCoverageManifestPath()
+{
+    return _getExplicitCoverageManifestPath().getLength() != 0;
+}
+
+String EndToEndCompileRequest::_getExplicitSeparateDebugInfoOutputPath()
+{
+    return getOptionSet().getStringOption(CompilerOptionName::SeparateDebugInfoOutput);
+}
+
+bool EndToEndCompileRequest::_hasExplicitSeparateDebugInfoOutputPath()
+{
+    return _getExplicitSeparateDebugInfoOutputPath().getLength() != 0;
+}
+
+// If the artifact carries coverage tracing metadata, write its JSON
+// manifest sidecar. By default slangc writes `<path>.coverage-manifest.json`
+// alongside file outputs. `-coverage-manifest-output <path>` overrides
+// that location and also works for stdout artifact output. Hosts can
+// read this sidecar to attribute runtime counter values back to source
+// entries. The JSON content is produced by the public
+// `slang_writeCoverageManifestJson` API; both that API and this sidecar
+// writer emit byte-identical output, so customers working in-process can
+// pipe the API output through the same downstream tooling.
+static slang::ICoverageTracingMetadata* _findCoverageTracingMetadata(IArtifact* artifact)
+{
+    if (!artifact)
+        return nullptr;
+    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
+    // Return coverage metadata if either dimension has data. Future coverage
+    // modes may record source entries without runtime counters, or runtime
+    // counter allocation before all source-entry metadata is populated; either
+    // non-empty dimension is worth persisting.
+    return coverage && (coverage->getCounterCount() != 0 || coverage->getEntryCount() != 0)
+               ? coverage
+               : nullptr;
+}
+
+// Normalizes paths for preflight collision checks:
+// - Existing paths compare by their canonical filesystem path.
+// - Not-yet-created paths canonicalize their deepest existing ancestor, then
+//   append the original non-existent suffix.
+// - Paths with no canonicalizable ancestor fall back to absolutized, simplified
+//   text. Equality after this transform implies the paths would alias the same
+//   filesystem entity, modulo platform case-folding below.
+static String _normalizeOutputPathForCompare(const String& path)
+{
+    if (path.getLength() == 0)
+        return String();
+
+    String absolutePath = path;
+    if (!Path::isAbsolute(path))
+    {
+        String currentPath = Path::getCurrentPath();
+        if (currentPath.getLength() != 0)
+            absolutePath = Path::combine(currentPath, path);
+    }
+    absolutePath = Path::simplify(absolutePath);
+
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(absolutePath, canonicalPath)) &&
+        canonicalPath.getLength() != 0)
+    {
+        return canonicalPath;
+    }
+
+    // Output files usually do not exist during preflight validation. Canonicalize
+    // the deepest existing prefix so symlinked output directories still compare
+    // correctly for not-yet-created artifacts and sidecars.
+    String parentPath = Path::getParentDirectory(absolutePath);
+    if (parentPath.getLength() == 0 || parentPath == absolutePath)
+        return absolutePath;
+
+    String canonicalParentPath = _normalizeOutputPathForCompare(parentPath);
+    if (canonicalParentPath.getLength() == 0)
+        return absolutePath;
+
+    return Path::combine(canonicalParentPath, Path::getFileName(absolutePath));
+}
+
+static bool _areOutputPathsEquivalent(const String& left, const String& right)
+{
+    String normalizedLeft = _normalizeOutputPathForCompare(left);
+    String normalizedRight = _normalizeOutputPathForCompare(right);
+#if SLANG_WINDOWS_FAMILY
+    return normalizedLeft.getUnownedSlice().caseInsensitiveEquals(
+        normalizedRight.getUnownedSlice());
+#else
+    // Treat POSIX paths as case-sensitive even on case-folding mounts. The
+    // worst case is a missed collision diagnostic on those mounts; Windows is
+    // the platform where case aliases are expected and handled explicitly.
+    return normalizedLeft == normalizedRight;
+#endif
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
 {
-    if (!artifact || path.getLength() == 0)
+    auto coverage = _findCoverageTracingMetadata(artifact);
+    if (!coverage)
         return SLANG_OK;
-    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
-    // Emit the sidecar if either dimension has data. Future coverage
-    // modes may record source entries without runtime counters, or
-    // runtime counter allocation before all source-entry metadata is
-    // populated; the sidecar is the persisted handoff for both.
-    if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
-        return SLANG_OK;
+
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
+    String sidecarPath;
+    if (explicitSidecarPath.getLength() != 0)
+    {
+        sidecarPath = explicitSidecarPath;
+    }
+    else
+    {
+        if (_isStdoutArtifactPath(path))
+            return SLANG_OK;
+        sidecarPath = path + ".coverage-manifest.json";
+    }
+
     ComPtr<ISlangBlob> jsonBlob;
     SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
-    String sidecarPath = path + ".coverage-mapping.json";
-    return File::writeAllBytes(
-        sidecarPath,
-        jsonBlob->getBufferPointer(),
-        jsonBlob->getBufferSize());
+    const SlangResult writeResult =
+        File::writeAllBytes(sidecarPath, jsonBlob->getBufferPointer(), jsonBlob->getBufferSize());
+    if (SLANG_FAILED(writeResult))
+    {
+        getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = sidecarPath});
+    }
+    return writeResult;
 }
 
 SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
@@ -480,28 +677,241 @@ static String _getDebugSpvPath(const String& basePath)
     return basePath + dbgExt;
 }
 
-SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
+String EndToEndCompileRequest::_getSeparateDebugInfoOutputPath(
     TargetProgram* targetProgram,
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+    if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+        return String();
+
+    const auto separateDebugInfoArtifact = getSeparateDbgArtifact(artifact);
+    if (!separateDebugInfoArtifact)
+        return String();
+
+    const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
+    if (explicitPath.getLength() != 0)
+        return explicitPath;
+
+    // Preserve the legacy behavior as a fallback: without an explicit debug path, derive the
+    // sidecar location from the main `-o` output file. The separate-debug preflight runs before
+    // this helper's coverage-preflight caller and rejects stdout paths that cannot be derived.
+    SLANG_RELEASE_ASSERT(!_isStdoutArtifactPath(path));
+
+    // The artifact's name may have been set to the debug build id hash, use
+    // it as the filename if it exists.
+    String separateDebugInfoOutputPath = separateDebugInfoArtifact->getName();
+    if (separateDebugInfoOutputPath.getLength() == 0)
     {
-        const auto dbgArtifact = getSeparateDbgArtifact(artifact);
-        // Check if a debug artifact was actually created (only for SPIR-V targets)
-        if (dbgArtifact)
+        separateDebugInfoOutputPath = _getDebugSpvPath(path);
+    }
+    else
+    {
+        separateDebugInfoOutputPath.append(".dbg.spv");
+    }
+    return separateDebugInfoOutputPath;
+}
+
+SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
+{
+    const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
+    const bool hasExplicitPath = explicitPath.getLength() != 0;
+
+    // This preflight has two modes. Fallback mode only rejects a debug-bearing stdout artifact,
+    // because it has no main output path from which to derive a sidecar path. Explicit mode counts
+    // debug artifacts and collects every other destination for the missing-data and collision
+    // checks after the loop.
+    List<String> otherOutputPaths;
+    Index debugArtifactCount = 0;
+    bool missingDerivedPath = false;
+
+    List<ExistingOutputArtifact> outputArtifacts;
+    _collectExistingOutputArtifacts(outputArtifacts);
+    for (const auto& outputArtifact : outputArtifacts)
+    {
+        // With an explicit path, compare it against every other output, including outputs from
+        // targets that do not themselves produce separate debug information.
+        if (hasExplicitPath)
         {
-            // The artifact's name may have been set to the debug build id hash, use
-            // it as the filename if it exists.
-            String dbgPath = dbgArtifact->getName();
-            if (dbgPath.getLength() == 0)
-                dbgPath = _getDebugSpvPath(path);
-            else
-                dbgPath.append(".dbg.spv");
-            return _maybeWriteArtifact(dbgPath, dbgArtifact);
+            // Normalize both spellings of stdout so an explicit `-` sidecar cannot collide with an
+            // implicit stdout main artifact.
+            otherOutputPaths.add(
+                _isStdoutArtifactPath(outputArtifact.path) ? String("-") : outputArtifact.path);
+
+            if (_findCoverageTracingMetadata(outputArtifact.artifact))
+            {
+                String coveragePath = _getExplicitCoverageManifestPath();
+                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(outputArtifact.path))
+                {
+                    coveragePath = outputArtifact.path + ".coverage-manifest.json";
+                }
+                if (coveragePath.getLength() != 0)
+                    otherOutputPaths.add(coveragePath);
+            }
         }
-        // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
-        // The warning about unsupported targets is already issued during option parsing
+
+        if (!getSeparateDbgArtifact(outputArtifact.artifact))
+            continue;
+
+        debugArtifactCount++;
+        // In fallback mode, the only invalid shape is a debug-bearing stdout artifact because it
+        // has no file path from which to derive the sidecar destination.
+        if (!hasExplicitPath && _isStdoutArtifactPath(outputArtifact.path))
+            missingDerivedPath = true;
+    }
+
+    if (missingDerivedPath)
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
+        return SLANG_FAIL;
+    }
+
+    if (!hasExplicitPath)
+        return SLANG_OK;
+
+    const String reflectionPath =
+        getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
+    if (reflectionPath.getLength() != 0)
+        otherOutputPaths.add(reflectionPath);
+    if (m_dependencyOutputPath.getLength() != 0)
+        otherOutputPaths.add(m_dependencyOutputPath);
+
+    if (debugArtifactCount == 0)
+    {
+        getSink()->diagnose(
+            Diagnostics::SeparateDebugInfoOutputWithoutDebugData{.path = explicitPath});
+        return SLANG_FAIL;
+    }
+    if (debugArtifactCount > 1)
+    {
+        getSink()->diagnose(
+            Diagnostics::SeparateDebugInfoOutputMultipleArtifacts{.path = explicitPath});
+        return SLANG_FAIL;
+    }
+
+    for (const auto& otherPath : otherOutputPaths)
+    {
+        if (_areOutputPathsEquivalent(explicitPath, otherPath))
+        {
+            getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputCollidesWithArtifact{
+                .path = explicitPath,
+                .otherPath = otherPath});
+            return SLANG_FAIL;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteSeparateDebugInfoOutput(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+        return SLANG_OK;
+
+    const auto separateDebugInfoArtifact = getSeparateDbgArtifact(artifact);
+    // A separate debug-info artifact is currently produced only for SPIR-V targets. The warning
+    // about unsupported targets is already issued during option parsing.
+    if (!separateDebugInfoArtifact)
+        return SLANG_OK;
+
+    String separateDebugInfoOutputPath =
+        _getSeparateDebugInfoOutputPath(targetProgram, path, artifact);
+    // The separate-debug preflight runs before emission and rejects every shape for which this
+    // artifact has no destination, including an underivable stdout fallback.
+    SLANG_RELEASE_ASSERT(separateDebugInfoOutputPath.getLength() != 0);
+    return _maybeWriteArtifact(separateDebugInfoOutputPath, separateDebugInfoArtifact);
+}
+
+SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
+{
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
+    if (explicitSidecarPath.getLength() == 0)
+        return SLANG_OK;
+
+    // Container output is rejected earlier by E45111 when the option is set.
+    // Non-command-line requests do not use the slangc artifact-write path this
+    // preflight protects.
+    if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
+        return SLANG_OK;
+
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+    List<String> emittedArtifactPaths;
+    Index coverageArtifactCount = 0;
+
+    // Records paths slangc will emit for this target/artifact pair and counts
+    // coverage-bearing artifacts. The count rejects 0 or 2+ coverage artifacts;
+    // the path list rejects explicit-sidecar collisions.
+    auto recordArtifact =
+        [&](TargetProgram* targetProgram, const String& artifactPath, IArtifact* artifact)
+    {
+        if (!artifact)
+            return;
+        // Stdout artifacts have no file path to collide with.
+        if (artifactPath.getLength() != 0)
+            emittedArtifactPaths.add(artifactPath);
+
+        String dbgPath = _getSeparateDebugInfoOutputPath(targetProgram, artifactPath, artifact);
+        // Targets that did not emit separate debug info have no debug path to collide with.
+        if (dbgPath.getLength() != 0)
+            emittedArtifactPaths.add(dbgPath);
+
+        if (_findCoverageTracingMetadata(artifact))
+            coverageArtifactCount++;
+    };
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            recordArtifact(
+                targetProgram,
+                _getWholeProgramPath(targetReq),
+                targetProgram->getExistingWholeProgramResult());
+        }
+        else
+        {
+            Index entryPointCount = program->getEntryPointCount();
+            for (Index ee = 0; ee < entryPointCount; ++ee)
+            {
+                recordArtifact(
+                    targetProgram,
+                    _getEntryPointPath(targetReq, ee),
+                    targetProgram->getExistingEntryPointResult(ee));
+            }
+        }
+    }
+
+    // Exactly one coverage-instrumented artifact is allowed to claim an
+    // explicit sidecar path. Any other count is rejected before collision checks.
+    if (coverageArtifactCount > 1)
+    {
+        getSink()->diagnose(
+            Diagnostics::CoverageManifestOutputMultipleArtifacts{.path = explicitSidecarPath});
+        return SLANG_FAIL;
+    }
+
+    if (coverageArtifactCount == 0)
+    {
+        getSink()->diagnose(
+            Diagnostics::CoverageManifestOutputWithoutCoverageData{.path = explicitSidecarPath});
+        return SLANG_FAIL;
+    }
+
+    for (const auto& artifactPath : emittedArtifactPaths)
+    {
+        if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
+        {
+            getSink()->diagnose(Diagnostics::CoverageManifestOutputCollidesWithArtifact{
+                .path = explicitSidecarPath});
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;
@@ -618,6 +1028,12 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
             getSink()->diagnose(Diagnostics::UnableToCreateModuleContainer{});
             return res;
         }
+
+        // Emit only for command-line compiles. maybeCreateContainer() is also reached by the
+        // programmatic compile API, where adding a diagnostic to every module compile would be
+        // unexpected output for an embedder and could trip a diagnostic-count assertion.
+        if (m_isCommandLineCompile)
+            getSink()->diagnose(Diagnostics::ModuleFormatNotFinalized{});
 
         // Need to turn into a blob
         List<uint8_t> blobData;
@@ -781,6 +1197,12 @@ void EndToEndCompileRequest::generateOutput()
 
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
+        if (SLANG_FAILED(_validateSeparateDebugInfoOutputPaths()))
+            return;
+
+        if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
+            return;
+
         auto linkage = getLinkage();
         auto program = getSpecializedGlobalAndEntryPointsComponentType();
 
@@ -799,9 +1221,9 @@ void EndToEndCompileRequest::generateOutput()
 
                     // If we are compiling separate debug info, check for the additional
                     // SPIRV artifact and write that if needed.
-                    _maybeWriteDebugArtifact(targetProgram, path, artifact);
+                    _maybeWriteSeparateDebugInfoOutput(targetProgram, path, artifact);
 
-                    _maybeWriteCoverageMapping(path, artifact);
+                    _maybeWriteCoverageManifest(path, artifact);
                 }
             }
             else
@@ -817,9 +1239,9 @@ void EndToEndCompileRequest::generateOutput()
 
                         // If we are compiling separate debug info, check for the additional
                         // SPIRV artifact and write that if needed.
-                        _maybeWriteDebugArtifact(targetProgram, path, artifact);
+                        _maybeWriteSeparateDebugInfoOutput(targetProgram, path, artifact);
 
-                        _maybeWriteCoverageMapping(path, artifact);
+                        _maybeWriteCoverageManifest(path, artifact);
                     }
                 }
             }
@@ -1494,7 +1916,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 
 void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 {
-    getOptionSet().set(CompilerOptionName::AllowGLSL, value);
+    setLegacyAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::compile()
@@ -1519,11 +1941,12 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1556,6 +1979,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else
@@ -1617,7 +2041,7 @@ SlangResult EndToEndCompileRequest::compile()
     }
 
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
-    if (reflectionPath.getLength() != 0)
+    if (reflectionPath.getLength() != 0 && SLANG_SUCCEEDED(res))
     {
         auto reflection = this->getReflection();
         if (!reflection)
@@ -1914,13 +2338,15 @@ SlangResult EndToEndCompileRequest::loadRepro(
     const void* data,
     size_t size)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState((const uint8_t*)data, size, getSink(), buffer));
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(
+        ReproUtil::loadState((const uint8_t*)data, size, getSink(), reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
 
     SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, this));
     return SLANG_OK;
@@ -1958,6 +2384,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 {
     auto linkage = getLinkage();
     auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    if (!(linkage && program))
+        return nullptr;
 
     // Note(tfoley): The API signature doesn't let the client
     // specify which target they want to access reflection
@@ -1974,7 +2402,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 
     auto targetReq = linkage->targets[targetIndex];
     auto targetProgram = program->getTargetProgram(targetReq);
-
+    if (!targetProgram)
+        return nullptr;
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     auto programLayout = targetProgram->getOrCreateLayout(&sink);

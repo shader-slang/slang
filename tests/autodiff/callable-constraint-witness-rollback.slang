@@ -1,24 +1,26 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // A [BackwardDifferentiable] interface method adds callable constraints to
 // the requirement. A direct candidate with only a legacy backward derivative
-// can satisfy the backward constraint but not the forward constraint, so it
-// fails and conformance checking falls back to a synthesized wrapper.
-//
-// The failed direct candidate must not leave partial constraint witnesses in
-// the witness table, or the synthesized wrapper will try to add the same
-// backward constraint witness again.
+// can match the source signature and satisfy the backward constraint, but it
+// must still be rejected because it does not satisfy the generated
+// forward-differentiable constraint.
 
 interface IModule<T : IDifferentiable>
 {
     [BackwardDifferentiable]
     T forward(T input);
+/*CHECK:
+      ^^^^^^^ see interface requirement declaration of 'forward'
+*/
 }
 
 struct InferenceModule : IModule<float>
 {
     [BackwardDerivative(forward_bwd)]
     float forward(float input)
+//CHECK:  ^^^^^^^ callable differentiability requirement not satisfied
+//CHECK:  ^^^^^^^ member 'forward' does not satisfy the required forward-differentiable constraint for interface requirement 'forward'.
     {
         return input;
     }
@@ -27,16 +29,4 @@ struct InferenceModule : IModule<float>
     {
         updateDiff(input, dOut);
     }
-}
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
-
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    InferenceModule module;
-    outputBuffer[dispatchThreadID.x] = module.forward(1.0);
-    //CHK:1.0
 }

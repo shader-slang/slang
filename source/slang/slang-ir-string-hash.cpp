@@ -25,23 +25,41 @@ void findGetStringHashInsts(IRModule* module, List<IRGetStringHash*>& outInsts)
     _findGetStringHashRec(module->getModuleInst(), outInsts);
 }
 
-void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
+static void _addGlobalHashedStringLiteralsToPool(
+    IRGlobalHashedStringLiterals* hashedStringLits,
+    StringSlicePool& pool)
+{
+    const Index count = hashedStringLits->getOperandCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
+        pool.add(stringLit->getStringSlice());
+    }
+}
+
+static IRGlobalHashedStringLiterals* _findGlobalHashedStringLiterals(IRModule* module)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
-
+    IRGlobalHashedStringLiterals* foundInst = nullptr;
     for (IRInst* child : moduleInst->getChildren())
     {
         if (IRGlobalHashedStringLiterals* hashedStringLits =
                 as<IRGlobalHashedStringLiterals>(child))
         {
-            const Index count = hashedStringLits->getOperandCount();
-            for (Index i = 0; i < count; ++i)
-            {
-                IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
-                pool.add(stringLit->getStringSlice());
-            }
+            SLANG_RELEASE_ASSERT(!foundInst || foundInst == hashedStringLits);
+            foundInst = hashedStringLits;
         }
     }
+
+    return foundInst;
+}
+
+void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
+{
+    auto hashedStringLits = module->_getOrCreateLinkingInfo()->getGlobalHashedStringLiterals();
+
+    if (hashedStringLits)
+        _addGlobalHashedStringLiteralsToPool(hashedStringLits, pool);
 }
 
 void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module)
@@ -51,6 +69,8 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
     {
         return;
     }
+
+    SLANG_RELEASE_ASSERT(!_findGlobalHashedStringLiterals(module));
 
     IRBuilder builder(module);
 
@@ -66,11 +86,11 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
         operandInsts.add(stringLit);
     }
 
-    IRInst* globalHashedInst = builder.emitIntrinsicInst(
+    auto globalHashedInst = as<IRGlobalHashedStringLiterals>(builder.emitIntrinsicInst(
         nullptr,
         kIROp_GlobalHashedStringLiterals,
         UInt(slicesCount),
-        operandInsts.getArrayView().getBuffer());
+        operandInsts.getArrayView().getBuffer()));
 
     // Mark to keep alive
     builder.addKeepAliveDecoration(globalHashedInst);
@@ -84,7 +104,11 @@ Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
 
     for (auto inst : insts)
     {
-        if (inst->getStringLit() == nullptr)
+        // Test the operand directly instead of through `getStringLit()`. That accessor is generated
+        // from the typed operand declaration and casts without checking, so it hands back a
+        // non-null `IRStringLit*` even when the operand is something else entirely -- which is
+        // precisely the case this check exists to reject.
+        if (as<IRStringLit>(inst->getOperand(0)) == nullptr)
         {
             if (sink)
             {

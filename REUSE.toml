@@ -5,48 +5,71 @@ SPDX-PackageDownloadLocation = "https://github.com/shader-slang/slang"
 
 [[annotations]]
 path = "**"
-precedence = "aggregate"
-SPDX-FileCopyrightText = ["2016, Carnegie Mellon University and NVIDIA Corporation", "2024 The Khronos Group, Inc."]
+precedence = "closest"
+SPDX-FileCopyrightText = [
+  "2016, Carnegie Mellon University and NVIDIA Corporation",
+  "2024 The Khronos Group, Inc.",
+  ]
 SPDX-License-Identifier = "Apache-2.0 WITH LLVM-exception"
 
 [[annotations]]
 path = "docs/_includes/anchor_headings.html"
-precedence = "aggregate"
+precedence = "closest"
 SPDX-FileCopyrightText = "2018 Vladimir \"allejo\" Jimenez"
 SPDX-License-Identifier = "Apache-2.0 WITH LLVM-exception"
 
 [[annotations]]
-path = ["external/spirv/spirv.h", "external/glext.h", "external/wglext.h", "external/spirv-tools-generated/OpenCLDebugInfo100.h", "external/spirv-tools-generated/DebugInfo.h", "external/spirv-tools-generated/NonSemanticShaderDebugInfo100.h", "external/glslang-generated/glslang/build_info.h"]
-precedence = "aggregate"
+path = "external/spirv-tools-generated/options-pinned.h"
+precedence = "closest"
+SPDX-FileCopyrightText = "The Abseil Authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+  "external/spirv/spirv.h",
+  "external/glext.h",
+  "external/wglext.h",
+  "external/spirv-tools-generated/OpenCLDebugInfo100.h",
+  "external/spirv-tools-generated/DebugInfo.h",
+  "external/spirv-tools-generated/NonSemanticShaderDebugInfo100.h",
+  "external/glslang-generated/glslang/build_info.h",
+]
+precedence = "closest"
 SPDX-FileCopyrightText = "The Khronos Group, Inc."
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
 path = "tests/fcpw/**"
-precedence = "aggregate"
+precedence = "closest"
 SPDX-FileCopyrightText = "2020 Rohan Sawhney"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
+path = "external/stb/**"
+precedence = "closest"
+SPDX-FileCopyrightText = "Sean Barrett"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
 path = "external/renderdoc_app.h"
-precedence = "aggregate"
+precedence = "closest"
 SPDX-FileCopyrightText = "2019-2021 Baldur Karlsson"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
 path = "external/dxc/dxcapi.h"
-precedence = "aggregate"
+precedence = "closest"
 SPDX-FileCopyrightText = "Microsoft Corporation. All rights reserved."
 SPDX-License-Identifier = "LicenseRef-UOI-NCSA"
 
 [[annotations]]
 path = "source/core/slang-crypto.cpp"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "2001 Alexander Peslyak"
-SPDX-License-Identifier = "Apache-2.0"
+precedence = "closest"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "Unlicense"
 
 [[annotations]]
-path = "**.md"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "2024 The Khronos Group, Inc."
-SPDX-License-Identifier = "CC-BY-4.0"
+path = "tools/gfx-unit-test/span.h"
+precedence = "closest"
+SPDX-FileCopyrightText = "Tristan Brindle"
+SPDX-License-Identifier = "BSL-1.0"

@@ -8,8 +8,10 @@ struct NotIFoo
 {
 }
 
-// TODO: Ideally, we'd get the error directly here already, as NotIFoo does not
-// conform to IFoo.
+// The default `T = NotIFoo` does not conform to the required interface `IFoo`,
+// so specializing this generic at the call below reports a focused
+// non-conformance diagnostic rather than the general specialization-failed
+// fallback.
 void invalidDefault<T : IFoo = NotIFoo>()
 /*diag:
      ^^^^^^^^^^^^^^ see declaration of func invalidDefault<T> -> void
@@ -32,5 +34,6 @@ void badDefaultOrder2<int A=B,int B=10>()
 void other()
 {
     invalidDefault();
-//diag:           ^ could not specialize generic for arguments of type ()
+//diag:           ^ type argument doesn't conform to interface
+//diag:           ^ type argument 'NotIFoo' does not conform to the required interface 'IFoo'
 }

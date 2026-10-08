@@ -269,6 +269,26 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_MetalPackedVectorType:
+        {
+            // A packed vector has its element's alignment and no padding,
+            // independent of the layout rules in effect (that is its purpose:
+            // MSL `packed_float3` is 12 bytes with 4-byte alignment).
+            auto packedVecType = cast<IRMetalPackedVectorType>(type);
+            IRSizeAndAlignment elementTypeLayout;
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
+                targetReq,
+                this,
+                packedVecType->getElementType(),
+                &elementTypeLayout));
+            auto count = packedVecType->getElementCount();
+            SLANG_RELEASE_ASSERT(count && count->getOp() == kIROp_IntLit);
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                elementTypeLayout.getStride() * getIntegerValueFromInst(count),
+                elementTypeLayout.alignment);
+            return SLANG_OK;
+        }
+        break;
     case kIROp_AnyValueType:
         {
             auto anyValType = cast<IRAnyValueType>(type);
@@ -402,6 +422,14 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_StringType:
+        if (targetReq && builtinTypeInfo.stringSize != 0)
+        {
+            *outSizeAndAlignment =
+                IRSizeAndAlignment(builtinTypeInfo.stringSize, builtinTypeInfo.stringAlignment);
+            return SLANG_OK;
+        }
+        break;
     case kIROp_ScalarBufferLayoutType:
     case kIROp_CBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
@@ -409,6 +437,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+        // `uint` before emit, so one reaching layout is an internal error (a leak from that pass).
+        SLANG_UNEXPECTED("untyped descriptor-heap handle type should have been lowered to uint");
     case kIROp_DescriptorHandleType:
         {
             // Check for spvBindlessTextureNV capability
@@ -423,9 +456,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 }
             }
 
-            if (hasBindlessTextureNV)
+            if (isDescriptorHandleRepresentedAsUInt64(type, hasBindlessTextureNV))
             {
-                // For spvBindlessTextureNV, DescriptorHandle<T> is uint64_t
+                // uint64 form (texture/sampler kinds under spvBindlessTextureNV)
                 *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
                 return SLANG_OK;
             }
@@ -450,8 +483,29 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
     case kIROp_AttributedType:
         {
+            // Only layout-transparent attributes may reach here: `unorm`/`snorm` select a
+            // texture image format at emit and `no_diff` carries no storage, so the type
+            // lays out as its base. Checked rather than assumed because the `Attr` family
+            // also holds storage-shaped members (`AlignedAttr`, `TypeAlignmentAttr`,
+            // `TypeSizeAttr`); none is attached to a *type* today -- `AlignedAttr` goes on
+            // an `IRLoad` -- and laying one of those out as its base would silently drop
+            // the property it exists to carry.
+            //
+            // Every attribute is checked, not just the first: `getAttributedType` takes a
+            // list and stores each as an operand, so `getAttr()` is only operand 1.
+            //
+            // SLANG_RELEASE_ASSERT, not SLANG_ASSERT: the latter compiles to SLANG_ASSUME
+            // in Release, which makes a violation undefined behaviour rather than a
+            // diagnosis -- the same construct whose `__builtin_unreachable()` produced the
+            // SIGSEGV this file's fix exists to stop.
             auto attributedType = cast<IRAttributedType>(type);
-            SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr);
+            for (UInt i = 1; i < attributedType->getOperandCount(); ++i)
+            {
+                const auto attrOp = attributedType->getOperand(i)->getOp();
+                SLANG_RELEASE_ASSERT(
+                    attrOp == kIROp_NoDiffAttr || attrOp == kIROp_UNormAttr ||
+                    attrOp == kIROp_SNormAttr);
+            }
             return getSizeAndAlignment(
                 targetReq,
                 this,

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../core/slang-list.h"
-#include "../core/slang-string.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-list.h"
+#include "core/slang-string.h"
 
 namespace Slang
 {
@@ -40,6 +40,7 @@ struct DiagnosticRenderOptions
 {
     bool enableTerminalColors = false;
     bool enableUnicode = false;
+    SlangDiagnosticFormat format = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
 };
 
 String renderDiagnostic(

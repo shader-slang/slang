@@ -86,7 +86,7 @@ struct EmptyArrayLoweringContext
             [&](IRGetElement* getElement)
             {
                 const auto base = getElement->getBase();
-                return hasEmptyArrayType(base) ? builder.emitPoison(getElement->getDataType())
+                return hasEmptyArrayType(base) ? builder.getPoison(getElement->getDataType())
                                                : nullptr;
             },
             [&](IRGetElementPtr* gep)
@@ -94,27 +94,23 @@ struct EmptyArrayLoweringContext
                 const auto base = gep->getBase();
                 return hasEmptyArrayPtrType(gep) || hasEmptyArrayPtrType(base) ||
                                as<IRUndefined>(base)
-                           ? builder.emitPoison(gep->getDataType())
+                           ? builder.getPoison(gep->getDataType())
                            : nullptr;
             },
             [&](IRFieldAddress* gep)
             {
                 const auto base = gep->getBase();
                 return hasEmptyArrayPtrType(gep) || as<IRUndefined>(base)
-                           ? builder.emitPoison(gep->getDataType())
+                           ? builder.getPoison(gep->getDataType())
                            : nullptr;
             },
-            [&](IRLoad* load)
-            {
-                return as<IRUndefined>(load->getOperand(0))
-                           ? builder.emitPoison(load->getDataType())
-                           : nullptr;
+            [&](IRLoad* load) {
+                return as<IRUndefined>(load->getOperand(0)) ? builder.getPoison(load->getDataType())
+                                                            : nullptr;
             },
-            [&](IRImageLoad* load)
-            {
-                return as<IRUndefined>(load->getOperand(0))
-                           ? builder.emitPoison(load->getDataType())
-                           : nullptr;
+            [&](IRImageLoad* load) {
+                return as<IRUndefined>(load->getOperand(0)) ? builder.getPoison(load->getDataType())
+                                                            : nullptr;
             },
             [&](IRStore* store)
             {
@@ -137,13 +133,13 @@ struct EmptyArrayLoweringContext
             [&](IRImageSubscript* subscript)
             {
                 return as<IRUndefined>(subscript->getImage())
-                           ? builder.emitPoison(subscript->getDataType())
+                           ? builder.getPoison(subscript->getDataType())
                            : nullptr;
             },
             [&](IRAtomicOperation* atomic)
             {
                 return as<IRUndefined>(atomic->getOperand(0))
-                           ? builder.emitPoison(atomic->getDataType())
+                           ? builder.getPoison(atomic->getDataType())
                            : nullptr;
             },
             // The following should match any instruction which can construct a 0-sized array.

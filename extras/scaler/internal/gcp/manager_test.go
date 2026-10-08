@@ -3,8 +3,10 @@ package gcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -358,7 +360,8 @@ func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -407,7 +410,8 @@ func TestCreateVMAllCandidateZonesStockout(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -452,7 +456,8 @@ func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -475,6 +480,298 @@ func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
 	}
 	if len(m.vms) != 0 {
 		t.Fatalf("tracked VM count = %d, want 0", len(m.vms))
+	}
+	if got := m.ActiveCount(); got != 0 {
+		t.Fatalf("active count after failed CreateVM = %d, want 0", got)
+	}
+}
+
+func TestCreateVMConcurrentNonGPUCreatesReserveZones(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-c,us-east1-d,us-central1-a",
+			InstanceTemplate: "linux-build-runner",
+			GPUType:          "none",
+			Platform:         "linux",
+		},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
+	}
+
+	const createCount = 5
+	insertEntered := make(chan struct{}, createCount)
+	releaseInserts := make(chan struct{})
+	var releaseInsertsOnce sync.Once
+	releasePendingInserts := func() {
+		releaseInsertsOnce.Do(func() { close(releaseInserts) })
+	}
+	defer releasePendingInserts()
+	var mu sync.Mutex
+	var zones []string
+
+	m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+		mu.Lock()
+		zones = append(zones, req.GetZone())
+		mu.Unlock()
+
+		insertEntered <- struct{}{}
+		<-releaseInserts
+		return nil
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, createCount)
+	for i := range createCount {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			runnerName := fmt.Sprintf("linux-build-test-%d", i)
+			_, err := m.CreateVM(context.Background(), runnerName, "jit-config")
+			errs <- err
+		}(i)
+	}
+
+	for i := 0; i < createCount; i++ {
+		select {
+		case <-insertEntered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for concurrent inserts to start")
+		}
+	}
+
+	if got := m.ActiveCount(); got != createCount {
+		t.Fatalf("active count while inserts are pending = %d, want %d", got, createCount)
+	}
+
+	releasePendingInserts()
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("CreateVM returned error: %v", err)
+		}
+	}
+
+	wantZoneCounts := map[string]int{
+		"us-east1-c":    2,
+		"us-east1-d":    2,
+		"us-central1-a": 1,
+	}
+	gotZoneCounts := map[string]int{}
+	mu.Lock()
+	for _, zone := range zones {
+		gotZoneCounts[zone]++
+	}
+	mu.Unlock()
+	if len(zones) != createCount {
+		t.Fatalf("insert count = %d, want %d", len(zones), createCount)
+	}
+	for zone, want := range wantZoneCounts {
+		if got := gotZoneCounts[zone]; got != want {
+			t.Fatalf("zone %s insert count = %d, want %d (all zones: %v)", zone, got, want, gotZoneCounts)
+		}
+	}
+	if got := m.ActiveCount(); got != createCount {
+		t.Fatalf("active count after CreateVM completes = %d, want %d", got, createCount)
+	}
+}
+
+func TestCreateVMConcurrentGPUCreatesRespectPendingQuota(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-d",
+			InstanceTemplate: "linux-gpu-runner-sm80plus-l4",
+			GPUType:          "nvidia-l4",
+			Platform:         "linux",
+		},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
+	}
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return []zoneCandidate{{zone: "us-east1-d", region: "us-east1", available: 1}}, nil
+	}
+
+	insertEntered := make(chan struct{}, 1)
+	releaseInsert := make(chan struct{})
+	m.insertVMFunc = func(context.Context, *computepb.InsertInstanceRequest) error {
+		insertEntered <- struct{}{}
+		<-releaseInsert
+		return nil
+	}
+
+	firstErr := make(chan error, 1)
+	go func() {
+		_, err := m.CreateVM(context.Background(), "linux-sm80plus-a", "jit-config")
+		firstErr <- err
+	}()
+
+	select {
+	case <-insertEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first insert to start")
+	}
+
+	if got := m.ActiveCount(); got != 1 {
+		t.Fatalf("active count while first insert is pending = %d, want 1", got)
+	}
+
+	_, err := m.CreateVM(context.Background(), "linux-sm80plus-b", "jit-config")
+	if err == nil {
+		t.Fatal("second CreateVM should fail while reported GPU quota is fully reserved")
+	}
+	if !strings.Contains(err.Error(), "no candidate zones have unreserved nvidia-l4 quota") {
+		t.Fatalf("second CreateVM error = %q, want unreserved quota error", err)
+	}
+	if got := m.ActiveCount(); got != 1 {
+		t.Fatalf("active count after rejected second create = %d, want 1", got)
+	}
+
+	close(releaseInsert)
+	if err := <-firstErr; err != nil {
+		t.Fatalf("first CreateVM returned error: %v", err)
+	}
+	if got := m.ActiveCount(); got != 1 {
+		t.Fatalf("active count after first CreateVM completes = %d, want 1", got)
+	}
+}
+
+// TestCreateVMConcurrentGPUCreatesSpreadAcrossZonesInRegion verifies that when
+// a region has multiple zones and enough quota for several VMs, concurrent
+// reservations spread across the zones instead of all herding onto the first
+// one. Without intra-region spreading the burst would pile onto a single zone
+// and turn zonal stockouts into avoidable retries.
+func TestCreateVMConcurrentGPUCreatesSpreadAcrossZonesInRegion(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Project:          "test-project",
+			Zones:            "us-east1-d,us-east1-b",
+			InstanceTemplate: "linux-gpu-runner-sm80plus-l4",
+			GPUType:          "nvidia-l4",
+			Platform:         "linux",
+		},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
+	}
+	// One region, two zones, room for two concurrent VMs.
+	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+		return []zoneCandidate{
+			{zone: "us-east1-d", region: "us-east1", available: 2},
+			{zone: "us-east1-b", region: "us-east1", available: 2},
+		}, nil
+	}
+
+	const createCount = 2
+	insertEntered := make(chan struct{}, createCount)
+	releaseInserts := make(chan struct{})
+	var mu sync.Mutex
+	var zones []string
+	m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+		mu.Lock()
+		zones = append(zones, req.GetZone())
+		mu.Unlock()
+		insertEntered <- struct{}{}
+		<-releaseInserts
+		return nil
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, createCount)
+	for i := range createCount {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := m.CreateVM(context.Background(), fmt.Sprintf("linux-sm80plus-%d", i), "jit-config")
+			errs <- err
+		}(i)
+	}
+
+	for i := 0; i < createCount; i++ {
+		select {
+		case <-insertEntered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for concurrent inserts to start")
+		}
+	}
+
+	close(releaseInserts)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("CreateVM returned error: %v", err)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	gotZoneCounts := map[string]int{}
+	for _, zone := range zones {
+		gotZoneCounts[zone]++
+	}
+	wantZoneCounts := map[string]int{"us-east1-d": 1, "us-east1-b": 1}
+	for zone, want := range wantZoneCounts {
+		if got := gotZoneCounts[zone]; got != want {
+			t.Fatalf("zone %s insert count = %d, want %d (all zones: %v)", zone, got, want, gotZoneCounts)
+		}
+	}
+}
+
+// TestCreateVMStampsExpectGPUMetadata verifies that CreateVM stamps the
+// "expect-gpu" instance-metadata key from the pool's GPUType: "true" for GPU
+// pools and "false" for CPU-only pools (GPUType == "none"). The Linux startup
+// script reads this to decide whether a missing accelerator is fatal (GPU pool)
+// or expected (CPU-only build/analytics pool), so the contract must be explicit
+// rather than inferred from the VM's PCI state.
+func TestCreateVMStampsExpectGPUMetadata(t *testing.T) {
+	cases := []struct {
+		name    string
+		gpuType string
+		want    string
+	}{
+		{"gpu pool", "nvidia-l4", "true"},
+		{"cpu-only pool", "none", "false"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Manager{
+				config: ManagerConfig{
+					Project:          "test-project",
+					Zones:            "us-east1-d",
+					InstanceTemplate: "linux-build-runner",
+					GPUType:          tc.gpuType,
+					Platform:         "linux",
+				},
+				vms:            map[string]*vmInfo{},
+				pendingCreates: map[string]zoneCandidate{},
+			}
+			m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+				return []zoneCandidate{{zone: "us-east1-d", region: "us-east1", available: 16}}, nil
+			}
+
+			var got string
+			var found bool
+			m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+				for _, item := range req.GetInstanceResource().GetMetadata().GetItems() {
+					if item.GetKey() == "expect-gpu" {
+						got = item.GetValue()
+						found = true
+					}
+				}
+				return nil
+			}
+
+			if _, err := m.CreateVM(context.Background(), "build-test", "jit-config"); err != nil {
+				t.Fatalf("CreateVM returned error: %v", err)
+			}
+			if !found {
+				t.Fatal("expect-gpu metadata key was not set")
+			}
+			if got != tc.want {
+				t.Fatalf("expect-gpu = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

@@ -9,7 +9,10 @@ namespace Slang
 {
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
-    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SharedSemanticsContext sharedSemanticsContext(
+        linkage,
+        linkage->m_optionSet.getLanguageVersion(),
+        sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
@@ -109,8 +112,25 @@ Type* SemanticsVisitor::getConstantBufferType(Type* elementType, Type* layoutTyp
     return m_astBuilder->getConstantBufferType(elementType, layoutType, witness);
 }
 
+static String _getExprName(Expr* expr)
+{
+    if (auto overloadedExpr = as<OverloadedExpr>(expr))
+    {
+        if (overloadedExpr->name)
+            return String(overloadedExpr->name->text);
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        if (declRefExpr->name)
+            return String(declRefExpr->name->text);
+    }
+    return String();
+}
+
 Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
 {
+    auto originalExpr = expr;
+
     if (auto overloadedExpr = as<OverloadedExpr>(expr))
     {
         expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
@@ -125,9 +145,17 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         return expr;
     }
 
-    getSink()->diagnose(Diagnostics::ExpectedAType{
-        .whatWeGot = expr->type.type ? String(expr->type.type->toString()) : String("null"),
-        .expr = expr});
+    auto name = _getExprName(originalExpr);
+    if (name.getLength() == 0)
+        name = _getExprName(expr);
+
+    StringBuilder whatWeGot;
+    whatWeGot << "a '" << (expr->type.type ? expr->type.type->toString() : toSlice("null")) << "'";
+    if (name.getLength())
+        whatWeGot << " for '" << name << "'";
+
+    getSink()->diagnose(
+        Diagnostics::ExpectedAType{.whatWeGot = whatWeGot.produceString(), .expr = expr});
     return CreateErrorExpr(expr);
 }
 
@@ -284,8 +312,13 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
+                auto exprName = _getExprName(originalExpr);
+                StringBuilder whatWeGotStr;
+                whatWeGotStr << "a '" << originalExpr->getClass().getName() << "'";
+                if (exprName.getLength())
+                    whatWeGotStr << " for '" << exprName << "'";
                 diagSink->diagnose(Diagnostics::ExpectedAType{
-                    .whatWeGot = originalExpr->getClass().getName(),
+                    .whatWeGot = whatWeGotStr.produceString(),
                     .expr = originalExpr});
             }
         }
@@ -550,6 +583,14 @@ Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
         expr->base = CheckProperType(expr->base);
         expr->type = expr->base.exp->type;
     }
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+{
+    // This spelling denotes the built-in type directly, so a declaration named `uint` cannot
+    // shadow it through ordinary name lookup.
+    expr->type = m_astBuilder->getTypeType(m_astBuilder->getUIntType());
     return expr;
 }
 

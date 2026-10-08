@@ -582,6 +582,7 @@ EOF
             </div>
 
             <div class="buttons">
+                <a href="${LINK_PREFIX}slangc-coverage-trend.html" class="btn btn-primary">📈 slangc Coverage Trend</a>
                 <a href="${LINK_PREFIX}history/index.html" class="btn btn-secondary">📚 Historical Reports</a>
             </div>
         </div>
@@ -634,6 +635,7 @@ EOF
 
             <div class="buttons">
                 <a href="${LINK_PREFIX}latest/index.html" class="btn btn-primary">📄 View Detailed Report</a>
+                <a href="${LINK_PREFIX}slangc-coverage-trend.html" class="btn btn-primary">📈 slangc Coverage Trend</a>
                 <a href="${LINK_PREFIX}history/index.html" class="btn btn-secondary">📚 Historical Reports</a>
             </div>
         </div>
@@ -648,6 +650,7 @@ else
             </div>
 
             <div class="buttons">
+                <a href="${LINK_PREFIX}slangc-coverage-trend.html" class="btn btn-primary">📈 slangc Coverage Trend</a>
                 <a href="${LINK_PREFIX}history/index.html" class="btn btn-secondary">📚 Historical Reports</a>
             </div>
         </div>

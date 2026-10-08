@@ -31,26 +31,44 @@
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
 
-# #10828: Preprocessor ExpansionInputStream leak during slangc-test
-# Leak from _maybeBeginMacroInvocation() and type layout objects
-# created during compilation.
-LEAK: _maybeBeginMacroInvocation
+# #11938: Repro load leaks CacheFileSystem::PathInfo entries that have no
+# unique identity: the post-load hand-off to the CacheFileSystem's owning
+# unique-identity map skips them (see the TODO in slang-repro.cpp), so
+# nobody owns them. Surfaced by the repro-validator unit tests.
+LEAK: getPathInfoFromFile
 
-# #10893: Use-after-free of TypeLayoutReflection in slang-rhi
-# ShaderObjectLayout cache during render-test CPU compute tests.
-# All three SUMMARY lines below cascade from a single dangling vptr
-# dereference in TypeLayout::FindResourceInfo / List::begin(). UBSan
-# SUMMARY lines only carry file:line -- update line numbers if the
-# surrounding code shifts, or remove entries when #10893 is fixed.
+# #10893: Use-after-free of TypeLayoutReflection in the slang-rhi
+# ShaderObjectLayout cache during render-test CPU compute tests. The cache
+# is keyed by raw TypeLayoutReflection*, and under server-count=1 those
+# addresses are recycled across sessions, so a cached entry's
+# m_elementTypeLayout can dangle. All three SUMMARY lines below cascade
+# from that single wild pointer: the ASan overflow is the read in
+# TypeLayout::FindResourceInfo, and the two UBSan findings are the bad
+# vptr on the way into it. All three must be listed, since a log counts
+# as expected only when every SUMMARY line in it matches a pattern.
+#
+# These entries were removed on 2026-07-08 in 70b2d94417 (#11937) after
+# several quiet nightlies, then the finding resurfaced in run 30971112743
+# on 2026-08-05. It is intermittent because it depends on allocator address
+# reuse, so quiet runs do not mean it is fixed -- remove these only when
+# #10893 itself is fixed, not merely when they go unmatched for a while.
+#
+# UBSan SUMMARY lines carry only file:line -- no function name -- so these
+# two are position-dependent against the file's own guidance, and will go
+# stale whenever the surrounding code shifts (the reflection entry has
+# already moved 1384 -> 1401). Update the line numbers when that happens.
+# The begin() entry is function-name based and is the durable one.
 Slang::List<Slang::TypeLayout::ResourceInfo, Slang::StandardAllocator>::begin()
-slang-reflection-api.cpp:1384
+slang-reflection-api.cpp:1401
 slang-type-layout.h:772
 
-# #10988: alloc-dealloc-mismatch in glslang_disassembleSPIRV.
-# String allocated with `new char[len]` in
-# glslang_disassembleSPIRVWithResult is freed with scalar `delete` in
-# glslang_disassembleSPIRV. The buggy free is reachable only from the
-# SPIR-V validation-failure branch in slang-emit.cpp, so it stayed
-# dormant from 2025-09-30 (PR #8526) until 2026-04-29, when a newly
-# added test on master produced invalid SPIR-V and walked into it.
-in glslang_disassembleSPIRV
+# Historical entries:
+#   #10828 LEAK: _maybeBeginMacroInvocation -- fixed by this PR: the
+#     wrong-arg-count macro invocation error paths now free the
+#     MacroInvocation.
+#   #11936 LEAK: SlangRecord::tryWrap / SlangRecord::callWithDefaults /
+#     _replayContext -- fixed: createSession now releases the file-system
+#     wrapper reference it creates; the ReplayContext releases proxies the
+#     playback dispatcher orphaned into discarded outputs at teardown; and
+#     the replay-playback unit tests attach their test proxies instead of
+#     double-counting them.

@@ -3,9 +3,9 @@
 #ifndef OPTIONS_H_INCLUDED
 #define OPTIONS_H_INCLUDED
 
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-smart-pointer.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-render-api-util.h"
+#include "core/slang-smart-pointer.h"
 #include "test-reporter.h"
 
 // A category that a test can be tagged with
@@ -134,6 +134,10 @@ struct Options
     // Maximum number of test servers to run.
     int serverCount = 1;
 
+    // The slangc optimization-level argument injected for tests that do not specify their own
+    // optimization level. It can be set from "-O0" through "-O3" and defaults to "-O0".
+    Slang::String defaultOptimizationLevel = "-O0";
+
     bool emitSPIRVDirectly = true;
 
     // Whether to enable RHI device caching in render-test (default: true in slang-test)
@@ -142,15 +146,16 @@ struct Options
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 
-    // Per-file info for expected failure lists: (fileName, count) pairs, in order added.
-    struct ExpectedFailureFileInfo
+    // Per-file info for loaded test list files: (fileName, count) pairs, in order added.
+    struct TestListFileInfo
     {
         Slang::String fileName;
         int count;
     };
-    Slang::List<ExpectedFailureFileInfo> expectedFailureFiles;
+    Slang::List<TestListFileInfo> expectedFailureFiles;
 
     Slang::List<Slang::String> skipList;
+    Slang::List<TestListFileInfo> skipListFiles;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(

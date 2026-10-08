@@ -1,13 +1,30 @@
 // slang-target.cpp
 #include "slang-target.h"
 
-#include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
 namespace Slang
 {
+
+bool isHLSLBasedTarget(CodeGenTarget target)
+{
+    // We identify targets that require the HLSL emission rules. DXBC and DXIL compilation,
+    // including their assembly variants, passes emitted HLSL to a downstream compiler.
+    switch (target)
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        return true;
+    default:
+        return false;
+    }
+}
 
 bool isHeterogeneousTarget(CodeGenTarget target)
 {
@@ -115,7 +132,8 @@ CapabilitySet TargetRequest::getTargetCaps()
                 {
                     for (auto atom : profileCapAtomSet)
                     {
-                        if (isTargetVersionAtom(asAtom(atom)))
+                        // SPIR-V code-gen path: pull only SPIR-V version atoms from the profile.
+                        if (isSpirvVersionAtom(asAtom(atom)))
                         {
                             atoms.add((CapabilityName)atom);
                             hasTargetVersionAtom = true;

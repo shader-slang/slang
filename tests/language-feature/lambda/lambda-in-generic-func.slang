@@ -44,6 +44,7 @@ void computeMain<TBias: IPackedVal>(
     invoke(lambda, 0, 1.0f);
 }
 
+[noinline]
 void invoke(IFunc<float, uint, float> f, uint x, float value)
 {
     f(x, value);

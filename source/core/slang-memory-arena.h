@@ -4,6 +4,7 @@
 #include "slang-free-list.h"
 #include "slang.h"
 
+#include <limits>
 #include <stdlib.h>
 #include <string.h>
 #include <type_traits>
@@ -161,7 +162,7 @@ public:
     /// Rewind (and effectively deallocate) all allocations *after* the cursor
     void rewindToCursor(const void* cursor);
 
-    /// Add a block such that it will be freed when everything else is freed.
+    /// Adds a block allocated by StandardAllocator that the arena owns and deallocates.
     void addExternalBlock(void* data, size_t size);
 
     // Swap this with rhs
@@ -247,7 +248,7 @@ private:
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) const
 {
-    assert(size);
+    SLANG_ASSERT(size);
     uint8_t* ptr = (uint8_t*)data;
     return (ptr >= m_start && ptr + size <= m_current) || _findNonCurrent(data, size) != nullptr;
 }
@@ -255,7 +256,7 @@ SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) cons
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -301,7 +302,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateCurrentUnaligned(size_t sizeInByte
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -326,7 +327,7 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
 
     if (!m_current)
     {
@@ -354,9 +355,9 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void* MemoryArena::allocateAligned(size_t sizeInBytes, size_t alignment)
 {
-    assert(sizeInBytes > 0);
+    SLANG_ASSERT(sizeInBytes > 0);
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     if (!m_current)
     {
@@ -419,8 +420,13 @@ SLANG_FORCE_INLINE T* MemoryArena::allocate()
 template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateArray(size_t numElems)
 {
-    return (numElems > 0) ? reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)))
-                          : nullptr;
+    if (numElems == 0)
+        return nullptr;
+    // Guard against sizeof(T) * numElems overflowing size_t, which would otherwise turn an
+    // attacker-controlled element count (e.g. from deserialized data) into an undersized
+    // allocation that callers then write numElems elements into.
+    SLANG_RELEASE_ASSERT(numElems <= std::numeric_limits<size_t>::max() / sizeof(T));
+    return reinterpret_cast<T*>(allocateAligned(sizeof(T) * numElems, alignof(T)));
 }
 
 // --------------------------------------------------------------------------
@@ -428,14 +434,13 @@ template<typename T>
 SLANG_FORCE_INLINE T* MemoryArena::allocateAndCopyArray(const T* arr, size_t numElems)
 {
     static_assert(std::is_trivially_copyable_v<T>);
-    if (numElems > 0)
-    {
-        const size_t totalSize = sizeof(T) * numElems;
-        void* ptr = allocateAligned(totalSize, alignof(T));
-        ::memcpy(ptr, arr, totalSize);
-        return reinterpret_cast<T*>(ptr);
-    }
-    return nullptr;
+    if (numElems == 0)
+        return nullptr;
+    SLANG_RELEASE_ASSERT(numElems <= std::numeric_limits<size_t>::max() / sizeof(T));
+    const size_t totalSize = sizeof(T) * numElems;
+    void* ptr = allocateAligned(totalSize, alignof(T));
+    ::memcpy(ptr, arr, totalSize);
+    return reinterpret_cast<T*>(ptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +477,7 @@ inline void MemoryArena::adjustToBlockAlignment()
         // Set the position
         m_current = ptr;
     }
-    assert(size_t(m_current) & alignMask);
+    SLANG_ASSERT(size_t(m_current) & alignMask);
 }
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void MemoryArena::rewindToCursor(const void* cursor)

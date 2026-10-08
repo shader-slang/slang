@@ -3,6 +3,7 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -28,6 +29,17 @@ public:
     };
     Dictionary<ConstKey, VMOperand> mapConstantIntToOperand;
     Dictionary<IRFunc*, int> mapFuncToId;
+
+    // Global parameters already reported via diagnoseGlobalParam, so the same
+    // unsupported parameter is diagnosed once rather than once per reference.
+    HashSet<IRGlobalParam*> diagnosedGlobalParams;
+
+    // Types with no HostVM layout (e.g. `String`), already reported via
+    // getRepresentableSizeAndAlignment. Keyed on the type so a given unrepresentable
+    // type is diagnosed once rather than at every storage-defining site that hits it
+    // (a value's own slot, a variable's backing storage, a store's width, and a
+    // function's result-ABI slot, among others).
+    HashSet<IRType*> diagnosedUnrepresentableTypes;
 
     VMByteCodeBuilder& byteCodeBuilder;
     CodeGenContext* codeGenContext;
@@ -93,6 +105,9 @@ public:
         return operand;
     }
 
+    // Allocate (or return the cached) working-set slot for `inst`'s value, sized through the
+    // guarded getRepresentableSizeAndAlignment so a value whose type has no HostVM layout is
+    // diagnosed rather than given a silent 0-byte slot.
     VMOperand ensureWorkingsetMemory(VMByteCodeFunctionBuilder& funcBuilder, IRInst* inst)
     {
         VMOperand operand;
@@ -100,11 +115,8 @@ public:
         if (mapInstToOperand.tryGetValue(inst, operand))
             return operand;
 
-        IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        IRSizeAndAlignment sizeAlignment =
+            getRepresentableSizeAndAlignment(inst, inst->getDataType());
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
         mapInstToOperand[inst] = operand;
         return operand;
@@ -168,7 +180,11 @@ public:
 
     VMOperand addConstantValue(IRConstant* inst)
     {
-        VMOperand operand;
+        // Zero-initialize for the same reason ensureInst does: the VoidLit and PtrLit
+        // arms below never call setType, so without this their operand would carry an
+        // indeterminate `type` (and `padding`) that writeInst copies byte-for-byte
+        // into the code buffer. Zeroing makes the unset `type` a well-defined General.
+        VMOperand operand = {};
         operand.sectionId = kSlangByteCodeSectionConstants;
 
         // Align constantSection.
@@ -179,6 +195,13 @@ public:
             &sizeAlignment);
         alignConstSection(sizeAlignment.alignment);
 
+        // Reserve-then-fill contract: offset and size are recorded here, before the
+        // switch. Every arm that falls through to the shared `return operand` below must
+        // then append exactly `operand.size` bytes to constantSection. (StringLit is the
+        // exception: it returns early with a separate strings-section operand and does not
+        // use this reservation.) An arm that under-fills leaves the reserved slot unbacked,
+        // which is the #11375/#11402 bug: the next constant overlaps this one, and a
+        // trailing under-filled constant reads past the section end at run time.
         operand.offset = (uint32_t)byteCodeBuilder.constantSection.getCount();
         operand.size = sizeAlignment.size;
 
@@ -230,15 +253,47 @@ public:
                 byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeof(value));
                 break;
             }
+        case kIROp_BoolLit:
+            {
+                // Widen to int64_t and append the low `sizeAlignment.size` bytes. This is
+                // correct only on a little-endian host, where the 0/1 value lives in the
+                // low bytes regardless of the width the type-layout pass picks for bool,
+                // and only while that width does not exceed sizeof(int64_t) (asserted).
+                SLANG_ASSERT(sizeAlignment.size <= (IRIntegerValue)sizeof(int64_t));
+                int64_t value = static_cast<IRBoolLit*>(inst)->getValue() ? 1 : 0;
+                byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeAlignment.size);
+                // OperandDataType has no boolean tag. Bool is laid out in 4 bytes, so tagging
+                // it Int32 would make the disassembler render it as an integer (`i32(...)`);
+                // General keeps it an untyped `const:` rather than mislabeling it.
+                operand.setType(OperandDataType::General);
+                break;
+            }
         case kIROp_VoidLit:
+            // A void constant is zero bytes wide, so the reserved slot is already the
+            // right (empty) size and there is nothing to append.
             break;
+        default:
+            {
+                // The only IRConstant op (the `Constant` block in slang-ir-insts.lua) not
+                // handled above is BlobLit, which VM emission does not support. This is a
+                // live guard, not just future-proofing: rather than reserve a slot and
+                // leave it unbacked (the #11375 bug), fail loudly at emit time. Name the
+                // op so a future unsupported constant is identified in the report.
+                StringBuilder sb;
+                sb << "unhandled IRConstant op in VM emitter: " << getIROpInfo(inst->getOp()).name;
+                SLANG_UNEXPECTED(sb.getBuffer());
+            }
         }
         return operand;
     }
 
     VMOperand ensureInst(IRInst* inst)
     {
-        VMOperand operand;
+        // Zero-initialize: the global-parameter branch below diagnoses and returns
+        // without computing a real operand, so it must start from a well-defined
+        // value rather than indeterminate stack bytes (which writeInst would copy
+        // byte-for-byte into the code buffer).
+        VMOperand operand = {};
         if (mapInstToOperand.tryGetValue(inst, operand))
             return operand;
 
@@ -258,11 +313,155 @@ public:
             operand.size *= (uint32_t)constantVector->getOperandCount();
             mapInstToOperand[inst] = operand;
         }
+        else if (auto globalParam = findReferencedGlobalParam(inst))
+        {
+            // A global parameter (possibly reached through a global-scope instruction
+            // such as a load of the parameter) has arrived at value emission. The
+            // interpreter cannot represent it, so report the limitation and return the
+            // (unused) default operand; emission fails once an error has been reported.
+            diagnoseGlobalParam(globalParam);
+            mapInstToOperand[inst] = operand;
+        }
         else
         {
             SLANG_UNEXPECTED("unsupported global inst for vm bytecode emit");
         }
         return operand;
+    }
+
+    // Return the global shader parameter that `inst` is, or that it references
+    // through its operands (transitively), or null if there is none. Used to detect
+    // values the interpreter cannot represent: a `uniform float` used in a function
+    // body, for example, lowers to a global-scope `load` of the parameter, so the
+    // unsupported value reaching the emitter is the load rather than the parameter
+    // itself.
+    IRGlobalParam* findReferencedGlobalParam(IRInst* inst)
+    {
+        HashSet<IRInst*> visited;
+        return findReferencedGlobalParam(inst, visited);
+    }
+
+    // Worker for findReferencedGlobalParam. `visited` guards against re-walking
+    // shared operands in the global-scope graph, which a global initializer can
+    // reference from several places.
+    IRGlobalParam* findReferencedGlobalParam(IRInst* inst, HashSet<IRInst*>& visited)
+    {
+        if (auto globalParam = as<IRGlobalParam>(inst))
+            return globalParam;
+        // Only global-scope instructions are followed here; an operand at function
+        // scope is an ordinary value that ensureInst handles through its normal paths.
+        if (!as<IRModuleInst>(inst->getParent()))
+            return nullptr;
+        if (!visited.add(inst))
+            return nullptr;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (auto found = findReferencedGlobalParam(inst->getOperand(i), visited))
+                return found;
+        }
+        return nullptr;
+    }
+
+    // Report that a global shader parameter is not supported by the interpreter. The
+    // interpreter runs on the CPU and has no concept of global parameters or GPU
+    // resource types (e.g. RWStructuredBuffer), so a program referencing one cannot
+    // be interpreted. This is the single source of truth for the diagnostic; the two
+    // detection points below feed into it.
+    void diagnoseGlobalParam(IRGlobalParam* globalParam)
+    {
+        if (!diagnosedGlobalParams.add(globalParam))
+            return;
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::GlobalParamNotSupportedByInterpreter{.name = getName(globalParam)});
+    }
+
+    // Report that `type` has no HostVM representation (getNaturalSizeAndAlignment fails
+    // for it, e.g. `String`), located at `diagnosticSource`. De-duplicated per type
+    // because several layout-query sites can encounter the same unrepresentable type.
+    void diagnoseUnrepresentableType(IRInst* diagnosticSource, IRType* type)
+    {
+        if (!diagnosedUnrepresentableTypes.add(type))
+            return;
+        // The site is often a synthesized temporary -- e.g. the block parameter a
+        // ternary lowers its result into -- with no source location of its own, so
+        // fall back to the location of a use.
+        auto loc = diagnosticSource->sourceLoc.isValid() ? diagnosticSource->sourceLoc
+                                                         : findFirstUseLoc(diagnosticSource);
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::TypeNotRepresentableByInterpreter{.type = type, .location = loc});
+    }
+
+    // Return the HostVM size and alignment of `type`, diagnosing types that have none.
+    // `String` and other host-only types have no interpreter layout, so allocating storage
+    // for one would let the interpreter read past a 0-byte slot and crash. On layout failure
+    // this reports E52014 against `diagnosticSource` and returns a defined (0,1) placeholder
+    // rather than the query's output (which a failing path may have left partially written);
+    // alignment 1 keeps the later getStride()/align() well defined. Emission still fails
+    // overall, because the recorded diagnostic makes emitVMByteCodeForEntryPoints return
+    // SLANG_FAIL -- the same sink-error path GlobalParamNotSupportedByInterpreter relies on
+    // -- so the placeholder slot is never run.
+    //
+    // This is the one *guarded* layout query, routed deliberately only at the storage-defining
+    // sites: value slots (ensureWorkingsetMemory), a local var's backing storage (kIROp_Var), a
+    // store's destination width (kIROp_Store), and a function's result-ABI slot (emitFunction).
+    // The file's other, raw getNaturalSizeAndAlignment/getNaturalOffset queries (parameter stride,
+    // load width, and the element/field strides and offsets of an aggregate under construction)
+    // are left un-guarded on purpose. Each computes a stride/offset into storage whose value slot
+    // is itself allocated through a guarded site -- so an unrepresentable *enclosing* value (e.g.
+    // the array/struct being built) is diagnosed there -- or it lies on the representable
+    // constant/strings path (an IRStringLit in addConstantValue never takes a working-set slot).
+    // Either way the recorded diagnostic aborts emission before a raw query's harmless
+    // (0,1)/zero-stride result is executed. A new storage-defining site must route through here.
+    IRSizeAndAlignment getRepresentableSizeAndAlignment(IRInst* diagnosticSource, IRType* type)
+    {
+        IRSizeAndAlignment sizeAlignment = {};
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment)))
+        {
+            diagnoseUnrepresentableType(diagnosticSource, type);
+            return IRSizeAndAlignment(0, 1);
+        }
+        return sizeAlignment;
+    }
+
+    // Report a clean diagnostic if any instruction of a function body has a global
+    // parameter as a direct operand, and return true in that case.
+    //
+    // This complements the check in ensureInst: every emitted *value* flows through
+    // ensureInst and is caught there, but a few instruction handlers (and the
+    // unimplemented-instruction fallback in emitInst) abort before calling ensureInst
+    // on their global-parameter operand. Checking operands up front, before emitting
+    // any instruction of the function, catches those cases and lets the failure
+    // propagate out of emitVMByteCodeForEntryPoints as a clean error instead of an
+    // internal abort.
+    bool diagnoseGlobalParamReferences(IRFunc* func)
+    {
+        bool diagnosed = false;
+        for (auto block : func->getBlocks())
+        {
+            // Mirror emitFunction, which skips unreachable blocks; an operand reference
+            // in a block that is never emitted cannot cause an abort.
+            if (isUnreachableBlock(block))
+                continue;
+
+            for (auto inst : block->getChildren())
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    // Use findReferencedGlobalParam (not a direct as<IRGlobalParam>) so
+                    // this mirrors the detection in ensureInst: an operand can be a
+                    // global-scope load of the parameter rather than the parameter
+                    // itself, and the consuming instruction's handler may abort before
+                    // ensureInst is reached.
+                    if (auto globalParam = findReferencedGlobalParam(inst->getOperand(i)))
+                    {
+                        diagnoseGlobalParam(globalParam);
+                        diagnosed = true;
+                    }
+                }
+            }
+        }
+        return diagnosed;
     }
 
     void writeInst(
@@ -521,8 +720,11 @@ public:
             {
                 IRBuilder builder(inst);
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
-                IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment);
+                // Size the local's backing storage by its pointee type (guarded). This guard
+                // is defensive/co-caught: a reachable `String` local is already diagnosed at
+                // its value slot or a use, so it enforces the fail-loud invariant uniformly at
+                // this storage-writing boundary rather than being an independent sole catcher.
+                IRSizeAndAlignment sizeAlignment = getRepresentableSizeAndAlignment(inst, type);
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -551,17 +753,28 @@ public:
             break;
         case kIROp_Store:
             {
-                IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
-                    &sizeAlignment);
+                auto storeInst = as<IRStore>(inst);
+                IRBuilder builder(inst);
+
+                // A HostVM store must have a typed destination. NativePtr/ComPtr are opaque handle
+                // values and RawPointer is untyped, so none is a valid store destination here.
+                auto pointeeType =
+                    tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
+                SLANG_RELEASE_ASSERT(pointeeType);
+
+                // Size the store by its destination (pointee) type (guarded): StringType has no
+                // configured HostVM size, while a NativeString field is pointer-sized. Like the
+                // var guard this is defensive/co-caught -- a reachable unrepresentable
+                // destination is already diagnosed at its allocation or a use -- and enforces the
+                // fail-loud invariant uniformly at this storage-writing boundary.
+                IRSizeAndAlignment sizeAlignment =
+                    getRepresentableSizeAndAlignment(inst, pointeeType);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
                     (uint32_t)sizeAlignment.getStride(),
-                    ensureInst(inst->getOperand(0)),
-                    ensureInst(inst->getOperand(1)));
+                    ensureInst(storeInst->getPtr()),
+                    ensureInst(storeInst->getVal()));
             }
             break;
         case kIROp_Add:
@@ -1078,14 +1291,21 @@ public:
 
     void emitFunction(IRFunc* func)
     {
+        // Bail out with a clean diagnostic before emitting any instruction if this
+        // function references a global shader parameter, which the interpreter does
+        // not support.
+        if (diagnoseGlobalParamReferences(func))
+            return;
+
         VMByteCodeFunctionBuilder funcBuilder;
         funcBuilder.name = addStringLiteral(getName(func).getUnownedSlice());
 
-        IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            func->getResultType(),
-            &sizeAlignment);
+        // Size the function's result-ABI slot by its result type (guarded). Unlike the var and
+        // store guards this one is load-bearing: a function that returns a `String` literal takes
+        // the constant path and never gets a value slot, so this is the *only* site that catches
+        // it -- pinned by tests/byte-code/interpreter-string-result-type.slang.
+        IRSizeAndAlignment sizeAlignment =
+            getRepresentableSizeAndAlignment(func, func->getResultType());
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();
 
         Dictionary<IRBlock*, Index> mapBlockToByteOffset;
@@ -1193,8 +1413,18 @@ SlangResult emitVMByteCodeForEntryPoints(
     LinkedIR& linkedIR,
     VMByteCodeBuilder& byteCode)
 {
+    auto sink = codeGenContext->getSink();
+    int errorCountBefore = sink->getErrorCount();
+
     ByteCodeEmitter emitter(byteCode, codeGenContext);
     emitter.emitEntryPoints(linkedIR);
+
+    // If emission reported a diagnostic (e.g. an unsupported global parameter),
+    // fail cleanly so the emitted bytecode is not used, rather than returning
+    // success with malformed output.
+    if (sink->getErrorCount() != errorCountBefore)
+        return SLANG_FAIL;
+
     return SLANG_OK;
 }
 

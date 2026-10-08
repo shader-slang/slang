@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry compute_main -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry compute_main -stage compute
 
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O3
 
 // Check that we can specialize buffer loads through bindless handles, and
 // do not load big struct elements into registers unnecessarily.

@@ -1,7 +1,7 @@
 // unit-test-geometry-shader.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
+#include "core/slang-io.h"
+#include "core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test the compilation API for compiling geometry shaders to DXIL.
 
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY && SLANG_ENABLE_DXIL_SUPPORT
 
 SLANG_UNIT_TEST(geometryShader)
 {

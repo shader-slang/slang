@@ -1,11 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_GLSL_SPIRV): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=CHECK_SPIR): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SPIRV): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-scalar.slang -stage compute -entry computeMain -target hlsl
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -allow-glsl -output-using-type -Xslang -DTARGET_LLVM
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-via-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -source-language glsl -output-using-type -Xslang -DTARGET_LLVM
 
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 buffer MyBlockName1
@@ -52,7 +52,7 @@ bool Test_ScalarType()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
-    constexpr const float epsilon = 0.000001;
+    const float epsilon = 0.000001;
     const mat2 identity2x2 = mat2(vec2(1,0),vec2(0,1));
     const mat3 identity3x3 = mat3(vec3(1,0,0),vec3(0,1,0),vec3(0,0,1));
     const mat4 identity4x4 = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),vec4(0,0,0,1));
@@ -222,7 +222,7 @@ bool Test_ScalarType()
         && genDType(0) == fract(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: mod(
-        // CHECK_SPIR-COUNT-2: Floor{{ }}
+        // CHECK_SPIR-COUNT-2: FMod{{ }}
         && genFType(0) == mod(genFType(zero), genFType(one))
         && genDType(0) == mod(genDType(zero), genDType(one))
 
@@ -232,7 +232,7 @@ bool Test_ScalarType()
         && genDType(0) == modf(genDType(zero), outGenDType) && 0 == outGenDType
 
         // CHECK_GLSL-COUNT-4: min(
-        // CHECK_SPIR-COUNT-2: FMin{{ }}
+        // CHECK_SPIR-COUNT-2: NMin{{ }}
         // CHECK_SPIR: SMin{{ }}
         // CHECK_SPIR: UMin{{ }}
         && genFType(0) == min(genFType(zero), genFType(zero))
@@ -241,7 +241,7 @@ bool Test_ScalarType()
         && genUType(0) == min(genUType(zero), genUType(zero))
 
         // CHECK_GLSL-COUNT-4: max(
-        // CHECK_SPIR-COUNT-2: FMax{{ }}
+        // CHECK_SPIR-COUNT-2: NMax{{ }}
         // CHECK_SPIR: SMax{{ }}
         // CHECK_SPIR: UMax{{ }}
         && genFType(0) == max(genFType(zero), genFType(zero))

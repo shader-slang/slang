@@ -1,6 +1,6 @@
 # RTX Remix Shader Compilation Reproduction Script
 
-This script (`repro-remix.sh`) helps reproduce issues from the [RTX Remix nightly workflow](../.github/workflows/compile-rtx-remix-shaders-nightly.yml) locally.
+This script (`repro-remix.sh`) helps reproduce issues from the [RTX Remix nightly workflow](../.github/workflows/nightly-remix-test.yml) locally.
 
 ## Purpose
 
@@ -257,7 +257,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## Related Documentation
 
-- [Main workflow file](../.github/workflows/compile-rtx-remix-shaders-nightly.yml)
+- [Main workflow file](../.github/workflows/nightly-remix-test.yml)
 - [Building Slang](../docs/building.md)
 - [SPIRV debugging guide](../CLAUDE.md#slangc-with--target-spirv-asm)
 - [dxvk-remix repository](https://github.com/NVIDIAGameWorks/dxvk-remix)

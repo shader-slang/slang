@@ -138,14 +138,19 @@ void SharedSemanticsContext::cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWi
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
 {
     // We cache the computed inheritance information for types,
     // and re-use that information whenever possible.
 
     // DeclRefTypes will have their inheritance info cached in m_mapDeclRefToInheritanceInfo.
     if (auto declRefType = as<DeclRefType>(type))
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            ioSkippedIncompleteFacet);
 
     // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
     // Each entry also snapshots the extension epochs of the declarations that
@@ -170,20 +175,42 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
         entry.isComputing = true;
     }
 
-    auto info = _calcInheritanceInfo(type, circularityInfo);
+    // Collect any in-progress ancestors that had to be skipped to break a
+    // benevolent cycle (see `_getInheritanceInfo`). A non-`DeclRefType` has no
+    // `DeclRef` identity to subtract as "self"; but the equality cycles we
+    // tolerate are between associated-type accesses, which are `DeclRefType`s
+    // routed through `_getInheritanceInfo` (which subtracts their own self), so
+    // a non-empty `frameSkipped` here means this result is still missing an
+    // ancestor and must not be cached.
+    HashSet<DeclRef<Decl>> frameSkipped;
+    auto info = _calcInheritanceInfo(type, circularityInfo, &frameSkipped);
 
-    auto& entry = m_mapTypeToInheritanceInfo[type];
-    entry.info = info;
-    _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
-    entry.generation = m_nextInheritanceInfoCacheGeneration++;
-    entry.isComputing = false;
+    if (frameSkipped.getCount() == 0)
+    {
+        auto& entry = m_mapTypeToInheritanceInfo[type];
+        entry.info = info;
+        _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
+        entry.generation = m_nextInheritanceInfoCacheGeneration++;
+        entry.isComputing = false;
+    }
+    else
+    {
+        // Contextual/partial result: roll back the in-progress entry so a later
+        // root-level query recomputes the complete list, and propagate the
+        // unresolved ancestors to our caller.
+        m_mapTypeToInheritanceInfo.remove(type);
+        if (ioSkippedIncompleteFacet)
+            for (auto& k : frameSkipped)
+                ioSkippedIncompleteFacet->add(k);
+    }
 
     return info;
 }
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     DeclRef<ExtensionDecl> const& extension,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
 {
     if (_checkForCircularityInExtensionTargetType(extension.getDecl(), circularityInfo))
     {
@@ -199,7 +226,29 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     // routine with an optional `Type` parameter.
     //
     InheritanceCircularityInfo newCircularityInfo(extension.getDecl(), circularityInfo);
-    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo);
+    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo, ioSkippedIncompleteFacet);
+}
+
+bool SharedSemanticsContext::_isInheritanceInfoBeingComputed(Type* type)
+{
+    // A type is "in progress" when its inheritance-info cache entry exists and
+    // is still marked `isComputing` -- i.e. it is an ancestor currently on the
+    // inheritance-computation stack. We use this to detect a *benevolent* cycle:
+    // an equality constraint such as `__constraint A == B` makes `T.A` and `T.B`
+    // each a base of the other, so while computing `T.A` we will be asked to add
+    // `T.B`, whose computation in turn wants to add `T.A` -- but `T.A` is still
+    // in progress. Rather than feed that back into the linearization (which would
+    // be reported as a cyclic-inheritance error), the caller skips the constraint.
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto found = m_mapDeclRefToInheritanceInfo.tryGetValue(declRefType->getDeclRef()))
+            return found->isComputing;
+    }
+    else if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
+    {
+        return found->isComputing;
+    }
+    return false;
 }
 
 bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
@@ -221,7 +270,8 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
     // information that has been computed for a `DeclRef` whenever
@@ -246,13 +296,54 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
         entry.isComputing = true;
     }
 
-    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
+    // `_calcInheritanceInfo` accumulates into `frameSkipped` the set of
+    // in-progress *ancestor* `DeclRef`s that had to be skipped to break a
+    // benevolent equality cycle (its own skips plus any propagated up from the
+    // bases it recursed into).
+    HashSet<DeclRef<Decl>> frameSkipped;
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo, &frameSkipped);
 
-    auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
-    entry.info = info;
-    _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
-    entry.generation = m_nextInheritanceInfoCacheGeneration++;
-    entry.isComputing = false;
+    // This frame *supplies* its own facet, so it resolves any skip that named
+    // it. Remove ourselves from the unresolved set; what remains are ancestors
+    // strictly above us that are still missing.
+    //
+    // Worked example -- `interface IDerived { __constraint A == B; }`:
+    //   * computing `T.A` expands `A == B` and recurses into `T.B`;
+    //   * `T.B` sees `T.A` is in progress, skips the constraint, and reports
+    //     `frameSkipped = {T.A}` -> `T.B` is partial and is NOT cached;
+    //   * back in `T.A`: `frameSkipped = {T.A}` minus self `{T.A}` = {} -> `T.A`
+    //     is complete (the only thing `T.B` omitted was `T.A`, which `T.A`
+    //     already contains) and IS cached;
+    //   * a later root-level query for `T.B` (with `T.A` now cached) skips
+    //     nothing -> complete -> cached.
+    //
+    // The set (rather than a bool) is required for longer cycles: in
+    // `A -> B -> C -> A`, `C` skips `A`, and `B` stays partial (it inherits the
+    // unresolved `{A}`) until the computation unwinds to `A` itself, which is
+    // the only frame that may cache.
+    frameSkipped.remove(declRef);
+    bool isComplete = frameSkipped.getCount() == 0;
+
+    if (isComplete)
+    {
+        auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
+        entry.info = info;
+        _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
+        entry.generation = m_nextInheritanceInfoCacheGeneration++;
+        entry.isComputing = false;
+    }
+    else
+    {
+        // Partial/contextual result: it was computed while an ancestor was still
+        // in progress, so it would wrongly omit that ancestor. Do not cache it;
+        // roll the in-progress entry back to "not computed" so the next
+        // (root-level) query recomputes the complete list, and propagate the
+        // still-unresolved ancestors to our caller.
+        m_mapDeclRefToInheritanceInfo.remove(declRef);
+        if (ioSkippedIncompleteFacet)
+            for (auto& k : frameSkipped)
+                ioSkippedIncompleteFacet->add(k);
+    }
 
     getSession()->m_typeDictionarySize = Math::Max(
         getSession()->m_typeDictionarySize,
@@ -278,10 +369,39 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
             currentParent = newParent;
     };
 
-    if (declRef.as<GenericTypeParamDeclBase>())
+    auto addDependentGenericParentsFromVal = [&](auto& self, Val* val) -> void
     {
-        if (!genericParent)
-            mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
+        if (!val)
+            return;
+
+        if (auto declRefType = as<DeclRefType>(val))
+        {
+            getDependentGenericParentImpl(genericParent, declRefType->getDeclRef());
+            return;
+        }
+
+        if (auto declRefIntVal = as<DeclRefIntVal>(val))
+        {
+            getDependentGenericParentImpl(genericParent, declRefIntVal->getDeclRef());
+            return;
+        }
+
+        if (as<Witness>(val) || as<DeclRefBase>(val))
+            return;
+
+        // Generic value arguments can be compound expressions. Walk their operands so a generic
+        // application is still recognized as dependent on the generic parameters referenced inside
+        // those expressions.
+        for (auto operand : val->m_operands)
+        {
+            if (operand.kind == ValNodeOperandKind::ValNode)
+                self(self, operand.getVal());
+        }
+    };
+
+    if (isGenericParam(declRef))
+    {
+        mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
         return;
     }
     else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
@@ -289,15 +409,19 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
         if (auto lookupSourceDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()))
             getDependentGenericParentImpl(genericParent, lookupSourceDeclRef);
     }
+    else if (auto memberDeclRef = as<MemberDeclRef>(declRef.declRefBase))
+    {
+        // A member/accessor can be the endpoint of a generic lookup path. The leaf accessor is not
+        // owned by the generic, but the parent path still carries the generic arguments, so
+        // dependency queries must continue through the parent decl-ref.
+        getDependentGenericParentImpl(genericParent, DeclRef<Decl>(memberDeclRef->getParent()));
+    }
     else if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
     {
         for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
-        {
-            if (auto argDeclRef = isDeclRefTypeOf<Decl>(genericAppDeclRef->getArg(i)))
-            {
-                getDependentGenericParentImpl(genericParent, argDeclRef);
-            }
-        }
+            addDependentGenericParentsFromVal(
+                addDependentGenericParentsFromVal,
+                genericAppDeclRef->getArg(i));
     }
 }
 
@@ -334,18 +458,171 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
     SLANG_ASSERT(selfIsSubtypeOfBase);
     SLANG_ASSERT(baseIsSubtypeOfFacet);
 
+    SpecializeInterfaceInheritanceWitnessKey key = {
+        baseInterfaceDecl,
+        selfIsSubtypeOfBase,
+        baseIsSubtypeOfFacet};
+    if (auto found = m_specializeInterfaceInheritanceWitnessCache.tryGetValue(key))
+        return *found;
+
     auto lookupSubstitution = SubstitutionSet(_getASTBuilder()->getLookupDeclRef(
         selfIsSubtypeOfBase,
         baseInterfaceDecl->getThisTypeDecl()));
 
-    return as<SubtypeWitness>(
-        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
+    // `as<SubtypeWitness>` can be null if substitution ever produced a non-witness `Val` for a
+    // witness input -- caching that is intentional and harmless: a cached null and a freshly
+    // recomputed null behave identically to every caller, so there is nothing this cache changes
+    // about how that case is handled.
+    auto result =
+        as<SubtypeWitness>(baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
+    m_specializeInterfaceInheritanceWitnessCache.add(key, result);
+    return result;
+}
+
+bool SharedSemanticsContext::tryResolveConstraintTypes(
+    DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
+{
+    // Try to resolve the `sub`/`sup` types of a constraint enough to match it during
+    // inheritance computation. Shared by both constraint scans in
+    // `_calcInheritanceInfo`. For a `sub`/`sup` type that is not yet resolved:
+    //
+    //   * a *leaf* reference (a bare type-parameter / associated-type name) is safe to
+    //     resolve eagerly -- resolving it performs no member lookup on the type
+    //     currently being computed -- and resolving it now lets a facet-introducing
+    //     constraint take effect regardless of the order constraints are written in;
+    //
+    //   * a *multi-level* (member-expression) access such as `T.A.C` must NOT be
+    //     resolved here: the lookup of `C` on `T.A` would re-enter `T.A`'s in-progress
+    //     inheritance and fail with a spurious "member not found" (and poison the
+    //     subtype).
+    //
+    // Returns true if the `sub`/`sup` types are resolved and the caller may match the
+    // constraint. Returns false if a multi-level `sub`/`sup` type is still unresolved;
+    // the caller then defers the constraint (the scans record it as an in-progress skip
+    // so the frame is reported partial and recomputed later -- see the call sites).
+    SemanticsVisitor visitor(this);
+    auto constraintDecl = constraintDeclRef.getDecl();
+
+    auto resolveLeafOrDefer = [&](TypeExp& operand) -> bool // true if must defer
+    {
+        if (operand.type)
+            return false; // already resolved -> observe
+        if (as<MemberExpr>(operand.exp))
+            return true;                                    // unresolved multi-level -> defer
+        operand = visitor.TranslateTypeNodeForced(operand); // leaf -> safe eager resolve
+        return false;
+    };
+
+    ensureDecl(&visitor, constraintDecl, DeclCheckState::ScopesWired);
+    visitor.CheckConstraintSubType(constraintDecl->sub);
+
+    bool mustDefer = resolveLeafOrDefer(constraintDecl->sub);
+    if (constraintDecl->isEqualityConstraint)
+        mustDefer = resolveLeafOrDefer(constraintDecl->sup) || mustDefer;
+
+    return !mustDefer;
+}
+
+static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstraintDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    GenericDecl* genericDifferentiabilityRequirementDecl,
+    SubtypeWitness* conformingWitness,
+    DeclRef<GenericDecl>& outLookedUpGenericRequirementDeclRef)
+{
+    // Consider this example:
+    //
+    //     interface IFoo
+    //     {
+    //         [Differentiable]
+    //         void f<T>(T value);
+    //     }
+    //
+    // The callable requirement remains `GenericDecl { inner = CallableDecl f }`, and the
+    // differentiability annotation contributes a sibling
+    // `GenericDecl { inner = FuncConstraintDecl(This.f<T> : IDiff<This.f<T>>) }`.
+    //
+    // When computing inheritance for a looked-up method type, the direct constraint scan sees the
+    // outer generic requirement but cannot use the inner `FuncConstraintDecl` until it is expressed
+    // through the source type's conformance witness. This helper forms that looked-up generic
+    // requirement and applies default substitutions so the caller can copy the satisfying method's
+    // generic arguments onto it.
+    auto constraintDecl = as<FuncConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
+    if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    DeclRef<GenericDecl> lookedUpGenericDeclRef =
+        astBuilder->getLookupDeclRef(conformingWitness, genericDifferentiabilityRequirementDecl)
+            .as<GenericDecl>();
+    if (!lookedUpGenericDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+    outLookedUpGenericRequirementDeclRef = lookedUpGenericDeclRef;
+
+    return createDefaultSubstitutionsIfNeeded(
+               astBuilder,
+               visitor,
+               astBuilder->getMemberDeclRef(lookedUpGenericDeclRef, constraintDecl))
+        .as<GenericTypeConstraintDecl>();
+}
+
+static DeclRef<GenericTypeConstraintDecl>
+_getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<GenericDecl> lookedUpGenericRequirementDeclRef,
+    DeclRef<GenericTypeConstraintDecl> defaultConstraintDeclRef,
+    Type* satisfyingMethodType)
+{
+    if (!defaultConstraintDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto constraintDecl = as<FuncConstraintDecl>(defaultConstraintDeclRef.getDecl());
+    if (!constraintDecl)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
+
+    // The differentiability constraint generic is cloned from the satisfying method generic:
+    // `__generic<T> f()` becomes sibling `__generic<T> __constraint f<T> : ...`. The
+    // satisfying method type therefore already carries the declaration-order arguments (ordinary
+    // arguments and hidden proof arguments) that the constraint generic needs.
+    auto satisfyingMethodDeclRef = isDeclRefTypeOf<CallableDecl>(satisfyingMethodType);
+    if (!satisfyingMethodDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto callableRequirementGenericApp =
+        SubstitutionSet(constraintDecl->callableRequirementDeclRef).findGenericAppDeclRef();
+    if (!callableRequirementGenericApp)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto satisfyingMethodGenericApp =
+        SubstitutionSet(satisfyingMethodDeclRef)
+            .findGenericAppDeclRef(callableRequirementGenericApp->getGenericDecl());
+    if (!satisfyingMethodGenericApp)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto defaultConstraintGenericApp =
+        SubstitutionSet(defaultConstraintDeclRef)
+            .findGenericAppDeclRef(lookedUpGenericRequirementDeclRef.getDecl());
+    if (!defaultConstraintGenericApp ||
+        defaultConstraintGenericApp->getArgCount() != satisfyingMethodGenericApp->getArgCount())
+    {
+        return DeclRef<GenericTypeConstraintDecl>();
+    }
+
+    return astBuilder
+        ->getGenericAppDeclRef(
+            lookedUpGenericRequirementDeclRef,
+            satisfyingMethodGenericApp->getArgs(),
+            constraintDecl)
+        .as<GenericTypeConstraintDecl>();
 }
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
 {
     // This method is the main engine for computing linearized inheritance
     // lists for types and `extension` declarations.
@@ -395,6 +672,31 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto astBuilder = _getASTBuilder();
     auto& arena = astBuilder->getArena();
     SemanticsVisitor visitor(this);
+
+    // An enum's `__EnumType` conformance is not written in source; it is synthesized in
+    // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its base
+    // list is therefore incomplete until then, so force that state before linearizing to avoid
+    // caching a spurious non-conforming result.
+    //
+    // Restricted to enums, and skipped while the enum is itself being checked:
+    //   * Enum-only because driving a general aggregate here could re-enter this same
+    //     computation. `visitEnumDecl`'s one subtype query, `tryGetSubtypeWitness(tagType, ...)`,
+    //     is on the enum's *tag* type, never on the enum, so it does not query the enum's own
+    //     inheritance; a struct, by contrast, does (its `IDefaultInitializable` synthesis under
+    //     `-zero-initialize` queries `isSubtype(self, ...)`).
+    //   * The `isBeingChecked` guard avoids `ensureDecl` diagnosing a `CyclicReference` on the
+    //     enum and returning without advancing. That happens when the enum's inheritance is
+    //     linearized while the enum is itself mid-check -- e.g. a self-referential base
+    //     `enum E : IFoo<E>` with `IFoo<T : __EnumType>`, a genuine cycle -- so we defer to the
+    //     inheritance machinery's own cyclic-reference reporting (which points at the offending
+    //     base) rather than emit a worse diagnostic on `E`.
+    if (auto enumDeclRef = declRef.as<EnumDecl>())
+    {
+        auto* enumDecl = enumDeclRef.getDecl();
+        if (!enumDecl->checkState.isBeingChecked())
+            visitor.ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+    }
+
     if (auto extensionDeclRef = declRef.as<ExtensionDecl>())
     {
         auto extendedType = getTargetType(astBuilder, extensionDeclRef);
@@ -411,6 +713,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         if (isDeclRefTypeOf<InterfaceDecl>(selfType))
         {
+            // For an interface *type*, the self/base conformance witnesses are rooted at
+            // the interface's `ThisType` (not at `selfType` as for every other type), so
+            // a concrete conforming type `T : IInterface` can later specialize them via
+            // `This -> T`. i.e. here `DeclRefType(InterfaceDecl)` is treated as a
+            // *requirement template*, not as the *existential box* it also denotes.
+            //
+            // KNOWN LIMITATION (#11469): that dual meaning means using an interface type
+            // as an existential (e.g. a generic argument `Foo<IInterface>`) gets this
+            // `This`-rooted answer, so its conformance witness's `sub` is a standalone
+            // `IInterface.This` -- ill-formed for the box, and a source of non-canonical
+            // type identity. Properly disentangling box vs `ThisType` here is invasive,
+            // so the symptom is normalized downstream instead (#11464 / #11465 / #11468).
             selfIsSelf = visitor.getThisTypeWitness(
                 astBuilder,
                 as<DeclRefType>(selfType)->getDeclRef().as<InterfaceDecl>());
@@ -496,7 +810,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         SLANG_ASSERT(selfIsBaseWitness);
 
-        auto baseInheritanceInfo = getInheritanceInfo(baseType, circularityInfo);
+        auto baseInheritanceInfo =
+            getInheritanceInfo(baseType, circularityInfo, ioSkippedIncompleteFacet);
 
         DeclRef<Decl> baseDeclRef;
         if (auto baseDeclRefType = as<DeclRefType>(baseType))
@@ -548,7 +863,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // own linearized inheritance list will include
             // any transitive based declared on the `extension`.
             //
-            auto extInheritanceInfo = getInheritanceInfo(extDeclRef, circularityInfo);
+            auto extInheritanceInfo =
+                getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
             addDirectBaseFacet(
                 Facet::Kind::Extension,
                 selfType,
@@ -608,18 +924,36 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         visitor.calcThisType(interfaceDeclRef));
                 }
 
-                // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
-                // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
-                // the type constraint if the constraint is on the associated type itself.
+                // A GenericTypeConstraintDecl reaches this point either as a member of an
+                // `associatedtype` declaration or, for an interface, as a direct `__constraint`
+                // member. For an `associatedtype` it contributes a base only when its subject
+                // references the associated type itself (so a subject that is not even a `VarExpr`
+                // cannot match and is skipped below). For an interface it never refines the
+                // interface's own bases and is skipped entirely (see the interface guard further
+                // down for why).
                 //
                 auto genericTypeConstraintDeclRef =
                     typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
                 if (genericTypeConstraintDeclRef)
                 {
+                    auto subExpr = genericTypeConstraintDeclRef.getDecl()->sub.exp;
+
                     // If the base expr on the constraint isn't even a `VarExpr`, then it can't be
                     // referencing the associated type itself and we can skip this constraint.
-                    if (!genericTypeConstraintDeclRef.getDecl()->sub.type &&
-                        !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
+                    if (!genericTypeConstraintDeclRef.getDecl()->sub.type && !as<VarExpr>(subExpr))
+                        continue;
+
+                    // An interface-level `__constraint` (a direct `GenericTypeConstraintDecl`
+                    // member of the interface) never refines the interface's *own* set of
+                    // bases. Its subject is required to be one of the interface's associated
+                    // types -- e.g. `__constraint This.DataType == This` -- whose effect is
+                    // surfaced when computing the inheritance of the corresponding
+                    // associated-type access (`T.DataType`), not here. (A bare-`This` subject
+                    // such as `__constraint This : IBar` is rejected during checking; see
+                    // `visitGenericTypeConstraintDecl`.) So we must not process such a
+                    // constraint while enumerating the interface's bases: eagerly checking it
+                    // would recurse into the inheritance of an associated type and form a cycle.
+                    if (containerDeclRef.as<InterfaceDecl>())
                         continue;
                 }
 
@@ -669,6 +1003,334 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         break;
     }
 
+    // Surface interface-level constraints (declared via `__constraint` in an
+    // interface body, including those produced by an `associatedtype` with a
+    // trailing constraint or synthesized for `[Differentiable]` interface
+    // requirements) when computing the inheritance of a lookup-derived type such
+    // as `T.DataType`, `T.TA.TB`, or `T.dadd`.
+    //
+    // A constraint like `__constraint This.DataType == This` is a direct
+    // `GenericTypeConstraintDecl` member of an interface that some type in the
+    // access chain conforms to. Its subject is written relative to the
+    // interface's `This`, so it constrains a lookup access rooted at any type
+    // that conforms to the interface. We therefore walk the lookup chain of
+    // `selfType` and, at each conforming type, enumerate the interfaces it conforms
+    // to and match constraints whose subject (relative to `This`) names exactly
+    // the same lookup-derived type as `selfType`. The opposite (`sub`/`sup`) side
+    // of a matching constraint is added as a base of `selfType`.
+    //
+    // Worked example:
+    //
+    //     interface IBase  { associatedtype D; }
+    //     interface IDeriv : IBase { __constraint D == This; }
+    //     // for some `T : IDeriv`, consider the access `T.D`
+    //
+    // Computing the inheritance of `T.D`: the conforming type `T` conforms to `IDeriv`,
+    // whose member constraint `D == This` has subject `This.D` -- matching the
+    // chain `[D]` leading from conforming type `T` down to `T.D`. The other endpoint,
+    // `This`, re-expressed through the witness `T : IDeriv`, is `T`. So `T` is
+    // added as a base of `T.D`, which is what lets a `T.D` value be used where a
+    // `T` is expected. A subtype constraint such as `__constraint D : IFoo`
+    // works the same way but only matches on its `sub` endpoint, adding `IFoo`
+    // as the base.
+    //
+    // A `[Differentiable]` interface method uses the same mechanism:
+    //
+    //     interface IDiff
+    //     {
+    //         [Differentiable]
+    //         static T dadd(T left, T right);
+    //     }
+    //
+    // Header checking creates the sibling constraint
+    // `__constraint This.dadd : IForwardDifferentiable<This.dadd>`. When a
+    // generic function calls `T.dadd` for `T : IDiff`, the lookup type
+    // `T.dadd` must inherit from `IForwardDifferentiable<T.dadd>` so
+    // `registerAssociatedMethods` can record the derivative association before
+    // IR differentiability checking.
+    //
+    // The constraints are discovered purely from the interfaces each conforming type
+    // conforms to (via `getInheritanceInfo(conformingType).facets`); the relocation
+    // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
+    // also appear as such interface-member `GenericTypeConstraintDecl`s.
+    //
+    if (SubstitutionSet(declRef).findLookupDeclRef())
+    {
+        // Walk the lookup chain of `type` from the outermost access inward,
+        // invoking `callback` once per lookup with that lookup's source (the type
+        // the access is rooted on at that step). For `T.A.B` it yields `T.A`,
+        // then `T`; for `T.dadd` it yields `T`. The walk stops at the first
+        // non-lookup-derived type.
+        auto enumerateLookupSources = [](Type* type, auto&& callback)
+        {
+            Type* cur = type;
+            for (;;)
+            {
+                auto declRefType = as<DeclRefType>(cur);
+                if (!declRefType)
+                    break;
+                auto lookupDeclRef = SubstitutionSet(declRefType->getDeclRef()).findLookupDeclRef();
+                if (!lookupDeclRef)
+                    break;
+                cur = lookupDeclRef->getLookupSource();
+                callback(cur);
+            }
+        };
+
+        // The depth of a lookup access is the number of lookup substitutions applied to its root
+        // type.
+        auto lookupChainDepth = [&](Type* type) -> Index
+        {
+            Index depth = 0;
+            enumerateLookupSources(type, [&](Type*) { ++depth; });
+            return depth;
+        };
+
+        // The depth of the access we are computing inheritance for. We never add a base that is a
+        // *deeper* lookup access than `selfType`: a recursive associated-type equality would
+        // otherwise make an access claim a deeper access as a base, which re-expands without bound.
+        // Only the reduce-to-shallower direction of an equality is useful for member lookup, and it
+        // terminates.
+        Index selfChainDepth = lookupChainDepth(selfType);
+
+        // Collect the conforming types along `selfType`'s lookup chain. For
+        // `selfType == T.TA.TB` the conforming types are `T.TA` and `T`. Each is
+        // a concrete source type (not an interface); we scan the interfaces it
+        // conforms to for constraints below, then re-express each constraint through
+        // the conforming witness and match its endpoints against `selfType`.
+        List<Type*> conformingTypes;
+        enumerateLookupSources(selfType, [&](Type* source) { conformingTypes.add(source); });
+
+        for (auto conformingType : conformingTypes)
+        {
+            auto conformingTypeInheritanceInfo =
+                getInheritanceInfo(conformingType, circularityInfo, ioSkippedIncompleteFacet);
+            for (auto facet : conformingTypeInheritanceInfo.facets)
+            {
+                auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
+                if (!interfaceDeclRef)
+                    continue;
+                auto conformingWitness = facet->subtypeWitness;
+                if (!conformingWitness)
+                    continue;
+
+                auto tryAddConstraintBase =
+                    [&](DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
+                {
+                    auto constraintDecl = constraintDeclRef.getDecl();
+                    bool isEqualityConstraint = constraintDecl->isEqualityConstraint;
+
+                    // Skip a constraint that is currently being checked: resolving
+                    // a multi-level subject (e.g. `This.TA.TB`) requires the
+                    // inheritance of a shallower access (`This.TA`), which can
+                    // re-enter this routine. Skipping the in-progress constraint
+                    // breaks that cycle; the shallower access does not need the
+                    // deeper constraint as one of its bases anyway.
+                    if (constraintDecl->checkState.isBeingChecked())
+                        return;
+
+                    // Observe a constraint whose endpoint types resolve; defer one whose
+                    // subject is an unresolved multi-level access (resolving it would
+                    // re-enter the in-progress type). On deferral, record the constraint
+                    // as an in-progress skip so this frame is reported partial (and not
+                    // cached) and recomputed once the constraint has been checked on its
+                    // own; the constraint's own `DeclRef` is never the self of an
+                    // inheritance frame, so it is never removed from the skipped set. See
+                    // `_getInheritanceInfo`. Shared with the generic-parameter scan below.
+                    if (!tryResolveConstraintTypes(constraintDeclRef))
+                    {
+                        if (ioSkippedIncompleteFacet)
+                            ioSkippedIncompleteFacet->add(constraintDeclRef);
+                        return;
+                    }
+
+                    // Consider this example:
+                    //
+                    //     interface IContext {}
+                    //     interface IConsumer<T> where T : IContext {}
+                    //     interface ILayout
+                    //     {
+                    //         associatedtype Context : IContext;
+                    //         associatedtype First : IConsumer<Context>;
+                    //         associatedtype Second : IConsumer<Context>;
+                    //     }
+                    //
+                    // This loop sees all three constraints while computing the bases of
+                    // `T.Context`. If we call `ensureDecl` on the unrelated `Second` constraint,
+                    // checking `IConsumer<T.Context>` asks for the bases of `T.Context` again.
+                    // The first calculation is not finished yet, so this recursion causes a false
+                    // conformance error.
+                    //
+                    // We must therefore find and skip unrelated constraints before `ensureDecl`.
+
+                    // Step 1: Express the constraint in terms of the concrete lookup source.
+                    // For example, change `This.Second` to `T.Second` so that it can be compared
+                    // with `selfType`.
+                    DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
+                    if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
+                    {
+                        lookedUpConstraint =
+                            astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
+                                .as<GenericTypeConstraintDecl>();
+                        if (!lookedUpConstraint)
+                            return;
+                    }
+
+                    // Step 2: Compare the constraint's endpoints with `selfType`. A directed
+                    // constraint `A : B` applies only to `A`. An equality `A == B` applies to
+                    // either endpoint.
+                    //
+                    // Use canonical equality because lookup through a witness can express an
+                    // endpoint through its concrete typealias. Witnesses embedded in defaulted
+                    // generic arguments are re-rooted by `TryCheckOverloadCandidateConstraints`
+                    // before they reach this comparison.
+                    Type* selfCanonical = selfType->getCanonicalType();
+                    auto doesEndpointMatchSelfType = [&](Type* endpointType) -> bool
+                    { return endpointType->getCanonicalType()->equals(selfCanonical); };
+
+                    // `tryResolveConstraintTypes` has resolved the subject. That is enough to
+                    // filter a directed constraint because only its subject can match `selfType`.
+                    // Its super-type is intentionally left for `ensureDecl`: resolving an
+                    // unrelated super-type here can re-enter the inheritance query described
+                    // above. Re-expressing the constraint through a lookup only substitutes the
+                    // resolved subject, so it cannot make the subject null.
+                    Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                    SLANG_RELEASE_ASSERT(lookedUpSub);
+
+                    bool constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSub);
+                    if (!constraintAppliesToSelf && isEqualityConstraint)
+                    {
+                        // If the left-hand side of an equality is not `selfType`, check the
+                        // right-hand side as well. `tryResolveConstraintTypes` has resolved both
+                        // sides.
+                        Type* lookedUpSup = getSup(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(lookedUpSup);
+                        constraintAppliesToSelf = doesEndpointMatchSelfType(lookedUpSup);
+                    }
+
+                    // Step 3: Skip the constraint unless it applies to `selfType`. Only relevant
+                    // constraints are fully checked by `ensureDecl`.
+                    if (!constraintAppliesToSelf)
+                        return;
+
+                    ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
+
+                    // The endpoint reads before `ensureDecl` were only for relevance filtering.
+                    // Read the fully checked constraint below to select its base.
+                    Type* baseType = nullptr;
+                    if (isEqualityConstraint)
+                    {
+                        // `ensureDecl` has populated both endpoint types. It may also swap them
+                        // into canonical order, so re-read them and use the endpoint opposite
+                        // `selfType` as the base.
+                        Type* checkedSub = getSub(astBuilder, lookedUpConstraint);
+                        Type* checkedSup = getSup(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(checkedSub);
+                        SLANG_RELEASE_ASSERT(checkedSup);
+
+                        bool selfIsSub = doesEndpointMatchSelfType(checkedSub);
+                        bool selfIsSup = doesEndpointMatchSelfType(checkedSup);
+
+                        // Equality checking only reorders the endpoints; it does not replace
+                        // them. The prefilter matched at least one endpoint, so at least one of
+                        // the checked endpoints must still match.
+                        SLANG_RELEASE_ASSERT(selfIsSub || selfIsSup);
+
+                        baseType = selfIsSub ? checkedSup : checkedSub;
+                    }
+                    else
+                    {
+                        // A directed constraint cannot swap its endpoints. Its subject already
+                        // matched `selfType`, so its checked super-type is the base.
+                        baseType = getSup(astBuilder, lookedUpConstraint);
+                        SLANG_RELEASE_ASSERT(baseType);
+                    }
+
+                    // Skip a trivial self-base. Differential idempotence makes
+                    // `T.Differential.Differential` canonically equal to
+                    // `T.Differential`, so the equality `Differential.Differential ==
+                    // Differential` matches `selfType == T.Differential` on its deeper
+                    // endpoint and would try to add `T.Differential` as its own base.
+                    if (baseType->getCanonicalType()->equals(selfCanonical))
+                        return;
+
+                    // Never introduce a base that is a deeper lookup access than
+                    // `selfType`; that is the non-terminating direction of a
+                    // self-referential equality constraint.
+                    if (lookupChainDepth(baseType) > selfChainDepth)
+                        return;
+
+                    // Break *benevolent* equality cycles. An equality such as
+                    // `__constraint A == B` makes `T.A` and `T.B` each a base of
+                    // the other. While computing one of them, the other is still
+                    // in progress (an ancestor on the stack); adding it as a base
+                    // here would put the in-progress type back into the
+                    // linearization and surface as a "cyclic inheritance" error.
+                    //
+                    // Instead we skip the constraint and record the skipped
+                    // in-progress ancestor. The frame that *is* that ancestor
+                    // already contains itself, so it ends up complete (and
+                    // cached); this contextual frame is reported partial (and not
+                    // cached) so a later root-level query -- by which point the
+                    // ancestor is cached -- recomputes the full list. See
+                    // `_getInheritanceInfo`.
+                    //
+                    // This skip is deliberately scoped to constraint-derived
+                    // bases (not the shared `addDirectBaseType` used for ordinary
+                    // `interface` inheritance), so genuinely circular interface
+                    // inheritance (`interface IFoo : IBar {} interface IBar :
+                    // IFoo {}`) is still diagnosed rather than silently accepted.
+                    if (_isInheritanceInfoBeingComputed(baseType))
+                    {
+                        if (ioSkippedIncompleteFacet)
+                            if (auto baseDeclRefType = as<DeclRefType>(baseType))
+                                ioSkippedIncompleteFacet->add(baseDeclRefType->getDeclRef());
+                        return;
+                    }
+
+                    auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
+                        selfType,
+                        baseType,
+                        lookedUpConstraint);
+                    addDirectBaseType(baseType, satisfyingWitness);
+                };
+
+                for (auto constraintDeclRef :
+                     getMembersOfType<GenericTypeConstraintDecl>(astBuilder, interfaceDeclRef))
+                {
+                    tryAddConstraintBase(constraintDeclRef);
+                }
+
+                for (auto memberDecl : interfaceDeclRef.getDecl()->getDirectMemberDecls())
+                {
+                    auto genericDecl = as<GenericDecl>(memberDecl);
+                    if (!genericDecl)
+                        continue;
+
+                    DeclRef<GenericDecl> lookedUpGenericRequirementDeclRef;
+                    auto defaultConstraintDeclRef =
+                        _tryGetDefaultDifferentiabilityConstraintDeclRef(
+                            astBuilder,
+                            &visitor,
+                            genericDecl,
+                            conformingWitness,
+                            lookedUpGenericRequirementDeclRef);
+                    auto constraintDeclRef =
+                        _getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
+                            astBuilder,
+                            &visitor,
+                            lookedUpGenericRequirementDeclRef,
+                            defaultConstraintDeclRef,
+                            selfType);
+                    if (!constraintDeclRef)
+                        continue;
+
+                    tryAddConstraintBase(constraintDeclRef);
+                }
+            }
+        }
+    }
+
     if (auto genericDeclRef = getDependentGenericParent(declRef))
     {
         // The constraints placed on a generic type parameter are siblings of that
@@ -691,7 +1353,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto extDeclRef =
                     createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, extensionDecl)
                         .as<ExtensionDecl>();
-                auto extInheritanceInfo = getInheritanceInfo(extDeclRef, circularityInfo);
+                auto extInheritanceInfo =
+                    getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
                 addDirectBaseFacet(
                     Facet::Kind::Extension,
                     selfType,
@@ -707,23 +1370,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         for (auto constraintDeclRef :
              getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
         {
-            if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
+            auto constraintDecl = constraintDeclRef.getDecl();
+            if (constraintDecl->checkState.isBeingChecked())
                 continue;
 
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
-
-            // Check only the sub-type.
-            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
-            auto sub = constraintDeclRef.getDecl()->sub;
-
-            // If the sub-type part of the generic constraint is a member expression, it can't
-            // possibly be defining a constraint for a generic type parameter, so we skip it
-            // to avoid circular checking on the generic param type.
-            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+            // A member-expression subject can't possibly constrain the *bare* generic
+            // type parameter (it constrains a deeper access), so skip it outright when
+            // computing the parameter's own inheritance -- this avoids circular checking
+            // on the generic param type.
+            if (selfIsGenericParamType && as<MemberExpr>(constraintDecl->sub.exp))
                 continue;
 
-            if (!sub.type)
-                sub = visitor.TranslateTypeNodeForced(sub);
+            // Observe a constraint whose endpoint types resolve; defer one whose subject
+            // is an unresolved multi-level access. On deferral, record it as an
+            // in-progress skip so the frame is reported partial and recomputed later
+            // (same as the associated-type scan above; see `_getInheritanceInfo`).
+            if (!tryResolveConstraintTypes(constraintDeclRef))
+            {
+                if (ioSkippedIncompleteFacet)
+                    ioSkippedIncompleteFacet->add(constraintDeclRef);
+                continue;
+            }
+
+            auto sub = constraintDecl->sub;
 
             // Canonicalize the constraint declRef to make sure we have a full reference to it.
             constraintDeclRef =
@@ -1161,8 +1830,10 @@ void SharedSemanticsContext::_mergeFacetLists(
                 }
                 else
                 {
-                    // Shouldn't really have a non-struct inherit from a struct...
-                    SLANG_UNEXPECTED("Unexpected witness structure");
+                    // `enum E : uint` gives us an explicit `E -> uint` structural witness, and
+                    // `uint` may have interface facets. Do not infer `E : IFoo` through `uint`;
+                    // that would be the same unsupported conformance/inheritance mix as the
+                    // struct case above.
                 }
             }
             else if (
@@ -1196,7 +1867,6 @@ void SharedSemanticsContext::_mergeFacetLists(
             else if (
                 isDeclRefTypeOf<StructDecl>(baseType) && isDeclRefTypeOf<StructDecl>(facetType))
             {
-                // TODO: Merge with one of the cases above..
                 if (isDeclRefTypeOf<StructDecl>(selfType))
                 {
                     // struct -> struct -> struct is fine, but we'll need to construct a transitive
@@ -1209,8 +1879,10 @@ void SharedSemanticsContext::_mergeFacetLists(
                 }
                 else
                 {
-                    // Shouldn't really have a non-struct inherit from a struct...
-                    SLANG_UNEXPECTED("Unexpected witness structure");
+                    // Enum tag types use inheritance syntax to name the underlying integer type,
+                    // but they should not inherit all structural facets of that integer type. Keep
+                    // enum-to-tag conversion on the explicit conversion path instead of adding
+                    // indirect inheritance facets introduced by enum backing types.
                 }
             }
         }
@@ -1397,7 +2069,8 @@ bool FacetList::containsMatchFor(Facet facet) const
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet)
 {
     // The majority of the interesting for for computing linearized
     // inheritance information arises for `DeclRef`s, but we still
@@ -1416,10 +2089,73 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
-        return _getInheritanceInfo(
+        // Forward the `This`-type's inheritance to obtain the correct facet *structure*
+        // (ordering/directness/origins), then canonicalize each conformance witness so it
+        // is rooted at the existential's own canonical witness (`getSubtypeWitness()` ->
+        // ExtractExistentialSubtypeWitness) instead of the `DeclaredSubtypeWitness` the
+        // forwarding produces. This makes the witnesses match those the direct
+        // member-access path builds, so the same access (e.g. `foo.This.Params`) interns
+        // to a single `Type*`. See issue #11464.
+        auto forwarded = _getInheritanceInfo(
             extractExistentialType->getThisTypeDeclRef(),
             extractExistentialType,
             circularityInfo);
+
+        SemanticsVisitor visitor(this);
+        auto selfWitness = extractExistentialType->getSubtypeWitness(); // ee : IFoo
+        auto interfaceType = extractExistentialType->getOriginalInterfaceType();
+        auto ifaceInfo =
+            getInheritanceInfo(interfaceType, circularityInfo, ioSkippedIncompleteFacet);
+
+        auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
+            Facet::Kind::Type,
+            Facet::Directness::Self,
+            DeclRef<Decl>(),
+            extractExistentialType,
+            visitor.createTypeEqualityWitness(extractExistentialType));
+        Facet tail = directFacet;
+        for (auto facet : forwarded.facets)
+        {
+            if (facet->directness == Facet::Directness::Self)
+                continue;
+
+            // Re-root the conformance witness `ee : sup` at the existential's canonical
+            // witness: directly for the opened interface, transitively for its bases.
+            SubtypeWitness* witness = facet->subtypeWitness;
+            Type* sup = witness ? witness->getSup() : nullptr;
+            if (sup == interfaceType)
+            {
+                witness = selfWitness;
+            }
+            else
+            {
+                for (auto ifaceFacet : ifaceInfo.facets)
+                {
+                    if (ifaceFacet->subtypeWitness && ifaceFacet->subtypeWitness->getSup() == sup)
+                    {
+                        witness = astBuilder->getTransitiveSubtypeWitness(
+                            selfWitness,
+                            ifaceFacet->subtypeWitness);
+                        break;
+                    }
+                }
+            }
+
+            auto projectedFacet = new (arena) Facet::Impl(
+                astBuilder,
+                facet->kind,
+                facet->directness,
+                facet->origin.declRef,
+                facet->origin.type,
+                witness);
+            tail->next = projectedFacet;
+            tail = projectedFacet;
+        }
+
+        InheritanceInfo info;
+        info.facets = FacetList(directFacet);
+        return info;
     }
     else if (as<AndType>(type))
     {
@@ -1476,8 +2212,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             List<InheritanceInfo> elementInheritanceInfos;
             for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
             {
-                elementInheritanceInfos.add(
-                    getInheritanceInfo(concreteTypePack->getElementType(i), circularityInfo));
+                elementInheritanceInfos.add(getInheritanceInfo(
+                    concreteTypePack->getElementType(i),
+                    circularityInfo,
+                    ioSkippedIncompleteFacet));
             }
 
             for (auto facet : elementInheritanceInfos[0].facets)
@@ -1534,8 +2272,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto eachType = as<EachType>(type))
     {
-        auto elementInheritanceInfo =
-            getInheritanceInfo(eachType->getElementType(), circularityInfo);
+        auto elementInheritanceInfo = getInheritanceInfo(
+            eachType->getElementType(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             elementInheritanceInfo,
@@ -1548,7 +2288,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto firstType = as<FirstPackElementType>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(firstType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(firstType->getBasePack(), circularityInfo, ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1561,7 +2302,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto lastType = as<LastPackElementType>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(lastType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(lastType->getBasePack(), circularityInfo, ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1574,8 +2316,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto expandType = as<ExpandType>(type))
     {
-        auto patternInheritanceInfo =
-            getInheritanceInfo(expandType->getPatternType(), circularityInfo);
+        auto patternInheritanceInfo = getInheritanceInfo(
+            expandType->getPatternType(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             patternInheritanceInfo,
@@ -1588,8 +2332,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto trimFirstType = as<TrimFirstTypePack>(type))
     {
-        auto packInheritanceInfo =
-            getInheritanceInfo(trimFirstType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo = getInheritanceInfo(
+            trimFirstType->getBasePack(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1602,7 +2348,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto trimLastType = as<TrimLastTypePack>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(trimLastType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo = getInheritanceInfo(
+            trimLastType->getBasePack(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1625,10 +2374,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             visitor.createTypeEqualityWitness(type));
         Facet tail = directFacet;
 
-        auto emptyInheritanceInfo =
-            getInheritanceInfo(packBranchType->getEmptyType(), circularityInfo);
-        auto nonEmptyInheritanceInfo =
-            getInheritanceInfo(packBranchType->getNonEmptyType(), circularityInfo);
+        auto emptyInheritanceInfo = getInheritanceInfo(
+            packBranchType->getEmptyType(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
+        auto nonEmptyInheritanceInfo = getInheritanceInfo(
+            packBranchType->getNonEmptyType(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
 
         for (auto emptyFacet : emptyInheritanceInfo.facets)
         {
@@ -1667,7 +2420,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        auto baseInheritanceInfo = _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
+        auto baseInheritanceInfo = _calcInheritanceInfo(
+            modifiedType->getBase(),
+            circularityInfo,
+            ioSkippedIncompleteFacet);
 
         if (modifiedType->findModifier<NoDiffModifierVal>())
         {

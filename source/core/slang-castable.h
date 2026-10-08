@@ -3,7 +3,7 @@
 #define SLANG_CASTABLE_H
 
 
-#include "../core/slang-com-object.h"
+#include "core/slang-com-object.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 

@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hullMain -stage hull -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull -allow-glsl
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hullMain -stage hull
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull
 
 //HLSL: hullMain
 

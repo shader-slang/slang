@@ -1,6 +1,6 @@
 // trace-ray-inline.slang
 
-//TEST:CROSS_COMPILE:-target dxil-asm -stage compute -profile sm_6_5 -entry main -line-directive-mode none
+//TEST:CROSS_COMPILE:-target dxil-asm -stage compute -profile sm_6_5 -entry main -line-directive-mode none -O3
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -profile glsl_460+GL_EXT_ray_query -entry main -line-directive-mode none
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
 

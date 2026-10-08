@@ -6,14 +6,24 @@ counter at runtime; the counter buffer is read back by the host and
 converted to LCOV `.info` for rendering by `genhtml`, Codecov, VS
 Code Coverage Gutters, or any other LCOV consumer.
 
-For the maintainer-facing architectural rationale behind the current
-design, including why IR-time buffer synthesis is paired with post-
-emit coverage metadata for binding-info propagation, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+Related documentation and examples:
 
-For the host-facing binding contract used by `slang-rhi` and direct
-hosts, see
-[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+- [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md) —
+  architectural rationale: why IR-time buffer synthesis is paired
+  with post-emit coverage metadata, the pipeline stages, the two
+  reporting channels, and the roadmap.
+- [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md) —
+  the host-facing binding contract, with per-target binding recipes.
+- [`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md) —
+  where each coverage mode inserts counters, with examples.
+- [`examples/shader-coverage-image-pipeline`](../../examples/shader-coverage-image-pipeline/)
+  and
+  [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
+  runnable end-to-end example programs (see Quick start below).
+- [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
+  one shader dispatched with `--backend=cpu|cuda|vulkan|metal`,
+  implementing each backend's binding recipe from the host-interface
+  doc.
 
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
@@ -29,19 +39,21 @@ Add `-trace-coverage` to any compile, in-process or via `slangc`:
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage -o shader.spv
 # -> shader.spv
-# -> shader.spv.coverage-mapping.json   (optional sidecar; see below)
+# -> shader.spv.coverage-manifest.json   (optional sidecar; see below)
 ```
 
 Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
-`RWStructuredBuffer<uint> __slang_coverage` directly in the IR
-coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the hidden resource binding through
+`RWStructuredBuffer<uint64_t> __slang_coverage` directly in the IR
+coverage pass (or `RWStructuredBuffer<uint>` under
+`-trace-coverage-counter-width 32`; see [Counter buffer
+format](#counter-buffer-format)) — no AST decl, so it does not
+appear in Slang's public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
 allocate and how source coverage entries map to those counters.
 
-The `.coverage-mapping.json` sidecar is **optional** — it's a
+The `.coverage-manifest.json` sidecar is **optional** — it's a
 serialization of the same metadata for cross-process / offline
 workflows where the dispatch happens in a different program from
 the compile (typical for precompiled shader pipelines). In-process
@@ -54,13 +66,22 @@ directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
 
-For the pipeline architecture, design rationale, and alternatives
-weighed, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
-and
-[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
-For examples showing where each coverage mode inserts counters, see
-[`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md).
+Three runnable example programs demonstrate the workflow — compile
+with coverage, bind the counter buffer, dispatch, read back, and
+render a report:
+
+- [`examples/shader-coverage-image-pipeline`](../../examples/shader-coverage-image-pipeline/) —
+  a multi-stage image-processing pipeline (denoise → tone map →
+  gamma) showing how branch and function coverage surface
+  unexercised code paths.
+- [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
+  a software BVH ray-traversal kernel showing how coverage exposes
+  input-shape gaps in test data (rare-case paths that never run).
+- [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
+  a variant of the user-guide tutorial's kernel dispatched with
+  `--backend=cpu|cuda|vulkan|metal`, showing that only the
+  binding step differs per backend and that all four produce
+  identical counters.
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -157,11 +178,29 @@ SLANG_CHECK(syntheticResources != nullptr);
 SLANG_CHECK(syntheticResources->getResourceCount() == 1);
 uint32_t coverageResourceIndex = 0;
 
-slang::SyntheticResourceInfo resourceInfo = {};
+// Default-construct (or `= {}`) so the struct's default member initializers
+// set `structSize` to the size of the definition you compiled against. The
+// implementation reads it for ABI versioning and returns
+// SLANG_E_INVALID_ARG if it is too small, so a struct zeroed with `memset`
+// is rejected.
+slang::SyntheticResourceInfo resourceInfo;
 if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo)))
 {
     // Descriptor-backed targets: resourceInfo.space, resourceInfo.binding.
     // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
+
+    // Bindless form (`-trace-coverage-bindless-index N`): which element of
+    // the descriptor array this shader was compiled to use. `-1` means the
+    // buffer is bound as a single descriptor, not as an array element, so
+    // there is no index to apply.
+    if (resourceInfo.bindlessIndex >= 0)
+    {
+        // The shader accesses `__slang_coverage[resourceInfo.bindlessIndex]`.
+        // `resourceInfo.arraySize` is
+        // `slang::kUnboundedSyntheticResourceArraySize` here: the array is
+        // unsized, so how many descriptors to supply is the host's decision
+        // and must not be read off this field as a count.
+    }
 }
 
 for (uint32_t i = 0; i < entryCount; ++i) {
@@ -176,21 +215,44 @@ for (uint32_t i = 0; i < entryCount; ++i) {
 }
 ```
 
-The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+The host allocates a `counterCount`-element counter buffer at the width
+reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default;
+`uint32` under `-trace-coverage-counter-width 32` or on Metal targets,
+where the width is capped automatically), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
-direct telemetry, a custom LCOV writer, a dashboard, etc. In the
-current line/function/branch producers, entries and counters are
-one-to-one. Future source-region modes may expose source entries that
-are not identical to runtime counter slots, including entries with no
-direct runtime counter of their own. Hosts should use
-`entry.counterIndex` and be prepared for future extended entry data
-rather than assuming the entry index equals the counter index.
+direct telemetry, a custom LCOV writer, a dashboard, etc.
+
+**Entries and counters are not one-to-one.** Line coverage coalesces
+markers that provably execute together — those in one basic block with
+nothing between them that can abandon the invocation — onto a single
+counter and a single runtime probe. This is what keeps instrumented
+shader code small, since emitted size scales with probe count. Several
+entries therefore share a `counterIndex`, and `counterCount` is never
+larger than the entry count -- roughly half on the bundled demos.
+Function and branch entries keep a dedicated counter, so a compile that
+enables only those modes leaves the two counts equal; do not code
+against a strict inequality.
+
+Two consequences for hosts:
+
+- Size the readback buffer from `counterCount`, never from the entry
+  count. They are different numbers.
+- Accumulate per entry (`counters[entry.counterIndex]` for each entry),
+  never per counter. A counter no longer identifies one source
+  location, so iterating counters and attributing each to "its" line is
+  wrong.
+
+Both were already the documented contract; coalescing is what makes
+getting them wrong actually break. Future modes may additionally expose
+entries with no direct runtime counter, so hosts should keep using
+`entry.counterIndex` and be prepared for extended entry data rather
+than assuming the entry index equals the counter index.
 
 #### Producing the canonical manifest JSON in-process
 
-If a host wants the same `.coverage-mapping.json` bytes that `slangc`
+If a host wants the same `.coverage-manifest.json` bytes that `slangc`
 writes as a sidecar — for example to feed
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) without
 going through a file, or to ship the manifest to a separate
@@ -206,7 +268,7 @@ targets when available.
 ComPtr<ISlangBlob> manifest;
 slang_writeCoverageManifestJson(coverage, manifest.writeRef());
 // manifest->getBufferPointer() / getBufferSize() are the exact
-// bytes slangc would have written to <output>.coverage-mapping.json.
+// bytes slangc would have written to <output>.coverage-manifest.json.
 ```
 
 The output is byte-identical to slangc's sidecar, so anything that
@@ -218,7 +280,7 @@ well.
 
 ```
 shader.slang ── slangc -trace-coverage ──► shader.spv
-                                            shader.spv.coverage-mapping.json
+                                            shader.spv.coverage-manifest.json
                                                        │
                           (ship binary + sidecar — possibly later, possibly
                           on a different machine, possibly without Slang linked)
@@ -236,13 +298,27 @@ shader.slang ── slangc -trace-coverage ──► shader.spv
 For workflows that compile offline and dispatch later — possibly on
 a different machine, possibly without Slang linked: when `slangc`
 writes a compiled artifact to a file with `-trace-coverage` on, it
-also writes `<output>.coverage-mapping.json` next to it.
+also writes `<output>.coverage-manifest.json` next to it.
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage -o shader.spv
 # -> shader.spv
-# -> shader.spv.coverage-mapping.json
+# -> shader.spv.coverage-manifest.json
+```
+
+Use `-coverage-manifest-output <path>` when the compiled artifact is
+written to stdout, or when the build needs a stable manifest path
+instead of the default path derived from `-o`. The flag only controls
+where the coverage manifest is written; it does not enable
+instrumentation by itself, so use it with `-trace-coverage`,
+`-trace-function-coverage`, or `-trace-branch-coverage`.
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage -coverage-manifest-output shader.coverage.json
+# -> SPIR-V binary on stdout
+# -> shader.coverage.json
 ```
 
 Hosts that aren't linked against Slang still get the data: the
@@ -269,32 +345,50 @@ contract.
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
-| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                               |
-| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                    |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                 |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                                                       |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                                                      |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists, and true/false arms for the condition of a scalar `?:` and the left operand of a short-circuiting `&&` / `\|\|`. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
+| `-coverage-manifest-output <path>`        | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                                                                 |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                                                          |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                                                       |
 
 ---
 
 ## Counter buffer format
 
-`uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
-at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
+Flat little-endian array of `N` counters, no header. Element width is
+`uint64` by default (`uint32` under `-trace-coverage-counter-width 32`),
+reported by `manifest.buffer.element_stride` /
+`CoverageBufferInfo::elementByteWidth`. Indexed by
+`CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
+effectively never wrap; uint32 slots wrap silently at 2^32 hits per
+slot and read back as small numbers.
+
+Counter slot indices are per-compile: slot `K` does not identify the
+same source location across two compiles or shader variants, and one
+slot may serve several source locations. Aggregate by the source
+attribution in the manifest or metadata, never by slot index.
+
+The counter buffer and the manifest must come from the *same* compile.
+`slang-coverage-to-lcov.py` enforces this by requiring the buffer size
+to match `counter_count` exactly; a mismatch is an error rather than a
+silently truncated read, because a prefix of a stale buffer produces
+plausible but wrong hit counts.
 
 ---
 
 ## The converter — `slang-coverage-to-lcov.py`
 
 ```
---manifest <file.coverage-mapping.json>  Source entry → counter mapping.
+--manifest <file.coverage-manifest.json>  Source entry → counter mapping.
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.
---counters <file.bin>            Binary uint32 little-endian
+--counters <file.bin>            Binary little-endian; element width
+                                 (uint32 or uint64) auto-detected from
+                                 the manifest's buffer.element_stride
   OR
 --counters-text <file-or-'->     Whitespace-separated decimal ints
                                  ('-' reads stdin)
@@ -322,15 +416,15 @@ declares the slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
-| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
-| CPU source                                | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                            | Supported                              | Compiler-side decoration correct      |
-| D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                        | Supported                              | Compiler-side decoration correct      |
-| CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
-| GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
-| LLVM-emitted CPU                          | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation until the synthesized resource + atomic sequence has a verified LLVM lowering path.                                                                                                                       | (n/a)                                  | (n/a)                                 |
+| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                        | `-trace-coverage-binding N 0`          | `-trace-coverage-binding N M` (M ≠ 0) |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | ------------------------------------- |
+| CPU source                                | Supported. The direct-host binding recipe is documented in `docs/design/shader-coverage-host-interface.md`.                                                                                                                                                                                      | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                           | Supported                              | Compiler-side decoration correct      |
+| D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                       | Supported                              | Compiler-side decoration correct      |
+| CUDA                                      | Supported                                                                                                                                                                                                                                                                                        | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Metal (direct)                            | Supported. Counting-mode counters are automatically capped to 32-bit (MSL has no 64-bit `atomic_fetch_add_explicit`); an explicitly requested 64-bit width is capped with warning W45115. The direct-host binding recipe is documented in `docs/design/shader-coverage-host-interface.md`.       | (untested)                             | (untested)                            |
+| GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                | (untested)                             | (untested)                            |
+| LLVM-emitted CPU                          | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation until the synthesized resource + atomic sequence has a verified LLVM lowering path.                                                                                                                      | (n/a)                                  | (n/a)                                 |
 | WGSL / WebGPU                             | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a)                                  | (n/a)                                 |
 
 ### Format scope
@@ -344,27 +438,45 @@ declares the slot in its own pipeline layout / root signature.
   source `switch` case/default dispatch arms, including the implicit
   no-match default path when no `default` label exists.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
-- **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
-  slot. Multiple ops on the same source line accumulate
-  independently before LCOV-emit-time aggregation.
+- **Counter width is selectable.** `uint64` by default (effectively
+  never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
+  which wraps silently at 2^32 hits per slot. Multiple ops on the same
+  source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
 
-- **`-trace-coverage-binding=N:M` with `M != 0`** — the compiler
-  emits the correct `(set, register)` decoration on every backend.
-  Whether the host's binding code routes that correctly depends on
-  the host. A pre-existing slang-rhi limitation around multi-
-  descriptor-set support is tracked at
-  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959);
-  hosts using their own pipeline-layout code are unaffected.
-- **Metal end-to-end dispatch** — a pre-existing slang-rhi Metal
-  binding/initialization quirk causes atomic writes to land in the
-  wrong buffer. Not a coverage-feature defect; tracked at
+- **Metal counters are always 32-bit.** MSL provides no 64-bit atomic
+  fetch-add, so the compiler automatically caps counting-mode counters
+  to uint32 on Metal targets; an explicitly requested 64-bit width is
+  capped with warning W45115. The practical effect is silent
+  wraparound past 2^32 hits per counter slot (boolean mode is
+  unaffected). Metal is otherwise fully supported for direct hosts —
+  see the binding recipe in
+  `docs/design/shader-coverage-host-interface.md`.
+- **The `slang-rhi` Metal backend returns garbage counter values** due
+  to a binding quirk tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
-  On Apple silicon, use Vulkan via MoltenVK.
+  This affects only hosts that dispatch through `slang-rhi` on Metal;
+  direct Metal hosts are unaffected.
 - **Auto-allocation can add a descriptor set on Vulkan / SPIR-V.**
   Direct hosts must include the reported coverage `(set, binding)` in
   their pipeline layout and bind the counter buffer there. Hosts that
   require a fixed existing set can use `-trace-coverage-binding`.
   Hosts that reserve descriptor sets outside the shader IR can use
   `-trace-coverage-reserved-space`.
+- **`-trace-coverage-reserved-space` is Khronos-only.** D3D
+  register-space reservation (and the D3D12 runtime binding policy in
+  general) is a follow-up, tracked at
+  [shader-slang/slang#11169](https://github.com/shader-slang/slang/issues/11169);
+  D3D hosts pin a slot with `-trace-coverage-binding` instead.
+- **Short-circuit sites record the left operand.** `-trace-branch-coverage`
+  gives each `&&` / `||` a site whose true/false arms count the left
+  operand's value, which decides whether the right operand is
+  evaluated. The last right operand of a chain is the expression's
+  value, not a branch: an enclosing `if` or loop site records it, but
+  in a value context such as `bool r = a && b;` its outcome is not
+  recorded.
+- **WGSL and LLVM-emitted CPU targets are not instrumented.**
+  Coverage tracing emits warning E45102 and skips instrumentation on
+  these targets (see the support matrix above for details and
+  workarounds).

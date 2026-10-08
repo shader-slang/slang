@@ -1,0 +1,987 @@
+"""Data-driven description of the perf suite: which workloads exist, how to
+invoke slangc for each, and which phase timers are the primary signal.
+
+A WorkloadSpec describes one workload: how to generate its source, how to invoke
+slangc, and which phase timers are the primary regression signal.
+
+Compile modes:
+- "target"  : single-file compile to a GPU target with an entry point. Triggers
+              the full pipeline incl. linkAndOptimizeIR / specializeModule /
+              autodiff lowering. Default target spirv (-emit-spirv-directly).
+- "module"  : compile a single file to a serialized .slang-module. Downstream-
+              free; exercises only parse / sema / generateIR. Used for front-end
+              buckets where a clean, tool-independent number is preferable.
+- "link"    : multi-file. Precompile every non-main file to .slang-module, then
+              compile the main file (the one whose name contains "main") to a
+              target against them. Stresses module read + linkIR.
+- "api"     : driven by native/api-driver.cpp against libslang instead of by
+              slangc. Measures the compilation-API dimension (session setup,
+              module loading, per-compile fixed overhead) that a one-shot CLI
+              invocation cannot separate. api_cmd selects the driver mode.
+"""
+
+from dataclasses import dataclass, field
+
+from . import workloads
+
+
+@dataclass
+class WorkloadSpec:
+    name: str
+    bucket: str
+    default_size: int
+    # Exactly ONE of gen / source_dir, checked in lib/corpus.py. `gen` is
+    # callable(n) -> {filename: source}, for workloads whose point is scaling
+    # with N; `source_dir` names a directory under corpus/, for workloads that
+    # ARE real code and do not scale. corpus.py resolves either into files on
+    # disk, so bench.py sees only a directory and never learns which kind it
+    # was — which is what lets generation move elsewhere, or be skipped.
+    gen: object = None
+    source_dir: str = None
+    mode: str = "target"
+    # extra slangc flags appended after the standard ones
+    extra_flags: list = field(default_factory=list)
+    # phase timers that best localize this bucket's cost
+    primary_timers: list = field(default_factory=lambda: ["compileInner"])
+    # additional sizes worth sweeping for scaling curves (optional; used by
+    # bench.py --sweep). default_size must be a member so a swept run also
+    # yields the canonical point used for cross-release comparison.
+    sweep_sizes: list = field(default_factory=list)
+    # Promote this workload's memory measurements (peak RSS, api-driver RSS
+    # deltas) into the tracked counter series, trend alerts, and memory
+    # pages. Raw rss_kb is RECORDED for every workload regardless (free, and
+    # preserved in results.json for deep dives); tracking is curated because
+    # most workloads' peaks are floor-bound and just re-draw the session
+    # floor. The tracked set is the realistic end-to-end workloads (mdl_dxr
+    # and the rt renderers, whose api-driver runs also carry the
+    # createGlobalSession RSS delta) plus one floor per execution mode:
+    # minimal for slangc (the shader-slang/slang#9817 headline) and
+    # api_session_create for the api-driver. Both floors are required —
+    # report.py subtracts a workload's own-mode floor from its peak, and a
+    # peak is only comparable against a baseline from the same binary.
+    track_memory: bool = False
+    # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
+    # the reflection serializer in addition to the layout engine.
+    reflection_json: bool = False
+    # Diagnostic codes this workload is EXPECTED to emit (e.g. ["E30019"]).
+    # Two effects, and both matter: bench.py stops treating those codes as a
+    # compile failure, AND it fails the workload if they stop appearing. The
+    # second half is the point -- `diagnostics_clean`, which this replaces,
+    # silently became a clean compile that measured no diagnostics at all and
+    # nothing noticed for months.
+    expected_diagnostics: list = field(default_factory=list)
+    # for multi-file/corpus workloads: the file to compile (imports resolve via
+    # -I <gendir>). If None, bench heuristically picks the file whose name
+    # contains "main", or the first file if none does. If set, used directly
+    # as the compile entry point.
+    main_file: str = None
+    # sys.platform values this workload can run on (None = all). Workloads
+    # needing a platform-bound downstream toolchain (dxc, nvrtc) set this;
+    # bench.py excludes them from the DEFAULT set elsewhere but still runs
+    # them when named explicitly in --only, failing loudly if the tool is
+    # genuinely absent (downstream_required below is what enforces that).
+    platforms: list = None
+    # The workload's number is meaningless without its downstream compiler:
+    # missing-downstream diagnostics (E00100 etc.), which bench.py normally
+    # treats as benign, fail this workload instead — otherwise a host without
+    # the toolchain would record Slang-internal timers and report OK.
+    downstream_required: bool = False
+    # for mode="api": the api-driver subcommand ("session-create",
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize",
+    # "rt-composite"), the
+    # root module name for the by-name-loading modes, and extra driver flags
+    # (e.g. --reflect).
+    api_cmd: str = None
+    api_root: str = None
+    api_flags: list = field(default_factory=list)
+
+
+# Standard target invocation avoids GPU drivers and stays comparable across
+# releases. Downstream spirv-opt may run if bundled; primary_timers are all
+# Slang-internal (measured before downstream) so localization stays clean.
+SPIRV = ["-target", "spirv", "-emit-spirv-directly"]
+
+WORKLOADS = [
+    # The list order is CANONICAL: it is the report's constant panel order
+    # (via display_order below) and bench.py's run order. Sections: real-world
+    # / holistic first, then the API-path workloads, then the compiler
+    # pipeline front end -> back end (parse .. sema .. IR .. specialization ..
+    # backends), downstream-compiler workloads last.
+    # ---- real-shader corpus ----------------------------------------------
+    WorkloadSpec(
+        name="mdl_dxr",
+        track_memory=True,
+        bucket="real_world",
+        source_dir="mdl",
+        default_size=0,  # static corpus: nothing scales with n
+        mode="target",
+        extra_flags=SPIRV,
+        main_file="hit.slang",
+        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR"],
+    ),
+    # ---- complexity ladder: realistic mixed shader, simple -> complex ------
+    # Sweep this to see the holistic compile-time curve as a representative
+    # shader grows in complexity (control flow + generics + dispatch + resources
+    # + call depth all scale together), vs the single-axis stressors above.
+    WorkloadSpec(
+        name="complexity_ladder",
+        bucket="realistic_scaling",
+        gen=workloads.gen_complexity_ladder,
+        default_size=160,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
+                        "simplifyIR"],
+        sweep_sizes=[160, 320, 640, 1280],
+    ),
+    # ---- API-path workloads (application-integration dimension) -----------
+    # Driven by native/api-driver.cpp against libslang (see DESIGN.md
+    # "API-path workloads"). These cover the costs a one-shot slangc run pays
+    # exactly once and cannot separate: session creation (core-module load),
+    # per-compile fixed overhead across many small kernels, and import
+    # resolution over a deep module graph.
+    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
+    # Few×HEAVY programs over a ~100-module utility/scene/material library
+    # behind IMaterial/IBSDF interfaces — the real-application shape where each
+    # program pays the whole library's import cost. n = material count.
+    WorkloadSpec(
+        name="rt_renderer",
+        track_memory=True,
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="rt-composite",
+        api_root="rt_kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # One compute-kernel variant per material via IEntryPoint::specialize —
+    # link-time specialization against interface-heavy cross-module code.
+    WorkloadSpec(
+        name="rt_renderer_specialize",
+        track_memory=True,
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="specialize",
+        api_root="rt_compute",
+        api_flags=["--impl-prefix", "Material_"],
+        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
+    ),
+    # The api-mode floor, and the reason it is track_memory: peak RSS is only
+    # comparable within one executable, and api-mode workloads run the separate
+    # api-driver binary rather than slangc. Each iteration creates and destroys
+    # a global session and a session and does nothing else, so its peak is the
+    # driver's startup plus one session — the api-side counterpart of what
+    # `minimal` measures for slangc. report.py subtracts it from the api-mode
+    # workloads' peaks; without it their own-memory curves would carry the
+    # difference between two binaries' baselines.
+    WorkloadSpec(
+        name="api_session_create",
+        track_memory=True,
+        bucket="api_overhead",
+        gen=workloads.gen_api_none,
+        default_size=10,  # createGlobalSession+createSession iterations
+        mode="api",
+        api_cmd="session-create",
+        primary_timers=["apiCreateGlobalSession", "apiCreateSession", "apiTotal"],
+    ),
+    WorkloadSpec(
+        name="api_many_kernels",
+        bucket="api_overhead",
+        gen=workloads.gen_api_kernels,
+        default_size=100,
+        mode="api",
+        api_cmd="many-kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    WorkloadSpec(
+        name="api_module_graph",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # Same DAG loaded through serialized .slang-module binaries — the import
+    # path where the 2026-07-03 module-loading regression (#11952) lives;
+    # source-based loads (above) were flat across it.
+    WorkloadSpec(
+        name="api_module_graph_bin",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph-bin",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule"],
+    ),
+    # Per-program reflection walk (getLayout + full parameter/type-layout
+    # traversal) over parameter-rich kernels — the binding-table query pattern
+    # every API client pays per compiled program.
+    WorkloadSpec(
+        name="api_reflection",
+        bucket="api_overhead",
+        gen=workloads.gen_api_reflect_kernels,
+        default_size=40,
+        mode="api",
+        api_cmd="many-kernels",
+        api_flags=["--reflect"],
+        primary_timers=["apiReflection", "apiTotal", "apiGetCode"],
+    ),
+    # One generic entry point specialized per impl type via
+    # IEntryPoint::specialize — the one-kernel-per-material pattern; stresses
+    # specialization + link per variant.
+    WorkloadSpec(
+        name="api_specialize",
+        bucket="api_overhead",
+        gen=workloads.gen_api_specialize,
+        default_size=60,
+        mode="api",
+        api_cmd="specialize",
+        api_root="spec_root",
+        primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
+    ),
+
+    # ---- per-compile floor (core-module load + link) ---------------------
+    WorkloadSpec(
+        name="minimal",
+        track_memory=True,
+        bucket="core_link",
+        gen=workloads.gen_minimal,
+        default_size=0,  # fixed; near-empty shader
+        mode="target",
+        extra_flags=SPIRV,
+        # loadBuiltinModule is per-process (excluded from compileInner) but still
+        # reported; readSerializedModuleIR + linkIR are the core-module-size signal.
+        primary_timers=["compileInner", "linkIR", "readSerializedModuleIR",
+                        "loadBuiltinModule"],
+    ),
+    # ---- core compiler-stage buckets --------------------------------------
+    WorkloadSpec(
+        name="parse",
+        bucket="parse",
+        gen=workloads.gen_parse,
+        default_size=2000,
+        mode="module",
+        primary_timers=["parseTranslationUnit", "frontEndExecute"],
+        sweep_sizes=[250, 500, 1000, 2000],
+    ),
+    WorkloadSpec(
+        name="conditional_compilation",
+        bucket="parse",
+        gen=workloads.gen_conditional_compilation,
+        default_size=200,
+        mode="module",
+        primary_timers=["parseTranslationUnit", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    # Emits one diagnostic per function, so it measures diagnostic PRODUCTION
+    # (source-location resolution, line/caret rendering, message formatting,
+    # sink throughput) rather than the trivial check that finds the error.
+    # Compilation stops after the front end, which is why SemanticChecking is
+    # ~86% of compileInner here against ~27% for the same shape compiling
+    # cleanly -- nothing downstream dilutes it.
+    #
+    # Sized at 9600 deliberately. Its predecessor `diagnostics_clean` ran at
+    # N=400 for 23 ms, of which ~9 ms was the per-compile floor, and on
+    # 2026-09-10 a single perturbed sample carried its median 18.7% past the
+    # trend gate and back again the next night -- the suite's only false alarm
+    # in 73 nights. At 9600 this measures ~122 ms with run-to-run spread under
+    # 1%.
+    WorkloadSpec(
+        name="diagnostics",
+        bucket="diagnostics",
+        gen=workloads.gen_diagnostics,
+        default_size=9600,
+        mode="module",
+        # E30019 ("type mismatch in expression") is an intentional pin, not
+        # an incidental one: `source/slang/diagnostics/type-errors.lua` also
+        # has an experimental "argument_type_mismatch" diagnostic prototyping
+        # the multi-span diagnostic system under the SAME code, commented as
+        # a "guinea pig." If that migration ever renumbers or reassigns
+        # E30019, this workload will report "expected diagnostics absent"
+        # from a diagnostic-numbering change, not a perf regression -- update
+        # this code in lockstep with that migration rather than treating the
+        # failure as a suite bug.
+        expected_diagnostics=["E30019"],
+        primary_timers=["SemanticChecking", "frontEndExecute", "compileInner"],
+        sweep_sizes=[2400, 4800, 9600, 19200],
+    ),
+    WorkloadSpec(
+        name="sema_generics",
+        bucket="sema",
+        gen=workloads.gen_sema_generics,
+        default_size=1000,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[125, 250, 500, 1000],
+    ),
+    WorkloadSpec(
+        name="interface_depth",
+        bucket="sema",
+        gen=workloads.gen_interface_depth,
+        # size = interface inheritance chain depth (linear chain, not generic
+        # nesting); measured ~N^3.4 at 2026-07, so 128 (~0.4 s) caps the
+        # ladder.
+        default_size=128,  # was 64: 26.6 ms, 58% on-target, 13.7% spread
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[16, 32, 64, 128],
+    ),
+    WorkloadSpec(
+        name="conformance",
+        bucket="sema",
+        gen=workloads.gen_conformance,
+        default_size=2400,  # was 600: 39.5 ms, 8.0% spread
+        mode="module",
+        # frontEndExecute (65%) leads: SemanticChecking is only 19% of this
+        # workload at every ladder size, so witness synthesis is showing up
+        # outside the checking timer.
+        primary_timers=["frontEndExecute", "SemanticChecking"],
+        sweep_sizes=[600, 1200, 2400, 4800],
+    ),
+    # ---- type checking: operator overload resolution + implicit conversion -
+    # Front-end-only (module mode) stressors for the quietly expensive part of
+    # semantic checking: every binary operator and cross-type assignment runs
+    # overload resolution + conversion-cost ranking. parse/sema_generics don't
+    # isolate this (uniform types / generic-constraint cost dominate there).
+    WorkloadSpec(
+        name="operator_typecheck",
+        bucket="typecheck",
+        gen=workloads.gen_operator_typecheck,
+        default_size=800,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[200, 400, 800, 1600],
+    ),
+    WorkloadSpec(
+        name="implicit_conversion",
+        bucket="typecheck",
+        gen=workloads.gen_implicit_conversion,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[300, 600, 1200, 2400],
+    ),
+    WorkloadSpec(
+        name="overload_resolution",
+        bucket="typecheck",
+        gen=workloads.gen_overload_resolution,
+        default_size=2400,  # was 600: 30.1 ms, 11.5% spread
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[600, 1200, 2400, 4800],
+    ),
+    WorkloadSpec(
+        name="generic_builtin_operator",
+        bucket="typecheck",
+        gen=workloads.gen_generic_builtin_operator,
+        default_size=1000,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[250, 500, 1000, 2000],
+    ),
+    WorkloadSpec(
+        name="vector_matrix_overload_set",
+        bucket="typecheck",
+        gen=workloads.gen_vector_matrix_overload_set,
+        default_size=200,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    # ---- shared-infrastructure / scaling stressors -----------------------
+    WorkloadSpec(
+        name="ir_builder",
+        bucket="ir_infra",
+        gen=workloads.gen_ir_builder,
+        default_size=4000,
+        mode="target",
+        extra_flags=SPIRV,
+        # generateOutput is 64% here: one giant function costs more to emit
+        # than to build. Tracking both halves rather than only the one the
+        # workload is named after.
+        primary_timers=["generateIR", "simplifyIR", "generateOutput"],
+        sweep_sizes=[500, 1000, 2000, 4000],
+    ),
+    WorkloadSpec(
+        name="serialize",
+        bucket="ir_infra",
+        gen=workloads.gen_serialize,
+        default_size=1500,
+        mode="module",
+        primary_timers=["writeSerializedModuleAST", "writeSerializedModuleIR", "compileInner"],
+        sweep_sizes=[375, 750, 1500, 3000],
+    ),
+    WorkloadSpec(
+        name="flat_expr_dag",
+        bucket="ir_infra",
+        gen=workloads.gen_flat_expr_dag,
+        default_size=500,
+        mode="target",
+        # CUDA specifically: this is where deferBufferLoad's global-context
+        # packing and simplifyNonSSAIR's redundancy-removal pass (the two
+        # #13012 fixed a cubic blowup in) actually run over locals; SPIR-V
+        # keeps resources/locals closer to SSA and rarely triggers either.
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[125, 250, 500, 1000],
+    ),
+    WorkloadSpec(
+        name="module_link",
+        bucket="module_link",
+        gen=workloads.gen_module_link,
+        default_size=100,
+        mode="link",
+        extra_flags=SPIRV,
+        # linkIR is 13%. Resolving and checking the main module against n
+        # imports (frontEndExecute, 62%) is the larger half of what this
+        # actually exercises.
+        primary_timers=["linkIR", "frontEndExecute", "compileInner"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="material_module_graph",
+        bucket="module_link",
+        gen=workloads.gen_material_module_graph,
+        default_size=16,
+        mode="link",
+        extra_flags=SPIRV,
+        primary_timers=["linkIR", "specializeModule", "compileInner"],
+        sweep_sizes=[4, 8, 16, 32],
+    ),
+    WorkloadSpec(
+        name="specialization",
+        bucket="specialization",
+        gen=workloads.gen_specialization,
+        default_size=300,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
+        sweep_sizes=[75, 150, 300, 600],
+    ),
+    WorkloadSpec(
+        name="generic_reinterpret_dispatch",
+        bucket="specialization",
+        gen=workloads.gen_generic_reinterpret_dispatch,
+        default_size=16,
+        mode="target",
+        extra_flags=SPIRV,
+        # generateOutput is included despite not being a leaf timer: it is a
+        # large, currently-unattributed cost this workload is the first to
+        # surface, kept as a real open finding rather than smoothed over by
+        # only listing timers that already explain the total. See
+        # gen_generic_reinterpret_dispatch's docstring for the measured
+        # figures -- kept in that one place, not restated here, so the two
+        # cannot drift apart.
+        primary_timers=["compileInner", "generateOutput", "specializeModule", "lowerReinterpret"],
+        sweep_sizes=[4, 8, 16, 32],
+    ),
+    WorkloadSpec(
+        name="dynamic_dispatch",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_dynamic_dispatch,
+        default_size=200,
+        mode="target",
+        # NB: -report-dynamic-dispatch-sites is informational but was added
+        # mid-window (absent in older releases), so it is intentionally NOT used
+        # here — dispatch lowering cost is captured via specializeModule anyway.
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "specializeModule", "linkIR", "linkAndOptimizeIR"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="existential_aggregate",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_existential_aggregate,
+        default_size=100,
+        mode="target",
+        extra_flags=SPIRV,
+        # existential field in a struct -> legalizeExistentialTypeLayout, plus a
+        # witness-table-per-case specialization blowup. Neither is the primary
+        # signal of the bare-local dynamic_dispatch workload.
+        # legalizeExistentialTypeLayout is the pass this workload exists to
+        # stress, and it measures 1% of compileInner. linkAndOptimizeIR (49%)
+        # is what actually moves, so a regression is only visible if both are
+        # tracked.
+        primary_timers=["compileInner", "linkAndOptimizeIR", "specializeModule",
+                        "legalizeExistentialTypeLayout", "simplifyIR"],
+        sweep_sizes=[50, 100, 200, 400],
+    ),
+    WorkloadSpec(
+        name="generic_method_dispatch",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_generic_method_dispatch,
+        default_size=32,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "specializeModule", "linkAndOptimizeIR"],
+        sweep_sizes=[8, 16, 32, 64],
+    ),
+    # ---- suspected-regression features -----------------------------------
+    WorkloadSpec(
+        name="autodiff",
+        bucket="autodiff",
+        gen=workloads.gen_autodiff,
+        default_size=200,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "linkAndOptimizeIR", "frontEndExecute"],
+        sweep_sizes=[25, 50, 100, 200],
+    ),
+    WorkloadSpec(
+        name="inlining",
+        bucket="inlining",
+        gen=workloads.gen_inlining,
+        default_size=400,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["simplifyIR", "linkAndOptimizeIR", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="loop_unroll",
+        bucket="loop_unroll",
+        gen=workloads.gen_loop_unroll,
+        default_size=300,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
+        sweep_sizes=[75, 150, 300, 600],
+    ),
+    WorkloadSpec(
+        name="control_flow_ssa",
+        bucket="control_flow",
+        gen=workloads.gen_control_flow_ssa,
+        default_size=120,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+        sweep_sizes=[60, 120, 240, 480],
+    ),
+    # ---- coverage-gap stressors (passes / paths no other workload hits) ---
+    WorkloadSpec(
+        name="resource_aggregate",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=320,  # was 80: 37.9 ms, legalizeResourceTypes only 2%
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
+        # Window starts at default_size: below N=80 the total is dominated by a
+        # quasi-fixed front-end cost (type sharing makes per-item sema cheap)
+        # that would floor-distort the fit; [80..640] measures the pass, not it.
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    # legalizeResourceTypes takes a TargetProgram and behaves differently per
+    # target, but until now the suite only ever measured it on the target where
+    # it is cheapest. Same generator and same ladder as the SPIR-V entry above
+    # (whose name is kept unchanged so its series is unbroken), so the four are
+    # directly comparable -- and they are the widest back-end divergence
+    # anywhere in the suite. Swept on v2026.17.1:
+    #
+    #     N          80     160     320     640     exponent   vs spirv
+    #     spirv    38.6    55.9    99.6   198.8       N^0.79       1.0x
+    #     metal    52.6   144.7   480.3  1790.3       N^1.70       9.0x
+    #     glsl     32.6    95.6   464.8  3114.6       N^2.19      15.7x
+    #     cuda     61.4   273.6  1801.4 13595.6       N^2.60      68.4x
+    #
+    # Again the named pass is not the cost: legalizeResourceTypes is 13-17 ms
+    # at N=640 and does not even run on CUDA. Of the 13.6 s CUDA point, 13.3 s
+    # is deferBufferLoad; of the 3.1 s GLSL point, 2.9 s is simplifyNonSSAIR.
+    # Both primary timers are listed so whichever one a target pays shows up.
+    WorkloadSpec(
+        name="resource_aggregate_metal",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="resource_aggregate_glsl",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner",
+                        "simplifyNonSSAIR", "deferBufferLoad"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="resource_aggregate_cuda",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["linkAndOptimizeIR", "compileInner", "simplifyNonSSAIR",
+                        "deferBufferLoad"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="reflection_layout",
+        bucket="reflection_layout",
+        gen=workloads.gen_reflection_layout,
+        default_size=120,
+        mode="target",
+        extra_flags=SPIRV,
+        reflection_json=True,
+        primary_timers=["compileInner", "frontEndExecute", "generateOutput"],
+        sweep_sizes=[30, 60, 120, 240],
+    ),
+    WorkloadSpec(
+        name="codegen_spirv",
+        bucket="codegen",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    # ---- source-target emission (the text backends spirv-directly skips) --
+    # Same shader as codegen_spirv, but emitted to a textual GPU language so the
+    # whole emitEntryPointsSourceFromIR path + target legalization (legalizeIRForMetal /
+    # legalizeIRForWGSL) is exercised — entirely bypassed by -emit-spirv-directly,
+    # so no other workload covers it. Metal/WGSL emit text with no external toolchain.
+    WorkloadSpec(
+        name="emit_metal",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="emit_wgsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "wgsl"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="emit_hlsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="emit_glsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="emit_cuda",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    # ---- back-end legalization matrix --------------------------------------
+    # Same discipline as the rest of the suite -- one axis per workload -- but
+    # each axis is compiled to SEVERAL targets, because for the back end the
+    # signal is the ratio BETWEEN targets on one source, not any single number.
+    # The emit_*/codegen_* family above cannot supply that: its shared source
+    # (gen_codegen) contains none of the constructs the target-specific passes
+    # are gated on, so all six targets agree to within 1.18x. SPIR-V is carried
+    # in every family as the control, since it is what every other workload in
+    # the suite measures. See COVERAGE-ANALYSIS.md for the measurements and for
+    # why a single mixed cross-target shader was rejected.
+    #
+    # Loads in one function: deferBufferLoad + simplifyNonSSAIR. Targets that
+    # move globals into an explicit global context (CUDA) turn every parameter
+    # access into a Load and pay per-load alias/side-effect queries; SPIR-V
+    # keeps them as globals. cuda/spirv measured 0.86x at v2026.2 and 3.63x at
+    # v2026.17 on the same source at this size -- a regression the suite could
+    # not see before this workload existed.
+    WorkloadSpec(
+        name="backend_loads_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    WorkloadSpec(
+        name="backend_loads_cuda",
+        bucket="backend_legalize",
+        gen=workloads.gen_resource_load_chain,
+        default_size=320,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "deferBufferLoad", "simplifyNonSSAIR"],
+        sweep_sizes=[80, 160, 320, 640],
+    ),
+    # Combined texture-samplers. The construct is what is isolated here: a
+    # `Sampler2D` is split by `lowerCombinedTextureSamplers` on the non-Khronos
+    # source targets and left alone on the Khronos ones, and no other workload
+    # declares one. Same shape as backend_loads with the texture and sampler
+    # combined, so the pair A/B the split.
+    #
+    # The SPLIT ITSELF IS NOT THE COST. Measured on v2026.17.1 at N=512,
+    # `lowerCombinedTextureSamplers` is 0.5 ms of a 304 ms Metal compile; the
+    # 216 ms is `simplifyNonSSAIR` chewing on the load/store-heavy IR the split
+    # produces. That is why simplifyNonSSAIR is a primary timer here and the
+    # legalization pass is kept alongside it rather than instead of it -- the
+    # pass is cheap today and a regression in it should still alert.
+    WorkloadSpec(
+        name="backend_samplers_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_samplers_wgsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_combined_samplers,
+        default_size=256,
+        mode="target",
+        extra_flags=["-target", "wgsl"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "lowerCombinedTextureSamplers"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    # Matrix arithmetic. Two workloads declare a matrix type today; none
+    # computes with one, so the whole matrix lowering path (legalizeMatrixTypes
+    # / specializeMatrixLayout, both target-parameterized; HLSL additionally
+    # runs wrapStructuredBuffersOfMatrices) was unmeasured.
+    #
+    # As with the samplers family, the lowering is not the cost: on v2026.17.1
+    # at N=512 `legalizeMatrixTypes` measures 0.0 ms on every target, while
+    # GLSL spends 560 ms of 686 and CUDA 1254 ms of 1974 in `simplifyNonSSAIR`.
+    # GLSL runs at N^1.60 and CUDA at N^1.98 against SPIR-V's N^0.78.
+    # Use N=512 across the family to reduce relative timing noise. A same-binary
+    # interleaved Windows study found steadier HLSL/GLSL totals and fewer Metal
+    # simplification spikes at this size. Keep N=256 in the sweep for scaling
+    # comparisons; size provenance prevents mixing the old and new baselines.
+    WorkloadSpec(
+        name="backend_matrix_spirv",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=512,
+        mode="target",
+        extra_flags=["-target", "spirv", "-emit-spirv-directly"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    # HLSL is the one target with a matrix-unique pass (wrapStructuredBuffersOfMatrices,
+    # the whole reason the comment above cites an "HLSL additionally runs" baseline) --
+    # omitting it, as the family originally did, left the target it was motivated by
+    # unmeasured. backend_loads and backend_samplers both already carry an hlsl entry.
+    WorkloadSpec(
+        name="backend_matrix_hlsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=512,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout",
+                        "wrapStructuredBuffersOfMatrices"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_glsl",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=512,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_metal",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=512,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    WorkloadSpec(
+        name="backend_matrix_cuda",
+        bucket="backend_legalize",
+        gen=workloads.gen_matrix_chain,
+        default_size=512,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
+                        "legalizeMatrixTypes", "specializeMatrixLayout"],
+        sweep_sizes=[64, 128, 256, 512],
+    ),
+    # ---- downstream compilers (Windows perf runner only) -------------------
+    # These measure the full pipeline INCLUDING the downstream compiler (dxc
+    # for DXIL, nvrtc for PTX) — an internal application benchmark showed
+    # downstream time is ~60% of a real app's combined compile time, and the
+    # suite had no signal for it. generateOutput spans slang emit + the
+    # downstream invocation; wall_ms is the end-to-end number.
+    WorkloadSpec(
+        name="codegen_dxil",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="codegen_ptx",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "ptx"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+]
+
+BY_NAME = {w.name: w for w in WORKLOADS}
+
+# default_size must be a member of every sweep ladder so a swept run also
+# yields the canonical point: analyze.canonical_runs collapses multi-size runs
+# by `size == default_size`, and a ladder that omits it would silently feed a
+# wrong-N point into the cross-release tracking series.
+for _w in WORKLOADS:
+    assert not _w.sweep_sizes or _w.default_size in _w.sweep_sizes, (
+        f"{_w.name}: default_size {_w.default_size} not in sweep_sizes {_w.sweep_sizes}")
+
+
+# Every back-end family must carry a SPIR-V entry. These workloads exist to
+# measure the ratio BETWEEN targets on one source, and SPIR-V is the control
+# because it is the target every other workload in the suite uses. Dropping it
+# would leave the family measuring absolute milliseconds on machines whose
+# absolute milliseconds are not comparable with anything -- which fails
+# silently, as a plausible-looking chart, rather than as an error.
+for _family in ("backend_loads", "backend_samplers", "backend_matrix"):
+    _members = [w.name for w in WORKLOADS if w.name.startswith(_family + "_")]
+    assert _members, f"{_family}: family has no members"
+    assert f"{_family}_spirv" in _members, (
+        f"{_family}: no SPIR-V control entry; the family's numbers are only "
+        f"meaningful as ratios against it. Members: {_members}")
+    # Same invariant as resource_aggregate below: a variant pointed at a
+    # different generator, size or ladder than its family's control would
+    # pass every check above while producing a plausible-looking, but not
+    # actually comparable, cross-target ratio -- a copy-paste error here is
+    # the same silent-failure shape §"Every back-end family..." above warns
+    # about, just one property down (generator/size drift instead of a
+    # missing control).
+    _control = BY_NAME[f"{_family}_spirv"]
+    for _member_name in _members:
+        _m = BY_NAME[_member_name]
+        assert (_m.gen is _control.gen and _m.default_size == _control.default_size
+                and _m.sweep_sizes == _control.sweep_sizes), (
+            f"{_member_name} must match {_family}_spirv's generator/size/ladder "
+            "exactly; the family's members are only interpretable as a "
+            "cross-target comparison")
+del _family, _members, _control, _member_name, _m
+
+# resource_aggregate is the same shape with the SPIR-V entry named without a
+# suffix, because it predates the family and renaming it would break its
+# cross-release series. Its target variants must keep its generator, size and
+# ladder, or the four stop being comparable -- which is the entire point of
+# running the same source on four targets.
+_base = BY_NAME["resource_aggregate"]
+for _name in ("resource_aggregate_metal", "resource_aggregate_glsl",
+              "resource_aggregate_cuda"):
+    _v = BY_NAME[_name]
+    assert (_v.gen is _base.gen and _v.default_size == _base.default_size
+            and _v.sweep_sizes == _base.sweep_sizes), (
+        f"{_name} must match resource_aggregate's generator/size/ladder exactly; "
+        "the variants are only interpretable as a cross-target comparison")
+del _base, _name, _v
+
+
+def display_order(names):
+    """Return `names` sorted into the canonical manifest order (the WORKLOADS
+    list above), which is also the order report panels render in. Names not in
+    the manifest (e.g. retired workloads still present in stored results) sort
+    after all known ones, alphabetically, so nothing silently disappears from
+    the report."""
+    pos = {w.name: i for i, w in enumerate(WORKLOADS)}
+    return sorted(names, key=lambda n: (pos.get(n, len(pos)), n))

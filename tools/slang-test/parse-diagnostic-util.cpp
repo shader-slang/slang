@@ -2,14 +2,14 @@
 
 #include "parse-diagnostic-util.h"
 
-#include "../../source/compiler-core/slang-artifact-associated-impl.h"
-#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
-#include "../../source/compiler-core/slang-downstream-compiler.h"
-#include "../../source/core/slang-byte-encode-util.h"
-#include "../../source/core/slang-char-util.h"
-#include "../../source/core/slang-hex-dump-util.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "compiler-core/slang-artifact-diagnostic-util.h"
+#include "compiler-core/slang-downstream-compiler.h"
+#include "core/slang-byte-encode-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-hex-dump-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-com-helper.h"
 
 using namespace Slang;

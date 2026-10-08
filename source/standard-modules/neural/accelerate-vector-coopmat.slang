@@ -93,9 +93,11 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     public __subscript(int index) -> T
     {
         [ForceInline]
+        [Differentiable]
         get { return this.data[index]; }
 
         [ForceInline]
+        [Differentiable]
         set { this.data[index] = newValue; }
     }
 

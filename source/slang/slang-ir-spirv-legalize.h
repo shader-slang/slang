@@ -1,6 +1,6 @@
 // slang-ir-spirv-legalize.h
 #pragma once
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-spirv-snippet.h"
 

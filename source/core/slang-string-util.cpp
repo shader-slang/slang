@@ -2,7 +2,14 @@
 
 #include "slang-blob.h"
 #include "slang-char-util.h"
+#include "slang-math.h"
 #include "slang-text-io.h"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
 
 namespace Slang
 {
@@ -830,149 +837,302 @@ String StringUtil::replaceAll(
     return SLANG_OK;
 }
 
+/// @brief Converts a string to an integer.
+///
+/// @tparam         allowHex       Allow hexadecimal numbers ("0x" / "0X" prefix)
+/// @tparam         allowPlusSign  Allow the plus sign ("+")
+/// @tparam         IntType    Integer type (must be signed)
+/// @param[in]      in         String to convert
+/// @param[out]     outValue   Integer value, written on success
+/// @param[in,out]  pos        Position within `in`. Always updated when characters are consumed.
+///                            Characters include: sign, possible hexadecimal prefix ("0x"/"0X"),
+///                            digits.
+/// @param[in] requireFullBuf  Whether extra characters at the end are an error.
+/// @return                    Success indicator
+///
+/// Conversion is successful if:
+/// - At least one digit was consumed
+/// - No overflow occurred
+/// - When `requireFullBuf` is true, no characters remain after the digits.
+///
+/// If an overflow occurs, all consecutive digits are consumed.
+template<bool allowHex, bool allowPlusSign, typename IntType>
+static bool genParseInt(
+    const UnownedStringSlice& in,
+    IntType& outValue,
+    Index& pos,
+    bool requireFullBuf)
+{
+    static_assert(std::is_signed_v<IntType>);
+
+    using UintType = std::make_unsigned_t<IntType>;
+
+    bool isNegative{};
+    bool parsedDigits{};
+    bool overflow{};
+    UintType radix = 10U;
+    UintType absValue{};
+
+    // See the rationale below in overflow detection
+    constexpr UintType overflowLimitDec = (std::numeric_limits<UintType>::max() - 10U + 1U) / 10U;
+    constexpr UintType overflowLimitHex = (std::numeric_limits<UintType>::max() - 16U + 1U) / 16U;
+
+    UintType overflowLimit = overflowLimitDec;
+
+    if (pos < in.getLength() && in[pos] == '-')
+    {
+        isNegative = true;
+        ++pos;
+    }
+    else
+    {
+        if constexpr (allowPlusSign)
+        {
+            if (pos < in.getLength() && in[pos] == '+')
+            {
+                // just skip the positive sign
+                ++pos;
+            }
+        }
+    }
+
+    auto getDigit = CharUtil::getDecimalDigitValue;
+
+    if constexpr (allowHex)
+    {
+        if ((pos + 1) < in.getLength() && in[pos] == '0' &&
+            (in[pos + 1] == 'x' || in[pos + 1] == 'X'))
+        {
+            pos += 2;
+            radix = 16U;
+            overflowLimit = overflowLimitHex;
+            getDigit = CharUtil::getHexDigitValue;
+        }
+    }
+
+    while (pos < in.getLength())
+    {
+        const int digit = getDigit(in[pos]);
+        if (digit < 0)
+            break;
+
+        // In general, accumulating a digit overflows when:
+        //
+        //     absValue * radix + digit > UintType_MAX
+        //
+        // i.e.,
+        //
+        //     absValue > (UintType_MAX - digit) / radix
+        //
+        // However, we can safely assume that digit = (radix-1) here, since the
+        // actual overflow (see absValue <= absLimit below) is already at:
+        //
+        //     absValue > (IntType_MAX + 1 - digit) / radix
+        //
+        // This avoids the semi-expensive division in overflow checks.
+        //
+        // To summarize, we use the overflow condition:
+        //
+        //     absValue > (UintType_MAX - radix + 1) / radix
+        if (absValue > overflowLimit)
+            overflow = true;
+
+        absValue = absValue * radix + static_cast<UintType>(digit);
+
+        parsedDigits = true;
+        ++pos;
+    }
+
+    if (parsedDigits && !overflow && (!requireFullBuf || pos == in.getLength()))
+    {
+        // bounds check
+        UintType absLimit{std::numeric_limits<IntType>::max()};
+        absLimit += UintType{isNegative}; // absolute limit is one more for negative numbers
+
+        if (absValue <= absLimit)
+        {
+            // success!
+            if (isNegative)
+            {
+                // do the negation in the UIntType domain to avoid undefined
+                // behavior
+                outValue = static_cast<IntType>(UintType{0} - absValue);
+            }
+            else
+            {
+                outValue = static_cast<IntType>(absValue);
+            }
+
+            return true;
+        }
+    }
+
+    // if we get here, there was an error
+    return false;
+}
+
 /* static */ SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
 {
-    const char* cur = in.begin();
-    const char* end = in.end();
-
-    bool negate = false;
-    if (cur < end && *cur == '-')
-    {
-        negate = true;
-        cur++;
-    }
-
-    int radix = 10;
-    auto getDigit = CharUtil::getDecimalDigitValue;
-    if (cur + 1 < end && *cur == '0' && (*(cur + 1) == 'x' || *(cur + 1) == 'X'))
-    {
-        radix = 16;
-        getDigit = CharUtil::getHexDigitValue;
-        cur += 2;
-    }
-
-    // We need at least one digit
-    if (cur >= end || !CharUtil::isDigit(*cur))
-    {
-        return SLANG_FAIL;
-    }
-
-    Int value = 0;
-    // Do the digits
-    for (; cur < end; ++cur)
-    {
-        const auto d = getDigit(*cur);
-        if (d == -1)
-            return SLANG_FAIL;
-        value = value * radix + d;
-    }
-
-    value = negate ? -value : value;
-
-    outValue = value;
-    return SLANG_OK;
+    Index pos{};
+    return genParseInt<true, true>(in, outValue, pos, true) ? SLANG_OK : SLANG_FAIL;
 }
 
 /* static */ SlangResult StringUtil::parseInt64(const UnownedStringSlice& text, int64_t& out)
 {
-    bool negate = false;
-
-    const char* cur = text.begin();
-    const char* end = text.end();
-
-    if (cur < end)
-    {
-        if (*cur == '-')
-        {
-            negate = true;
-            cur++;
-        }
-        else if (*cur == '+')
-        {
-            cur++;
-        }
-    }
-
-    // Must have at least one digit
-    if (cur >= end || !CharUtil::isDigit(*cur))
-    {
-        return SLANG_FAIL;
-    }
-
-    uint64_t value = 0;
-    // We can have 20 digits, but the last digit can cause overflow.
-    // Lets do the easy first digits first
-    Index numSimple = 19;
-    for (; cur < end && CharUtil::isDigit(*cur) && numSimple > 0; ++cur, --numSimple)
-    {
-        value = value * 10 + (*cur - '0');
-    }
-
-    if (cur < end && CharUtil::isDigit(*cur))
-    {
-        const auto prevValue = value;
-        value = value * 10 + (*cur - '0');
-        cur++;
-
-        if (value < prevValue)
-        {
-            // We have overflow
-            return SLANG_FAIL;
-        }
-    }
-
-    if (negate)
-    {
-        if (value > ~((~uint64_t(0)) >> 1))
-        {
-            // Overflow
-            return SLANG_FAIL;
-        }
-        out = -int64_t(value);
-    }
-    else
-    {
-        if (value > ((~uint64_t(0)) >> 1))
-        {
-            // Overflow
-            return SLANG_FAIL;
-        }
-        out = value;
-    }
-
-    return (cur == end) ? SLANG_OK : SLANG_FAIL;
+    Index pos{};
+    return genParseInt<true, true>(text, out, pos, true) ? SLANG_OK : SLANG_FAIL;
 }
 
 int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
 {
     int result = 0;
-    while (text[pos] == ' ' && pos < text.getLength())
-    {
+
+    // skip spaces
+    while (pos < text.getLength() && text[pos] == ' ')
         pos++;
-        continue;
-    }
-    bool isNeg = false;
-    if (pos < text.getLength() && text[pos] == '-')
+
+    if (!genParseInt<false, false>(text, result, pos, false))
+        result = 0;
+
+    return result;
+}
+
+String StringUtil::makeMinimalHexFloat(double value)
+{
+    static constexpr char hexChars
+        [16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    char buf[32]{};
+    std::size_t i{};
+
+    if (std::signbit(value))
     {
-        pos++;
-        isNeg = true;
+        buf[i++] = '-';
+        value = std::abs(value);
     }
-    while (pos < text.getLength())
+
+    if (std::isfinite(value))
     {
-        if (text[pos] >= '0' && text[pos] <= '9')
+        int exp;
+        std::uint64_t mantissa;
+
+        if (value == 0.0)
         {
-            result *= 10;
-            result += text[pos] - '0';
-            pos++;
+            exp = 0;
+            mantissa = 0U;
         }
         else
         {
-            break;
+            double fraction = std::frexp(value, &exp);
+
+            // returned fraction: 0.xxxxxxxx...
+
+            mantissa = static_cast<std::uint64_t>(fraction * std::exp2(53));
+            // mantissa is now xxxxxxx... (integer number)
+
+            // adjust exponent, since we print 1.xxxxx...
+            --exp;
+
+            // Now the floating point number is adjusted to:
+            //
+            // mantissa[52] '.' mantissa[51] mantissa[50] ... mantissa[0] 'p' <exp>
         }
+
+        buf[i++] = '0';
+        buf[i++] = 'x';
+        buf[i++] = mantissa & (uint64_t{1} << 52) ? '1' : '0';
+        mantissa &= ~(uint64_t{1} << 52);
+        if (mantissa)
+        {
+            buf[i++] = '.';
+
+            while (mantissa)
+            {
+                // print mantissa nibble bits 48..51
+                uint64_t nibble = (mantissa >> 48U) & uint64_t{0xF};
+                buf[i++] = hexChars[nibble];
+
+                // zap bits 48-63
+                mantissa = mantissa & uint64_t{0xFFFFFFFFFFFF};
+
+                // shift mantissa left by a nibble
+                mantissa <<= 4U;
+            }
+        }
+
+        buf[i++] = 'p';
+        buf[i++] = (exp >= 0) ? '+' : '-';
+
+        snprintf(&buf[i], (sizeof buf) - i, "%d", std::abs(exp));
     }
-    if (isNeg)
-        result = -result;
-    return result;
+    else
+    {
+        if (value == std::numeric_limits<double>::infinity())
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "inf");
+        else
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "nan");
+    }
+
+    SLANG_ASSERT(i < sizeof buf);
+
+    return String(buf);
+}
+
+// Shared Levenshtein core. When `caseInsensitive` is set, characters are folded
+// with `CharUtil::toLower` during the comparison, avoiding the need to allocate
+// lowercased copies of the inputs.
+static Index _calcLevenshteinDistance(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b,
+    bool caseInsensitive)
+{
+    const Index lenA = a.getLength();
+    const Index lenB = b.getLength();
+    if (lenA == 0)
+        return lenB;
+    if (lenB == 0)
+        return lenA;
+
+    auto fold = [&](char c) -> char { return caseInsensitive ? CharUtil::toLower(c) : c; };
+
+    // Classic dynamic-programming Levenshtein using two rolling rows so the
+    // working set is O(lenB) rather than O(lenA * lenB).
+    List<Index> prevRow;
+    List<Index> currRow;
+    prevRow.setCount(lenB + 1);
+    currRow.setCount(lenB + 1);
+
+    for (Index j = 0; j <= lenB; ++j)
+        prevRow[j] = j;
+
+    for (Index i = 1; i <= lenA; ++i)
+    {
+        currRow[0] = i;
+        const char ca = fold(a[i - 1]);
+        for (Index j = 1; j <= lenB; ++j)
+        {
+            const Index cost = (ca == fold(b[j - 1])) ? 0 : 1;
+            const Index deletion = prevRow[j] + 1;
+            const Index insertion = currRow[j - 1] + 1;
+            const Index substitution = prevRow[j - 1] + cost;
+            currRow[j] = Math::Min(deletion, insertion, substitution);
+        }
+        prevRow.swapWith(currRow);
+    }
+
+    return prevRow[lenB];
+}
+
+Index StringUtil::calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ false);
+}
+
+Index StringUtil::calcLevenshteinDistanceCaseInsensitive(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ true);
 }
 
 } // namespace Slang

@@ -1,0 +1,217 @@
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+
+// Note: HLSL does not have 8-bit integer types, so dx12 is not tested here
+
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
+// Note: Metal does not have the double type
+
+// Note: WGSL does not have 8-bit integer types, so wgsl is not tested here
+
+// Conversions to 8-bit signed integer from all fundamental scalar types
+
+//TEST_INPUT:ubuffer(data=[0], count=71, stride=1):out,name=outputBuffer
+RWStructuredBuffer<int8_t> outputBuffer;
+
+static uint i = 0;
+
+[noinline] void storeValue(bool     v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(int8_t   v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(uint8_t  v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(int16_t  v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(uint16_t v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(int32_t  v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(uint32_t v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(int64_t  v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(uint64_t v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(half     v) { outputBuffer[i++] = (int8_t)v; }
+[noinline] void storeValue(float    v) { outputBuffer[i++] = (int8_t)v; }
+
+#ifndef NO_DOUBLE
+[noinline] void storeValue(double   v) { outputBuffer[i++] = (int8_t)v; }
+#endif
+
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    // conversions from bool
+    storeValue(false);
+    storeValue(true);
+    // CHECK: 0
+    // CHECK-NEXT: 1
+
+    // conversions from int8_t
+    storeValue(int8_t(-128));
+    storeValue(int8_t(-42));
+    storeValue(int8_t(67));
+    storeValue(int8_t(127));
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -42
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: 127
+
+    // conversions from uint8_t
+    storeValue(uint8_t(0));
+    storeValue(uint8_t(42));
+    storeValue(uint8_t(128));
+    storeValue(uint8_t(255));
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 42
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -1
+
+    // conversions from int16_t
+    storeValue(int16_t(-32768));
+    storeValue(int16_t(-4242));
+    storeValue(int16_t(-128));
+    storeValue(int16_t(-1));
+    storeValue(int16_t(0));
+    storeValue(int16_t(1));
+    storeValue(int16_t(67));
+    storeValue(int16_t(127));
+    storeValue(int16_t(6767));
+    storeValue(int16_t(32767));
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 110
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 1
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: 111
+    // CHECK-NEXT: -1
+
+    // conversions from uint16_t
+    storeValue(uint16_t(0));
+    storeValue(uint16_t(42));
+    storeValue(uint16_t(128));
+    storeValue(uint16_t(255));
+    storeValue(uint16_t(4242));
+    storeValue(uint16_t(6767));
+    storeValue(uint16_t(65535));
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 42
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: -110
+    // CHECK-NEXT: 111
+    // CHECK-NEXT: -1
+
+    // conversions from int32_t
+    storeValue(0x00000000);
+    storeValue(0x0000007F);
+    storeValue(0x000000FF);
+    storeValue(0x40414243);
+    storeValue(int32_t(0xFEFDFCFB));
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: -5
+
+    // conversions from uint32_t
+    storeValue(0x00000000U);
+    storeValue(0x0000007FU);
+    storeValue(0x000000FFU);
+    storeValue(0x40414243U);
+    storeValue(0xFEFDFCFBU);
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: -5
+
+    // conversions from int64_t
+    storeValue(0x0000000000000000LL);
+    storeValue(0x000000000000007FLL);
+    storeValue(0x00000000000000FFLL);
+    storeValue(0x1112131440414243LL);
+    storeValue(int64_t(0xF1F2F3F4FEFDFCFBLL));
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: -5
+
+    // conversions from uint64_t
+    storeValue(0x0000000000000000LLU);
+    storeValue(0x000000000000007FLLU);
+    storeValue(0x00000000000000FFLLU);
+    storeValue(0x1112131440414243LLU);
+    storeValue(0xF1F2F3F4FEFDFCFBLLU);
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: -1
+    // CHECK-NEXT: 67
+    // CHECK-NEXT: -5
+
+    // conversions from half float
+    storeValue(-128.9hf);
+    storeValue(-128.0hf);
+    storeValue(-67.9hf);
+    storeValue(0.001hf);
+    storeValue(42.9hf);
+    storeValue(85.0hf);
+    storeValue(127.0hf);
+    storeValue(127.9hf);
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -67
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 42
+    // CHECK-NEXT: 85
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: 127
+
+    // conversions from float
+    storeValue(-128.9f);
+    storeValue(-128.0f);
+    storeValue(-67.9f);
+    storeValue(0.001f);
+    storeValue(42.9f);
+    storeValue(85.0f);
+    storeValue(127.0f);
+    storeValue(127.9f);
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -67
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 42
+    // CHECK-NEXT: 85
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: 127
+
+    // conversions from double
+#ifndef NO_DOUBLE
+    storeValue(-128.9LF);
+    storeValue(-128.0LF);
+    storeValue(-67.9LF);
+    storeValue(0.001LF);
+    storeValue(42.9LF);
+    storeValue(85.0LF);
+    storeValue(127.0LF);
+    storeValue(127.9LF);
+#else
+    storeValue(int8_t(-128));
+    storeValue(int8_t(-128));
+    storeValue(int8_t(-67));
+    storeValue(int8_t(0));
+    storeValue(int8_t(42));
+    storeValue(int8_t(85));
+    storeValue(int8_t(127));
+    storeValue(int8_t(127));
+#endif
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -128
+    // CHECK-NEXT: -67
+    // CHECK-NEXT: 0
+    // CHECK-NEXT: 42
+    // CHECK-NEXT: 85
+    // CHECK-NEXT: 127
+    // CHECK-NEXT: 127
+}

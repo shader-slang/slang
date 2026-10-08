@@ -564,6 +564,20 @@ extern "C"
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarLayout(
         SlangReflectionTypeLayout* type);
 
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer this returns a
+     * variable layout over an (unbounded) array of the element type at offset zero, so element
+     * stride and element type can be queried through the normal array-layout accessors. Returns
+     * null for type layouts that are not container-like.
+     */
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+        SlangReflectionTypeLayout* type);
+
     SLANG_API SlangParameterCategory
     spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* type);
 
@@ -710,9 +724,13 @@ extern "C"
         SlangReflectionVariable* var,
         SlangSession* globalSession,
         char const* name);
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` and check for a null blob
+     * instead. */
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
@@ -1047,8 +1065,15 @@ extern "C"
         SlangCompileRequest* request,
         int translationUnitIndex);
 
-    /** Get the descriptor set/space index allocated for the bindless resource heap.
-     *  Returns -1 if the program does not use bindless resource heap.
+    /** Get the descriptor set/space index reserved for the bindless resource heap.
+     *
+     * This is a layout/reflection reservation made before final target lowering and
+     * optimization. It can remain non-negative even when the emitted target code no
+     * longer uses a bindless heap/resource-handle path. Query `IBindlessResourceMetadata`
+     * from target metadata to determine whether such a path survived in the compiled
+     * target IR.
+     *
+     * Returns -1 only when no bindless heap space was reserved for the program layout.
      */
     SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* reflection);
 #ifdef __cplusplus
@@ -1389,7 +1414,21 @@ struct ICompileRequest : public ISlangUnknown
         int slotIndex,
         char const* typeName) = 0;
 
-    /** Enable or disable an experimental, best-effort GLSL frontend
+    /** Deprecated. When enabled, treat every translation unit in this request as GLSL.
+
+    Prefer selecting the source language when creating each translation unit:
+
+    @code
+    int translationUnit = request->addTranslationUnit(
+        SLANG_SOURCE_LANGUAGE_GLSL,
+        "moduleName");
+    request->addTranslationUnitSourceFile(translationUnit, path);
+    @endcode
+
+    Enabling this compatibility path emits deprecation diagnostic 117 when the request is
+    compiled. If the request already contains a translation unit explicitly selected as a
+    non-GLSL language, diagnostic 129 warns that this request-wide compatibility setting takes
+    precedence and treats that translation unit as GLSL.
      */
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) = 0;
 

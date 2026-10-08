@@ -121,6 +121,13 @@ struct ASTIterator
                 dispatchIfNotNull(arg);
         }
 
+        void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (auto arg : expr->arguments)
+                dispatchIfNotNull(arg);
+        }
+
         void visitVarExpr(VarExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -265,6 +272,10 @@ struct ASTIterator
 
         void visitThisExpr(ThisExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitThisTypeExpr(ThisTypeExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+        }
         void visitThisInterfaceExpr(ThisInterfaceExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -318,6 +329,12 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->value);
             dispatchIfNotNull(expr->typeExpr);
+        }
+        void visitCastOptionalExpr(CastOptionalExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->valueArg);
+            dispatchIfNotNull(expr->innerCoercedExpr);
         }
         void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
         {

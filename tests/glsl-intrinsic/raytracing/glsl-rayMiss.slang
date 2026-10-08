@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage miss -entry main -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -allow-glsl -emit-spirv-directly -stage miss -entry main -target spirv-assembly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayMiss.slang -stage miss -entry main -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/raytracing/glsl-rayMiss.slang -emit-spirv-directly -stage miss -entry main -target spirv-assembly
 
 layout(binding = 0) uniform accelerationStructureEXT as;
 
@@ -13,7 +13,7 @@ buffer MyBlockName
 // CHECK_SPV-DAG: IncomingRayPayload{{NV|KHR}}
 layout(location = 2) rayPayloadInEXT vec4 payload;
 // CHECK_GLSL-DAG: hitObjectAttributeEXT
-// CHECK_SPV-DAG: HitObjectAttributeNV
+// CHECK_SPV-DAG: HitObjectAttributeEXT
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
 bool testVars() {

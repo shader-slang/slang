@@ -27,11 +27,9 @@ struct A : IDerived
     __init(float a) { this.a = a; }
 
     [Differentiable]
-    [NoDiffThis]
     float baseCalc(float x) { return a * x * x; }       // df/dx = 2*a*x
 
     [Differentiable]
-    [NoDiffThis]
     float derivedCalc(float x) { return a * x * x * x; } // df/dx = 3*a*x^2
 }
 
@@ -42,11 +40,9 @@ struct B : IDerived
     __init(float b) { this.b = b; }
 
     [Differentiable]
-    [NoDiffThis]
     float baseCalc(float x) { return b * x; }             // df/dx = b
 
     [Differentiable]
-    [NoDiffThis]
     float derivedCalc(float x) { return b * x * x; }      // df/dx = 2*b*x
 }
 

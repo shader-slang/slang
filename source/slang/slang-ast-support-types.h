@@ -1,16 +1,15 @@
 #pragma once
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-semantic-version.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-basic.h"
+#include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <type_traits>
 
 //
@@ -43,6 +42,7 @@ FIDDLE() namespace Slang
     class Val;
 
     class DeclRefBase;
+    struct SubstitutionCache;
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
@@ -238,11 +238,41 @@ FIDDLE() namespace Slang
         IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
+        WaveIsFirstLane,
+        WaveReadLaneFirst,
+        CallShader,
+        ReportHit = 16,
         COUNT
     };
 
     /// Convert string name to KnownBuiltinDeclName enum
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
+
+    /// Returns true if `name` identifies one of the differentiable builtin
+    /// interfaces (`IDifferentiable`, `IDifferentiablePtr`, and the
+    /// function-translation interfaces `IForwardDifferentiable`,
+    /// `IBackwardDifferentiable`, `IBwdCallable`).
+    ///
+    /// This is the authoritative definition of the "differentiable interface
+    /// family": the IR linker defers the witness-table entries of conformances
+    /// to these interfaces when linking a program that does not use auto-diff
+    /// (see `shouldDeepCloneWitnessTable` in slang-ir-link.cpp). A newly added
+    /// differentiable interface must be added here, or its witness tables will
+    /// be deep-cloned into every program regardless of auto-diff use.
+    inline bool isDifferentiableInterfaceBuiltin(KnownBuiltinDeclName name)
+    {
+        switch (name)
+        {
+        case KnownBuiltinDeclName::IDifferentiable:
+        case KnownBuiltinDeclName::IDifferentiablePtr:
+        case KnownBuiltinDeclName::IForwardDifferentiable:
+        case KnownBuiltinDeclName::IBackwardDifferentiable:
+        case KnownBuiltinDeclName::IBwdCallable:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
@@ -754,6 +784,9 @@ FIDDLE() namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // An operation-local cache shared by recursive copies of this substitution set.
+        SubstitutionCache* substitutionCache = nullptr;
 
         // The element index if the substitution is happening inside a pack expansion.
         // For example, if we are substituting the pattern type of `expand each T`, where
@@ -1342,8 +1375,8 @@ FIDDLE() namespace Slang
         // The kind of lookup step that was performed
         Kind kind;
 
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
+        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
+        // and is that value mutable?
         //
         enum class ThisParameterMode : uint8_t
         {
@@ -1603,7 +1636,64 @@ FIDDLE() namespace Slang
         Val* m_val = nullptr;
     };
 
+    /// Identifies one requirement entry in a specific, already known interface witness table.
+    ///
+    /// The key intentionally carries no substitution context: the table's interface type provides
+    /// that context. Under the current AST representation a generic requirement is stored under
+    /// its innermost non-generic declaration rather than its wrapping `GenericDecl`; construction
+    /// performs that normalization in one place. Code that identifies a requirement independently
+    /// of one known table must keep its `DeclRef` instead of using this key.
+    struct InterfaceRequirementKey
+    {
+        explicit InterfaceRequirementKey(Decl* requirementDecl);
+
+        /// Creates a key and reports how many generic wrappers were removed from its declaration.
+        static InterfaceRequirementKey createWithGenericWrapperCount(
+            Decl* requirementDecl,
+            UCount& outGenericWrapperCount);
+
+        Decl* getDecl() const { return m_decl; }
+
+    private:
+        InterfaceRequirementKey(Decl* requirementDecl, UCount* outGenericWrapperCount);
+
+        Decl* m_decl;
+    };
+
     typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
+
+    /// Records the semantic-checking state of one requirement in a witness table.
+    ///
+    /// Ordinary checking follows `Unchecked -> Checking -> Succeeded|Failed`. An inherited-
+    /// interface requirement may instead follow `Unchecked -> WitnessReady -> Checking` so that
+    /// lookup can traverse its nested table before every requirement in that table has been
+    /// validated. A `Succeeded` or `WitnessReady` requirement always has a dictionary entry;
+    /// `Failed` never does. `Unchecked` may already have an entry synthesized by another semantic
+    /// operation, which the per-requirement checker adopts as a successful result.
+    ///
+    /// This state cannot be encoded by `RequirementWitness::Flavor`: `Flavor::none` is also the
+    /// valid dictionary value of a successfully satisfied optional requirement.
+    /// `ConformanceInterfaceCheckStatus` separately records whole-table traversal. Its state is not
+    /// an aggregate of these entry states: on-demand checking may finish entries while the table is
+    /// still `Unchecked`, and a failed whole-table traversal retains entries that succeeded before
+    /// another requirement failed so later diagnostics can keep using those structural answers.
+    enum class RequirementCheckState
+    {
+        /// No per-requirement check has started.
+        Unchecked,
+
+        /// An inherited-interface table is available for lookup but has not been validated.
+        WitnessReady,
+
+        /// One semantic operation owns the attempt to produce or validate this entry.
+        Checking,
+
+        /// The requirement was satisfied and its dictionary entry is final.
+        Succeeded,
+
+        /// The requirement could not be satisfied and has no dictionary entry.
+        Failed,
+    };
 
     FIDDLE()
     class WitnessTable : public RefObject
@@ -1611,7 +1701,27 @@ FIDDLE() namespace Slang
         FIDDLE(...)
         const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
-        void add(Decl* decl, RequirementWitness const& witness);
+        /// Adds a witness while normalizing `requirementDecl` to its table-local requirement key.
+        void add(Decl* requirementDecl, RequirementWitness const& witness);
+
+        /// Adds the witness for an already-normalized table-local requirement key.
+        void add(InterfaceRequirementKey key, RequirementWitness const& witness);
+
+        /// Returns whether this table contains a witness for `key`.
+        bool containsRequirement(InterfaceRequirementKey key) const
+        {
+            return m_requirementDictionary.containsKey(key.getDecl());
+        }
+
+        /// Looks up the witness for `key` without performing semantic checking.
+        bool tryGetRequirementWitness(InterfaceRequirementKey key, RequirementWitness& outWitness)
+            const
+        {
+            return m_requirementDictionary.tryGetValue(key.getDecl(), outWitness);
+        }
+
+        /// Removes a requirement witness and forgets its semantic-checking state.
+        void removeRequirement(InterfaceRequirementKey key);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         FIDDLE() Type* baseType;
@@ -1624,6 +1734,24 @@ FIDDLE() namespace Slang
 
         // Cached dictionary for looking up satisfying values.
         FIDDLE() RequirementDictionary m_requirementDictionary;
+
+        /// Returns the semantic-checking state for `key`.
+        RequirementCheckState getRequirementCheckState(InterfaceRequirementKey key) const
+        {
+            if (auto state = m_requirementCheckStates.tryGetValue(key.getDecl()))
+                return *state;
+            return RequirementCheckState::Unchecked;
+        }
+
+        /// Updates the semantic-checking state for `key`.
+        void setRequirementCheckState(InterfaceRequirementKey key, RequirementCheckState state)
+        {
+            m_requirementCheckStates[key.getDecl()] = state;
+        }
+
+        // Semantic-checking state is deliberately not serialized. A serialized witness table is
+        // already complete, while a specialized copy can derive completion from its entries.
+        Dictionary<Decl*, RequirementCheckState> m_requirementCheckStates;
 
         RefPtr<WitnessTable> specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
     };
@@ -1783,6 +1911,50 @@ FIDDLE() namespace Slang
         Ref,
     };
 
+    /// Combined semantic information about a parameter's type and parameter-passing mode.
+    ///
+    /// The two fields deliberately use the same decomposition as a parameter type with a
+    /// parameter-passing-mode wrapper: `type` is the value type *inside* that wrapper, while
+    /// `mode` identifies the wrapper. Thus `type` never contains an `OutParamType`,
+    /// `BorrowInOutParamType`, `BorrowInParamType`, or `RefParamType`.
+    ///
+    /// Other modifiers that are part of the parameter's semantic value type remain encoded in
+    /// `type`. In particular, a `no_diff` parameter uses a `ModifiedType` carrying
+    /// `NoDiffModifierVal`. Producers and consumers must preserve this decomposition so that a
+    /// `ParamInfo` and its wrapped parameter-type representation encode the same information.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter value type, including semantic type modifiers such as
+        /// `no_diff`, but excluding any parameter-passing-mode wrapper.
+        FIDDLE() Type* type = nullptr;
+
+        /// The effective parameter-passing mode, stored separately from `type`.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::Ref:
+            return true;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return false;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
+
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
     /// The kind of a builtin interface requirement that can be automatically synthesized.
@@ -1821,6 +1993,14 @@ FIDDLE() namespace Slang
         BwdCallableRematFunc,   ///< The "remat" built-in associated function
         BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
         LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function
+
+        DifferentialWitness, ///< The `IDifferentiable.Differential : IDifferentiable` conformance
+                             ///< (the witness that the differential type is itself differentiable)
+        DifferentialPtrWitness,    ///< The `IDifferentiablePtrType.Differential :
+                                   ///< IDifferentiablePtrType` conformance
+        BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
+                                   ///< conformance (witness that the backward-callable context type
+                                   ///< conforms to `IBwdCallable`)
     };
 
     enum class FunctionDifferentiableLevel
@@ -1862,5 +2042,62 @@ FIDDLE() namespace Slang
         Public,
         Default = Internal,
     };
+
+    // Identifies a builtin operator recognized by the fast path. Used by `BuiltinOperatorExpr`
+    // (the checked-AST node the fast path produces) and `BuiltinOperationIntVal` (its
+    // compile-time-constant form). These mirror the builtin IR ops (see
+    // `convertToBuiltinArithmeticOp` / `lowerBuiltinOperatorExpr`); their integer values are
+    // part of the serialized/mangled form, so only append, never reorder.
+    enum class BuiltinOperationKind
+    {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+        Neg,
+        Eql,
+        Neq,
+        Less,
+        Greater,
+        Leq,
+        Geq,
+        BitAnd,
+        BitOr,
+        BitXor,
+        BitNot,
+        Lsh,
+        Rsh,
+        Not,
+        // `?:` / `&&` / `||`. These are never produced by the fast-path `BuiltinOperatorExpr`
+        // (`?:` is not an infix operator and `&&`/`||` are short-circuiting), but a *resolved*
+        // operator call on them can still fold to a compile-time-constant `BuiltinOperationIntVal`
+        // (e.g. `cond ? N : M` in an array size). Appended after the real fast-path ops above.
+        Conditional,
+        And,
+        Or,
+        // Sentinel for "not a builtin fast-path operator". Returned by
+        // `getBuiltinOperationKindFromString` for operators the fast path does not rewrite (e.g.
+        // `&&`/`||`/`?:`). Never stored on a node and never serialized, so it is kept last.
+        Unknown,
+    };
+
+    // Whether an operator is being applied to one operand or two; disambiguates the prefix `-`
+    // (Neg) from the binary `-` (Sub) in `getBuiltinOperationKindFromString`.
+    enum class OperatorArity
+    {
+        Unary,
+        Binary,
+    };
+
+    // Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
+    // and mangling so a `BuiltinOperationIntVal` is identified consistently.
+    UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
+
+    // Map an operator-name + arity to a `BuiltinOperationKind`, or `Unknown` for operators
+    // that have no builtin fast-path form (e.g. `&&`/`||`).
+    BuiltinOperationKind getBuiltinOperationKindFromString(
+        UnownedStringSlice opText,
+        OperatorArity arity);
 
 } // namespace Slang

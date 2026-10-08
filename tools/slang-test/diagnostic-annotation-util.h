@@ -193,7 +193,7 @@
 #ifndef SLANG_TEST_DIAGNOSTIC_ANNOTATION_UTIL_H
 #define SLANG_TEST_DIAGNOSTIC_ANNOTATION_UTIL_H
 
-#include "../../source/core/slang-basic.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

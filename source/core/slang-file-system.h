@@ -1,9 +1,9 @@
 #ifndef SLANG_FILE_SYSTEM_H_INCLUDED
 #define SLANG_FILE_SYSTEM_H_INCLUDED
 
-#include "../core/slang-blob.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-string-util.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

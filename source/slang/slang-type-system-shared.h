@@ -5,6 +5,62 @@
 
 namespace Slang
 {
+
+// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
+struct BarrierMemoryTypeFlags
+{
+    enum Enum : uint32_t
+    {
+        UavMemory = 0x01u,
+        GroupSharedMemory = 0x02u,
+        NodeInputMemory = 0x04u,
+        NodeOutputMemory = 0x08u,
+        AllMemory = 0x0fu,
+    };
+};
+static_assert(
+    BarrierMemoryTypeFlags::UavMemory == 0x01u,
+    "UavMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::GroupSharedMemory == 0x02u,
+    "GroupSharedMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::NodeInputMemory == 0x04u,
+    "NodeInputMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::NodeOutputMemory == 0x08u,
+    "NodeOutputMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::AllMemory == 0x0fu,
+    "AllMemory must match experimental/workgraph.slang");
+
+// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
+struct BarrierSemanticFlags
+{
+    enum Enum : uint32_t
+    {
+        Reorder = 0x00u,
+        GroupSync = 0x01u,
+        GroupScope = 0x02u,
+        DeviceScope = 0x04u,
+    };
+};
+static_assert(
+    BarrierSemanticFlags::Reorder == 0x00u,
+    "Reorder must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::GroupSync == 0x01u,
+    "GroupSync must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::GroupScope == 0x02u,
+    "GroupScope must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::DeviceScope == 0x04u,
+    "DeviceScope must match experimental/workgraph.slang");
 #define FOREACH_BASE_TYPE(X) \
     X(Void)                  \
     X(Bool)                  \
@@ -151,6 +207,12 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+// NOTE: The IR linker assumes every `AnnotationKind` is differentiability-
+// related: `cloneAnnotations` in slang-ir-link.cpp skips cloning *all*
+// module-scope annotations into the final codegen link of a program that does
+// not use auto-diff. If you add a kind that is not auto-diff-related, that
+// gate must learn to distinguish kinds, or your annotations will be silently
+// dropped from every non-differentiating program.
 enum class AnnotationKind
 {
     Unknown = 0,
@@ -173,6 +235,11 @@ enum class AnnotationKind
     DifferentialPtrPairType = 13,
     DifferentialZero = 14,
     DifferentialAdd = 15,
+
+    // Sentinel — keep last. `cloneAnnotations` in slang-ir-link.cpp
+    // static_asserts against this value so that adding a kind forces a visit
+    // to the pruning gate (see the note above this enum).
+    CountOf = 16,
 };
 
 

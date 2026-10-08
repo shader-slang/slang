@@ -2,8 +2,8 @@
 #ifndef SLANG_HLSL_TO_VULKAN_LAYOUT_OPTIONS_H
 #define SLANG_HLSL_TO_VULKAN_LAYOUT_OPTIONS_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-name-value.h"
+#include "core/slang-basic.h"
+#include "core/slang-name-value.h"
 
 namespace Slang
 {

@@ -14,9 +14,6 @@
 
 set -euo pipefail
 
-RUNNER_VERSION="2.334.0"
-RUNNER_SHA256="048024cd2c848eb6f14d5646d56c13a4def2ae7ee3ad12122bee960c56f3d271"
-
 # Defense in depth: wipe stray actions-runner installs that may be baked into
 # the base image under user accounts other than the canonical "runner" user.
 # A May 2026 SM80Plus outage was caused by /home/<engineer>/actions-runner/
@@ -89,7 +86,7 @@ log() {
   echo "$msg" >>"$LOG_FILE"
 }
 
-log "=== Linux GPU Runner Startup ==="
+log "=== Linux Runner Startup ==="
 log "Runner directory: $RUNNER_DIR"
 log "Runner user: $RUNNER_USER"
 
@@ -133,92 +130,173 @@ if [ -z "$current_runner_version" ]; then
 fi
 log "Current Actions runner version: $current_runner_version"
 
-if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
-  log "Updating Actions runner to v${RUNNER_VERSION}..."
+# Ask GitHub for the latest release instead of comparing against a hardcoded
+# pin. A hardcoded RUNNER_VERSION constant previously went stale twice
+# (2026-04-29, 2026-08-11): GitHub deprecates old runner binaries and rejects
+# their registration attempts, so every VM booted with the stale pin baked in
+# died before it could pick up a job, and someone had to notice the outage
+# and bump the constant by hand. Querying "latest" removes that manual step;
+# every boot self-heals against whatever GitHub currently accepts.
+#
+# Fetch the release JSON once and reuse it for both the version and the
+# per-asset SHA-256 digest, rather than issuing a second request. GitHub
+# started publishing a "digest" field on every release asset in June 2025
+# (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
+# so tracking "latest" does not have to give up checksum verification.
+if ! release_json="$(mktemp /tmp/runner-release.XXXXXX.json)"; then
+  fail_update_and_shutdown "Failed to create temporary release metadata file"
+fi
+if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 30 \
+  https://api.github.com/repos/actions/runner/releases/latest -o "$release_json"; then
+  fail_update_and_shutdown "Failed to fetch latest Actions runner release metadata from GitHub API"
+fi
+
+latest_runner_version="$(grep -o '"tag_name": *"v[^"]*"' "$release_json" | head -n 1 | sed -E 's/.*"v([^"]*)"/\1/')"
+if [ -z "$latest_runner_version" ]; then
+  fail_update_and_shutdown "Failed to determine latest Actions runner version from GitHub API"
+fi
+log "Latest Actions runner version: $latest_runner_version"
+
+# The asset list is a flat array of objects with "name" before "digest" in
+# GitHub's field order, so scanning forward from the matching asset's "name"
+# line to the next "digest" line reliably finds that asset's own digest
+# rather than a different asset's, without needing a JSON parser.
+runner_asset_name="actions-runner-linux-x64-${latest_runner_version}.tar.gz"
+latest_runner_digest="$(awk -v name="\"name\": \"${runner_asset_name}\"" '
+  index($0, name) { found=1 }
+  found && /"digest":/ { print; exit }
+' "$release_json" | sed -E 's/.*"digest": *"sha256:([a-f0-9]+)".*/\1/')"
+rm -f "$release_json"
+
+if [ -z "$latest_runner_digest" ]; then
+  fail_update_and_shutdown "Failed to determine SHA-256 digest for ${runner_asset_name} from GitHub API"
+fi
+
+if [ "$current_runner_version" != "$latest_runner_version" ]; then
+  log "Updating Actions runner to v${latest_runner_version}..."
   if ! runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"; then
     fail_update_and_shutdown "Failed to create temporary Actions runner archive"
   fi
-  runner_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+  runner_url="https://github.com/actions/runner/releases/download/v${latest_runner_version}/${runner_asset_name}"
 
   if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
-    fail_update_and_shutdown "Failed to download Actions runner v${RUNNER_VERSION}"
+    fail_update_and_shutdown "Failed to download Actions runner v${latest_runner_version}"
   fi
 
-  if ! printf '%s  %s\n' "$RUNNER_SHA256" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
-    fail_update_and_shutdown "Actions runner v${RUNNER_VERSION} checksum verification failed"
+  if ! printf '%s  %s\n' "$latest_runner_digest" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
+    fail_update_and_shutdown "Actions runner v${latest_runner_version} checksum verification failed"
   fi
 
   if ! chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"; then
-    fail_update_and_shutdown "Failed to change owner for Actions runner v${RUNNER_VERSION} archive"
+    fail_update_and_shutdown "Failed to change owner for Actions runner v${latest_runner_version} archive"
   fi
 
   if ! sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"; then
-    fail_update_and_shutdown "Failed to extract Actions runner v${RUNNER_VERSION}"
+    fail_update_and_shutdown "Failed to extract Actions runner v${latest_runner_version}"
   fi
   rm -f "$runner_archive" || true
   runner_archive=""
 
   updated_runner_version="$(runner_version || true)"
   log "Actions runner version after update: ${updated_runner_version:-unknown}"
-  if [ "${updated_runner_version:-}" != "$RUNNER_VERSION" ]; then
-    fail_update_and_shutdown "Runner version mismatch after update (expected ${RUNNER_VERSION}, got ${updated_runner_version:-unknown})"
+  if [ "${updated_runner_version:-}" != "$latest_runner_version" ]; then
+    fail_update_and_shutdown "Runner version mismatch after update (expected ${latest_runner_version}, got ${updated_runner_version:-unknown})"
   fi
 fi
 
 # Step 0.5: Ensure NVIDIA GPU devices are initialized.
-# On fresh boot, the kernel module may not be loaded yet. Running nvidia-smi
-# loads the module and creates /dev/nvidia* device files that the CI workflow
-# mounts into Docker containers (--device /dev/nvidia-modeset, /dev/dri, etc.)
-log "Initializing NVIDIA GPU..."
-gpu_ready=false
-for attempt in $(seq 1 10); do
-  if nvidia-smi >/dev/null 2>&1; then
-    log "  GPU initialized successfully."
-    gpu_ready=true
-    break
-  fi
-  log "  Attempt ${attempt}/10: nvidia-smi not ready, waiting..."
-  sleep 5
-done
+#
+# This block only applies to GPU pools (the Linux test runners). CPU-only pools
+# (the build and analytics runners) share both this startup script *and* the
+# same base image, so the nvidia-smi tool and driver libraries are present even
+# when no GPU is attached — tool presence is therefore NOT a reliable signal.
+#
+# Whether this pool is *supposed* to have a GPU is authoritative, not inferred:
+# the scaler stamps an "expect-gpu" metadata key from the pool's --gcp-gpu-type
+# config (true for GPU pools, false for CPU-only build/analytics pools). We then
+# combine that contract with the actual hardware, detected by a physically-
+# attached NVIDIA device on the PCI bus (vendor ID 10de — prefer lspci, fall
+# back to the sysfs PCI vendor list if pciutils is absent):
+#   - GPU pool + GPU present     -> initialize the GPU (fatal if init fails).
+#   - GPU pool + GPU MISSING     -> fatal: the accelerator attach failed; a
+#                                   runner here would silently accept GPU jobs.
+#   - CPU-only pool              -> skip GPU init and register as a CPU runner.
+# Defaulting expect-gpu to "true" keeps existing GPU pools fail-safe even if the
+# metadata is somehow absent.
+EXPECT_GPU="$(curl -sf --max-time 10 --connect-timeout 5 \
+  -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/expect-gpu" 2>/dev/null || echo "true")"
+log "GPU expectation for this pool: expect-gpu=${EXPECT_GPU}"
 
-if [ "$gpu_ready" != "true" ]; then
-  log "ERROR: GPU initialization failed after 10 attempts"
+gpu_present=false
+if command -v lspci >/dev/null 2>&1; then
+  if lspci -d 10de: 2>/dev/null | grep -q .; then
+    gpu_present=true
+  fi
+elif grep -qi '0x10de' /sys/bus/pci/devices/*/vendor 2>/dev/null; then
+  gpu_present=true
+fi
+
+if [ "$EXPECT_GPU" != "false" ] && [ "$gpu_present" != "true" ]; then
+  log "ERROR: This pool expects an NVIDIA GPU but none is attached (accelerator attach failed?). Refusing to register a GPU runner with no device."
   shutdown -h now
   exit 1
 fi
 
-# Create nvidia-modeset device if it doesn't exist (needed for Vulkan)
-if [ ! -e /dev/nvidia-modeset ]; then
-  log "  Creating /dev/nvidia-modeset..."
-  nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
-fi
+if [ "$gpu_present" = "true" ]; then
+  log "Initializing NVIDIA GPU..."
+  gpu_ready=false
+  for attempt in $(seq 1 10); do
+    if nvidia-smi >/dev/null 2>&1; then
+      log "  GPU initialized successfully."
+      gpu_ready=true
+      break
+    fi
+    log "  Attempt ${attempt}/10: nvidia-smi not ready, waiting..."
+    sleep 5
+  done
 
-# Enable GPU persistence mode to prevent NVML state corruption in containers.
-# Without this, NVML can lose track of GPU processes when they exit inside Docker,
-# causing "Failed to initialize NVML: Unknown Error".
-log "  Enabling GPU persistence mode..."
-if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
-  log "  GPU persistence mode enabled."
+  if [ "$gpu_ready" != "true" ]; then
+    log "ERROR: GPU initialization failed after 10 attempts"
+    shutdown -h now
+    exit 1
+  fi
+
+  # Create nvidia-modeset device if it doesn't exist (needed for Vulkan)
+  if [ ! -e /dev/nvidia-modeset ]; then
+    log "  Creating /dev/nvidia-modeset..."
+    nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
+  fi
+
+  # Enable GPU persistence mode to prevent NVML state corruption in containers.
+  # Without this, NVML can lose track of GPU processes when they exit inside Docker,
+  # causing "Failed to initialize NVML: Unknown Error".
+  log "  Enabling GPU persistence mode..."
+  if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
+    log "  GPU persistence mode enabled."
+  else
+    log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+  fi
+
+  # Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
+  # with cgroup v2 require these symlinks to properly inject devices into
+  # containers. Without them, containers can intermittently lose GPU access
+  # with "Failed to initialize NVML: Unknown Error".
+  # See: https://github.com/NVIDIA/nvidia-docker/issues/1730
+  log "  Creating /dev/char symlinks..."
+  if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
+    log "  /dev/char symlinks created."
+  else
+    log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
+  fi
+
+  # Verify GPU devices
+  log "  GPU devices:"
+  ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
+  ls -la /dev/dri/* 2>&1 | while read -r line; do log "    $line"; done || true
 else
-  log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+  log "No NVIDIA GPU on the PCI bus and none expected; skipping GPU initialization (CPU-only runner)."
 fi
-
-# Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
-# with cgroup v2 require these symlinks to properly inject devices into
-# containers. Without them, containers can intermittently lose GPU access
-# with "Failed to initialize NVML: Unknown Error".
-# See: https://github.com/NVIDIA/nvidia-docker/issues/1730
-log "  Creating /dev/char symlinks..."
-if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
-  log "  /dev/char symlinks created."
-else
-  log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
-fi
-
-# Verify GPU devices
-log "  GPU devices:"
-ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
-ls -la /dev/dri/* 2>&1 | while read -r line; do log "    $line"; done || true
 
 # Step 1: Read JIT config from GCP instance metadata
 log "Reading JIT config from instance metadata..."

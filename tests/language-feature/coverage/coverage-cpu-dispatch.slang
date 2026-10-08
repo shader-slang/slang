@@ -33,4 +33,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // Counter increments happen against the coverage buffer accessed via
 // globalParams — confirms the IR pass found and rewrote correctly.
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage
+// The `u64` suffix here pins the per-slot width to the current
+// compiler-default of 64 bits. If the default ever changes (e.g. a
+// future PR flips to uint32 on platforms with weak int64 support),
+// this CHECK becomes the canary that flags the change. Tests that
+// add a `-trace-coverage-counter-width 32` line to this file must
+// either gate their CHECKs on the chosen width or use a fresh test.
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage

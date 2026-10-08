@@ -6,13 +6,14 @@
 
 #include "slang-language-server.h"
 
-#include "../../tools/platform/performance-counter.h"
-#include "../compiler-core/slang-json-native.h"
-#include "../compiler-core/slang-json-rpc-connection.h"
-#include "../compiler-core/slang-language-server-protocol.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-secure-crt.h"
-#include "../core/slang-string-util.h"
+#include "compiler-core/slang-json-native.h"
+#include "compiler-core/slang-json-rpc-connection.h"
+#include "compiler-core/slang-language-server-protocol.h"
+#include "core/slang-char-util.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
+#include "platform/performance-counter.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-com-helper.h"
@@ -51,7 +52,7 @@ ArrayView<const char*> getCommitChars()
 {
     static const char* _commitCharsArray[] = {",", ".", ";", ":", "(", ")", "[", "]",
                                               "<", ">", "{", "}", "*", "&", "^", "%",
-                                              "!", "-", "=", "+", "|", "/", "?", " "};
+                                              "!", "-", "=", "+", "|", "/", "?"};
     return makeArrayView(_commitCharsArray, SLANG_COUNT_OF(_commitCharsArray));
 }
 
@@ -63,6 +64,13 @@ SlangResult LanguageServerCore::init(const InitializeParams& args)
     for (auto& wd : m_workspaceFolders)
     {
         rootUris.add(URI::fromString(wd.uri.getUnownedSlice()));
+    }
+    if (rootUris.getCount() == 0)
+    {
+        if (args.rootUri.hasValue && args.rootUri.value.getLength())
+            rootUris.add(URI::fromString(args.rootUri.value.getUnownedSlice()));
+        else if (args.rootPath.hasValue && args.rootPath.value.getLength())
+            rootUris.add(URI::fromLocalFilePath(args.rootPath.value.getUnownedSlice()));
     }
     m_workspace->init(rootUris, getOrCreateGlobalSession());
     return SLANG_OK;
@@ -122,7 +130,7 @@ SlangResult LanguageServer::parseNextMessage()
             }
             else if (call.method == ShutdownParams::methodName)
             {
-                m_connection->sendResult(NullResponse::get(), call.id);
+                m_connection->sendNullResult(call.id);
                 return SLANG_OK;
             }
             else if (call.method == InitializeParams::methodName)
@@ -211,7 +219,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 14)
+                    if (arr.getCount() == 15)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -221,6 +229,7 @@ SlangResult LanguageServer::parseNextMessage()
                         updateInlayHintOptions(arr[10], arr[11]);
                         updateWorkspaceFlavor(arr[12]);
                         updateTraceOptions(arr[13]);
+                        updatePredefinedLanguageVersion(arr[14]);
                     }
                 }
                 break;
@@ -375,8 +384,12 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
             else if (initExpr)
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(version->linkage, module, &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
+                    version->linkage,
+                    module,
+                    version->linkage->m_optionSet.getLanguageVersion(),
+                    &sink);
+                SemanticsVisitor semanticsVisitor(semanticContext);
                 if (auto intVal = semanticsVisitor.tryFoldIntegerConstantExpression(
                         declRef.substitute(version->linkage->getASTBuilder(), initExpr),
                         SemanticsVisitor::ConstantFoldingKind::LinkTime,
@@ -622,7 +635,7 @@ SlangResult LanguageServer::hover(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -702,13 +715,14 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             if (auto funcDecl = as<FunctionDeclBase>(declRef.getDecl()))
             {
                 DiagnosticSink sink;
-                SharedSemanticsContext semanticContext(
+                auto semanticContext = SharedSemanticsContext::createForOptionalModule(
                     version->linkage,
                     getModule(funcDecl),
+                    version->linkage->m_optionSet.getLanguageVersion(),
                     &sink);
-                SemanticsVisitor semanticsVisitor(&semanticContext);
+                SemanticsVisitor semanticsVisitor(semanticContext);
 
-                auto assocDecls = semanticContext.getAssociatedDeclsForDecl(funcDecl);
+                auto assocDecls = semanticContext->getAssociatedDeclsForDecl(funcDecl);
                 Decl* bwdDiff = nullptr;
                 Decl* fwdDiff = nullptr;
                 Decl* primalSubst = nullptr;
@@ -1070,7 +1084,7 @@ SlangResult LanguageServer::gotoDefinition(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1250,7 +1264,7 @@ SlangResult LanguageServer::completion(
 {
     auto result = m_core.completion(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
     else if (result.result.items.getCount())
         m_connection->sendResult(&result.result.items, responseId);
     else
@@ -1412,9 +1426,24 @@ SlangResult LanguageServer::completionResolve(
     const JSONValue& responseId)
 {
     auto result = m_core.completionResolve(args, editItem);
-    if (SLANG_FAILED(result.returnCode) || result.isNull)
+    if (SLANG_FAILED(result.returnCode))
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        // Unlike the other requests, completionItem/resolve has a non-nullable result: LSP requires
+        // it to answer with a CompletionItem or a JSON-RPC error, never null. So report an actual
+        // resolution failure as an error rather than a null result.
+        m_connection->sendError(
+            JSONRPC::ErrorCode::InternalError,
+            UnownedStringSlice("failed to resolve completion item"),
+            responseId);
+        return SLANG_OK;
+    }
+    if (result.isNull)
+    {
+        // The item has no `data` to enrich but carries a textEdit (file/import completions). There
+        // is nothing to add, yet LSP still requires the item back, not null. A CompletionItem
+        // cannot carry a textEdit, so echo the TextEditCompletionItem the client sent to preserve
+        // it.
+        m_connection->sendResult(&editItem, responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1464,7 +1493,7 @@ SlangResult LanguageServer::semanticTokens(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1639,7 +1668,7 @@ SlangResult LanguageServer::signatureHelp(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -1838,7 +1867,13 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     // on the best candidate.
     //
     DiagnosticSink sink;
-    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    // Signature help performs ad hoc checking without a primary module so that extension lookup
+    // retains its existing linkage-wide point of view. Its language rules still come from the
+    // parsed document module, including any `#language` directive in that file.
+    SharedSemanticsContext semanticsContext(
+        version->linkage,
+        parsedModule->getModuleDecl()->languageVersion,
+        &sink);
     SemanticsVisitor semanticsVisitor(&semanticsContext);
 
     auto addDeclRef = [&](DeclRef<Decl> declRef)
@@ -2026,7 +2061,7 @@ SlangResult LanguageServer::documentSymbol(
     auto result = m_core.documentSymbol(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2067,7 +2102,7 @@ SlangResult LanguageServer::inlayHint(
 
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2130,7 +2165,7 @@ SlangResult LanguageServer::formatting(
     auto result = m_core.formatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2165,7 +2200,7 @@ SlangResult LanguageServer::rangeFormatting(
     auto result = m_core.rangeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2216,7 +2251,7 @@ SlangResult LanguageServer::onTypeFormatting(
     auto result = m_core.onTypeFormatting(args);
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
-        m_connection->sendResult(NullResponse::get(), responseId);
+        m_connection->sendNullResult(responseId);
         return SLANG_OK;
     }
     m_connection->sendResult(&result.result, responseId);
@@ -2489,6 +2524,42 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
     }
 }
 
+// Apply the `slang.predefinedLanguageVersion` client setting (a version string such as "2025"):
+// map it via the same TypeTextUtil::findLanguageVersion path the `-std`/`-language-version` option
+// uses, store it on the workspace, and refresh open documents if it changed. An empty value clears
+// the setting (UNKNOWN, compiler default); an unrecognized non-empty value is logged and the
+// previously configured version is left in place, so a typo does not silently disable a working
+// configuration.
+void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
+{
+    if (value.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+        String str;
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        {
+            SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
+            if (str.getLength() != 0)
+            {
+                version = TypeTextUtil::findLanguageVersion(str.getUnownedSlice());
+                if (version == SLANG_LANGUAGE_VERSION_UNKNOWN)
+                {
+                    logMessage(
+                        2 /* warning */,
+                        String("slang.predefinedLanguageVersion: unknown language version '") +
+                            str + "'; keeping the previous setting.");
+                    return;
+                }
+            }
+            if (m_core.m_workspace->updatePredefinedLanguageVersion(version))
+            {
+                sendRefreshRequests(m_connection);
+            }
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -2520,6 +2591,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.workspaceFlavor";
     args.items.add(item);
     item.section = "slangLanguageServer.trace.server";
+    args.items.add(item);
+    item.section = "slang.predefinedLanguageVersion";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,
@@ -2811,7 +2884,7 @@ SlangResult LanguageServer::queueJSONCall(JSONRPCCall call)
 
 SlangResult LanguageServer::runCommand(Command& call)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         // Do different things
         if (call.method == DidOpenTextDocumentParams::methodName)
@@ -2832,12 +2905,14 @@ SlangResult LanguageServer::runCommand(Command& call)
             return SLANG_OK;
         }
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return SLANG_FAIL;
     }
+#endif
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         if (call.method == HoverParams::methodName)
         {
@@ -2895,12 +2970,16 @@ SlangResult LanguageServer::runCommand(Command& call)
             return SLANG_OK;
         }
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
-        // If we encountered an internal compiler error, don't crash the language server.
-        // Instead we just return a null response.
-        return m_connection->sendResult(NullResponse::get(), call.id);
+        // If we encountered an internal compiler error, don't crash the language server; instead
+        // return a null response. This recovery only applies with exceptions enabled; under
+        // SLANG_DISABLE_EXCEPTIONS an internal abort routes through handleSignal(AbortCompilation)
+        // → exit(-1) and terminates the process before reaching here.
+        return m_connection->sendNullResult(call.id);
     }
+#endif
 
     return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
 }
@@ -3029,6 +3108,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         {
             updateSearchPaths(kv.value);
         }
+        else if (key == "slang.searchInAllWorkspaceDirectories")
+        {
+            updateSearchInWorkspace(kv.value);
+        }
         else if (key == "slang.enableCommitCharactersInAutoCompletion")
         {
             updateCommitCharacters(kv.value);
@@ -3104,6 +3187,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.workspaceFlavor")
         {
             updateWorkspaceFlavor(kv.value);
+        }
+        else if (key == "slang.predefinedLanguageVersion")
+        {
+            updatePredefinedLanguageVersion(kv.value);
         }
     }
 }

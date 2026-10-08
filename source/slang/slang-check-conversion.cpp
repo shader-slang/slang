@@ -747,7 +747,14 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     return true;
 }
 
-// translation from initializer list to constructor invocation if the struct has constructor.
+// Try to coerce an initializer list to `toType` by invoking one of `toType`'s
+// explicit constructors, e.g. turning `float3 v = {a, b}` into `float3(a, b)`.
+// Returns whether such a coercion is possible. The return value must be the same
+// whether or not `outExpr` is requested: overload resolution first calls this with
+// `outExpr == nullptr` to probe whether a candidate is viable (see `canCoerce`),
+// then again with `outExpr` set to actually build the expression. Reporting success
+// only when `outExpr` is non-null would make the viability probe a false negative and
+// reject an otherwise-valid candidate.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
@@ -778,31 +785,66 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
+            // The constructor is type-checked against a temporary sink so that a
+            // genuine overload-match failure can be swallowed and retried through
+            // the legacy initializer-list path. Once we commit to the
+            // constructor, however, any diagnostics it produced are real and must
+            // be surfaced on the caller's sink. This includes warnings such as a
+            // `[deprecated]` constructor (which leave `getErrorCount() == 0` and
+            // were previously lost) as well as errors such as a `[RemovedSince]`
+            // constructor. We only forward when actually building the result
+            // expression (`outExpr != nullptr`); a `canCoerce()` viability probe
+            // passes `outExpr == nullptr` and must stay silent (see `canCoerce`).
+            auto forwardDiagnostics = [&]()
+            {
+                if (!outExpr || tempSink.outputBuffer.getLength() == 0)
+                    return;
+                getSink()->diagnoseRaw(
+                    tempSink.getErrorCount() ? Severity::Error : Severity::Warning,
+                    tempSink.outputBuffer.getUnownedSlice());
+            };
+
+            // A genuine overload-match failure yields an error expression,
+            // whereas a matched constructor that merely emitted diagnostics
+            // (e.g. it is `[deprecated]` or `[RemovedSince]`) still yields a
+            // valid constructor-call expression.
             if (tempSink.getErrorCount())
             {
                 HashSet<Type*> isVisit;
-                if (!isCStyleType(toType, isVisit))
-                {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    tempSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                    // For non-c-style types, we will always return true when there
-                    // is a ctor, so that we do not fallback to legacy initializer list logic
-                    // in `_coerceInitializerList()` and produce unrelated errors.
-                    if (outExpr)
-                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
-                    return true;
-                }
-                return false;
-            }
+                const bool ctorMatched = !IsErrorExpr(ctorInvokeExpr);
 
-            if (outExpr)
-            {
-                *outExpr = ctorInvokeExpr;
+                // For a C-style type, a genuine match failure should fall back to
+                // the legacy initializer-list logic in `_coerceInitializerList()`.
+                // But when the constructor actually matched and the error is about
+                // that constructor itself (for example it has been removed via
+                // `[RemovedSince]`), falling back would silently discard the
+                // error, so we surface it here instead.
+                if (isCStyleType(toType, isVisit) && !ctorMatched)
+                    return false;
+
+                forwardDiagnostics();
+
+                // For non-c-style types (and matched-but-errored C-style ctors),
+                // we always return true when there is a ctor, so that we do not
+                // fallback to legacy initializer list logic in
+                // `_coerceInitializerList()` and produce unrelated errors.
+                if (outExpr)
+                    *outExpr = CreateErrorExpr(ctorInvokeExpr);
                 return true;
             }
+
+            // The explicit constructor matched and type-checked, so this is a
+            // valid coercion. Report success even when no output expression was
+            // requested (e.g. the `canCoerce` viability probe passes
+            // `outExpr == nullptr`); otherwise overload resolution would treat
+            // the conversion as impossible and reject an otherwise-viable
+            // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
+            // `createCtorInvokeExprForAbstractType`, which return `true`
+            // independent of `outExpr`.
+            forwardDiagnostics();
+            if (outExpr)
+                *outExpr = ctorInvokeExpr;
+            return true;
         }
     }
     return false;
@@ -1009,7 +1051,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
-                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementCount);
+                as<PolynomialIntVal>(toElementCount) || as<BuiltinOperationIntVal>(toElementCount);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
@@ -1203,7 +1245,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
-                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+                as<PolynomialIntVal>(rowCountIntVal) || as<BuiltinOperationIntVal>(rowCountIntVal);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
@@ -1656,6 +1698,32 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
+bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
+{
+    // Only builtin scalars are eligible, and `bool` is excluded: it already has
+    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // so routing it through the enum->tag->bool composite would introduce a
+    // second, competing representation of the same conversion.
+    auto toBasicType = as<BasicExpressionType>(toType);
+    if (!toBasicType || toBasicType->getBaseType() == BaseType::Bool)
+        return false;
+
+    // The enum must be unscoped, tested through the shared `isUnscopedEnum`
+    // predicate (also used by the parser). It recognizes `UnscopedEnumAttribute`
+    // — attached for `-unscoped-enum` (non-generic enums only) or an explicit
+    // `[UnscopedEnum]` (any enum) — as well as a still-unchecked `[UnscopedEnum]`
+    // for parser-time callers; by the time coercion runs the attribute is checked.
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+
+    // The widening is an HLSL-compatibility feature, so it applies only when the
+    // current translation unit is the HLSL-flavored dialect. The translation
+    // unit request is absent on some paths (e.g. entry-point specialization and
+    // reflection), which correctly reads as "not HLSL".
+    auto translationUnit = getShared()->getTranslationUnitRequest();
+    return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -2045,6 +2113,91 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be implicitly cast to Optional<U> when T is coercible to U.
+    if (auto fromOptType = as<OptionalType>(fromType))
+    {
+        if (auto toOptType = as<OptionalType>(toType))
+        {
+            Type* fromInner = fromOptType->getValueType();
+            Type* toInner = toOptType->getValueType();
+
+            if (!fromInner->equals(toInner))
+            {
+                // Create a synthetic VarDecl of type fromInner as a placeholder for the
+                // extracted inner value. We build innerVarExpr here (even in cost-probe mode)
+                // because the inner _coerce call needs a properly-typed fromExpr; passing
+                // nullptr would risk a null-deref in the ExplicitRefType path.
+                auto innerVarDecl = getASTBuilder()->create<VarDecl>();
+                innerVarDecl->nameAndLoc.name = getName("__optInner");
+                innerVarDecl->type.type = fromInner;
+
+                auto innerVarExpr = getASTBuilder()->create<VarExpr>();
+                innerVarExpr->type = QualType(fromInner);
+                innerVarExpr->loc = fromExpr ? fromExpr->loc : SourceLoc();
+                innerVarExpr->declRef = makeDeclRef(innerVarDecl);
+
+                // Cost probe: suppress diagnostics on failure.
+                ConversionCost innerCost = kConversionCost_None;
+                bool innerCoercible = _coerce(
+                    site,
+                    toInner,
+                    nullptr,
+                    QualType(fromInner),
+                    innerVarExpr,
+                    nullptr,
+                    &innerCost,
+                    nullptr);
+
+                if (innerCoercible)
+                {
+                    if (outCost)
+                    {
+                        // +1 so that Optional<T>->Optional<U> (with T!=U) costs more than an
+                        // exact Optional<T>->Optional<T> match (cost 0), while still ranking
+                        // below any direct non-Optional conversion.
+                        *outCost = innerCost + 1;
+                    }
+                    if (outToExpr)
+                    {
+                        // Re-run the inner conversion in build mode to construct the
+                        // coerced expression. Note that a probe (outToExpr==nullptr) can
+                        // succeed for an *ambiguous* inner conversion while the build path
+                        // fails: _coerce returns true when probing an ambiguous conversion
+                        // but sets outToExpr to an error expr and returns false when asked
+                        // to reify it (see the AmbiguousConversion path). So do not assert
+                        // success here — on failure the inner call has already emitted the
+                        // specific diagnostic (via sink), so just propagate the failure.
+                        Expr* innerCoercedExpr = nullptr;
+                        bool ok = _coerce(
+                            site,
+                            toInner,
+                            &innerCoercedExpr,
+                            QualType(fromInner),
+                            innerVarExpr,
+                            sink,
+                            nullptr,
+                            nullptr);
+                        if (!ok)
+                        {
+                            *outToExpr = CreateErrorExpr(fromExpr);
+                            return false;
+                        }
+
+                        auto castExpr = getASTBuilder()->create<CastOptionalExpr>();
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->type = QualType(toType);
+                        castExpr->checked = true;
+                        castExpr->valueArg = fromExpr;
+                        castExpr->innerVarDecl = innerVarDecl;
+                        castExpr->innerCoercedExpr = innerCoercedExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
@@ -2064,6 +2217,98 @@ bool SemanticsVisitor::_coerce(
                 *outToExpr = rsExpr;
             }
             return true;
+        }
+
+        // HLSL compatibility: an unscoped enum in an
+        // HLSL-dialect translation unit may also convert implicitly to any
+        // builtin scalar its tag type can reach, performed as two implicit
+        // rounds that mirror the reverse composite below: first enum -> tag,
+        // then tag -> destination. Consider `enum Color { Red, Green, Blue };
+        // float f = Color.Green;` in a `.hlsl` file compiled with
+        // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
+        // `float`. This fires only at implicit sites; explicit casts such as
+        // `float(Color.Green)` already succeed through the target's initializer path.
+        if (site != CoercionSite::ExplicitCoercion &&
+            isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+        {
+            Expr* tagExpr = nullptr;
+            if (fromExpr)
+            {
+                auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
+                castToTag->type = tagType;
+                castToTag->loc = fromExpr->loc;
+                castToTag->base = fromExpr;
+                tagExpr = castToTag;
+            }
+
+            Expr* convertedExpr = nullptr;
+            ConversionCost innerCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    toType,
+                    outToExpr ? &convertedExpr : nullptr,
+                    QualType(tagType),
+                    tagExpr,
+                    sink,
+                    &innerCost,
+                    nullptr))
+            {
+                // Cost is additive across the two rounds: the enum -> tag leg
+                // reuses kConversionCost_RankPromotion (matching the direct
+                // enum -> tag case above) plus the inner tag -> destination cost.
+                // This keeps enum -> tag (150) cheaper than enum -> float
+                // (150 + 400 = 550), so overload resolution still prefers the
+                // tag. No E30081 "unrecommended implicit conversion" warning
+                // fires on this path: we return here, before the
+                // initializer-overload branch that emits it, and the inner leg
+                // (int -> float, 400) stays below that branch's threshold (500).
+                if (outCost)
+                    *outCost = kConversionCost_RankPromotion + innerCost;
+                if (outToExpr)
+                    *outToExpr = convertedExpr;
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
+        }
+    }
+
+    // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
+    // (`EnumTag(x)` or `(EnumTag)x`) should first coerce `x` to the enum's tag type and then wrap
+    // that tag value in the nominal enum type.
+    if (site == CoercionSite::ExplicitCoercion)
+    {
+        if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
+        {
+            auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            if (!tagType)
+                return false;
+
+            Expr* tagExpr = nullptr;
+            ConversionCost tagCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    tagType,
+                    outToExpr ? &tagExpr : nullptr,
+                    fromType,
+                    fromExpr,
+                    sink,
+                    &tagCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = tagCost + kConversionCost_Explicit;
+                if (outToExpr)
+                {
+                    auto enumExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    enumExpr->type = toType;
+                    if (fromExpr)
+                        enumExpr->loc = fromExpr->loc;
+                    enumExpr->base = tagExpr;
+                    *outToExpr = enumExpr;
+                }
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
         }
     }
 
@@ -2185,15 +2430,6 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // Disallow converting to a ParameterGroupType.
-    //
-    // TODO(tfoley): Under what circumstances would this check ever be needed?
-    //
-    if (as<ParameterGroupType>(toType))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
-    }
-
     // If the type that we are converting from is a parameter group type
     // (something like `ConstantBuffer<X>` or `ParameterBlock<X>`) and we
     // are converting to some type `Y`, then we want to allow for a multi-step
@@ -2239,6 +2475,9 @@ bool SemanticsVisitor::_coerce(
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
+            // The recursive coercion below diagnoses against this synthesized
+            // dereference, so it must carry the operand's source location.
+            derefExpr->loc = fromExpr->loc;
         }
 
         ConversionCost subCost = kConversionCost_None;
@@ -2374,6 +2613,41 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Fast path: at an implicit coercion site, an opaque generic type parameter
+    // cannot convert to a concrete scalar builtin, so skip the initializer-based
+    // conversion search that makes up the rest of this function. Ranking an
+    // operator call on a constrained generic `T` against the many concrete
+    // scalar overloads otherwise runs one full (always-failing) conversion
+    // search per rejected candidate — the dominant semantic-checking cost in
+    // generic-heavy code (issue #11897). The `ImplicitCastMethodKey` failure
+    // cache below cannot absorb this: its key includes the `Type*`, and every
+    // generic declaration has a distinct `T` type object.
+    //
+    // Soundness: by this point the exact-match, subtype-witness, and
+    // type-equality-witness paths have all failed, and at an implicit site
+    // nested conversions are disallowed, so an initializer could only match
+    // `T` exactly — and no scalar builtin declares an implicit initializer
+    // with an opaque generic parameter type (a contingent core-module
+    // property, pinned by generic-arithmetic-coerce-diag.slang). The one
+    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // so `bool` targets are excluded. Everything else stays on the search
+    // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
+    // scalars such as `BFloat16`/FP8 (which do declare generic initializers).
+    // Pack elements never reach this test (`each T` has type `EachType`, not
+    // a decl-ref); a bare pack-parameter decl-ref, should a checker path ever
+    // form one at a coercion, is intentionally rejected under the same
+    // argument (no scalar builtin accepts a pack). The boundaries are pinned
+    // by tests/language-feature/generics/generic-arithmetic-coerce*.slang.
+    const auto toTypeBasic = as<BasicExpressionType>(toType);
+    const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
+    const auto fromTypeGenericParamDeclRef =
+        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
+    if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&
+        fromTypeGenericParamDeclRef)
+    {
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
+    }
+
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
     // declarations on the target type.
@@ -2440,6 +2714,16 @@ bool SemanticsVisitor::_coerce(
     {
         AddTypeOverloadCandidates(toType, overloadContext);
     }
+
+    // `canCoerce` performs a speculative cost probe by passing a null `outToExpr`; materialized
+    // conversions pass storage for the result. Apply the legacy compatibility fallback in both
+    // cases, but supply the sink only for a materialized conversion. A null sink explicitly
+    // requests a non-diagnostic operation, so there is nowhere to report the deprecation.
+    bool usedLegacyGenericParameterCountFallback =
+        tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+            overloadContext,
+            overloadContext.loc,
+            outToExpr ? sink : nullptr);
 
     // After all of the overload candidates have been added
     // to the context and processed, we need to see whether
@@ -2743,8 +3027,11 @@ bool SemanticsVisitor::_coerce(
 
             // TODO: Register associated differentiable methods & types here as well.
         }
-        if (!cachedMethod)
+        if (!cachedMethod && !usedLegacyGenericParameterCountFallback)
         {
+            // Never cache a conversion selected by the legacy compatibility fallback. A cost probe
+            // must not hide a later source-level warning, and every materialized source occurrence
+            // must resolve and report its own use of the deprecated rule.
             // We can only cache the method if it is a public, otherwise we may not be able to
             // use this method depending on where we are performing the coercion.
             if (overloadContext.bestCandidate->item.declRef &&

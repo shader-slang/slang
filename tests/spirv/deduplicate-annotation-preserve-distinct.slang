@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv-asm -entry computeMain -stage compute -O0
+//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv-asm -entry computeMain -stage compute
 
 // Check that annotation instructions with distinct operands are preserved.
 

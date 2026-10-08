@@ -28,7 +28,7 @@ void main()
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
     // CHECK: TraceRay(
-    // CHECK: rayPayload{{.*}}.data{{.*}};
+    // CHECK: [[scalar:someInData1_[0-9]+]] = rayPayload{{_[0-9]}}.data{{_[0-9]}};
     TraceRay(as,
              1,
              0xff,
@@ -40,7 +40,8 @@ void main()
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
     // Motion blur not supported in HLSL - removed TraceMotionRay test
-    // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = rayPayload{{.*}}.data{{.*}};
+    // The second dispatch receives the scalar copied back from the first payload wrapper.
+    // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = [[scalar]];
     // CHECK: TraceRay(
     // CHECK: rayPayload{{.*}}.data{{.*}};
     TraceRay(as,

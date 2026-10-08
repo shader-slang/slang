@@ -1,14 +1,15 @@
 // slang-emit-cpp.cpp
 #include "slang-emit-cpp.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../core/slang-token-reader.h"
-#include "../core/slang-writer.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-token-reader.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 /*
 ABI
@@ -1301,6 +1302,17 @@ void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* de
     }
 }
 
+void CPPSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // C/C++ (and, via inheritance, CUDA) has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
+    }
+}
+
 const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(Index elemCount)
 {
     SLANG_UNUSED(elemCount);
@@ -1358,32 +1370,56 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
-            // Only 32-bit integer widths are supported by the prelude
-            // helpers today; wider/narrower types fall through to the
-            // default unhandled-opcode diagnostic so the build fails
-            // loudly instead of producing bogus code.
+            // Shader coverage is the client this lowering exists for,
+            // and it only emits the unsigned variants (its
+            // synthesized buffer element type is uint/uint64). User
+            // code does not reach it through the atomic APIs meant
+            // for it: `InterlockedAdd` and `Atomic<T>` declare
+            // capabilities that exclude the CPU target, so they are
+            // rejected before emission. `Atomic<T>.add` is the
+            // exception, because the extension that declares it does
+            // not repeat `Atomic<T>`'s `[require]`; that is also the
+            // only way the signed variants are reached.
+            //
+            // 32-bit and 64-bit integer widths are supported via the
+            // matching prelude helper pair
+            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
+            // float types fall through to the default unhandled-
+            // opcode diagnostic so the build fails loudly instead
+            // of producing bogus code.
             auto dataType = inst->getDataType();
-            bool isSignedInt = dataType->getOp() == kIROp_IntType;
-            bool isUnsignedInt = dataType->getOp() == kIROp_UIntType;
-            if (!isSignedInt && !isUnsignedInt)
+            char const* helper;
+            switch (dataType->getOp())
+            {
+            case kIROp_UIntType:
+                helper = "_slang_atomic_add_u32";
+                break;
+            case kIROp_IntType:
+                helper = "_slang_atomic_add_i32";
+                break;
+            case kIROp_UInt64Type:
+                helper = "_slang_atomic_add_u64";
+                break;
+            case kIROp_Int64Type:
+                helper = "_slang_atomic_add_i64";
+                break;
+            default:
                 return false;
-            char const* helper = isSignedInt ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            }
             emitInstResultDecl(inst);
             m_writer->emit(helper);
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
+            // The value-operand literal's C++ suffix (`U`/`ULL`) is
+            // chosen by `emitOperand` from the IR operand's type, so
+            // the literal width here matches the chosen `helper`
+            // signature automatically.
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            // Memory-order operand (operand 2) is intentionally
-            // ignored: the prelude helpers in `slang-cpp-prelude.h`
-            // pick the strongest ordering each toolchain provides
-            // out-of-the-box — `__ATOMIC_RELAXED` on GCC/Clang
-            // (which honors operand 2's intent), and
-            // `_InterlockedExchangeAdd` on MSVC (sequentially
-            // consistent on the supported architectures, stronger
-            // than relaxed but still correct under concurrency).
-            // Other backends (SPIR-V/Metal/CUDA) map operand 2 to
-            // native ordering; CPU's coupling lives in the prelude.
+            // Operand 2 (memory order) is consumed by the prelude
+            // helpers in `slang-cpp-prelude.h`, not threaded through
+            // here; see those helpers for the per-toolchain ordering
+            // choice.
             m_writer->emit(");\n");
             return true;
         }
@@ -1399,6 +1435,19 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     default:
         {
             return false;
+        }
+
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // A Slang array lowers to `struct FixedArray<T,N> { T m_data[N]; }`, so its initializer
+            // needs two brace levels — the struct and its `m_data` member — whereas the base
+            // emitter emits one and relies on brace-elision, which is ambiguous for nested arrays.
+            // MakeStruct is a genuine struct and stays on the base single-brace path.
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
         }
 
     case kIROp_InOutImplicitCast:
@@ -1914,7 +1963,8 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // it.
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            switch (use->getUser()->getOp())
+            auto user = use->getUser();
+            switch (user->getOp())
             {
             case kIROp_MatrixReshape:
             case kIROp_VectorReshape:
@@ -1925,6 +1975,24 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
                 return false;
             default:
                 break;
+            }
+
+            // A multi-component swizzle read has no native `.xyz` construction
+            // form in C++/CUDA, so the `kIROp_Swizzle` handler in `emitInstExpr`
+            // below builds the result element by element -- for example
+            // `float3{ base.x, base.y, base.z }` -- re-emitting the base operand
+            // once per component. If `base` is a value we would otherwise fold
+            // into its use site (a texture fetch or buffer load), that fold
+            // textually duplicates the fetch N times, producing N times the
+            // memory traffic. SPIR-V lowers the same swizzle to a single
+            // `OpVectorShuffle`, and HLSL emits a native `.xyz`, both evaluating
+            // the base once; keeping the base as its own temp here brings the
+            // C-family targets to that parity. This mirrors the reshape/cast
+            // guard above, whose rationale is likewise "multiple references."
+            if (auto swizzle = as<IRSwizzle>(user))
+            {
+                if (swizzle->getBase() == inst && swizzle->getElementCount() > 1)
+                    return false;
             }
         }
         switch (inst->getOp())
@@ -2064,7 +2132,7 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
-void CPPSourceEmitter::_emitEntryPointDefinitionStart(
+void CPPSourceEmitter::_emitEntryPointSignature(
     IRFunc* func,
     const String& funcName,
     const UnownedStringSlice& varyingTypeName)
@@ -2074,7 +2142,6 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(
     auto entryPointDecl = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecl);
 
-    // Emit the actual function
     emitEntryPointAttributes(func, entryPointDecl);
     emitType(resultType, funcName);
 
@@ -2082,6 +2149,14 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(
     m_writer->emit(varyingTypeName);
     m_writer->emit("* varyingInput, void* entryPointParams, void* globalParams)");
     emitSemantics(func);
+}
+
+void CPPSourceEmitter::_emitEntryPointDefinitionStart(
+    IRFunc* func,
+    const String& funcName,
+    const UnownedStringSlice& varyingTypeName)
+{
+    _emitEntryPointSignature(func, funcName, varyingTypeName);
     m_writer->emit("\n{\n");
 
     m_writer->indent();
@@ -2092,6 +2167,15 @@ void CPPSourceEmitter::_emitEntryPointDefinitionEnd(IRFunc* func)
     SLANG_UNUSED(func);
     m_writer->dedent();
     m_writer->emit("}\n");
+}
+
+void CPPSourceEmitter::_emitEntryPointPrototype(
+    IRFunc* func,
+    const String& funcName,
+    const UnownedStringSlice& varyingTypeName)
+{
+    _emitEntryPointSignature(func, funcName, varyingTypeName);
+    m_writer->emit(";\n");
 }
 
 namespace
@@ -2336,6 +2420,27 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                 getComputeThreadGroupSize(func, groupThreadSize);
 
                 String funcName = getName(func);
+
+                // In header mode the wrappers must be declarations, not definitions (see #9403).
+                // The bodies call the `_`-prefixed workhorse, which is not emitted in a header, so
+                // emitting them would produce a header that fails to compile; and function bodies
+                // in a header would violate the one-definition rule across translation units.
+                if (shouldEmitOnlyHeader())
+                {
+                    _emitEntryPointPrototype(
+                        func,
+                        funcName + "_Thread",
+                        UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
+                    _emitEntryPointPrototype(
+                        func,
+                        funcName + "_Group",
+                        UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    _emitEntryPointPrototype(
+                        func,
+                        funcName,
+                        UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    continue;
+                }
 
                 {
                     StringBuilder builder;

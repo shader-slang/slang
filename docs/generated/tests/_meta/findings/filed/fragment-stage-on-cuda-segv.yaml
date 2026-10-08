@@ -1,0 +1,27 @@
+schema_version: 1
+id: fragment-stage-on-cuda-segv
+bundle: cross-cutting/targets
+suspected_kind: sigsegv
+scope: cuda
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: slangc repro.slang -target cuda -entry main -stage fragment -o /dev/null
+  source_slang: docs/generated/tests/cross-cutting/targets/fragment-stage-on-cuda.slang
+  observed_summary: slangc SIGSEGVs when a `[shader("fragment")]` entry point is compiled with `-target cuda` instead of emitting a target-capability-mismatch diagnostic
+  exit_code: 139
+  minimized_repro: |
+    [shader("fragment")]
+    float4 main() : SV_Target
+    {
+        return float4(1, 0, 0, 1);
+    }
+expected:
+  claim: A stage/target mismatch (fragment stage on CUDA target) should produce a clean target-capability diagnostic, consistent with how other stage/target mismatches are reported.
+  citation_kind: sibling-test
+  citation: tests/compute/compute-smoke.slang
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/cross-cutting/targets.md
+agent_self_assessment:
+  confidence: high

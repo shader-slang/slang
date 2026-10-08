@@ -126,9 +126,8 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
                                                                   ->resolve())
                                           : nullptr;
 
-    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
+    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType); rawFwdDiffFuncType)
     {
-        SLANG_UNUSED(rawFwdDiffFuncType);
         if (auto substFwdDiffFuncType = as<FwdDiffFuncType>(substitutedDirectFuncType))
         {
             auto diffTypeWitness =
@@ -173,33 +172,30 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
 
     for (auto paramType : funcType->getParamTypes())
     {
-        auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
-        auto witness = getDiffWitness(paramValueType);
+        auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
+        auto witness =
+            doesTypeHaveNoDiffModifier(paramInfo.type) ? nullptr : getDiffWitness(paramInfo.type);
         paramWitnesses.add(witness);
     }
 
-    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+    SubtypeWitness* returnWitness =
+        doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
+                callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
+            ? nullptr
+            : getDiffWitness(funcType->getResultType());
 
-    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
     Type* thisParamType = nullptr;
+    SubtypeWitness* thisWitness = nullptr;
 
-    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
-        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
     {
-        thisParamType = nullptr;
+        // Keep the witness faithful to the checked primal receiver ABI. Each derivative-function
+        // consumer applies its own role-specific transformation to this declaration-derived mode;
+        // specialization and the differentiated value type must not reselect the mode.
+        thisParamType = getParamTypeWithModeWrapper(astBuilder, *thisParamInfo);
+        if (!doesTypeHaveNoDiffModifier(thisParamInfo->type))
+            thisWitness = getDiffWitness(thisParamInfo->type);
     }
-    else if (thisValueType.type)
-    {
-        if (thisValueType.isLeftValue)
-            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
-        else
-            thisParamType = thisValueType.type;
-    }
-
-    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
-
-    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
-        thisWitness = nullptr;
 
     return astBuilder->getOrCreate<DiffTypeInfoWitness>(
         thisParamType,
@@ -252,19 +248,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
-    // First, make sure both sub type and super type decl are ready for lookup.
-    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
-    {
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-        }
-    }
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
     SubtypeWitness* failureWitness = nullptr;
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
@@ -281,7 +264,8 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType()->resolve();
+        auto rawFacetType = facet->getType();
+        auto facetType = as<Type>(rawFacetType->resolve());
         if (!facetType)
             continue;
 
@@ -306,8 +290,26 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
+        auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
+
+        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
+        // interface's `ThisType` (treating the type as a requirement template; see #11469).
+        // When the query `subType` is the interface (existential box) itself, the facet
+        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
+        // Re-root the witness onto the queried `subType` so the returned witness satisfies
+        // the invariant `result->getSub() == subType`; this yields a well-formed,
+        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
+        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
+        {
+            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
+                return m_astBuilder->getDeclaredSubtypeWitness(
+                    subType,
+                    superType,
+                    boxWitness->getDeclRef());
+        }
+        return witness;
     }
+
     //
     // TODO: We could expand upon the test using the facet list above
     // by taking the facet lists of both `subType` and `superType`
@@ -418,79 +420,215 @@ SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
 
 bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)
 {
-    if (auto arrayType = as<ArrayExpressionType>(type))
-    {
-        return doesTypeHaveTag(arrayType->getElementType(), tag);
-    }
-    if (auto modifiedType = as<ModifiedType>(type))
-    {
-        return doesTypeHaveTag(modifiedType->getBase(), tag);
-    }
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
-            return aggTypeDecl.getDecl()->hasTag(tag);
-    }
-    return false;
+    return (int(getTypeTags(type)) & int(tag)) != 0;
 }
+
+/// A context for computing the storage-related properties of a type and its instance fields.
+///
+/// The `getTags` method inspects checked field signatures rather than cached aggregate tags.
+/// Header checking needs these properties to choose storage for uniform parameter shadows,
+/// before body checking has accumulated tags on the aggregate declaration.
+/// For example, `struct Box<T> { T value; };` has an opaque field in `Box<Texture2D>`, but not
+/// in `Box<float>`. Caching tags on the unspecialized declaration cannot describe both cases.
+/// Requires `visitor` to identify the semantic-checking context before `getTags` is called.
+struct TypeTagContext
+{
+    SemanticsVisitor* visitor;
+    HashSet<Type*> activeTypes;
+    Dictionary<Type*, TypeTag> computedTags;
+    UInt nestingDepth = 0;
+    UInt interruptedInspections = 0;
+
+    /// Compute the tags of `type` with query-local caching and bounded recursive inspection.
+    ///
+    /// Returns established flags, including `TypeTag::Incomplete` if inspection cannot finish.
+    /// The nesting limit counts steps through fields, bases, aliases, and type wrappers.
+    TypeTag getTags(Type* type)
+    {
+        // We need to bound inspection of fields such as `struct Box<T> { Box<Box<T>> next; }`.
+        // Substitution creates a distinct type at each step, so cycle detection cannot stop it.
+        // We mark the result incomplete at the compiler's nesting limit; ordinary type
+        // validation diagnoses the invalid nesting at the declaration that uses the type.
+        if (nestingDepth >= kMaxTypeNestingDepth)
+        {
+            interruptedInspections++;
+            return TypeTag::Incomplete;
+        }
+
+        // We may encounter many fields with the same instantiated type. We reuse computed
+        // tags so each encounter does not require traversing that type's nested structure again.
+        TypeTag cachedTags;
+        if (computedTags.tryGetValue(type, cachedTags))
+            return cachedTags;
+
+        // An active type encountered again indicates a cycle through fields, bases, or wrappers.
+        // We return `TypeTag::Incomplete` and leave validity diagnostics to ordinary checking.
+        if (!activeTypes.add(type))
+        {
+            interruptedInspections++;
+            return TypeTag::Incomplete;
+        }
+
+        auto interruptedInspectionsBefore = interruptedInspections;
+        nestingDepth++;
+        auto tags = getTagsImpl(type);
+        nestingDepth--;
+        activeTypes.remove(type);
+
+        // A result from interrupted inspection depends on the current path and remaining depth.
+        // We do not cache it: a later, shallower visit may establish additional properties.
+        // Fully inspected extern types can still be cached with `TypeTag::Incomplete`, which
+        // records that linking may replace their definitions rather than interrupted inspection.
+        if (interruptedInspections == interruptedInspectionsBefore)
+            computedTags.add(type, tags);
+        return tags;
+    }
+
+    /// Compute direct type properties and combine properties of instantiated fields and bases.
+    ///
+    /// Requires `getTags` to have registered `type` in the current recursion path.
+    TypeTag getTagsImpl(Type* type)
+    {
+        // An array has the properties of its elements. Its bound additionally determines
+        // whether storage has a known size, a link-time size, or no declared size.
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            auto tags = getTags(arrayType->getElementType());
+            auto elementCount = arrayType->getElementCount();
+
+            // An absent bound describes an unbounded and non-addressable array.
+            if (!elementCount)
+                return TypeTag(int(tags) | int(TypeTag::Unsized) | int(TypeTag::NonAddressable));
+
+            // Linking or specialization resolves a count that is not yet a `ConstantIntVal`.
+            auto constantCount = as<ConstantIntVal>(elementCount);
+            if (!constantCount)
+                return TypeTag(int(tags) | int(TypeTag::LinkTimeSized));
+
+            // The compiler also represents an unbounded array with an internal sentinel count.
+            if (constantCount->getValue() == kUnsizedArrayMagicLength)
+                return TypeTag(int(tags) | int(TypeTag::Unsized) | int(TypeTag::NonAddressable));
+            return tags;
+        }
+
+        // Type modifiers do not change the properties represented by `TypeTag`. We inspect
+        // the underlying type so qualifiers such as `no_diff` do not hide a resource field.
+        if (auto modifiedType = as<ModifiedType>(type))
+            return getTags(modifiedType->getBase());
+
+        // We classify parameter-group representations before inspecting aggregate declarations.
+        // `ParameterBlock<T>` is a binding container rather than an addressable value of `T`.
+        if (as<ParameterBlockType>(type))
+            return TypeTag::NonAddressable;
+        if (auto parameterGroupType = as<UniformParameterGroupType>(type))
+        {
+            // Other parameter groups, such as `ConstantBuffer<T>`, are opaque buffer values.
+            // The buffer value has a fixed representation even when `T` has a trailing unsized
+            // array. We clear only `TypeTag::Unsized`; the other element properties still apply
+            // to validation of the buffer's contents.
+            auto tags = getTags(parameterGroupType->getElementType());
+            return TypeTag((int(tags) & ~int(TypeTag::Unsized)) | int(TypeTag::Opaque));
+        }
+
+        // The compiler's resource type classes describe opaque values directly. Their builtin
+        // declarations do not describe the fields that a compiled resource value would store.
+        if (as<UntypedBufferResourceType>(type))
+            return TypeTag::Opaque;
+        if (as<ResourceType>(type))
+            return TypeTag::Opaque;
+
+        // Samplers and structured buffers also use dedicated resource representations. Their
+        // tags do not depend on the fields of the builtin declarations.
+        if (as<SamplerStateType>(type))
+            return TypeTag::Opaque;
+        if (as<HLSLStructuredBufferTypeBase>(type))
+            return TypeTag::Opaque;
+
+        // A dynamic resource has an opaque representation even before specialization chooses
+        // a particular resource type.
+        if (as<DynamicResourceType>(type))
+            return TypeTag::Opaque;
+
+        // For types without an aggregate declaration, no additional flags are currently known.
+        // This includes scalar types and generic parameters that have not been substituted.
+        // `TypeTag::None` does not certify the validity of their eventual specializations.
+        auto declRefType = as<DeclRefType>(type);
+        if (!declRefType)
+            return TypeTag::None;
+        auto aggregateRef = declRefType->getDeclRef().as<AggTypeDecl>();
+        if (!aggregateRef)
+            return TypeTag::None;
+
+        // A builtin aggregate may use a dedicated compiler representation rather than its
+        // declared fields. Its declaration tags remain authoritative for that representation.
+        auto aggregate = aggregateRef.getDecl();
+        if (aggregate->hasModifier<MagicTypeModifier>())
+            return aggregate->typeTags;
+
+        // Header checking resolves a link-time alias's default type. An externally replaceable
+        // declaration remains incomplete because the linker can select a different definition.
+        visitor->ensureDecl(aggregate, DeclCheckState::ReadyForReference);
+        TypeTag tags = TypeTag::None;
+        if (aggregate->hasModifier<ExternModifier>())
+            tags = TypeTag::Incomplete;
+        if (aggregate->aliasedType.type)
+        {
+            // A link-time alias has a checked default type, such as `Data` in
+            // `extern struct Alias : IData = Data;`. We apply the alias reference's
+            // substitutions to that semantic type and resolve it before inspecting its fields.
+            auto defaultType =
+                as<Type>(aggregate->aliasedType.type
+                             ->substitute(visitor->getASTBuilder(), SubstitutionSet(aggregateRef))
+                             ->resolve());
+            SLANG_RELEASE_ASSERT(defaultType);
+
+            // `getTags` establishes properties of the default, but linking can select a different
+            // definition. We include `TypeTag::Incomplete` even when the default is fully known.
+            return TypeTag(int(getTags(defaultType)) | int(TypeTag::Incomplete));
+        }
+
+        // We now inspect instance fields. `getMemberDeclRef` constructs a field reference with
+        // the aggregate's substitutions, and `getType` applies them to its checked field type.
+        for (auto field : aggregate->getFields())
+        {
+            if (isEffectivelyStatic(field))
+                continue;
+
+            // We access `field` directly rather than through name lookup. `getType` requires
+            // its checked signature, but not the redeclaration checks in `ReadyForReference`.
+            // Header checking publishes `SignatureChecked` before array-element validation,
+            // so we can inspect a recursive field without re-entering that validation.
+            visitor->ensureDecl(field, DeclCheckState::SignatureChecked);
+            auto fieldRef =
+                visitor->getASTBuilder()->getMemberDeclRef(aggregateRef, field).as<VarDeclBase>();
+            tags = TypeTag(int(tags) | int(getTags(getType(visitor->getASTBuilder(), fieldRef))));
+        }
+
+        // Concrete base types contribute stored fields, while interface conformance does not.
+        // `getMemberDeclRef` records the substitutions; `getBaseType` applies them to the base.
+        for (auto base : aggregate->getMembersOfType<InheritanceDecl>())
+        {
+            visitor->ensureDecl(base, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseRef = visitor->getASTBuilder()
+                               ->getMemberDeclRef(aggregateRef, base)
+                               .as<InheritanceDecl>();
+            auto baseType = getBaseType(visitor->getASTBuilder(), baseRef);
+            if (isDeclRefTypeOf<InterfaceDecl>(baseType))
+                continue;
+            tags = TypeTag(int(tags) | int(getTags(baseType)));
+        }
+        return tags;
+    }
+};
 
 TypeTag SemanticsVisitor::getTypeTags(Type* type)
 {
-    if (auto arrayType = as<ArrayExpressionType>(type))
-    {
-        auto typeTag = getTypeTags(arrayType->getElementType());
-        bool sized = false;
-        if (auto cint = as<ConstantIntVal>(arrayType->getElementCount()))
-        {
-            if (cint->getValue() != kUnsizedArrayMagicLength)
-            {
-                sized = true;
-            }
-        }
-        else if (arrayType->getElementCount())
-        {
-            sized = true;
-            typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
-        }
-        if (!sized)
-        {
-            // Unbounded arrays are both Unsized and NonAddressable
-            typeTag =
-                (TypeTag)((int)typeTag | (int)TypeTag::Unsized | (int)TypeTag::NonAddressable);
-        }
-
-        return typeTag;
-    }
-    if (auto modifiedType = as<ModifiedType>(type))
-    {
-        return getTypeTags(modifiedType->getBase());
-    }
-    if (as<ParameterBlockType>(type))
-    {
-        // ParameterBlock types are non-addressable
-        return TypeTag::NonAddressable;
-    }
-    if (auto parameterGroupType = as<UniformParameterGroupType>(type))
-    {
-        auto elementTags = getTypeTags(parameterGroupType->getElementType());
-        elementTags = (TypeTag)(((int)elementTags & ~(int)TypeTag::Unsized) | (int)TypeTag::Opaque);
-        return elementTags;
-    }
-    else if (
-        as<UntypedBufferResourceType>(type) || as<ResourceType>(type) ||
-        as<SamplerStateType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||
-        as<DynamicResourceType>(type))
-    {
-        return TypeTag::Opaque;
-    }
-    else if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
-        {
-            return aggTypeDecl.getDecl()->typeTags;
-        }
-    }
-    return TypeTag::None;
+    // We start a fresh query so tags are computed from the checked type and its substitutions.
+    // The cache lasts only for this call and is keyed by instantiated `Type*`, so different
+    // specializations of an aggregate have separate results.
+    TypeTagContext context;
+    context.visitor = this;
+    return context.getTags(type);
 }
 
 

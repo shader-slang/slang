@@ -1,0 +1,38 @@
+schema_version: 1
+id: declarations-tbuffer-spirv-cuda-cpp-crash
+bundle: conformance/declarations
+suspected_kind: wrong-codegen
+title: "`tbuffer` emit crashes on SPIR-V / CUDA / CPP (unhandled-inst)"
+observed_at: "2026-06-02T10:00:00+00:00"
+scope: spirv
+evidence:
+  command: "./build/Release/bin/slangc -target spirv-asm -entry computeMain -stage compute docs/generated/tests/conformance/declarations/tbuffer-emission.slang"
+  source_slang: docs/generated/tests/conformance/declarations/tbuffer-emission.slang
+  observed_summary: |
+    Emitting a `tbuffer` declaration to SPIR-V causes:
+    "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE
+    unimplemented: Unhandled global inst in spirv-emit:
+    let  %1 : _ = TextureBuffer(%SLANGx5FParameterGroupx5FMyTex)"
+
+    Emitting to CUDA or CPP targets causes:
+    "internal error[E99999]: unexpected condition encountered in Slang compiler:
+    unhandled type for C/C++ emit"
+
+    HLSL, GLSL, Metal, and WGSL all emit successfully. The `tbuffer` keyword
+    is an HLSL-specific construct; other backends should either translate it to
+    a uniform/constant-buffer or emit a diagnostic, not crash.
+expected:
+  claim: |
+    The doc (declarations.md#constant-buffers-and-texture-buffers) states that `tbuffer`
+    uses TextureBuffer<T>. Emitting to SPIR-V, CUDA, and CPP should either produce valid
+    output or emit a graceful unsupported-feature diagnostic, not an unhandled-inst crash.
+  citation_kind: doc
+  citation: docs/language-reference/declarations.md
+provenance:
+  agent_model: claude-sonnet-4-6
+  source_commit: a01e79278cf0be9772deb8b2be52ee87687697a3
+  doc_anchor: docs/language-reference/declarations.md#constant-buffers-and-texture-buffers
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Intentional unsupported target: possible, but the compiler should emit a clean diagnostic rather than crash with E99997/E99999."

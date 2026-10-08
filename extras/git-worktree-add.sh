@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Compatibility: this script must run on bash 3.2, the version Apple ships as
+# /bin/bash on macOS. Do NOT use bash 4+ only features such as ${var,,}/${var^^}
+# (case conversion), associative arrays (declare -A), mapfile/readarray, or
+# namerefs (local -n). Lowercasing is done via the to_lower() helper below.
 set -euo pipefail
 
 is_wsl() {
@@ -47,7 +51,7 @@ Options:
                      by dashes. In review mode, defaults to
                      ../review-pr-<number>.
   --tmux             Start a tmux session named after the branch or review in
-                     the new worktree after setup completes.
+                     the new worktree and use the branch as the terminal title.
   --no-submodules    Skip submodule initialization.
   -h, --help         Show this help.
 
@@ -70,6 +74,12 @@ log() {
 die() {
   echo "Error: $*" >&2
   exit 1
+}
+
+# Lowercase a string. Uses tr instead of ${var,,} so the script runs on
+# bash 3.2 (the version Apple ships as /bin/bash).
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 require_command() {
@@ -157,12 +167,16 @@ is_git_repository() {
 start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
+  local branchName="$3"
+  local titleFormat="${branchName//\#/##}"
 
+  "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
+  "$TMUX_EXE" set-option -t "$sessionName" set-titles on
+  "$TMUX_EXE" set-option -t "$sessionName" set-titles-string "$titleFormat"
   if [[ -n "${TMUX:-}" ]]; then
-    "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
     "$TMUX_EXE" switch-client -t "=$sessionName"
   else
-    "$TMUX_EXE" new-session -s "$sessionName" -c "$sessionDir"
+    "$TMUX_EXE" attach-session -t "=$sessionName"
   fi
 }
 
@@ -225,7 +239,7 @@ review_repo_matches_configured_remote() {
     if ! remoteRepo="$(github_repo_from_url "$remoteUrl")"; then
       continue
     fi
-    if [[ "${remoteRepo,,}" == "${reviewRepoFull,,}" ]]; then
+    if [[ "$(to_lower "$remoteRepo")" == "$(to_lower "$reviewRepoFull")" ]]; then
       return 0
     fi
   done < <(git_run remote)
@@ -492,5 +506,5 @@ fi
 
 if [[ $startTmux -eq 1 ]]; then
   log "Starting tmux session: $sessionName"
-  start_tmux_session "$sessionName" "$dstDirShell"
+  start_tmux_session "$sessionName" "$dstDirShell" "$branchName"
 fi

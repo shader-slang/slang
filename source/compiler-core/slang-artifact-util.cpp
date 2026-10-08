@@ -1,8 +1,8 @@
 // slang-artifact-util.cpp
 #include "slang-artifact-util.h"
 
-#include "../core/slang-castable.h"
-#include "../core/slang-io.h"
+#include "core/slang-castable.h"
+#include "core/slang-io.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"

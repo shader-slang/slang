@@ -2,6 +2,7 @@
 #include "slang-ir-legalize-varying-params.h"
 
 #include "slang-ir-clone.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
@@ -9,6 +10,7 @@
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-layout.h"
 
 #include <set>
 
@@ -409,9 +411,17 @@ protected:
     Stage m_stage = Stage::Unknown;
 
 
-    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+    virtual void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
+
+        // Reset per-parameter scratch before legalizing this entry point's
+        // result (done below, before the parameter loop sets `m_param`). A
+        // stale `m_param` from a prior entry point may already be freed, and
+        // result-position diagnostics read it via
+        // `getUnsupportedVaryingDiagnosticLoc` (#11659).
+        m_param = nullptr;
+        m_paramLayout = nullptr;
 
         // Before diving into the work of processing an entry point, we start by
         // extracting a bunch of information about the entry point that will
@@ -545,7 +555,7 @@ protected:
         m_param = param;
 
         // We expect and require all entry-point parameters to have layout
-        // information assocaited with them at this point.
+        // information associated with them at this point.
         //
         auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(paramLayoutDecoration);
@@ -600,10 +610,10 @@ protected:
 
     void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
-        // The deafult handling of any mutable (`out` or `inout`) parameter
+        // The default handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
         // type and to use that in place of the actual parameter during
-        // exeuction of the function.
+        // execution of the function.
 
         // The replacement variable will have the type of the original
         // parameter (the `T` in `Out<T>` or `InOut<T>`).
@@ -635,7 +645,7 @@ protected:
         }
 
         // Because the `out` or `inout` parameter is represented
-        // as a pointer, and our local variabel is also a pointer
+        // as a pointer, and our local variable is also a pointer
         // we can directly replace all uses of the original parameter
         // with uses of the variable.
         //
@@ -827,7 +837,7 @@ protected:
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
     {
-        // By default, when we seek to creating a legalized value
+        // By default, when we seek to create a legalized value
         // for a varying parameter, we will look at its type to
         // decide what to do.
         //
@@ -1039,13 +1049,23 @@ protected:
     // to diagnose the case of a system-value semantic that isn't
     // understood by the target.
 
+    // Location for an unsupported-varying diagnostic. Normally the parameter
+    // being processed, but the entry-point result is legalized before the
+    // parameter loop sets `m_param`, so fall back to the entry-point function
+    // when `m_param` is null to avoid a null dereference (#11659).
+    SourceLoc getUnsupportedVaryingDiagnosticLoc() const
+    {
+        SLANG_ASSERT(m_entryPointFunc);
+        return m_param ? m_param->sourceLoc : m_entryPointFunc->sourceLoc;
+    }
+
     LegalizedVaryingVal diagnoseUnsupportedSystemVal(VaryingParamInfo const& info)
     {
         SLANG_UNUSED(info);
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this system-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
@@ -1056,7 +1076,7 @@ protected:
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this user-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
@@ -1107,6 +1127,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // Maximum number of payload registers (32 registers = 128 bytes)
     static const int kMaxPayloadRegisters = 32;
 
+    // Maximum number of OptiX hit attribute registers (8 registers = 32 bytes). Shared by the read
+    // path (`emitOptiXAttributeFetch`) and the `ReportHit` write path.
+    static const int kMaxOptiXHitAttributeRegisters = 8;
+
     // Track payload write-back info for inout parameters
     struct PayloadWritebackInfo
     {
@@ -1115,6 +1139,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         int registerCount;
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
+
+    bool hasAlreadyRegisteredPayloadWriteback(IRType* payloadType) const
+    {
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
+    }
 
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
@@ -1187,6 +1218,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // Empty-type legalization preserves non-optimizable empty fields as `void` so
+                // that field indices stay stable. The field occupies no storage, but make-struct
+                // still needs a matching operand until void cleanup removes both of them.
+                if (as<IRVoidType>(fieldType))
+                {
+                    fieldVals.add(builder->getVoidValue());
+                    continue;
+                }
+
                 // Align to field alignment before reading
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -1416,6 +1457,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // A legalized empty field has no storage, so it contributes no alignment or data.
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
                 // Align to field alignment before writing
                 int fieldAlign = getTypeCppAlignment(fieldType, builder);
                 ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
@@ -1718,6 +1764,267 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
+    // Resolve the callee of a call to the concrete IR function it targets, unwrapping a
+    // `specialize` wrapper around a function. Returns null for indirect calls (e.g. a call
+    // through a function value) where the callee is not a known function. This is the single
+    // resolver shared by emitPayloadWritebacks() and the terminate-reaching analysis below.
+    //
+    // Resolution boundary (the contract the analysis below relies on): by this point in the
+    // pipeline generics are specialized and witness lookups resolved, so every call that reaches
+    // the CUDA legalizer targets a concrete function. The only callee this returns null for is a
+    // genuinely indirect call (a call through a function value); a terminating intrinsic reached
+    // only through such a call is therefore not detectable here, but those calls are resolved away
+    // before this stage, so the terminate-reaching analysis covers every case that can actually
+    // occur.
+    static IRFunc* getResolvedCalleeFunc(IRCall* call)
+    {
+        auto callee = call->getCallee();
+        if (auto func = as<IRFunc>(callee))
+            return func;
+        if (auto specialize = as<IRSpecialize>(callee))
+            return as<IRFunc>(specialize->getBase());
+        return nullptr;
+    }
+
+    // Return true if `func` itself calls, or transitively reaches through resolvable direct
+    // calls, a shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch). This decides which
+    // callees must be inlined into a ray entry point so that the payload write-back is emitted
+    // before the ray terminates.
+    //
+    // `visited` is recursion-internal scratch: callers must pass a freshly-constructed empty set.
+    // It only guards against call-graph cycles — a `func` already in `visited` short-circuits to
+    // false regardless of whether it reaches a terminating intrinsic, so the set is NOT a memo of
+    // the predicate and must not be shared across separate top-level queries.
+    bool funcReachesShaderTerminatingIntrinsic(IRFunc* func, HashSet<IRFunc*>& visited)
+    {
+        if (!func || !visited.add(func))
+            return false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+                auto callee = getResolvedCalleeFunc(call);
+                if (isShaderTerminatingIntrinsic(callee))
+                    return true;
+                // Only recurse into callees with a body; intrinsics and external declarations
+                // cannot themselves contain a terminating call.
+                if (callee && callee->getFirstBlock() &&
+                    funcReachesShaderTerminatingIntrinsic(callee, visited))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Return true if the terminate-reaching call subgraph reachable from `func` contains a cycle.
+    // A recursive helper that terminates the ray cannot be flattened by inlining (inlining a
+    // recursive call chain would not terminate), so the caller must skip inlining and diagnose
+    // instead. Standard DFS back-edge detection restricted to functions in `terminateReaching`.
+    //
+    // `terminateReaching` is a real input (the set the search is restricted to). `onStack` (the
+    // current DFS path) and `done` (fully-explored functions) are recursion-internal scratch:
+    // callers must pass freshly-constructed empty sets, and on the early `return true` they are
+    // left indeterminate (the unwinding `onStack.remove`/`done.add` are skipped).
+    bool terminateSubgraphHasCycle(
+        IRFunc* func,
+        HashSet<IRFunc*>& terminateReaching,
+        HashSet<IRFunc*>& onStack,
+        HashSet<IRFunc*>& done)
+    {
+        onStack.add(func);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+                auto callee = getResolvedCalleeFunc(call);
+                if (!callee || !terminateReaching.contains(callee))
+                    continue;
+                if (onStack.contains(callee))
+                    return true;
+                if (!done.contains(callee) &&
+                    terminateSubgraphHasCycle(callee, terminateReaching, onStack, done))
+                    return true;
+            }
+        }
+        onStack.remove(func);
+        done.add(func);
+        return false;
+    }
+
+    // Inline, into each ray entry point, every callee that transitively reaches a
+    // shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch).
+    //
+    // This must run before the entry point is legalized: emitPayloadWritebacks() inserts the
+    // OptiX payload write-back before terminating calls, but it scans only the entry point's own
+    // blocks. A terminating call buried in a non-[ForceInline] callee is therefore missed, and the
+    // ray terminates before the entry-point epilogue writes the payload back, silently dropping
+    // the caller's payload mutations (issue #11658). Inlining the terminating call into the entry
+    // point reproduces exactly the codegen already produced when the callee is marked
+    // [ForceInline] (the maintainer's documented workaround), where the write-back lands before
+    // the terminate.
+    //
+    // On the rare path where a terminate-reaching callee cannot be flattened (a recursive chain,
+    // or a callee inlineCall cannot inline), the write-back cannot be guaranteed, so this pass
+    // emits an error (Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee) via `sink`
+    // rather than silently miscompiling.
+    void inlineShaderTerminatingCalleesForRayEntryPoints(IRModule* module, DiagnosticSink* sink)
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto entryPoint = as<IRFunc>(globalInst);
+            if (!entryPoint)
+                continue;
+            auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+            if (!entryPointDecor || !entryPoint->getFirstBlock())
+                continue;
+
+            // IgnoreHit/AcceptHitAndEndSearch are any-hit-only intrinsics (declared
+            // `[require(..., raytracing_anyhit)]` in the core module), so a terminating call can
+            // only legitimately appear in an `anyhit` entry point. Gating on Stage::AnyHit keeps
+            // every other entry point (including non-ray CUDA kernels) a strict no-op, and ensures
+            // an unrelated function that merely shares the name "IgnoreHit"/"AcceptHitAndEndSearch"
+            // — which isShaderTerminatingIntrinsic matches via name hint — is never disturbed.
+            if (entryPointDecor->getProfile().getStage() != Stage::AnyHit)
+                continue;
+
+            // Collect every defined function reachable from the entry point via resolvable
+            // direct calls.
+            HashSet<IRFunc*> reachable;
+            List<IRFunc*> workList;
+            reachable.add(entryPoint);
+            workList.add(entryPoint);
+            while (workList.getCount())
+            {
+                auto func = workList.getLast();
+                workList.removeLast();
+                for (auto block : func->getBlocks())
+                    for (auto inst : block->getChildren())
+                        if (auto call = as<IRCall>(inst))
+                        {
+                            auto callee = getResolvedCalleeFunc(call);
+                            if (callee && callee->getFirstBlock() && reachable.add(callee))
+                                workList.add(callee);
+                        }
+            }
+
+            // From the reachable set, compute `terminateReaching`: the functions (keyed on their
+            // pre-inlining identity) that reach a terminating intrinsic. This set is authoritative
+            // for exactly two decisions made before any IR is mutated: the `contains(entryPoint)`
+            // "is there anything to do" early-out, and the acyclicity check. The inlining loop and
+            // residual scan below deliberately do NOT consult it — they re-derive "reaches a
+            // terminating intrinsic" against the entry point's *current* blocks, because inlining
+            // mutates those blocks and a set keyed on the original functions would be stale.
+            HashSet<IRFunc*> terminateReaching;
+            for (auto func : reachable)
+            {
+                HashSet<IRFunc*> visited;
+                if (funcReachesShaderTerminatingIntrinsic(func, visited))
+                    terminateReaching.add(func);
+            }
+
+            // If no terminating intrinsic is reachable from this entry point (e.g. a non-ray
+            // kernel, or a ray shader that never terminates), there is nothing to do. If the only
+            // terminating calls are direct in the entry point's own blocks, no *callee* is
+            // terminate-reaching and the inlining loop below is a no-op, leaving the existing
+            // direct-call handling in emitPayloadWritebacks() untouched.
+            if (!terminateReaching.contains(entryPoint))
+                continue;
+
+            // A recursive terminate-reaching call chain cannot be flattened by inlining (the
+            // inline loop below would not terminate); skip inlining and let the diagnostic report
+            // it. In practice such recursion is already rejected upstream (E55201, "recursion not
+            // allowed"), so this guard primarily guarantees the pass itself always terminates.
+            HashSet<IRFunc*> onStack, done;
+            bool hasCycle = terminateSubgraphHasCycle(entryPoint, terminateReaching, onStack, done);
+
+            if (!hasCycle)
+            {
+                // Inline into the entry point every call that transitively reaches a terminating
+                // intrinsic, until none remain. We inline exactly these calls (rather than marking
+                // callees [ForceInline] and running the module-wide force-inliner) so unrelated
+                // callees are left untouched. The result is the same flattened entry point that a
+                // [ForceInline] callee produces, so emitPayloadWritebacks() then inserts the
+                // payload write-back before each terminating call.
+                //
+                // Termination (decreasing measure): each iteration inlines *all* terminate-reaching
+                // calls currently in the entry point, so the maximum entry-point-to-terminate call
+                // nesting depth strictly decreases by one per iteration. The terminate-reaching
+                // subgraph is acyclic (checked above), so that depth is finite and bounded by the
+                // number of reachable functions; the loop therefore converges in at most
+                // `reachable.getCount()` real passes plus one final no-op pass. `maxIterations` is
+                // a deliberately generous cap, not a tight bound: the assertion exists only to turn
+                // a hypothetical non-terminating loop into a debug-build failure, never to fire on
+                // a valid input.
+                Index maxIterations = reachable.getCount() + 1;
+                Index iterationCount = 0;
+                for (bool changed = true; changed;)
+                {
+                    SLANG_ASSERT(iterationCount++ <= maxIterations);
+                    changed = false;
+                    List<IRCall*> terminatingCalls;
+                    for (auto block : entryPoint->getBlocks())
+                        for (auto inst : block->getChildren())
+                            if (auto call = as<IRCall>(inst))
+                            {
+                                auto callee = getResolvedCalleeFunc(call);
+                                if (!callee || !callee->getFirstBlock())
+                                    continue;
+                                HashSet<IRFunc*> visited;
+                                if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                                    terminatingCalls.add(call);
+                            }
+                    for (auto call : terminatingCalls)
+                        if (inlineCall(call))
+                            changed = true;
+                }
+            }
+
+            // After inlining, a terminating intrinsic should only be reachable as a *direct* call
+            // in the entry point's own blocks (which emitPayloadWritebacks() handles). If a
+            // resolvable callee that reaches one is still present (a recursive chain skipped
+            // above, or a callee that inlineCall could not flatten), the payload write-back before
+            // ray termination cannot be guaranteed; diagnose rather than silently miscompile. (The
+            // only residual shape this cannot see is a terminating call reached through a genuinely
+            // indirect callee — see the resolution-boundary contract on getResolvedCalleeFunc; such
+            // calls are resolved away before this stage.)
+            IRCall* residualCall = nullptr;
+            for (auto block : entryPoint->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (!call)
+                        continue;
+                    auto callee = getResolvedCalleeFunc(call);
+                    if (!callee || !callee->getFirstBlock())
+                        continue;
+                    HashSet<IRFunc*> visited;
+                    if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                    {
+                        residualCall = call;
+                        break;
+                    }
+                }
+                if (residualCall)
+                    break;
+            }
+            if (residualCall)
+            {
+                // A dedicated `err`-severity diagnostic (not the internal-error `Unimplemented`,
+                // code 99999): this is a user-correctable limitation with an actionable workaround,
+                // not a compiler bug to "file an issue" about.
+                sink->diagnose(Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee{
+                    .location = residualCall->sourceLoc});
+            }
+        }
+    }
+
     // Emit payload write-backs before return instructions and shader-terminating calls
     void emitPayloadWritebacks()
     {
@@ -1752,14 +2059,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     if (auto call = as<IRCall>(inst))
                     {
-                        auto callee = call->getCallee();
-                        auto calleeFunc = as<IRFunc>(callee);
-                        if (!calleeFunc)
-                        {
-                            if (auto specialize = as<IRSpecialize>(callee))
-                                calleeFunc = as<IRFunc>(specialize->getBase());
-                        }
-
+                        auto calleeFunc = getResolvedCalleeFunc(call);
                         if (isShaderTerminatingIntrinsic(calleeFunc))
                         {
                             builder.setInsertBefore(call);
@@ -1880,6 +2180,189 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
 
         return nullptr;
+    }
+
+    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+        SLANG_OVERRIDE
+    {
+        // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
+        // should not undergo varying-parameter legalization. The CUDA emitter preserves the
+        // pointer-typed parameters and emits the callable as an ordinary __device__ function.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+            return;
+
+        EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
+    }
+
+    static bool isSupportedOptiXHitAttributeLeaf(IRBasicType* basicType)
+    {
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Float:
+        case BaseType::Bool:
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int:
+        case BaseType::UInt8:
+        case BaseType::UInt16:
+        case BaseType::UInt:
+        case BaseType::Char:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // OptiX has no aggregate hit-attribute ABI: attributes are passed only as individual 32-bit
+    // registers (`optixReportIntersection` / `optixGetAttribute_N`), so a `ReportHit` aggregate
+    // must be flattened into per-register scalars. Append `value`'s scalar leaves to `outLeaves` in
+    // the same order the reader (`emitOptiXAttributeFetch`) consumes registers — struct fields,
+    // then array/vector/matrix elements, in index order — so the value round-trips. Returns false
+    // (the caller diagnoses) for an unsized array or an unsupported leaf type.
+    bool flattenOptiXHitAttributes(
+        IRInst* value,
+        IRType* type,
+        IRBuilder* builder,
+        List<IRInst*>& outLeaves)
+    {
+        // Attributes are reported by value, so a scalar attribute register never round-trips a
+        // pointer: extracting a field from a pointer value would emit `(&a).x`, and dereferencing
+        // would silently change which value is reported. Reject any pointer type rather than
+        // miscompile it.
+        if (tryGetPointedToType(builder, type))
+            return false;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = builder->emitFieldExtract(fieldType, value, field->getKey());
+                if (!flattenOptiXHitAttributes(fieldVal, fieldType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = arrayType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            auto colCountInst = as<IRIntLit>(matType->getColumnCount());
+            if (!rowCountInst || !colCountInst)
+                return false;
+            auto elementType = matType->getElementType();
+            auto rowType = builder->getVectorType(elementType, matType->getColumnCount());
+            for (IRIntegerValue row = 0; row < rowCountInst->getValue(); ++row)
+            {
+                auto rowIdx = builder->getIntValue(builder->getIntType(), row);
+                auto rowVal = builder->emitElementExtract(rowType, value, rowIdx);
+                for (IRIntegerValue col = 0; col < colCountInst->getValue(); ++col)
+                {
+                    auto colIdx = builder->getIntValue(builder->getIntType(), col);
+                    auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
+                    if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                        return false;
+                }
+            }
+            return true;
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = vecType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            if (!isSupportedOptiXHitAttributeLeaf(basicType))
+                return false;
+            outLeaves.add(value);
+            return true;
+        }
+
+        return false;
+    }
+
+    // Rewrite each `ReportOptiXIntersection(tHit, hitKind, attributes)` produced by the core-module
+    // `ReportHit` into a call carrying the aggregate's flattened scalar leaves, so the CUDA emitter
+    // can render a single `optixReportIntersection(tHit, hitKind, a0..aN)`. Collect the marker
+    // insts first, then rewrite: the rewrite creates a new (already-flattened) inst that must not
+    // be re-collected, and the pass runs exactly once per module.
+    void legalizeOptiXReportIntersections(IRModule* module, DiagnosticSink* sink)
+    {
+        List<IRInst*> workList;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+                for (auto inst : block->getChildren())
+                    if (inst->getOp() == kIROp_ReportOptiXIntersection &&
+                        inst->getOperandCount() == 3)
+                        workList.add(inst);
+        }
+
+        for (auto inst : workList)
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+
+            auto tHit = inst->getOperand(0);
+            auto hitKind = inst->getOperand(1);
+            auto attrs = inst->getOperand(2);
+
+            List<IRInst*> leaves;
+            if (!flattenOptiXHitAttributes(attrs, attrs->getDataType(), &builder, leaves))
+            {
+                sink->diagnose(
+                    Diagnostics::OptixHitAttributeTypeNotSupported{.location = inst->sourceLoc});
+                continue;
+            }
+            if (leaves.getCount() > kMaxOptiXHitAttributeRegisters)
+            {
+                sink->diagnose(Diagnostics::OptixHitAttributeTooLarge{
+                    .registerCount = int(leaves.getCount()),
+                    .location = inst->sourceLoc});
+                continue;
+            }
+
+            List<IRInst*> args;
+            args.add(tHit);
+            args.add(hitKind);
+            args.addRange(leaves);
+            auto newInst = builder.emitIntrinsicInst(
+                inst->getFullType(),
+                kIROp_ReportOptiXIntersection,
+                args.getCount(),
+                args.getBuffer());
+            newInst->sourceLoc = inst->sourceLoc;
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+        }
     }
 
     void beginModuleImpl() SLANG_OVERRIDE
@@ -2036,6 +2519,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
 
+                // The incoming value of an `inout` register payload is read once,
+                // on the `VaryingInput` pass; its outgoing value is produced by the
+                // write-back registered on that same pass. The `VaryingOutput` pass
+                // therefore has no register read to perform, so return an empty
+                // value (making the output assignment a no-op) rather than emitting
+                // a redundant readback. Match by payload type so that a distinct
+                // payload using the pointer-packing fallback still reaches its own
+                // output assignment.
+                if (info.kind == LayoutResourceKind::VaryingOutput &&
+                    hasAlreadyRegisteredPayloadWriteback(info.type))
+                {
+                    return LegalizedVaryingVal();
+                }
+
                 // Only use register-based payload for hit/miss/anyhit shaders
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
                 bool useRegisterBasedPayload = (m_stage == Stage::AnyHit) ||
@@ -2103,8 +2600,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
                     /* type to fetch */ info.type,
                     /*the builder in use*/ &builder);
-                if (ioBaseAttributeIndex > 8)
+                if (ioBaseAttributeIndex > kMaxOptiXHitAttributeRegisters)
                 {
+                    // A hit attribute is always a parameter, never a result, so
+                    // `m_param` is set here; guard the deref in release too.
+                    SLANG_RELEASE_ASSERT(m_param);
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "the supplied hit attribute exceeds the maximum hit attribute "
                                    "structure "
@@ -2294,7 +2794,17 @@ void legalizeEntryPointVaryingParamsForCPU(
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink)
 {
     CUDAEntryPointVaryingParamLegalizeContext context;
+    // Hoist shader-terminating intrinsics (IgnoreHit/AcceptHitAndEndSearch) buried in callees
+    // into ray entry points before legalization, so the payload write-back is emitted before the
+    // ray terminates (issue #11658).
+    context.inlineShaderTerminatingCalleesForRayEntryPoints(module, sink);
     context.processModule(module, sink);
+}
+
+void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink)
+{
+    CUDAEntryPointVaryingParamLegalizeContext context;
+    context.legalizeOptiXReportIntersections(module, sink);
 }
 
 void depointerizeInputParams(IRFunc* entryPointFunc)
@@ -2452,7 +2962,7 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
-    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const
+    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
     }
@@ -3462,12 +3972,14 @@ private:
         {
             auto parent = layoutDecor->parent;
             layoutDecor->removeAndDeallocate();
-            builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
+            return builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
         }
         return layoutDecor;
     }
 
-    // Find overlapping field semantics and legalize them
+protected:
+    // Canonicalize each field's semantic to a lowercase (name, index) pair and legalize
+    // overlapping indices
     void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
     {
         // Goal is to ensure we do not have overlapping semantics for the user defined semantics:
@@ -3650,6 +4162,7 @@ private:
         }
     }
 
+private:
     void wrapReturnValueInStruct(EntryPointInfo entryPoint)
     {
         // Wrap return value into a struct if it is not already a struct.
@@ -3929,6 +4442,16 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+            {
+                // [[instance_id]] includes the base instance; SV_InstanceID does not. Unlike the
+                // other special values, the normal path still runs after the special handler:
+                // it decorates and converts the parameter, and the handler only adds the
+                // subtraction.
+                result.isSpecial = true;
+                result.systemValueName = toSlice("instance_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
         case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
@@ -3995,6 +4518,8 @@ protected:
         case SystemValueSemanticName::VertexID:
         case SystemValueSemanticName::VulkanVertexID:
             {
+                // SV_VertexID still includes [[base_vertex]], the same mismatch SV_InstanceID
+                // corrects above.
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 break;
@@ -4139,6 +4664,22 @@ protected:
         return elementVarLayoutBuilder.build();
     }
 
+    // Find the entry point's parameter carrying the given system value semantic, if any. At most
+    // one parameter carries a given semantic, so the first match is the only one.
+    IRInst* findSystemValueParam(const EntryPointInfo& entryPoint, SystemValueSemanticName name)
+        const
+    {
+        for (auto item : collectSystemValFromEntryPoint(entryPoint))
+        {
+            UnownedStringSlice semanticName;
+            UnownedStringSlice semanticIndex;
+            splitNameAndIndex(item.attrName.getUnownedSlice(), semanticName, semanticIndex);
+            if (convertSystemValueSemanticNameToEnum(String(semanticName)) == name)
+                return item.var;
+        }
+        return nullptr;
+    }
+
     void handleSpecialSystemValue(
         const EntryPointInfo& entryPoint,
         SystemValLegalizationWorkItem& workItem,
@@ -4154,21 +4695,50 @@ protected:
             var->replaceUsesWith(val);
             var->removeAndDeallocate();
         }
+        else if (info.systemValueNameEnum == SystemValueSemanticName::InstanceID)
+        {
+            // `var` stays the [[instance_id]] parameter; its uses read `var - base_instance`.
+            // Snapshot the uses first so the subtraction's own operand is not redirected.
+            List<IRUse*> uses;
+            for (auto use = var->firstUse; use; use = use->nextUse)
+                uses.add(use);
+
+            // Reuse a declared SV_StartInstanceLocation: Metal rejects a second [[base_instance]].
+            IRInst* baseInstance =
+                findSystemValueParam(entryPoint, SystemValueSemanticName::StartInstanceLocation);
+
+            IRBuilder svBuilder(builder.getModule());
+            svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+            if (!baseInstance)
+            {
+                // Already the permitted uint, and the emitter reads the attribute from the
+                // decoration, so it needs neither a layout nor its own legalization;
+                // legalizeSystemValueParameters collected its work list before this loop, so
+                // the new parameter is never revisited either.
+                baseInstance = svBuilder.emitParam(svBuilder.getUIntType());
+                svBuilder.addTargetSystemValueDecoration(baseInstance, toSlice("base_instance"));
+                svBuilder.addNameHintDecoration(baseInstance, toSlice("base_instance"));
+            }
+            if (baseInstance->getFullType() != var->getFullType())
+            {
+                // The front end only admits scalar integers for SV_InstanceID, so this converts.
+                baseInstance = tryConvertValue(svBuilder, baseInstance, var->getFullType());
+                SLANG_ASSERT(baseInstance);
+            }
+            // The normal path still legalizes `var` (and a reused base declared after it) and
+            // redirects their uses here to the converted values.
+            auto baseRelativeInstanceId = svBuilder.emitSub(var->getFullType(), var, baseInstance);
+            for (auto use : uses)
+                svBuilder.replaceOperand(use, baseRelativeInstanceId);
+        }
         else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
         {
             // Ensure we have a cached "sv_groupthreadid" in our entry point
             if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
             {
-                auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
-                for (auto i : systemValWorkItems)
-                {
-                    auto indexAsStringGroupThreadId = String(i.attrIndex);
-                    if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var)
-                            .systemValueNameEnum == SystemValueSemanticName::GroupThreadID)
-                    {
-                        entryPointToGroupThreadId[entryPoint.entryPointFunc] = i.var;
-                    }
-                }
+                if (auto groupThreadId =
+                        findSystemValueParam(entryPoint, SystemValueSemanticName::GroupThreadID))
+                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
                 if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
                 {
                     // Add the missing groupthreadid needed to compute sv_groupindex
@@ -4247,20 +4817,62 @@ protected:
         }
     }
 
+    // Inline every helper containing a DispatchMesh call into its callers until each call sits
+    // directly in an entry point, where the Metal intrinsic's `_slang_mesh_payload` and
+    // `_slang_mgp` parameters are in scope. This is module-wide and a no-op once done, so running
+    // it once per entry point is harmless. Each pass inlines each helper's current call sites
+    // once, moving every call one caller closer, so it converges unless a helper reaches itself;
+    // that recursion is normally rejected up front, but the check can be disabled, so it is
+    // asserted here rather than assumed.
+    void inlineHelpersCallingDispatchMesh(IRGlobalValueWithCode* dispatchMeshFunc) const
+    {
+        for (bool inlined = true; inlined;)
+        {
+            inlined = false;
+
+            HashSet<IRFunc*> helpers;
+            traverseUses(
+                dispatchMeshFunc,
+                [&](const IRUse* use)
+                {
+                    auto parent = getParentFunc(use->getUser());
+                    if (as<IRCall>(use->getUser()) && parent &&
+                        !parent->findDecoration<IREntryPointDecoration>())
+                        helpers.add(parent);
+                });
+            for (auto helper : helpers)
+            {
+                // Only calls of `helper`, not uses that pass it as a value.
+                traverseUses(
+                    helper,
+                    [&](const IRUse* use)
+                    {
+                        auto call = as<IRCall>(use->getUser());
+                        if (!call || call->getCallee() != helper)
+                            return;
+                        SLANG_RELEASE_ASSERT(getParentFunc(call) != helper);
+                        inlined |= inlineCall(call);
+                    });
+            }
+        }
+    }
+
     void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
     {
+        auto func = entryPoint.entryPointFunc;
+
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        for (const auto globalInst : func->getModule()->getGlobalInsts())
         {
-            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            if (const auto f = as<IRGlobalValueWithCode>(globalInst))
             {
-                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                if (const auto dec = f->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                        dispatchMeshFunc = func;
+                        dispatchMeshFunc = f;
                     }
                 }
             }
@@ -4269,52 +4881,47 @@ protected:
         if (!dispatchMeshFunc)
             return;
 
-        IRBuilder builder{entryPoint.entryPointFunc->getModule()};
+        inlineHelpersCallingDispatchMesh(dispatchMeshFunc);
 
-        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        // A module has one DispatchMesh specialization (asserted above), so every call in an
+        // entry point writes the same [[payload]] type and any one will do.
+        IRCall* dispatchCall = nullptr;
         traverseUses(
             dispatchMeshFunc,
             [&](const IRUse* use)
             {
-                if (const auto call = as<IRCall>(use->getUser()))
-                {
-                    SLANG_ASSERT(call->getArgCount() == 4);
-                    const auto payload = call->getArg(3);
-
-                    const auto payloadPtrType =
-                        composeGetters<IRPtrType>(payload, &IRInst::getDataType);
-                    SLANG_ASSERT(payloadPtrType);
-                    const auto payloadType = payloadPtrType->getValueType();
-                    SLANG_ASSERT(payloadType);
-
-                    builder.setInsertBefore(
-                        entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                    const auto annotatedPayloadType = builder.getPtrType(
-                        kIROp_RefParamType,
-                        payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData,
-                        payloadPtrType->getDataLayout());
-                    auto packedParam = builder.emitParam(annotatedPayloadType);
-                    builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
-                    IRVarLayout::Builder varLayoutBuilder(
-                        &builder,
-                        IRTypeLayout::Builder{&builder}.build());
-
-                    // Add the MetalPayload resource info, so we can emit [[payload]]
-                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                    auto paramVarLayout = varLayoutBuilder.build();
-                    builder.addLayoutDecoration(packedParam, paramVarLayout);
-
-                    // Now we replace the call to DispatchMesh with a call to the mesh grid
-                    // properties But first we need to create the parameter
-                    const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
-                    auto mgp = builder.emitParam(meshGridPropertiesType);
-                    builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                }
+                auto call = as<IRCall>(use->getUser());
+                if (!dispatchCall && call && getParentFunc(call) == func)
+                    dispatchCall = call;
             });
+        if (!dispatchCall)
+            return; // nothing dispatches here; a helper no entry point reaches is never emitted
+
+        SLANG_ASSERT(dispatchCall->getArgCount() == 4);
+        const auto payloadPtrType = as<IRPtrTypeBase>(dispatchCall->getArg(3)->getDataType());
+        SLANG_ASSERT(payloadPtrType);
+
+        IRBuilder builder{func->getModule()};
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        const auto annotatedPayloadType = builder.getPtrType(
+            kIROp_RefParamType,
+            payloadPtrType->getValueType(),
+            AddressSpace::MetalObjectData,
+            payloadPtrType->getDataLayout());
+        auto packedParam = builder.emitParam(annotatedPayloadType);
+        builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+        IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+        // Add the MetalPayload resource info, so we can emit [[payload]]
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+        builder.addLayoutDecoration(packedParam, varLayoutBuilder.build());
+
+        // The intrinsic sets the grid size through mesh_grid_properties.set_threadgroups_per_grid
+        auto mgp = builder.emitParam(builder.getMetalMeshGridPropertiesType());
+        builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
     }
 
-    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
+    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) SLANG_OVERRIDE
     {
         auto func = entryPoint.entryPointFunc;
 
@@ -4384,6 +4991,9 @@ protected:
 
                 verticesParam = param;
                 auto vertStruct = as<IRStructType>(vertexType);
+                // Neither an input nor the result, so nothing else canonicalizes the semantics;
+                // the case-insensitive sv_position match below still holds afterwards.
+                fixFieldSemanticsOfFlatStruct(vertStruct);
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4415,6 +5025,8 @@ protected:
 
                 primitivesParam = param;
                 auto primStruct = as<IRStructType>(primitiveType);
+                // Lifted like the vertex struct above, so canonicalized the same way.
+                fixFieldSemanticsOfFlatStruct(primStruct);
                 for (auto field : primStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4614,6 +5226,8 @@ protected:
         case SystemValueSemanticName::InstanceID:
         case SystemValueSemanticName::VulkanInstanceID:
             {
+                // instance_index includes firstInstance, and WGSL has no base_instance builtin
+                // to subtract, so SV_InstanceID cannot be made HLSL-accurate here.
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
             }
@@ -4773,7 +5387,44 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
-void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
+// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
+// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
+// IREntryPointParamDecoration recording the entry-point function it came from. If a later pass
+// replaces the entry point with a wrapper (as lowerOutParameters does below), those tags still
+// reference the old function; introduceExplicitGlobalContext binds a global uniform to an entry
+// point only when this decoration names that entry point, so without re-pointing the uniform is
+// silently dropped — on Metal a struct-returning vertex shader's `uniform T*` gets no [[buffer]]
+// argument and reads uninitialized memory.
+static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
+{
+    List<IREntryPointParamDecoration*> decorationsToRetarget;
+    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
+    {
+        if (auto decor = as<IREntryPointParamDecoration>(use->getUser()))
+            decorationsToRetarget.add(decor);
+    }
+    for (auto decor : decorationsToRetarget)
+        decor->setOperand(0, newFunc);
+}
+
+// Convert an entry point's `out`/`inout` parameters (and, for a vertex shader, a struct return)
+// into a single return struct whose fields carry the original stage-output semantics. Metal models
+// stage outputs as return-struct fields (e.g. `[[color(N)]]`, `[[position]]`), so a pointer-typed
+// `out` parameter cannot survive to emit. This runs for the graphics output stages (vertex and
+// fragment); the downstream `wrapReturnValueInStruct`/`fixFieldSemanticsOfFlatStruct` path then
+// maps the field semantics to the Metal attributes (e.g. `SV_Target` -> `[[color(N)]]`).
+//
+// The trigger differs by stage. An `out`/`inout` parameter must be lowered on either stage (that is
+// the #11969 crash: a fragment `out float4 : SV_Target` otherwise reaches emit as a pointer with an
+// unmapped address space). A by-value struct return, however, only needs this explicit lowering for
+// vertex — a fragment that already returns its outputs by value (e.g. `FragOut { float4 :
+// SV_Target; float : SV_Depth; }`) is handled correctly downstream, and re-wrapping it here would
+// strip the field semantics. So the struct-return trigger is gated on the vertex stage.
+void legalizeShaderOutputParamsForMetal(
+    DiagnosticSink* sink,
+    EntryPointInfo& entryPoint,
+    Stage stage)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
 
@@ -4784,7 +5435,9 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
         [](auto param) { return as<IROutParamTypeBase>(param->getFullType()); });
 
     auto returnType = oldFunc->getResultType();
-    if (!as<IRStructType>(returnType) && !hasOutParameters)
+    const bool hasStructReturn = as<IRStructType>(returnType) != nullptr;
+    const bool triggerOnStructReturn = hasStructReturn && stage == Stage::Vertex;
+    if (!triggerOnStructReturn && !hasOutParameters)
         return;
 
     const bool alwaysUseReturnStruct = true;
@@ -4792,6 +5445,10 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
 
     if (oldFunc == entryPoint.entryPointFunc)
         return;
+
+    // The wrapper is now the entry point, so global uniform params that recorded `oldFunc` as
+    // their originating entry point must follow it (see retargetEntryPointParamDecorations).
+    retargetEntryPointParamDecorations(oldFunc, entryPoint.entryPointFunc);
 
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;
@@ -4817,9 +5474,22 @@ void legalizeEntryPointVaryingParamsForMetal(
 {
     for (auto& e : entryPoints)
     {
-        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        // Both vertex and fragment stages produce varying outputs that Metal models as
+        // return-struct fields, so an `out`/`inout` output parameter on either stage must be
+        // lowered into the return struct rather than surviving as a pointer-typed parameter (see
+        // issue #11969, where a fragment `out float4 : SV_Target` reached Metal emit as a pointer
+        // and hit an unmapped address space). The function itself decides, per stage, whether a
+        // by-value struct return also triggers the lowering (vertex only) — see
+        // legalizeShaderOutputParamsForMetal.
+        const auto stage = e.entryPointDecor->getProfile().getStage();
+        switch (stage)
         {
-            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        case Stage::Vertex:
+        case Stage::Fragment:
+            legalizeShaderOutputParamsForMetal(sink, e, stage);
+            break;
+        default:
+            break;
         }
     }
     LegalizeMetalEntryPointContext context(module, sink);

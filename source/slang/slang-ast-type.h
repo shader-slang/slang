@@ -481,6 +481,30 @@ class DescriptorHandleType : public PointerLikeType
     FIDDLE(...)
 };
 
+// An opaque, untyped resource handle produced by indexing `ResourceDescriptorHeap[i]`.
+// It wraps a single `uint` heap index and only ever implicit-converts to a concrete
+// resource (CBV_SRV_UAV) type or to a resource-family `DescriptorHandle<T>`; the concrete
+// type is recovered from the conversion target. It is a plain builtin (not a
+// `PointerLikeType`) because it does not dereference. It never survives to emit: the
+// `lowerUntypedResourceHandleToUInt` IR pass rewrites every untyped handle to its underlying
+// `uint` heap index before emit/layout, which treat a survivor as an internal error.
+FIDDLE()
+class UntypedResourceHandleType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// An opaque, untyped sampler handle produced by indexing `SamplerDescriptorHeap[j]`.
+// Behaves exactly like `UntypedResourceHandleType` but only converts to sampler types or to
+// a sampler-family `DescriptorHandle<T>` (the resource/sampler heap families are kept
+// disjoint by the per-kind conversions in hlsl.meta.slang). It is lowered to `uint` by the
+// same `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit.
+FIDDLE()
+class UntypedSamplerHandleType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
 FIDDLE(abstract)
@@ -877,6 +901,11 @@ class BorrowInParamType : public ParamPassingModeType
     void _toTextOverride(StringBuilder& out);
 };
 
+/// Decode a parameter type into its value type and separately stored parameter-passing mode.
+///
+/// This operation is the inverse of `getParamTypeWithModeWrapper(ASTBuilder*, ParamInfo const&)`.
+ParamInfo getParamInfoFromTypeWithModeWrapper(Type* paramTypeWithModeWrapper);
+
 /// A reference type that is explicitly named somewhere in code (`Ref<T>`).
 ///
 /// The explicit reference types are distinct from the
@@ -930,16 +959,28 @@ class NamedExpressionType : public Type
 /// usually this is a mode returned by `getExplicitlyDeclaredParamPassingMode()`
 /// or something similar.
 ///
-/// The `paramType` should be the declared type of the parameter, not including
-/// any of the wrapper types that are used to represent parameter-passing modes.
+/// The `paramType` must be the parameter declaration's unspecialized type, not including any of the
+/// wrapper types used to represent parameter-passing modes. Calling this function with a
+/// specialized or otherwise transformed type can change the ABI promised by the declaration.
 ///
 /// This function is primarily concerned with adjusting a parameter-passing
 /// mode to account for non-copyable types, which may need different defaults
-/// than a copyable type.
+/// than a copyable type. It also forces mesh-shader output parameters
+/// (`MeshOutputType`) to a direction-neutral mode, since their output direction
+/// is intrinsic to the type rather than to an explicit `out` modifier.
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType);
+
+/// Returns the mode used for an effective `this` parameter when it becomes an explicit parameter
+/// of a derivative function.
+///
+/// BorrowIn maps to In and Ref maps to BorrowInOut as a compatibility projection used by the
+/// current derivative-function ABI. Other modes retain their effective parameter-passing behavior
+/// and may be transformed further by the applicable forward- or reverse-mode rule. This projection
+/// is specific to derivative consumers and does not change the declaration's `ParamInfo`.
+ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode);
 
 // A function type is defined by its parameter types
 // and its result type.
@@ -1001,26 +1042,9 @@ class FuncType : public Type
     ///
     ParamPassingMode getParamPassingMode(Index index);
 
-    /// Combined information on the type and parameter-passing mode of a parameter.
-    ///
-    struct ParamInfo
-    {
-        /// The parameter-passing mode for the parameter.
-        ParamPassingMode mode = ParamPassingMode::In;
-
-        /// The user-perceived type of the parameter.
-        Type* type = nullptr;
-    };
-
     /// Get combined information on the type and parameter-passing mode of a parameter.
     ///
-    ParamInfo getParamInfo(Index index)
-    {
-        ParamInfo info;
-        info.mode = getParamPassingMode(index);
-        info.type = getParamValueType(index);
-        return info;
-    }
+    ParamInfo getParamInfo(Index index);
 
     /// Get the result type of this function.
     ///

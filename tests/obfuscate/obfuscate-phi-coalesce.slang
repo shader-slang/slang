@@ -7,7 +7,7 @@
 // into one variable, because the name-based interference guard was gone and
 // isInstReachable failed to detect the conflict through nested SPIRVAsmOperandInst.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -O0 -obfuscate
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -obfuscate
 
 // Two distinct OpVariables must be allocated for the two phi nodes (t0 and t1).
 // If the bug is present, only one variable is allocated and the second CHECK fails.

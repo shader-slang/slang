@@ -23,5 +23,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-NOT: _slang_coverage
 
 // No atomic-add helper call — the coverage pass is the only source of
-// these on a shader that has no atomics of its own.
-//CHECK-NOT: _slang_atomic_add_u32
+// these on a shader that has no atomics of its own. The check covers
+// both uint64 (the default) and uint32 (the
+// `-trace-coverage-counter-width 32` opt-down) spellings so the
+// negative assertion stays correct regardless of the chosen width.
+//CHECK-NOT: _slang_atomic_add_u{{32|64}}

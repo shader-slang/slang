@@ -56,7 +56,48 @@ function(generator dir)
     endif()
 endfunction()
 
-if(NOT SLANG_OVERRIDE_LUA_PATH)
+if(SLANG_USE_SYSTEM_LUA)
+    if(SLANG_OVERRIDE_LUA_PATH)
+        message(
+            FATAL_ERROR
+            "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
+        )
+    endif()
+    find_package(Lua 5.4 QUIET)
+    set(slang_fiddle_lua_include_args)
+    if(Lua_FOUND)
+        set(slang_fiddle_lua_library ${LUA_LIBRARIES})
+        # The system include path belongs only to this leaf generator, not its interface.
+        set(slang_fiddle_lua_include_args
+            INCLUDE_DIRECTORIES_PRIVATE
+            ${LUA_INCLUDE_DIR}
+        )
+    else()
+        # FindLua in CMake 3.22 does not search Lua 5.5. Its pkg-config file does.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SLANG_LUA55 REQUIRED IMPORTED_TARGET lua-5.5)
+        set(slang_fiddle_lua_library PkgConfig::SLANG_LUA55)
+        # The imported target supplies its own include directories.
+    endif()
+    # The bundled translation unit compiles Lua's private onelua.c source.
+    slang_glob_sources(slang_fiddle_sources slang-fiddle)
+    list(
+        REMOVE_ITEM
+        slang_fiddle_sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
+    )
+    generator(
+        slang-fiddle
+        EXPLICIT_SOURCE
+        ${slang_fiddle_sources}
+        LINK_WITH_PRIVATE
+        compiler-core
+        ${slang_fiddle_lua_library}
+        ${slang_fiddle_lua_include_args}
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        SLANG_USE_SYSTEM_LUA=1
+    )
+elseif(NOT SLANG_OVERRIDE_LUA_PATH)
     generator(
         slang-fiddle
         LINK_WITH_PRIVATE
@@ -74,6 +115,7 @@ else()
     )
 endif()
 generator(slang-embed)
+generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
@@ -169,6 +211,7 @@ if(SLANG_ENABLE_GFX)
         # this
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}
+            ${slang_SOURCE_DIR}/tools
             ${slang_SOURCE_DIR}/include
             if
             (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
@@ -234,6 +277,36 @@ if(SLANG_ENABLE_GFX)
     )
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
+    # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
+    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # debugger. Build libspvdb here and link it into slang-test so that
+    # .slang test files under tests/debuginfo can drive the debugger
+    # in-process and validate its output with FileCheck.
+    #
+    # slang-test-main.cpp is the translation unit that compiles the stb_image
+    # implementation, so spvdb normally reuses those symbols instead of
+    # compiling a second copy. In a static-library build, though, Slang also
+    # defines STB_IMAGE_STATIC (see cmake/CompilerFlags.cmake), which makes
+    # every stbi_* function internal to slang-test-main.cpp and therefore
+    # unreachable from spvdb — there, spvdb has to compile its own copy.
+    if(SLANG_LIB_TYPE STREQUAL "STATIC")
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE FALSE)
+    else()
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
+    endif()
+    add_subdirectory(
+        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
+        EXCLUDE_FROM_ALL
+    )
+
+    # spvdb is a vendored library that brings its own warning configuration, so
+    # it deliberately does not go through slang_add_target /
+    # set_default_compile_options. It is linked into slang-test, though, and
+    # sanitizer settings have to match across a whole binary, so apply just the
+    # sanitizer flags to it.
+    add_sanitizer_options(spvdb)
+
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -241,6 +314,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_FROM_PRIVATE unit-test slang-rhi
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/tools
         FOLDER test
     )
     slang_add_target(
@@ -261,9 +335,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             compiler-core
             slang
             stb
+            spvdb
             ${CMAKE_DL_LIBS}
             Threads::Threads
-        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PRIVATE prelude slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SPVDB=1
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test
@@ -279,12 +355,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slang-llvm
             copy-dxcompiler
             copy-dxil
+            stage-dxc-headers
             copy-webgpu_dawn
             copy-slang-tint
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module)
+    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(slang-test slang-numerics-modules)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -313,7 +391,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OBJECT
         EXCLUDE_FROM_ALL
         INCLUDE_DIRECTORIES_PUBLIC .
-        INCLUDE_FROM_PRIVATE slang core
+        LINK_WITH_PRIVATE core
+        INCLUDE_FROM_PRIVATE slang
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/include
         FOLDER test
     )
@@ -321,6 +400,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # These are libraries loaded at runtime from the test executable:
     #
     # `platform` contains all the platform abstractions for a GUI application.
+    #
+    # The public header gui.h includes both imgui.h and slang-rhi.h. imgui is
+    # INCLUDE_FROM_PUBLIC (below) so consumers of gui.h inherit its (override-aware) leaf
+    # include dir, since including gui.h transitively includes imgui.h; slang-rhi stays
+    # INCLUDE_FROM_PRIVATE because every current gui.h consumer links slang-rhi directly.
     #
     slang_add_target(
         platform
@@ -339,7 +423,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE imgui slang-rhi
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PUBLIC imgui
         INCLUDE_DIRECTORIES_PUBLIC
             .
             platform
@@ -370,42 +455,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         REQUIRED_BY slang-test
         FOLDER test/tools
     )
-
-    slang_add_target(
-        render-test
-        MODULE
-        EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            compiler-core
-            slang
-            slang-rhi
-            platform
-            stb
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-        INCLUDE_FROM_PRIVATE slang-rhi
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-        EXTRA_COMPILE_OPTIONS_PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHa>
-        OUTPUT_NAME render-test-tool
-        REQUIRED_BY slang-test
-        FOLDER test/tools
+    # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
+    target_sources(
+        gfx-unit-test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
     )
 
-    if(SLANG_HAS_WEBGPU_SUPPORT AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
-        # slang-rhi loads Dawn from the directory containing the module/executable that
-        # contains RHI. Put render-test beside the runtime sidecar libraries in WGPU builds.
-        set_target_properties(
-            render-test
-            PROPERTIES
-                LIBRARY_OUTPUT_DIRECTORY
-                    "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}"
-        )
-    endif()
+    add_subdirectory(render-test)
 
     slang_add_target(
         slang-unit-test
@@ -414,9 +471,21 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            # The record-replay unit tests call into the record-replay subsystem, which is compiled
+            # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
+            SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
-        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            unit-test
+            slang
+            metal-cpp
+            Threads::Threads
+        LINK_WITH_FRAMEWORK Foundation Metal
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/examples
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
@@ -428,7 +497,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # publishing an internal validator as part of the stable public ABI.
     target_sources(
         slang-unit-test
-        PRIVATE ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+        PRIVATE
+            ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`
@@ -440,6 +513,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
+    if(SLANG_ENABLE_OPTIX)
+        target_compile_definitions(
+            slang-unit-test
+            PRIVATE SLANG_UNIT_TEST_ENABLE_OPTIX=1
+        )
+        target_include_directories(
+            slang-unit-test
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
+        )
+    endif()
     slang_add_target(
         slang-reflection-test
         MODULE
@@ -474,5 +558,51 @@ if(SLANG_ENABLE_REPLAYER)
             ${slang_SOURCE_DIR}/source/slang-record-replay
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         FOLDER test
+    )
+endif()
+
+#
+# Unit tests that call non-exported `source/slang` entry points directly.
+#
+# These are separate from `slang-unit-test` because of how they link, not what they
+# test. `slang-unit-test` is a shared library loaded by `slang-test`, so it can reach
+# only the symbols libslang-compiler exports — and the entry points these tests need
+# carry no export annotation, so they are not among them. Linking the compiler
+# statically into an executable resolves them at link time instead, with no annotation
+# and no change to `source/slang`.
+#
+# The target is therefore only defined for a static build. Under
+# SLANG_LIB_TYPE=SHARED the link would fail by design, so guarding the
+# definition here — rather than marking it EXCLUDE_FROM_ALL — means it is part
+# of `all` exactly where it can work.
+#
+# The SLANG_ENABLE_SLANG_RHI condition mirrors the guard on the `unit-test`
+# object library this target links against, even though these tests do not use
+# the RHI themselves.
+if(
+    SLANG_ENABLE_TESTS
+    AND SLANG_ENABLE_SLANG_RHI
+    AND SLANG_LIB_TYPE STREQUAL "STATIC"
+)
+    slang_add_target(
+        slang-static-unit-test
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/tools
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+        FOLDER test
+    )
+    # The tests include internal slang headers that transitively pull in the
+    # FIDDLE and capability generated headers. The `slang` target consumes those
+    # as PRIVATE link dependencies so their include directories do not
+    # propagate; expose them here, as `slang-unit-test` does.
+    target_include_directories(
+        slang-static-unit-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
 endif()

@@ -1,8 +1,8 @@
 // slang-artifact-diagnostic-util.cpp
 #include "slang-artifact-diagnostic-util.h"
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

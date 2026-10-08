@@ -1,11 +1,11 @@
 // slang-artifact-associated-impl.cpp
 #include "slang-artifact-associated-impl.h"
 
-#include "../core/slang-array-view.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-array-view.h"
+#include "core/slang-char-util.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-type-text-util.h"
 #include "slang-artifact-diagnostic-util.h"
 
 namespace Slang
@@ -289,6 +289,8 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     }
     if (guid == slang::IMetadata::getTypeGuid())
         return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::IBindlessResourceMetadata::getTypeGuid())
+        return static_cast<slang::IBindlessResourceMetadata*>(this);
     if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
     {
         return static_cast<slang::ICoverageTracingMetadata*>(this);
@@ -356,6 +358,11 @@ const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
     return m_debugBuildIdentifier.getBuffer();
 }
 
+bool ArtifactPostEmitMetadata::usesBindlessResourceHeap()
+{
+    return m_usesBindlessResourceHeap;
+}
+
 uint32_t ArtifactPostEmitMetadata::getCounterCount()
 {
     return m_coverageCounterCount;
@@ -381,13 +388,31 @@ static constexpr size_t kCoverageBufferInfoV1MinSize =
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
-#define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value)              \
-    do                                                                                    \
-    {                                                                                     \
-        if ((outInfo)->structSize >=                                                      \
-            offsetof(slang::CoverageEntryInfo, fieldName) + sizeof((outInfo)->fieldName)) \
-            (outInfo)->fieldName = (value);                                               \
+// Write a field that lives past a struct's v1 size, but only when the
+// caller's `structSize` shows it has room for it. A caller compiled
+// against an older header keeps its own layout and must be left
+// untouched, so every tail field goes through here.
+//
+// The three named macros below exist so call sites do not repeat the
+// struct type; the versioned-write rule itself lives only here, so
+// adding a fourth ABI-versioned struct cannot introduce a fourth copy
+// of it that drifts from the others.
+#define SLANG_WRITE_OPTIONAL_ABI_FIELD(structType, outInfo, fieldName, value) \
+    do                                                                        \
+    {                                                                         \
+        if ((outInfo)->structSize >=                                          \
+            offsetof(structType, fieldName) + sizeof((outInfo)->fieldName))   \
+            (outInfo)->fieldName = (value);                                   \
     } while (0)
+
+#define SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::SyntheticResourceInfo, outInfo, fieldName, value)
+
+#define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::CoverageEntryInfo, outInfo, fieldName, value)
+
+#define SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(outInfo, fieldName, value) \
+    SLANG_WRITE_OPTIONAL_ABI_FIELD(slang::CoverageBufferInfo, outInfo, fieldName, value)
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
@@ -447,6 +472,16 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
             break;
         }
     }
+
+    // Optional tail field: write the per-slot byte width only if the
+    // caller's `CoverageBufferInfo` is large enough to receive it.
+    // Older callers (smaller `structSize`) see no field; their
+    // pre-existing default of `4` from the struct's in-class
+    // initializer continues to apply at the caller side.
+    SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(
+        outInfo,
+        elementByteWidth,
+        m_coverageCounterByteWidth);
     return SLANG_OK;
 }
 
@@ -497,6 +532,9 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     outInfo->uniformOffset = record.uniformOffset;
     outInfo->uniformStride = record.uniformStride;
     outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
+    // Past the v1 size, so only written when the caller's struct has room
+    // for it. A v1 caller keeps its own layout and is left untouched.
+    SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, bindlessIndex, record.bindlessIndex);
     return SLANG_OK;
 }
 

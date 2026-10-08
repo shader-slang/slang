@@ -70,29 +70,29 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // two if/else arms, two if-without-else arms, two while-loop condition
 // arms, two do-while condition arms, two switch case arms, one explicit
 // switch default arm, and one implicit switch no-match/default arm.
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(4\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(5\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(6\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(7\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(8\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(9\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(10\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(11\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(12\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(13\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(14\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(15\)}}
-//CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(16\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(3\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(4\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(5\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(6\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(7\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(8\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(9\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(10\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(11\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(12\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(13\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(14\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(15\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(16\)}}
 
 // The three coverage modes must be accepted together and share one
 // synthesized coverage buffer. The exact combined slot map is covered
 // by metadata/unit tests; this smoke test catches command-line pass
 // gating mistakes.
 //ALL: RWStructuredBuffer{{.*}}_slang_coverage
-//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//ALL-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//ALL-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//ALL-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//ALL-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}

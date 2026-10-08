@@ -10,7 +10,11 @@
 // to the output, so a filecheck on the emitted HLSL is enough to
 // confirm the steer reached the target.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -trace-coverage-binding 7 3 -profile cs_5_0
+// `-trace-coverage-counter-width 32` is pinned because cs_5_0 does
+// not support the default uint64 path (no `uint64_t` type, no SM 6.6
+// `InterlockedAdd(uint64_t*, ...)` overload). The binding-steer being
+// tested here is independent of the counter width.
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -trace-coverage-binding 7 3 -profile cs_5_0 -trace-coverage-counter-width 32
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)

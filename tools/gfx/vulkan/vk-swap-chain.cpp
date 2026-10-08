@@ -1,7 +1,7 @@
 // vk-swap-chain.cpp
 #include "vk-swap-chain.h"
 
-#include "../apple/cocoa-util.h"
+#include "gfx/apple/cocoa-util.h"
 #include "vk-util.h"
 
 namespace gfx

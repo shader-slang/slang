@@ -17,15 +17,13 @@ interface IDerived : IBase
         get;
 
         set{ }
-//diag: ^^^ interface requirement has body
-//diag: ^^^ non-method interface requirement cannot have a body.
+//diag: ^^^ partial interface accessor default implementation
+//diag: ^^^ interface accessor default implementation is incomplete; define all accessors or none.
     }
 
     __subscript(int index)->int
     {
-        get{}
-//diag: ^^^ interface requirement has body
-//diag: ^^^ non-method interface requirement cannot have a body.
+        get;
     }
 
     override int f() {}

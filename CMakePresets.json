@@ -24,6 +24,7 @@
       "binaryDir": "${sourceDir}/build.em",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_LIB_TYPE": "STATIC",
         "SLANG_ENABLE_AFTERMATH": "OFF",
         "SLANG_ENABLE_CUDA": "OFF",
         "SLANG_ENABLE_GFX": "OFF",
@@ -293,7 +294,7 @@
       "generators": ["ZIP"],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
-        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
+        "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm;user-skills"
       }
     },
     {

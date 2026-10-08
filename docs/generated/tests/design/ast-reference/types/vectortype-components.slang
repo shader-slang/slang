@@ -1,0 +1,24 @@
+//META: generated=true
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
+//META: doc_section_digest=eb9e797ca9c3dbb949a62072e232852c0f820f49dd331388c5e7ffcde24a8c1c
+//META: purpose=A VectorExpressionType carries an element type and an element count; a float4 value's four components are independently readable by swizzle.
+//META: intent=functional
+//META: pipeline_stage=check
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Verifies the (element-type, count) shape of the vector arithmetic
+// leaf: a float4 exposes exactly four float components addressable as
+// .x/.y/.z/.w. Each is printed with a distinct value; CHECK asserts all
+// four, which only holds if the count-4 shape survived checking.
+
+//TEST:INTERPRET(filecheck=CHECK):
+
+void main()
+{
+    float4 v = float4(10.0, 20.0, 30.0, 40.0);
+    // CHECK: v=10,20,30,40
+    printf("v=%d,%d,%d,%d\n", int(v.x), int(v.y), int(v.z), int(v.w));
+}

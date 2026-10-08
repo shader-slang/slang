@@ -527,13 +527,21 @@ struct ShaderInputLayoutParser
         }
     }
 
+    // type name: <word> ( "." <word> )*
     String parseTypeName(Misc::TokenReader& parser)
     {
-        String typeName = parser.ReadWord();
+        StringBuilder sb;
+        sb << parser.ReadWord();
+
+        while (parser.AdvanceIf("."))
+        {
+            sb << ".";
+            sb << parser.ReadWord();
+        }
+
         if (parser.AdvanceIf("<"))
         {
-            StringBuilder sb;
-            sb << typeName << "<";
+            sb << "<";
             for (;;)
             {
                 if (parser.LookAhead(Misc::TokenType::IntLiteral))
@@ -546,9 +554,9 @@ struct ShaderInputLayoutParser
             }
             sb << ">";
             parser.Read(">");
-            return sb.produceString();
         }
-        return typeName;
+
+        return sb.produceString();
     }
 
     RefPtr<ShaderInputLayout::Val> parseValExpr(Misc::TokenReader& parser)

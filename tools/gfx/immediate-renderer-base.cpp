@@ -667,7 +667,7 @@ public:
                     (GfxIndex)cmd.operands[1]);
                 break;
             default:
-                assert(!"unknown command");
+                SLANG_ASSERT_FAILURE("unknown command");
                 break;
             }
         }
@@ -706,7 +706,7 @@ public:
         uint64_t valueToSignal) override
     {
         // TODO: implement fence signal.
-        assert(fence == nullptr);
+        SLANG_ASSERT(fence == nullptr);
 
         CommandBufferInfo info = {};
         for (GfxIndex i = 0; i < count; i++)

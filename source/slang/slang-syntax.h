@@ -3,6 +3,8 @@
 
 #include "slang-ast-builder.h"
 
+#include <optional>
+
 namespace Slang
 {
 
@@ -33,6 +35,55 @@ inline Type* getBaseType(
     if (!declRef)
         return nullptr;
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
+}
+
+inline SubstExpr<Expr> getPackCountConstraintPackExpr(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return SubstExpr<Expr>();
+    return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
+}
+
+inline DeclRef<Decl> getPackCountConstraintPackDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    // The declaration checker stores the checked pack target in `packDeclRef`;
+    // `packExpr` remains only as source syntax for diagnostics and printing.
+    if (!declRef)
+        return DeclRef<Decl>();
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return DeclRef<Decl>();
+
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, packDeclRef);
+}
+
+inline IntVal* getPackCountConstraintActualCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->actualCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
+inline IntVal* getPackCountConstraintExpectedCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->expectedCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
 }
 
 // `Val`
@@ -252,7 +303,7 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 
-/// Get the user-perceived type of a parameters.
+/// Get the user-perceived type of a parameter.
 ///
 /// This type will use the declared type of the parameter, as well as modifiers
 /// on the parameter, such as `no_diff`, that are semantically relevant to the
@@ -264,6 +315,15 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 ///
 Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
+/// Get the semantic information for a parameter declaration.
+///
+/// The returned value type includes substitutions from `paramDeclRef` and semantic type modifiers
+/// such as `no_diff`. Its mode is determined solely from the underlying parameter declaration and
+/// that declaration's unspecialized type. Applying substitutions must never change a parameter's
+/// mode, because doing so would make specialized call sites disagree with the callee's declared
+/// ABI.
+ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
+
 /// Get the type of a parameter including any wrapper type necessary to convey its parameter-passing
 /// mode.
 ///
@@ -272,6 +332,10 @@ Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 /// `OutParam<int>`.
 ///
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
+
+/// Encode `paramInfo` as a parameter type, adding the wrapper selected by `paramInfo.mode` around
+/// its value type when necessary.
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& paramInfo);
 
 /// If necessary, wrap the value type of a parameter up with the wrapper type corresponding to its
 /// mode.
@@ -334,6 +398,148 @@ DeclRef<StructDecl> findBaseStructDeclRef(
 
 SubtypeWitness* findThisTypeWitness(SubstitutionSet substs, InterfaceDecl* interfaceDecl);
 
+/// Describes how far a passive requirement-witness lookup can proceed.
+enum class RequirementWitnessLookupFrontierStatus
+{
+    /// The originally requested requirement witness was found.
+    Found,
+
+    /// A declaration-context witness table exists, but the next required entry is absent.
+    MissingEntry,
+
+    /// The next concrete inheritance declaration has not published its witness table yet.
+    MissingConcreteTable,
+
+    /// The next path segment is a projected conformance whose concrete subtype must be resolved.
+    NeedsConcreteConformance,
+
+    /// The witness path does not currently identify a unique concrete lookup frontier.
+    Indeterminate,
+};
+
+/// The result of locating the next frontier in a requirement-witness lookup.
+///
+/// A `MissingEntry` or `MissingConcreteTable` result does not necessarily identify the originally
+/// requested, leaf-most requirement. It identifies the first missing structural step on the path
+/// to that requirement. A client that materializes the missing table or entry must restart lookup
+/// from the original subtype witness and requirement decl-ref; it must not form the final result
+/// directly from this frontier.
+class RequirementWitnessLookupFrontier
+{
+public:
+    static RequirementWitnessLookupFrontier makeFound(RequirementWitness witness)
+    {
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::Found;
+        result.m_witness = witness;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeMissingEntry(
+        RefPtr<WitnessTable> witnessTable,
+        DeclRef<Decl> requirementDeclRef)
+    {
+        SLANG_RELEASE_ASSERT(witnessTable && requirementDeclRef);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::MissingEntry;
+        result.m_witnessTable = witnessTable;
+        result.m_requirementDeclRef = requirementDeclRef;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeMissingConcreteTable(
+        DeclRef<InheritanceDecl> concreteConformanceDeclRef)
+    {
+        SLANG_RELEASE_ASSERT(concreteConformanceDeclRef);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::MissingConcreteTable;
+        result.m_concreteConformanceDeclRef = concreteConformanceDeclRef;
+        return result;
+    }
+
+    static RequirementWitnessLookupFrontier makeNeedsConcreteConformance(
+        SubtypeWitness* projectedConformanceWitness)
+    {
+        SLANG_RELEASE_ASSERT(projectedConformanceWitness);
+        RequirementWitnessLookupFrontier result;
+        result.m_status = RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance;
+        result.m_projectedConformanceWitness = projectedConformanceWitness;
+        return result;
+    }
+
+    RequirementWitnessLookupFrontierStatus getStatus() const { return m_status; }
+
+    /// The fully specialized result. Valid when `status == Found`.
+    RequirementWitness getWitness() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::Found);
+        return m_witness;
+    }
+
+    void setFoundWitness(RequirementWitness witness)
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::Found);
+        m_witness = witness;
+    }
+
+    /// The declaration-context table containing the missing entry. Valid for `MissingEntry`.
+    RefPtr<WitnessTable> getWitnessTable() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::MissingEntry);
+        return m_witnessTable;
+    }
+
+    /// The requirement at the current frontier. Valid for `MissingEntry`.
+    DeclRef<Decl> getRequirementDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(m_status == RequirementWitnessLookupFrontierStatus::MissingEntry);
+        return m_requirementDeclRef;
+    }
+
+    /// The declaration that can publish the missing root table. Valid for `MissingConcreteTable`.
+    DeclRef<InheritanceDecl> getConcreteConformanceDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(
+            m_status == RequirementWitnessLookupFrontierStatus::MissingConcreteTable);
+        return m_concreteConformanceDeclRef;
+    }
+
+    /// The projected relation that must be made concrete. Valid for `NeedsConcreteConformance`.
+    SubtypeWitness* getProjectedConformanceWitness() const
+    {
+        SLANG_RELEASE_ASSERT(
+            m_status == RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance);
+        return m_projectedConformanceWitness;
+    }
+
+private:
+    RequirementWitnessLookupFrontierStatus m_status =
+        RequirementWitnessLookupFrontierStatus::Indeterminate;
+    RequirementWitness m_witness;
+    RefPtr<WitnessTable> m_witnessTable;
+    DeclRef<Decl> m_requirementDeclRef;
+    DeclRef<InheritanceDecl> m_concreteConformanceDeclRef;
+    SubtypeWitness* m_projectedConformanceWitness = nullptr;
+};
+
+/// Passively locates the next frontier in a requirement-witness lookup.
+///
+/// This operation never performs semantic checking or mutates a witness table. In particular, a
+/// missing result is the first missing structural step and might be an inherited-interface entry
+/// above the requested leaf. After making progress on a missing table or entry, a forceful client
+/// must call this operation again with the original `subtypeWitness` and `requirementDeclRef`. A
+/// `NeedsConcreteConformance` result instead gives the projected relation through which the client
+/// must continue the original requirement lookup after resolving that relation's subtype.
+RequirementWitnessLookupFrontier locateNextRequirementWitnessLookupFrontier(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* subtypeWitness,
+    DeclRef<Decl> requirementDeclRef);
+
+/// Passively looks up an existing requirement witness for ordinary value resolution.
+///
+/// Unlike `locateNextRequirementWitnessLookupFrontier`, this operation does not report why a lookup
+/// failed. An intermediate witness table remains in declaration-context form; value and declaration
+/// witnesses are specialized along the subtype-witness path before being returned.
 RequirementWitness tryLookUpRequirementWitness(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
@@ -369,13 +575,41 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 
 /// Get the parameter-passing mode to use for a parameter.
 ///
-/// The actual mode to use takes into account both the explicit
-/// modifiers on the declaration, as well as the declared type
-/// of the parameter. In cases where the parameter's type
-/// is not copyable, the mode implied by its declaration may be
-/// adjusted to something else.
+/// The actual mode takes into account both the explicit modifiers on the declaration and the
+/// declaration's unspecialized type. In cases where that declared type is not copyable, the mode
+/// implied by the declaration may be adjusted to something else. A specialized parameter type
+/// must never be used to recompute this result.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+
+/// Finds the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked`. A declaration has a
+/// `ThisParamInfoAttribute` if and only if it has an effective `this` parameter, so an empty result
+/// means that the checked declaration has no such parameter. The returned value type includes the
+/// substitutions carried by `declRef`, but its mode is the declaration-derived mode recorded
+/// during signature checking and is never recomputed after substitution. When a declaration with
+/// an effective receiver is looked up through a callable-as-type, the result is the callable lookup
+/// source's checked information; receiverless requirements remain receiverless.
+std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+/// Gets the checked information for `declRef`'s effective `this` parameter.
+///
+/// The declaration must have reached `DeclCheckState::SignatureChecked` and must have an effective
+/// `this` parameter. The returned value type includes the substitutions carried by `declRef`, but
+/// the declaration-derived mode is invariant under those substitutions.
+ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+/// Returns whether a `this` expression in `callableDeclRef`'s body is writable.
+///
+/// The effective parameter mode normally determines this property. A class setter is the one
+/// exception: its effective `this` parameter has `In` mode, but the class value still names an
+/// object whose fields the setter body is expected to mutate. This exception affects expression
+/// checking only; it does not change the effective parameter mode used for calls or lowering.
+bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo);
+
+/// Returns true if `type` or one of its modified-type bases carries `no_diff`.
+bool doesTypeHaveNoDiffModifier(Type* type);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {
@@ -423,9 +657,15 @@ inline FilteredMemberRefList<ParamDecl> getParameters(
     return getMembersOfType<ParamDecl>(astBuilder, declRef);
 }
 
-std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+/// Gets the ordinary parameters that form a callable's complete function signature.
+///
+/// An accessor nested under a callable storage declaration receives that parent's parameters
+/// before its own. For example, a subscript setter's signature contains its subscript indices
+/// followed by its new-value parameter. The effective `this` parameter, when present, is not part
+/// of this list and is queried separately.
+List<DeclRef<ParamDecl>> getParametersForCallableSignature(
     ASTBuilder* astBuilder,
-    Type* paramTypeWithDirection);
+    DeclRef<CallableDecl> declRef);
 
 inline Decl* getInner(DeclRef<GenericDecl> declRef)
 {
@@ -487,6 +727,12 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType);
 
 NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef);
 
+/// Returns the canonical AST lookup name shared by subscript declarations and expressions.
+inline Name* getSubscriptOperatorName(ASTBuilder* astBuilder)
+{
+    return astBuilder->getNamePool()->getName("operator[]");
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
 
 GenericDeclRefType* getGenericDeclRefType(
@@ -544,6 +790,19 @@ ModuleDecl* getModuleDecl(Scope* scope);
 
 /// Get the module that a declaration is associated with, if any.
 Module* getModule(Decl* decl);
+
+/// If `decl` is an unscoped `enum` declaration, return it; otherwise return
+/// null. "Unscoped" is defined here by the marker this predicate tests: the enum
+/// carries `UnscopedEnumAttribute`. The parser attaches that attribute via two
+/// independent routes — `-unscoped-enum` (only for non-generic enums) and an
+/// explicit `[UnscopedEnum]` (any enum, a generic one included) — so a generic
+/// enum can be unscoped through the explicit attribute alone. For a non-generic
+/// unscoped enum the parser additionally injects its enumerators into the
+/// enclosing scope, but that injection is a consequence, not the definition: a
+/// generic `[UnscopedEnum]` enum is unscoped here yet gets no injection. This is
+/// the single source of truth for "is this enum unscoped"; it also matches a
+/// still-unchecked `[UnscopedEnum]` so it can be used during parsing.
+EnumDecl* isUnscopedEnum(Decl* decl);
 
 /// Get the parent decl, skipping any generic decls in between.
 ContainerDecl* getParentDecl(Decl* decl);

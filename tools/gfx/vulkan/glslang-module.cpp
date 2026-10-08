@@ -1,7 +1,6 @@
 // glslang-module.cpp
 #include "glslang-module.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,7 +10,7 @@
 #include <dlfcn.h>
 #endif
 
-#include "../renderer-shared.h"
+#include "gfx/renderer-shared.h"
 #include "slang-tag-version.h"
 
 namespace gfx

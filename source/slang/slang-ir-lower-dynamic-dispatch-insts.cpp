@@ -153,7 +153,8 @@ IRFunc* emitWitnessTableWrapper(
     IRModule* module,
     IRInst* funcInst,
     IRFuncType* effectiveFuncType,
-    IRFuncType* interfaceRequirementVal)
+    IRFuncType* interfaceRequirementVal,
+    TargetRequest* targetReq)
 {
     auto funcTypeInInterface = interfaceRequirementVal;
     auto targetFuncType = effectiveFuncType;
@@ -167,6 +168,31 @@ IRFunc* emitWitnessTableWrapper(
     if (auto func = as<IRFunc>(funcInst))
         if (auto name = _getWitnessTableWrapperFuncName(module, func))
             builder->addNameHintDecoration(wrapperFunc, name);
+
+    // This wrapper only marshals arguments between the interface's `AnyValue`-based
+    // signature and the concrete implementation's signature -- it is compiler-synthesized
+    // glue, not a call the downstream target compiler has any reason to keep as a distinct
+    // function. Every other synthesized marshalling helper in the compiler (e.g. the
+    // pack/unpack storage helpers in slang-ir-lower-buffer-element-type.cpp) is force-inlined
+    // the same way for the same reason. Without this, whether the wrapper (and, transitively,
+    // the switch-based dispatch function built around it in `createDispatchFunc`) survives to
+    // the final target output is left entirely to the downstream compiler's own heuristic
+    // inliner, which can decline once the wrapped method body is non-trivial (observed on the
+    // CUDA/NVRTC backend specifically).
+    //
+    // Excluded on the CPU/LLVM-JIT target: force-inlining a wrapper that declares a local
+    // (the pack-after-call temp `maybeUnpackArg` creates for by-reference/setter-style
+    // parameters) into a caller that also force-inlines a sibling wrapper from a different
+    // concrete-type case corrupts that target's own debug-info generation -- confirmed via a
+    // real crash (LLVM's DwarfDebug::finalizeModuleInfo, on conflicting IRLocalVariable
+    // metadata for the two inlined instances) in
+    // tests/language-feature/dynamic-dispatch/special-members-setter.slang's property/subscript
+    // setter case. This is a latent bug in that target's own debug-info emission
+    // (source/slang-llvm/slang-llvm-builder.cpp), not something this pass can fix -- skipping
+    // force-inline here is a target-specific carve-out, not a claim that force-inlining itself
+    // is wrong.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder->addForceInlineDecoration(wrapperFunc);
 
     builder->setInsertInto(wrapperFunc);
     auto block = builder->emitBlock();
@@ -247,7 +273,8 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 //
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
-    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping)
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
+    TargetRequest* targetReq)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -264,6 +291,16 @@ IRFunc* createDispatchFunc(
     auto func = builder.createFunc();
     builder.setInsertInto(func);
     func->setFullType(dispatchFuncType);
+
+    // Same reasoning as `emitWitnessTableWrapper`'s force-inline decoration above: this
+    // function only exists because `mapping` is a closed, statically-enumerable set of
+    // concrete-type implementations (that's the only case this pass runs for), so the
+    // `switch` built below is itself the already-resolved dispatch. Leaving it as a separate,
+    // non-force-inlined function defeats that resolution by handing the decision back to a
+    // downstream heuristic inliner. Same CPU/LLVM-JIT exclusion as `emitWitnessTableWrapper`
+    // -- see the comment there.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder.addForceInlineDecoration(func);
 
     auto entryBlock = builder.emitBlock();
     builder.setInsertInto(entryBlock);
@@ -312,7 +349,8 @@ IRFunc* createDispatchFunc(
             funcInst->getModule(),
             funcInst,
             effectiveFuncType,
-            innerDispatchFuncType);
+            innerDispatchFuncType,
+            targetReq);
 
         // Create case block
         auto caseBlock = builder.emitBlock();
@@ -491,7 +529,10 @@ struct TagOpsLoweringContext : public InstPassBase
         auto srcSet = cast<IRWitnessTableSet>(
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destSet = cast<IRSetBase>(cast<IRSetTagType>(inst->getDataType())->getOperand(0));
-        auto key = cast<IRStructKey>(inst->getOperand(1));
+        // The requirement key; `IRInst*` rather than `IRStructKey*` because a
+        // built-in interface requirement uses the hoistable `IRBuiltinRequirementKey`.
+        // Used only as a witness-table lookup key below.
+        IRInst* key = inst->getOperand(1);
 
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
@@ -580,6 +621,32 @@ struct TagOpsLoweringContext : public InstPassBase
         processAllInsts([&](IRInst* inst) { return processInst(inst); });
     }
 };
+
+/// Returns the only payload-bearing type in `typeSet`, ignoring the zero-sized `none` element.
+///
+/// For example, `{Foo, none}` and `{Foo}` return `Foo`, while `{Foo, Bar, none}` and `{none}`
+/// return `nullptr`.
+///
+/// Untagged-union lowering uses this classification to store a single concrete payload directly;
+/// the surrounding tagged union continues to carry the `uint` tag that distinguishes `Foo` from
+/// `none` and participates in the existing subset/superset tag conversions.
+static IRType* tryGetSinglePayloadType(IRTypeSet* typeSet)
+{
+    IRType* payloadType = nullptr;
+    for (UInt i = 0; i < typeSet->getCount(); ++i)
+    {
+        auto element = typeSet->getElement(i);
+        if (as<IRNoneTypeElement>(element))
+            continue;
+
+        auto elementType = as<IRType>(element);
+        SLANG_RELEASE_ASSERT(elementType);
+        if (payloadType)
+            return nullptr;
+        payloadType = elementType;
+    }
+    return payloadType;
+}
 
 // This context lowers `TypeSet` instructions.
 struct UntaggedUnionLoweringContext : public InstPassBase
@@ -701,6 +768,52 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
     void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
+        // `none` has no payload, so a set with one real type needs no AnyValue container. For
+        // example, `UntaggedUnion({Foo, none})` can store `Foo` directly while the tagged union's
+        // separate witness-table tag continues to record whether the value is `Foo` or `none`.
+        if (auto payloadType =
+                tryGetSinglePayloadType(cast<IRTypeSet>(untaggedUnionType->getSet())))
+        {
+            List<IRPackAnyValue*> packsToInspect;
+            for (auto use = untaggedUnionType->firstUse; use; use = use->nextUse)
+            {
+                if (auto pack = as<IRPackAnyValue>(use->getUser()))
+                {
+                    if (pack->getDataType() == untaggedUnionType)
+                        packsToInspect.add(pack);
+                }
+            }
+
+            untaggedUnionType->replaceUsesWith(payloadType);
+
+            // A pack into `{Foo, none}` either carries a `Foo` or supplies the irrelevant payload
+            // for the `none` tag. The first case is now `PackAnyValue<Foo>(foo)`; leave that
+            // identity for ordinary AnyValue marshalling to remove. In the second case, replace
+            // the old zero-sized placeholder with a well-formed default `Foo`, matching the
+            // representation expected by the now-direct payload field.
+            for (auto pack : packsToInspect)
+            {
+                auto value = pack->getValue();
+                auto valueStorageType = value->getDataType();
+                if (auto valueUnionType = as<IRUntaggedUnionType>(valueStorageType))
+                {
+                    if (auto valuePayloadType =
+                            tryGetSinglePayloadType(cast<IRTypeSet>(valueUnionType->getSet())))
+                        valueStorageType = valuePayloadType;
+                }
+                if (valueStorageType == payloadType)
+                    continue;
+
+                IRBuilder builder(pack);
+                builder.setInsertBefore(pack);
+                auto replacement = builder.emitDefaultConstruct(payloadType);
+                pack->replaceUsesWith(replacement);
+                pack->removeAndDeallocate();
+            }
+
+            return;
+        }
+
         // Type collections are replaced with `AnyValueType` large enough to hold
         // any of the types in the collection.
         //
@@ -1441,7 +1554,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // We'll replace it with a poison value so that any accidental uses will result in
         // an error later on.
         //
-        inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
         return true;
     }
 
@@ -1604,7 +1717,36 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Replace all WitnessTableID type or RTTIHandleType with `uint2`.
+    // Dynamic-dispatch handles are 64-bit values stored as a uint2 on all targets.
+    // This avoids needing 64-bit integer support and keeps existential layouts
+    // the same across targets.
+
+    // Return the lowered IR type that carries a dynamic-dispatch handle: a `uint2`.
+    IRType* getLoweredHandleType(IRBuilder& builder)
+    {
+        return builder.getVectorType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getIntType(), 2));
+    }
+
+    // Build a lowered handle value carrying the 32-bit `id` in its low bits, to
+    // match getLoweredHandleType(): pack it into element 0 of a `uint2`
+    // (element 1 = 0).
+    IRInst* makeHandleFromID(IRBuilder& builder, IRInst* id)
+    {
+        IRInst* args[] = {id, builder.getIntValue(builder.getUIntType(), 0)};
+        return builder.emitMakeVector(getLoweredHandleType(builder), 2, args);
+    }
+
+    // Read the 32-bit id back out of a lowered handle value produced by
+    // makeHandleFromID(): extract element 0 of the `uint2`.
+    IRInst* getIDFromHandle(IRBuilder& builder, IRInst* handle)
+    {
+        UInt index = 0;
+        return builder.emitSwizzle(builder.getUIntType(), handle, 1, &index);
+    }
+
+    // Replace every WitnessTableID / RTTIHandle type with its lowered carrier.
     void lowerHandleTypes()
     {
         List<IRInst*> instsToRemove;
@@ -1620,10 +1762,7 @@ struct ExistentialLoweringContext : public InstPassBase
                 {
                     IRBuilder builder(module);
                     builder.setInsertBefore(inst);
-                    auto uint2Type = builder.getVectorType(
-                        builder.getUIntType(),
-                        builder.getIntValue(builder.getIntType(), 2));
-                    inst->replaceUsesWith(uint2Type);
+                    inst->replaceUsesWith(getLoweredHandleType(builder));
                     instsToRemove.add(inst);
                 }
                 break;
@@ -1864,8 +2003,9 @@ struct ExistentialLoweringContext : public InstPassBase
     bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
     {
         // Turn an instruction of the form `IRCreateExistentialObject(witnessTableID, value)`
-        // into a `MakeTuple(makeVector(rttiHandleType, 0, 0), makeVector(witnessTableIDType,
-        // witnessTableId, 0), reinterpret(targetValueType, value))`.
+        // into a `MakeTuple(rttiHandle, witnessTableIDHandle, reinterpret(targetValueType,
+        // value))`, where the two handles are built by the handle helpers (the RTTI handle
+        // is a zero placeholder; the witness handle carries the witness-table id).
         //
 
         IRBuilder builder(module);
@@ -1874,28 +2014,12 @@ struct ExistentialLoweringContext : public InstPassBase
         auto witnessTableID = inst->getOperand(0);
         auto value = inst->getOperand(1);
 
-        // Create the RTTI handle component (uint2 with zeros)
-        IRInst* rttiHandleArgs[] = {
-            builder.getIntValue(builder.getUIntType(), 0),
-            builder.getIntValue(builder.getUIntType(), 0)};
-
-        auto rttiHandle = builder.emitMakeVector(
-            builder.getVectorType(
-                builder.getUIntType(),
-                builder.getIntValue(builder.getIntType(), 2)),
-            2,
-            rttiHandleArgs);
-
-        // Create the witness table ID component (uint2 with witnessTableID and 0)
-        IRInst* witnessTableIDArgs[] = {
-            witnessTableID,
-            builder.getIntValue(builder.getUIntType(), 0)};
-        auto witnessTableIDVec = builder.emitMakeVector(
-            builder.getVectorType(
-                builder.getUIntType(),
-                builder.getIntValue(builder.getIntType(), 2)),
-            2,
-            witnessTableIDArgs);
+        // Build the RTTI and witness-table-ID handle values via the handle
+        // helpers, so this site does not depend on the lowered representation.
+        // The RTTI handle is a zero placeholder; the witness handle carries the
+        // witness-table id in its low 32 bits.
+        auto rttiHandle = makeHandleFromID(builder, builder.getIntValue(builder.getUIntType(), 0));
+        auto witnessTableIDHandle = makeHandleFromID(builder, witnessTableID);
 
         // Get the target value type from the existential tuple type
         auto tupleType = as<IRTupleType>(inst->getDataType());
@@ -1907,7 +2031,7 @@ struct ExistentialLoweringContext : public InstPassBase
         // Create the tuple
         auto tuple = builder.emitMakeTuple(
             inst->getDataType(),
-            {rttiHandle, witnessTableIDVec, reinterpretedValue});
+            {rttiHandle, witnessTableIDHandle, reinterpretedValue});
 
         inst->replaceUsesWith(tuple);
         inst->removeAndDeallocate();
@@ -1916,9 +2040,9 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool processGetSequentialIDInst(IRGetSequentialID* inst)
     {
-        // If the operand is a witness table, it is already replaced with a uint2
-        // at this point, where the first element in the uint2 is the id of the
-        // witness table.
+        // If the operand is a witness table, it has already been lowered to a witness
+        // handle by lowerHandleTypes(); read the sequential id back out of it with
+        // getIDFromHandle() (which knows the representation, so this site need not).
         //
 
         IRBuilder builder(module);
@@ -1934,8 +2058,10 @@ struct ExistentialLoweringContext : public InstPassBase
             return true;
         }
 
-        UInt index = 0;
-        auto id = builder.emitSwizzle(builder.getUIntType(), inst->getRTTIOperand(), 1, &index);
+        // The sequential id is the low 32 bits of the lowered witness handle; the
+        // handle helper reads it back out without this site needing to know the
+        // representation.
+        auto id = getIDFromHandle(builder, inst->getRTTIOperand());
         inst->replaceUsesWith(id);
         inst->removeAndDeallocate();
         return true;

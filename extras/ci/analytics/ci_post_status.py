@@ -186,34 +186,43 @@ def commit_and_push(repo_dir, message):
         print(f"Error: commit failed:\n{result.stderr}", file=sys.stderr)
         return False
 
-    print("Pushing...")
-    result = run_git(["push"], repo_dir)
-    if result.returncode != 0:
-        stderr = result.stderr.strip()
-        print("\nError: push failed.", file=sys.stderr)
-        if "GH007" in stderr or "email privacy" in stderr:
-            print(
-                "\nGitHub blocked the push due to email privacy settings.\n"
-                "Fix: Go to https://github.com/settings/emails and either:\n"
-                "  1. Uncheck 'Block command line pushes that expose my email', or\n"
-                "  2. Set your git email to your GitHub noreply address:\n"
-                "     git config --global user.email "
-                "'<ID>+<USER>@users.noreply.github.com'",
-                file=sys.stderr,
-            )
-        elif "Permission denied" in stderr or "Authentication failed" in stderr:
-            print(
-                "\nPush access denied. You need write access to\n"
-                f"  {REPO}\n"
-                "Ask a maintainer to add you as a collaborator.",
-                file=sys.stderr,
-            )
-        else:
-            print(stderr, file=sys.stderr)
-        return False
+    result = None
+    for attempt in range(1, 4):
+        print(f"Pushing (attempt {attempt}/3)...")
+        result = run_git(["push"], repo_dir)
+        if result.returncode == 0:
+            print("Pushed successfully.")
+            return True
+        if attempt == 3:
+            break
+        print("Push failed; rebasing before retry...", file=sys.stderr)
+        pull = run_git(["pull", "--rebase"], repo_dir)
+        if pull.returncode != 0:
+            print(f"Error: pull --rebase failed:\n{pull.stderr}", file=sys.stderr)
+            return False
 
-    print("Pushed successfully.")
-    return True
+    stderr = result.stderr.strip() if result else ""
+    print("\nError: push failed.", file=sys.stderr)
+    if "GH007" in stderr or "email privacy" in stderr:
+        print(
+            "\nGitHub blocked the push due to email privacy settings.\n"
+            "Fix: Go to https://github.com/settings/emails and either:\n"
+            "  1. Uncheck 'Block command line pushes that expose my email', or\n"
+            "  2. Set your git email to your GitHub noreply address:\n"
+            "     git config --global user.email "
+            "'<ID>+<USER>@users.noreply.github.com'",
+            file=sys.stderr,
+        )
+    elif "Permission denied" in stderr or "Authentication failed" in stderr:
+        print(
+            "\nPush access denied. You need write access to\n"
+            f"  {REPO}\n"
+            "Ask a maintainer to add you as a collaborator.",
+            file=sys.stderr,
+        )
+    else:
+        print(stderr, file=sys.stderr)
+    return False
 
 
 def cmd_add(args, tmpdir):

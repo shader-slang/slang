@@ -1,7 +1,7 @@
 // slang-ir-specialize.cpp
 #include "slang-ir-specialize.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-inline.h"
@@ -46,7 +46,8 @@ IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
     IRModule* module,
-    SpecializationContext* context);
+    SpecializationContext* context,
+    bool queueFollowUpWork);
 
 struct SpecializationContext
 {
@@ -64,6 +65,8 @@ struct SpecializationContext
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
+        , expanded(*inModule->getContainerPool().getHashSet<IRInst>())
+        , workListStack(*inModule->getContainerPool().getList<IRInst>())
         , module(inModule)
         , targetProgram(target)
         , options(options)
@@ -74,6 +77,8 @@ struct SpecializationContext
         module->getContainerPool().free(&workList);
         module->getContainerPool().free(&workListSet);
         module->getContainerPool().free(&cleanInsts);
+        module->getContainerPool().free(&expanded);
+        module->getContainerPool().free(&workListStack);
     }
 
     bool isUnsimplifiedArithmeticInst(IRInst* inst)
@@ -285,15 +290,110 @@ struct SpecializationContext
     List<IRInst*>& workList;
     HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
-    void addToWorkList(IRInst* inst)
+
+    // A *drain* is one full emptying of the work list — one `processSpecializationWorkList` call
+    // (via `processSpecializationWorkListFromRoot`) that pops until the list is empty. The module
+    // pass runs many drains; on-demand callers run their own drains on a subtree root.
+    //
+    // `workListSet` tracks which insts are *currently queued*, and the popped inst is removed from
+    // it in the drain loop, so it dedups the drain queue but does not record that an inst's use
+    // closure was already walked. `expanded` is that separate memo, used *only* by the ordinary
+    // seeding walk (`forceSeed == false`): an inst is added the first time its forward use closure
+    // is walked and, unlike `workListSet`, is not removed on pop, so re-reaching an already-walked
+    // inst while nothing has changed does not redundantly re-walk its closure. It is reset per
+    // drain in
+    // `processSpecializationWorkListFromRoot`. The mutation walk (`forceSeed == true`) deliberately
+    // does *not* consult `expanded`; see `expandUseClosure`.
+    HashSet<IRInst*>& expanded;
+    // Scratch stack for the iterative closure walk in `expandUseClosure` (transient per call).
+    List<IRInst*>& workListStack;
+
+    // Schedule `inst` on the drain queue if it is not already queued, and report whether this call
+    // was the one that queued it. Does not walk its use closure (that is `expandUseClosure`'s job);
+    // the two are kept separate so the queue-dedup memo (`workListSet`) and the seeding-walk memo
+    // (`expanded`) can have independent lifetimes. The "newly queued" result is what the mutation
+    // walk uses to decide how far to descend (see `expandUseClosure`).
+    bool enqueue(IRInst* inst)
     {
         if (workListSet.add(inst))
         {
             workList.add(inst);
-
-
-            addUsersToWorkList(inst);
+            return true;
         }
+        return false;
+    }
+
+    // Enqueue every instruction reachable by following use edges forward from `seed` (its users,
+    // their users, and so on) — because specializing an inst may unblock specialization of the
+    // things that use it. `seed` itself is never enqueued here. The walk uses an explicit stack so
+    // its depth is independent of use-chain length, so a long chain cannot overflow the call
+    // stack.
+    //
+    // The descent condition depends on `forceSeed`, and the two modes are intentionally different:
+    //
+    //  - Seeding walk (`forceSeed == false`, from `addToWorkList`): descend into a user the first
+    //    time it is seen this drain, deduped by `expanded`. Nothing has changed since an earlier
+    //    walk of that user this drain, so re-walking it would only re-discover the same users; the
+    //    memo skips that redundant work.
+    //
+    //  - Mutation walk (`forceSeed == true`, from `addUsersToWorkList`): descend into every user
+    //    that was not already queued (iff `enqueue(user)` succeeded). This re-walks the changed
+    //    inst's
+    //    *transitive* forward closure, so a downstream `specialize` reached only through a no-op
+    //    wrapper intermediate — e.g. `%A = specialize(H, …)`, `%arg = PtrType(%A)`, `%C =
+    //    specialize(G, %arg)`, where reprocessing the `PtrType` is not itself a change and so never
+    //    re-seeds `%C` — is still re-reached in the same drain once `%A` concretizes. The mutation
+    //    walk does not consult `expanded`: a mutation is precisely the event after which an
+    //    already-walked closure must be reconsidered.
+    //
+    // Not re-entrant: nothing it does (enqueue, set/list operations, walking uses) calls back into
+    // the work-list helpers, so the single shared `workListStack` is safe to reuse.
+    void expandUseClosure(IRInst* seed, bool forceSeed)
+    {
+        workListStack.clear();
+        if (forceSeed)
+        {
+            expanded.add(seed);
+            workListStack.add(seed);
+        }
+        else if (expanded.add(seed))
+        {
+            workListStack.add(seed);
+        }
+
+        while (workListStack.getCount() != 0)
+        {
+            auto inst = workListStack.getLast();
+            workListStack.removeLast();
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                bool newlyQueued = enqueue(user);
+                if (forceSeed)
+                {
+                    // Transitive re-walk bounded by the queue: descend into a user only if this
+                    // call queued it, which also terminates the walk on use cycles (a second visit
+                    // finds it already queued).
+                    if (newlyQueued)
+                    {
+                        expanded.add(user);
+                        workListStack.add(user);
+                    }
+                }
+                else if (expanded.add(user))
+                {
+                    workListStack.add(user);
+                }
+            }
+        }
+    }
+
+    // Schedule `inst` for draining and walk its forward use closure once per drain (deduped by
+    // `expanded`): `enqueue` plus a non-forced `expandUseClosure`.
+    void addToWorkList(IRInst* inst)
+    {
+        enqueue(inst);
+        expandUseClosure(inst, /*forceSeed*/ false);
     }
 
     static constexpr UInt kMaxIRSpecializationDepthBudget = 512;
@@ -373,20 +473,17 @@ struct SpecializationContext
         return false;
     }
 
-    // When a transformation makes a change to an instruction,
-    // we may need to re-consider transformations for instructions
-    // that use its value. In those cases we will call `addUsersToWorkList`
-    // on the instruction that is being modified or replaced.
-    //
-    void addUsersToWorkList(IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-
-            addToWorkList(user);
-        }
-    }
+    // When a transformation makes a change to an instruction, we may need to re-consider
+    // transformations for instructions that use its value. Callers invoke this at the point of
+    // mutation on the instruction being modified or replaced. It re-walks `inst`'s forward use
+    // closure (a force-seeded `expandUseClosure`) so that a change reaches not only `inst`'s direct
+    // users but any downstream user reachable through no-op wrapper intermediates (e.g. a
+    // `PtrType`/`ArrayType` around a now-concrete type). The re-walk is bounded by the queue — it
+    // descends only through users this call newly queues, leaving an already-queued user for the
+    // drain to reconsider — so the closure is revisited across the drain rather than re-walked
+    // whole here. It is deliberately *not* gated by the `expanded` seeding memo: a mutation is
+    // exactly the event after which an already-walked closure must be revisited.
+    void addUsersToWorkList(IRInst* inst) { expandUseClosure(inst, /*forceSeed*/ true); }
 
     // Of course, somewhere along the way we expect
     // to run into uses of `specialize(...)` instructions
@@ -409,7 +506,10 @@ struct SpecializationContext
     // suitable for use as a replacement for the `specialize(...)`
     // instruction.
     //
-    IRInst* specializeGeneric(IRGeneric* genericVal, IRSpecialize* specializeInst)
+    IRInst* specializeGeneric(
+        IRGeneric* genericVal,
+        IRSpecialize* specializeInst,
+        bool queueFollowUpWork = true)
     {
         // We need to fold the generic arguments here in order to uniquely identify
         // which specializations need to be generated.
@@ -476,14 +576,18 @@ struct SpecializationContext
         activeGenericSpecializations[key] = specializeInst;
         SLANG_DEFER(activeGenericSpecializations.remove(key));
 
-        IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
+        IRInst* specializedVal =
+            specializeGenericImpl(genericVal, specializeInst, module, this, queueFollowUpWork);
         if (!specializedVal)
             return nullptr;
 
-        // The body of the specialized generic may expose more specialization opportunities, so
-        // we add the children to workList.
-        for (auto child : specializedVal->getDecorationsAndChildren())
-            addToWorkList(child);
+        if (queueFollowUpWork)
+        {
+            // The body of the specialized generic may expose more specialization opportunities, so
+            // the normal module pass queues the children for the shared worklist drain.
+            for (auto child : specializedVal->getDecorationsAndChildren())
+                addToWorkList(child);
+        }
 
         // The value that was returned from evaluating
         // the generic is the specialized value, and we
@@ -590,8 +694,21 @@ struct SpecializationContext
             inst,
             [&](IRInst* user)
             {
-                if (user->getOp() != kIROp_Annotation)
+                // Weak/cache users do not represent executable IR demand. In particular,
+                // TranslationContext::resolveInst creates an IRWeakUse while it is resolving a
+                // specialize instruction; counting that as a real use lets nested specialization
+                // delete the very instruction the resolver still owns.
+                switch (user->getOp())
+                {
+                case kIROp_Annotation:
+                case kIROp_WeakUse:
+                case kIROp_CompilerDictionaryEntry:
+                case kIROp_CompilerDictionaryValue:
+                    return;
+                default:
                     hasNonTrivialUses = true;
+                    return;
+                }
             });
 
         if (auto specialize = as<IRSpecialize>(inst))
@@ -678,7 +795,7 @@ struct SpecializationContext
             // later passes from encountering an unresolvable specialize instruction.
             IRBuilder builder(module);
             builder.setInsertBefore(specInst);
-            auto poison = builder.emitPoison(specInst->getFullType());
+            auto poison = builder.getPoison(specInst->getFullType());
             specInst->replaceUsesWith(poison);
             specInst->removeAndDeallocate();
             return true;
@@ -983,7 +1100,13 @@ struct SpecializationContext
                                                                        : packBranch->getOperand(2);
         packBranch->replaceUsesWith(replacement);
         packBranch->removeAndDeallocate();
-        addToWorkList(replacement);
+        // Resolving the pack branch is a mutation, so reconsider `replacement` and its users with
+        // the same transitive re-walk any mutation site gives. Use `enqueue` (not `addToWorkList`)
+        // before `addUsersToWorkList`: `addToWorkList` would run the seeding walk first, queuing
+        // `replacement`'s users into `workListSet`; the forced walk only descends into users that
+        // are newly queued, so it would find them already queued and stop -- missing a `specialize`
+        // reachable only through a no-op wrapper past a user.
+        enqueue(replacement);
         addUsersToWorkList(replacement);
         return true;
     }
@@ -1000,6 +1123,25 @@ struct SpecializationContext
         case kIROp_MakeTuple:
             operand = operand->getDataType();
             break;
+        }
+
+        // Fold only when the element count is a concrete `IRIntLit`; a `T[N]`
+        // whose `N` is still a generic parameter has a non-literal count and
+        // must wait for a later specialization round (matching the pack case
+        // below, which bails while any element is still abstract).
+        if (auto arrayType = as<IRArrayType>(operand))
+        {
+            if (auto count = as<IRIntLit>(arrayType->getElementCount()))
+            {
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                auto newInst = builder.getIntValue(inst->getDataType(), count->getValue());
+                addUsersToWorkList(inst);
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
+            }
+            return false;
         }
 
         // We can only figure out the count of a type pack or tuple type.
@@ -1240,10 +1382,20 @@ struct SpecializationContext
         auto firstUse = inst->firstUse;
         bool instChanged = peepholeOptimizeInst(targetProgram, module, inst);
 
-        for (auto use = firstUse; use; use = use->nextUse)
+        // Only a fold that rewrote `inst` needs to re-notify its users. Reconsider the users
+        // captured before the fold (the rewrite may have emptied `inst`'s use list). The
+        // `enqueue` + `addUsersToWorkList` pairing is deliberate: a plain `addToWorkList` would run
+        // the seeding walk first, queuing the user's own users into `workListSet`; the forced walk
+        // only descends into newly-queued users, so it would find them already queued and stop --
+        // missing a `specialize` reachable only through a no-op wrapper past a user.
+        if (instChanged)
         {
-            auto user = use->getUser();
-            addToWorkList(user);
+            for (auto use = firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                enqueue(user);
+                addUsersToWorkList(user);
+            }
         }
         return instChanged;
     }
@@ -1682,66 +1834,8 @@ struct SpecializationContext
             bool iterChanged = false;
             for (;;)
             {
-                bool hasSpecialization = false;
-                addToWorkList(module->getModuleInst());
-
-                // We will then iterate until our work list goes dry.
-                //
-                while (workList.getCount() != 0)
-                {
-                    // If we've emitted errors (e.g. from diagnosing an invalid
-                    // existential specialization), bail out early to avoid
-                    // processing IR that may be in an inconsistent state.
-                    if (sink && sink->getErrorCount() != 0)
-                    {
-                        workList.clear();
-                        break;
-                    }
-
-                    IRInst* inst = workList.getLast();
-
-                    workList.removeLast();
-                    workListSet.remove(inst);
-
-                    if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
-                        continue;
-
-                    // For each instruction we process, we want to perform
-                    // a few steps.
-                    //
-                    // First we will look for all the general-purpose
-                    // specialization opportunities (generic specialization,
-                    // existential specialization, simplifications, etc.)
-                    //
-                    if (inst->hasUses() || inst->mightHaveSideEffects() || isWitnessTableType(inst))
-                    {
-                        hasSpecialization |= maybeSpecializeInst(inst);
-                    }
-
-                    // Finally, we need to make our logic recurse through
-                    // the whole IR module, so we want to add the children
-                    // of any parent instructions to our work list so that
-                    // we process them too.
-                    //
-                    // Note that we are adding the children of an instruction
-                    // in reverse order. This is because the way we are
-                    // using the work list treats it like a stack (LIFO) and
-                    // we know that fully-specialized-ness will tend to flow
-                    // top-down through the program, so that we want to process
-                    // the children of an instruction in their original order.
-                    //
-                    for (auto child = inst->getLastDecorationOrChild(); child;
-                         child = child->getPrevInst())
-                    {
-                        // Also note that `addToWorkList` has been written
-                        // to avoid adding any instruction that is a descendent
-                        // of an IR generic, because we don't actually want
-                        // to perform specialization inside of generics.
-                        //
-                        if (!isAnnotation(child))
-                            addToWorkList(child);
-                    }
-                }
+                bool hasSpecialization =
+                    processSpecializationWorkListFromRoot(module->getModuleInst());
                 if (hasSpecialization)
                     iterChanged = true;
                 else
@@ -1752,13 +1846,31 @@ struct SpecializationContext
                 break;
 
             if (iterChanged)
-            {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst());
-                peepholeOptimizeGlobalScope(targetProgram, this->module);
-                performMandatoryEarlyInlining(module);
-                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
-                unrollLoopsInModule(module, targetProgram, sink);
+
+            // This cleanup group must run on every round, not only after a round
+            // that performed specialization. `unrollLoopsInModule` in particular
+            // is semantics-bearing, not an optimization: it implements
+            // `[ForceUnroll]`/`[unroll]` and diagnoses loops that cannot be
+            // unrolled, and this is its only call site in the pipeline. Gating it
+            // on `iterChanged` used to be masked by every linked module containing
+            // auto-diff IR to specialize on the first round; with auto-diff
+            // link-time pruning a program with no specialization work would
+            // otherwise never have its loops unrolled.
+            eliminateDeadCode(module->getModuleInst());
+            peepholeOptimizeGlobalScope(targetProgram, this->module);
+            performMandatoryEarlyInlining(module);
+            applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
+            bool unrolledAnyLoop = false;
+            unrollLoopsInModule(module, targetProgram, sink, &unrolledAnyLoop);
+            if (unrolledAnyLoop)
+            {
+                // Unrolling can expose new specialization opportunities (e.g. a
+                // `specialize` whose argument becomes a constant inside an
+                // unrolled body), so treat it as a change and take another
+                // round.
+                this->changed = true;
+                iterChanged = true;
             }
 
             if (sink && sink->getErrorCount() != 0)
@@ -1802,6 +1914,87 @@ struct SpecializationContext
         {
             addInstsToWorkListRec(child);
         }
+    }
+
+    bool processSpecializationWorkList()
+    {
+        bool hasSpecialization = false;
+
+        // Drain the context worklist so children and any users queued by a rewrite are handled by
+        // the same traversal path in both full-module and on-demand specialization.
+        while (workList.getCount() != 0)
+        {
+            // If we've emitted errors (e.g. from diagnosing an invalid existential
+            // specialization), bail out early to avoid processing IR that may be
+            // in an inconsistent state.
+            if (sink && sink->getErrorCount() != 0)
+            {
+                workList.clear();
+                break;
+            }
+
+            IRInst* inst = workList.getLast();
+
+            workList.removeLast();
+            workListSet.remove(inst);
+
+            if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
+                continue;
+
+            // First, look for all the general-purpose specialization opportunities: generic
+            // specialization, existential specialization, pack simplifications, etc.
+            auto op = inst->getOp();
+            bool instChanged = false;
+            if (inst->hasUses() || inst->mightHaveSideEffects() || isWitnessTableType(inst))
+                instChanged = maybeSpecializeInst(inst);
+
+            hasSpecialization |= instChanged;
+
+            // Expanding an `IRExpand` deletes its body, so there are no surviving expand children
+            // to enqueue after that rewrite.
+            if (op == kIROp_Expand && instChanged)
+                continue;
+
+            // Recurse through the IR tree by pushing children in reverse order. The worklist is
+            // LIFO, so this processes children in source order while still sharing the queue used
+            // for rewrite follow-up users.
+            for (auto child = inst->getLastDecorationOrChild(); child; child = child->getPrevInst())
+            {
+                if (!isAnnotation(child))
+                    addToWorkList(child);
+            }
+        }
+
+        return hasSpecialization;
+    }
+
+    bool processSpecializationWorkListFromRoot(IRInst* rootInst)
+    {
+        if (!rootInst)
+            return false;
+
+        // Reset the seeding-walk memo for each drain. On-demand callers (`specializeChildInsts`)
+        // seed only a subtree root, which may be an instruction whose closure was already walked
+        // in an earlier drain; its forward use closure is the only way to reach users outside the
+        // subtree, so it must be walked afresh here rather than suppressed by a stale entry.
+        expanded.clear();
+
+        addToWorkList(rootInst);
+        return processSpecializationWorkList();
+    }
+
+    bool specializeChildInsts(IRInst* rootInst)
+    {
+        // Drive the subtree to a fixpoint. A single drain is not order-complete: the forced walk
+        // descends only into a not-yet-queued user, so a no-op wrapper still queued when its
+        // grand-operand specializes can shadow an already-popped `specialize` user. Re-draining
+        // with a fresh `expanded` (cleared per drain in `processSpecializationWorkListFromRoot`)
+        // recovers such a user independent of enqueue order. Terminates once a drain reports no
+        // change.
+        bool anyChange = false;
+        while (processSpecializationWorkListFromRoot(rootInst))
+            anyChange = true;
+        return anyChange;
     }
 
     // Returns true if the call inst represents a call to
@@ -1963,19 +2156,26 @@ struct SpecializationContext
     {
         // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
         // calls first. These calls on builtin generic types should be handled
-        // the same way as a `load` inst.
+        // the same way as a `load` inst. A successful rewrite here deletes and
+        // replaces the call, so report the mutation.
         if (maybeSpecializeBufferLoadCall(inst))
-            return false;
+            return true;
 
-        // If any arguments are value packs, we need to flatten them.
+        // If any arguments are value packs, we need to flatten them. Report whether the callee's
+        // parameter pack or the call's argument pack was actually rewritten: flattening a pack
+        // mutates the IR even though no generic was specialized, and the work-list fixpoint drains
+        // on `hasSpecialization`, so an under-reported mutation here could terminate the fixpoint
+        // before a follow-up drain reconsiders the work it enables.
         bool isCalleeFullyExpanded = false;
-        tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
+        bool mutated =
+            tryExpandParameterPack(as<IRFunc>(inst->getCallee()), &isCalleeFullyExpanded);
         if (isCalleeFullyExpanded)
         {
-            inst = tryExpandArgPack((IRCall*)inst);
+            auto newInst = tryExpandArgPack(inst);
+            mutated |= newInst != inst;
         }
 
-        return false;
+        return mutated;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
@@ -3260,11 +3460,86 @@ struct SpecializationContext
             param->replaceUsesWith(val);
         }
         {
-            // Now that we've replaced any uses of global generic
-            // parameters, we will do a second pass to remove
-            // the parameters and any `bind_global_generic_param`
+            // Before removing anything, diagnose any global generic parameter
+            // (`type_param` or `__generic_value_param`) that still has uses. A
+            // leftover use means the user is referencing the param from shader
+            // code that needs a concrete binding (e.g. interface-method dispatch
+            // on a value typed by the param), which is not a supported
+            // shader-body construct (#5627).
+            //
+            // A single source-level declaration can lower to several
+            // `IRGlobalGenericParam`s: a constrained `type_param T : IFoo`
+            // produces a type-kind param plus a paired *witness-table* param,
+            // and either may retain the leftover use. To emit exactly one
+            // message per source declaration we report the user-written params
+            // (a `type_param`'s type-kind param, or a `__generic_value_param`'s
+            // value-typed param) and skip the synthesized witness-table params,
+            // which never correspond to a separate source declaration — unless a
+            // witness param is the *only* thing left with a use, in which case we
+            // must still report it (handled by the second pass below).
+            //
+            // `diagnosedLeftoverUse` records that this loop actually *emitted* a
+            // diagnostic, so the cleanup loop below can assert "a leftover use
+            // implies it was reported" without depending on the global error
+            // count (which keeps the assert correct even if the diagnostic is
+            // reclassified or suppressed).
+            bool diagnosedLeftoverUse = false;
+            if (sink)
+            {
+                // First pass: report each user-written param (type-kind or value
+                // param). A constrained `type_param T : IFoo` also produces a
+                // synthesized witness-table param; we skip it *here* so the pair
+                // yields a single message.
+                bool reportedNonWitness = false;
+                for (auto inst : moduleInst->getChildren())
+                {
+                    if (inst->getOp() != kIROp_GlobalGenericParam || !inst->firstUse)
+                        continue;
+                    if (inst->getDataType() &&
+                        inst->getDataType()->getOp() == kIROp_WitnessTableType)
+                        continue;
+                    reportedNonWitness = true;
+                    diagnosedLeftoverUse = true;
+                    sink->diagnose(Diagnostics::UnspecializedGlobalGenericParamWithUses{
+                        .location = inst->sourceLoc});
+                }
+
+                // Second pass: if the *only* leftover-use params are
+                // witness-table params (no user-written partner retained a use),
+                // report them too — otherwise such a param would be left in the
+                // IR with no diagnostic, breaking the cleanup loop's invariant.
+                //
+                // A single declaration can produce several witness-table params
+                // (e.g. a conjunction `type_param T : IFoo & IBar`), all sharing
+                // the declaration's source location, so dedup by location to
+                // still emit one message per declaration.
+                if (!reportedNonWitness)
+                {
+                    HashSet<SourceLoc::RawValue> reportedLocs;
+                    for (auto inst : moduleInst->getChildren())
+                    {
+                        if (inst->getOp() != kIROp_GlobalGenericParam || !inst->firstUse)
+                            continue;
+                        diagnosedLeftoverUse = true;
+                        if (inst->sourceLoc.isValid() &&
+                            !reportedLocs.add(inst->sourceLoc.getRaw()))
+                            continue;
+                        sink->diagnose(Diagnostics::UnspecializedGlobalGenericParamWithUses{
+                            .location = inst->sourceLoc});
+                    }
+                }
+            }
+
+            // Now remove the parameters and any `bind_global_generic_param`
             // instructions, since both should be dead/unused.
             //
+            // Exception: leave any still-used param (with its dangling uses) in
+            // place. We have diagnosed an error above, so `linkAndOptimizeIR`
+            // checks the error count right after this pass and discards the
+            // module — removal is unnecessary. And removing a still-used param
+            // here (replacing uses with a hoistable poison keyed on the param's
+            // own type while the param is torn down) corrupts the hoistable-inst
+            // dedup and crashes (issue #11316).
             IRInst* next = nullptr;
             for (auto inst = moduleInst->getFirstChild(); inst; inst = next)
             {
@@ -3276,11 +3551,31 @@ struct SpecializationContext
                     break;
 
                 case kIROp_GlobalGenericParam:
+                    if (inst->firstUse)
+                    {
+                        // A leftover-use param is left in place (not removed):
+                        // we have diagnosed it above, so `linkAndOptimizeIR`
+                        // bails on the error count right after this pass and
+                        // discards the module. Removing it here would replace its
+                        // uses with a hoistable poison keyed on the param's own
+                        // type while the param is torn down, corrupting the
+                        // hoistable-inst dedup and crashing (issue #11316).
+                        //
+                        // Fail loudly if we reach here without having diagnosed:
+                        // the sole production caller (`linkAndOptimizeIR`) always
+                        // supplies a sink, and the diagnose loop above sets
+                        // `diagnosedLeftoverUse` for any leftover-use param, so a
+                        // violation means a contract bug, not user input. Using
+                        // the local flag (not the global error count) keeps this
+                        // correct even if E38207 is reclassified or suppressed.
+                        SLANG_RELEASE_ASSERT(sink && diagnosedLeftoverUse);
+                        break;
+                    }
+                    inst->removeAndDeallocate();
+                    break;
                 case kIROp_BindGlobalGenericParam:
                     // A `bind_global_generic_param` instruction should
-                    // have no uses in the first place, and all the global
-                    // generic parameters should have had their uses replaced.
-                    //
+                    // have no uses in the first place.
                     SLANG_ASSERT(!inst->firstUse);
                     inst->removeAndDeallocate();
                     break;
@@ -3410,6 +3705,14 @@ bool specializeModule(
     context.sink = sink;
     context.processModule();
     return context.changed;
+}
+
+bool specializeChildInsts(SpecializationContext* context, IRInst* rootInst)
+{
+    // On-demand translations can instantiate a specialized function while another pass is in the
+    // middle of using it. Run the existing local specialization rules over those children
+    // immediately so concrete pack expands do not leak into downstream consumers such as autodiff.
+    return context ? context->specializeChildInsts(rootInst) : false;
 }
 
 void finalizeSpecialization(IRModule* module)
@@ -3666,12 +3969,16 @@ IRInst* specializeGenericWithSetArgs(
             loweredFunc->setFullType(
                 builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
         }
-        else if (as<IRDebugFunction>(inst))
+        else if (as<IRDebugFunction>(inst) || as<IRDebugLexicalBlock>(inst))
         {
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
             auto clonedInst = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            // Declaration scopes have one identity for this specialization. The function
+            // decoration uses the static environment, while body scope markers and local
+            // variables use the dynamic environment; both must refer to the same clone.
+            cloneEnv.mapOldValToNew[inst] = clonedInst;
             if (context)
             {
                 context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
@@ -3713,7 +4020,8 @@ IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
     IRModule* module,
-    SpecializationContext* context)
+    SpecializationContext* context,
+    bool queueFollowUpWork)
 {
     UInt specializationDepth = 0;
     if (context)
@@ -3790,8 +4098,19 @@ IRInst* specializeGenericImpl(
     builder->setInsertBefore(specializeInst);
 
     List<IRInst*> pendingWorkList;
-    SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
-                    context->addToWorkList(pendingWorkList[ii]););
+    SLANG_DEFER({
+        if (queueFollowUpWork)
+        {
+            // The module specialization pass wants cloned generic bodies to feed the shared
+            // follow-up queue. Type-flow callers can opt out and immediately process a specific
+            // result with `specializeChildInsts` instead.
+            for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--)
+            {
+                if (context)
+                    context->addToWorkList(pendingWorkList[ii]);
+            }
+        }
+    });
 
     // Now we will run through the body of the generic and
     // clone each of its instructions into the global scope,
@@ -3876,7 +4195,10 @@ IRInst* specializeGenericImpl(
     UNREACHABLE_RETURN(nullptr);
 }
 
-IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specializeInst)
+IRInst* specializeGeneric(
+    SpecializationContext* context,
+    IRSpecialize* specializeInst,
+    bool queueFollowUpWork)
 {
     SLANG_ASSERT(context);
     if (!context)
@@ -3898,7 +4220,7 @@ IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* speciali
         return specializeGenericWithSetArgs(specializeInst, context, specializationDepth + 1);
     }
 
-    return context->specializeGeneric(baseGeneric, specializeInst);
+    return context->specializeGeneric(baseGeneric, specializeInst, queueFollowUpWork);
 }
 
 IRInst* specializeGeneric(IRSpecialize* specializeInst)

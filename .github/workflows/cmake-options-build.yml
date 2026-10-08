@@ -50,17 +50,39 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+
       - id: set-matrix
+        env:
+          BUILD_OS: ${{ inputs.os }}
         run: |
           {
             echo "matrix<<MATRIX_EOF"
-            cat .github/cmake-options-matrix.json
+            jq --arg os "$BUILD_OS" \
+              '{include: [.include[] | select(.macos_only != "true" or $os == "macos")]}' \
+              .github/cmake-options-matrix.json
             echo "MATRIX_EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
@@ -69,15 +91,51 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Keep macOS option sweeps from building DXC from source. The
+      # SLANG_DXC_BUILD_FROM_SOURCE matrix entry still tests OFF.
+      SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
+      # Whether this matrix entry can *run* what it builds. Both steps that execute a
+      # built binary are gated on it, so the platform exclusions live in one place
+      # rather than being repeated in each `if:` and having to be kept in lockstep by
+      # hand. The build step deliberately does not use this: cross-compiled entries
+      # still build, they just cannot run the result.
+      #
+      # Clause by clause, each excludes one case:
+      #   linux_only / windows_only      entry applies to one OS; skip on the others
+      #   container_only                 entry is only meaningful in the container job
+      #   skip_linux_aarch64             entry is unsupported on linux aarch64
+      #   !(windows && arch != '')       windows-aarch64 cross-compiles on an x64
+      #                                  runner and cannot execute what it builds
+      SLANG_CI_CAN_RUN_BUILT_BINARY: ${{ (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '') }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          persist-credentials: false
           submodules: "recursive"
-          fetch-depth: "2"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
 
       - name: Setup
         uses: ./.github/actions/common-setup
@@ -98,13 +156,28 @@ jobs:
 
       - name: Set up MSVC cross-compilation
         if: inputs.os == 'windows' && inputs.arch != ''
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+        # run its node20 bundle on the node24 runtime. This restates the
+        # deprecation annotation ("forced to run on Node.js 24") rather than
+        # silencing it — the point is to exercise the runtime that survives the
+        # retirement, so a break surfaces now instead of when Node 20 is removed.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           arch: ${{ inputs.arch }}
 
       - name: Install system apt packages
         if: matrix.apt_packages != '' && inputs.os == 'linux'
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Install system Homebrew packages
+        if: matrix.brew_packages != '' && inputs.os == 'macos'
+        env:
+          BREW_PACKAGES: ${{ matrix.brew_packages }}
+        run: |
+          read -r -a packages <<< "$BREW_PACKAGES"
+          brew install "${packages[@]}"
 
       - name: Configure CMake (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
@@ -130,9 +203,9 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
-                -LA 2>/dev/null \
-              | grep -E "^${option}:(BOOL|STRING)=" \
-              | sed 's/.*=//' \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
+                -LA \
+              | sed -n -E "s/^${option}:(BOOL|STRING)=//p" \
               | tr '[:upper:]' '[:lower:]'
             )
             case "$defaultVal" in
@@ -162,6 +235,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           else
@@ -170,6 +244,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           fi
@@ -177,3 +252,102 @@ jobs:
       - name: Build Slang (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: cmake --build build --config "$cmake_config"
+
+      # slang-static-unit-test only exists when SLANG_LIB_TYPE=STATIC, which is
+      # exactly this matrix entry. Runnability -- the windows-aarch64 entries
+      # cross-compile on an x64 runner and cannot execute what they build -- is
+      # handled by the shared predicate, which the slangc version check below uses
+      # too.
+      # Gated on the option's *value*, not only its name: the target is defined for
+      # SLANG_LIB_TYPE=STATIC and does not exist for SHARED. Testing the name alone
+      # happens to work while the matrix carries a single STATIC entry, and would turn
+      # a future SHARED entry into a spurious "expected slang-static-unit-test at ..."
+      # job failure rather than a skipped step.
+      - name: Run slang-static-unit-test (${{ matrix.option }})
+        if: >-
+          matrix.option == 'SLANG_LIB_TYPE' && matrix.value == 'STATIC' &&
+          env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
+        run: |
+          # RUNNER_OS is provided by the runner, so nothing from the workflow
+          # inputs is interpolated into this script.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test_path="$bin_dir/slang-static-unit-test.exe"
+          else
+            test_path="$bin_dir/slang-static-unit-test"
+          fi
+          if [[ ! -f "$test_path" ]]; then
+            echo "ERROR: expected slang-static-unit-test at $test_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+          "$test_path"
+
+      - name: Verify slangc version (${{ matrix.option }})
+        if: env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
+        run: |
+          slangc_enabled=$(
+            sed -n 's/^SLANG_ENABLE_SLANGC:[^=]*=//p' build/CMakeCache.txt \
+            | tr '[:upper:]' '[:lower:]'
+          )
+          case "$slangc_enabled" in
+            on|true|1|yes) ;;
+            off|false|0|no)
+              echo "SLANG_ENABLE_SLANGC is ${slangc_enabled}; skipping slangc runtime check."
+              exit 0
+              ;;
+            *)
+              echo "ERROR: could not determine SLANG_ENABLE_SLANGC from build/CMakeCache.txt"
+              exit 1
+              ;;
+          esac
+
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            slangc_path="$bin_dir/slangc.exe"
+          else
+            slangc_path="$bin_dir/slangc"
+          fi
+
+          if [[ ! -f "$slangc_path" ]]; then
+            echo "ERROR: expected slangc at $slangc_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+
+          export PATH="$bin_dir:$PATH"
+          if [[ -d "$lib_dir" ]]; then
+            if [[ "${{ inputs.os }}" == "macos" ]]; then
+              export DYLD_LIBRARY_PATH="$lib_dir:${DYLD_LIBRARY_PATH:-}"
+            else
+              export LD_LIBRARY_PATH="$lib_dir:${LD_LIBRARY_PATH:-}"
+            fi
+          fi
+
+          "$slangc_path" -v
+
+      # Exercise `cmake --install` and a `find_package(slang)` consumer for
+      # entries that opt in via install_test. The static-lib build
+      # (SLANG_LIB_TYPE=STATIC) used to skip the install(EXPORT ...) step
+      # entirely, so a broken export would not have been caught by a plain
+      # configure+build. The find_package smoke test additionally guards the
+      # consumer path that actually broke in #11359: `cmake --install` can
+      # succeed while silently omitting slangTargets.cmake, and that only
+      # surfaces when a downstream calls find_package(slang). See issue #11359.
+      - name: Install Slang and verify find_package (${{ matrix.option }})
+        if: matrix.install_test == 'true' && (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
+        run: |
+          cmake --install build --config "$cmake_config" --prefix install
+          # Minimal consumer that resolves the exported slang::slang target.
+          mkdir -p consumer
+          cat >consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.25)
+          project(slang-find-package-smoke LANGUAGES CXX)
+          find_package(slang CONFIG REQUIRED)
+          if(NOT TARGET slang::slang)
+              message(FATAL_ERROR "find_package(slang) did not define slang::slang")
+          endif()
+          EOF
+          # CMAKE_PREFIX_PATH lets find_package locate the package config under
+          # the install prefix regardless of the OS-specific config dir
+          # (`cmake` on Windows, `${CMAKE_INSTALL_LIBDIR}/cmake/slang`
+          # elsewhere; see SLANG_CMAKE_CONFIG_DIR in CMakeLists.txt).
+          cmake -S consumer -B consumer/build -DCMAKE_PREFIX_PATH="$PWD/install"

@@ -9,7 +9,7 @@ interface IFoo
 }
 
 struct T : IFoo
-//CHK:     ^^^^ missing interface member
+//CHK:     ^^^^ error E38100
 //CHK:     ^^^^ type 'T' does not provide required interface member 'bar'
 {
 }

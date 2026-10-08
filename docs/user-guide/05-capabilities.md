@@ -151,6 +151,56 @@ struct Foo1 : IFoo1
 }
 ```
 
+## Capabilities of Extensions
+
+An `extension` declaration adds members to an existing type. Because the extension can only be used
+where its target type is available, the capabilities declared on the extension must not be disjoint
+from the target type's capabilities — the two capability sets must share at least one common
+target/stage (non-empty intersection). Declaring a `[require(...)]` attribute on an extension, or
+on one of its non-static member functions, constructors, subscripts, or properties, that is disjoint
+from the target type's capabilities is an error.
+
+```csharp
+[require(glsl)]
+struct MyType {}
+
+// Error: extension requires hlsl only, which is disjoint from MyType's glsl support.
+[require(hlsl)]
+extension MyType {}
+
+// Error: member requires hlsl only, which is disjoint from MyType's glsl support.
+extension MyType
+{
+    [require(hlsl)]
+    void foo() {}
+}
+
+// OK: member requires glsl, which intersects with MyType's glsl requirement.
+extension MyType
+{
+    [require(glsl)]
+    void bar() {}
+}
+
+// OK: extension declares both glsl and hlsl support. The intersection with MyType's
+// [require(glsl)] is {glsl}, which is non-empty, so no error. Note that the extension
+// is still only usable on glsl — the extra hlsl claim is permitted but ineffective.
+[require(glsl)]
+[require(hlsl)]
+extension MyType {}
+```
+
+Static extension *member functions* are exempt from this check because they can be called without
+an instance of the target type. A `[require(...)]` attribute on a constructor, subscript, or property is
+always checked: a constructor produces a value of the target type, a subscript provides indexed
+access to it, and a property provides named access to it, so all three must be compatible with the
+target's capabilities. Individual accessors (`get`, `set`, `ref`) inside a subscript or property are
+also each checked independently — a `[require(...)]` attribute on one accessor is validated against
+the target type even if its enclosing subscript or property carries no `[require(...)]` of its own.
+Members that carry no `[require(...)]` attribute of their own are not individually checked at the
+member level (the extension's own capability constraint, if any, is checked separately at the
+extension level). Conflicts produce diagnostic `E36100`.
+
 ## Capabilities Between Requirement and Implementation
 
 We require that all requirement capabilities are supersets of their implementation (only required if capabilities are explicitly annotated).

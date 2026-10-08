@@ -99,12 +99,22 @@ bool F32_isfinite(float f);
 bool F32_isinf(float f);
 
 // Binary
+// Host-callable code compiled through LLVM uses this prelude instead of the direct LLVM backend.
+// We classify NaNs before comparing so these helpers match HLSL's numeric-operand selection.
 SLANG_FORCE_INLINE float F32_min(float a, float b)
 {
+    if (F32_isnan(a))
+        return b;
+    if (F32_isnan(b))
+        return a;
     return a < b ? a : b;
 }
 SLANG_FORCE_INLINE float F32_max(float a, float b)
 {
+    if (F32_isnan(a))
+        return b;
+    if (F32_isnan(b))
+        return a;
     return a > b ? a : b;
 }
 float F32_pow(float a, float b);
@@ -353,10 +363,18 @@ bool F64_isinf(double f);
 // Binary
 SLANG_FORCE_INLINE double F64_min(double a, double b)
 {
+    if (F64_isnan(a))
+        return b;
+    if (F64_isnan(b))
+        return a;
     return a < b ? a : b;
 }
 SLANG_FORCE_INLINE double F64_max(double a, double b)
 {
+    if (F64_isnan(a))
+        return b;
+    if (F64_isnan(b))
+        return a;
     return a > b ? a : b;
 }
 double F64_pow(double a, double b);
@@ -709,7 +727,34 @@ struct half
     bool operator==(half other) const { return load() == other.load(); }
     bool operator!=(half other) const { return load() != other.load(); }
 
+    // Scalar conversion operators. `half` only stores a bit-pattern, so every
+    // conversion routes through `load()` (half -> float) and then to the target
+    // scalar, matching the arithmetic/comparison operators above. These are needed
+    // because the emitter lowers a Slang cast like `(int8_t)h` to a functional-style
+    // cast `int8_t(h)`, and an `explicit operator float()` does not chain through a
+    // single cast to a non-float scalar; without a direct operator the downstream
+    // C++ compiler rejects the cast (shader-slang/slang#11996). Kept `explicit` so
+    // that half arithmetic (all operands `half`) stays unambiguous.
     explicit operator float() const { return load(); }
+    explicit operator double() const { return double(load()); }
+    explicit operator bool() const { return load() != 0.0f; }
+    explicit operator int8_t() const { return int8_t(load()); }
+    explicit operator uint8_t() const { return uint8_t(load()); }
+    explicit operator int16_t() const { return int16_t(load()); }
+    explicit operator uint16_t() const { return uint16_t(load()); }
+    explicit operator int32_t() const { return int32_t(load()); }
+    explicit operator uint32_t() const { return uint32_t(load()); }
+    explicit operator int64_t() const { return int64_t(load()); }
+    explicit operator uint64_t() const { return uint64_t(load()); }
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+    // On platforms where `intptr_t`/`uintptr_t` are distinct from the sized
+    // 64-bit integer types (e.g. Apple), the `int64_t`/`uint64_t` operators do
+    // not cover an emitted `intptr_t(h)` cast, so provide them explicitly. This
+    // guard mirrors the vector/matrix operator specializations in
+    // slang-cpp-types-core.h.
+    explicit operator intptr_t() const { return intptr_t(load()); }
+    explicit operator uintptr_t() const { return uintptr_t(load()); }
+#endif
 };
 #endif
 
@@ -972,6 +1017,16 @@ SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint16_t U16_min(uint16_t a, uint16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint16_t U16_max(uint16_t a, uint16_t b)
+{
+    return a > b ? a : b;
+}
+
 SLANG_FORCE_INLINE half U16_ashalf(uint16_t x)
 {
     Union16 u;
@@ -985,6 +1040,16 @@ SLANG_FORCE_INLINE uint32_t I16_countbits(int16_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE int16_t I16_min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int16_t I16_max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- U8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
 {
@@ -992,10 +1057,30 @@ SLANG_FORCE_INLINE uint32_t U8_countbits(uint8_t v)
     return U16_countbits(uint16_t(v));
 }
 
+SLANG_FORCE_INLINE uint8_t U8_min(uint8_t a, uint8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint8_t U8_max(uint8_t a, uint8_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I8 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t I8_countbits(int16_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE int8_t I8_min(int8_t a, int8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE int8_t I8_max(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U32 -----------------------------------------

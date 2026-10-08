@@ -1,0 +1,43 @@
+[Unit]
+Description=GCP Runner Scaler (Linux analytics jobs, no GPU, tiny VM)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=linux-analytics-runners \
+    --labels=Linux,self-hosted,analytics,GCP \
+    --platform=linux \
+    --max-runners=2 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a,us-west1-b \
+    --gcp-instance-template=linux-analytics-runner \
+    --gcp-gpu-type=none \
+    --vm-prefix=linux-analytics \
+    --session-max-age=30m
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-linux-analytics
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target

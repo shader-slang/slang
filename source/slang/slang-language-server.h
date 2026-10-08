@@ -1,7 +1,7 @@
 #pragma once
-#include "../compiler-core/slang-json-rpc-connection.h"
-#include "../compiler-core/slang-json-rpc.h"
-#include "../core/slang-range.h"
+#include "compiler-core/slang-json-rpc-connection.h"
+#include "compiler-core/slang-json-rpc.h"
+#include "core/slang-range.h"
 #include "slang-language-server-auto-format.h"
 #include "slang-language-server-completion.h"
 #include "slang-language-server-inlay-hints.h"
@@ -265,6 +265,7 @@ private:
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
     void updateTraceOptions(const JSONValue& value);
     void updateWorkspaceFlavor(const JSONValue& value);
+    void updatePredefinedLanguageVersion(const JSONValue& value);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

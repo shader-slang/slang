@@ -2,7 +2,7 @@
 #ifndef SLANG_EMIT_BASE_H
 #define SLANG_EMIT_BASE_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir.h"

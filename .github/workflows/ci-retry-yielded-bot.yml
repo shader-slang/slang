@@ -1,0 +1,55 @@
+name: CI Retry Yielded Bot
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+  # Safety backstop in case a workflow_run event is missed. The job is
+  # short-lived and exits immediately if CI is still active.
+  # Runs hourly at :17 — an off-peak minute on purpose. GitHub heavily
+  # oversubscribes round-number cron slots (:00/:15/:30/:45), so schedules
+  # there are delayed or silently dropped; an odd minute avoids that.
+  schedule:
+    - cron: "17 * * * *"
+
+concurrency:
+  group: ci-retry-yielded-bot
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  retry:
+    # Lightweight work (checkout + Python + `gh api`); not latency-sensitive.
+    #
+    # RUNNER SELECTION — switchable via the `ANALYTICS_RUNS_ON` repository
+    # variable, WITHOUT a code change (Settings → Secrets and variables →
+    # Actions → Variables): unset (default) → GitHub-hosted `ubuntu-latest`;
+    # set to a runs-on JSON string (e.g. `["Linux", "self-hosted",
+    # "analytics", "GCP"]`) → the GCP analytics pool. Same variable drives
+    # ci-health.yml, ci-analytics.yml, and the ci.yml wait-for-human-priority
+    # gate — keep this in the same group so it doesn't get stranded on GCP.
+    runs-on: ${{ vars.ANALYTICS_RUNS_ON && fromJSON(vars.ANALYTICS_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Rerun oldest yielded bot CI if quiet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --lookback-hours (16) must stay above wait-for-priority.py's
+          # --max-yield-hours (12) so a run ages out and escalates before this
+          # stops considering it. --max-attempts uses the script default (a high
+          # safety backstop). --max-reruns 1 throttles escalations to one bot
+          # run per fire, avoiding a thundering herd when several have aged out.
+          python3 extras/ci/retry-yielded-bot-ci.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --lookback-hours 16 \
+            --max-reruns 1

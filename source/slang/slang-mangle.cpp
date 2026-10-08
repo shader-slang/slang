@@ -1,6 +1,6 @@
 #include "slang-mangle.h"
 
-#include "../compiler-core/slang-name.h"
+#include "compiler-core/slang-name.h"
 #include "slang-check.h"
 #include "slang-syntax.h"
 
@@ -127,6 +127,34 @@ void emitName(ManglingContext* context, Name* name)
 void emitVal(ManglingContext* context, Val* val);
 
 void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool includeModuleName);
+
+// Emit the parameter-passing-mode portion of a callable parameter's mangled name.
+void emitParamPassingMode(ManglingContext* context, ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::Ref:
+        emitRaw(context, "r_");
+        break;
+    case ParamPassingMode::BorrowIn:
+        emitRaw(context, "c_");
+        break;
+    case ParamPassingMode::Out:
+        emitRaw(context, "o_");
+        break;
+    case ParamPassingMode::BorrowInOut:
+        emitRaw(context, "io_");
+        break;
+    case ParamPassingMode::In:
+        emitRaw(context, "i_");
+        break;
+    default:
+        StringBuilder errMsg;
+        errMsg << "Unknown parameter direction";
+        SLANG_ABORT_COMPILATION(errMsg.toString().begin());
+        break;
+    }
+}
 
 void emitSimpleIntVal(ManglingContext* context, Val* val)
 {
@@ -378,13 +406,13 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "k");
         emit(context, (UInt)constantIntVal->getValue());
     }
-    else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
+    else if (auto builtinOpIntVal = dynamicCast<BuiltinOperationIntVal>(val))
     {
-        emitRaw(context, "KC");
-        emit(context, funcCallIntVal->getArgs().getCount());
-        emitName(context, funcCallIntVal->getFuncDeclRef().getName());
-        for (Index i = 0; i < funcCallIntVal->getArgs().getCount(); i++)
-            emitVal(context, funcCallIntVal->getArgs()[i]);
+        emitRaw(context, "KB");
+        emit(context, builtinOpIntVal->getArgs().getCount());
+        emitNameImpl(context, getBuiltinOperationOpText(builtinOpIntVal->getOp()));
+        for (Index i = 0; i < builtinOpIntVal->getArgs().getCount(); i++)
+            emitVal(context, builtinOpIntVal->getArgs()[i]);
     }
     else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
     {
@@ -620,6 +648,28 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     {
         emit(context, "I");
         emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
+
+        // An interface-level constraint that is a direct member of an interface
+        // (a `GenericTypeConstraintDecl` produced by relocating an associated
+        // type's bound -- `associatedtype A : IFoo`, an `associatedtype ...
+        // where` clause, or an explicit `__constraint`) is not uniquely
+        // identified by the parent interface and the bound `sup` alone: a single
+        // interface may constrain several associated types to the *same* bound,
+        // e.g. `associatedtype A : IFoo; associatedtype B : IFoo;`. Without
+        // encoding the constrained type these would mangle to the same
+        // requirement-key name and collide (e.g. in the witness-table cloning
+        // dictionary during linking). Emit the constrained `sub` type so each
+        // such constraint gets a distinct name. Ordinary inheritance
+        // (`InheritanceDecl`) and generic `where` constraints (whose parent is a
+        // generic, not an interface) are unaffected.
+        if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
+        {
+            if (isInterfaceRequirement(genConstraintDeclRef.getDecl()))
+            {
+                emitType(context, getSub(context->astBuilder, genConstraintDeclRef));
+            }
+        }
+
         if (parentGenericDeclRef)
         {
             ignoreName = true;
@@ -790,7 +840,8 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         List<ParamPassingMode> paramPassingModes;
         Type* resultType = nullptr;
 
-        if (!callableDeclRef.getDecl()->funcType.type)
+        bool hasDirectFuncType = callableDeclRef.getDecl()->funcType.type != nullptr;
+        if (!hasDirectFuncType)
         {
             auto parameters = getParameters(context->astBuilder, callableDeclRef);
             for (auto paramDeclRef : parameters)
@@ -810,30 +861,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 // parameter modifier makes big difference in the spirv code generation, for example
                 // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
                 // distinguish them in the mangled name to avoid name collision.
-                ParamPassingMode paramDirection = paramPassingModes[i];
-                switch (paramDirection)
-                {
-                case ParamPassingMode::Ref:
-                    emitRaw(context, "r_");
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    emitRaw(context, "c_");
-                    break;
-                case ParamPassingMode::Out:
-                    emitRaw(context, "o_");
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    emitRaw(context, "io_");
-                    break;
-                case ParamPassingMode::In:
-                    emitRaw(context, "i_");
-                    break;
-                default:
-                    StringBuilder errMsg;
-                    errMsg << "Unknown parameter direction";
-                    SLANG_ABORT_COMPILATION(errMsg.toString().begin());
-                    break;
-                }
+                emitParamPassingMode(context, paramPassingModes[i]);
                 emitType(context, parameterTypes[i]);
             }
 
@@ -843,48 +871,6 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             {
                 emitType(context, resultType);
             }
-
-            // Include key modifiers in the mangled name so we never deduplicate
-            // things like a nonmutating method and a mutating method.
-            bool isMutating = false;
-            bool isRefThis = false;
-            bool isFwdDiff = false;
-            bool isBwdDiff = false;
-            bool isNoDiffThis = false;
-            for (auto modifier : callableDeclRef.getDecl()->modifiers)
-            {
-                if (as<MutatingAttribute>(modifier))
-                {
-                    isMutating = true;
-                }
-                else if (as<RefAttribute>(modifier))
-                {
-                    isRefThis = true;
-                }
-                else if (as<ForwardDifferentiableAttribute>(modifier))
-                {
-                    isFwdDiff = true;
-                }
-                else if (as<BackwardDifferentiableAttribute>(modifier))
-                {
-                    isBwdDiff = true;
-                }
-                else if (as<NoDiffThisAttribute>(modifier))
-                {
-                    isNoDiffThis = true;
-                }
-            }
-
-            if (isMutating)
-                emitRaw(context, "m");
-            if (isRefThis)
-                emitRaw(context, "r");
-            if (isFwdDiff)
-                emitRaw(context, "f");
-            if (isBwdDiff)
-                emitRaw(context, "b");
-            if (isNoDiffThis)
-                emitRaw(context, "n");
         }
         else
         {
@@ -893,6 +879,71 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 as<Type>(funcType->substitute(context->astBuilder, SubstitutionSet(callableDeclRef))
                              ->resolve());
             emitType(context, resolvedFuncType);
+        }
+
+        auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, callableDeclRef);
+        auto synthesizedThisMode =
+            thisParamInfo
+                ? callableDeclRef.getDecl()->findModifier<SynthesizedParamPassingModeModifier>()
+                : nullptr;
+
+        // Keep the established mangling stable while changing the source of truth for the
+        // effective `this` parameter. Historically, ordinary callables emitted `m` and `r` only
+        // for modes requested directly with `[mutating]` and `[__ref]`; `[constref]`, a setter's
+        // writable default, and modes inherited from an enclosing declaration emitted no suffix.
+        // Direct function-type declarations emitted none of these suffixes. The checked
+        // information cannot reproduce those spelling distinctions by itself because several
+        // spellings intentionally produce the same ParamInfo, and overlapping attributes can
+        // produce more than one suffix even though they resolve to one effective mode.
+        //
+        // Source declarations therefore continue to use their spelling to reproduce the legacy
+        // suffix bits, even when they do not have an effective `this` parameter. Synthesized
+        // witness wrappers are different: their declaration-owned mode is an internal ABI fact,
+        // and wrappers with distinct modes must not receive the same symbol and be coalesced by
+        // linking. Those wrappers use the checked information below to encode that distinction.
+        bool isMutating = false;
+        bool isRefThis = false;
+        bool isNoDiffThis =
+            !hasDirectFuncType && callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>();
+        if (!hasDirectFuncType && !synthesizedThisMode)
+        {
+            isMutating = callableDeclRef.getDecl()->hasModifier<MutatingAttribute>();
+            isRefThis = callableDeclRef.getDecl()->hasModifier<RefAttribute>();
+        }
+
+        // Include other signature-relevant modifiers.
+        bool isFwdDiff = false;
+        bool isBwdDiff = false;
+        if (!hasDirectFuncType)
+        {
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+            }
+        }
+
+        if (isMutating)
+            emitRaw(context, "m");
+        if (isRefThis)
+            emitRaw(context, "r");
+        if (isFwdDiff)
+            emitRaw(context, "f");
+        if (isBwdDiff)
+            emitRaw(context, "b");
+        if (isNoDiffThis)
+            emitRaw(context, "n");
+        if (synthesizedThisMode)
+        {
+            SLANG_ASSERT(synthesizedThisMode->mode == thisParamInfo->mode);
+            emitRaw(context, "t");
+            emitParamPassingMode(context, thisParamInfo->mode);
         }
     }
 }

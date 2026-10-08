@@ -29,23 +29,38 @@ void writeSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
 
+/// Reads module metadata without deserializing the IR or checking the semantic module version.
+/// `moduleVersion` is required and is written on success. `compilerVersion`, `name`, and
+/// `serializationVersion` are optional. `serializationVersion` is written as soon as the metadata
+/// record is available, including when an unsupported format causes `SLANG_E_NOT_AVAILABLE`;
+/// `compilerVersion` and `name` are written only on success. A well-formed metadata record with a
+/// null module pointer returns `SLANG_FAIL`. A non-data chunk or missing Fossil root triggers
+/// `SLANG_UNEXPECTED`. The distinct unsupported-format result lets metadata callers issue a
+/// specific diagnostic before attempting IR deserialization.
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
-    String& compilerVersion,
-    UInt& version,
-    String& name);
+    String* compilerVersion,
+    UInt64& moduleVersion,
+    String* name,
+    UInt64* serializationVersion = nullptr);
 
 // Enable a mild optimization by putting instructions with payloads at the end
 // of the stream to make deserialization slightly faster
 const bool kReorderInstructionsForSerialization = true;
+
+// Recursive IR tree traversal is used on both write and read. This matches the
+// existing IR specialization depth budget and is shared so round-trips stay symmetric.
+const Int64 kMaxIRSerializationDepth = 512;
 
 // We expose this function here as it's used by the verifyIRSerialize function in
 // slang-serialize-container.cpp
 template<typename Func>
 static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& processInst)
 {
-    const auto go = [&](auto& go, IRInst* inst) -> void
+    const auto go = [&](auto& go, IRInst* inst, Int64 depth) -> void
     {
+        SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
+
         // Process the current instruction
         processInst(inst);
 
@@ -76,27 +91,27 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
                 }
                 else
                 {
-                    go(go, c);
+                    go(go, c, depth + 1);
                 }
             }
             for (const auto c : lits)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
             for (const auto c : strings)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
         }
         else
         {
             for (const auto c : inst->m_decorationsAndChildren)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
         }
     };
-    go(go, moduleInst);
+    go(go, moduleInst, 0);
 }
 
 } // namespace Slang

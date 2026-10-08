@@ -20,14 +20,15 @@ void BlobBuilder::writeTo(Stream* stream)
     // correct values for relative pointers when we write
     // them out.
     //
-    SLANG_MAYBE_UNUSED
     Size sizeComputed = _calcSizeAndSetCachedChunkOffsets();
 
     // Now we can scan through the chunks again and write
-    // the bytes of each of their shards.
+    // the bytes of each of their shards. The total size is
+    // passed down because a chunk may hold a field that
+    // reports the size of the whole blob.
     //
     SLANG_MAYBE_UNUSED
-    Size sizeWritten = _writeChunksTo(stream);
+    Size sizeWritten = _writeChunksTo(stream, sizeComputed);
 
     SLANG_ASSERT(sizeComputed == sizeWritten);
 }
@@ -74,7 +75,7 @@ Size BlobBuilder::_calcSizeAndSetCachedChunkOffsets()
     return totalSize;
 }
 
-Size BlobBuilder::_writeChunksTo(Stream* stream)
+Size BlobBuilder::_writeChunksTo(Stream* stream, Size totalBlobSize)
 {
     Size totalSize = 0;
     for (auto chunk : _chunks)
@@ -110,7 +111,7 @@ Size BlobBuilder::_writeChunksTo(Stream* stream)
         // (because in that case the total bytes written so far
         // should be `chunkOffset - chunkPrefixSize`).
         //
-        chunk->_writeTo(stream);
+        chunk->_writeTo(stream, totalBlobSize);
 
         totalSize = chunkOffset + chunkContentSize;
     }
@@ -375,6 +376,25 @@ ShardBuilder* ChunkBuilder::_createDataShard(void const* data, Size size)
     return shard;
 }
 
+void ChunkBuilder::_writeTotalBlobSize(Size fieldSize)
+{
+    SLANG_ASSERT(fieldSize == sizeof(UInt32) || fieldSize == sizeof(UInt64));
+
+    auto shard = _createTotalBlobSizeShard(fieldSize);
+    _childShards.add(shard);
+    _contentSize += fieldSize;
+}
+
+ShardBuilder* ChunkBuilder::_createTotalBlobSizeShard(Size fieldSize)
+{
+    auto& arena = getParentBlob()->_getArena();
+    auto shard = new (arena) ShardBuilder(ShardBuilder::Kind::TotalBlobSize);
+
+    shard->_size = fieldSize;
+
+    return shard;
+}
+
 ShardBuilder* ChunkBuilder::_createRelativePtrShard(ChunkBuilder* targetChunk, Size ptrSize)
 {
     auto& arena = getParentBlob()->_getArena();
@@ -386,7 +406,7 @@ ShardBuilder* ChunkBuilder::_createRelativePtrShard(ChunkBuilder* targetChunk, S
     return shard;
 }
 
-void ChunkBuilder::_writeTo(Stream* stream)
+void ChunkBuilder::_writeTo(Stream* stream, Size totalBlobSize)
 {
     auto chunkOffset = _getCachedOffset();
 
@@ -399,13 +419,13 @@ void ChunkBuilder::_writeTo(Stream* stream)
         auto prefixSize = _prefixShard->getSize();
         auto prefixOffset = chunkOffset - prefixSize;
 
-        _prefixShard->_writeTo(stream, prefixOffset);
+        _prefixShard->_writeTo(stream, prefixOffset, totalBlobSize);
     }
 
     auto shardOffset = chunkOffset;
     for (auto shard : _childShards)
     {
-        shard->_writeTo(stream, shardOffset);
+        shard->_writeTo(stream, shardOffset, totalBlobSize);
         shardOffset += shard->getSize();
     }
     SLANG_ASSERT(shardOffset == chunkOffset + getContentSize());
@@ -421,7 +441,7 @@ ShardBuilder::ShardBuilder(Kind kind)
 {
 }
 
-void ShardBuilder::_writeTo(Stream* stream, Size inSelfOffset)
+void ShardBuilder::_writeTo(Stream* stream, Size inSelfOffset, Size totalBlobSize)
 {
     switch (_kind)
     {
@@ -459,6 +479,32 @@ void ShardBuilder::_writeTo(Stream* stream, Size inSelfOffset)
 
             default:
                 SLANG_UNEXPECTED("unsupported relative pointer size");
+                break;
+            }
+        }
+        break;
+
+    case Kind::TotalBlobSize:
+        {
+            switch (_size)
+            {
+            case sizeof(UInt32):
+                {
+                    auto value = UInt32(totalBlobSize);
+                    SLANG_ASSERT(Size(value) == totalBlobSize);
+                    stream->write(&value, sizeof(value));
+                }
+                break;
+
+            case sizeof(UInt64):
+                {
+                    auto value = UInt64(totalBlobSize);
+                    stream->write(&value, sizeof(value));
+                }
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unsupported blob-size field size");
                 break;
             }
         }

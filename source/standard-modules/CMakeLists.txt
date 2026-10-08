@@ -4,11 +4,23 @@
 
 #
 # Neural module configuration
-# SLANG_STANDARD_MODULE_DIR_NAME is the output directory name for all the standard modules, currently there is only neural module
+# SLANG_STANDARD_MODULE_DIR_NAME is the output directory name for all the standard modules
 set(SLANG_STANDARD_MODULE_DIR_NAME "slang-standard-module-${SLANG_VERSION_NUMERIC}" CACHE STRING "Directory name for standard module")
 
 # SLANG_NEURAL_MODULE_FILE_NAME is the file name for the neural module
 set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "module file name for neural module")
+
+# SLANG_WORKGRAPH_MODULE_FILE_NAME is the file name for the experimental workgraph module
+set(SLANG_WORKGRAPH_MODULE_FILE_NAME "workgraph.slang-module" CACHE STRING "module file name for workgraph module")
+
+if(NOT "${SLANG_DISABLE_NOTE_IDS}" STREQUAL "")
+    if(NOT SLANG_DISABLE_NOTE_IDS MATCHES "^[0-9]+(,[0-9]+)*$")
+        message(
+            FATAL_ERROR
+            "SLANG_DISABLE_NOTE_IDS must be comma-separated numeric IDs"
+        )
+    endif()
+endif()
 
 # Determine the library directory based on platform
 # On Windows: shared libraries (.dll) go to bin/
@@ -20,7 +32,7 @@ else()
 endif()
 
 # Set install directory using the platform-specific library directory
-set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE STRING "Installation directory for neural module")
+set(SLANG_STANDARD_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}" CACHE STRING "Installation directory for standard modules")
 
 #
 # Generate the standard module configuration header, this is used by the slang compiler to find the standard module
@@ -41,3 +53,12 @@ set_target_properties(generate_standard_module_config_header PROPERTIES FOLDER "
 
 # Build the neural module
 add_subdirectory(neural)
+
+# Build experimental modules
+add_subdirectory(experimental)
+
+# Build the experimental numeric interface modules.
+add_subdirectory(numerics)
+
+# Build the experimental functional module.
+add_subdirectory(functional)

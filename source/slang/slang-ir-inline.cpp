@@ -1,7 +1,7 @@
 // slang-ir-inline.cpp
 #include "slang-ir-inline.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
@@ -323,16 +323,8 @@ struct InliningPassBase
         IRInst* calleeDebugFunc = nullptr;
     };
 
-    // Sets up the initial debug information structures required *before* inlining a call site.
-    //
-    // This function performs the following steps:
-    // 1. Checks if the callee function has associated debug location information.
-    // 2. Obtain the call inst's existing debug information.
-    // 3. Finds the last `IRDebugLine` preceding the `call` instruction to determine the source
-    //    location (line, col, file) of the call site.
-    // 4. Emits an `IRDebugInlinedAt` instruction with outer set to callDebugInlinedAt.
-    // 5. Inserts the newly created `IRDebugInlinedAt` instruction immediately *before* the `call`
-    // instruction.
+    // Insert the inline-site record before the call and restore the caller's scope after it.
+    // Insert neither when the source line or either function's debug scope is unavailable.
     DebugInlineInfo emitCalleeDebugInlinedAt(IRCall* call, IRFunc* callee, IRBuilder& builder)
     {
         IRDebugLine* lastDebugLine = nullptr;
@@ -342,43 +334,24 @@ struct InliningPassBase
             return DebugInlineInfo();
         }
 
-        // Check if the call inst is part of an existing scope. If yes, then we restore
-        // that scope after the inlining of callee. This case can occur when we have out of
-        // order inlining. See forceinline-basic-block-inline-order.slang test for that use
-        // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
-        // that there's another function that was inlined. We don't want that scope. If the call
-        // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
-        // *before* we see a DebugNoScope
-        IRDebugScope* callDebugScope = nullptr;
-        builder.setInsertAfter(call);
+        // Each block starts in its enclosing function's scope. Explicit scope instructions
+        // assign a new current state; DebugNoScope clears it rather than popping a stack.
+        // Consider two sibling calls: leaf(); leaf();. The restore after the first call
+        // must stop this scan so the second call does not inherit the first inline chain.
+        auto callerFunc = getParentFunc(call);
+        IRInst* callerScope = callerFunc ? findExistingDebugFunc(callerFunc) : nullptr;
+        IRInst* callDebugInlinedAt = nullptr;
         for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
         {
             if (as<IRDebugNoScope>(inst))
             {
+                callerScope = nullptr;
                 break;
             }
-            if (as<IRDebugScope>(inst))
+            if (auto scope = as<IRDebugScope>(inst))
             {
-                callDebugScope = as<IRDebugScope>(inst);
-                builder.emitDebugScope(callDebugScope->getScope(), callDebugScope->getInlinedAt());
-                break;
-            }
-        }
-        if (!callDebugScope)
-        {
-            builder.emitDebugNoScope();
-        }
-
-        IRDebugInlinedAt* callDebugInlinedAt = nullptr;
-        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
-        {
-            if (as<IRDebugNoScope>(inst))
-            {
-                break;
-            }
-            if (as<IRDebugInlinedAt>(inst))
-            {
-                callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
+                callerScope = scope->getScope();
+                callDebugInlinedAt = scope->getInlinedAt();
                 break;
             }
         }
@@ -393,38 +366,24 @@ struct InliningPassBase
             }
         }
 
-        if (!lastDebugLine)
+        // Functions without a source location may have no IRDebugFuncDecoration.
+        // Leave the scope unchanged when we cannot describe both sides of the inline call.
+        auto calleeDebugFunc = findExistingDebugFunc(callee);
+        if (!lastDebugLine || !callerScope || !calleeDebugFunc)
             return DebugInlineInfo();
 
-        auto calleeDebugFunc = findExistingDebugFunc(callee);
-
-        // The caller func is the right lexical scope needed for nsight to show where
-        // the function is getting inlined inside.
-        if (auto callerFunc = getParentFunc(call))
-        {
-            // When `maybeAddDebugLocationDecoration()` failed to find the source
-            // location, IRDebugFuncDecoration is expected to be absent.
-            if (auto callerDebugFunc = findExistingDebugFunc(callerFunc))
-            {
-                builder.setInsertBefore(call);
-                auto newDebugInlinedAt = builder.emitDebugInlinedAt(
-                    lastDebugLine->getLineStart(),
-                    lastDebugLine->getColStart(),
-                    lastDebugLine->getSource(),
-                    callerDebugFunc,
-                    callDebugInlinedAt);
-
-                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
-            }
-            else
-            {
-                // It is more likely to be a bug when IRDebugLocationDecoration exists and
-                // IRDebugFuncDecoration doesn't exist.
-                SLANG_ASSERT(nullptr == callerFunc->findDecoration<IRDebugLocationDecoration>());
-            }
-        }
-
-        return DebugInlineInfo();
+        // Restore the state only when we can also describe the inlined region. A caller
+        // without an inline chain needs a scope-only instruction, not DebugNoScope.
+        builder.setInsertAfter(call);
+        builder.emitDebugScope(callerScope, callDebugInlinedAt);
+        builder.setInsertBefore(call);
+        auto newDebugInlinedAt = builder.emitDebugInlinedAt(
+            lastDebugLine->getLineStart(),
+            lastDebugLine->getColStart(),
+            lastDebugLine->getSource(),
+            callerScope,
+            callDebugInlinedAt);
+        return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
     }
 
     /// Inline the given `callSite`, which is assumed to have been validated
@@ -634,11 +593,8 @@ struct InliningPassBase
         // them into the same basic block as the `call`.
         //
         builder->setInsertBefore(call);
-        IRInst* calleeDebugScope = nullptr;
         if (calleeDebugFunc && newDebugInlinedAt)
-        {
-            calleeDebugScope = builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
-        }
+            builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
 
         // Along the way, we will detect any `return` instruction,
         // and remember the (clone of the) returned value.
@@ -668,10 +624,19 @@ struct InliningPassBase
                 returnVal = findCloneForOperand(env, inst->getOperand(0));
                 break;
 
-            case kIROp_DebugNoScope:
+            case kIROp_DebugScope:
                 {
-                    if (calleeDebugScope)
-                        _cloneInstWithSourceLoc(callSite, env, builder, calleeDebugScope);
+                    auto scope =
+                        as<IRDebugScope>(_cloneInstWithSourceLoc(callSite, env, builder, inst));
+                    if (newDebugInlinedAt && !scope->getInlinedAt())
+                    {
+                        builder->setInsertBefore(scope);
+                        auto replacement =
+                            builder->emitDebugScope(scope->getScope(), newDebugInlinedAt);
+                        replacement->sourceLoc = scope->sourceLoc;
+                        scope->removeAndDeallocate();
+                        builder->setInsertBefore(call);
+                    }
                     break;
                 }
 
@@ -684,8 +649,7 @@ struct InliningPassBase
                 }
             }
         }
-        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
-        // outer set, and delete the older debugInlinedAt
+        // Extend each existing inline chain at its root to include this call site.
         for (auto inst : debugInlinedInsts)
         {
             if (newDebugInlinedAt && !inst->isOuterInlinedPresent())
@@ -695,7 +659,7 @@ struct InliningPassBase
                     inst->getLine(),
                     inst->getCol(),
                     inst->getFile(),
-                    inst->getDebugFunc(),
+                    inst->getScope(),
                     newDebugInlinedAt);
                 inst->replaceUsesWith(newInlinedAt);
                 inst->removeAndDeallocate();
@@ -721,22 +685,12 @@ struct InliningPassBase
     }
 
     /// Inline the body of the callee for `callSite`.
-    // Here is the algorithm for inserting debug information for slang inlined functions:
-    // 1. Check if the call inst belongs to an existing debug scope and find corresponding
-    // debugInlinedAt. [callDebugScope, callDebugInlinedAt]
-    //    1a. If callDebugScope exists, emit this debug Scope* after* the call inst.
-    // 2. Emit a new DebugInlinedAt inst, with debugFunc of the callee, and outer debugInlinedAt is
-    // callDebugInlinedAt. [newDebugInlinedAt]
-    //    2a. If calleDebugScope does not exist, emit debugNoScope after the call inst.
-    // 3. Clone the callee body.
-    // 4. For each cloned block, do this:
-    //    4a.Emit a new DebugScope inst setting the current scope to newDebugInlinedAt.
-    //    [calleeDebugScope] 4b.Emit a DebugNoScope at the end of each block. 4c.If callDebugScope
-    //    exists, do not emit a DebugNoScope for the last block.
-    // 5. For each cloned debugInlinedAt inst, if its outer inlined at operand is null, set it to
-    // the new DebugInlinedAt inst inserted at the top of the block.
-    // 6. For each cloned debugNoScope inst, replace it with calleeDebugScope. (This is because all
-    // cloned insts are in callee's scope).
+    // Preserve explicit scope transitions while attaching this call's inline chain to
+    // the callee's ordinary scopes and to the roots of its existing inline chains.
+    // Consider outer() containing an already-inlined leaf(). After leaf() returns,
+    // its restore selects outer() without an inline chain. When outer() is itself
+    // inlined, that restore must acquire the new call's chain so subsequent locals
+    // remain associated with this particular invocation of outer().
     void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
         auto callee = callSite.callee;
@@ -754,21 +708,11 @@ struct InliningPassBase
                 ptrArgList.add(arg);
         }
 
-        if (debugInlineInfo.calleeDebugFunc && callSite.specialize)
-        {
-            auto debugFunc = as<IRDebugFunction>(debugInlineInfo.calleeDebugFunc);
-            auto newType = cloneInst(env, builder, debugFunc->getDebugType());
-            if (newType != debugFunc->getDebugType())
-            {
-                auto newDebugFunc = builder->emitDebugFunction(
-                    debugFunc->getName(),
-                    debugFunc->getLine(),
-                    debugFunc->getCol(),
-                    debugFunc->getFile(),
-                    newType);
-                debugInlineInfo.calleeDebugFunc = newDebugFunc;
-            }
-        }
+        // inlineCallSite already clones the generic's metadata into this environment.
+        // Consider outer<T>() calling leaf<T>(), both early-inlined. Rebuilding outer's
+        // DebugFunction here would give its entry scope a different identity from the
+        // restored scope and local variables cloned through the environment below.
+        debugInlineInfo.calleeDebugFunc = findCloneForOperand(env, debugInlineInfo.calleeDebugFunc);
 
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
@@ -927,9 +871,8 @@ struct InliningPassBase
             }
             isFirstBlock = false;
         }
-        // For each existing debugNoScope inst, replace it with new debug scope we emit.
-        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
-        // outer set, and delete the older debugInlinedAt
+        // Attach the outer call to ordinary scopes restored inside the cloned callee.
+        // Extend each existing inline chain at its root to include this call site.
         if (newDebugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
         {
             for (auto calleeBlock : callee->getBlocks())
@@ -938,13 +881,14 @@ struct InliningPassBase
                 setInsertBeforeOrdinaryInst(builder, clonedBlock->getFirstOrdinaryInst());
                 builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
 
-                List<IRInst*> debugNoScopeToRemove;
+                List<IRDebugScope*> scopesToInline;
                 List<IRDebugInlinedAt*> debugInlinedAtToProcess;
                 for (auto inst : clonedBlock->getChildren())
                 {
-                    if (as<IRDebugNoScope>(inst))
+                    if (auto scope = as<IRDebugScope>(inst))
                     {
-                        debugNoScopeToRemove.add(inst);
+                        if (!scope->getInlinedAt())
+                            scopesToInline.add(scope);
                     }
                     if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
                     {
@@ -954,11 +898,13 @@ struct InliningPassBase
                         }
                     }
                 }
-                for (auto inst : debugNoScopeToRemove)
+                for (auto scope : scopesToInline)
                 {
-                    builder->setInsertAfter(inst);
-                    builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
-                    inst->removeAndDeallocate();
+                    builder->setInsertBefore(scope);
+                    auto replacement =
+                        builder->emitDebugScope(scope->getScope(), newDebugInlinedAt);
+                    replacement->sourceLoc = scope->sourceLoc;
+                    scope->removeAndDeallocate();
                 }
                 for (auto inlinedAt : debugInlinedAtToProcess)
                 {
@@ -967,7 +913,7 @@ struct InliningPassBase
                         inlinedAt->getLine(),
                         inlinedAt->getCol(),
                         inlinedAt->getFile(),
-                        inlinedAt->getDebugFunc(),
+                        inlinedAt->getScope(),
                         newDebugInlinedAt);
                     inlinedAt->replaceUsesWith(newInlinedAt);
                     inlinedAt->removeAndDeallocate();
@@ -1029,7 +975,7 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
 namespace
 { // anonymous
 
-// Inlines calls that involve String types
+// Inlines calls whose parameter or result types need legalization before target emission.
 struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
@@ -1037,6 +983,7 @@ struct TypeInliningPass : InliningPassBase
     TargetProgram* targetProgram;
 
     bool shouldInlineBorrowRefTypesForSPIRV = false;
+    bool shouldInlineNonDefaultMatrixAggregatesForHLSL = false;
 
     TypeInliningPass(IRModule* module, TargetProgram* inTargetProgram)
         : Super(module), targetProgram(inTargetProgram)
@@ -1045,6 +992,60 @@ struct TypeInliningPass : InliningPassBase
         {
             shouldInlineBorrowRefTypesForSPIRV = true;
         }
+        auto target = targetProgram->getTargetReq()->getTarget();
+        shouldInlineNonDefaultMatrixAggregatesForHLSL = target == CodeGenTarget::HLSL ||
+                                                        target == CodeGenTarget::DXIL ||
+                                                        target == CodeGenTarget::DXILAssembly;
+    }
+
+    // Returns whether a value type contains a matrix whose layout differs from the target default.
+    // Matrix layouts are resolved before this pass. Only by-value struct fields and array elements
+    // contribute to aggregate storage; pointers and resource handles do not.
+    bool containsMatrixWithNonDefaultLayout(IRType* type)
+    {
+        if (auto matrixType = as<IRMatrixType>(type))
+        {
+            return getIntVal(matrixType->getLayout()) !=
+                   targetProgram->getOptionSet().getMatrixLayoutMode();
+        }
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+            return containsMatrixWithNonDefaultLayout(arrayType->getElementType());
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsMatrixWithNonDefaultLayout(field->getFieldType()))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Returns whether an out/inout parameter needs inlining to preserve its matrix elements in DXC.
+    bool doesHLSLAggregateParamRequireInlining(IRType* type)
+    {
+        if (!shouldInlineNonDefaultMatrixAggregatesForHLSL)
+            return false;
+        auto valueType = cast<IRPtrTypeBase>(type)->getValueType();
+        if (!as<IRStructType>(valueType) && !as<IRArrayTypeBase>(valueType))
+            return false;
+
+        // DXC can reorder component accesses inside aggregate output parameters when a matrix
+        // field's layout differs from its command-line default. Consider this example:
+        //
+        //     struct S { column_major float2x3 m; };
+        //     void fill(out S s)
+        //     {
+        //         s.m = (float2x3)0;
+        //         s.m[0][1] = 1;
+        //         s.m[1][0] = 3;
+        //     }
+        //
+        // With -Zpr, the caller reads 0 at [0][1] and 1 at [1][0], rather than 1 and 3.
+        // Bare matrix parameters and ordinary aggregate copies work correctly. Inlining
+        // these aggregate calls before DXC removes the faulty parameter copy without
+        // changing the fields' storage layout or the default layout of other matrices.
+        return containsMatrixWithNonDefaultLayout(valueType);
     }
 
     bool doesTypeRequireInline(IRType* type, IRInst* arg, IRFunc* callee)
@@ -1057,14 +1058,19 @@ struct TypeInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
+        case kIROp_OutParamType:
+            return doesHLSLAggregateParamRequireInlining(type);
         case kIROp_RefParamType:
             {
                 if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
             }
-        case kIROp_BorrowInParamType:
         case kIROp_BorrowInOutParamType:
+            if (doesHLSLAggregateParamRequireInlining(type))
+                return true;
+            [[fallthrough]];
+        case kIROp_BorrowInParamType:
             {
                 if (shouldInlineBorrowRefTypesForSPIRV)
                 {

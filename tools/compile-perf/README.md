@@ -1,0 +1,490 @@
+# Slang compile-time performance suite
+
+A harness that measures **compiler time** (how long `slangc` takes to compile),
+not GPU/runtime performance — built to **detect and localize compile-time
+regressions** and replay the measurement across historical Slang releases.
+
+Motivation: a compile-time slowdown was observed building Slang for Falcor.
+This suite reproduces that class of problem in a controlled, attributable way:
+each test stresses one compiler stage, so a regression points at a specific
+pass; and the same suite runs unchanged against any release binary, so a
+regression points at a specific release.
+
+---
+
+## Measurement
+
+`slangc` is run with `-report-detailed-perf-benchmark`, which prints per-phase
+timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per run.
+
+> The detailed flag emits everything the plain `-report-perf-benchmark` does,
+> with identical meaning, **plus one sub-timer per `SLANG_PASS` inside
+> `linkAndOptimizeIR`** — ~67 of them, covering the whole target-specific back
+> end (`deferBufferLoad`, `simplifyNonSSAIR`, `lowerCombinedTextureSamplers`,
+> `legalizeIRForMetal`, …). Without it every one of those collapses into the
+> single `linkAndOptimizeIR (self)` residual and a back-end regression cannot be
+> attributed to a pass. Measured overhead is ≤ 1% of `compileInner`, inside
+> run-to-run noise. `bench.py` probes each binary once and falls back to
+> `-report-perf-benchmark` for releases that predate the flag, so a sweep over
+> old binaries still measures (with the coarse timer set).
+
+- **Headline metric: `compileInner`** — the full compile (front-end + IR +
+  codegen). It _excludes_ the fixed ~280 ms core-module load, so it is stable
+  and comparable across workloads and versions.
+- **Localization** uses the Slang-internal stage timers, which are measured
+  _before_ any downstream tool (spirv-opt), so they stay comparable across 10+
+  months of releases even when bundled tools differ. The timers are **nested**:
+
+  ```
+  compileInner
+    ├─ frontEndExecute ─── parseTranslationUnit, SemanticChecking, generateIR
+    └─ generateOutput ──── linkAndOptimizeIR ── specializeModule, simplifyIR,
+                                                 linkIR, unrollLoopsInModule
+  ```
+
+  Attribution therefore uses **leaf** timers (a jump in `generateOutput` is just
+  its child `linkAndOptimizeIR`, whose jump is its child `specializeModule`…).
+
+- **Robustness:** prepare inputs and dependencies once, then run one warmup
+  pass and five timed passes over all selected workload/size pairs. For A, B,
+  and C, the timed order is `ABC ABC ABC ABC ABC`, rather than `AAAAA BBBBB CCCCC`.
+  This spreads each workload's samples across the suite so a short host
+  disturbance is less likely to affect most of its five samples. The **median**
+  remains the default comparison metric. Raw samples and
+  `median`/`min`/`mean`/`stdev` remain in `results.json`; reporting tools accept
+  `--metric` to switch. `--warmup` and `--samples` set the number of complete
+  passes; generation and module precompilation are not repeated between passes.
+  Interleaving does not remove disturbances lasting the whole suite.
+- **Sampling provenance:** each record identifies `sampling_strategy` as
+  `interleaved` (the CLI) or `consecutive` (the isolated `run_spec` API).
+  The nightly trend gate compares only matching known strategies, in addition
+  to matching runner, size, and timer schema. Older records without the marker
+  remain available for historical reporting but cannot seed the new gate's
+  baseline. Judgement resumes after enough comparable points accumulate; a
+  skipped comparison is reported explicitly rather than treated as a pass.
+- **Memory:** peak RSS per compile is captured when the platform query
+  succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
+  `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
+  memory charts is that, not a bug) — see the Memory footprint section
+  below.
+- **Comparison coverage:** the candidate archive records how many metrics had
+  a usable baseline. If none were judged, the CI summary and Slack report
+  “Insufficient comparable history” instead of a clean performance verdict.
+  This is informational, not a performance alarm; normal comparisons resume
+  as compatible history accumulates.
+- **Nightly alert confirmation:** a warning (5%) or regression (10%) first
+  triggers one additional batch for the affected workloads on the same runner
+  and compiler. The rerun uses the original sizes, sample count (default five),
+  and warmup count. Only the same counter crossing the original, frozen
+  baseline in both batches can alert. Two error-level crossings are required
+  for a red alarm; an error followed by a warning confirms only a warning.
+  Clean runs do no extra measurements. A failed or incomplete rerun is an
+  evaluation failure, not recovery. Original graph points stay unchanged;
+  `daily/<label>/confirmation.json` preserves the baseline, candidate rows and
+  rerun's raw samples, and both batches are also uploaded as a CI artifact.
+  `confirm.py measure` runs before publication, while `confirm.py report`
+  emits the final verdict on the notification host. Direct `trend.py` calls
+  remain useful for inspecting unconfirmed historical changes.
+- **Matrix workload size:** all five `backend_matrix_*` targets default to
+  512, with 256 retained in the size sweep. A local same-binary Windows study
+  with interleaved sampling found lower HLSL/GLSL total-time variation and
+  fewer Metal simplification spikes at 512. The larger inputs cost more time
+  and did not improve every counter; confirmation is still required. Keep the
+  family sizes equal for cross-target comparisons. Size provenance excludes
+  the old 256-size measurements from the new alert baseline.
+- **Floor + slope:** `ladder_scaling.py --workload <name>` fits
+  `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
+  separating a fixed-cost regression (heavier stdlib) from a per-element one
+  (a pass got slower) from a scaling one (a rising final-step ratio).
+
+> **Reading the numbers:** the synthetic workloads are _stress tests built to
+> amplify_ one pass each. A "3.8×" is a sensitivity figure for that pass, **not**
+> a user-facing slowdown. `mdl_dxr` (a real shader) is the realistic end-to-end
+> signal.
+
+---
+
+## Workloads
+
+Workloads run per release. Synthetic ones are generated deterministically by
+`workloads.py`, scaled by a size knob `N`; `mdl_dxr` is a real shader corpus.
+
+### Suspected-regression features (deepest workloads)
+
+| Test                      | What it generates                                                                                                                                    | Targets (compiler stage)                                                                                                                                                                                                                                                                         | Primary timer                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| **autodiff**              | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic                            | the **autodiff IR transform**                                                                                                                                                                                                                                                                    | `linkAndOptimizeIR`                                                      |
+| **dynamic_dispatch**      | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization**                                                                                                                                                                                                                                                   | `specializeModule`                                                       |
+| **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch                                                 | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`)                                                                                                                    | `linkAndOptimizeIR`, `specializeModule`, `legalizeExistentialTypeLayout` |
+| **diagnostics**           | `N` functions each containing one type error, so the compile emits `N` diagnostics                                                                   | **diagnostic production** — source-location resolution, line/caret rendering, message formatting and sink throughput. Compilation stops after the front end, so nothing downstream dilutes it and `SemanticChecking` is ~86% of `compileInner`. Replaces `diagnostics_clean`, which emitted none | `SemanticChecking`                                                       |
+
+### Core compiler-stage tests
+
+| Test                                          | What it generates                                                           | Targets                                                                                                                                                                                                                                                                                                                                     | Primary timer                            |
+| --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **parse**                                     | `N` trivial functions, long expressions                                     | **lexing/parsing**                                                                                                                                                                                                                                                                                                                          | `parseTranslationUnit`                   |
+| **sema_generics**                             | `N` generic functions × 3 type instantiations                               | **semantic checking / generic instantiation**                                                                                                                                                                                                                                                                                               | `SemanticChecking`                       |
+| **interface_depth**                           | a linear interface inheritance chain `N` deep, conformance at the bottom    | **calcInheritanceInfo vs interface-hierarchy depth** (~N^3.4 measured)                                                                                                                                                                                                                                                                      | `SemanticChecking`                       |
+| **specialization**                            | a generic `Box<T:IVal>` over `N` distinct types                             | **generic specialization**                                                                                                                                                                                                                                                                                                                  | `specializeModule`                       |
+| **inlining**                                  | `N` `[ForceInline]` functions (bounded-depth groups)                        | **inliner + SSA simplify**                                                                                                                                                                                                                                                                                                                  | `simplifyIR`                             |
+| **codegen_spirv**                             | one shader, `N` lines of backend math                                       | **target code emission** (SPIR-V, direct)                                                                                                                                                                                                                                                                                                   | `generateOutput`                         |
+| **emit_metal** / **emit_wgsl**                | the same shader as `codegen_spirv`, emitted to **textual** Metal / WGSL     | the **source-emission backend** (`emitEntryPointsSourceFromIR`) that `-emit-spirv-directly` skips entirely. This family measures the EMITTER, not target legalization: its shared source is construct-free, so the target-specific passes all run and find nothing (six targets within 1.18x). Legalization is the `backend_*` family's job | `emitEntryPointsSourceFromIR`            |
+| **emit_hlsl** / **emit_glsl** / **emit_cuda** | the same shader, emitted to textual HLSL / GLSL / CUDA                      | the remaining **source-emission backends** (D3D source path, GLSL legalization, the C++-family emitter)                                                                                                                                                                                                                                     | `emitEntryPointsSourceFromIR`            |
+| **codegen_dxil** / **codegen_ptx**            | the same shader, compiled through the **downstream** compiler (dxc / nvrtc) | the full pipeline **including the downstream toolchain**; win32-only, and a missing toolchain is a HARD failure (`downstream_required`) so a host without dxc/nvrtc cannot silently report OK. Excluded from release sweeps: release packages do not bundle the downstream compilers, so their history lives in the daily series            | `compileInner` (+ downstream wall clock) |
+| **module_link**                               | `N` modules precompiled to `.slang-module`, then linked                     | **module read + IR link**                                                                                                                                                                                                                                                                                                                   | `linkIR`, `frontEndExecute`              |
+
+> **Removed 2026-09:** `generic_nesting` and `generic_nesting_eval`. At 2.9 ms
+> and 4.2 ms they sat below the trend check's 2 ms absolute gate, so they would
+> have needed a +69%/+48% regression to report anything and never fired in 73
+> nights; and the exponential they were built for is gone (`SemanticChecking`
+> measures 0.45 ms at nesting depth 16 and 0.90 ms at depth 64).
+
+### Type-checking tests
+
+The quietly expensive part of semantic checking: every binary operator and every
+cross-type assignment runs **overload resolution** over a candidate set and ranks
+**implicit-conversion** costs. `parse` deliberately uses uniform-`float`
+arithmetic (each operator matches one overload trivially) and `sema_generics` is
+dominated by generic-constraint cost, so neither isolates this. These compile to
+`.slang-module` (front-end only), so the signal is `SemanticChecking`, not codegen.
+
+| Test                    | What it generates                                                                                                         | Targets                                                                                                                          | Primary timer      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **operator_typecheck**  | `N` functions, each a long arithmetic expression with operands alternating among `float`/`int`/`uint` (typed + literal)   | **operator overload resolution + coercion at every node** — the "checking the types of `1` and `2` in `1 + 2`" cost, ×many nodes | `SemanticChecking` |
+| **implicit_conversion** | `N` functions, each a cascade of conversions: scalar widening, splats, mixed initializer lists, vector compose/truncate   | the **coercion / conversion-cost engine** (distinct from operator overloading)                                                   | `SemanticChecking` |
+| **overload_resolution** | a large user-defined overload set (`pick`/`pick2`, scalar + vector + 2-arg) called from `N` sites with rotating arg types | **candidate enumeration + conversion-rank comparison** to choose the best match                                                  | `SemanticChecking` |
+
+### Shared-infrastructure & scaling tests
+
+Added after a real investigation (the v2026.7 compile-time regressions)
+showed that a _fixed per-compile_ regression — the standard module growing,
+inflating `linkIR`/deserialization for **every** compile — was nearly
+invisible to feature-targeted tests. These
+isolate the shared machinery and scaling behavior directly.
+
+| Test            | What it generates                                        | Targets                                            | Primary timer                                           |
+| --------------- | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| **minimal**     | a near-empty shader                                      | the **per-compile floor**: core-module load + link | `linkIR`, `readSerializedModuleIR`, `loadBuiltinModule` |
+| **ir_builder**  | one giant straight-line function (`N` trivial int ops)   | **IR construction / dedup / SSA simplify**         | `generateIR`, `simplifyIR`, `generateOutput`            |
+| **serialize**   | a large module of `N` public functions → `.slang-module` | **IR/AST serialization (write)**                   | `writeSerializedModuleAST/IR`                           |
+| **conformance** | `N` structs conforming to a shared interface             | **conformance checking / witness synthesis**       | `frontEndExecute`, `SemanticChecking`                   |
+| **loop_unroll** | a `[ForceUnroll]` loop of `N` iterations                 | **loop unrolling + simplify**                      | `unrollLoopsInModule`                                   |
+
+`minimal` is the **regression canary**: cheap enough to run on every PR, and the
+single best early warning for "the stdlib got heavier"-class regressions.
+
+### Coverage-gap tests
+
+Each exercises a pass or output path that **no other workload reaches** — found
+by probing the dev `slangc` with `-report-perf-benchmark` and noting timers that
+never appeared in the suite. All scale by breadth (number of constructs).
+
+| Test                   | What it generates                                                                                                                                 | Targets (compiler stage)                                                                                                                                                                                                                    | Primary timer                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **resource_aggregate** | `N` structs bundling textures + a sampler + a `StructuredBuffer`, all read live                                                                   | **resource-type legalization**: nesting resources in an aggregate forces `legalizeResourceTypes` to flatten them into bindings (every other workload's only resource is a bare `RWStructuredBuffer`); the timer grows super-linearly in `N` | `legalizeResourceTypes`                                |
+| **reflection_layout**  | `N` constant buffers with rich payloads (vectors, matrices, nested `Light[]`/`Material` structs, scalar arrays), compiled with `-reflection-json` | the **parameter binding / layout engine** + reflection serializer — the only large, deeply-typed shader **parameter interface** in the suite (the layout/reflection path no other workload covers)                                          | `compileInner` (+ `frontEndExecute`, `generateOutput`) |
+| **control_flow_ssa**   | one entry point with `N` stacked control-flow blocks (nested if/else + bounded loop with break/continue + switch) mutating carried locals         | **SSA construction / CFG simplify**: reassigning locals across branches and back-edges forces phi insertion (`constructSSA` inside `simplifyIR`) — the axis `complexity_ladder` only touches as one of several                              | `simplifyIR`, `frontEndExecute`                        |
+
+### Back-end legalization tests
+
+The `emit_*`/`codegen_*` family above compiles **one shared source** to every
+target, and that source is deliberately construct-free — one compute entry, one
+`RWStructuredBuffer`, N lines of scalar math. Almost every target-specific pass
+in `linkAndOptimizeIR` is gated on a construct it does not contain, so each pass
+runs and finds nothing to do: measured, the six targets land within **1.18×** of
+each other, with ~42% of every number being the identical front end. The suite
+was one shader wide on the back end.
+
+These workloads supply the constructs those passes are gated on. Each scales
+**one axis**, and each is compiled to **several targets**, because for the back
+end the signal is the **ratio between targets on one source**, not any single
+number. SPIR-V is carried in every family as the control — it is what every
+other workload in the suite measures.
+
+> One axis per workload is not a stylistic preference here. A mixed
+> "kitchen sink" cross-target shader was tried first and **failed**: a shared
+> super-linear front-end cost dominated it and flattened a 21× cuda/spirv
+> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+
+| Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `backend_loads_*`      | spirv, hlsl, metal, cuda       | `N` textures, each sampled once, in one entry point                | targets that move globals into an explicit global context (CUDA) turn every parameter access into a `Load`; SPIR-V keeps them as globals. The axis is **loads per function**, not resource count | `deferBufferLoad`, `simplifyNonSSAIR`              |
+| `backend_samplers_*`   | spirv, hlsl, metal, wgsl       | `N` combined `Sampler2D` reads                                     | the combined texture-sampler construct, split by `lowerCombinedTextureSamplers` on the non-Khronos source targets and left alone on Khronos ones. No other workload declares one                 | `simplifyNonSSAIR`, `lowerCombinedTextureSamplers` |
+| `backend_matrix_*`     | spirv, hlsl, glsl, metal, cuda | a chain of `N` `mul`s on `float4x4` read from a `StructuredBuffer` | the matrix lowering path (`legalizeMatrixTypes`, `specializeMatrixLayout`, HLSL's `wrapStructuredBuffersOfMatrices`). Two workloads _declare_ a matrix type; none computed with one              | `simplifyNonSSAIR`, `legalizeMatrixTypes`          |
+| `resource_aggregate_*` | (+ metal, glsl, cuda)          | the existing `resource_aggregate` source                           | `legalizeResourceTypes`, which takes a `TargetProgram` and behaves differently per target, but was only ever measured on the target where it is cheapest                                         | `legalizeResourceTypes`, `simplifyNonSSAIR`        |
+
+The SPIR-V `resource_aggregate` entry keeps its original name so its
+cross-release series is unbroken; the three new targets use the same generator,
+default size and sweep ladder, so all four are directly comparable.
+
+#### What these actually found
+
+**The target-specific legalization passes are not the cost.** Swept on
+v2026.17.1, every one of them is small at every size — `legalizeMatrixTypes`
+measures 0.0 ms on every target, `lowerCombinedTextureSamplers` 0.5 ms,
+`legalizeResourceTypes` 13-17 ms (and it does not run on CUDA at all). What is
+expensive is the **load/store redundancy machinery running over the IR those
+passes produce**, reached two ways: `deferBufferLoad` on targets that pack
+parameters into a global context, and `simplifyNonSSAIR` everywhere after
+phi-elimination. SPIR-V barely pays it, because it keeps resources as opaque
+globals and never generates the load-heavy IR in the first place.
+
+`compileInner` in ms on v2026.17.1, with the fitted exponent and the ratio to
+the SPIR-V control at the top size:
+
+| workload                   |   80 |   160 |    320 |     640 | exponent | vs spirv |
+| -------------------------- | ---: | ----: | -----: | ------: | -------: | -------: |
+| `resource_aggregate`       | 38.6 |  55.9 |   99.6 |   198.8 |   N^0.79 |     1.0x |
+| `resource_aggregate_metal` | 52.6 | 144.7 |  480.3 |  1790.3 |   N^1.70 |     9.0x |
+| `resource_aggregate_glsl`  | 32.6 |  95.6 |  464.8 |  3114.6 |   N^2.19 |    15.7x |
+| `resource_aggregate_cuda`  | 61.4 | 273.6 | 1801.4 | 13595.6 |   N^2.60 |    68.4x |
+| `backend_loads_spirv`      | 20.1 |  30.4 |   50.0 |    91.5 |   N^0.73 |     1.0x |
+| `backend_loads_hlsl`       | 15.8 |  24.2 |   41.3 |    88.0 |   N^0.82 |     1.0x |
+| `backend_loads_metal`      | 20.6 |  36.9 |   85.8 |   252.1 |   N^1.20 |     2.8x |
+| `backend_loads_cuda`       | 23.6 |  49.1 |  180.6 |  4195.7 |   N^2.49 |    45.8x |
+
+Of the 13.6 s CUDA point, 13.3 s is `deferBufferLoad`. Of the 3.1 s GLSL point,
+2.9 s is `simplifyNonSSAIR`. Of the 304 ms Metal `backend_samplers` point at
+N=512, 216 ms is `simplifyNonSSAIR` against 0.5 ms for the sampler split. Every
+SPIR-V, HLSL and WGSL column is sub-linear (N^0.65 to N^0.82); every
+super-linear column is one of those two passes. Filed as #13010.
+
+Across the v2026.12 — v2026.17.1 release sweep both passes are **flat** while
+everything around them improved 2-4x, so the ratios widen with every release:
+`backend_loads` cuda/spirv went 2.15x at v2026.12 to 3.53x at v2026.17.1, and
+`backend_samplers` metal/spirv 1.88x to 2.51x — not because the back ends got
+slower, but because the general compile-time work of that window did not reach
+them.
+
+### Complexity-scaling test
+
+The single-axis stressors above each isolate **one** pass. `complexity_ladder`
+instead ramps _several_ realistic dimensions together — branchy control flow,
+generic calls, bounded inner loops, resource reads, dynamic dispatch, and
+call-graph depth — so the size knob `N` models a real shader growing from
+**simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
+--sweep`) and fit with `ladder_scaling.py` (its default workload) to get the holistic
+complexity → compile-time curve, separating the fixed **floor** from the
+per-unit **slope** and surfacing super-linear bends at high complexity.
+
+| Test                  | What it generates                                                                                       | Targets                                                             | Primary timer                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------- |
+| **complexity_ladder** | a mixed-feature shader (control flow + generics + loops + dispatch + resources, scaled together by `N`) | the **whole pipeline at once**, as a realistic-shader scaling curve | `compileInner` (+ `frontEndExecute`, `linkAndOptimizeIR`) |
+
+### Real-shader test
+
+| Test        | What it is                                                                                                                                                          | Targets                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **mdl_dxr** | the real **MDL/DXR** path-tracer shaders (`shader-slang/MDL-SDK`): `hit.slang` + imported `material.slang` (549 KB), `runtime.slang`, etc., compiled monolithically | **holistic real-world compile time** |
+
+**Compile modes** (per workload, see `manifest.py`): `target` (compile to SPIR-V
+with an entry point — triggers the full pipeline incl. specialization/autodiff),
+`module` (compile to a downstream-free `.slang-module` — front-end only), `link`
+(precompile modules then link). Every workload is GPU-free and external-SDK-free
+so it runs headless / in CI.
+
+---
+
+### API-path & RT workloads (`mode="api"`)
+
+Driven through `libslang` by `native/api-driver.cpp` (built once per bench run
+with the host compiler; it `dlopen`s the library, so one driver measures every
+release). They cover the costs a one-shot `slangc` run pays exactly once and
+cannot separate — the application-integration dimension. Included in the
+tracked nightly via `bench.py --api`; same sampling as everything else
+(1 warmup + 5 timed samples, median/min/mean/stdev per timer).
+
+| Test                       | Shape                                                                | Exercises                                                                                        |
+| -------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **api_session_create**     | N global-session create/destroy cycles, no sources                   | `slang_createGlobalSession` — core-module deserialization (the recurring session-cost complaint) |
+| **api_many_kernels**       | N tiny independent kernels, one compile each in one session          | per-compile fixed overhead — the many×tiny middleware pattern                                    |
+| **api_module_graph**       | layered import DAG loaded by name                                    | import resolution + checking over a renderer-library-like graph                                  |
+| **api_module_graph_bin**   | the same DAG resolved from serialized `.slang-module` binaries       | the binary import path (source-load + `writeToFile` setup is excluded from `apiTotal`)           |
+| **api_reflection**         | parameter-rich kernels + full type-layout walks                      | `getLayout` + `spReflection_*` — the binding-table query pattern                                 |
+| **api_specialize**         | interface + N conforming structs, one specialized variant each       | `IComponentType::specialize` + per-variant codegen                                               |
+| **rt_renderer**            | raygen/closesthit/miss over a ~100-module generated renderer library | `createCompositeComponentType` + link + per-entry codegen — few×heavy RT programs                |
+| **rt_renderer_specialize** | one compute kernel per material via specialize                       | link-time specialization against interface-heavy cross-module code                               |
+
+#### API timer glossary
+
+Leaf timers wrap exactly **one public API call** (wall clock, measured in the
+driver), with three composites: `apiTotal` (the mode's whole timed section),
+`apiReflection` (`getLayout` plus the full reflection walk), and
+`apiCreateSession` (`findProfile` + `createSession`). These names are
+user-facing (site charts, trend alerts); a timer's meaning must not drift from
+this table.
+
+| Timer                    | API call                                                  | Notes                                                                                                                                                                                                                                                                                                            |
+| ------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apiTotal`               | whole timed section of the mode                           | excludes setup that runs before its scope opens. In module-graph-bin that setup includes `apiCreateGlobalSession`, the source load, and `writeToFile` — so that mode's `apiTotal` covers only the fresh binary re-load and is NOT comparable with other modes' `apiTotal`, which include global-session creation |
+| `apiLoadModuleSource`    | `ISession::loadModule()` (setup pass)                     | module-graph-bin only: the source load that precedes the timed binary-load pass; excluded from `apiTotal`                                                                                                                                                                                                        |
+| `apiWriteModule`         | `IModule::writeToFile()` per loaded module                | module-graph-bin only: serializes the loaded modules in the setup pass; excluded from `apiTotal`                                                                                                                                                                                                                 |
+| `apiCreateGlobalSession` | `slang_createGlobalSession()`                             | core-module deserialization dominates                                                                                                                                                                                                                                                                            |
+| `apiCreateSession`       | `IGlobalSession::createSession()`                         | also includes the preceding `findProfile()` lookup                                                                                                                                                                                                                                                               |
+| `apiLoadModule`          | `ISession::loadModule()` / `loadModuleFromSourceString()` | import resolution + front end of the module and its transitive imports                                                                                                                                                                                                                                           |
+| `apiFindEntryPoint`      | `IModule::findEntryPointByName()`                         |                                                                                                                                                                                                                                                                                                                  |
+| `apiComposite`           | `ISession::createCompositeComponentType()`                |                                                                                                                                                                                                                                                                                                                  |
+| `apiLink`                | `IComponentType::link()`                                  |                                                                                                                                                                                                                                                                                                                  |
+| `apiSpecialize`          | `IComponentType::specialize()`                            | per conforming type                                                                                                                                                                                                                                                                                              |
+| `apiGetCode`             | `IComponentType::getEntryPointCode()`                     | per-entry-point target codegen; should track the library's own `compileInner` — a growing gap is cost OUTSIDE compiler instrumentation                                                                                                                                                                           |
+| `apiReflection`          | `IComponentType::getLayout()` + `spReflection_*` walks    |                                                                                                                                                                                                                                                                                                                  |
+
+## Quickstart
+
+> Examples use `python3` (macOS/Linux); on **Windows** use `python` (or `py`).
+> The scripts are marked executable, so on macOS/Linux you can also run them
+> directly — `./bench.py …` instead of `python3 bench.py …`.
+
+```bash
+# 1. (once) fetch the real-shader corpus
+cp /path/to/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang corpus/mdl/
+
+# 2. run the whole suite against a slangc build
+python3 bench.py --slangc /path/to/slangc --label dev      # -> results/dev/
+
+# 3. (historical) fetch release binaries and sweep them all
+python3 fetch_releases.py --since 2025-08-01                # default window start
+python3 sweep.py --samples 5                                # -> results/releases/<tag>/
+
+# 4. visualize
+python3 report.py                           # per-workload history + phase breakdown HTML
+python3 breakdown.py --label <tag>          # phase attribution for one label (stdout table)
+
+# 5. complexity sweep of one build (compile time vs size N), with HTML report
+python3 bench.py --slangc /path/to/slangc --label dev --sweep \
+    --only resource_aggregate,reflection_layout,control_flow_ssa
+python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.html
+
+# 6. (coming in follow-up) check a change for a compile-time regression:
+#    bench two slangc binaries, diff with compare.py
+```
+
+---
+
+## Files in this suite
+
+### Scripts
+
+| File                                 | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native/api-driver.cpp`              | **API-path driver** — dlopens a given libslang, runs the `mode="api"` workloads through the COM API, emits `[*]` timer lines in slangc's report format (see the API timer glossary above)                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `lib/workloads.py`                   | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `lib/manifest.py`                    | per-workload spec: invocation, compile mode, primary timers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `bench.py`                           | **test runner** — runs slangc, parses all timers, writes `results.json` (merge-on-write); generated sources go to an auto-removed `--gen-dir` scratch, not the results dir                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `fetch_releases.py`                  | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `sweep.py`                           | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `compare.py` / `compare_branches.py` | **local regression check** — base-vs-head diff + one-command branch driver; planned for a follow-up PR                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `track.py`                           | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `daily_movers.py`                    | **daily progress summary** — suite-wide day boundaries ranked by headline movement with leaf-timer attribution and the commit range to bisect; `--workload <name>` for one workload's per-timer net + biggest step (date + commits)                                                                                                                                                                                                                                                                                                                                                                                 |
+| `trend.py`                           | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `lib/analyze.py`                     | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `breakdown.py`                       | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **history pages** (per-workload detail pages under `analysis/workloads/`, linked from the landing page and the `*-releases.html` / `*-tot.html` cadence pages; `report_per_workload.html` is a redirect to the landing page) and **per-sweep** (stacked-area vs N in `sweep_report.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
+| `report.py`                          | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `ladder_scaling.py`                  | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `compare_repro.py`                   | **reproducibility check** — compare a fresh sweep against a saved baseline: per-(release, workload, size) `compileInner` drift, worst-first, with a summary and over-threshold flags                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `sweep_report.py`                    | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers; `--publish DIR` renders the site's sweep landing page + every archived sweep                                                                                                                                                                                                                                                                                                               |
+
+### Documents
+
+| Document    | What it contains                                                       |
+| ----------- | ---------------------------------------------------------------------- |
+| `README.md` | this file — overview, the tests and what they target, quickstart       |
+| `DESIGN.md` | design decisions, local use cases, CI workflows, and the result layout |
+
+### Generated outputs (gitignored)
+
+The first group is stored in `slang-compile-perf` (the CI results repo). The
+second group is regenerable on demand and is gitignored from that repo — generate
+them locally by pointing the report scripts at a checkout of `slang-compile-perf`
+via `--results <checkout-path>`.
+
+**Stored in `slang-compile-perf`:**
+
+| Path                                           | What it is                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats) |
+| `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                 |
+| `results/tracking/tracking.json`               | derived tracking series (release history ++ daily tail)            |
+
+**Regenerable / local only (gitignored from the results repo):**
+
+| Path                                                    | What it is                                                                                                       |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `results/analysis/*.svg`                                | charts                                                                                                           |
+| `results/analysis/index.html`                           | landing page (status strip + section navigation)                                                                 |
+| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)                                                              |
+| `results/analysis/memory-{tot,releases}.html`           | memory line panels: session floor (absolute), createGlobalSession deltas, per-workload OWN memory (peak − floor) |
+| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                                                                            |
+| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages                                                             |
+| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                                       |
+| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
+| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
+
+---
+
+## Notes / caveats
+
+- **`parse` is sema-dominated:** `parseTranslationUnit` is cheap even for huge
+  files; use that timer (not `frontEndExecute`) for the pure-parse signal.
+- **Summed timers can exceed `compileInner`:** timers invoked many times
+  (e.g. `simplifyIR`) sum across invocations and the profiler is re-entrant;
+  compare such timers version-over-version, not as a fraction of the total.
+- **Cross-version error formats:** the runner recognizes both modern
+  (`error[E30015]:`) and legacy (`error 30015:`) slangc diagnostics.
+
+## Memory footprint
+
+Every sample also records the child process's **peak RSS** (`rss_kb`:
+`ru_maxrss` via `os.wait4` on POSIX, `PeakWorkingSetSize` via
+`GetProcessMemoryInfo` on Windows), and the api driver reports the RSS
+delta across its **first** `createGlobalSession` (`[MEM]` output lines,
+parsed into the record's `memory` dict) — the cold-session footprint of
+#9817. **Everything is stored; only the meaningful set is shown**: raw
+peak RSS lands in results.json for every workload (deep dives never need
+a re-bench), but `analyze.canonical_runs` promotes memory into the
+tracked counter series (`peakRssKb`,
+`apiCreateGlobalSessionRssDeltaKb`) only for workloads the manifest
+flags with `track_memory` — the realistic end-to-end workloads
+(`mdl_dxr`, `rt_renderer`, `rt_renderer_specialize`; the rt api-driver
+runs also carry the createGlobalSession RSS delta) plus **one floor per
+execution mode** — because most workloads' peaks are floor-bound and
+would just re-draw the floor across dozens of panels and alert series.
+The tracked series
+feed the nightly trend check (1 MiB absolute floor, same ratio gate)
+and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
+kilobytes from rendering as milliseconds.
+
+**Two floors, not one.** A process peak is only comparable against a
+baseline measured from the _same executable_, and `build_commands` runs
+target-mode workloads as `slangc` but api-mode workloads as the separate
+`api-driver` binary. So `minimal` (an empty-shader compile, the #9817
+headline) is the floor for target-mode workloads and
+`api_session_create` (create + destroy a session, nothing else) is the
+floor for api-mode ones; `report.MEMORY_FLOOR` maps mode to floor and
+`report.floor_workload_for` resolves it per workload. Subtracting the
+slangc floor from an api-driver peak would fold the two binaries'
+differing startup cost into the workload's own-memory curve, so a change
+in either baseline would read as a workload regression.
+
+**The RSS reader checks itself before it is trusted.** `currentRssKb` in
+`native/api-driver.cpp` has three platform branches and is compiled ad
+hoc by `bench.py`, so it never reaches the `tests/` harness and
+`check-python-core` (Python-only, Linux-only) cannot see it either. Its
+plausible failures are silent _scalings_ — a dropped
+`sysconf(_SC_PAGESIZE)` multiply, a bytes-vs-KB divide on the wrong
+side, a reader returning address space instead of resident memory — and
+each of those charts a believable curve rather than raising anything.
+So `build_api_driver` runs `api-driver --selfcheck-mem` immediately
+after compiling: it measures the reader against a 64 MiB touched
+allocation (catching the 1024×/4096× errors) and a 512 MiB untouched one
+(catching address-space-vs-resident), and a driver that fails is
+discarded like a missing one. Measuring a known allocation is what keeps
+this independent of Slang — a plausibility band on the session footprint
+would just hardcode a guess a real memory optimization could falsify.
+
+The site presents memory on `memory-{tot,releases}.html` as a compact
+dashboard of line panels — the session floors (the absolute charts),
+the createGlobalSession delta, then each tracked workload's OWN memory
+(its peak minus the same point's floor for its mode, the pure workload
+signal) — because memory components do not tile a total and a stacked
+area would lie.

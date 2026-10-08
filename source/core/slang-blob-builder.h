@@ -95,7 +95,7 @@ private:
     MemoryArena& _getArena() { return _arena; }
 
     Size _calcSizeAndSetCachedChunkOffsets();
-    Size _writeChunksTo(Stream* stream);
+    Size _writeChunksTo(Stream* stream, Size totalBlobSize);
 };
 
 /// A chunk is a logically contiguous unit, such that data can
@@ -208,6 +208,23 @@ public:
         _writeRelativePtr(targetChunk, sizeof(T));
     }
 
+    /// Write a field holding the total size, in bytes, of the finished blob.
+    ///
+    /// The total size is not known until every chunk has been laid out, so the
+    /// bytes are filled in when the blob is written out, the same way a relative
+    /// pointer is. This lets a format put a self-describing size in a header at
+    /// the front of the blob.
+    ///
+    /// The type parameter `T` determines the width of the field (either 4 or 8
+    /// bytes). As with `writeData()`, this does not adjust the alignment of the
+    /// chunk.
+    ///
+    template<typename T>
+    void writeTotalBlobSize()
+    {
+        _writeTotalBlobSize(sizeof(T));
+    }
+
     /// Append the contents of another chunk to this one.
     ///
     /// This *moves* all of the contents of `chunk` into `this`.
@@ -274,13 +291,15 @@ private:
     void _setCachedOffset(Size offset) { _cachedOffset = offset; }
 
     void _writeRelativePtr(ChunkBuilder* targetChunk, Size ptrSize);
+    void _writeTotalBlobSize(Size fieldSize);
 
     ShardBuilder* _createDataShard(void const* data, Size size);
     ShardBuilder* _createRelativePtrShard(ChunkBuilder* targetChunk, Size ptrSize);
+    ShardBuilder* _createTotalBlobSizeShard(Size fieldSize);
 
     ShardBuilder* _prefixShard = nullptr;
 
-    void _writeTo(Stream* stream);
+    void _writeTo(Stream* stream, Size totalBlobSize);
 
     void _addPrefixRelativePtr(ChunkBuilder* targetChunk, Size ptrSize);
 };
@@ -306,11 +325,15 @@ public:
     // * Shards that represent a relative pointer to some chunk,
     //   which cannot have their exact binary value determined
     //   until the offsets of chunk/shards have been finalized.
+    //
+    // * Shards that hold the total size of the blob, which likewise
+    //   is not known until every chunk has been laid out.
 
     enum class Kind
     {
         Data,
         RelativePtr,
+        TotalBlobSize,
     };
 
     Size getSize() const { return _size; }
@@ -323,7 +346,7 @@ private:
     friend class ChunkBuilder;
     ShardBuilder(Kind kind);
 
-    void _writeTo(Stream* stream, Size selfOffset);
+    void _writeTo(Stream* stream, Size selfOffset, Size totalBlobSize);
 
     /// Kind of this shard (data or relative pointer)
     Kind _kind = Kind::Data;

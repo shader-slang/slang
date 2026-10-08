@@ -1,10 +1,11 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-filesystem.cpp
 // Comprehensive tests for file system replay functionality
 
 #include "unit-test-replay-common.h"
 
 // Only this file uses MutableFileSystemProxy
-#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
+#include "slang-record-replay/proxy/proxy-mutable-file-system.h"
 
 // =============================================================================
 // File System Proxy Tests - ISlangFileSystem interface
@@ -751,3 +752,4 @@ SLANG_UNIT_TEST(replayFileSystemProxyLargeFile)
     // Clean up
     ctx().reset();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

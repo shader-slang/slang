@@ -1,0 +1,124 @@
+# Uncovered diagnostic codes — bucket 4 of 5
+# 121 codes in this bucket. Range 40013..100005.
+# code	severity	name	message
+40013	err	arg-is-not-constexpr	argument is not a compile-time constant
+40014	note	invisible-overload-candidate	candidate (invisible): ~candidate
+40015	note	more-overload-candidates	~count:Int more overload candidates
+40016	warning	integer-constant-overflow	integer constant overflow in conversion
+40020	err	cannot-unroll-loop	loop unrolling failed
+41000	warning	unreachable-code	unreachable code detected
+41001	err	recursive-type	type contains cyclic reference
+41002	err	cyclic-interface-dependency	interface has cyclic dependency on itself
+41003	err	circular-conformance	type contains circular reference through conforming interface
+41009	err	missing-return-error	non-void function must return
+41011	err	profile-incompatible-with-target-switch	__target_switch has no compatible target
+41012	warning	profile-implicitly-upgraded	profile implicitly upgraded
+41014	err	type-cannot-be-packed-into-any-value	type cannot be packed for dynamic dispatch
+41015	warning	using-uninitialized-out	use of uninitialized out parameter
+41016	warning	using-uninitialized-variable	use of uninitialized variable
+41017	warning	using-uninitialized-global-variable	use of uninitialized global variable
+41018	warning	returning-with-uninitialized-out	returning without initializing out parameter
+41019	err	type-does-not-fit-any-value-size	type does not fit in size required by interface
+41020	warning	constructor-uninitialized-field	exiting constructor without initializing field
+41021	warning	field-not-default-initialized	default initializer will not initialize field
+41022	err	loss-of-derivative-due-to-call-of-non-differentiable-function	derivative cannot be propagated through non-differentiable call
+41023	err	get-string-hash-must-be-on-string-literal	getStringHash requires string literal
+41025	err	loss-of-derivative-using-non-differentiable-location-as-out-arg	derivative is lost passing non-differentiable location
+41026	warning	switch-fallthrough-restructured	switch fall-through will be restructured
+41027	err	accessing-value-of-none-optional	accessing .value on an Optional that is always none
+41028	err	cannot-default-initialize-struct-with-uninitialized-resource	cannot default-initialize struct with uninitialized resource
+41029	err	cannot-default-initialize-struct-containing-resources	cannot default-initialize struct containing resource fields
+41031	err	loss-of-derivative-assigning-to-non-differentiable-location	derivative is lost during assignment
+41032	err	cannot-default-initialize-resource	cannot default-initialize resource type
+41033	warning	using-uninitialized-value	use of uninitialized value
+41034	warning	operator-shift-on-narrow-type	left shift on narrow integer type
+41201	warning	expect-dynamic-uniform-argument	argument might not be dynamic uniform
+41202	err	not-equal-bit-cast-size	bit_cast size mismatch
+41203	warning	expect-dynamic-uniform-value	value must be dynamic uniform
+41204	err	bit-cast-to-non-concrete-type	cannot bit-cast to existential (non-concrete) type
+41300	err	byte-address-buffer-unaligned	invalid byte address buffer alignment
+41400	err	static-assertion-failure	static assertion failed
+41401	err	static-assertion-failure-without-message	static assertion failed
+41402	err	static-assertion-condition-not-constant	static assertion condition not compile-time constant
+41403	err	invalid-atomic-destination-pointer	invalid atomic destination
+41404	err	multi-sampled-texture-does-not-allow-writes	cannot write to multisampled texture
+41901	err	unsupported-use-of-l-value-for-auto-diff	unsupported L-value for auto differentiation
+42001	err	invalid-use-of-torch-tensor-type-in-device-func	TorchTensor not allowed in device functions
+42050	warning	potential-issues-with-prefer-recompute-on-side-effect-method	[PreferRecompute] on function with side effects
+45001	err	unresolved-symbol	unresolved external symbol
+45100	warning	coverage-buffer-reserved-name	`__slang_coverage` is reserved by `-trace-coverage`
+45101	err	coverage-binding-collision	`-trace-coverage-binding` collides with an existing parameter
+45102	warning	coverage-target-not-supported	`-trace-coverage` is not supported on this target; coverage instrumentation skipped
+45103	err	coverage-binding-exhausted	could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0
+45104	err	coverage-pass-through-incompatible	`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation
+45105	err	coverage-uniform-layout-unavailable	could not resolve the CPU/CUDA uniform layout for `__slang_coverage`
+45106	err	coverage-binding-option-out-of-range	coverage binding option value is out of range
+45107	warning	coverage-reserved-space-ignored	`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces
+49999	err	unknown-system-value-semantic	unknown system-value semantic
+50000	err	cooperative-matrix-unsupported-element-type	unsupported element type for cooperative matrix
+50001	err	cooperative-matrix-invalid-shape	invalid shape for cooperative matrix
+50002	err	cooperative-matrix-invalid-mma-type-combination	invalid type combination for cooperative matrix multiply-add
+50011	warning	spirv-version-not-supported	SPIR-V version too old
+50060	err	invalid-mesh-stage-output-topology	invalid mesh output topology
+50100	err	no-type-conformances-found-for-interface	no type conformances found
+50101	err	dynamic-dispatch-on-potentially-uninitialized-existential	cannot dispatch on uninitialized interface
+50102	note	dynamic-dispatch-code-generated-here	generated dynamic dispatch code for this site. ~count:Int possible types: '~types'
+50103	note	specialized-dynamic-dispatch-code-generated-here	generated specialized dynamic dispatch code for this site. ~count:Int possible types: '~types'. specialization arguments: '~specArgs'.
+50104	err	interface-typed-entry-point-param-not-supported	interface-typed entry point parameter not supported
+52000	err	multi-level-break-unsupported	multi-level break not supported
+52001	warning	dxil-not-found	dxil library not found
+52002	err	pass-through-compiler-not-found	pass-through compiler not found
+52003	err	cannot-disassemble	cannot disassemble
+52004	err	unable-to-write-file	unable to write file
+52005	err	unable-to-read-file	unable to read file
+52006	err	compiler-not-defined-for-transition	compiler not defined for transition
+52008	err	dynamic-dispatch-on-specialize-only-interface	dynamic dispatch on specialize-only type
+52009	err	cannot-emit-reflection-without-target	cannot emit reflection JSON
+52010	err	ref-param-with-interface-type-in-dynamic-dispatch	ref parameter incompatible with dynamic dispatch
+52012	err	ref-accessor-with-interface-type-in-dynamic-dispatch	ref accessor incompatible with dynamic dispatch
+54001	warning	mesh-output-must-be-out	mesh output must be out
+54002	err	mesh-output-must-be-array	mesh output must be array
+54003	err	mesh-output-array-must-have-size	mesh output array must have size
+54004	warning	unnecessary-hlsl-mesh-output-modifier	unnecessary mesh output modifier
+54005	err	cannot-read-from-mesh-shader-output	cannot read values from mesh shader outputs
+54006	err	invalid-parameter-passing-mode-for-write-only-reference	Parameter passing mode requires reading a write-only value.
+55101	err	invalid-torch-kernel-return-type	invalid pytorch kernel return type
+55102	err	invalid-torch-kernel-param-type	invalid pytorch kernel parameter type
+55200	err	unsupported-builtin-type	unsupported builtin type
+55202	err	system-value-attribute-not-supported	system value semantic not supported
+55203	err	system-value-type-incompatible	system value type mismatch
+55204	err	unsupported-target-intrinsic	unsupported intrinsic operation
+55205	err	unsupported-specialization-constant-for-num-threads	specialization constants not supported for numthreads
+55208	err	unsupported-coop-mat-element-type-for-hlsl	unsupported cooperative matrix element type for HLSL
+55209	err	unsupported-coop-mat-scope-for-hlsl	unsupported cooperative matrix scope for HLSL
+56001	err	unable-to-auto-map-cuda-type-to-host-type	CUDA type mapping failed
+56002	err	attempt-to-query-size-of-unsized-array	cannot get size of unsized array
+56101	err	resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal	ConstantBuffer with resource types in ParameterBlock not supported on Metal
+56102	err	division-by-matrix-not-supported	division by matrix not supported
+56103	err	int16-not-supported-in-wgsl	16-bit integers not supported in WGSL
+56104	err	assign-to-ref-not-supported	mesh output must be assigned as whole struct
+56105	err	array-of-resource-type-not-supported-in-wgsl	array of resource types not supported in WGSL
+56106	err	storage-texture-access-mode-not-supported-in-wgsl	texture format '~format' does not support '~accessMode' access for storage textures in WGSL
+56107	warning	multisampled-subpass-input-not-supported-on-metal	Metal does not support per-sample SubpassLoad; the sample index will be ignored
+56108	err	subpass-input-used-outside-entry-point	SubpassInput used outside of the fragment entry point function
+56109	err	subpass-input-in-parameter-block-not-allowed-on-metal	SubpassInput in ParameterBlock not supported on Metal
+57001	warning	spirv-opt-failed	spirv-opt optimization failed
+57002	err	unknown-patch-constant-parameter	unknown patch constant parameter
+57003	err	unknown-tess-partitioning	unknown tessellation partitioning
+57004	err	output-spv-is-empty	SPIR-V output contains no exported symbols
+58001	err	entry-point-must-return-void-when-global-output-present	entry point must return void with global outputs
+58002	err	unhandled-glsl-ssbo-type	unhandled GLSL SSBO contents
+58003	err	inconsistent-pointer-address-space	inconsistent pointer address space
+81110	err	nvapi-macro-mismatch	conflicting NVAPI macro definitions
+81111	err	opaque-reference-must-resolve-to-global	cannot determine register/space for NVAPI resource
+90001	warning	ignored-documentation-on-overload-candidate	documentation comment on overload candidate ignored
+99996	note	note-failed-to-load-dynamic-library	failed to load dynamic library '~path'
+99997	err	compilation-aborted-due-to-exception	Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)
+99998	err	compilation-aborted	Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)
+99999	note	noteLocationOfInternalError	an internal error threw an exception while working on code near this location
+100000	error	downstreamNameNotKnown	downstream tool name not known, allowed names are $0
+100001	error	expectedArgumentForOption	expected an argument for command-line option '$0'
+100002	error	unbalancedDownstreamArguments	unbalanced downstream arguments
+100003	error	closeOfUnopenDownstreamArgs	close of an unopen downstream argument scope
+100004	error	downstreamToolNameNotDefined	downstream tool name not defined
+100005	error	invalidArgumentForOption	invalid argument format for command-line option '$0'

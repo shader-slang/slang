@@ -3,37 +3,55 @@ module network;
 import common;
 import mlp;
 
+// CoopVec lane reads are not natively differentiable, so provide the reverse rule needed to
+// convert the network output to a conventional array.
+internal NFloat[N] coopVecToArray<let N : int>(CoopVec<NFloat, N> value)
+{
+    NFloat[N] result;
+    [ForceUnroll]
+    for (int i = 0; i < N; i++)
+        result[i] = value[i];
+    return result;
+}
+
+[BackwardDerivativeOf(coopVecToArray)]
+internal void coopVecToArrayBwd<let N : int>(
+    inout DifferentialPair<CoopVec<NFloat, N>> value,
+    NFloat[N] resultGrad)
+{
+    CoopVec<NFloat, N> valueGrad;
+    [ForceUnroll]
+    for (int i = 0; i < N; i++)
+        valueGrad[i] = resultGrad[i];
+    value = diffPair(value.p, valueGrad);
+}
+
 public struct MyNetwork
 {
     public FeedForwardLayer<4, 16> layer1;
     public FeedForwardLayer<16, 4> layer2;
 
     [Differentiable]
-    internal MLVec<4> encodeInput(NFloat x, NFloat y)
+    internal CoopVec<NFloat, 4> encodeInput(NFloat x, NFloat y)
     {
-        return MLVec<4>.fromArray({
-                x,
-                y,
-                x*x,
-                y*y,
-            });
+        return CoopVec<NFloat, 4>(x, y, x * x, y * y);
     }
 
     [Differentiable]
-    internal MLVec<4> _eval(NFloat x, NFloat y)
+    internal CoopVec<NFloat, 4> _eval(NFloat x, NFloat y)
     {
         let encoding = encodeInput(x, y);
         let layer1Output = layer1.eval(encoding);
-        let leyer2Output = layer2.eval(layer1Output);
-        return leyer2Output;
+        let layer2Output = layer2.eval(layer1Output);
+        return layer2Output;
     }
 
     [Differentiable]
     public half4 eval(no_diff NFloat x, no_diff NFloat y)
     {
-        let mlv = _eval(x, y);
-        let arr = mlv.toArray();
-        return half4(arr[0], arr[1], arr[2], arr[3]);
+        let result = _eval(x, y);
+        let resultArray = coopVecToArray(result);
+        return half4(resultArray[0], resultArray[1], resultArray[2], resultArray[3]);
     }
 }
 
@@ -55,4 +73,3 @@ public half4 groundtruth(half x, half y)
         x + 0.5 * y * y,
     };
 }
-

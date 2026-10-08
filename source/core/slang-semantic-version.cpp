@@ -1,7 +1,7 @@
 // slang-semantic-version.cpp
 #include "slang-semantic-version.h"
 
-#include "../core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "slang-com-helper.h"
 
 namespace Slang

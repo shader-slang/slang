@@ -11,6 +11,21 @@
 namespace Slang
 {
 
+// Returns true if the `argIndex`-th parameter of `call`'s callee is passed with
+// copy-in/out (`out`/`inout`) semantics. Such an argument may be bridged through a
+// `function`-space temporary, whereas a `ref`/borrow parameter aliases the caller's
+// object (e.g. `workgroupUniformLoad` on groupshared memory) and must receive the
+// real pointer. Returns false when the callee signature is unavailable, so an
+// argument of unknown mode is left untouched.
+static bool paramHasCopyInOutSemantics(IRCall* call, UInt argIndex)
+{
+    auto funcType = as<IRFuncType>(call->getCallee()->getFullType());
+    if (!funcType || argIndex >= funcType->getParamCount())
+        return false;
+    auto paramType = funcType->getParamType(argIndex);
+    return as<IROutParamType>(paramType) || as<IRBorrowInOutParamType>(paramType);
+}
+
 static void legalizeCall(IRCall* call)
 {
     // WGSL does not allow forming a pointer to a sub part of a composite value.
@@ -43,16 +58,29 @@ static void legalizeCall(IRCall* call)
         auto ptrType = as<IRPtrTypeBase>(arg->getDataType());
         if (!ptrType)
             continue;
-        switch (arg->getOp())
-        {
-        case kIROp_Var:
-        case kIROp_Param:
-        case kIROp_GlobalParam:
-        case kIROp_GlobalVar:
+
+        auto argOp = arg->getOp();
+
+        // A by-ref `Param` and a block-local `Var` are already in the `function` address
+        // space, so they can be passed to a `ptr<function, T>` parameter directly.
+        if (argOp == kIROp_Param)
             continue;
-        default:
-            break;
+        if (argOp == kIROp_Var && as<IRBlock>(arg->getParent()))
+            continue;
+
+        // A module-scope object (`GlobalVar`/`GlobalParam`, or a `Var` outside a block)
+        // lives in a module-scope space such as `private`. Passing it directly to a
+        // `ptr<function, T>` (`out`/`inout`) parameter is the address-space mismatch WGSL
+        // rejects (#12173), so bridge it through the copy-in/out temp below. A `ref`/borrow
+        // parameter instead aliases the caller's real object (e.g. `workgroupUniformLoad`
+        // on groupshared memory), so it must keep receiving that object directly.
+        if (argOp == kIROp_Var || argOp == kIROp_GlobalVar || argOp == kIROp_GlobalParam)
+        {
+            if (!paramHasCopyInOutSemantics(call, i))
+                continue;
         }
+        // Otherwise the argument is a pointer to a sub-part of a composite value (e.g.
+        // `s.x`), which WGSL cannot address directly — bridge it unconditionally, as before.
 
         // Create a local variable to hold the input argument.
         auto var = builder.emitVar(ptrType->getValueType(), AddressSpace::Function);

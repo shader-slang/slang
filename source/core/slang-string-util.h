@@ -186,18 +186,66 @@ struct StringUtil
     static bool areLinesEqual(const UnownedStringSlice& a, const UnownedStringSlice& b);
 
     /// Convert in to int. Returns SLANG_FAIL on error
+    ///
+    /// The format is one of:
+    ///
+    ///    ["+" | "-"] <dec_digit>+
+    ///    ["+" | "-"] ("0x" | "0X") <hex_digit>+
+    ///
+    /// E.g.: `123`, `+123`, `-123`, `0x123ABC`, `+0x123ABC`, `-0x123ABC`
+    ///
+    /// It is a failure if `in` contains non-digit characters after the number.
     static SlangResult parseInt(const UnownedStringSlice& in, Int& outValue);
 
     /// Convert ioText into double. Returns SLANG_OK on success.
     static SlangResult parseDouble(const UnownedStringSlice& text, double& out);
 
     /// Convert into int64_t. Returns SLANG_OK on success.
+    ///
+    /// Same format as parseInt(). It is a failure if `text` contains non-digit
+    /// characters after the number.
     static SlangResult parseInt64(const UnownedStringSlice& text, int64_t& out);
 
-    /// Parse an integer from text starting at pos until the end or the first non-digit char.
-    /// Modifies pos to the position where parsing ends.
-    /// Returns parsed integer.
+    /// Parse a decimal integer from text starting at pos.
+    ///
+    /// The format is:
+    ///
+    ///    (" ")* ["-"] <dec_digit>+
+    ///
+    /// Trailing characters are not an error. Parsing stops at the first
+    /// non-digit and leaves `pos` on it. For example, `" 12ab"` returns 12 with
+    /// `pos` on the `a`. `pos` advances over everything consumed even when no
+    /// number is found, so `" -x"` returns 0 with `pos` on the `x`.
+    ///
+    /// Note that this function returns 0 on error. However, 0 is also a valid
+    /// return value.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
+
+    /// Format `value` as a C99 hexadecimal floating-point literal. The output
+    /// is a minimal string, with the following format:
+    ///
+    /// - value  0.0:  0x0p+0
+    /// - value -0.0: -0x0p+0
+    /// - non-zero finite value: (-)?0x1p[+-]N or (-)?0x1.xxxxxp[+-]N where the last 'x'
+    ///   is non-zero. Examples: 0x1p-100, 0x1.fedcba9876p+54
+    /// - infinite value: (-)?inf
+    /// - not-a-number: nan
+    ///
+    static String makeMinimalHexFloat(double value);
+
+    /// Compute the Levenshtein edit distance between `a` and `b`: the minimum number of
+    /// single-character insertions, deletions, or substitutions needed to turn one string
+    /// into the other. Used, for example, to suggest the closest known identifier for a
+    /// misspelled name ("did you mean ...?"). The comparison is case-sensitive; use
+    /// `calcLevenshteinDistanceCaseInsensitive` (or lower-case the inputs beforehand) for a
+    /// case-insensitive distance.
+    static Index calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
+    /// Like `calcLevenshteinDistance`, but folds characters with `CharUtil::toLower` during
+    /// the comparison, so it does not allocate lower-cased copies of the inputs.
+    static Index calcLevenshteinDistanceCaseInsensitive(
+        const UnownedStringSlice& a,
+        const UnownedStringSlice& b);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses

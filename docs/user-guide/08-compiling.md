@@ -194,11 +194,35 @@ Slang supports multiple file-name extensions for input files, but the most commo
 
 If multiple source files are passed to `slangc`, they will be grouped into translation units using the following rules:
 
-* If there are any `.slang` files, then all of them will be grouped into a single translation unit
+* If there are any `.slang` files, then all of them will be grouped into a single translation unit.
 
 * Each `.hlsl` file will be grouped into a distinct translation unit of its own.
 
+* Each GLSL file (`.glsl`, `.vert`, `.frag`, `.geom`, `.tesc`, `.tese`, `.comp`, `.mesh`, `.task`, `.rgen`, `.rint`, `.rahit`, `.rchit`, `.rmiss`, or `.rcall`) will be grouped into a distinct translation unit of its own.
+
 * Each `.slang-module` file forms its own translation unit.
+
+Every translation unit has one effective source language.
+An explicit `-lang` option selects that language for the following input files; otherwise, `slangc` infers it from each file-name extension.
+Primary source files grouped into one translation unit must agree on the inferred language unless `-lang` resolves the disagreement.
+Because a file-name extension is only an inferred default, an explicit source-language selection intentionally overrides a mismatching extension without a diagnostic.
+
+A Slang `#language` directive or GLSL `#version` directive is expected to agree with the translation unit's selected language.
+For backward compatibility, the compiler currently warns and honors a conflicting source directive before parsing the translation unit.
+Code should not rely on this override: select the intended language with `-lang` or an appropriate file-name extension, and use `#language` only to select a Slang language version.
+
+The command-line tool may infer a default output target from the language known before preprocessing.
+That convenience inference does not account for a later compatibility override from `#language` or `#version`, so invocations using such an override should specify `-target` explicitly.
+
+The deprecated `-allow-glsl` option is a request-wide compatibility spelling that forces every input translation unit to use GLSL.
+New invocations should use a GLSL file-name extension or `-lang glsl` for each GLSL input instead.
+If `-allow-glsl` is combined with an explicit non-GLSL selection for a translation unit, the compiler warns about the conflicting requests and the compatibility option takes precedence.
+
+An `import glsl;` declaration is not a source-language selector.
+In legacy Slang source it imports GLSL declarations and preserves historical GLSL operator behavior without enabling GLSL syntax.
+This compatibility path is not available in Slang 202c or later.
+In HLSL source the import is accepted for compatibility, but produces a warning because it adds GLSL declarations and operator rules to HLSL source without enabling GLSL syntax.
+GLSL source imports the builtin `glsl` module implicitly, so an explicit `import glsl;` there is redundant.
 
 To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
 
@@ -301,6 +325,7 @@ When used, `option` is not interpreted by GCC, but is passed to the linker once 
 * `gcc` - GCC C/C++ compiler
 * `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
 * `nvrtc` - NVRTC CUDA compiler
+* `spirv-opt` - spirv-tools SPIRV optimizer
 
 The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example, to send an option `-Gfa` through to DXC you can use:
 
@@ -349,6 +374,14 @@ And the linker would see (as passed through by GCC):
 ```
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+Arguments passed via `-Xspirv-opt` are forwarded to the SPIRV-Tools optimizer as additional passes, registered on top of the passes selected by the `-O<level>` preset (they add to that level, they do not replace it). For example, to strip debug information in addition to the `-O1` passes:
+
+```
+-target spirv -O1 -Xspirv-opt --strip-debug
+```
+
+The accepted flags are the pass-selection flags of the `spirv-opt` command-line tool (for example `--strip-debug`, `--eliminate-dead-code-aggressive`, `-O`, `-Os`) — those recognized by SPIRV-Tools' `RegisterPassesFromFlags`. The full set is documented by the `spirv-opt` tool itself (see [`tools/opt/opt.cpp`](https://github.com/KhronosGroup/SPIRV-Tools/blob/main/tools/opt/opt.cpp) in the SPIRV-Tools repository, or run `spirv-opt --help`). Driver-level `spirv-opt` options that do not select a pass (such as `--target-env` or `--validate-after-all`) are not supported. An unrecognized flag is reported by SPIRV-Tools and the compilation fails. The selected passes run in addition to the `-OX` preset; because they are requested explicitly, they run even under `-O0` (which has no preset of its own, so only the selected passes run). They currently apply to the default direct SPIR-V path; they are not forwarded on the `-emit-spirv-via-glsl` path.
 
 NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
@@ -651,6 +684,22 @@ if (coopMeta)
     }
 }
 ```
+
+### Experimental Standard Modules
+
+Some standard-library APIs are packaged as experimental modules. A shader must enable
+experimental features before importing one of these modules, for example with
+`slangc -experimental-feature`.
+
+The work graph APIs are available from:
+
+```slang
+import experimental.workgraph;
+```
+
+`experimental.workgraph` provides work graph node attributes, record types, and barrier
+helpers for HLSL Shader Model 6.8 work graph shaders. The module is experimental and the API
+surface may change before it is stabilized.
 
 ## Using the Compilation API
 
@@ -1047,6 +1096,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
+| EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1054,12 +1104,14 @@ meanings of their `CompilerOptionValue` encodings.
 | Target             | Specifies the target format. Has same effect as setting TargetDesc::format. |
 | WarningsAsErrors   | Specifies a list of warnings to be treated as errors. `stringValue0` encodes a comma separated list of warning codes or names, or can be "all" to indicate all warnings. |
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
+| DisableNotes       | Specifies a list of notes to disable. `stringValue0` encodes comma separated list of note codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
+| WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected. |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
-| Capability | Specify an additional capability available in the compilation target. `intValue0` encodes a capability defined in the `CapabilityName` enum. |
+| Capability | Specify an additional capability available in the compilation target. Can be a string or int value kind. `stringValue0` encodes the capability name as listed in [Capability Atoms](a4-02-reference-capability-atoms.md). `intValue0` encodes the raw capability representation returned by `IGlobalSession::findCapability`. |
 | DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
 | DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
 | DisableSpecialization | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting. |
@@ -1087,16 +1139,58 @@ meanings of their `CompilerOptionValue` encodings.
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
-| UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
+| UseUpToDateBinaryModule | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
-| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries. |
 | SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVUnifiedDescriptorHeapStride | When generating SPIR-V with `spvDescriptorHeapEXT`, emits each resource descriptor-heap runtime array's `ArrayStride` as the maximum of the image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default `OpConstantSizeOfEXT` path (used when `SPIRVResourceHeapStride` is 0); mutually exclusive with a non-zero `SPIRVResourceHeapStride` (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. `intValue0` specifies a bool value for the setting. |
 | ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+
+### Backwards Compatibility Option for Legacy HLSL
+
+For HLSL inputs, `-Gec` enables additional backwards-compatibility features for legacy HLSL.
+The equivalent API option is `CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility`.
+The option currently enables uniform parameter temporaries; additional legacy HLSL behaviors may be added in the future.
+It has no effect on Slang or GLSL inputs.
+
+#### Uniform Parameter Temporaries
+
+With `-Gec`, file and namespace uniform parameters can be used as mutable temporaries within each shader invocation, subject to the same type restrictions as mutable `static` globals.
+For example:
+
+```hlsl
+uint x;
+cbuffer Settings { uint y; };
+
+void setValues(uint value)
+{
+    x = value;
+    y = value + 1;
+}
+```
+
+Each copy starts with the corresponding shader input's value for every entry-point invocation.
+Assignments and `out`/`inout` arguments update that private copy; they do not modify the constant buffer.
+Reflection continues to describe the original shader inputs and their bindings.
+Semantic checking enforces explicit `readonly` and `writeonly` qualifiers on the temporary or alias.
+
+The temporary has the parameter's type.
+For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
+This type selection also applies when the struct contains a resource.
+
+Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
+Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
+Reading these parameters with `-Gec` does not allocate mutable resource storage.
+A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
+If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
+Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
 

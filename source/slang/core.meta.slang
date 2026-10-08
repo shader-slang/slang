@@ -111,6 +111,42 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+//@hidden:
+// A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
+// that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
+// matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
+// `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
+// implement these by calling `min`/`max` on their own operands. That call is resolved when each
+// builtin conformance is checked, where the operand shape is known, so it binds the concrete
+// overload for that shape, which ranks above the generic ones that would call back into
+// `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
+// and the same per-element code as a direct call on cpp/cuda.
+//
+// `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
+// defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a
+// type ordered as a whole. The builtin types override them: vectors and matrices are
+// component-wise, and scalars keep each target's own `min`/`max`, including its NaN handling, which
+// a `lessThan` comparison does not match. A user `IFloat`/`IInteger` type therefore needs no new
+// members. The requirements live here rather than in `IComparable` so that a type conforming only
+// to `IComparable` gains no new requirements and `IComparable` stays a pure ordering interface.
+interface __IMinMax : IComparable
+{
+    This __min(This other)
+    {
+        if (this.lessThan(other))
+            return this;
+        return other;
+    }
+
+    This __max(This other)
+    {
+        if (this.lessThan(other))
+            return other;
+        return this;
+    }
+}
+//@public:
+
 /// Represents types that has a defined range of values.
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
@@ -248,7 +284,7 @@ interface ILogical : IComparable
 /// }
 /// ```
 ///
-interface IInteger : IArithmetic, ILogical
+interface IInteger : IArithmetic, ILogical, __IMinMax
 {
     /// Converts the value of the current instance to an `int`.
     /// @return The converted `int` value.
@@ -301,7 +337,7 @@ interface IInteger : IArithmetic, ILogical
 /// }
 /// ```
 ///
-interface IFloat : IArithmetic, IDifferentiable
+interface IFloat : IArithmetic, IDifferentiable, __IMinMax
 {
     /// Initializes a value of the conforming type form a `float`.
     [Differentiable]
@@ -343,10 +379,41 @@ interface IFloat : IArithmetic, IDifferentiable
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
+// Interface for value types that support arithmetic through IArithmetic-style methods
+// and can expose those methods as differentiable operations.
+interface IDifferentiableArithmetic : IArithmetic, IDifferentiable
+{
+    [Differentiable]
+    This add(This other);
+
+    [Differentiable]
+    This sub(This other);
+
+    [Differentiable]
+    This mul(This other);
+
+    [Differentiable]
+    This div(This other);
+
+    [Differentiable]
+    This neg();
+}
+
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
 interface __BuiltinType
+{
+}
+
+/// A compiler-supported, non-void scalar representation.
+///
+/// Implemented by `bool`, the builtin signed and unsigned integer scalar types, and the `half`,
+/// `float`, and `double` types. This sealed marker supports representation-level dispatch such as
+/// compiler-defined casts; it does not imply any particular mathematical capabilities.
+[sealed]
+[builtin]
+interface __BuiltinScalarType : __BuiltinType
 {
 }
 
@@ -355,7 +422,7 @@ interface __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -363,7 +430,7 @@ interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 /// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType, ILogical
+interface __BuiltinLogicalType : __BuiltinScalarType, ILogical
 {
 }
 
@@ -481,9 +548,9 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     associatedtype Differential : IDifferentiable
 ///         where Differential.Differential == Differential;
 ///
-///     static Differential dzero();
+///     [Differentiable] static Differential dzero();
 ///
-///     static Differential dadd(Differential, Differential);
+///     [Differentiable] static Differential dadd(Differential, Differential);
 /// }
 /// ```
 ///
@@ -542,24 +609,26 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     // Specify that `MyRay.Differential` is `MyRayDifferential`.
 ///     typealias Differential = MyRayDifferential;
 ///
-///     // Specify that the derivative for `origin` will be stored in `MayRayDifferential.d_origin`.
-///     [DerivativeMember(MayRayDifferential.d_origin)]
+///     // Specify that the derivative for `origin` will be stored in `MyRayDifferential.d_origin`.
+///     [DerivativeMember(MyRayDifferential.d_origin)]
 ///     float3 origin;
 ///
-///     // Specify that the derivative for `dir` will be stored in `MayRayDifferential.d_dir`.
-///     [DerivativeMember(MayRayDifferential.d_dir)]
+///     // Specify that the derivative for `dir` will be stored in `MyRayDifferential.d_dir`.
+///     [DerivativeMember(MyRayDifferential.d_dir)]
 ///     float3 dir;
 ///
 ///     // This is a non-differentiable field so we don't put any attributes on it.
 ///     int nonDifferentiablePayload;
 ///
 ///     // Define zero derivative.
+///     [Differentiable]
 ///     static MyRayDifferential dzero()
 ///     {
 ///         return {float3(0.0), float3(0.0)};
 ///     }
 ///
 ///     // Define the add operation of two derivatives.
+///     [Differentiable]
 ///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
 ///     {
 ///         MyRayDifferential result;
@@ -573,7 +642,11 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
 /// corresponding field in the `Differential` type, so the compiler knows how to access the derivative for the field.
 ///
-/// However, there is still a missing piece in the above code: we also need to make `MyRayDifferential` conform to `IDifferentiable` because it is required that the `Differential` of a type must itself be `Differential`. Again we can use automatic fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
+/// However, there is still a missing piece in the above code: we also need to make
+/// `MyRayDifferential` conform to `IDifferentiable` because it is required that
+/// the `Differential` of a type must itself be `IDifferentiable`, and that
+/// `Differential.Differential == Differential`. Again we can use automatic
+/// fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
 /// ```csharp
 /// struct MyRayDifferential : IDifferentiable
 /// {
@@ -590,28 +663,31 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// {
 ///     typealias Differential = MyRayDifferential;
 ///
-///    [DerivativeMember(MyRayDifferential.d_origin)]
-///    float3 d_origin;
+///     [DerivativeMember(MyRayDifferential.d_origin)]
+///     float3 d_origin;
 ///
-///    [DerivativeMember(MyRayDifferential.d_dir)]
-///    float3 d_dir;
+///     [DerivativeMember(MyRayDifferential.d_dir)]
+///     float3 d_dir;
 ///
-///    static MyRayDifferential dzero()
-///    {
-///        return {float3(0.0), float3(0.0)};
-///    }
+///     [Differentiable]
+///     static MyRayDifferential dzero()
+///     {
+///         return {float3(0.0), float3(0.0)};
+///     }
 ///
-///    static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
-///    {
-///        MyRayDifferential result;
-///        result.d_origin = v1.d_origin + v2.d_origin;
+///     [Differentiable]
+///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
+///     {
+///         MyRayDifferential result;
+///         result.d_origin = v1.d_origin + v2.d_origin;
 ///         result.d_dir = v1.d_dir + v2.d_dir;
 ///         return result;
 ///     }
 /// }
 /// ```
-/// In this specific case, the automatically generated `IDifferentiable`
-/// implementation will be exactly the same as the manually written code listed above.
+/// In this specific case, the manually written `dzero` and `dadd` have the same
+/// value behavior as the automatically generated `IDifferentiable` implementation.
+/// When writing these requirements manually, include `[Differentiable]` as shown.
 ///
 ///
 __magic_type(DifferentiableType)
@@ -692,7 +768,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
@@ -709,10 +785,10 @@ __magic_type(BwdDiffFuncInterfaceType)
 [__FunctionInterface]
 interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType))
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType))
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
@@ -733,8 +809,8 @@ interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 ///     typealias Differential = DifferentialPair<T.Differential>;
 ///     property T p {get;}
 ///     property T.Differential d {get;}
-///     static Differential dzero();
-///     static Differential dadd(Differential a, Differential b);
+///     [Differentiable] static Differential dzero();
+///     [Differentiable] static Differential dadd(Differential a, Differential b);
 /// }
 /// ```
 ///
@@ -918,10 +994,13 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Represents types that provide a subscript operator so that they can be used like an immutable array.
+/// Represents types that provide a subscript operator so that they can be used like an immutable
+/// array.
 /// @param T The element type returned by the subscript operator.
-/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
-/// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `Buffer`,
+/// `StructuredBuffer`, and `RWStructuredBuffer` types.
+/// @example The following example shows how to define a generic function that computes the sum of
+/// all elements in an array-like type.
 /// ```csharp
 /// T sum<T:IFloat, U:IArray<T>>(U array)
 /// {
@@ -1263,6 +1342,8 @@ $}
         __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
         __intrinsic_op($(kIROp_IntCast)) uint toUInt();
         __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
+        [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+        [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 ${
         break;
 
@@ -1298,6 +1379,8 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
@@ -1313,7 +1396,7 @@ $}
         {
             return a + b;
         }
-        
+
 ${
         break;
     }
@@ -2058,7 +2141,12 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 //@public:
 
 /// Represents a string.
-/// This type can only be used on the CPU target.
+/// This type is backed by the Slang core runtime (`Slang::String`), which is
+/// available on host CPU targets (e.g. `-target host-cpp`) and the LLVM-backed
+/// CPU path (`-emit-cpu-via-llvm`). It is explicitly rejected when generating
+/// kernel C++/CUDA output (`-target cpp`, `-target cuda`, `-target ptx`); use
+/// `NativeString` (a null-terminated `const char*`) there instead. On other
+/// GPU/shader targets `String` is not a supported value type.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
@@ -2258,13 +2346,20 @@ struct vector : IRWArray<T>
 }
 
 //@hidden:
-static const int kRowMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR);
-static const int kColumnMajorMatrixLayout = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR);
+// The in-memory element order of a `matrix`. An enum rather than an `int` so that an
+// unresolved layout is still recognizable as a generic argument, where it sits beside
+// the row and column counts.
+enum MatrixLayoutMode : int
+{
+    Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN),
+    RowMajor = $(SLANG_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_MATRIX_LAYOUT_COLUMN_MAJOR),
+}
 
 //@public:
 /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 /// @category math_types Math types
-__generic<T = float, let R : int = 4, let C : int = 4, let L : int = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)>
+__generic<T = float, let R : int = 4, let C : int = 4, let L : MatrixLayoutMode = MatrixLayoutMode.Unknown>
 __magic_type(MatrixExpressionType)
 struct matrix : IRWArray<vector<T,C>>
 {
@@ -2330,6 +2425,8 @@ extension vector<T,N> : IInteger
     [__unsafeForceInlineEarly] int64_t toInt64() { return __intCast<int64_t>(this[0]); }
     [__unsafeForceInlineEarly] uint toUInt() { return __intCast<uint>(this[0]); }
     [__unsafeForceInlineEarly] uint64_t toUInt64() { return __intCast<uint64_t>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
@@ -2370,6 +2467,12 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
+
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
 
     [OverloadRank(-1)]
     [Differentiable]
@@ -2417,7 +2520,7 @@ extension vector<T,N> : IDifferentiable
     }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IFloat
 {
     // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
@@ -2435,6 +2538,25 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
+    // The concrete floating-point matrix overloads accept layout `L` directly. Overload resolution
+    // therefore selects the shaped overload without a layout conversion or a recursive call to
+    // the whole-type `IFloat` forwarder.
+    [__unsafeForceInlineEarly]
+    override This __min(This other)
+    {
+        return min(this, other);
+    }
+
+    [__unsafeForceInlineEarly]
+    override This __max(This other)
+    {
+        return max(this, other);
+    }
+
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
+
     [OverloadRank(-1)]
     [Differentiable]
     [__unsafeForceInlineEarly]
@@ -2446,7 +2568,7 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
-    
+
     /// Initialize a matrix where all elements have the same scalar `value`.
     [OverloadRank(-1)]
     [Differentiable]
@@ -2456,7 +2578,7 @@ extension matrix<T,N,M,L> : IFloat
 
 }
 
-__generic<T:IDifferentiable, let N : int, let M : int, let L : int>
+__generic<T:IDifferentiable, let N : int, let M : int, let L : MatrixLayoutMode>
 extension matrix<T,N,M,L> : IDifferentiable
 {
     // IDifferentiable.
@@ -2477,7 +2599,7 @@ extension matrix<T,N,M,L> : IDifferentiable
     }
 }
 
-__generic<let R : int, let C : int, let L : int>
+__generic<let R : int, let C : int, let L : MatrixLayoutMode>
 extension matrix<int16_t,R,C,L>
 {
     typealias T = int16_t;
@@ -2494,14 +2616,14 @@ vector<T,N*2> __makeVector(vector<T,N> vec1, vector<T,N> vec2);
 __generic<T>
 extension vector<T, 4>
 {
-    __generic<let L : int>
+    __generic<let L : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     __init(matrix<T, 2, 2, L> value)
     {
         this = __makeVector(value[0], value[1]);
     }
 }
-__generic<T, let L : int>
+__generic<T, let L : MatrixLayoutMode>
 extension matrix<T, 2, 2, L>
 {
     [__unsafeForceInlineEarly]
@@ -2760,6 +2882,28 @@ __generic<T> __extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int2, int) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(vector<T,2> xy, T z)
+    {
+        // legacy semantics with implicit promotion of z to vector<T,2>
+        this = { xy.x, xy.y, z, z };
+    }
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int, int2) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(T x, vector<T,2> yz)
+    {
+        // legacy semantics with implicit promotion of x to vector<T,2>
+        this = { x, x, yz.x, yz.y };
+    }
 }
 
 ${
@@ -2768,7 +2912,7 @@ ${
 for( int R = 1; R <= 4; ++R )
 for( int C = 1; C <= 4; ++C )
 {
-    sb << "__generic<T, let L:int> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
+    sb << "__generic<T, let L : MatrixLayoutMode> __extension matrix<T, " << R << "," << C << ", L>\n{\n";
 
     // initialize from R*C scalars
     if (R == 1 || C == 1)
@@ -2842,7 +2986,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 }
 
 // If T is implicitly convertible to U, then matrix<T,R,C,L> is implicitly convertible to matrix<U,R,C,L>.
-__generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
+__generic<ToType, let R : int, let C : int, let L : MatrixLayoutMode> extension matrix<ToType,R,C,L>
 {
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
@@ -2948,21 +3092,6 @@ $(fullPtrType) operator-($(fullPtrType) value, TInt offset)
     return __getOffsetPtr(value, -offset);
 }
 
-__generic<T : IArithmetic>
-[__unsafeForceInlineEarly]
-__prefix T operator+(T value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-[__unsafeForceInlineEarly]
-__prefix vector<T,N> operator+(vector<T,N> value)
-{ return value; }
-
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
-[__unsafeForceInlineEarly]
-__prefix matrix<T,R,C> operator+(matrix<T,R,C> value)
-{ return value; }
-
 ${
 
 static const struct IncDecOpInfo
@@ -3002,7 +3131,7 @@ vector<T,N> operator$(op.name)(in out vector<T,N> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
-__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
 {$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
@@ -3193,7 +3322,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M, Layout> left, matrix<R, N, M> right)
 {
@@ -3225,7 +3354,7 @@ __generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M :
 __intrinsic_op($(info.op))
 matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
 
-__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : int>
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int, let Layout : MatrixLayoutMode>
 [__unsafeForceInlineEarly]
 matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M, Layout> left, R right)
 {
@@ -3280,7 +3409,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C,Layout> left, matrix<T,R,C> right)
     {
@@ -3288,7 +3417,7 @@ ${
         return left;
     }
 
-    __generic<T : $(op.interface), let R : int, let C : int, let Layout : int>
+    __generic<T : $(op.interface), let R : int, let C : int, let Layout : MatrixLayoutMode>
     [__unsafeForceInlineEarly]
     matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C, Layout> left, T right)
     {
@@ -3599,9 +3728,74 @@ __prefix T operator -(T v0)
     return v0.neg();
 }
 
+$(attrib)
+__generic<T : $(interfaceName)>
+[__unsafeForceInlineEarly]
+[OverloadRank($(overloadRank))]
+__prefix T operator +(T v0)
+{
+    return v0;
+}
+
 ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
+
+// Let differentiable arithmetic-only types use the normal operators inside AD code without
+// requiring those types to satisfy the richer IFloat interface.
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator +(T v0, T v1)
+{
+    return v0.add(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator -(T v0, T v1)
+{
+    return v0.sub(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator *(T v0, T v1)
+{
+    return v0.mul(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator /(T v0, T v1)
+{
+    return v0.div(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator -(T v0)
+{
+    return v0.neg();
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator +(T v0)
+{
+    return v0;
+}
 
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
@@ -3706,6 +3900,31 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &=(in out T v0, T v1)
+{
+    v0 = v0 & v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator |=(in out T v0, T v1)
+{
+    v0 = v0 | v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ^=(in out T v0, T v1)
+{
+    v0 = v0 ^ v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
 // in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
@@ -3720,6 +3939,11 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
@@ -3855,6 +4079,23 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
+__generic<T>
+__intrinsic_op($(kIROp_GetNaturalAlignment))
+int __naturalAlignmentOf_impl(T v);
+
+// Return the largest power-of-two byte alignment that `T`'s natural layout guarantees.
+// This is the strongest alignment a value of `T` can be promised when its address is a
+// multiple of `T`'s natural stride, e.g. 16 for `float4`, 8 for `float2`/`half4`, and 4
+// for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
+// single-argument `*Aligned` byte-address accessors forward as their alignment promise so
+// that the promise is always a valid (power-of-two) alignment.
+__generic<T>
+[__unsafeForceInlineEarly]
+int __naturalAlignmentOf()
+{
+    return __naturalAlignmentOf_impl(__declVal<T>());
+}
+
 [__unsafeForceInlineEarly]
 int32_t __elemToByteOffset<T>(int32_t elemOffset)
 {
@@ -3875,10 +4116,6 @@ internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
-
-__generic<T>
-__intrinsic_op( $(kIROp_GetLegalizedSPIRVGlobalParamAddr))
-__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
@@ -4383,6 +4620,11 @@ attribute_syntax [outputcontrolpoints(count: int)]  : OutputControlPointsAttribu
 __attributeTarget(FuncDecl)
 attribute_syntax [outputtopology(topology)]         : OutputTopologyAttribute;
 
+/// Used on an hull shader entrypoint to declare the output primitive type of the tessellator.
+/// @param topology The output primitive type, must be one of "point", "line", "triangle_cw", and "triangle_ccw".
+__attributeTarget(FuncDecl)
+attribute_syntax [OutputTopology(topology)]         : OutputTopologyAttribute;
+
 /// Used on an hull shader entrypoint to specify the patch type used by the hull shader.
 /// @param mode The patch type used by the hull shader. Valid values are "tri", "quad" and "isoline".
 __attributeTarget(FuncDecl)
@@ -4417,6 +4659,34 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 /// Used on a fragment shader entry point to specify that early depth stencil testing can be enabled.
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
+
+/// Used on a fragment shader entry point so that its input `SV_Coverage` reports only the samples
+/// that survived the early depth/stencil test, rather than every sample the fragment covers.
+/// @remarks On SPIR-V this requires the `SampleMaskPostDepthCoverage` capability, declares
+/// `OpExtension "SPV_KHR_post_depth_coverage"`, and enables the `PostDepthCoverage` execution mode.
+/// On GLSL it requires `GL_ARB_post_depth_coverage` and emits `layout(post_depth_coverage) in;`.
+/// Post-depth coverage is only meaningful with early depth/stencil testing, so the compiler also
+/// enables `EarlyFragmentTests` (which Vulkan requires to accompany `PostDepthCoverage`); pairing
+/// this attribute with `[earlydepthstencil]` is therefore optional but harmless.
+/// @remarks This attribute currently takes effect on SPIR-V/Vulkan and GLSL only. On any other
+/// target (HLSL, Metal, WGSL, CUDA) no post-depth-coverage execution mode is emitted and the
+/// compiler warns that the attribute has no effect, rather than silently changing `SV_Coverage`
+/// semantics.
+__attributeTarget(FuncDecl)
+attribute_syntax [postdepthcoverage]    : PostDepthCoverageAttribute;
+
+// SPIR-V 64-bit indexing
+/// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
+/// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the
+/// entry point's call graph, the emitted SPIR-V entry point requires the `Shader64BitIndexingEXT`
+/// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
+/// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
+/// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+/// @remarks This attribute is a pure opt-in marker: the requirement is honored only where the
+/// programmer applies it. The compiler does not infer it from the use of 64-bit indices, nor does
+/// it diagnose 64-bit indexing performed without the attribute.
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
 
 // Compute Shader
 
@@ -4515,6 +4785,31 @@ attribute_syntax [mutating] : MutatingAttribute;
 ///
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+/// Marks a function whose return value should not be discarded. When a call to a
+/// function marked with `[NoDiscard]` is made in a context where its result is
+/// discarded — an expression statement, or a `for` loop's side-effect expression,
+/// including through transparent wrappers (parentheses) and pass-through operands
+/// (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler emits an
+/// error. Applying `[NoDiscard]` to a function that returns `void` is itself an
+/// error, reported at the declaration, since such a function has no result to discard.
+/// @remarks
+/// This is useful for functions that look like they mutate the object they are called
+/// on, but instead return a result. For example, a member function `load` that returns
+/// the loaded value rather than mutating `this`:
+/// ```
+/// struct MyType
+/// {
+///    [NoDiscard]
+///    MyType load() { ... }
+/// }
+/// MyType t;
+/// t.load(); // error: result of '[NoDiscard]' function is discarded.
+/// let loaded = t.load(); // OK
+/// ```
+///
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiscard] : NoDiscardAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.
@@ -4797,9 +5092,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -4939,16 +5231,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4960,16 +5255,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4978,6 +5276,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -4989,16 +5288,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5209,7 +5511,7 @@ semantic sv_waveindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 

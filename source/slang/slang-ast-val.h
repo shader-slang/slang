@@ -212,37 +212,54 @@ class TypeCastIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-// An compile time int val as result of some general computation.
+// `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` /
+// `getBuiltinOperationKindFromString`) are declared in slang-ast-support-types.h, since they are
+// shared with the AST-level `BuiltinOperatorExpr` node.
+
+// A compile-time integer that is the result of a builtin operator applied to operands that
+// are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). It identifies the
+// operator by a `BuiltinOperationKind` enum rather than a resolved operator `DeclRef`, so it is
+// the single `IntVal` representation for a builtin operator whether the expression was rewritten
+// by the fast path (`BuiltinOperatorExpr`) or reached as a resolved operator call (`?:`, `&&`,
+// `||`, or operators on enum/generic operands). It re-evaluates on substitution and folds once
+// its operands become concrete.
 FIDDLE()
-class FuncCallIntVal : public IntVal
+class BuiltinOperationIntVal : public IntVal
 {
     FIDDLE(...)
+    BuiltinOperationKind getOp() { return (BuiltinOperationKind)getIntConstOperand(1); }
+    OperandView<IntVal> getArgs() { return OperandView<IntVal>(this, 2, getOperandCount() - 2); }
+    Index getArgCount() { return getOperandCount() - 2; }
+
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
 
-    DeclRef<Decl> getFuncDeclRef() { return as<DeclRefBase>(getOperand(1)); }
-    Type* getFuncType() { return as<Type>(getOperand(2)); }
-    OperandView<IntVal> getArgs() { return OperandView<IntVal>(this, 3, getOperandCount() - 3); }
-    Index getArgCount() { return getOperandCount() - 3; }
-
-    FuncCallIntVal(
-        Type* inType,
-        DeclRef<Decl> inFuncDeclRef,
-        Type* inFuncType,
-        ArrayView<IntVal*> inArgs)
+    BuiltinOperationIntVal(Type* inType, BuiltinOperationKind inOp, ArrayView<IntVal*> inArgs)
     {
-        setOperands(inType, inFuncDeclRef, inFuncType);
+        // `+`/`-`/`*`/unary-`-` are always represented as `PolynomialIntVal` (so value
+        // unification can canonicalize them), and an all-constant fold of any operator produces
+        // a `ConstantIntVal`; a `BuiltinOperationIntVal` is therefore never formed for these
+        // opcodes. Keeping this invariant means there is a single `IntVal` representation per
+        // builtin operator.
+        SLANG_ASSERT(
+            inOp != BuiltinOperationKind::Add && inOp != BuiltinOperationKind::Sub &&
+            inOp != BuiltinOperationKind::Mul && inOp != BuiltinOperationKind::Neg);
+        setOperands(inType, (IntegerLiteralValue)inOp);
         for (auto arg : inArgs)
             m_operands.add(ValNodeOperand(arg));
     }
 
+    // `loc` is the source location of the operator expression being folded; it is used only to
+    // locate a divide-by-zero diagnostic. The sink-less substitute/resolve callers leave it
+    // defaulted (they never diagnose).
     static Val* tryFoldImpl(
         ASTBuilder* astBuilder,
         Type* resultType,
-        DeclRef<Decl> newFuncDecl,
+        BuiltinOperationKind op,
         List<IntVal*>& newArgs,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink,
+        SourceLoc loc = SourceLoc());
 
     bool _isLinkTimeValOverride()
     {
@@ -1109,6 +1126,42 @@ class HasDiffTypeInfoWitness : public Witness
 };
 
 FIDDLE()
+class DeclaredVariadicPackCountWitness : public Witness
+{
+    FIDDLE(...)
+    DeclaredVariadicPackCountWitness(DeclRef<GenericVariadicPackCountConstraintDecl> inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
+
+    DeclRef<GenericVariadicPackCountConstraintDecl> getDeclRef()
+    {
+        return as<DeclRefBase>(getOperand(0));
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class ConcreteVariadicPackCountWitness : public Witness
+{
+    FIDDLE(...)
+    ConcreteVariadicPackCountWitness(IntVal* actualCount, IntVal* expectedCount)
+    {
+        setOperands(actualCount, expectedCount);
+    }
+
+    IntVal* getActualCount() const { return as<IntVal>(getOperand(0)); }
+    IntVal* getExpectedCount() const { return as<IntVal>(getOperand(1)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class NonEmptyPackWitness : public Witness
 {
     FIDDLE(...)
@@ -1323,6 +1376,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
+    else if (auto firstWitness = as<FirstSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(firstWitness->getPatternTypeWitness());
+    }
+    else if (auto lastWitness = as<LastSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(lastWitness->getPatternTypeWitness());
+    }
     else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());
@@ -1331,18 +1392,17 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
+    // Every other `SubtypeWitness` kind -- `Transitive`, `ExtractExistential`, `Dynamic`,
+    // `DiffTypeInfo`, `HigherOrderDiffTypeTranslation`, `PackBranch` -- denotes a genuine,
+    // non-equality subtype relationship, for which `false` is the correct answer; a catch-all
+    // abort here would wrongly reject valid input. Equality is witnessed only by a
+    // `TypeEqualityWitness`, an equality `DeclaredSubtypeWitness`, or one of the pack wrappers
+    // above, which reduce to the equality of their pattern witness (or, for `TypePack`, of every
+    // element witness). A new pack wrapper that should reduce to an inner witness must be given an
+    // arm above; without one it silently answers `false`, a wrong result indistinguishable from a
+    // legitimate non-equality `false`.
     return false;
 }
-
-RequirementWitness getUnspecializedLookupRec(
-    ASTBuilder* astBuilder,
-    Decl* requirementKey,
-    SubtypeWitness* witness);
-
-RequirementWitness specializeLookedUpRec(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    RequirementWitness lookedUpVal);
 
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);

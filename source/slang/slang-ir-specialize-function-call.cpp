@@ -63,6 +63,12 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
+        // A `CastDynamicResource` wraps a bindless/dynamic resource access in a
+        // concrete resource type. Like the indexing ops above, its result is
+        // suitable for specialization exactly when its underlying value (operand
+        // 0) is, so we trace through it to that base. Without this case a bindless
+        // resource argument would not be recognized as specializable.
+        case kIROp_CastDynamicResource:
             {
                 auto base = arg->getOperand(0);
 
@@ -642,6 +648,16 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            // `CastDynamicResource` is a transparent wrapper that views a
+            // dynamic/bindless resource as a concrete resource type. It
+            // contributes nothing to the specialization key itself, so we just
+            // recurse into its underlying value (operand 0), mirroring the
+            // `Load`/`FieldAddress` cases above.
+            auto oldBase = oldArg->getOperand(0);
+            getCallInfoForArg(ioInfo, oldBase);
+        }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
             // We are accessing a resource from a bindless handle.
@@ -659,25 +675,47 @@ struct FunctionParameterSpecializationContext
         }
     }
 
+    // Return a NonUniformResourceIndex inst that `inst` is derived from, or null.
+    // Non-uniformity is contagious, so a NonUniformResourceIndex reached through an
+    // integer cast or through integer/bitwise index arithmetic (e.g. the `* i` in
+    // buffers[NonUniformResourceIndex(i) * i]) still makes the resulting index
+    // non-uniform. Because `buffers[...].Load(...)` and resource subscripts lower to
+    // a call whose index argument is this arithmetic value, the specializer must see
+    // through the arithmetic here to re-mark the index parameter inside the
+    // specialized function (see maybeInsertNonUniformResourceIndex). We walk into the
+    // operands of the cast/arithmetic ops isNonUniformIndexArithmeticOp() recognises,
+    // using an explicit worklist with a visited set so a shared operand sub-DAG (e.g.
+    // `x = a + a`) is expanded at most once rather than exponentially.
+    //
+    // When the index derives from more than one wrapper (e.g.
+    // `NonUniformResourceIndex(a) * NonUniformResourceIndex(b)`), this returns whichever
+    // one the worklist reaches first -- any of them, not a unique or "closest" wrapper.
+    // That is fine because neither caller depends on *which* wrapper is returned, nor on
+    // there being exactly one: getCallInfoForArg uses only whether a wrapper exists (to
+    // key the specialization), and maybeInsertNonUniformResourceIndex uses the result as
+    // a clone template and then overwrites both its operand and its type.
     IRInst* findNonuniformIndexInst(IRInst* inst)
     {
-        for (;;)
+        HashSet<IRInst*> seen;
+        List<IRInst*> pending;
+        pending.add(inst);
+        while (pending.getCount())
         {
-            if (inst == nullptr)
-                return nullptr;
+            auto cur = pending.getLast();
+            pending.removeLast();
+            if (!cur || !seen.add(cur))
+                continue;
 
-            if (inst->getOp() == kIROp_NonUniformResourceIndex)
-                return inst;
+            if (cur->getOp() == kIROp_NonUniformResourceIndex)
+                return cur;
 
-            if (inst->getOp() == kIROp_IntCast)
-            {
-                inst = inst->getOperand(0);
-            }
-            else
-            {
-                return nullptr;
-            }
+            if (cur->getOp() == kIROp_IntCast)
+                pending.add(cur->getOperand(0));
+            else if (isNonUniformIndexArithmeticOp(cur->getOp()))
+                for (UInt i = 0; i < cur->getOperandCount(); i++)
+                    pending.add(cur->getOperand(i));
         }
+        return nullptr;
     }
 
     // The remaining information we've discussed is only
@@ -931,6 +969,31 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            // Reconstruct the wrapper inside the specialized body: first obtain the
+            // specialized value for the wrapped operand, then re-apply the
+            // `CastDynamicResource` cast over it so the specialized callee sees the
+            // same concrete resource type the original argument had.
+            //
+            // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
+            // copied from `oldArg` to `newVal` -- this is intentional.
+            // CastDynamicResource is inlined away before SPIR-V legalization;
+            // NonUniform reaches the consumed resource through the reconstructed
+            // access chain whose index already carries the decoration.
+            auto oldBase = oldArg->getOperand(0);
+            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newBase};
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                kIROp_CastDynamicResource,
+                1,
+                newOperands);
+            return newVal;
+        }
         else if (auto castHandleToResource = as<IRCastDescriptorHandleToResource>(oldArg))
         {
             // We are accessing a resource from a bindless handle.
@@ -1177,6 +1240,14 @@ struct FunctionParameterSpecializationContext
                 // At last, set the operand of the NonUniformResourceIndex to the new parameter
                 // because we haven't done it yet during inst clone.
                 clonedInst->setOperand(0, newParam);
+
+                // NonUniformResourceIndex is an identity wrapper, so its result type must
+                // match the parameter it now wraps. The discovered inner wrapper can have a
+                // different (e.g. narrower) type than this parameter when the non-uniform
+                // index was reached through a width-changing cast or arithmetic (for
+                // example `uint64Value << NonUniformResourceIndex(uintValue)`), so reset
+                // the type here rather than keeping the cloned wrapper's original type.
+                clonedInst->setFullType(newParam->getFullType());
             }
             paramIndex++;
         }

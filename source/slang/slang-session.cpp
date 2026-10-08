@@ -1,8 +1,8 @@
 // slang-session.cpp
 #include "slang-session.h"
 
-#include "../core/slang-shared-library.h"
 #include "compiler-core/slang-artifact-util.h"
+#include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
@@ -20,7 +20,7 @@
 namespace Slang
 {
 
-// Helper function to find the neural.slang module path
+// Helper function to find the standard module root path.
 static String getStandardModuleDirPath()
 {
     // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
@@ -34,21 +34,30 @@ static String getStandardModuleDirPath()
     if (libslangDir.getLength() == 0)
         return String();
 
-    // TODO: Change this to SLANG_STANDARD_MODULE_DIR_NAME directory if we add more standard modules
     String stdModuleDirPath = Path::combine(libslangDir, SLANG_STANDARD_MODULE_DIR_NAME);
     return stdModuleDirPath;
 }
 
 static String findStandardModulePath(String const& stdModuleDirPath, String const& moduleName)
 {
-    // The neural module is always in the same directory as libslang.so/slang.dll
-    // e.g., bin/slang-standard-module/ on Windows, lib/slang-standard-module/ on Linux/Mac
+    // Standard modules are co-located with libslang.so/slang.dll under
+    // SLANG_STANDARD_MODULE_DIR_NAME.
+    // Hierarchical imports map to subdirectories, e.g. "slang/neural" or "experimental/workgraph".
     String stdModulePath = Path::combine(stdModuleDirPath, moduleName + ".slang-module");
 
     if (File::exists(stdModulePath))
         return stdModulePath;
 
     return String();
+}
+
+static SHA1::Digest computeSourceBlobDigest(ISlangBlob* blob)
+{
+    SLANG_RELEASE_ASSERT(blob);
+
+    DigestBuilder<SHA1> digestBuilder;
+    digestBuilder.append(blob);
+    return digestBuilder.finalize();
 }
 
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
@@ -61,6 +70,9 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
 {
     namePool = session->getNamePool();
 
+    if (SLANG_DISABLE_NOTE_IDS[0] != '\0')
+        m_optionSet.add(CompilerOptionName::DisableNotes, String(SLANG_DISABLE_NOTE_IDS));
+
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
 
     setFileSystem(nullptr);
@@ -71,13 +83,26 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
         for (const auto& nameToMod : builtinLinkage->mapNameToLoadedModules)
             mapNameToLoadedModules.add(nameToMod);
     }
-
-    m_semanticsForReflection = new SharedSemanticsContext(this, nullptr, nullptr);
 }
 
-SharedSemanticsContext* Linkage::getSemanticsForReflection()
+RefPtr<SharedSemanticsContext> Linkage::getSemanticsForReflection()
 {
-    return m_semanticsForReflection.get();
+    // Linkage options are populated after the `Linkage` constructor runs. Defer construction so
+    // ad hoc reflection checking observes the language version configured on the session or
+    // compile request instead of unconditionally capturing the compiler default. A legacy compile
+    // request can also process a new `-std` option after reflection has started, so replace a
+    // cached context whose effective version no longer matches the linkage.
+    std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
+    auto languageVersion = m_optionSet.getLanguageVersion();
+    if (!m_semanticsForReflection ||
+        m_semanticsForReflection->getLanguageVersion() != languageVersion)
+    {
+        m_semanticsForReflection = new SharedSemanticsContext(this, languageVersion, nullptr);
+    }
+    // A `SemanticsVisitor` stores only a raw pointer to its shared context. Its constructors reject
+    // a temporary `RefPtr`, and callers retain this returned owner in a local for the entire
+    // checking operation because a later option change can replace the cached member.
+    return m_semanticsForReflection;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -112,11 +137,10 @@ Linkage::~Linkage()
         auto globalSession = getSessionImpl();
         std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
         if (!globalSession->m_typeCheckingCache ||
-            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
-                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+            globalSession->getTypeCheckingCache()->conversionCostCache.getCount() <
+                getTypeCheckingCache()->conversionCostCache.getCount())
         {
             globalSession->m_typeCheckingCache = m_typeCheckingCache;
-            getTypeCheckingCache()->version++;
         }
         destroyTypeCheckingCache();
     }
@@ -190,7 +214,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
             DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto name = getNamePool()->getName(moduleName);
 
@@ -199,6 +223,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
         return asExternal(module);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -214,6 +239,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 slang::IModule* Linkage::loadModuleFromBlob(
@@ -236,30 +262,70 @@ slang::IModule* Linkage::loadModuleFromBlob(
     }
 
 
-    try
+    SLANG_EXCEPTION_TRY
     {
-        auto getDigestStr = [](auto x)
+        // When `source` is null, read the file at `path` and reuse the one blob
+        // for the digest and the load so both see identical bytes, incl.
+        // session-only sources the File::exists fallback below cannot see.
+        ComPtr<ISlangBlob> sourceBlob(source);
+        if (!sourceBlob && blobType == ModuleBlobType::Source && path)
         {
-            DigestBuilder<SHA1> digestBuilder;
-            digestBuilder.append(x);
-            return digestBuilder.finalize().toString();
-        };
+            // A custom file system may return failure while still writing a
+            // blob; treat any failure as "no source" so the guard below runs.
+            if (SLANG_FAILED(getFileSystemExt()->loadFile(path, sourceBlob.writeRef())))
+                sourceBlob.setNull();
+        }
+
+        if (!sourceBlob)
+        {
+            // Reached with nothing to load: a source `path` that could not be
+            // read, an absent `path`, or a null IR blob. `source` is user-facing
+            // input that may legitimately be null (a source module loads from
+            // `path`), so diagnose rather than assert (#12852); the message
+            // names `path` when there is one.
+            sink.diagnose(Diagnostics::CannotOpenFile{.path = path ? String(path) : String()});
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
+        }
+
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(sourceBlob);
 
         String moduleNameStr = moduleName;
         if (!moduleName)
-            moduleNameStr = getDigestStr(source);
+            moduleNameStr = sourceDigest.toString();
 
         auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
-            return loadedModule;
+            if (!loadedModule)
+                return nullptr;
+
+            if (blobType != ModuleBlobType::Source)
+                return loadedModule;
+
+            // Returning the cached module is only safe when the incoming source
+            // is identical to whatever produced the cached module; otherwise the
+            // caller expects a module they have never actually loaded, leading
+            // to silent wrong-module use (and sometimes crashes) downstream.
+            // See #10957.
+            if (loadedModule->getSourceDigest() == sourceDigest)
+            {
+                return loadedModule;
+            }
+
+            sink.diagnose(Diagnostics::ModuleAlreadyLoadedWithDifferentSource{
+                .moduleName = name,
+                .location = SourceLoc(),
+            });
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
         }
         String pathStr = path;
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            pathStr = getDigestStr(source);
+            pathStr = sourceDigest.toString();
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
@@ -271,10 +337,13 @@ slang::IModule* Linkage::loadModuleFromBlob(
             }
         }
         RefPtr<Module> module =
-            loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+            loadModuleImpl(name, pathInfo, sourceBlob, SourceLoc(), &sink, nullptr, blobType);
+        if (module)
+            module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.get());
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -290,6 +359,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
@@ -349,9 +419,13 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::loadModuleInfoFromIRBlob(
 
     RefPtr<IRModule> irModule;
     String compilerVersion;
-    UInt version;
+    UInt64 version;
     String name;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, compilerVersion, version, name));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, &compilerVersion, version, &name));
+    // The public metadata API exposes the version as a signed SlangInt, while untrusted serialized
+    // data can contain any UInt64 value.
+    if (version > UInt64((std::numeric_limits<SlangInt>::max)()))
+        return SLANG_FAIL;
     const auto compilerVersionSlice = m_stringSlicePool.addAndGetSlice(compilerVersion);
     const auto nameSlice = m_stringSlicePool.addAndGetSlice(name);
     outModuleCompilerVersion = compilerVersionSlice.begin();
@@ -438,7 +512,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     }
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto specializedType =
             specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
@@ -446,6 +520,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
 
         return asExternal(specializedType);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -456,6 +531,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 DeclRef<GenericDecl> getGenericParentDeclRef(
@@ -492,7 +568,8 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
     //
     // If it's not specialized, then declRef will be the one with default substitutions.
     //
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
 
     auto decl = declRef.getDecl();
     while (decl && !as<GenericDecl>(decl))
@@ -504,8 +581,15 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
         return true; // no generics => always specialized
 
     auto defaultArgs = getDefaultSubstitutionArgs(getASTBuilder(), &visitor, as<GenericDecl>(decl));
-    auto currentArgs =
-        SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl))->getArgs();
+
+    // If the declRef carries no generic-application substitution for this
+    // generic at all (e.g. a bare reference to a generic entry point discovered
+    // via `[shader(...)]`), then nothing has been substituted, so it is
+    // unspecialized.
+    auto genericAppDeclRef = SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl));
+    if (!genericAppDeclRef)
+        return false;
+    auto currentArgs = genericAppDeclRef->getArgs();
 
     if (defaultArgs.getCount() != currentArgs.getCount()) // should really never happen.
         return true;
@@ -537,7 +621,8 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     List<Type*> argTypes,
     DiagnosticSink* sink)
 {
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
     SemanticsVisitor::ExprLocalScope scope;
     visitor = visitor.withSink(sink).withExprLocalScope(&scope);
 
@@ -596,7 +681,8 @@ DeclRef<Decl> Linkage::specializeGeneric(
     SLANG_AST_BUILDER_RAII(getASTBuilder());
     SLANG_ASSERT(declRef);
 
-    SemanticsVisitor visitor(getSemanticsForReflection());
+    auto sharedSemanticsContext = getSemanticsForReflection();
+    SemanticsVisitor visitor(sharedSemanticsContext);
     visitor = visitor.withSink(sink);
 
     auto genericDeclRef = getGenericParentDeclRef(getASTBuilder(), &visitor, declRef);
@@ -664,7 +750,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
         {
         case slang::ContainerType::ConstantBuffer:
             {
-                SemanticsVisitor visitor(getSemanticsForReflection());
+                auto sharedSemanticsContext = getSemanticsForReflection();
+                SemanticsVisitor visitor(sharedSemanticsContext);
                 auto layoutType = getASTBuilder()->getDefaultLayoutType();
                 Type* cbType = visitor.getConstantBufferType(type, layoutType);
                 containerTypeReflection = cbType;
@@ -819,9 +906,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     DiagnosticSink sink;
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
-        SemanticsVisitor visitor(getSemanticsForReflection());
+        auto sharedSemanticsContext = getSemanticsForReflection();
+        SemanticsVisitor visitor(sharedSemanticsContext);
         visitor = visitor.withSink(&sink);
 
         auto witness = visitor.isSubtype(
@@ -833,9 +921,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
         }
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
     bool success = (result != nullptr);
     *outConformanceComponentType = result.detach();
@@ -1004,8 +1092,11 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage = SourceLanguage::Slang;
     SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
+    // Term strings are always snippets of Slang syntax, rather than translation units that may
+    // select a parser mode. `preprocessSource` requires this output, so discard any directive it
+    // observes and preserve the term parser's Slang-language contract below.
+    SourceLanguageDirective ignoredSourceLanguageDirective;
 
     auto tokens = preprocessSource(
         srcFile,
@@ -1013,11 +1104,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage,
+        ignoredSourceLanguageDirective,
         languageVersion);
-
-    if (sourceLanguage == SourceLanguage::Unknown)
-        sourceLanguage = SourceLanguage::Slang;
 
     return parseTermFromSourceFile(
         getASTBuilder(),
@@ -1025,7 +1113,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         &sink,
         scope,
         getNamePool(),
-        sourceLanguage);
+        SourceLanguage::Slang);
 }
 
 UInt Linkage::addTarget(CodeGenTarget target)
@@ -1060,16 +1148,18 @@ void Linkage::loadParsedModule(
 
     int errorCountBefore = sink->getErrorCount();
     int errorCountAfter;
-    try
+    SLANG_EXCEPTION_TRY
     {
         compileRequest->checkAllTranslationUnits();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(name);
         throw;
     }
+#endif
     errorCountAfter = sink->getErrorCount();
     if (isInLanguageServer())
     {
@@ -1145,6 +1235,37 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // If we failed to find a previously-loaded module, then we
     // will go ahead and load the module from the serialized form.
     //
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                .actualVersion = String(serializationVersion),
+                .location = SourceLoc()});
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+            .actualVersion = String(moduleVersion),
+            .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+            .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+            .location = SourceLoc()});
+        return nullptr;
+    }
+
     PathInfo filePathInfo;
     return loadSerializedModule(
         moduleName,
@@ -1188,7 +1309,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
 
     mapPathToLoadedModule.add(mostUniqueIdentity, module);
     mapNameToLoadedModules.add(moduleName, module);
-    try
+    SLANG_EXCEPTION_TRY
     {
         if (SLANG_FAILED(loadSerializedModuleContents(
                 module,
@@ -1206,12 +1327,14 @@ RefPtr<Module> Linkage::loadSerializedModule(
         loadedModulesList.add(module);
         return module;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(moduleName);
         throw;
     }
+#endif
 }
 
 RefPtr<Module> Linkage::loadBinaryModuleImpl(
@@ -1219,7 +1342,8 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     const PathInfo& moduleFilePathInfo,
     ISlangBlob* moduleFileContents,
     SourceLoc const& requestingLoc,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool isSpeculativeLoad)
 {
     auto astBuilder = getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
@@ -1236,6 +1360,57 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     auto moduleChunk = ModuleChunk::find(rootChunk);
     if (!moduleChunk)
     {
+        return nullptr;
+    }
+
+    auto irChunk = moduleChunk->findIR();
+    // Missing IR is malformed rather than a version mismatch.
+    if (!irChunk)
+        return nullptr;
+
+    UInt64 moduleVersion = 0;
+    UInt64 serializationVersion = 0;
+    const auto readResult =
+        readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr, &serializationVersion);
+    if (SLANG_FAILED(readResult))
+    {
+        if (readResult == SLANG_E_NOT_AVAILABLE)
+        {
+            if (isSpeculativeLoad)
+            {
+                sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::UnsupportedSerializedModuleFormatVersion{
+                    .actualVersion = String(serializationVersion),
+                    .location = requestingLoc});
+            }
+        }
+        // Other failures are malformed metadata and retain the existing load-failure behavior.
+        return nullptr;
+    }
+
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+    {
+        if (isSpeculativeLoad)
+        {
+            sink->diagnose(Diagnostics::IgnoringUnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::UnsupportedSerializedModuleVersion{
+                .actualVersion = String(moduleVersion),
+                .minimumVersion = String(IRModule::k_minSupportedModuleVersion),
+                .maximumVersion = String(IRModule::k_maxSupportedModuleVersion),
+                .location = requestingLoc});
+        }
         return nullptr;
     }
 
@@ -1290,12 +1465,19 @@ RefPtr<Module> Linkage::loadModuleImpl(
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
     const LoadedModuleDictionary* additionalLoadedModules,
-    ModuleBlobType blobType)
+    ModuleBlobType blobType,
+    bool isSpeculativeLoad)
 {
     switch (blobType)
     {
     case ModuleBlobType::IR:
-        return loadBinaryModuleImpl(moduleName, modulePathInfo, moduleBlob, requestingLoc, sink);
+        return loadBinaryModuleImpl(
+            moduleName,
+            modulePathInfo,
+            moduleBlob,
+            requestingLoc,
+            sink,
+            isSpeculativeLoad);
 
     case ModuleBlobType::Source:
         return loadSourceModuleImpl(
@@ -1327,15 +1509,24 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->setModuleName(name);
-    Stage impliedStage;
-    translationUnit->sourceLanguage = SourceLanguage::Slang;
-
-    // If we are loading from a file with apparaent glsl extension,
-    // set the source language to GLSL to enable GLSL compatibility mode.
-    if ((SourceLanguage)findSourceLanguageFromPath(filePathInfo.getName(), impliedStage) ==
-        SourceLanguage::GLSL)
+    // The module-loading API has no source-language parameter, so a session-level `Language`
+    // option is its explicit language-selection mechanism. Preserve that provenance on the
+    // translation unit instead of merely using the option as an initial parser mode: extension
+    // validation and source-directive precedence both depend on knowing that the caller made an
+    // explicit choice.
+    if (m_optionSet.hasOption(CompilerOptionName::Language))
     {
-        translationUnit->sourceLanguage = SourceLanguage::GLSL;
+        auto sourceLanguage = SourceLanguage(
+            m_optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language));
+        translationUnit->sourceLanguage = sourceLanguage;
+        translationUnit->sourceLanguageExplicitlyRequested = sourceLanguage;
+    }
+    else
+    {
+        // Imported source modules default to Slang when their file name does not imply a language.
+        // `parseTranslationUnit()` is the single place that resolves a recognized extension for
+        // both imported modules and ordinary compile-request inputs.
+        translationUnit->sourceLanguage = SourceLanguage::Slang;
     }
 
     frontEndReq->addTranslationUnit(translationUnit);
@@ -1387,15 +1578,17 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
         return nullptr;
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         loadParsedModule(frontEndReq, translationUnit, name, filePathInfo);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Slang::AbortCompilationException&)
     {
         // Something is fatally wrong, we should return nullptr.
         module = nullptr;
     }
+#endif
     errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore && !isInLanguageServer())
@@ -1423,6 +1616,37 @@ bool Linkage::isBeingImported(Module* module)
             return true;
     }
     return false;
+}
+
+RefPtr<Module> Linkage::_getImportableModuleOrDiagnose(
+    Module* module,
+    Name* moduleName,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink)
+{
+    if (!module)
+        return nullptr;
+
+    // The checked AST attribute is the source of truth for this module-level contract. Every
+    // discovery producer constructs or deserializes a checked ModuleDecl before making a module
+    // importable. Language-server sessions may deliberately omit IR, so import validation must not
+    // depend on the derived IR decoration.
+    auto moduleDecl = module->getModuleDecl();
+    SLANG_RELEASE_ASSERT(moduleDecl);
+    bool isExperimentalModule = moduleDecl->findModifier<ExperimentalModuleAttribute>() != nullptr;
+
+    if (isExperimentalModule && !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
+                .module = getText(moduleName),
+                .loc = requestingLoc});
+        }
+        return nullptr;
+    }
+
+    return module;
 }
 
 // Derive a file name for the module, by taking the given
@@ -1457,6 +1681,16 @@ String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 }
 
 RefPtr<Module> Linkage::findOrImportModule(
+    Name* moduleName,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink,
+    const LoadedModuleDictionary* loadedModules)
+{
+    auto module = _findOrImportModuleWithoutPolicy(moduleName, requestingLoc, sink, loadedModules);
+    return _getImportableModuleOrDiagnose(module, moduleName, requestingLoc, sink);
+}
+
+RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     Name* moduleName,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
@@ -1592,6 +1826,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     PathInfo requestingPathInfo =
         getSourceManager()->getPathInfo(requestingLoc, SourceLocType::Actual);
 
+    HashSet<String> serializedModulePathsTried;
     for (auto type : typesToTry)
     {
         for (auto sourceFileName : sourceFileNamesToTry)
@@ -1635,6 +1870,13 @@ RefPtr<Module> Linkage::findOrImportModule(
                 // If we failed to find the file at this step, we
                 // will continue the search for our other options.
                 //
+                continue;
+            }
+            if (type == ModuleBlobType::IR &&
+                !serializedModulePathsTried.add(filePathInfo.getMostUniqueIdentity()))
+            {
+                // The source and literate-source candidates can map to the same binary path.
+                // Avoid loading and diagnosing that path more than once.
                 continue;
             }
 
@@ -1690,14 +1932,19 @@ RefPtr<Module> Linkage::findOrImportModule(
                 requestingLoc,
                 sink,
                 loadedModules,
-                type);
+                type,
+                /*isSpeculativeLoad*/ true);
 
             // If the attempt to load the module from the given path
             // was successful, we go ahead and use it, without trying
             // out any other options.
             //
             if (module)
+            {
+                if (type == ModuleBlobType::Source)
+                    module->setSourceDigest(computeSourceBlobDigest(fileContents));
                 return module;
+            }
         }
     }
 
@@ -1724,20 +1971,10 @@ RefPtr<Module> Linkage::findOrImportModule(
                     requestingLoc,
                     sink,
                     nullptr,
-                    ModuleBlobType::IR);
+                    ModuleBlobType::IR,
+                    /*isSpeculativeLoad*/ true);
                 if (module)
                 {
-                    if (auto irModule = module->getIRModule())
-                    {
-                        if (irModule->getModuleInst()
-                                ->findDecoration<IRExperimentalModuleDecoration>() &&
-                            !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
-                        {
-                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
-                                .module = getText(moduleName),
-                                .loc = requestingLoc});
-                        }
-                    }
                     return module;
                 }
             }
@@ -1802,7 +2039,12 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    if (auto firstDependencyChunk = dependencyChunks.getFirst())
+    // The first dependency is the module's own source file. We still check it like the rest of
+    // the dependencies, but if that primary source is unavailable we accept the standalone
+    // precompiled module instead of treating it as stale. Missing later dependencies still
+    // indicate a stale source-backed module cache.
+    auto firstDependencyChunk = dependencyChunks.getFirst();
+    if (firstDependencyChunk)
     {
         moduleSrcPath = firstDependencyChunk->getValue();
 
@@ -1818,6 +2060,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
     }
 
+    Index dependencyIndex = 0;
     for (auto dependencyChunk : dependencyChunks)
     {
         auto file = dependencyChunk->getValue();
@@ -1830,8 +2073,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
-            return false;
+        {
+            if (dependencyIndex == 0)
+            {
+                // If the module's own source file is unavailable, we can't prove staleness, so
+                // fall back to accepting the standalone precompiled module. Missing later
+                // dependencies still indicate a stale source-backed module cache.
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         digestBuilder.append(sourceFile->getDigest());
+        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }
@@ -1967,20 +2223,50 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         sink,
         translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
 
     auto segments = extractSourceSegments(sourceFile, getSourceManager());
 
     auto preprocessed = preprocessSourceSegments(
         segments,
-        sourceLanguage,
         slangLanguageVersion,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
         &preprocessorHandler);
+
+    for (auto& segment : preprocessed)
+    {
+        auto& directive = segment.sourceLanguageDirective;
+        if (directive.language == SourceLanguage::Unknown)
+            continue;
+
+        // A semantic `__include` is parsed only after the containing translation unit has already
+        // selected its effective language and parsed its primary sources. It may confirm that
+        // language, but changing it here would leave the existing AST internally inconsistent.
+        if (directive.language != translationUnit->sourceLanguage)
+        {
+            // Use E00121 when a primary source directive selected the effective language: its
+            // retained location lets the diagnostic identify both conflicting directives. If the
+            // effective language came only from an API request or file extension, there is no
+            // earlier directive to cite, so E00123 instead explains that the unit was already
+            // parsed under the other language. `_tryApplySourceLanguageDirective` emits E00121 for
+            // conflicts within one preprocessing unit, while `_applySourceLanguageDirective`
+            // emits it across primary source files.
+            if (translationUnit->sourceLanguageImpliedBySourceContentsLoc.isValid())
+            {
+                sink->diagnose(Diagnostics::ConflictingSourceLanguageDirectives{
+                    .location = directive.location,
+                    .firstLocation = translationUnit->sourceLanguageImpliedBySourceContentsLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::SourceLanguageDirectiveConflictsWithTranslationUnit{
+                    .location = directive.location});
+            }
+        }
+    }
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {

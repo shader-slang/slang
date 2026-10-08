@@ -1,18 +1,19 @@
 // slang-code-gen.cpp
 #include "slang-code-gen.h"
 
-#include "../compiler-core/slang-slice-allocator.h"
-#include "../core/slang-type-convert-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-type-convert-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
+#include "slang-emit-metal.h"        // for `MetalExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 #include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-artifact-output-util.h"
 
 namespace Slang
@@ -237,6 +238,12 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
             return new ShaderExtensionTracker;
+        }
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
+        {
+            return new MetalExtensionTracker;
         }
     default:
         return nullptr;
@@ -605,29 +612,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         for (auto atomVal : atomSets)
         {
             auto atom = CapabilityAtom(atomVal);
-            switch (atom)
+            // Each present CUDA SM atom contributes its version; the downstream `-arch`
+            // selection takes the maximum across them.
+            if (SemanticVersion cudaSMVersion = getCUDASMVersionForAtom(atom);
+                cudaSMVersion.isSet())
             {
-            default:
-                break;
-
-#define CASE(KIND, NAME, VERSION)                                                   \
-    case CapabilityAtom::NAME:                                                      \
-        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{ \
-            DownstreamCompileOptions::CapabilityVersion::Kind::KIND,                \
-            VERSION});                                                              \
-        break
-
-                CASE(CUDASM, _cuda_sm_1_0, SemanticVersion(1, 0));
-                CASE(CUDASM, _cuda_sm_2_0, SemanticVersion(2, 0));
-                CASE(CUDASM, _cuda_sm_3_0, SemanticVersion(3, 0));
-                CASE(CUDASM, _cuda_sm_4_0, SemanticVersion(4, 0));
-                CASE(CUDASM, _cuda_sm_5_0, SemanticVersion(5, 0));
-                CASE(CUDASM, _cuda_sm_6_0, SemanticVersion(6, 0));
-                CASE(CUDASM, _cuda_sm_7_0, SemanticVersion(7, 0));
-                CASE(CUDASM, _cuda_sm_8_0, SemanticVersion(8, 0));
-                CASE(CUDASM, _cuda_sm_9_0, SemanticVersion(9, 0));
-
-#undef CASE
+                requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{
+                    DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM,
+                    cudaSMVersion});
             }
         }
     }
@@ -671,7 +663,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (compilerType == PassThroughMode::Dxc)
             {
                 // Can support no entry points on DXC because we can build libraries
-                profile = getTargetProgram()->getOptionSet().getProfile();
+                profile = getEffectiveTargetProfile(targetReq, getTargetProgram()->getOptionSet());
+                profile.setStage(Stage::Unknown);
             }
             else
             {
@@ -771,6 +764,29 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     }
 
     options.targetType = (SlangCompileTarget)target;
+
+    // The `-std` handed to the metal compiler must cover the newest syntax the emitter used, which
+    // the target capability alone does not describe: `printf` emits `<metal_logging>` (metal3.2)
+    // even though no metallib atom is present. Leaving it unset keeps the historical default.
+    if (compilerType == PassThroughMode::MetalC)
+    {
+        SemanticVersion metalLanguageVersion;
+        if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+            metalLanguageVersion = SemanticVersion(4, 0);
+
+        if (auto metalTracker = as<MetalExtensionTracker>(extensionTracker))
+        {
+            auto emittedVersion = metalTracker->getRequiredMetalLanguageVersion();
+            if (emittedVersion > metalLanguageVersion)
+                metalLanguageVersion = emittedVersion;
+
+            if (metalTracker->getRequiresLogging())
+                options.flags |= CompileOptions::Flag::EnableLogging;
+        }
+
+        if (metalLanguageVersion.isSet())
+            options.metalLanguageVersion = metalLanguageVersion;
+    }
 
     // Need to configure for the compilation
 
@@ -1053,6 +1069,8 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
         return CodeGenTarget::DXIL;
     case CodeGenTarget::SPIRVAssembly:
         return CodeGenTarget::SPIRV;
+    case CodeGenTarget::MetalLibAssembly:
+        return CodeGenTarget::MetalLib;
     case CodeGenTarget::WGSLSPIRVAssembly:
         return CodeGenTarget::WGSLSPIRV;
     default:
@@ -1107,8 +1125,30 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
-            // Also disassemble the debug artifact if one exists.
             auto debugArtifact = getSeparateDbgArtifact(intermediateArtifact);
+            auto coverageMetadata =
+                findAssociatedRepresentation<slang::ICoverageTracingMetadata>(intermediateArtifact);
+            if (debugArtifact || coverageMetadata)
+            {
+                // Preserve metadata sidecars when disassembly output still needs
+                // them: separate debug info historically used this association,
+                // and coverage manifests need the coverage metadata on the
+                // final disassembly artifact. Keep separate-debug-only behavior
+                // to the historical first metadata artifact; copy all metadata
+                // only when coverage needs the coverage-specific association.
+                for (auto associated : intermediateArtifact->getAssociated())
+                {
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    {
+                        disassemblyArtifact->addAssociated(associated);
+                        if (!coverageMetadata)
+                            break;
+                    }
+                }
+            }
+
+            // Also disassemble the debug artifact if one exists.
             ComPtr<IArtifact> disassemblyDebugArtifact;
             if (debugArtifact)
             {
@@ -1119,17 +1159,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                     disassemblyDebugArtifact.writeRef()));
                 disassemblyDebugArtifact->setName(debugArtifact->getName());
 
-                // The disassembly needs both the metadata for the debug build identifier
-                // and the debug spirv to be associated with is.
-                for (auto associated : intermediateArtifact->getAssociated())
-                {
-                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
-                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
-                    {
-                        disassemblyArtifact->addAssociated(associated);
-                        break;
-                    }
-                }
+                // Attach the disassembled debug artifact alongside the primary disassembly.
                 disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
             }
 

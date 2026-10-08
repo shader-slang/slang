@@ -1,7 +1,10 @@
 // unit-test-ir-blob.cpp
 
+#include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-fossil.h"
+#include "slang/slang-serialize-types.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
@@ -366,5 +369,358 @@ SLANG_UNIT_TEST(irBlob)
         // Verify both modules loaded successfully
         SLANG_CHECK(loadedModule1 != nullptr);
         SLANG_CHECK(loadedModule2 != nullptr);
+    }
+
+    // Test 9: An importing module loads from an IR blob when its dependency
+    // was itself registered from an IR blob -- an import-resolution smoke test
+    // on the pure blob path (freshness gate off).
+    //
+    // This pins the already-working path that the serialization rework in #6854
+    // ("A new approach to AST serialization") fixed: #6557's original symptom was
+    // loadModuleFromIRBlob returning nullptr for a module that `import`s another
+    // module, and the `containerData.modules.getCount() != 1` gate responsible
+    // was removed by #6854. (The separate digest defect this PR fixes -- reached
+    // only when UseUpToDateBinaryModule is on -- is covered by
+    // irBlobImportUpToDateCheck.)
+    // A serialized module records its imports as module-name references resolved
+    // at load time via the session's name->module map
+    // (Linkage::findOrImportModule); so the meaningful part is that the
+    // dependency's blob must be loaded into the session *first*. If the import
+    // fails to resolve, loadModuleFromIRBlob for the importer returns nullptr.
+    {
+        // A dependency module exposing a public function, and an importer that
+        // calls it -- the call creates a real cross-module reference, so the
+        // importer's serialized IR/AST genuinely depends on the dependency.
+        const char* dependencySource = R"(
+            module common_6557;
+
+            public int addOne(int x) { return x + 1; }
+        )";
+        const char* importerSource = R"(
+            module importer_6557;
+
+            import common_6557;
+
+            public int doubleThenAddOne(int x) { return addOne(addOne(x)); }
+        )";
+
+        // Build phase: compile both modules from source in one session and
+        // serialize each to an IR blob. Registering the dependency under its
+        // own name lets the importer's `import common_6557` resolve here.
+        ComPtr<slang::ISession> buildSession;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, buildSession.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> dependencyBlob;
+        ComPtr<ISlangBlob> importerBlob;
+        {
+            ComPtr<ISlangBlob> diagnostics;
+            ComPtr<slang::IModule> dependencyModule;
+            dependencyModule = buildSession->loadModuleFromSourceString(
+                "common_6557",
+                "common_6557.slang",
+                dependencySource,
+                diagnostics.writeRef());
+            SLANG_CHECK(dependencyModule != nullptr);
+            SLANG_CHECK(dependencyModule->serialize(dependencyBlob.writeRef()) == SLANG_OK);
+
+            ComPtr<slang::IModule> importerModule;
+            importerModule = buildSession->loadModuleFromSourceString(
+                "importer_6557",
+                "importer_6557.slang",
+                importerSource,
+                diagnostics.writeRef());
+            SLANG_CHECK(importerModule != nullptr);
+            SLANG_CHECK(importerModule->serialize(importerBlob.writeRef()) == SLANG_OK);
+        }
+
+        // Load phase: in a *fresh* session (nothing preloaded), register the
+        // dependency's blob first, then load the importer's blob. The importer
+        // must load successfully by resolving its import from the dependency
+        // blob we just registered. The freshness gate is off here, so this
+        // exercises only import resolution on the pure blob path (the
+        // #6854-fixed path); the UseUpToDateBinaryModule digest regression is
+        // covered by irBlobImportUpToDateCheck.
+        ComPtr<slang::ISession> loadSession;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, loadSession.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> loadDiagnostics;
+        ComPtr<slang::IModule> loadedDependency;
+        loadedDependency = slang_loadModuleFromIRBlob(
+            loadSession,
+            "common_6557",
+            "common_6557.slang",
+            dependencyBlob->getBufferPointer(),
+            dependencyBlob->getBufferSize(),
+            loadDiagnostics.writeRef());
+        SLANG_CHECK(loadedDependency != nullptr);
+
+        ComPtr<slang::IModule> loadedImporter;
+        loadedImporter = slang_loadModuleFromIRBlob(
+            loadSession,
+            "importer_6557",
+            "importer_6557.slang",
+            importerBlob->getBufferPointer(),
+            importerBlob->getBufferSize(),
+            loadDiagnostics.writeRef());
+        if (loadDiagnostics && loadDiagnostics->getBufferSize() > 0)
+        {
+            printf(
+                "Importing-module IR blob load diagnostics: %.*s\n",
+                (int)loadDiagnostics->getBufferSize(),
+                (const char*)loadDiagnostics->getBufferPointer());
+        }
+
+        // The importer can only be non-null if its `import common_6557` resolved
+        // against the dependency blob registered above; a failed import would
+        // make loadModuleFromIRBlob return nullptr (the original #6557 symptom).
+        SLANG_CHECK(loadedImporter != nullptr);
+    }
+}
+
+// Check current module loading and rejection of version-33 modules.
+//
+// Adding `UniformParameterShadowVarDecl` changes the numeric AST node IDs in version 34.
+// This test verifies that a current module loads, then changes only its module version to 33
+// and requires rejection with the specific unsupported-version diagnostic.
+SLANG_UNIT_TEST(irBlobRejectsVersion33)
+{
+    // The fixture includes a function parameter, whose AST node ID changed in version 34.
+    const char* moduleText = R"(
+        module version_guard;
+        public uint readValue(uint input) { return input + 1; }
+    )";
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Module serialization creates valid AST and IR chunks with the current compiler's schema.
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<slang::ISession> buildSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, buildSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::IModule> module;
+    module = buildSession->loadModuleFromSourceString(
+        "version_guard",
+        "version_guard.slang",
+        moduleText,
+        nullptr);
+    SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<ISlangBlob> moduleBlob;
+    SLANG_CHECK_ABORT(module->serialize(moduleBlob.writeRef()) == SLANG_OK);
+
+    // A fresh session must load the current version. Reusing `buildSession` could satisfy
+    // lookup from its existing module instead of reading the serialized bytes.
+    ComPtr<slang::ISession> currentSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, currentSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(currentSession->loadModuleFromIRBlob(
+        "version_guard",
+        "version_guard.slang-module",
+        moduleBlob,
+        nullptr));
+
+    // We copy the entire blob so its chunks and relative pointers remain intact when we change
+    // the module version.
+    List<uint8_t> olderModuleBytes;
+    olderModuleBytes.setCount(moduleBlob->getBufferSize());
+    memcpy(
+        olderModuleBytes.getBuffer(),
+        moduleBlob->getBufferPointer(),
+        moduleBlob->getBufferSize());
+
+    // We use RIFF navigation to select the IR metadata without inspecting the AST chunk.
+    auto rootChunk =
+        RIFF::RootChunk::getFromBlob(olderModuleBytes.getBuffer(), olderModuleBytes.getCount());
+    SLANG_CHECK_ABORT(rootChunk != nullptr);
+    auto moduleChunk = rootChunk->findListChunkRec(SerialBinary::kModuleFourCC);
+    SLANG_CHECK_ABORT(moduleChunk != nullptr);
+    auto irList = moduleChunk->findListChunk(PropertyKeys<IRModule>::IRModule);
+    SLANG_CHECK_ABORT(irList != nullptr);
+
+    // `writeSerializedModuleIR` writes one data chunk containing the serialized `IRModuleInfo`
+    // into this IR list, so its first child contains the metadata we need to change.
+    auto irChunk = as<RIFF::DataChunk>(irList->getFirstChild().get());
+    SLANG_CHECK_ABORT(irChunk != nullptr);
+
+    // In `slang-serialize-ir.cpp`, `IRModuleInfo` contains `serializationVersion`,
+    // `fullVersion`, then `module`. The serializer records that third field's offset in the layout.
+    auto fossilHeader = static_cast<Fossil::Header const*>(irChunk->getPayload());
+    auto moduleInfo = fossilHeader->rootValue.get();
+    auto infoLayout = reinterpret_cast<FossilizedRecordLayout*>(moduleInfo->getContentLayout());
+    SLANG_CHECK_ABORT(infoLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(infoLayout->fieldCount == 3);
+    auto infoFields = reinterpret_cast<FossilizedRecordElementLayout*>(infoLayout + 1);
+    SLANG_CHECK_ABORT(infoFields[2].layout.get()->kind == FossilizedValKind::Ptr);
+
+    // We obtain the serialized `IRModule` through the recorded pointer and its element layout.
+    auto modulePointer = reinterpret_cast<FossilizedPtr<void>*>(
+        static_cast<Byte*>(moduleInfo->getContentDataPtr()) + infoFields[2].offset);
+    SLANG_CHECK_ABORT(modulePointer->get() != nullptr);
+    auto pointerLayout = reinterpret_cast<FossilizedPtrLikeLayout*>(infoFields[2].layout.get());
+    auto moduleLayout =
+        reinterpret_cast<FossilizedRecordLayout*>(pointerLayout->elementLayout.get());
+    SLANG_CHECK_ABORT(moduleLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(moduleLayout->fieldCount == 3);
+
+    // `IRSerialWriteContext::handleIRModule` writes `m_name`, `m_version`, then `m_moduleInst`.
+    // We use the checked field layout to locate `m_version`, leaving the AST and format intact.
+    auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
+    SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
+    auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
+    const UInt64 olderVersion = 33;
+    memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
+
+    // Another fresh session must reject the older version with its specific diagnostic.
+    // A general load failure would not identify the module version as the reason for rejection.
+    ComPtr<slang::ISession> olderSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, olderSession.writeRef()) == SLANG_OK);
+    ComPtr<ISlangBlob> diagnostics;
+    auto loadedModule = slang_loadModuleFromIRBlob(
+        olderSession,
+        "version_guard",
+        "version_guard.slang-module",
+        olderModuleBytes.getBuffer(),
+        olderModuleBytes.getCount(),
+        diagnostics.writeRef());
+    SLANG_CHECK(loadedModule == nullptr);
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    String diagnosticText;
+    diagnosticText.append(
+        static_cast<char const*>(diagnostics->getBufferPointer()),
+        diagnostics->getBufferSize());
+    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 33"));
+}
+
+// Regression test for #6557 that mirrors the reporter's exact deployment shape:
+// precompiled `.slang-module` files produced with default options, loaded back
+// through `loadModuleFromIRBlob` with `UseUpToDateBinaryModule` enabled while the
+// original `.slang` sources remain on disk.
+//
+// This differs from `irBlob`'s Test 9 in three ways that together exercise a
+// distinct code path:
+//   1. The importer's blob is loaded *without* pre-registering the dependency in
+//      the session, so `import common` must be resolved from the file system
+//      during the load (via the dependency's own `.slang-module`), not from a
+//      blob the test loaded first.
+//   2. `UseUpToDateBinaryModule` is set, so `loadBinaryModuleImpl` runs
+//      `isBinaryModuleUpToDate` (slang-session.cpp): with the sources present it
+//      recomputes the SHA1 digest over the build version, option-set hash, and
+//      each dependency source's digest and compares it to the one stored in the
+//      module chunk. If that gate rejected an importing module,
+//      `loadModuleFromIRBlob` would return nullptr -- the #6557 symptom.
+//   3. The sources are kept available, so the freshness check takes its full
+//      recompute path rather than the "source missing -> accept standalone"
+//      shortcut.
+//
+// The scenario was requested on the issue by @pdeayton-nv; running it is both the
+// empirical answer and the regression lock.
+SLANG_UNIT_TEST(irBlobImportUpToDateCheck)
+{
+    // A dependency module exposing a public function, and an importer that calls
+    // it -- the call makes the importer genuinely depend on the dependency.
+    const char* dependencySource = R"(
+        module common;
+
+        public int addOne(int x) { return x + 1; }
+    )";
+    const char* importerSource = R"(
+        module A;
+
+        import common;
+
+        public int doubleThenAddOne(int x) { return addOne(addOne(x)); }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    // A single in-memory file system holds the sources and, after the build
+    // phase, the serialized `.slang-module` blobs. Keeping the sources present is
+    // deliberate: it drives the full freshness recompute in the load phase.
+    ComPtr<ISlangMutableFileSystem> memoryFileSystem =
+        ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
+    memoryFileSystem->saveFile("common.slang", dependencySource, strlen(dependencySource));
+    memoryFileSystem->saveFile("A.slang", importerSource, strlen(importerSource));
+
+    // Build phase: compile each module and serialize it to a `.slang-module`
+    // file via the default-option serialization path -- the same content-digest
+    // recipe an offline `slangc -o *.slang-module` invocation produces.
+    ComPtr<ISlangBlob> importerBlob;
+    {
+        sessionDesc.fileSystem = memoryFileSystem;
+        ComPtr<slang::ISession> buildSession;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, buildSession.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> dependencyModule;
+        dependencyModule = buildSession->loadModule("common", diagnostics.writeRef());
+        SLANG_CHECK(dependencyModule != nullptr);
+        ComPtr<slang::IBlob> dependencyBlob;
+        SLANG_CHECK(dependencyModule->serialize(dependencyBlob.writeRef()) == SLANG_OK);
+        memoryFileSystem->saveFileBlob("common.slang-module", dependencyBlob);
+
+        ComPtr<slang::IModule> importerModule;
+        importerModule = buildSession->loadModule("A", diagnostics.writeRef());
+        SLANG_CHECK(importerModule != nullptr);
+        SLANG_CHECK(importerModule->serialize(importerBlob.writeRef()) == SLANG_OK);
+        memoryFileSystem->saveFileBlob("A.slang-module", importerBlob);
+    }
+
+    // Load phase: a fresh session with UseUpToDateBinaryModule enabled. Reload the
+    // serialized `A.slang-module` artifact from the file system and load it via
+    // loadModuleFromIRBlob -- passing the `.slang-module` path -- without
+    // pre-loading the dependency, exactly as @pdeayton-nv's retest asked. `import
+    // common` is resolved from `common.slang-module` on the file system while the
+    // freshness gate is active.
+    {
+        slang::CompilerOptionEntry compilerOption = {};
+        compilerOption.name = slang::CompilerOptionName::UseUpToDateBinaryModule;
+        compilerOption.value.kind = slang::CompilerOptionValueKind::Int;
+        compilerOption.value.intValue0 = 1;
+
+        sessionDesc.fileSystem = memoryFileSystem;
+        sessionDesc.compilerOptionEntries = &compilerOption;
+        sessionDesc.compilerOptionEntryCount = 1;
+
+        ComPtr<slang::ISession> loadSession;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, loadSession.writeRef()) == SLANG_OK);
+
+        // Read the on-disk `.slang-module` back rather than reusing the in-memory
+        // build-phase blob, so the load path exercises the exact serialized bytes a
+        // deployed loader would see.
+        ComPtr<ISlangBlob> savedImporterBlob;
+        SLANG_CHECK(
+            memoryFileSystem->loadFile("A.slang-module", savedImporterBlob.writeRef()) == SLANG_OK);
+        SLANG_CHECK(savedImporterBlob != nullptr);
+
+        ComPtr<ISlangBlob> loadDiagnostics;
+        ComPtr<slang::IModule> loadedImporter;
+        loadedImporter = slang_loadModuleFromIRBlob(
+            loadSession,
+            "A",
+            "A.slang-module",
+            savedImporterBlob->getBufferPointer(),
+            savedImporterBlob->getBufferSize(),
+            loadDiagnostics.writeRef());
+        if (loadDiagnostics && loadDiagnostics->getBufferSize() > 0)
+        {
+            printf(
+                "Up-to-date importing-module IR blob load diagnostics: %.*s\n",
+                (int)loadDiagnostics->getBufferSize(),
+                (const char*)loadDiagnostics->getBufferPointer());
+        }
+
+        // The importer loads only if its `import common` resolved and the
+        // freshness gate accepted it; nullptr would be the #6557 symptom.
+        SLANG_CHECK(loadedImporter != nullptr);
     }
 }

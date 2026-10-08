@@ -98,6 +98,9 @@ set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(core_module_generated_header
     ${core_module_generated_header_dir}/slang-core-module-generated.h
 )
+set(core_module_archive_without_timestamp
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module-without-timestamp.bin
+)
 set(glsl_module_generated_header_dir
     ${CMAKE_CURRENT_BINARY_DIR}/../slang-glsl-module
 )
@@ -112,6 +115,7 @@ set(glsl_module_generated_header_dir
     PARENT_SCOPE
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
+set(core_module_archive_without_timestamp ${core_module_archive_without_timestamp} PARENT_SCOPE)
 
 # When SLANG_EMBED_CORE_MODULE=OFF, slang-without-embedded-core-module is an ALIAS
 # for slang, whose DLL (slang-compiler.dll) is placed in bin/ rather than generators/.
@@ -136,12 +140,23 @@ endif()
 
 add_custom_command(
     OUTPUT
+        ${core_module_archive_without_timestamp}
         ${core_module_generated_header}
         ${glsl_module_generated_header}
-        ${bootstrap_pre_copy_command}
+    ${bootstrap_pre_copy_command}
     COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
-        ${core_module_generated_header} -save-glsl-module-bin-source
+        ${CMAKE_COMMAND} -E make_directory ${core_module_generated_header_dir}
+        ${glsl_module_generated_header_dir}
+    COMMAND
+        "$<TARGET_FILE:slang-bootstrap>"
+        -compile-core-module
+        -archive-type
+        riff-lz4
+        -save-core-module
+        ${core_module_archive_without_timestamp}
+        -save-core-module-bin-source
+        ${core_module_generated_header}
+        -save-glsl-module-bin-source
         ${glsl_module_generated_header}
     DEPENDS
         slang-bootstrap
@@ -149,12 +164,27 @@ add_custom_command(
         ${bootstrap_extra_deps}
     VERBATIM
 )
-# Add a target so that we can depend on the above step when we create the glsl
-# module
+
 add_custom_target(
-    generate_core_module_headers
-    DEPENDS ${core_module_generated_header} ${glsl_module_generated_header}
+    generate_core_module
+    DEPENDS
+        ${core_module_archive_without_timestamp}
+        ${core_module_generated_header}
+        ${glsl_module_generated_header}
 )
+set_target_properties(generate_core_module PROPERTIES FOLDER generated)
+
+# Downstream targets depend on generate_core_module instead of the generated
+# files directly. With Visual Studio, a file-level dependency on a byproduct
+# copies the producer command into the dependent utility project, which makes
+# multi-target builds run the core generation command more than once.
+add_custom_target(generate_glsl_module_header)
+add_dependencies(generate_glsl_module_header generate_core_module)
+set_target_properties(generate_glsl_module_header PROPERTIES FOLDER generated)
+
+# Add a target so that existing dependents can request both generated headers.
+add_custom_target(generate_core_module_headers)
+add_dependencies(generate_core_module_headers generate_core_module generate_glsl_module_header)
 set_target_properties(generate_core_module_headers PROPERTIES FOLDER generated)
 
 set(core_module_common_args
@@ -177,7 +207,7 @@ set(core_module_common_args
 slang_add_target(
     ${core_module_common_args}
     TARGET_NAME slang-embedded-core-module
-    REQUIRES generate_core_module_headers
+    REQUIRES generate_core_module
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
     INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
 )

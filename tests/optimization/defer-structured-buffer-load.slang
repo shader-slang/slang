@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry compute_main -stage compute
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O3
 
 // Test that we can defer loading big structured buffer elements.
 

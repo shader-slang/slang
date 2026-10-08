@@ -2,7 +2,7 @@
 
 // Regression test for passing a `RayQuery` value into a subroutine.
 
-//TEST:CROSS_COMPILE: -profile sm_6_5 -stage compute -entry computeMain -target dxil-assembly
+//TEST:CROSS_COMPILE: -profile sm_6_5 -stage compute -entry computeMain -target dxil-assembly -O3
 
 RWStructuredBuffer<int> gOutput;
 RaytracingAccelerationStructure gScene;

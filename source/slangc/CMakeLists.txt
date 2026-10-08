@@ -4,6 +4,12 @@ else()
     set(SLANG_GLSL_MODULE_DEPENDENCY)
 endif()
 
+if(TARGET generate_core_module_cache)
+    set(SLANG_CORE_MODULE_CACHE_DEPENDENCY REQUIRES generate_core_module_cache)
+else()
+    set(SLANG_CORE_MODULE_CACHE_DEPENDENCY)
+endif()
+
 if(SLANG_ENABLE_SLANGC)
     slang_add_target(
         .
@@ -15,6 +21,7 @@ if(SLANG_ENABLE_SLANGC)
             slang
             Threads::Threads
             ${SLANG_GLSL_MODULE_DEPENDENCY}
+            ${SLANG_CORE_MODULE_CACHE_DEPENDENCY}
         PRECOMPILE_HEADERS
             ${slang_SOURCE_DIR}/source/core/slang-basic.h
         INSTALL
