@@ -70,7 +70,6 @@ namespace rt
 /// @par Constraints
 /// `Schema` must conform to `ITraceProgramSchema`.
 /// @category raytracing
-__magic_type(TraceProgramDescriptorType)
 __intrinsic_type(TraceProgramDescriptor)
 public struct TraceProgramDescriptor<Schema>
     where Schema : ITraceProgramSchema

@@ -32,8 +32,8 @@ endforeach()
 
 set(raytracing_module_file "${raytracing_output_dir}/raytracing.slang-module")
 
-# This module depends on compiler-owned structural stage identities, so build it with the compiler
-# from this tree after the core module is available. Cross builds use the supplied host generator.
+# Build with this tree's compiler and core module so the intrinsic types match. Cross builds use
+# the supplied host generator. The source uses ordinary Slang module compilation.
 if(SLANG_GENERATORS_PATH)
     if(CMAKE_HOST_WIN32)
         set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
@@ -55,9 +55,9 @@ endif()
 add_custom_command(
     OUTPUT ${raytracing_module_file}
     COMMAND
-        ${RAYTRACING_SLANG_COMPILER} -compile-slang-raytracing-module
-        -load-core-module ${core_module_archive_without_timestamp} -I
-        ${CMAKE_CURRENT_SOURCE_DIR} raytracing.slang -o raytracing.slang-module
+        ${RAYTRACING_SLANG_COMPILER} -load-core-module
+        ${core_module_archive_without_timestamp} -I ${CMAKE_CURRENT_SOURCE_DIR}
+        raytracing.slang -o raytracing.slang-module
     DEPENDS
         ${raytracing_copied_files}
         ${RAYTRACING_SLANG_COMPILER_DEPENDENCY}

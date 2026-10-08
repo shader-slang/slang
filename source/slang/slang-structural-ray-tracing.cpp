@@ -1369,16 +1369,12 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     auto descriptorGeneric = as<GenericDecl>(
         traceProgramDescriptorType ? traceProgramDescriptorType->parentDecl : nullptr);
     auto descriptorParameter = _getOnlyGenericTypeParameter(descriptorGeneric);
-    auto descriptorMagic = traceProgramDescriptorType
-                               ? traceProgramDescriptorType->findModifier<MagicTypeModifier>()
-                               : nullptr;
     auto descriptorIntrinsic =
         traceProgramDescriptorType
             ? traceProgramDescriptorType->findModifier<IntrinsicTypeModifier>()
             : nullptr;
     SLANG_RELEASE_ASSERT(
-        descriptorParameter && descriptorMagic && descriptorIntrinsic &&
-        descriptorMagic->magicNodeType.getTag() == ASTNodeType::TraceProgramDescriptorType &&
+        descriptorParameter && descriptorIntrinsic &&
         descriptorIntrinsic->irOp == kIROp_TraceProgramDescriptorType &&
         descriptorIntrinsic->irOperands.getCount() == 0 &&
         descriptorGeneric->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>().getCount() ==

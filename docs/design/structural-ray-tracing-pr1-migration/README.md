@@ -55,13 +55,15 @@ rt::TraceProgramDescriptor<Schema> program;
 It may also be a field in a host-bound parameter block. An already-bound descriptor can still be
 copied or passed to a function; opaque does not mean it cannot flow as a value.
 
-The compiler now represents it as `TraceProgramDescriptorType(schema, schemaWitness)`. Replace
+The compiler IR represents it as `TraceProgramDescriptor(schema, schemaWitness)`. Replace
 the full implementation's older `StructuralRayTracingProgramDescriptorType(storageType, schema)`
 wrapper and storage-field assumptions rather than keeping both representations. Target lowering
 creates Metal resources or erases the descriptor on native SBT targets.
 
-The standard-module build now uses `-compile-slang-raytracing-module` to authorize the packaged
-module's compiler-owned descriptor declaration.
+The module uses ordinary Slang module compilation. Its descriptor declaration uses the existing
+`__intrinsic_type(TraceProgramDescriptor)` modifier; normal generic lowering preserves both the
+schema and its conformance witness. Opaque-type checks read that same intrinsic modifier. There
+is no dedicated build option, module privilege, or descriptor AST type.
 
 ## 4. Share Metal tables across payload types
 

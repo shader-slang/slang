@@ -530,10 +530,10 @@ struct TypeTagContext
             return TypeTag((int(tags) & ~int(TypeTag::Unsized)) | int(TypeTag::Opaque));
         }
 
-        // The descriptor declaration has no fields by design, but it is a host-bound handle rather
-        // than an ordinary empty value. Classifying its dedicated AST type as opaque prevents generic
-        // layout and initialization checks from treating it like a fieldless user struct.
-        if (as<TraceProgramDescriptorType>(type))
+        // The descriptor has no fields, but its intrinsic type represents a host-bound handle.
+        // Read its intrinsic modifier so opacity checks and IR lowering agree on the representation,
+        // including when the declaration comes from an ordinary source or serialized module.
+        if (isIntrinsicTypeWithOp(type, kIROp_TraceProgramDescriptorType))
             return TypeTag::Opaque;
 
         // The compiler's resource type classes describe opaque values directly. Their builtin

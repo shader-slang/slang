@@ -7,6 +7,26 @@
 
 namespace Slang
 {
+bool isIntrinsicTypeWithOp(Type* type, IROp op)
+{
+    SLANG_ASSERT(type);
+    type = as<Type>(type->resolve());
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto decl = declRefType->getDeclRef().getDecl();
+    if (!decl)
+        return false;
+
+    auto modifier = decl->findModifier<IntrinsicTypeModifier>();
+    if (!modifier)
+        return false;
+    return IROp(modifier->irOp) == op;
+}
+
 Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink)
 {
     SharedSemanticsContext sharedSemanticsContext(

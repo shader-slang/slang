@@ -4747,6 +4747,12 @@ bool isInterfaceType(Type* type);
 
 bool isImmutableBufferType(Type* type);
 
+/// Returns whether the checked declaration of `type` carries `__intrinsic_type(op)`.
+/// Types such as `CoopMat` and `TraceProgramDescriptor` use this modifier without a dedicated
+/// AST type class. Read their declared opcode so aliases and generic substitutions retain the
+/// same classification without depending on the module or declaration name.
+bool isIntrinsicTypeWithOp(Type* type, IROp op);
+
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.
 bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type);

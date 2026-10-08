@@ -1363,10 +1363,6 @@ typedef uint32_t SlangSizeT;
         // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
-        // CLI-only authority for building the packaged slang.raytracing module. This permits
-        // its descriptor type without granting general core-module semantics.
-        CompileSlangRayTracingModule = 164,
-
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
