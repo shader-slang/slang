@@ -2777,12 +2777,13 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 // texelFetch
 // -------------------
 //
-// These `texelFetch` (and the `texelFetchOffset` below) overloads all take a *combined*
-// sampler -- `Sampler1D`/`Sampler2DRect`/`SamplerBuffer`, or an explicit `isCombined=1`
-// `_Texture`. On GLSL they lower to `texelFetch(sampler2D, ...)`, which never needs
+// These `texelFetch` (and the `texelFetchOffset` below) overloads take a *combined*
+// sampler (an `isCombined=1` `_Texture`), except the `SamplerBuffer` overload, whose
+// non-combined buffer lowers to `imageLoad` on GLSL. The combined overloads lower to
+// `texelFetch(sampler2D, ...)`, which never needs
 // `GL_EXT_samplerless_texture_functions` (that extension is only for texelFetch on a *bare*
 // texture). The static requirement is therefore plain `texture_sm_4_1`, not the
-// `texture_sm_4_1_samplerless` alias: carrying the samplerless atom on these combined-only
+// `texture_sm_4_1_samplerless` alias: carrying the samplerless atom on these
 // sites would spuriously fire `warning[E41012] profile implicitly upgraded` under an explicit
 // `-profile`, even though no `#extension` is emitted (see #11874). Where the samplerless
 // extension is genuinely needed (a bare-texture fetch) it is added at emit time by the
