@@ -32,9 +32,9 @@ struct StructuralMiss : rt::IMissShader
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::NoHitGroups;
+    typealias HitGroups = rt::EmptyHitGroupList;
     typealias MissShaders = rt::MissShaderList<StructuralMiss>;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 rt::AccelerationStructure scene;

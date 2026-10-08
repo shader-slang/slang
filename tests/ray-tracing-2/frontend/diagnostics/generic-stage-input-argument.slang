@@ -29,9 +29,9 @@ struct HitContext : rt::IHitContext
 struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias HitGroups = rt::EmptyHitGroupList;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 void consume<T>(T value)

@@ -51,8 +51,8 @@ struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = MyTraceContext;
     typealias HitGroups = rt::HitGroupList<HitGroup>;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 rt::AccelerationStructure scene;

@@ -37,8 +37,8 @@ struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestHitGroup>;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 struct Box<T>
@@ -53,12 +53,12 @@ void invalidMetadataValues(
     rt::HitGroupList<TestHitGroup> hitGroups,
 //CHECK:                           ^^^^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:                           ^^^^^^^^^ structural ray-tracing metadata type 'rt.HitGroupList<TestHitGroup>' has no runtime representation
-    rt::NoMissShaders missShaders,
-//CHECK:              ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
-//CHECK:              ^^^^^^^^^^^ structural ray-tracing metadata type 'rt.NoMissShaders' has no runtime representation
-    rt::NoCallableShaders callableShaders,
-//CHECK:                  ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
-//CHECK:                  ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.NoCallableShaders' has no runtime representation
+    rt::EmptyMissShaderList missShaders,
+//CHECK:                    ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                    ^^^^^^^^^^^ structural ray-tracing metadata type 'rt.MissShaderList<>' has no runtime representation
+    rt::EmptyCallableShaderList callableShaders,
+//CHECK:                        ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                        ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.CallableShaderList<>' has no runtime representation
     TestSchema schema,
 //CHECK:       ^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:       ^^^^^^ structural ray-tracing metadata type 'TestSchema' has no runtime representation

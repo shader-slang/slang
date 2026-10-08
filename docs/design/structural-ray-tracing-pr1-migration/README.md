@@ -3,7 +3,7 @@
 This report describes the changes the full implementation and demos need to adopt from
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
-Reference: PR1 API commit `e70b7badc`, plus the shared-table design documented in this report and
+Reference: the current PR1 source and the shared-table design documented in this report and
 the accompanying source comments. Updated on 2026-10-08. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
@@ -11,12 +11,12 @@ layout is agreed design; its backend implementation is deferred.
 ## 1. Remove open shader-list sections
 
 Removed `OpenHitGroups`, `OpenMissShaders`, and `OpenCallableShaders`. Use explicit variadic lists
-or the corresponding empty-section types:
+or the corresponding empty-list aliases:
 
 ```slang
 typealias HitGroups = rt::HitGroupList<OpaqueHitGroup, ShadowHitGroup>;
 typealias MissShaders = rt::MissShaderList<SkyMiss, ShadowMiss>;
-typealias CallableShaders = rt::NoCallableShaders;
+typealias CallableShaders = rt::EmptyCallableShaderList;
 ```
 
 Remove compiler/linker discovery that automatically includes implementations of a tag interface.
@@ -127,13 +127,33 @@ ray.tMax      -> ray.TMax
 
 Apply this to `desc.ray` and other values of `RayDesc`, including object-space rays.
 
+## 6. Replace the empty-list structs with aliases
+
+The separate `NoHitGroups`, `NoMissShaders`, and `NoCallableShaders` types are removed. Update
+their uses to the following aliases:
+
+```slang
+public typealias EmptyHitGroupList = HitGroupList<>;
+public typealias EmptyMissShaderList = MissShaderList<>;
+public typealias EmptyCallableShaderList = CallableShaderList<>;
+```
+
+Each alias is the same type as its empty variadic list and inherits `count == 0`. The compiler
+and backend should handle empty sections through that empty pack, without a separate type identity.
+Direct `HitGroupList<>` and equivalent miss/callable spellings remain valid; a bare generic name
+such as `HitGroupList` is not valid type syntax.
+
+Carry over the capability-inference fix in `CapabilityDeclReferenceVisitor`: a type-pack conformance
+proof contributes the capabilities of its element proofs. An empty proof contributes none. Visiting
+its constraint interface directly incorrectly imposed miss/callable requirements on empty lists.
+
 ## Additional API and integration updates
 
 These are additive declarations or behavior corrections rather than the main source migrations:
 
 - **List counts:** `IHitGroupList`, `IMissShaderList`, and `ICallableShaderList` now require
-  `static const int count`. Variadic lists provide their pack length; `NoHitGroups`, `NoMissShaders`,
-  and `NoCallableShaders` provide zero. Generic code can use the count through the interface
+  `static const int count`. Variadic lists provide their pack length; the three empty-list aliases
+  therefore provide zero. Generic code can use the count through the interface
   constraint, including `Schema.MissShaders.count`.
 - **Intersection payload:** `IntersectionInput<Context>.payload` now gives mutable access to
   `Context.Payload` on Metal and CUDA/OptiX, guarded by
@@ -150,6 +170,9 @@ These are additive declarations or behavior corrections rather than the main sou
   `MultiLevelAccelerationStructure<N>.levelCount` equals `N`, including the primitive-AS leaf.
   Levels run outermost to innermost; require `level < instanceCount`, not merely the static maximum.
   Existing scalar `instanceIndex` and `instanceID` remain specific to the portable two-level type.
+  The internal `IMultiLevelAccelerationStructure` now inherits `IAccelerationStructure`, so the
+  concrete multilevel handle declares only the derived conformance. The portable handle retains
+  an extension on the existing core `RaytracingAccelerationStructure` to preserve its resource type.
 - **Unimplemented paths:** Metal getters and operations now diagnose missing synthesis instead
   of returning fabricated values. The full implementation must supply real lowering. CUDA
   `geometryIndex` and `time` also have explicit pending paths. Front-end-only diagnostic tests

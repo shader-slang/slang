@@ -76,7 +76,7 @@ struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestHitGroup>;
-    typealias MissShaders = rt::NoMissShaders;
+    typealias MissShaders = rt::EmptyMissShaderList;
     typealias CallableShaders = rt::CallableShaderList<TestCallable>;
 }
 

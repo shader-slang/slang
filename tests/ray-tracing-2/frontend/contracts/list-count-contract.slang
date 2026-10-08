@@ -67,9 +67,9 @@ struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
 #if LIST_KIND == 0
-    typealias HitGroups = rt::NoHitGroups;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias HitGroups = rt::EmptyHitGroupList;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 #elif LIST_KIND == 1
     typealias HitGroups = rt::HitGroupList<>;
     typealias MissShaders = rt::MissShaderList<>;
@@ -111,7 +111,8 @@ struct SchemaCounts<S : rt::ITraceProgramSchema> : rt::ITraceProgramSchema
 [require(structural_raytracing_closesthit)]
 export int hitListCount()
 {
-    typealias Counts = ListCounts<Schema.HitGroups, rt::NoMissShaders, rt::NoCallableShaders>;
+    typealias Counts =
+        ListCounts<Schema.HitGroups, rt::EmptyMissShaderList, rt::EmptyCallableShaderList>;
     static_assert(Counts.hitCount == (LIST_KIND == 2 ? 1 : 0), "Hit list count");
     // Reserve a sentinel element so an empty list does not require a zero-length array.
     int entries[Counts.hitCount + 1] = {};
@@ -128,7 +129,8 @@ export int hitSchemaCount()
 [require(structural_raytracing_miss)]
 export int missListCount()
 {
-    typealias Counts = ListCounts<rt::NoHitGroups, Schema.MissShaders, rt::NoCallableShaders>;
+    typealias Counts =
+        ListCounts<rt::EmptyHitGroupList, Schema.MissShaders, rt::EmptyCallableShaderList>;
     static_assert(Counts.missCount == (LIST_KIND == 2 ? 2 : 0), "Miss list count");
     // Reserve a sentinel element so an empty list does not require a zero-length array.
     int entries[Counts.missCount + 1] = {};
@@ -145,7 +147,8 @@ export int missSchemaCount()
 [require(structural_raytracing_callable)]
 export int callableListCount()
 {
-    typealias Counts = ListCounts<rt::NoHitGroups, rt::NoMissShaders, Schema.CallableShaders>;
+    typealias Counts =
+        ListCounts<rt::EmptyHitGroupList, rt::EmptyMissShaderList, Schema.CallableShaders>;
     static_assert(Counts.callableCount == (LIST_KIND == 2 ? 3 : 0), "Callable list count");
     // Reserve a sentinel element so an empty list does not require a zero-length array.
     int entries[Counts.callableCount + 1] = {};

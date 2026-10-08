@@ -18,9 +18,9 @@ struct TestTraceContext : rt::ITraceContext
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::NoHitGroups;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias HitGroups = rt::EmptyHitGroupList;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 rt::TraceProgramDescriptor<Schema> descriptor;

@@ -43,8 +43,8 @@ public interface IHitGroup
 /// Represents a compile-time list of `IHitGroup` implementation types.
 ///
 /// Use this interface as a generic or associated-type constraint. Supply `HitGroupList<...>` for
-/// explicit entries or `NoHitGroups` for an empty list.
-/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
+/// explicit entries or `EmptyHitGroupList` (an alias for `HitGroupList<>`) for an empty list.
+/// It is sealed because the compiler reads the `HitGroupList` type pack directly; the interface
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IHitGroupList
@@ -60,8 +60,8 @@ public interface IHitGroupList
 /// Represents a compile-time list of `IMissShader` implementation types.
 ///
 /// Use this interface as a generic or associated-type constraint. Supply `MissShaderList<...>` for
-/// explicit entries or `NoMissShaders` for an empty list.
-/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
+/// explicit entries or `EmptyMissShaderList` (an alias for `MissShaderList<>`) for an empty list.
+/// It is sealed because the compiler reads the `MissShaderList` type pack directly; the interface
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IMissShaderList
@@ -77,9 +77,9 @@ public interface IMissShaderList
 /// Represents a compile-time list of `ICallableShader` implementation types.
 ///
 /// Use this interface as a generic or associated-type constraint. Supply `CallableShaderList<...>`
-/// for explicit entries or `NoCallableShaders` for an empty list.
-/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
-/// provides no way for a user-defined list to expose its entries.
+/// for explicit entries or `EmptyCallableShaderList` (an alias for `CallableShaderList<>`) for an
+/// empty list. It is sealed because the compiler reads the `CallableShaderList` type pack
+/// directly; the interface provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface ICallableShaderList
 {
@@ -147,50 +147,29 @@ public struct CallableShaderList<each Shader> : ICallableShaderList
     public static const int count = countof(Shader);
 }
 
-/// Selects an empty hit-group section.
+/// Names an empty list of hit-group types.
 ///
 /// @par Constraints
-/// Conforms to `IHitGroupList`, with no hit-group entries.
-public struct NoHitGroups : IHitGroupList
-{
-    /// Gives the number of hit-group types in this empty list.
-    ///
-    /// @par Constraints
-    /// A compile-time constant equal to zero, satisfying `IHitGroupList.count`.
-    public static const int count = 0;
-}
+/// Identical to `HitGroupList<>`; conforms to `IHitGroupList` with `count == 0`.
+public typealias EmptyHitGroupList = HitGroupList<>;
 
-/// Selects an empty miss-shader section.
+/// Names an empty list of miss-shader types.
 ///
 /// @par Constraints
-/// Conforms to `IMissShaderList`, with no miss-stage entries.
-public struct NoMissShaders : IMissShaderList
-{
-    /// Gives the number of miss-stage types in this empty list.
-    ///
-    /// @par Constraints
-    /// A compile-time constant equal to zero, satisfying `IMissShaderList.count`.
-    public static const int count = 0;
-}
+/// Identical to `MissShaderList<>`; conforms to `IMissShaderList` with `count == 0`.
+public typealias EmptyMissShaderList = MissShaderList<>;
 
-/// Selects an empty callable-shader section.
+/// Names an empty list of callable-shader types.
 ///
 /// @par Constraints
-/// Conforms to `ICallableShaderList`, with no callable-stage entries.
-public struct NoCallableShaders : ICallableShaderList
-{
-    /// Gives the number of callable-stage types in this empty list.
-    ///
-    /// @par Constraints
-    /// A compile-time constant equal to zero, satisfying `ICallableShaderList.count`.
-    public static const int count = 0;
-}
+/// Identical to `CallableShaderList<>`; conforms to `ICallableShaderList` with `count == 0`.
+public typealias EmptyCallableShaderList = CallableShaderList<>;
 
 /// Describes the finite set of ray-tracing code available to one linked program.
 ///
 /// The schema contains no physical SBT positions. Reflection maps these entry types to target
 /// identifiers or link-specific function indices that the host writes into runtime records.
-/// Each section names an explicit list or the corresponding empty-section type.
+/// Each section names an explicit list or the corresponding empty-list alias.
 public interface ITraceProgramSchema
 {
     /// Defines the acceleration structure and motion policy used to trace this program.
@@ -202,20 +181,21 @@ public interface ITraceProgramSchema
     /// Selects the finite list of hit groups available to this program.
     ///
     /// @par Constraints
-    /// Must conform to the sealed `IHitGroupList`: use `HitGroupList<...>` or `NoHitGroups`.
+    /// Must conform to the sealed `IHitGroupList`: use `HitGroupList<...>` or `EmptyHitGroupList`.
     associatedtype HitGroups : IHitGroupList;
 
     /// Selects the finite list of miss stages available to this program.
     ///
     /// @par Constraints
-    /// Must conform to the sealed `IMissShaderList`: use `MissShaderList<...>` or `NoMissShaders`.
+    /// Must conform to the sealed `IMissShaderList`: use `MissShaderList<...>` or
+    /// `EmptyMissShaderList`.
     associatedtype MissShaders : IMissShaderList;
 
     /// Selects the finite list of callable stages available to this program.
     ///
     /// @par Constraints
     /// Must conform to the sealed `ICallableShaderList`: use `CallableShaderList<...>` or
-    /// `NoCallableShaders`.
+    /// `EmptyCallableShaderList`.
     associatedtype CallableShaders : ICallableShaderList;
 }
 

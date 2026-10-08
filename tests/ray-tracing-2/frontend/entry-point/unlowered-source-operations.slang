@@ -78,7 +78,7 @@ struct Callable : rt::ICallableShader
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::NoHitGroups;
+    typealias HitGroups = rt::EmptyHitGroupList;
     typealias MissShaders = rt::MissShaderList<EmptyMiss, PayloadMiss>;
     typealias CallableShaders = rt::CallableShaderList<Callable>;
 }

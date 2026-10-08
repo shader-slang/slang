@@ -1560,10 +1560,10 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     {
         if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
         {
-            // A sealed entry-list type has one concrete type pack and, for a non-empty list, one
-            // matching conformance-witness pack. Select them by semantic role instead of relying
-            // on their positions among the generic arguments. Both IR lowering and reflection
-            // consume this exact checked representation.
+            // A concrete entry-list specialization has a type pack and a matching conformance-
+            // witness pack, both empty for an empty list. Select them by semantic role instead of
+            // relying on their positions among the generic arguments. Both IR lowering and
+            // reflection consume this exact checked representation.
             for (auto argument : genericApp->getArgs())
             {
                 auto resolvedArgument = argument->resolve();
@@ -1574,6 +1574,7 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
             }
         }
     }
+    // Dependent list types have no concrete entries until specialization.
     if (!result.types)
         result.types = astBuilder->getTypePack(ArrayView<Type*>());
     SLANG_RELEASE_ASSERT(

@@ -183,6 +183,11 @@ public interface IAccelerationStructure {}
 /// It represents portable two-level TLAS-to-BLAS traversal (or Metal IAS-to-primitive-AS
 /// traversal).
 ///
+/// The core module already declares this intrinsic resource type in `hlsl.meta.slang`. Extending
+/// it preserves the type accepted by existing bindings and native trace operations; declaring a
+/// new struct here would introduce a distinct type. The extension also keeps the core module
+/// independent of this experimental module's interface.
+///
 /// @par Specialization
 /// Extends the core `RaytracingAccelerationStructure` type with `IAccelerationStructure`
 /// conformance. There are no generic constraints; this conformance identifies that concrete
@@ -196,17 +201,18 @@ public extension RaytracingAccelerationStructure : IAccelerationStructure {}
 /// `IAccelerationStructure` interface. It does not denote the multilevel handle family.
 public typealias AccelerationStructure = RaytracingAccelerationStructure;
 
-/// Identifies depth-parameterized handles for the multilevel stage-input extensions.
+/// Refines `IAccelerationStructure` for handles with a maximum traversal depth.
 ///
 /// Extension lookup cannot infer a depth appearing only in a nested associated-type equality.
 /// This internal contract lets those extensions select the whole handle family without requiring
 /// shader code to supply a second depth argument when reading an instance path.
 ///
 /// @par Constraints
-/// Internal and sealed. `MultiLevelAccelerationStructure<N>` supplies this conformance; the
-/// portable `AccelerationStructure` type does not.
+/// Internal and sealed. Every conforming type is also an `IAccelerationStructure`.
+/// `MultiLevelAccelerationStructure<N>` supplies this conformance; the portable
+/// `AccelerationStructure` type does not.
 [sealed]
-internal interface IMultiLevelAccelerationStructure
+internal interface IMultiLevelAccelerationStructure : IAccelerationStructure
 {
     /// Gives the maximum depth, including the primitive acceleration structure and instance levels.
     ///
@@ -227,13 +233,13 @@ internal interface IMultiLevelAccelerationStructure
 /// This integer parameter is a type-level constant, not the runtime number of instances hit.
 ///
 /// @par Constraints
-/// Requires Metal and conforms to both `IAccelerationStructure` and the internal
-/// `IMultiLevelAccelerationStructure` contract. The parameter is declared as `int` with no
+/// Requires Metal and conforms to the internal `IMultiLevelAccelerationStructure` contract,
+/// which inherits `IAccelerationStructure`. The parameter is declared as `int` with no
 /// language-level range constraint; the caller must select a depth supported by Metal.
 [require(metal)]
 __intrinsic_type(RaytracingAccelerationStructure)
 public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
-    : IAccelerationStructure, IMultiLevelAccelerationStructure
+    : IMultiLevelAccelerationStructure
 {
     /// Gives the maximum acceleration-structure depth, including the primitive level.
     ///

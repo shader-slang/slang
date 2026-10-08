@@ -39,8 +39,8 @@ struct TestSchema : rt::ITraceProgramSchema
 {
     typealias TraceContext = TestTraceContext;
     typealias HitGroups = rt::HitGroupList<TestHitGroup>;
-    typealias MissShaders = rt::NoMissShaders;
-    typealias CallableShaders = rt::NoCallableShaders;
+    typealias MissShaders = rt::EmptyMissShaderList;
+    typealias CallableShaders = rt::EmptyCallableShaderList;
 }
 
 [numthreads(1, 1, 1)]
