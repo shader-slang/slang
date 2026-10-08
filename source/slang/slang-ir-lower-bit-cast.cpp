@@ -432,12 +432,31 @@ static bool haveSameNaturalLayout(TargetProgram* targetProgram, IRType* a, IRTyp
     return aLayout.size == bLayout.size && aLayout.alignment == bLayout.alignment;
 }
 
-// Return the offset given to `field` by `[[vk::offset]]`, which overrides natural layout, or -1.
-static IRIntegerValue getExplicitFieldOffset(IRStructField* field)
+// Return true if `a` and `b`, fields at the same position of two structs whose earlier fields
+// match, start at the same natural offset. Without `[[vk::offset]]` that follows from the earlier
+// fields matching in size and alignment; an explicit offset on either field has to be compared.
+static bool haveSameNaturalOffset(TargetProgram* targetProgram, IRStructField* a, IRStructField* b)
 {
-    if (auto offsetDecor = field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
-        return offsetDecor->getOffset()->getValue();
-    return -1;
+    if (!a->getKey()->findDecoration<IRVkStructOffsetDecoration>() &&
+        !b->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+        return true;
+    auto targetReq = targetProgram->getTargetReq();
+    IRIntegerValue aOffset = 0;
+    IRIntegerValue bOffset = 0;
+    if (SLANG_FAILED(getNaturalOffset(targetReq, a, &aOffset)) ||
+        SLANG_FAILED(getNaturalOffset(targetReq, b, &bOffset)))
+        return false;
+    return aOffset == bOffset;
+}
+
+// Return true if `type` is a struct holding an opaque handle, or an array of such structs. These
+// are the values that resource-type legalization splits apart. A handle, or an array of handles,
+// stays whole, so a `BitCast` of it is left to the target.
+static bool isStructWithOpaqueField(IRType* type)
+{
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+        type = arrayType->getElementType();
+    return as<IRStructType>(type) && isOpaqueType(type, nullptr);
 }
 
 // Return true if a `BitCast` from `fromType` to `toType` can be rewritten by
@@ -468,7 +487,7 @@ static bool isOpaqueBitCastMatch(TargetProgram* targetProgram, IRType* fromType,
             if (fieldIndex >= toFields.getCount())
                 return false;
             auto toField = toFields[fieldIndex++];
-            if (getExplicitFieldOffset(fromField) != getExplicitFieldOffset(toField))
+            if (!haveSameNaturalOffset(targetProgram, fromField, toField))
                 return false;
             if (!isOpaqueBitCastMatch(
                     targetProgram,
@@ -567,11 +586,7 @@ void lowerOpaqueBitCast(
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
 
-        // A cast with no aggregate side, such as one handle type to another, has nothing for
-        // resource-type legalization to split apart, so we leave it to the target.
-        if (!isCompositeType(fromType) && !isCompositeType(toType))
-            continue;
-        if (!isOpaqueType(fromType, nullptr) && !isOpaqueType(toType, nullptr))
+        if (!isStructWithOpaqueField(fromType) && !isStructWithOpaqueField(toType))
             continue;
 
         if (!isOpaqueBitCastMatch(targetProgram, fromType, toType))

@@ -1,7 +1,7 @@
 // Test that on CUDA, where a texture handle is an ordinary 64-bit value, a bit_cast from
 // a struct holding a texture to plain data keeps its byte semantics (issue #13480).
-// This test already passes on master; it pins that the opaque-aggregate bit_cast
-// rewrite leaves byte-level casts alone on targets without resource legalization.
+// CUDA does not legalize resource types, so the cast stays a byte-level bit_cast even
+// though the two types do not match field-for-field.
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
