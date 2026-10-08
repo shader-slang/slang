@@ -22191,6 +22191,30 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Collect the capabilities of the individual conformances in a type-pack proof.
+    // Consider this example:
+    //
+    //     [require(metal)] interface IMetalItem {}
+    //     struct Items<each T> where expand each T : IMetalItem
+    //     {
+    //         static const int count = countof(T);
+    //     }
+    //     [require(hlsl)] export int emptyCount() { return Items<>.count; }
+    //
+    // SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
+    // vacuously satisfied constraint. That canonical witness retains IMetalItem as its
+    // supertype, but has no element conformances requiring Metal. Visiting every operand
+    // would incorrectly restrict emptyCount to Metal. Visit the element witnesses instead:
+    // nonempty packs still propagate each conformance's capabilities, while an empty pack
+    // contributes none. General declaration-reference collection still visits the supertype
+    // because it remains part of the proof's identity.
+    void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
+    {
+        if (!this->visitedVals.add(witness))
+            return;
+        for (Index i = 0; i < witness->getCount(); i++)
+            this->dispatchIfNotNull(witness->getWitness(i));
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
