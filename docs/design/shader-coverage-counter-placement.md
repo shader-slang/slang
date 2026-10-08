@@ -582,8 +582,7 @@ false, both counters for `b` stay zero, and LCOV renders them as
 unevaluated (`-`), which distinguishes a skipped operand from an
 evaluated operand that was false. A chain such as `(a && b) || c` has
 decisions for `a`, `b`, and `c` in the same way, and parentheses and
-logical negation preserve that decision tree. A negated operand records
-the outcomes of the operand it negates.
+logical negation preserve that decision tree.
 
 The same source-oriented rule applies when the expression produces a
 value rather than a condition, as in `bool r = a && b;`. GCC can
