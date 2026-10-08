@@ -2519,7 +2519,10 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
                 flavor = WorkspaceFlavor::VFX;
             }
 
-            m_core.m_workspace->workspaceFlavor = flavor;
+            if (m_core.m_workspace->updateWorkspaceFlavor(flavor))
+            {
+                sendRefreshRequests(m_connection);
+            }
         }
     }
 }
