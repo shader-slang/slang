@@ -7,9 +7,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
 
 // No diagnostics are expected, and the check is exhaustive. Had the `extern float f(float)`
-// candidate been dropped, `f(1.5f)` would call `f(int)` with an implicit-conversion warning; had
-// `int f(int)` been dropped, `requireInteger(f(1))` would fail because `float` does not conform to
-// `IInteger`.
+// candidate been dropped, `f(1.5f)` would have no applicable overload (`float` to `int` is not an
+// implicit conversion); had `int f(int)` been dropped, `requireInteger(f(1))` would fail because
+// `float` does not conform to `IInteger`. A call is ranked by conversion cost before the `extern`
+// comparison is reached, so this file checks that both overloads stay callable; the bare-reference
+// tests extern-overload-bare-*.slang drive the comparison itself.
 
 import overloaddef;
 import overloadext;
