@@ -9,7 +9,7 @@ inputs:
   platform:
     required: true
   llvm-hash:
-    description: "Hash of build-llvm.sh for cache key"
+    description: "Hash of build-llvm.sh and LLVM patches for cache key"
     required: true
   build-if-missing:
     description: "Build LLVM if not found in GCS"

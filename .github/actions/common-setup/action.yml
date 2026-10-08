@@ -125,7 +125,7 @@ runs:
         os: ${{ inputs.os }}
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
-        llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
