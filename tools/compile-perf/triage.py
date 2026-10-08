@@ -36,6 +36,10 @@ Across the commit range between the last differing baseline commit and tonight's
     lines. This is a heuristic for choosing what to bisect or read first; it
     does not establish causation.
 
+The nightly's analyze job runs it after the Slack notification when the trend step
+reports a confirmed regression, and the agent-analysis job reads the result; a
+person can run it on any archived night (see below).
+
 Only the standard library is used (CI enforces this for the suite). Commit data
 comes from a local git checkout when it has both commits, otherwise from the
 GitHub REST API (GITHUB_TOKEN / GH_TOKEN optional).

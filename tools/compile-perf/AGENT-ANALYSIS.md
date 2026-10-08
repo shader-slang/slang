@@ -1,13 +1,24 @@
 # Nightly alert analysis protocol
 
 This file is the instruction set for the agent that writes the first analysis of
-a confirmed nightly compile-perf regression (`.github/workflows/compile-perf-agent-analysis.yml`).
+a confirmed nightly compile-perf regression: the `agent-analysis` job in
+`.github/workflows/nightly-mdl-perf-test.yml`, which runs after the `analyze` job.
 A person can follow it by hand. The measurable half is `triage.py`; this file covers
 the judgment half: turning the evidence bundle into a short, honest write-up.
 
 ## Inputs
 
-All under `analysis/` in the working directory, produced by `triage.py`:
+All under `analysis/` in the working directory:
+
+- `trend-report.txt`: the report the Slack alert is built from (the confirmed
+  errors and warnings against the frozen baseline), as printed by `confirm.py report`.
+  If it is a single line saying the confirmation could not be evaluated, say that and
+  rely on the bundle.
+- `results/`: the night's full `results.json` (every workload, every sample),
+  `confirmation.json` (the frozen plan and the rerun) and `meta.json`. The bundle is
+  computed from these; open them with Grep for a specific workload's samples.
+
+Produced by `triage.py` from those:
 
 - `bundle.md` and `bundle.json`: the evidence. Start from `bundle.md`, a short
   rendering of the same data. `bundle.json` is large (about 100 KB): search it with
