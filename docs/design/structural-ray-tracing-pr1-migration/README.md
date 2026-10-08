@@ -131,6 +131,10 @@ Apply this to `desc.ray` and other values of `RayDesc`, including object-space r
 
 These are additive declarations or behavior corrections rather than the main source migrations:
 
+- **List counts:** `IHitGroupList`, `IMissShaderList`, and `ICallableShaderList` now require
+  `static const int count`. Variadic lists provide their pack length; `NoHitGroups`, `NoMissShaders`,
+  and `NoCallableShaders` provide zero. Generic code can use the count through the interface
+  constraint, including `Schema.MissShaders.count`.
 - **Intersection payload:** `IntersectionInput<Context>.payload` now gives mutable access to
   `Context.Payload` on Metal and CUDA/OptiX, guarded by
   `structural_raytracing_intersection_payload`. D3D/Vulkan reject use of the property; intersection

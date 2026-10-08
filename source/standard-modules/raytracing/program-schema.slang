@@ -48,7 +48,14 @@ public interface IHitGroup
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IHitGroupList
-{}
+{
+    /// Gives the number of hit-group types in the list.
+    ///
+    /// @par Constraints
+    /// Must be a compile-time constant equal to the number of entries, including zero for an
+    /// empty list.
+    static const int count;
+}
 
 /// Represents a compile-time list of `IMissShader` implementation types.
 ///
@@ -58,7 +65,14 @@ public interface IHitGroupList
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IMissShaderList
-{}
+{
+    /// Gives the number of miss-stage types in the list.
+    ///
+    /// @par Constraints
+    /// Must be a compile-time constant equal to the number of entries, including zero for an
+    /// empty list.
+    static const int count;
+}
 
 /// Represents a compile-time list of `ICallableShader` implementation types.
 ///
@@ -68,7 +82,14 @@ public interface IMissShaderList
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface ICallableShaderList
-{}
+{
+    /// Gives the number of callable-stage types in the list.
+    ///
+    /// @par Constraints
+    /// Must be a compile-time constant equal to the number of entries, including zero for an
+    /// empty list.
+    static const int count;
+}
 
 /// Lists the hit-group implementations available to a trace program schema.
 ///
@@ -131,21 +152,39 @@ public struct CallableShaderList<each Shader> : ICallableShaderList
 /// @par Constraints
 /// Conforms to `IHitGroupList`, with no hit-group entries.
 public struct NoHitGroups : IHitGroupList
-{}
+{
+    /// Gives the number of hit-group types in this empty list.
+    ///
+    /// @par Constraints
+    /// A compile-time constant equal to zero, satisfying `IHitGroupList.count`.
+    public static const int count = 0;
+}
 
 /// Selects an empty miss-shader section.
 ///
 /// @par Constraints
 /// Conforms to `IMissShaderList`, with no miss-stage entries.
 public struct NoMissShaders : IMissShaderList
-{}
+{
+    /// Gives the number of miss-stage types in this empty list.
+    ///
+    /// @par Constraints
+    /// A compile-time constant equal to zero, satisfying `IMissShaderList.count`.
+    public static const int count = 0;
+}
 
 /// Selects an empty callable-shader section.
 ///
 /// @par Constraints
 /// Conforms to `ICallableShaderList`, with no callable-stage entries.
 public struct NoCallableShaders : ICallableShaderList
-{}
+{
+    /// Gives the number of callable-stage types in this empty list.
+    ///
+    /// @par Constraints
+    /// A compile-time constant equal to zero, satisfying `ICallableShaderList.count`.
+    public static const int count = 0;
+}
 
 /// Describes the finite set of ray-tracing code available to one linked program.
 ///
