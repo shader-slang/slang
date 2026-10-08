@@ -2782,8 +2782,8 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 // (an `isCombined=1` `_Texture`) lower on GLSL to `texelFetch` on a combined sampler, which never needs
 // `GL_EXT_samplerless_texture_functions`; carrying the samplerless atom there would spuriously
 // fire `warning[E41012] profile implicitly upgraded` under an explicit `-profile` (see #11874).
-// For bare-texture fetches and the non-combined `SamplerBuffer` overload, the `_Texture` `Load`
-// implementations request the extension at emit time with `__requireTargetExtension`.
+// Bare-texture fetches and the non-combined `SamplerBuffer` overload (which lowers to
+// `imageLoad`) get the extension from `__requireTargetExtension` in their `_Texture` `Load`.
 
 __generic<T:ITexelData, let sampleCount:int, let format:int>
 [ForceInline]
