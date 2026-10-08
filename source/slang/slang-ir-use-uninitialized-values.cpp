@@ -713,7 +713,7 @@ static bool doesEveryPathFromToCrossPropagationBoundary(
 
 /// Return whether `readingInst` has the form accepted by the wave-election exception.
 //
-// We account for two IR shapes for the same source-level `WaveReadLaneFirst(x)`. When the call
+// We account for two IR shapes for a call written as `WaveReadLaneFirst(x)`. When the call
 // takes `x` directly as an input argument, the usage classifier treats the call itself as the read;
 // no separate load exists at this point in the pipeline. Therefore:
 //
@@ -722,8 +722,8 @@ static bool doesEveryPathFromToCrossPropagationBoundary(
 //  - `readingInst` may be a load whose result is consumed only by such a call, apart from type-only
 //    queries.
 //
-// In either form, we require `WaveReadLaneFirst` to be the tracked value's only runtime consumer.
-// A read with another consumer remains subject to the normal path-sensitive proof. We also require
+// For the load form, we require the builtin call to be the load result's only runtime consumer.
+// A load with another consumer remains subject to the normal path-sensitive proof. We also require
 // a direct call to the known builtin rather than looking through a user-defined wrapper. A wrapper
 // therefore retains the existing conservative warning instead of suppressing a valid diagnostic.
 static bool isWaveReadLaneFirstUse(IRInst* readingInst)
@@ -1586,7 +1586,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
         }
     }
 
-    // We finish by reporting each constructor field that no returning path initializes.
+    // We finish by checking each constructor return for fields with no possible reaching write.
     checkConstructor(func, reachability, sink);
 }
 

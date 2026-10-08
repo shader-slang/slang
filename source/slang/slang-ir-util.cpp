@@ -98,6 +98,13 @@ bool isSingleResourceValueType(IRInst* type)
 
 bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type)
 {
+    // Semantic checking admits language types in
+    // `_isResourceTypeSupportedForPerInvocationReplacement` in `slang-check-decl.cpp`. This
+    // predicate recognizes IR types that the replacement pass can carry. Every admitted language
+    // type must lower to a type that satisfies this check after the target's selected resource-
+    // and empty-type legalization passes. Recognizing an IR type here does not make its
+    // corresponding language type legal in a mutable global declaration.
+    //
     // We strip attributed and rate wrappers at every level because either wrapper may surround an
     // array or its element. `IRArrayType` identifies a fixed-size array; we reject
     // `IRUnsizedArrayType` without asking a separate recursive type query to infer that fact.

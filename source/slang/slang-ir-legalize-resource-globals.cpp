@@ -519,11 +519,12 @@ struct LegalizeResourceGlobalVarsPass
         // a target-specific stage unless the proposed post-link validator receives those
         // capabilities.
         analyzeResourceAccess();
-        auto functionsAccessingResourceGlobals = computeFunctionsAccessingAnyResourceGlobal();
+        auto functionAccessesResourceGlobals =
+            computeWhetherEachFunctionAccessesAnyResourceGlobal();
         diagnosedUnsupportedProgram =
-            diagnoseFunctionsWithUnrewritableInvocations(sink, functionsAccessingResourceGlobals);
+            diagnoseFunctionsWithUnrewritableInvocations(sink, functionAccessesResourceGlobals);
         diagnosedUnsupportedProgram |=
-            diagnoseFunctionsWithAlternateImplementations(sink, functionsAccessingResourceGlobals);
+            diagnoseFunctionsWithAlternateImplementations(sink, functionAccessesResourceGlobals);
         if (diagnosedUnsupportedProgram)
             return;
         if (diagnoseArrayInitializationRequiringSubobjectAnalysis(sink))
@@ -795,13 +796,15 @@ struct LegalizeResourceGlobalVarsPass
         }
     }
 
-    /// Return which functions may read or write at least one selected resource global.
-    List<bool> computeFunctionsAccessingAnyResourceGlobal()
+    /// Return whether each function may read or write at least one selected resource global.
+    ///
+    /// The returned list has one flag per entry in `functions`, in the same order.
+    List<bool> computeWhetherEachFunctionAccessesAnyResourceGlobal()
     {
         // `analyzeResourceAccess` has already followed every supported storage transfer and
         // propagated callee effects to callers. We combine those per-global summaries so that the
         // invocation checks use the same definition of runtime access as parameter generation.
-        List<bool> accessesResource;
+        List<bool> functionAccessesResourceGlobals;
         for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
         {
             bool functionAccessesResource = false;
@@ -813,9 +816,9 @@ struct LegalizeResourceGlobalVarsPass
                     break;
                 }
             }
-            accessesResource.add(functionAccessesResource);
+            functionAccessesResourceGlobals.add(functionAccessesResource);
         }
-        return accessesResource;
+        return functionAccessesResourceGlobals;
     }
 
     /// Diagnose functions whose execution may access a selected global but whose invocation cannot
@@ -830,7 +833,7 @@ struct LegalizeResourceGlobalVarsPass
     /// extended.
     bool diagnoseFunctionsWithUnrewritableInvocations(
         DiagnosticSink* sink,
-        List<bool> const& accessesResource)
+        List<bool> const& functionAccessesResourceGlobals)
     {
         // Phase 4 can extend a direct call inside a function because the caller has replacement
         // storage whose value it can pass. A call outside a function body has no caller-local
@@ -846,7 +849,7 @@ struct LegalizeResourceGlobalVarsPass
 
         for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
         {
-            if (!accessesResource[functionIndex])
+            if (!functionAccessesResourceGlobals[functionIndex])
                 continue;
 
             auto const& function = functions[functionIndex];
@@ -876,7 +879,7 @@ struct LegalizeResourceGlobalVarsPass
     /// rewrite, and return whether any diagnostic was emitted.
     bool diagnoseFunctionsWithAlternateImplementations(
         DiagnosticSink* sink,
-        List<bool> const& accessesResource)
+        List<bool> const& functionAccessesResourceGlobals)
     {
         // Phase 3 analyzes the function's IR blocks, and phase 4 inserts any required copy-in and
         // copy-out operations into those blocks. Generic assembly or an applicable target intrinsic
@@ -886,7 +889,7 @@ struct LegalizeResourceGlobalVarsPass
         bool diagnosed = false;
         for (Index functionIndex = 0; functionIndex < functions.getCount(); ++functionIndex)
         {
-            if (!accessesResource[functionIndex])
+            if (!functionAccessesResourceGlobals[functionIndex])
                 continue;
 
             auto func = functions[functionIndex].func;

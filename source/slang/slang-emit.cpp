@@ -1006,6 +1006,41 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
+/// Resolve varying references and redirect ordinary calls to non-entry-point clones.
+///
+/// Shader entry points and CUDA kernels remain launch targets; ordinary calls use their clones.
+static void resolveVaryingReferencesAndSplitEntryPointCallsites(
+    IRModule* irModule,
+    CodeGenContext* codeGenContext)
+{
+    // A shader entry point or CUDA kernel that is also called as an ordinary function needs a
+    // non-entry-point clone.
+    // We first translate global varying variables and resolve varying-input references so that
+    // the clone contains the references that emission expects. We then redirect ordinary calls
+    // to the clone. Each pass retains its own hooks for IR validation, dumps, and profiling.
+    auto& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    if (requiredLoweringPassSet.globalVaryingVar)
+        wrapPass(
+            codeGenContext,
+            "translateGlobalVaryingVar",
+            translateGlobalVaryingVar,
+            irModule,
+            codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        wrapPass(
+            codeGenContext,
+            "resolveVaryingInputRef",
+            [](IRModule* module) { resolveVaryingInputRef(module); },
+            irModule);
+
+    wrapPass(
+        codeGenContext,
+        "fixEntryPointCallsites",
+        [](IRModule* module) { fixEntryPointCallsites(module); },
+        irModule);
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -2073,23 +2108,12 @@ Result linkAndOptimizeIR(
     const bool hasResourceGlobalCandidate = doesModuleContainResourceGlobalCandidate(irModule);
     if (hasResourceGlobalCandidate)
     {
-        // Specialization can expose references to global varying builtins that were hidden behind
-        // generic or interface dispatch. We translate those references now, then resolve varying
-        // input references before cloning any entry point that is also called as an ordinary
-        // function. The ordinary clone must contain the resolved references that emission will
-        // use.
-        if (requiredLoweringPassSet.globalVaryingVar)
-            SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-        if (requiredLoweringPassSet.resolveVaryingInputRef)
-            SLANG_PASS(resolveVaryingInputRef);
-
         // We split the launch and ordinary-call roles of shader entry points and CUDA kernels
         // before moving entry-point initialization. Otherwise the ordinary clone would inherit
         // initialization that must execute only when the original function is launched. Resource-
         // global legalization can then add generated resource parameters to the ordinary clone and
         // append matching arguments at its direct call sites.
-        SLANG_PASS(fixEntryPointCallsites);
+        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
 
         // Any resource- or empty-type legalization selected for the target has now run.
         // `isResourceGlobalCandidateForPerInvocationReplacement` accepts only resource values and
@@ -2396,13 +2420,7 @@ Result linkAndOptimizeIR(
         // A module with no resource-global candidate does not need the earlier entry-point split.
         // We leave these passes in their established position so that adding resource-global
         // legalization does not reorder unrelated modules.
-        if (requiredLoweringPassSet.globalVaryingVar)
-            SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-        if (requiredLoweringPassSet.resolveVaryingInputRef)
-            SLANG_PASS(resolveVaryingInputRef);
-
-        SLANG_PASS(fixEntryPointCallsites);
+        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
     }
 
     // For GLSL only, we will need to perform "legalization" of

@@ -2681,18 +2681,17 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
 /// `legalizeResourceGlobalVars` pass.
 static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
 {
-    // The post-link `legalizeResourceGlobalVars` pass replaces a mutable file- or namespace-scope
-    // resource variable with storage owned by each entry-point invocation. For each variable that
-    // it accepts, the pass creates a local in every function whose execution may read or write the
-    // value. It also adds a parameter to each such non-entry-point function, and it rewrites direct
-    // calls to pass the caller's replacement value or address. A function whose only use is a
-    // direct non-runtime reference, such as debug metadata, receives a local but no parameter. The
-    // pass then rewrites the function-body uses and removes the original `IRGlobalVar`.
+    // We need the stored value to remain one IR value when `legalizeResourceGlobalVars` replaces
+    // a mutable file- or namespace-scope resource variable with function-local storage and
+    // additional parameters for non-entry-point functions. We therefore admit only types with
+    // that representation on every target. Other semantic checks validate storage modifiers, and
+    // the replacement pass diagnoses uses it cannot rewrite. The design comment at the top of
+    // `slang-ir-legalize-resource-globals.cpp` explains the complete transformation.
     //
-    // This predicate answers only whether `type` can pass through that transformation as one IR
-    // value on every target. Other checks decide whether the declaration's storage modifiers are
-    // eligible, and the pass diagnoses uses that it cannot rewrite. The design comment at the top
-    // of `slang-ir-legalize-resource-globals.cpp` explains the complete transformation.
+    // Semantic checking owns the language-level type restrictions. Every type accepted here must
+    // lower to a type accepted by `isResourceValueOrArrayTypeSupportedForPerInvocationReplacement`
+    // after the target's selected resource- and empty-type legalization passes. When changing
+    // either predicate, we must check that relationship rather than compare AST and IR type names.
 
     // A type modifier does not change the representation that the replacement pass must carry.
     // We therefore look through each modifier before classifying the underlying type.
