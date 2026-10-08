@@ -8,7 +8,9 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 
+// SPIRV: result code = 0
 // SPIRV: OpEntryPoint
+// HLSL: result code = 0
 // HLSL: computeMain
 
 struct View
