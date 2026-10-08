@@ -4,12 +4,12 @@
 // 13074-static-resource-kinds.slang covers the corresponding one-dimensional SPIR-V case.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=NOCACHE): -target hlsl -entry main -stage compute -validate-ir
 
-//CHECK-NOT: cachedTextures
+//NOCACHE-NOT: cachedTextures
 //CHECK: Texture2D<float4 >   [[TEXTURES:textures_[0-9]+]][int(1)][int(1)]
 //CHECK-LABEL: void main()
 //CHECK: [[TEXTURES]][int(0)][int(0)].Load
-//CHECK-NOT: cachedTextures
 
 Texture2D<float4> textures[1][1];
 RWStructuredBuffer<float4> output;

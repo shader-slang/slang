@@ -94,8 +94,11 @@ static bool canReachFunctionThroughDirectCalls(
 // guarantees termination when non-essential validation is disabled.
 static bool isFunctionRecursive(IRFunc* func)
 {
+    // We return false for a declaration because it has no outgoing calls in this module.
+    if (!func->isDefinition())
+        return false;
     HashSet<IRFunc*> visitedFuncs;
-    return func->isDefinition() && canReachFunctionThroughDirectCalls(func, func, visitedFuncs);
+    return canReachFunctionThroughDirectCalls(func, func, visitedFuncs);
 }
 
 struct ResourceParameterSpecializationCondition : FunctionCallSpecializeCondition

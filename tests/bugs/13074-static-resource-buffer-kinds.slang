@@ -4,8 +4,9 @@
 // `cached`.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage compute -O0 -validate-ir
+//TEST:SIMPLE(filecheck=NOCACHE): -target hlsl -entry main -stage compute -O0 -validate-ir
 
-//CHECK-NOT: cached
+//NOCACHE-NOT: cached
 //CHECK-DAG: StructuredBuffer<float4 > [[STRUCTURED:inputStructured_[0-9]+]]
 //CHECK-DAG: RWStructuredBuffer<float4 > [[RW_STRUCTURED:inputRWStructured_[0-9]+]]
 //CHECK-DAG: RasterizerOrderedStructuredBuffer<float4 > [[RO_STRUCTURED:inputROStructured_[0-9]+]]
@@ -15,7 +16,6 @@
 //CHECK: [[STRUCTURED]].Load(int(0)) + [[RW_STRUCTURED]][int(0)] + [[RO_STRUCTURED]][int(0)]
 //CHECK: [[RW_BYTES]].Load4(0U)
 //CHECK: [[RO_BYTES]].Load4(0U)
-//CHECK-NOT: cached
 
 StructuredBuffer<float4> inputStructured;
 RWStructuredBuffer<float4> inputRWStructured;

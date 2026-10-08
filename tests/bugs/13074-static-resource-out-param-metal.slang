@@ -3,12 +3,12 @@
 // directly. SSA simplification can then remove the entry-point local before Metal emission.
 
 //TEST:SIMPLE(filecheck=CHECK): -O0 -target metal -entry main -stage fragment -validate-ir -line-directive-mode none
+//TEST:SIMPLE(filecheck=NOSTORAGE): -O0 -target metal -entry main -stage fragment -validate-ir -line-directive-mode none
 
-// CHECK-NOT: thread texture
 // CHECK-LABEL: fragment
 // CHECK: texture2d<float, access::sample>
-// CHECK-NOT: thread texture
-// CHECK-NOT: selectedTexture
+// NOSTORAGE-NOT: thread texture
+// NOSTORAGE-NOT: selectedTexture
 
 Texture2D<float4> inputTexture;
 static Texture2D<float4> selectedTexture;

@@ -1,4 +1,4 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/read-only.hlsl -Gec -target hlsl -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -Gec -no-codegen
 
 // Compatibility permits rebinding a direct resource through its mutable shadow. Explicit parameter
 // groups and legacy-buffer contents remain read-only aliases, so their writes must be rejected.
@@ -18,7 +18,9 @@ void main()
 {
     gTex = other;
     explicitBuffer.value = 1;
-    // CHECK: error[E30011]
+//CHECK:                 ^ left of '=' is not an l-value
+//CHECK:                 ^ left of '=' is not an l-value.
     value = 1;
-    // CHECK: error[E30011]
+//CHECK:  ^ left of '=' is not an l-value
+//CHECK:  ^ left of '=' is not an l-value.
 }

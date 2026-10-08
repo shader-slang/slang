@@ -2167,8 +2167,10 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Resource-type legalization has separated resources from the aggregates that contained them,
-    // so each remaining resource parameter represents one resource value or one resource array.
+    // On targets that require resource-type legalization, that pass has separated resources from
+    // the aggregates that contained them. Each remaining resource parameter on those paths
+    // represents one resource value or one resource array. CPU and CUDA paths retain aggregates
+    // because their target representations can contain resource values.
     // Some targets cannot pass those values through ordinary function parameters or results.
     // `specializeResourceUsage` specializes calls that it can rewrite into a supported form; later
     // target validation diagnoses any addressable resource storage that still cannot be emitted.

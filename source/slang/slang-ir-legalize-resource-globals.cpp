@@ -368,8 +368,17 @@ static ResourceAccess intersectAccess(ResourceAccess left, ResourceAccess right)
 /// Return which accesses through the user's result also access storage supplied by operand zero.
 static ResourceAccess getTransferredStorageAccess(IRUse* use);
 /// Return whether an instruction observes or changes an operand's runtime value.
+///
+/// Decorations, debug records, types, and queries whose result depends only on an operand's type
+/// are ignored. Every other use is conservatively treated as a value use.
 static bool doesInstUseOperandAtRuntime(IRInst* user);
 /// Analyze reads, writes, and unsupported uses reached from `rootAddress`.
+///
+/// A supported runtime use either transfers storage access through another result, reads or writes
+/// through the address, or passes it to a directional parameter of a directly called function
+/// whose IR body is available. The analysis follows that callee parameter under the same rules.
+/// Generic assembly and an applicable target intrinsic are unsupported because their emitted
+/// implementations may use a parameter differently from the function's IR body.
 static AddressUseAnalysis analyzeAddressUses(
     IRInst* rootAddress,
     CapabilitySet const& targetCaps,
@@ -381,13 +390,25 @@ static IRParam* findDirectCalleeParameter(IRCall* call, IRUse* argumentUse);
 /// Return whether `parameterType` gives an address argument a direction contract.
 static bool isDirectionalAddressParameterType(IRInst* parameterType);
 /// Return how a call may access the resource address passed by `use`.
+///
+/// The result combines the parameter's declared direction with additional effects from its defined
+/// direct callee's body. Reads through an explicit `out` temporary do not read caller storage.
 static ResourceAccess classifyCallArgumentAccess(
     IRCall* call,
     IRUse* use,
     CapabilitySet const& targetCaps);
 /// Return how a runtime use reads or writes the resource reached through `use`.
+///
+/// Loads are reads, and stores through the address operand are writes. Calls combine the formal
+/// parameter's declared direction with additional effects from a defined direct callee. Uses with
+/// no precise contract conservatively preserve every effect they might have. The caller separately
+/// determines whether a write assigns the whole value, based on the storage-access path.
 static ResourceAccess classifyTerminalAddressUse(IRUse* use, CapabilitySet const& targetCaps);
 /// Classify how storage access through the user's result applies to operand-zero storage.
+///
+/// Field and element operations select a subobject. `GetAddress`, `AssumeAddress`, and l-value
+/// implicit casts preserve whether the source denotes the whole value or a subobject. Other
+/// pointer casts preserve the whole value only when source and result have equal pointee types.
 static StorageAccessRelation classifyStorageAccessRelation(IRUse* use);
 /// Return whether a use may retain an address or observe its storage identity.
 static bool isAddressUseUnsupportedByPerFunctionStorage(
@@ -400,6 +421,9 @@ static bool hasFunctionUseThatCannotBeRewritten(IRFunc* func);
 /// Return whether `func` may be invoked without a direct call that this pass can rewrite.
 static bool mayBeInvokedWithoutRewritableCall(IRFunc* func);
 /// Return whether `globalVar` must remain in module-scope storage.
+///
+/// Retention decorations and linkage that exposes storage outside this module establish this
+/// requirement. `IRExportDecoration`, which only matches definitions during IR linking, does not.
 static bool requiresModuleScopeStorage(IRGlobalVar* globalVar);
 /// Return whether `inst` is nested inside a function block.
 static bool isInstInsideFunctionBody(IRInst* inst);
@@ -654,7 +678,7 @@ struct LegalizeResourceGlobalVarsPass
     ///
     /// Linkage and retention decorations can require the module-scope declaration to remain
     /// externally accessible or explicitly retained. Replacing such a declaration with separate
-    /// function-local variables would not preserve that contract. Return whether any diagnostic
+    /// function-local variables would not preserve that contract. Returns whether any diagnostic
     /// was emitted.
     bool diagnoseGlobalsRequiringModuleScopeStorage(DiagnosticSink* sink)
     {
@@ -962,9 +986,9 @@ struct LegalizeResourceGlobalVarsPass
                 assignsWholeValue = store->ptr.get() == use->get();
             else if (auto call = as<IRCall>(user))
             {
-                // The `out` contract and the callee's actual reads are independent facts. A callee
-                // may read through a cast before it assigns the parameter, but a normal return
-                // still guarantees that it assigned the whole value.
+                // The explicit `out` argument starts with an uninitialized callee temporary.
+                // Reading that temporary does not read the caller's value, while a normal return
+                // guarantees that the callee assigns the whole value copied back to the caller.
                 assignsWholeValue = as<IROutParamType>(findCallArgumentParameterType(call, use));
             }
         }
@@ -1231,8 +1255,8 @@ struct LegalizeResourceGlobalVarsPass
     /// guarantee.
     ///
     /// After an instruction with that guarantee, every continuing execution has a whole value.
-    /// Reaching `target` without crossing such an instruction proves that some part of the entry
-    /// value can reach it.
+    /// Reaching `target` without crossing such an instruction means that the analysis cannot rule
+    /// out a read of some part of the entry value at that instruction.
     bool canReachInstructionWithoutWholeValueContinuationGuarantee(
         Index functionIndex,
         IRInst* target,
@@ -1422,7 +1446,7 @@ struct LegalizeResourceGlobalVarsPass
     /// Diagnose address uses that separate per-function storage cannot preserve.
     ///
     /// Phase 4 gives each affected function its own storage. Code that retains an address or
-    /// otherwise observes its storage identity could detect that change. Return whether any
+    /// otherwise observes its storage identity could detect that change. Returns whether any
     /// diagnostic was emitted.
     bool diagnoseUnsupportedAddressUses(DiagnosticSink* sink)
     {
@@ -1448,8 +1472,8 @@ struct LegalizeResourceGlobalVarsPass
     /// In the original call, the callee's implicit global accesses and its explicit parameter both
     /// refer to the selected global. After rewriting, the former implicit accesses use the callee's
     /// replacement local, while the explicit parameter still accesses the caller-provided argument.
-    /// Separating the two paths preserves behavior only when both are read-only. Return whether any
-    /// diagnostic was emitted.
+    /// Separating the two paths preserves behavior only when both are read-only. Returns whether
+    /// any diagnostic was emitted.
     bool diagnoseConflictingCallAliases(DiagnosticSink* sink)
     {
         // We visit each existing argument that passes the selected global's address. When the
@@ -1973,7 +1997,6 @@ static bool hasAccessDirection(ResourceAccess value, ResourceAccess direction)
     return (UInt(value) & UInt(direction)) != 0;
 }
 
-/// Return which accesses through the user's result also access storage supplied by operand zero.
 static ResourceAccess getTransferredStorageAccess(IRUse* use)
 {
     // Address projections and pointer casts preserve both directions. An `inout` l-value cast also
@@ -1985,7 +2008,6 @@ static ResourceAccess getTransferredStorageAccess(IRUse* use)
     return mergeAccess(ResourceAccess::Read, ResourceAccess::Write);
 }
 
-/// Return which accesses through a callee parameter also access the caller-provided storage.
 static ResourceAccess getCallArgumentBodyTransferAccess(IRInst* parameterType)
 {
     // An `out` argument uses callee-local temporary storage and copies only its final value back,
@@ -1997,7 +2019,6 @@ static ResourceAccess getCallArgumentBodyTransferAccess(IRInst* parameterType)
     return mergeAccess(ResourceAccess::Read, ResourceAccess::Write);
 }
 
-/// Return whether `inst` is nested inside a function block.
 static bool isInstInsideFunctionBody(IRInst* inst)
 {
     // We walk toward the module until we reach a block or function. A block belongs to executable
@@ -2013,7 +2034,6 @@ static bool isInstInsideFunctionBody(IRInst* inst)
     return false;
 }
 
-/// Return whether `use` occurs in metadata attached to `globalVar`.
 static bool isUseInsideAttachedMetadata(IRUse* use, IRGlobalVar* globalVar)
 {
     // We walk from the user to the direct child of `globalVar` that contains it. Only a decoration
@@ -2029,8 +2049,6 @@ static bool isUseInsideAttachedMetadata(IRUse* use, IRGlobalVar* globalVar)
     return as<IRAnnotation>(subtreeRoot) != nullptr;
 }
 
-/// Return a use whose user is outside `globalVar` and whose operand belongs to metadata that will
-/// be deleted with the global.
 static IRUse* findUseOfAttachedMetadataOutsideGlobal(IRGlobalVar* globalVar)
 {
     // Initializer movement has removed the global's code blocks, so every remaining child must be
@@ -2061,11 +2079,6 @@ static IRUse* findUseOfAttachedMetadataOutsideGlobal(IRGlobalVar* globalVar)
     return nullptr;
 }
 
-/// Return whether an instruction observes or changes an operand's runtime value.
-///
-/// Address-use analysis must ignore decorations, debug records, types, and queries whose result
-/// depends only on an operand's type. Every other use is conservatively treated as a value use so
-/// that an unfamiliar instruction cannot silently omit a required resource argument.
 static bool doesInstUseOperandAtRuntime(IRInst* user)
 {
     // Decorations, debug records, types, and type-only queries do not depend on the runtime value.
@@ -2088,11 +2101,6 @@ static bool doesInstUseOperandAtRuntime(IRInst* user)
     return true;
 }
 
-/// Return how a call may access the resource address passed by `use`.
-///
-/// A parameter's direction provides its declared read/write contract. When a defined direct callee
-/// receives an address, we also inspect the parameter's IR uses because an explicit pointer cast
-/// can perform an effect that the declared parameter direction does not express.
 static ResourceAccess classifyCallArgumentAccess(
     IRCall* call,
     IRUse* use,
@@ -2136,13 +2144,6 @@ static ResourceAccess classifyCallArgumentAccess(
     return access;
 }
 
-/// Return how a runtime use reads or writes the resource reached through `use`.
-///
-/// Loads are reads, and stores through the address operand are writes. Calls combine the formal
-/// parameter's declared direction with any additional reads or writes found in a defined direct
-/// callee. Uses with no precise contract conservatively preserve every effect they might have. The
-/// caller decides whether a write assigns the whole value, because that also depends on whether the
-/// storage-access path covers the whole value or only a subobject.
 static ResourceAccess classifyTerminalAddressUse(IRUse* use, CapabilitySet const& targetCaps)
 {
     // We classify loads, atomic operations, stores, and calls from their operand contracts. An
@@ -2206,14 +2207,6 @@ static ResourceAccess classifyTerminalAddressUse(IRUse* use, CapabilitySet const
     }
 }
 
-/// Classify how storage access through the user's result applies to operand-zero storage.
-///
-/// Field and element operations select a subobject. `GetAddress` and `AssumeAddress` preserve the
-/// whole value. The lowering of an implicit l-value cast either reuses the supplied address or
-/// copies the whole value between the source and a temporary. Any access transferred by that cast
-/// therefore preserves whether the source denotes the whole value or a selected subobject. Other
-/// pointer casts preserve the whole value only when their source and result have equal
-/// pointee types.
 static StorageAccessRelation classifyStorageAccessRelation(IRUse* use)
 {
     // We first handle operations whose semantics state the relation directly. For the remaining
@@ -2245,8 +2238,13 @@ static StorageAccessRelation classifyStorageAccessRelation(IRUse* use)
 
     case kIROp_GetAddress:
     case kIROp_AssumeAddress:
+        return StorageAccessRelation::WholeValue;
+
     case kIROp_OutImplicitCast:
     case kIROp_InOutImplicitCast:
+        // Lowering either reuses the supplied address or copies the whole value between the
+        // supplied storage and a temporary. Every transferred access therefore preserves whether
+        // the original path covers a whole value or a subobject, even when the cast changes type.
         return StorageAccessRelation::WholeValue;
 
     case kIROp_BitCast:
@@ -2274,8 +2272,6 @@ static StorageAccessRelation classifyStorageAccessRelation(IRUse* use)
     return StorageAccessRelation::Unknown;
 }
 
-/// Return the defined direct callee's parameter corresponding to `argumentUse`, or null when the
-/// call or use has no such parameter.
 static IRParam* findDirectCalleeParameter(IRCall* call, IRUse* argumentUse)
 {
     // Operand zero names the callee. We match the remaining operand use by identity because one
@@ -2308,7 +2304,6 @@ static IRParam* findDirectCalleeParameter(IRCall* call, IRUse* argumentUse)
     return nullptr;
 }
 
-/// Return whether `parameterType` gives an address argument a direction contract.
 static bool isDirectionalAddressParameterType(IRInst* parameterType)
 {
     // These four parameter types describe how the callee may access an address supplied by its
@@ -2325,13 +2320,6 @@ static bool isDirectionalAddressParameterType(IRInst* parameterType)
     return false;
 }
 
-/// Analyze reads, writes, and unsupported uses reached from `rootAddress`.
-///
-/// A supported runtime use either transfers storage access through another result, reads or writes
-/// through the address, or passes it to a directional parameter of a directly called function
-/// whose IR body is available. We follow that callee parameter under the same rules. Generic
-/// assembly and an applicable target intrinsic are unsupported because the emitted implementation
-/// may use a parameter differently from the function's IR body.
 static AddressUseAnalysis analyzeAddressUses(
     IRInst* rootAddress,
     CapabilitySet const& targetCaps,
@@ -2341,6 +2329,7 @@ static AddressUseAnalysis analyzeAddressUses(
     // back to the root. A pending item therefore pairs one address with those directions. The
     // finite set of such pairs makes the traversal terminate even when recursive functions forward
     // a parameter around a call cycle.
+    /// A `PendingAddressUse` pairs an address with the access directions transferred to the root.
     struct PendingAddressUse
     {
         /// The address whose users remain to be examined.
@@ -2511,7 +2500,6 @@ static AddressUseAnalysis analyzeAddressUses(
     return result;
 }
 
-/// Return whether a use may retain the address or otherwise observe its storage identity.
 static bool isAddressUseUnsupportedByPerFunctionStorage(IRUse* use, CapabilitySet const& targetCaps)
 {
     // The loads and writes handled below cannot retain the address. For a call, the parameter's
@@ -2555,7 +2543,6 @@ static bool isAddressUseUnsupportedByPerFunctionStorage(IRUse* use, CapabilitySe
     return true;
 }
 
-/// Return whether `user` is a decoration that causes the referenced function to be invoked.
 static bool doesDecorationInvokeReferencedFunction(IRInst* user)
 {
     // These decorations name functions that the compiler or runtime calls without an `IRCall` in
@@ -2585,7 +2572,6 @@ static bool isEntryPointLaunchUse(IRUse* use)
     return user->getOp() == kIROp_DispatchKernel || user->getOp() == kIROp_CudaKernelLaunch;
 }
 
-/// Return whether `func` has an invocation or value use that phase 4 cannot rewrite.
 static bool hasFunctionUseThatCannotBeRewritten(IRFunc* func)
 {
     // We can append resource arguments to a direct call inside a function. A call in a global
@@ -2623,7 +2609,6 @@ static bool hasFunctionUseThatCannotBeRewritten(IRFunc* func)
     return false;
 }
 
-/// Return whether `func` may be invoked without an in-module direct call that can be rewritten.
 static bool mayBeInvokedWithoutRewritableCall(IRFunc* func)
 {
     // Each listed linkage or retention decoration prevents the module from proving that every
@@ -2650,10 +2635,6 @@ static bool mayBeInvokedWithoutRewritableCall(IRFunc* func)
     return hasFunctionUseThatCannotBeRewritten(func);
 }
 
-/// Return whether `globalVar` must remain in module-scope storage.
-///
-/// Retention decorations and linkage that exposes storage outside this module establish this
-/// requirement. `IRExportDecoration`, which only matches definitions during IR linking, does not.
 static bool requiresModuleScopeStorage(IRGlobalVar* globalVar)
 {
     // `IRExportDecoration` is intentionally absent. Definitions merged by IR linking use it for

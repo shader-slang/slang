@@ -152,7 +152,7 @@ bool doesUserResultTransferStorageAccessFromUse(IRUse* use);
 /// `BorrowIn` and `Out` are preserved. A generic type parameter need not derive from `IRType`, so
 /// callers must test the returned instruction for the specific wrapper they need.
 ///
-/// Return null when `argumentUse` does not belong to `call`, when the callee's data type is not a
+/// Returns null when `argumentUse` does not belong to `call`, when the callee's data type is not a
 /// function type, or when that function type has no corresponding parameter.
 IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
 

@@ -102,7 +102,6 @@ SLANG_UNIT_TEST(funcPropertyPropagationRejectsResourceReadsAndDebugInstructions)
     resourceReader->setFullType(voidFunctionType);
     builder.setInsertInto(resourceReader);
     builder.emitBlock();
-    builder.emitDebugLine(debugSource, 1, 1, 1, 1);
     IRInst* sampleOperands[] = {texture, sampler, coordinate};
     builder.emitIntrinsicInst(
         float4Type,

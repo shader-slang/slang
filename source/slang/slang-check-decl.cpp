@@ -3268,13 +3268,18 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     // Header checking advances declarations with inferred types or array bounds to
     // `DefinitionChecked`, so `SemanticsDeclBodyVisitor` will not run for them. We therefore
-    // validate their array element type and variable storage requirements now that the header has
-    // finished adjusting the type. Declarations that remain at `SignatureChecked` receive these
-    // checks from the body visitor instead.
+    // validate their array element type now that the header has finished adjusting the type.
+    // Declarations that remain at `SignatureChecked` receive that check from the body visitor.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
     {
         validateArrayElementTypeForVariable(varDecl);
-        checkVariableStorageRequirements(this, varDecl, getTypeTags(varDecl->getType()));
+
+        // We require inferred mutable globals to meet the same storage policy as explicitly typed
+        // globals. We do not apply that policy to inferred locals: `int copy[] = parameter;` is
+        // valid when `parameter` is an unsized array parameter. The caller supplies the array's
+        // length rather than the local declaration.
+        if (_isMutableFileOrNamespaceScopeStaticVariable(varDecl))
+            checkVariableStorageRequirements(this, varDecl, getTypeTags(varDecl->getType()));
     }
 }
 

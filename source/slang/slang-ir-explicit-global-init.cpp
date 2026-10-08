@@ -228,7 +228,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             reachableBlocksProvenToReturn);
     }
 
-    /// Cache the functions whose initializer-safety proofs are complete and detect call cycles.
+    /// An `InitializerSafetyAnalysis` records proven-safe functions and functions being analyzed.
     struct InitializerSafetyAnalysis
     {
         HashSet<IRFunc*> functionsBeingAnalyzed;

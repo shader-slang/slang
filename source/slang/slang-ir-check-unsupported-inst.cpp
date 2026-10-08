@@ -255,9 +255,11 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
         isKhronosTarget(target) || isWGPUTarget(target);
     const bool shouldUseD3DOpaqueDiagnostic =
         isD3DTarget(target) && target->getTarget() != CodeGenTarget::HLSL;
-    const bool shouldRejectOpaqueLocalStorage = shouldUseKhronosOrWGSLOpaqueDiagnostic ||
-                                                shouldUseD3DOpaqueDiagnostic ||
-                                                isMetalTarget(target);
+    bool shouldRejectOpaqueLocalStorage = shouldUseKhronosOrWGSLOpaqueDiagnostic;
+    if (shouldUseD3DOpaqueDiagnostic)
+        shouldRejectOpaqueLocalStorage = true;
+    if (isMetalTarget(target))
+        shouldRejectOpaqueLocalStorage = true;
 
     // Several unsupported locals can carry the same source location. We report only one
     // D3D or Metal error at each location so that the user does not receive duplicate diagnostics

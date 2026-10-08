@@ -93,7 +93,7 @@ void validateVectorsAndMatrices(
 /// `module` must be linked and at the pipeline checkpoint after `specializeModule` and before
 /// `legalizeResourceTypes`. The operation checks mutable `static` variables declared at file or
 /// namespace scope and mutable uniform-parameter shadows synthesized for `-Gec`; AST-to-IR lowering
-/// marks both with `IRFileOrNamespaceScopeMutableVarDecoration`. Return `false` after diagnosing a
+/// marks both with `IRFileOrNamespaceScopeMutableVarDecoration`. Returns `false` after diagnosing a
 /// marked variable whose linked type contains an opaque value for which per-invocation resource
 /// replacement is unavailable, or an unsized array stored by value.
 bool validateMutableGlobalVariableTypes(IRModule* module, DiagnosticSink* sink);

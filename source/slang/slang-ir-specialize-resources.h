@@ -24,7 +24,7 @@ bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* modu
 /// The operation simplifies the module after each successful specialization or inlining round. If
 /// a resource output cannot be reconstructed at its call sites, it tries to inline direct calls to
 /// the function and retry specialization. On D3D targets, it also tries to inline a call when a
-/// resource input has no IR form that can be emitted directly as HLSL. Return whether the module
+/// resource input has no IR form that can be emitted directly as HLSL. Returns whether the module
 /// changed.
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext);
 
