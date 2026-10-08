@@ -5,6 +5,7 @@
 // rejected until a test confirms that Apple's compiler accepts the generated source.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target metal -entry main -stage compute -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -minimum-slang-optimization -target metal -entry main -stage compute -validate-ir
 
 uniform Texture2D<float4> textures[1][1];
 RWStructuredBuffer<float4> output;

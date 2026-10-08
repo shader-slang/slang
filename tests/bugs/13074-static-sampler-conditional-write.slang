@@ -1,5 +1,7 @@
 //DIAGNOSTIC_TEST(dxc):SIMPLE(diag=CHECK): -O0 -target dxil -profile ps_6_0 -entry main -validate-ir
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target metal -entry main -stage fragment -validate-ir
+//DIAGNOSTIC_TEST(dxc):SIMPLE(diag=CHECK): -O0 -minimum-slang-optimization -target dxil -profile ps_6_0 -entry main -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -minimum-slang-optimization -target metal -entry main -stage fragment -validate-ir
 
 // Resource-global replacement creates mutable local storage when control flow selects between two
 // samplers. Neither DXIL nor Metal can represent that storage, so the late target check must

@@ -4,6 +4,7 @@
 // Apple's Metal compiler accepts the generated source.
 
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -O0
+//TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -O0 -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=LIB): -target metallib -stage compute -entry computeMain -O0
 
 uniform Texture2D<float4> texture;

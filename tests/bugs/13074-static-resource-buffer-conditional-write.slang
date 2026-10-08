@@ -4,6 +4,7 @@
 
 //DIAGNOSTIC_TEST(dxc):SIMPLE(diag=DXIL): -O0 -target dxil -entry main -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=METAL): -O0 -target metal -entry main -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=METAL): -O0 -minimum-slang-optimization -target metal -entry main -stage compute -validate-ir
 
 StructuredBuffer<float4> structuredA;
 StructuredBuffer<float4> structuredB;

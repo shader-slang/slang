@@ -3,6 +3,7 @@
 // a texture or sampler that cannot use the `thread` address space.
 
 //TEST:SIMPLE(filecheck=CHECK): -O0 -target metal -entry main -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=CHECK): -O0 -minimum-slang-optimization -target metal -entry main -stage compute -validate-ir
 
 //CHECK: acceleration_structure<{{.*}}> [[SELECTED:selectedScene_[0-9]+]];
 //CHECK: if({{.*}}selectSecondScene_

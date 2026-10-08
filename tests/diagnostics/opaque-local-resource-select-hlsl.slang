@@ -3,6 +3,7 @@
 // rather than applying a restriction from targets that cannot represent the surviving local.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK):-minimum-slang-optimization -target hlsl -entry main -stage fragment
 
 Texture1D<float> tex0, tex1;
 

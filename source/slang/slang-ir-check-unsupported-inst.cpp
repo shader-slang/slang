@@ -145,6 +145,78 @@ static IRType* findMetalUnsupportedLocalStorageType(IRType* type)
     return nullptr;
 }
 
+static void checkUnsupportedResourceLocals(
+    IRFunc* func,
+    TargetRequest* target,
+    bool shouldUseD3DStorageRules,
+    DiagnosticSink* sink)
+{
+    // The caller selects compiled D3D or Metal output. We use D3D storage rules when
+    // `shouldUseD3DStorageRules` is true, and Metal storage rules otherwise.
+    // We check each local variable against those rules. Resource specialization can leave a
+    // resource as an SSA value, but phi elimination and parameter
+    // lowering can create mutable storage for that value. We diagnose the storage, not the SSA
+    // value, because the target may support passing the value without supporting a mutable local.
+    // Several generated locals can refer to the same source declaration, so we report one error
+    // per source location in this function.
+    HashSet<SourceLoc::RawValue> diagnosedLocations;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() != kIROp_Var)
+                continue;
+
+            auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(inst->getDataType()));
+            SLANG_RELEASE_ASSERT(pointerType);
+            auto valueType = pointerType->getValueType();
+            SLANG_RELEASE_ASSERT(valueType);
+            auto unsupportedType = shouldUseD3DStorageRules
+                                       ? findD3DUnsupportedLocalStorageType(valueType)
+                                       : findMetalUnsupportedLocalStorageType(valueType);
+            if (!unsupportedType)
+                continue;
+
+            // A generated local may have no source location. We use its first use's location
+            // when possible so that the diagnostic points to relevant user code. Without a
+            // location, we still report the error; a missing location must not permit invalid IR.
+            auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+            if (loc.isValid())
+            {
+                if (!diagnosedLocations.add(loc.getRaw()))
+                    continue;
+            }
+            sink->diagnose(Diagnostics::OpaqueLocalStorageNotSupportedForTarget{
+                .type = unsupportedType,
+                .target = target->getTarget(),
+                .location = loc});
+        }
+    }
+}
+
+void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // We validate resource locals for compiled D3D and Metal output after the passes that can
+    // introduce local storage. This check is required even in minimum-optimization mode: skipping
+    // an optimization does not make unsupported storage representable. HLSL source output is
+    // excluded because its emitter can preserve the local for a downstream compiler to check.
+    const bool shouldUseD3DStorageRules =
+        isD3DTarget(target) && target->getTarget() != CodeGenTarget::HLSL;
+    if (!shouldUseD3DStorageRules && !isMetalTarget(target))
+        return;
+
+    // We visit ordinary functions and functions returned by generics, matching the function
+    // bodies that the general unsupported-instruction check examines at this compilation stage.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (auto generic = as<IRGeneric>(globalInst))
+            func = as<IRFunc>(findGenericReturnVal(generic));
+        if (func)
+            checkUnsupportedResourceLocals(func, target, shouldUseD3DStorageRules, sink);
+    }
+}
+
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
 // implemented in terms of the Slang core runtime (`Slang::String`), which is
 // available for host C++ output and for the LLVM-backed CPU path, but not in the
@@ -241,31 +313,17 @@ static bool instReferencesStringType(IRInst* inst)
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
     // We perform four independent checks. We diagnose unsupported function-typed values,
-    // `GetArrayLength`, target-specific opaque local storage and default construction, and `String`
+    // `GetArrayLength`, Khronos/WGSL opaque local storage and default construction, and `String`
     // values on kernel C++ or CUDA targets. We establish the target rules first, then scan the
     // function parameters and instructions once.
 
     // Resource specialization and SSA simplification run before this check. A resource value may
     // remain as an SSA instruction, which needs no local storage, or phi elimination may place it
-    // in an `IRVar`. SPIR-V, GLSL, WGSL, DXBC, DXIL, and Metal cannot represent particular resource
-    // types in that local storage. The HLSL emitter can print the local without losing information,
-    // so we allow HLSL source emission and let the compiler that receives that source decide
-    // whether to accept it.
+    // in an `IRVar`. SPIR-V, GLSL, and WGSL cannot represent particular resource types in that
+    // local storage. The D3D and Metal storage checks are separate so that their diagnostics also
+    // run in minimum-optimization mode, which skips this general check.
     const bool shouldUseKhronosOrWGSLOpaqueDiagnostic =
         isKhronosTarget(target) || isWGPUTarget(target);
-    const bool shouldUseD3DOpaqueDiagnostic =
-        isD3DTarget(target) && target->getTarget() != CodeGenTarget::HLSL;
-    bool shouldRejectOpaqueLocalStorage = shouldUseKhronosOrWGSLOpaqueDiagnostic;
-    if (shouldUseD3DOpaqueDiagnostic)
-        shouldRejectOpaqueLocalStorage = true;
-    if (isMetalTarget(target))
-        shouldRejectOpaqueLocalStorage = true;
-
-    // Several unsupported locals can carry the same source location. We report only one
-    // D3D or Metal error at each location so that the user does not receive duplicate diagnostics
-    // there. The location is only a presentation key; it does not identify the IR instruction.
-    HashSet<SourceLoc::RawValue> diagnosedOpaqueLocalStorageLocations;
-
     // The `String` type has no runtime representation in kernel C++/CUDA output;
     // a use there (e.g. `let s : String = "1"; s.getLength();`) would otherwise
     // emit uncompilable code referencing an undefined `String`/method instead of
@@ -309,50 +367,22 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             case kIROp_Var:
-                if (shouldRejectOpaqueLocalStorage)
+                if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
                 {
                     auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(inst->getDataType()));
                     SLANG_RELEASE_ASSERT(pointerType);
                     auto valueType = pointerType->getValueType();
                     SLANG_RELEASE_ASSERT(valueType);
-                    IRType* opaqueType = nullptr;
-                    if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
-                        opaqueType = findUnstorableOpaqueHandleType(valueType);
-                    else if (shouldUseD3DOpaqueDiagnostic)
-                        opaqueType = findD3DUnsupportedLocalStorageType(valueType);
-                    else
-                        opaqueType = findMetalUnsupportedLocalStorageType(valueType);
-
-                    if (opaqueType)
+                    if (auto opaqueType = findUnstorableOpaqueHandleType(valueType))
                     {
                         // A synthesized variable, such as one created by phi elimination, may have
                         // no source location. In that case we report the first operation that uses
                         // the storage so that the diagnostic still identifies relevant user code.
                         auto loc =
                             inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-                        if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
-                        {
-                            sink->diagnose(
-                                Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
-                                    .type = opaqueType,
-                                    .location = loc});
-                        }
-                        else
-                        {
-                            bool shouldDiagnose = !loc.isValid();
-                            if (loc.isValid())
-                            {
-                                shouldDiagnose =
-                                    diagnosedOpaqueLocalStorageLocations.add(loc.getRaw());
-                            }
-                            if (shouldDiagnose)
-                            {
-                                sink->diagnose(Diagnostics::OpaqueLocalStorageNotSupportedForTarget{
-                                    .type = opaqueType,
-                                    .target = target->getTarget(),
-                                    .location = loc});
-                            }
-                        }
+                        sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
+                            .type = opaqueType,
+                            .location = loc});
                     }
                 }
                 break;
