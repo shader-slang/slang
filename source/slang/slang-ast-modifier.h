@@ -189,6 +189,21 @@ class SynthesizedModifier : public Modifier
     FIDDLE() List<Val*> operands;
 };
 
+/// Records the effective parameter-passing mode that a synthesized declaration must preserve.
+///
+/// Requirement-witness synthesis creates new declarations after applying substitutions to their
+/// value types. Recomputing a mode from those substituted types can change the ABI promised by the
+/// original declaration. This internal modifier makes the required mode declaration-owned on the
+/// synthesized `ParamDecl`, or on a synthesized callable for its effective `this` parameter.
+/// Signature checking consumes it before attaching any checked semantic attributes. It has no
+/// source-language spelling.
+FIDDLE()
+class SynthesizedParamPassingModeModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+};
+
 // Marks that the definition of a func decl is synthesized static invoke func for
 // a lambda that doesn't capture anything.
 FIDDLE()
@@ -627,61 +642,6 @@ class IntrinsicTypeModifier : public Modifier
     // (e.g., for a texture type this passes in shape/mutability info)
     FIDDLE() List<uint32_t> irOperands;
 };
-
-// Modifiers that affect the storage layout for matrices
-FIDDLE(abstract)
-class MatrixLayoutModifier : public Modifier
-{
-    FIDDLE(...)
-};
-
-
-// Modifiers that specify row- and column-major layout, respectively
-FIDDLE(abstract)
-class RowMajorLayoutModifier : public MatrixLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE(abstract)
-class ColumnMajorLayoutModifier : public MatrixLayoutModifier
-{
-    FIDDLE(...)
-};
-
-// The HLSL flavor of those modifiers
-FIDDLE()
-class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-
-// The GLSL flavor of those modifiers
-//
-// Note(tfoley): The GLSL versions of these modifiers are "backwards"
-// in the sense that when a GLSL programmer requests row-major layout,
-// we actually interpret that as requesting column-major. This makes
-// sense because we interpret matrix conventions backwards from how
-// GLSL specifies them.
-FIDDLE()
-class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
-{
-    FIDDLE(...)
-};
-
 
 // More HLSL Keyword
 
@@ -1504,6 +1464,18 @@ class RefAttribute : public Attribute
     FIDDLE(...)
 };
 
+/// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
+///
+/// Signature checking attaches this attribute if and only if the declaration has an effective
+/// `this` parameter. Later compiler stages consume this checked semantic information instead of
+/// deriving it again from syntax or compilation options.
+FIDDLE()
+class ThisParamInfoAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() ParamInfo info;
+};
+
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
 // reading or writing through any pointer arguments, or any other
@@ -2203,6 +2175,72 @@ class SNormModifier : public ResourceElementFormatModifier
 
 FIDDLE()
 class NoDiffModifier : public TypeModifier
+{
+    FIDDLE(...)
+};
+
+// Modifiers that affect the storage layout for matrices.
+//
+// These are `TypeModifier`s so the parser grafts them onto the type specifier
+// (`row_major float2x3`), like `unorm`/`snorm`, keeping the layout on the
+// matrix element itself — including when a declarator wraps it in an array or
+// it precedes a function return type.
+//
+// The parser only moves these off a *declarator*, though; a traditional-style
+// function parameter (leading-modifier syntax, `void f(row_major float2x3 m)`)
+// keeps its modifiers on the `ParamDecl` — its type is parsed after the
+// modifiers — so that path applies the layout via `maybeApplyLayoutModifier`
+// (slang-check-decl.cpp) instead. (Modern `m: row_major float2x3` syntax puts
+// the modifier on the type expression, so it flows through the graft.)
+FIDDLE(abstract)
+class MatrixLayoutModifier : public TypeModifier
+{
+    FIDDLE(...)
+};
+
+
+// Modifiers that specify row- and column-major layout, respectively
+FIDDLE(abstract)
+class RowMajorLayoutModifier : public MatrixLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
+class ColumnMajorLayoutModifier : public MatrixLayoutModifier
+{
+    FIDDLE(...)
+};
+
+// The HLSL flavor of those modifiers
+FIDDLE()
+class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+
+// The GLSL flavor of those modifiers
+//
+// Note(tfoley): The GLSL versions of these modifiers are "backwards"
+// in the sense that when a GLSL programmer requests row-major layout,
+// we actually interpret that as requesting column-major. This makes
+// sense because we interpret matrix conventions backwards from how
+// GLSL specifies them.
+FIDDLE()
+class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
 {
     FIDDLE(...)
 };

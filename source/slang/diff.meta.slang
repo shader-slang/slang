@@ -1684,7 +1684,11 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     b = diffPair(b.p, vector<T, 3>.Differential(dbx, dby, dbz));
 }
 
-#define VECTOR_MATRIX_BINARY_DIFF_IMPL(NAME)                                                 \
+// VECTOR_BINARY_DIFF_IMPL supplies vector derivatives. Matrix derivatives use MATRIX_BINARY_DIFF_IMPL
+// for default-layout primals, or MATRIX_LAYOUT_BINARY_DIFF_IMPL when the primal carries layout L.
+// VECTOR_MATRIX_BINARY_DIFF_IMPL combines vector and default-layout matrix derivatives for atan2,
+// fmod, and pow. Min/max combine the vector macro with the explicit-layout matrix macro.
+#define VECTOR_BINARY_DIFF_IMPL(NAME)                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [PreferRecompute]                                                                        \
     [__readNone]                                                                             \
@@ -1703,26 +1707,6 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
         }                                                                                    \
         return DifferentialPair<vector<T, N>>(result, d_result);                             \
-    }                                                                                        \
-    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
-    [PreferRecompute]                                                                        \
-    [__readNone]                                                                             \
-    [ForwardDerivativeOf(NAME)]                                                              \
-    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
-        DifferentialPair<matrix<T, M, N>> dpx, DifferentialPair<matrix<T, M, N>> dpy)        \
-    {                                                                                        \
-        matrix<T, M, N> result;                                                              \
-        matrix<T, M, N>.Differential d_result;                                               \
-        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
-        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
-        {                                                                                    \
-            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
-                DifferentialPair<T>(dpx.p[i][j], __slang_noop_cast<T.Differential>(dpx.d[i][j])),  \
-                DifferentialPair<T>(dpy.p[i][j], __slang_noop_cast<T.Differential>(dpy.d[i][j]))); \
-            result[i][j] = dp_elem.p;                                                        \
-            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
-        }                                                                                    \
-        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [PreferRecompute]                                                                        \
@@ -1744,6 +1728,30 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         }                                                                                    \
         dpx = diffPair(dpx.p, left_d_result);                                                \
         dpy = diffPair(dpy.p, right_d_result);                                               \
+    }
+
+// The derivative signature must spell the same matrix layout parameters as the primal overload so
+// `[ForwardDerivativeOf]` and `[BackwardDerivativeOf]` can bind the pair.
+#define MATRIX_BINARY_DIFF_IMPL(NAME)                                                        \
+    __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
+    [PreferRecompute]                                                                        \
+    [__readNone]                                                                             \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
+        DifferentialPair<matrix<T, M, N>> dpx, DifferentialPair<matrix<T, M, N>> dpy)        \
+    {                                                                                        \
+        matrix<T, M, N> result;                                                              \
+        matrix<T, M, N>.Differential d_result;                                               \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i][j], __slang_noop_cast<T.Differential>(dpx.d[i][j])),  \
+                DifferentialPair<T>(dpy.p[i][j], __slang_noop_cast<T.Differential>(dpy.d[i][j]))); \
+            result[i][j] = dp_elem.p;                                                        \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
+        }                                                                                    \
+        return DifferentialPair<matrix<T, M, N>>(result, d_result);                          \
     }                                                                                        \
     __generic<T : __BuiltinFloatingPointType, let M : int, let N : int>                      \
     [PreferRecompute]                                                                        \
@@ -1767,6 +1775,65 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         dpx = diffPair(dpx.p, left_d_result);                                                \
         dpy = diffPair(dpy.p, right_d_result);                                               \
     }
+
+// We preserve the matrix layout through both the primal extrema operations and their derivatives.
+// See `MATRIX_BINARY_DIFF_IMPL` above for the primal/derivative signature-coupling rule.
+#define MATRIX_LAYOUT_BINARY_DIFF_IMPL(NAME)                                                 \
+    __generic<                                                                               \
+        T : __BuiltinFloatingPointType,                                                       \
+        let M : int,                                                                         \
+        let N : int,                                                                         \
+        let L : MatrixLayoutMode>                                                             \
+    [PreferRecompute]                                                                        \
+    [__readNone]                                                                             \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<matrix<T, M, N, L>> __d_##NAME##_matrix(                                \
+        DifferentialPair<matrix<T, M, N, L>> dpx,                                            \
+        DifferentialPair<matrix<T, M, N, L>> dpy)                                            \
+    {                                                                                        \
+        matrix<T, M, N, L> result;                                                           \
+        matrix<T, M, N, L>.Differential d_result;                                            \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i][j], __slang_noop_cast<T.Differential>(dpx.d[i][j])),  \
+                DifferentialPair<T>(dpy.p[i][j], __slang_noop_cast<T.Differential>(dpy.d[i][j]))); \
+            result[i][j] = dp_elem.p;                                                        \
+            d_result[i][j] = __slang_noop_cast<T>(dp_elem.d);                                \
+        }                                                                                    \
+        return DifferentialPair<matrix<T, M, N, L>>(result, d_result);                       \
+    }                                                                                        \
+    __generic<                                                                               \
+        T : __BuiltinFloatingPointType,                                                       \
+        let M : int,                                                                         \
+        let N : int,                                                                         \
+        let L : MatrixLayoutMode>                                                             \
+    [PreferRecompute]                                                                        \
+    [__readNone]                                                                             \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_matrix(                                                                \
+            inout DifferentialPair<matrix<T, M, N, L>> dpx,                                  \
+            inout DifferentialPair<matrix<T, M, N, L>> dpy,                                  \
+            matrix<T, M, N, L>.Differential dOut)                                            \
+    {                                                                                        \
+        matrix<T, M, N, L>.Differential left_d_result, right_d_result;                       \
+        [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
+        [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
+        {                                                                                    \
+            DifferentialPair<T> left_dp = diffPair(dpx.p[i][j], T.dzero());                  \
+            DifferentialPair<T> right_dp = diffPair(dpy.p[i][j], T.dzero());                 \
+            __d_##NAME(left_dp, right_dp, __slang_noop_cast<T.Differential>(dOut[i][j]));    \
+            left_d_result[i][j] = __slang_noop_cast<T>(left_dp.d);                           \
+            right_d_result[i][j] = __slang_noop_cast<T>(right_dp.d);                         \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, left_d_result);                                                \
+        dpy = diffPair(dpy.p, right_d_result);                                               \
+    }
+
+#define VECTOR_MATRIX_BINARY_DIFF_IMPL(NAME)                                                \
+    VECTOR_BINARY_DIFF_IMPL(NAME)                                                           \
+    MATRIX_BINARY_DIFF_IMPL(NAME)
 
 #define VECTOR_MATRIX_TERNARY_DIFF_IMPL(NAME)                                                \
     __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
@@ -2318,7 +2385,8 @@ void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Dif
     dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : (dpy.p < dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
-VECTOR_MATRIX_BINARY_DIFF_IMPL(max)
+VECTOR_BINARY_DIFF_IMPL(max)
+MATRIX_LAYOUT_BINARY_DIFF_IMPL(max)
 // Keep CoopVec min/max derivative tie handling aligned with the scalar implementation.
 COOPVEC_BINARY_DIFF_IMPL(max)
 
@@ -2346,7 +2414,8 @@ void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Dif
     dpy = diffPair(dpy.p, dpy.p < dpx.p ? dOut : (dpy.p > dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
-VECTOR_MATRIX_BINARY_DIFF_IMPL(min)
+VECTOR_BINARY_DIFF_IMPL(min)
+MATRIX_LAYOUT_BINARY_DIFF_IMPL(min)
 COOPVEC_BINARY_DIFF_IMPL(min)
 
 // copysign

@@ -56,7 +56,48 @@ function(generator dir)
     endif()
 endfunction()
 
-if(NOT SLANG_OVERRIDE_LUA_PATH)
+if(SLANG_USE_SYSTEM_LUA)
+    if(SLANG_OVERRIDE_LUA_PATH)
+        message(
+            FATAL_ERROR
+            "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
+        )
+    endif()
+    find_package(Lua 5.4 QUIET)
+    set(slang_fiddle_lua_include_args)
+    if(Lua_FOUND)
+        set(slang_fiddle_lua_library ${LUA_LIBRARIES})
+        # The system include path belongs only to this leaf generator, not its interface.
+        set(slang_fiddle_lua_include_args
+            INCLUDE_DIRECTORIES_PRIVATE
+            ${LUA_INCLUDE_DIR}
+        )
+    else()
+        # FindLua in CMake 3.22 does not search Lua 5.5. Its pkg-config file does.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SLANG_LUA55 REQUIRED IMPORTED_TARGET lua-5.5)
+        set(slang_fiddle_lua_library PkgConfig::SLANG_LUA55)
+        # The imported target supplies its own include directories.
+    endif()
+    # The bundled translation unit compiles Lua's private onelua.c source.
+    slang_glob_sources(slang_fiddle_sources slang-fiddle)
+    list(
+        REMOVE_ITEM
+        slang_fiddle_sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
+    )
+    generator(
+        slang-fiddle
+        EXPLICIT_SOURCE
+        ${slang_fiddle_sources}
+        LINK_WITH_PRIVATE
+        compiler-core
+        ${slang_fiddle_lua_library}
+        ${slang_fiddle_lua_include_args}
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        SLANG_USE_SYSTEM_LUA=1
+    )
+elseif(NOT SLANG_OVERRIDE_LUA_PATH)
     generator(
         slang-fiddle
         LINK_WITH_PRIVATE
@@ -321,6 +362,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
     add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(slang-test slang-numerics-modules)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -441,7 +483,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             metal-cpp
             Threads::Threads
         LINK_WITH_FRAMEWORK Foundation Metal
-        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/examples
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
