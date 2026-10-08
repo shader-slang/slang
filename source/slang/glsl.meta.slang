@@ -2779,7 +2779,7 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 //
 // These `texelFetch` (and the `texelFetchOffset` below) overloads use the plain `texture_sm_4_1`
 // static requirement, not the `texture_sm_4_1_samplerless` alias. The combined-sampler overloads
-// (an `isCombined=1` `_Texture`) lower on GLSL to `texelFetch(sampler2D, ...)`, which never needs
+// (an `isCombined=1` `_Texture`) lower on GLSL to `texelFetch` on a combined sampler, which never needs
 // `GL_EXT_samplerless_texture_functions`; carrying the samplerless atom there would spuriously
 // fire `warning[E41012] profile implicitly upgraded` under an explicit `-profile` (see #11874).
 // For bare-texture fetches and the non-combined `SamplerBuffer` overload, the `_Texture` `Load`
