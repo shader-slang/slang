@@ -1,8 +1,7 @@
 // Test that on CUDA, where a resource field is an ordinary value, a bit_cast whose
 // ordinary fields sit at different offsets (`b` is at offset 17 in `A` and offset 20
-// in `B`) keeps byte semantics and reports the size mismatch (issue #13480).
-// Resource fields that line up position-for-position do not by themselves make such
-// a cast compile.
+// in `B`) is rejected as a size mismatch with a single error (issue #13480). Resource
+// fields that line up position-for-position do not by themselves make such a cast compile.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
 

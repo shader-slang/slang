@@ -24,5 +24,6 @@ void computeMain()
     B b = bit_cast<B, A>(gA);
 //CHECK:                ^ E41205
 //CHECK:                ^ cannot bit_cast 'A' to 'B'
+//CHECK:                ^ has no bit representation here
     outputBuffer[0] = b.data[b.offset];
 }

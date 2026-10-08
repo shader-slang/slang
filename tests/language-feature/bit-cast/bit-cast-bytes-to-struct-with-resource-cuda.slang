@@ -17,5 +17,6 @@ void computeMain()
     A a = bit_cast<A, uint2>(gBits);
 //CHECK:                    ^ E41205
 //CHECK:                    ^ cannot bit_cast 'vector<uint,2>' to 'A'
+//CHECK:                    ^ has no bit representation here
     outputBuffer[0] = a.tex.Load(int3(0));
 }

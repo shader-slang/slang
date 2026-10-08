@@ -1964,17 +1964,17 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
-    // A `bit_cast` between aggregates holding opaque handles has to be rewritten before
-    // resource-type legalization splits those aggregates apart. Only targets that legalize
-    // resource types give a handle no byte representation, so only they reject a cast that
-    // cannot be rewritten field-for-field.
+    // A `bit_cast` between structs holding opaque handles has to be rewritten before
+    // resource-type legalization splits those structs apart. We rewrite matched casts on every
+    // target, because `lowerBitCast` cannot rebuild a handle from bytes either. Targets that
+    // legalize resource types give a handle no byte representation at all, so there an unmatched
+    // cast is an error; elsewhere it falls back to byte lowering.
     if (requiredLoweringPassSet.bitcast)
     {
-        SLANG_PASS(
-            lowerOpaqueBitCast,
-            targetProgram,
-            options.shouldLegalizeExistentialAndResourceTypes,
-            sink);
+        const bool handlesHaveNoByteRepresentation =
+            options.shouldLegalizeExistentialAndResourceTypes;
+        SLANG_PASS(lowerOpaqueBitCast, targetProgram, handlesHaveNoByteRepresentation, sink);
+        // A rejected cast is left in place, and resource-type legalization would abort on it.
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }

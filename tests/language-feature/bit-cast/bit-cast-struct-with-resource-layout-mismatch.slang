@@ -5,7 +5,8 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 
-// `b` is at offset 17 in `A` and offset 20 in `B`.
+// `b` follows a 1-byte field in `A` but is 4-byte aligned in `B`, so it starts at a different
+// offset (9 and 12 on SPIR-V, where the buffer field takes 8 bytes).
 struct A
 {
     StructuredBuffer<uint> data;
@@ -44,10 +45,12 @@ void computeMain()
     B b = bit_cast<B, A>(gA);
 //CHECK:                ^ E41205
 //CHECK:                ^ cannot bit_cast 'A' to 'B'
+//CHECK:                ^ has no bit representation here
     outputBuffer[0] = b.b;
 
     D d = bit_cast<D, C>(gC);
 //CHECK:                ^ E41205
 //CHECK:                ^ cannot bit_cast 'C' to 'D'
+//CHECK:                ^ has no bit representation here
     outputBuffer[1] = d.data[d.offset];
 }
