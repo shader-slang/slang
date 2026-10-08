@@ -292,8 +292,8 @@ SlangResult pinLockedPackage(
         if (hasVersion)
         {
             outError = String("Cannot pass a version while '") + name +
-                       "' is edited. The version moves with 'slang package edit advance " + name +
-                       "' or 'slang package unedit " + name + "'.";
+                       "' is edited. The version moves with 'slang package edit " + name +
+                       " --advance' or 'slang package unedit " + name + "'.";
             return SLANG_FAIL;
         }
         package.pinned = true;

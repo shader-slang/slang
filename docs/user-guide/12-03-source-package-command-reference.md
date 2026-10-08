@@ -202,7 +202,7 @@ slang package pin <name>
 
 Set the pin boolean on a lock row. The boolean lives in `slang-package-lock.json`, not in
 `slang-package.json`. The manifest range is left as it was. `update` will not move a pinned
-version. `edit` and `unedit` leave the boolean as they found it. `edit advance` and an ending of
+version. `edit` and `unedit` leave the boolean as they found it. `edit <name> --advance` and an ending of
 `unedit` can move the version and leave the boolean set.
 
 `<version>` is an exact dotted version, and it is required when the dependency is not edited. The
@@ -234,7 +234,7 @@ the next `update` may select a different tag.
 ```text
 slang package edit <name> --branch <branch>
 slang package edit <name> --branch <branch> --create
-slang package edit advance <name>
+slang package edit <name> --advance
 ```
 
 ### Description
@@ -249,15 +249,17 @@ them. The pin boolean is unchanged. Editing a pinned dependency starts the branc
 commit. Editing a dependency that is not pinned does not set the boolean. `fetch` does not check
 out the represented commit.
 
-`edit advance` looks for canonical release tags on one line of history: from the branch tip back
-to the commit of the release the row is representing. At a merge, a parent that does not contain
-that commit is skipped. When more than one parent contains it, the walk takes the first parent.
-One `edit advance` replaces the version, the tag, and the commit with the greatest canonical
-tag on that walk that is newer than the stored version and that still satisfies incoming
-constraints. When `v1.3` and `v1.4` are both on the line, the row becomes `1.4`. The command
-does not stop at the next tag and wait for another advance. The branch stays, and the checkout
-does not move. When no such tag exists, or the walk never visits that commit, the
-command says so and leaves the row unchanged. `update` does not run this, and it does not change
+`edit <name> --advance` looks for canonical release tags on one line of history: from the branch
+tip back to the commit of the release the row is representing. At a merge, a parent that does not
+contain that commit is skipped. When more than one parent contains it, the walk takes the first
+parent. One `edit <name> --advance` replaces the version, the tag, and the commit with the
+greatest canonical tag on that walk that is newer than the stored version and that still satisfies
+incoming constraints. When `v1.3` and `v1.4` are both on the line, the row becomes `1.4`. The
+command does not stop at the next tag and wait for another advance. The branch stays, and the
+checkout does not move. `--advance` cannot be combined with `--branch` or `--create`. The package
+name is the first argument, so a dependency named `advance` is edited with
+`edit advance --branch <branch>`. When no such tag exists, or the walk never visits that commit,
+the command says so and leaves the row unchanged. `update` does not run this, and it does not change
 an edited checkout.
 
 ## `unedit`
@@ -275,7 +277,7 @@ is no `--yes`. An ending that needs approval asks, and a run without a terminal 
 the edit. `--advance`, `--restore`, and `--tag` select one ending and cannot be combined. None of
 them changes the pin boolean.
 
-The command looks for a canonical release tag on the same line of history `edit advance` uses.
+The command looks for a canonical release tag on the same line of history `edit <name> --advance` uses.
 The candidate is the greatest such tag that is strictly newer than the represented release and
 that still satisfies the dependency constraints. A tag that arrived only through a merge of some
 other line is not a candidate.
@@ -296,7 +298,7 @@ even when the checkout is already on that commit.
 `--advance` selects the newer tag and fails when no newer tag on that line satisfies the
 constraints. It asks only when the checkout would move.
 
-`--restore` checks out the version and commit the edit is representing. After `edit advance`,
+`--restore` checks out the version and commit the edit is representing. After `edit <name> --advance`,
 that is the commit just advanced to. A newer legal tag is named and then left unused. This always
 asks.
 

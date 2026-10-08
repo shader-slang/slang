@@ -44,7 +44,7 @@ static void _printHelp(bool experimental = false)
         "  unpin <name>      Clear a pin. An edit stays on its branch.\n"
         "  edit <name> --branch <branch> [--create]\n"
         "                    Check out a branch of a solved dependency.\n"
-        "  edit advance <name>\n"
+        "  edit <name> --advance\n"
         "                    Move an edit's stored version to the latest canonical tag on that\n"
         "                    branch. Intermediate tags are not separate steps.\n"
         "  unedit <name> [--restore | --advance | --tag <version>] [--clean]\n"
@@ -3229,20 +3229,20 @@ SlangResult executeInDirectory(
     }
     if (command == "edit")
     {
-        if (argc >= 3 && String(argv[2]) == "advance")
+        if (argc < 3)
         {
-            if (argc != 4)
-            {
-                outError = "edit advance requires a package name.";
-                return SLANG_FAIL;
-            }
-            return advancePackageEdit(projectRoot, argv[3], outError);
+            outError = "edit requires a package name and --branch <branch>, or --advance.";
+            return SLANG_FAIL;
         }
-        String name;
+        String name = argv[2];
+        if (!isValidPackageName(name))
+        {
+            outError = String("Invalid package name: ") + name;
+            return SLANG_FAIL;
+        }
         String branch;
         bool create = false;
-        if (argc >= 3)
-            name = argv[2];
+        bool advance = false;
         for (int i = 3; i < argc; ++i)
         {
             String flag = argv[i];
@@ -3250,13 +3250,24 @@ SlangResult executeInDirectory(
                 branch = argv[++i];
             else if (flag == "--create")
                 create = true;
+            else if (flag == "--advance")
+                advance = true;
             else
             {
                 outError = String("Unknown edit option: ") + flag;
                 return SLANG_FAIL;
             }
         }
-        if (!isValidPackageName(name) || !branch.getLength())
+        if (advance)
+        {
+            if (branch.getLength() || create)
+            {
+                outError = "edit --advance cannot be combined with --branch or --create.";
+                return SLANG_FAIL;
+            }
+            return advancePackageEdit(projectRoot, name, outError);
+        }
+        if (!branch.getLength())
         {
             outError = "edit requires a package name and --branch <branch>.";
             return SLANG_FAIL;

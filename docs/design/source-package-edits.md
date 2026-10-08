@@ -22,11 +22,11 @@ A dependency that is being edited stores:
 
 The branch name is the branch the checkout is expected to be on. The version, tag, and commit are the release that branch is representing. `fetch` checks out a release row's commit and leaves an edited checkout on its branch. `update` does not fetch, merge, reset, or otherwise change an edited checkout: not its branch, `HEAD`, files, recorded version, or pin boolean. It reads the tree as it exists and solves the transitive dependencies declared by that manifest. The developer moves the branch with Git. When `HEAD` is not on the recorded branch, `update` reports the mismatch and leaves the checkout alone. `fetch` does not replace an edited checkout either. Two machines that share an edited lock can therefore see different trees. `validate` rejects a workspace that still has an edit, and an edited lock is not something to commit. The pin boolean is separate from the branch. A pinned dependency that is not edited still stores a version and a commit, and that row can be committed.
 
-The version stored on an edit is the release that row is representing. It starts as the release that was current when the edit began. `edit advance` is what moves it, and that move replaces the version, the tag, and the commit together. `update` does not replace it with a newer tag that later appears on the branch, whether or not the pin boolean is set. The source and the manifest come from the checkout as it exists, which may be commits ahead of that version. The solver keeps matching constraints against the recorded version, so a tag created during the edit does not change which release the rest of the graph thinks it selected. The boolean matters again after `unedit`: a set boolean keeps the version `unedit` landed on, and a clear boolean lets the next `update` drift.
+The version stored on an edit is the release that row is representing. It starts as the release that was current when the edit began. `edit <name> --advance` is what moves it, and that move replaces the version, the tag, and the commit together. `update` does not replace it with a newer tag that later appears on the branch, whether or not the pin boolean is set. The source and the manifest come from the checkout as it exists, which may be commits ahead of that version. The solver keeps matching constraints against the recorded version, so a tag created during the edit does not change which release the rest of the graph thinks it selected. The boolean matters again after `unedit`: a set boolean keeps the version `unedit` landed on, and a clear boolean lets the next `update` drift.
 
 ## Pinning a version
 
-A pin is a boolean stored on that dependency's row in `slang-package-lock.json`. It is not a field in `slang-package.json`. Committing the lock commits the pin, so the next `update` on another machine keeps the same version. The manifest range is left as it was. The boolean does not check out a branch, and it does not by itself change which commit is checked out. `update` reads it from the existing lock and will not move a pinned version to a newer tag. `edit advance` and `unedit` will, and they leave the boolean set.
+A pin is a boolean stored on that dependency's row in `slang-package-lock.json`. It is not a field in `slang-package.json`. Committing the lock commits the pin, so the next `update` on another machine keeps the same version. The manifest range is left as it was. The boolean does not check out a branch, and it does not by itself change which commit is checked out. `update` reads it from the existing lock and will not move a pinned version to a newer tag. `edit <name> --advance` and `unedit` will, and they leave the boolean set.
 
 ```text
 slang package pin <name> <version>
@@ -36,7 +36,7 @@ slang package unpin <name>
 
 `<version>` is an exact dotted version, and it is required when the dependency is not edited. The command resolves the canonical tag for that release, such as `v1.2` for `1.2` or `1.2.0`, sets the boolean, and stores that version plus the tag's commit. `fetch` checks out the commit. The version has to satisfy every incoming constraint. When it does not, `pin` fails and leaves the row unchanged. When no canonical tag for that release exists, `pin` fails the same way.
 
-While the dependency is edited, `pin <name>` sets the boolean and leaves the version and the branch alone. Passing `<version>` in that state fails. Moving the version is `edit advance`, or an ending of `unedit`.
+While the dependency is edited, `pin <name>` sets the boolean and leaves the version and the branch alone. Passing `<version>` in that state fails. Moving the version is `edit <name> --advance`, or an ending of `unedit`.
 
 `unpin` clears the boolean and works during an edit. The branch stays checked out. After `unedit`, the next `update` may select a different tag. Other dependencies still solve normally either way.
 
@@ -59,13 +59,15 @@ The branch name is required. Without `--create`, the branch must already exist a
 
 ## Moving the frozen version
 
-A newer tag on the branch does not become the stored version by itself. A separate command does that, and only when asked:
+A newer tag on the branch does not become the stored version by itself. A flag does that, and only when asked:
 
 ```text
-slang package edit advance <name>
+slang package edit <name> --advance
 ```
 
-The command looks for canonical release tags on one line of history: from the branch tip back to the commit of the release the row is representing. The stop point is that saved commit, not whatever commit currently carries the same version tag. One `edit advance` stores the latest tag that walk can adopt: its version, its tag name, and its commit. The next walk stops at that new commit. It does not stop at the first tag after the represented release.
+The package name is the first argument, so a dependency named `advance` is still edited with `edit advance --branch <branch>`. `--advance` cannot be combined with `--branch` or `--create`.
+
+The command looks for canonical release tags on one line of history: from the branch tip back to the commit of the release the row is representing. The stop point is that saved commit, not whatever commit currently carries the same version tag. One `edit <name> --advance` stores the latest tag that walk can adopt: its version, its tag name, and its commit. The next walk stops at that new commit. It does not stop at the first tag after the represented release.
 
 A merge commit records its parents in order. The first parent is the commit that was checked out when the merge was created, and each later parent is a line that was merged in. The walk uses that record. At a merge it asks, for each parent, whether the saved pin commit is an ancestor of that parent. A parent that does not contain the pin is a line that cannot lead back to the edit's starting point, and the walk does not enter it. When more than one parent contains the pin, which is the usual case when `main` also grew from that same release, the walk takes the first parent. The tags on that walk are considered together. The one written is the greatest canonical tag newer than the represented version that still satisfies the dependency constraints. If `v1.3` and `v1.4` are both on the line and both are legal, the row becomes `1.4` in that single command. The branch name stays, and the checkout does not move. When no such tag exists, or when the walk reaches a root without visiting the represented commit, the command says so and leaves the row unchanged.
 
@@ -77,13 +79,13 @@ v1.2 -- fix -- M (tip)
           v1.4
 ```
 
-`M` lists `fix` as its first parent and the `v1.4` commit as its second. Both parents contain the `v1.2` commit, so the ancestor test does not separate them. Parent order does: the walk takes `fix` and never visits `v1.4`. A tag created on `fix` after `v1.2` is the one `edit advance` can adopt. The same merge performed the other way around, with `main` checked out, would record `v1.4` as the first parent, and the walk would see `v1.4` on its way back to `v1.2`. The result follows whichever line was current at the merge.
+`M` lists `fix` as its first parent and the `v1.4` commit as its second. Both parents contain the `v1.2` commit, so the ancestor test does not separate them. Parent order does: the walk takes `fix` and never visits `v1.4`. A tag created on `fix` after `v1.2` is the one `edit <name> --advance` can adopt. The same merge performed the other way around, with `main` checked out, would record `v1.4` as the first parent, and the walk would see `v1.4` on its way back to `v1.2`. The result follows whichever line was current at the merge.
 
 `update` does not run this, and it does not move the checkout. An edit keeps claiming the release that was selected at freeze time until this command or `unedit` says otherwise.
 
 ## What an edit must remember
 
-The edit row's locator is the branch. The release it is representing is the version, the canonical tag, and that tag's commit. Those three stay together: `edit advance` moves all of them, and `unedit --restore` returns to that same commit. There is no second, older release kept from the start of the edit. `fetch` does not check the represented commit out.
+The edit row's locator is the branch. The release it is representing is the version, the canonical tag, and that tag's commit. Those three stay together: `edit <name> --advance` moves all of them, and `unedit --restore` returns to that same commit. There is no second, older release kept from the start of the edit. `fetch` does not check the represented commit out.
 
 ## Leaving an edit
 
@@ -97,13 +99,13 @@ Plain `unedit <name>` follows the endings below. `--advance`, `--restore`, and `
 
 `--advance` selects the newer tag on the edit line. The version written is that tag's version. The command fails when no newer tag on that line satisfies the constraints. The checkout moves only when the tag is behind the tip, and that move asks, naming how many commits would leave the workspace.
 
-`--restore` checks out the version and commit the edit is representing. After `edit advance`, that is the commit just advanced to. A newer legal tag is named and then left unused. This asks, because the branch's later commits leave the workspace.
+`--restore` checks out the version and commit the edit is representing. After `edit <name> --advance`, that is the commit just advanced to. A newer legal tag is named and then left unused. This asks, because the branch's later commits leave the workspace.
 
 `--tag <version>` creates a release tag on the commit currently checked out, then selects it the way `--advance` does. `<version>` is an exact dotted version. The tag name is `v` plus the canonical spelling, so `1.4.0` creates `v1.4`. The command fails before creating a tag when any of these is true: the release already has a tag, the version is not strictly greater than the version stored on the edit, the version is not strictly greater than every canonical tag already on the edit line, or the version does not satisfy the dependency constraints. The last of those keeps `--advance` from selecting some older tag and ignoring the one just created. The tag points at the checked-out commit, so the advance that follows selects it without moving `HEAD`. The tag is created locally and is not pushed.
 
 `--clean` discards uncommitted changes and stashes so the checkout is allowed to move. It does not approve dropping commits that follow a tag. Those commits remain the question the prompt asks.
 
-The command looks for a canonical release tag on the same line of history `edit advance` uses: from the tip back to the represented commit, staying on the parent that still reaches that commit. The candidate is the greatest such tag that is strictly newer than the represented version and that still satisfies the dependency constraints. A tag that arrived only through a merge of some other line is not a candidate.
+The command looks for a canonical release tag on the same line of history `edit <name> --advance` uses: from the tip back to the represented commit, staying on the parent that still reaches that commit. The candidate is the greatest such tag that is strictly newer than the represented version and that still satisfies the dependency constraints. A tag that arrived only through a merge of some other line is not a candidate.
 
 **The newer tag is the commit that is checked out.** The lock switches to that tag's version and that commit. The checkout does not move.
 
@@ -121,9 +123,9 @@ A dirty checkout blocks any ending that would move `HEAD`. `unedit` refuses that
 
 `slang package pin noise 1.2` sets the boolean and holds the solver on `1.2` at commit `abc`. A later tag `v1.3` that also satisfies `<2` is not selected by `update`. `unpin` clears the boolean and lets the next `update` select it.
 
-`slang package edit noise --branch fix-hash --create` creates `fix-hash` at `abc` and leaves the boolean set. The row still represents version `1.2`, tag `v1.2`, commit `abc`, and its locator is `fix-hash`. That stays true after `v1.4` is tagged on the branch, until `edit advance`. `update` still solves `noise` as `1.2` and leaves the `fix-hash` checkout where the developer put it.
+`slang package edit noise --branch fix-hash --create` creates `fix-hash` at `abc` and leaves the boolean set. The row still represents version `1.2`, tag `v1.2`, commit `abc`, and its locator is `fix-hash`. That stays true after `v1.4` is tagged on the branch, until `edit noise --advance`. `update` still solves `noise` as `1.2` and leaves the `fix-hash` checkout where the developer put it.
 
-`slang package edit advance noise` moves the represented release to `1.4`: the version, the tag, and that tag's commit. Until then the graph does not see `1.4`. `--restore` after that advance returns to the `1.4` commit, not to `abc`.
+`slang package edit noise --advance` moves the represented release to `1.4`: the version, the tag, and that tag's commit. Until then the graph does not see `1.4`. `--restore` after that advance returns to the `1.4` commit, not to `abc`.
 
 `unedit` before that advance sees that `v1.4` is newer than `1.2`, satisfies `<2`, and, when the tip is that tag, switches the lock to version `1.4` and that commit. No prompt. That adoption happens because the edit is ending, not because `update` noticed the tag. The boolean is still set, so a later `update` keeps `1.4`. The same `unedit` after `unpin` lands on `1.4` and lets that `update` drift.
 

@@ -173,7 +173,7 @@ tag with `ref` and omit `as` to derive the solver identity from the nearest rele
 line, or write `as` to assign it explicitly. `schema_version` in `slang-package.json` is only the
 file format version. A release row records the Git URL, canonical tag, exact version, and commit.
 An edit row records the Git URL, branch, and the version, canonical tag, and commit of the release
-that branch is representing. `edit advance` moves that version, tag, and commit together. `pinned`
+that branch is representing. `edit <name> --advance` moves that version, tag, and commit together. `pinned`
 is a boolean on the row and is
 omitted when it is false.
 
@@ -410,10 +410,12 @@ under `deps/`. Fetched source remains visible there; generated files go under `o
 `deps/NAME` checkout. `--create` creates a missing branch from the commit the dependency is
 resolved to and does not reset a branch that already exists. The lock keeps the version, tag, and
 commit it already had, and records the branch beside them. The pin boolean is unchanged.
-`edit advance NAME` moves that version, tag, and commit, in one step, to the greatest canonical
+`edit NAME --advance` moves that version, tag, and commit, in one step, to the greatest canonical
 tag on the line of history from the branch tip back to the commit the row is representing. A tag
 between the represented release and that latest tag is not a separate step. The tag must still
-satisfy incoming constraints. The checkout does not move.
+satisfy incoming constraints. The checkout does not move. `--advance` cannot be combined with
+`--branch` or `--create`. The package name stays the first argument, so a dependency named
+`advance` is edited with `edit advance --branch BRANCH`.
 
 `slang package unedit NAME` ends the edit on a release tag. `--advance`, `--restore`, and
 `--tag VERSION` select one ending and cannot be combined. There is no `--yes`. Declining a prompt
@@ -427,7 +429,7 @@ tag is behind `HEAD`, the command says how many commits would leave the workspac
 to check out the tag. Declining does not fall through to the represented release. When no newer
 tag satisfies the constraints, the only ending offered is the release the edit is already
 representing, and that still asks. `--advance` requires a newer legal tag. `--restore` returns to
-that same represented release, including after `edit advance`, and always asks.
+that same represented release, including after `edit NAME --advance`, and always asks.
 `--tag VERSION` creates a local annotated tag, `v` plus the canonical spelling, on `HEAD` and then
 selects it. The tag is not pushed. The command fails before creating the tag when the release
 already has a tag, the version is not strictly greater than the stored version and every canonical
@@ -441,7 +443,7 @@ approve dropping commits that follow a tag. A dirty checkout blocks any ending t
 dependency is not edited. The version must satisfy incoming constraints, and a canonical tag must
 exist. `pin NAME` while the dependency is edited sets the boolean only. `unpin NAME` clears the
 boolean and works during an edit. The branch stays. `update` will not move a pinned version.
-`edit advance` and `unedit` can, and they leave the boolean set.
+`edit NAME --advance` and `unedit` can, and they leave the boolean set.
 
 A non-empty `slang-package-overlay.json` is an error. There is no override command and no path
 dependency. An edit changes the branch of `deps/NAME`. It does not change where the package lives.
