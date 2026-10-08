@@ -184,6 +184,17 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
         // existing entry; evicting or adding an entry here would delete the file we just wrote
         // (if the oldest entry is the one being rewritten) or create a duplicate index entry.
         cacheIndex[existingEntryIndex].age = 0;
+
+        // An index written before rewrites were refreshed in place can hold the same key more
+        // than once. All copies refer to the one entry file just written, so keep only the
+        // refreshed entry: a leftover copy would count against the entry limit, and evicting it
+        // later would delete the file that the kept entry refers to.
+        for (Index entryIndex = cacheIndex.getCount() - 1; entryIndex > existingEntryIndex;
+             --entryIndex)
+        {
+            if (cacheIndex[entryIndex].key == key)
+                cacheIndex.removeAt(entryIndex);
+        }
     }
     else if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
     {

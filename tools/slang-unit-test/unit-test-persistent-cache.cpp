@@ -162,6 +162,30 @@ struct PersistentCacheTest
 
     // Get the absolute filename of the cache index file.
     String getIndexFilename() { return cache->m_indexFileName; }
+
+    // Replace the cache index with one that holds `copyCount` entries for the key of `entry`, as an
+    // index written before rewrites were refreshed in place could. The entry file is not touched.
+    void writeIndexWithDuplicateKey(const Entry& entry, Count copyCount)
+    {
+        PersistentCache::CacheIndex index;
+        for (Count i = 0; i < copyCount; ++i)
+            index.add(PersistentCache::CacheEntry{entry.key, uint32_t(i)});
+        SLANG_CHECK(cache->writeIndex(cache->m_indexFileName, index) == SLANG_OK);
+    }
+
+    // Count the entries for the key of `entry` in the cache index on disk.
+    Count countIndexEntries(const Entry& entry)
+    {
+        PersistentCache::CacheIndex index;
+        SLANG_CHECK(cache->readIndex(cache->m_indexFileName, index) == SLANG_OK);
+        Count count = 0;
+        for (const auto& indexEntry : index)
+        {
+            if (indexEntry.key == entry.key)
+                ++count;
+        }
+        return count;
+    }
 };
 
 } // namespace Slang
@@ -334,10 +358,13 @@ struct RewriteTest : public PersistentCacheTest
         writeEntry(entries[0]);
         writeEntry(entries[1]);
 
-        // Rewrite the LRU entry of a full cache.
-        writeEntry(entries[0]);
+        // Rewrite the LRU entry of a full cache with different data. The entry must stay in the
+        // cache and reading it must return the new data.
+        Entry rewritten{entries[0].key, createRandomBlob(4096)};
+        SLANG_CHECK(!isBlobEqual(rewritten.data, entries[0].data));
+        writeEntry(rewritten);
         SLANG_CHECK(cache->getStats().entryCount == 2);
-        SLANG_CHECK(readEntry(entries[0]) == true);
+        SLANG_CHECK(readEntry(rewritten) == true);
         SLANG_CHECK(readEntry(entries[1]) == true);
 
         // Rewriting the same key twice must not create duplicate index entries: if it did, the
@@ -357,6 +384,19 @@ struct RewriteTest : public PersistentCacheTest
         SLANG_CHECK(readEntry(entries[2]) == true);
         SLANG_CHECK(readEntry(entries[0]) == false);
         SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // An index written before this fix can already hold the same key twice. Rewriting that
+        // key must leave a single index entry, so that writing a new key into the full cache
+        // cannot evict a leftover copy and delete the file of the rewritten entry.
+        SLANG_CHECK(cache->clear() == SLANG_OK);
+        writeEntry(entries[0]);
+        writeIndexWithDuplicateKey(entries[0], 2);
+        writeEntry(rewritten);
+        SLANG_CHECK(countIndexEntries(rewritten) == 1);
+        SLANG_CHECK(cache->getStats().entryCount == 1);
+        writeEntry(entries[2]);
+        SLANG_CHECK(readEntry(rewritten) == true);
+        SLANG_CHECK(readEntry(entries[2]) == true);
     }
 };
 
