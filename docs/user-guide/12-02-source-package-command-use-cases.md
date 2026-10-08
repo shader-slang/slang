@@ -24,6 +24,11 @@ Manifest fields and validation rules are in [Slang Source Packages](source-packa
 ready-made `video-preview` example is in [Using Source Packages](source-package-workflow).
 Module file naming is in [Writing Module Files, Import, and Include](module-files).
 
+Path dependencies, the `override` command, `dependency pin`, `update --ignore-overrides`, and
+`unedit --adopt` / `--yes` are gone. Journeys below that still use those commands describe the
+previous tool. The current commands are in
+[Slang Package Command Reference](source-package-command-reference).
+
 ## The three kinds of state
 
 Before starting, distinguish the files that describe the same graph from different points of

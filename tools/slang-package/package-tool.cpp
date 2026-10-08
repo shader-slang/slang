@@ -10,6 +10,7 @@
 #include "core/slang-writer.h"
 #include "package-bundle.h"
 #include "package-docs.h"
+#include "package-edit.h"
 #include "package-git.h"
 #include "package-json.h"
 #include "package-local.h"
@@ -35,22 +36,22 @@ static void _printHelp(bool experimental = false)
         "Manifest (slang-package.json):\n"
         "  init              Create a package in the current directory.\n"
         "  dependency add <name> --git <url> (--version <range> | --ref <ref> [--as <ver>])\n"
-        "  dependency add <name> --path <path> --as <version>\n"
-        "  dependency pin <name> [--to <version> | --commit]\n"
         "  dependency remove <name> | list\n"
         "\n"
-        "Overlay (slang-package-overlay.json):\n"
-        "  override add <name> <path> [as]\n"
-        "  override enable|disable|remove <name> | list\n"
-        "  edit <name>       Make a Git checkout editable in place.\n"
-        "  unedit <name> [--clean | --adopt [--ref <ref>] [--as <version>]] [--yes]\n"
-        "                    --clean restores the lock; --adopt pins HEAD into the manifest.\n"
-        "\n"
         "Lock (slang-package-lock.json):\n"
+        "  pin <name> [<version>]\n"
+        "                    Pin a solved release, or pin the current edit without moving it.\n"
+        "  unpin <name>      Clear a pin. An edit stays on its branch.\n"
+        "  edit <name> --branch <branch> [--create]\n"
+        "                    Check out a branch of a solved dependency.\n"
+        "  edit advance <name>\n"
+        "                    Move an edit's stored version to a newer tag on that branch.\n"
+        "  unedit <name> [--restore | --advance | --tag <version>] [--clean]\n"
+        "                    End an edit on a release tag. There is no --yes.\n"
         "  fetch [--clean] [--yes] [--skip-validate]\n"
         "                    Install the lock. Missing lock runs update. --clean discards "
         "checkout state.\n"
-        "  update [--ignore-overrides] [--clean] [--dry-run] [--minimal] [--offline] [--yes]\n"
+        "  update [--clean] [--dry-run] [--minimal] [--offline] [--yes]\n"
         "         [--skip-validate]\n"
         "                    Re-resolve and rewrite the lock. --offline uses .slang/cache only.\n"
         "  status            Lock and graph readiness (details only when dirty).\n"
@@ -194,18 +195,8 @@ static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
     return command == "fetch" || command == "update" || command == "validate" ||
            command == "bundle" || command == "build" || command == "run" || command == "test" ||
            command == "docs" || command == "status" || command == "tree" || command == "why" ||
-           command == "dependency" || command == "override" || command == "edit" ||
-           command == "unedit";
-}
-
-static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
-{
-    for (auto& package : lock.packages)
-    {
-        if (package.name == name)
-            return &package;
-    }
-    return nullptr;
+           command == "dependency" || command == "edit" || command == "unedit" ||
+           command == "pin" || command == "unpin";
 }
 
 /// Write `slang-package-includes.txt` with the same export roots `bundle` passes to `slangc`.
@@ -286,6 +277,15 @@ static SlangResult _materialize(
 
     for (const auto& package : lock.packages)
     {
+        if (isEditedLockedPackage(package))
+        {
+            fprintf(
+                stdout,
+                "Leaving edited package '%s' on branch '%s'.\n",
+                package.name.getBuffer(),
+                package.branch.getBuffer());
+            continue;
+        }
         Index localIndex = findActiveLocalPackageIndex(localPackages, package.name);
         if (localIndex >= 0)
         {
@@ -397,7 +397,8 @@ static SlangResult _collectCheckoutsRequiringClean(
     String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
     for (const auto& package : lock.packages)
     {
-        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+        if (isEditedLockedPackage(package) ||
+            findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
             isPathOnlyLockedPackage(package))
         {
             continue;
@@ -1034,103 +1035,6 @@ static SlangResult _dependencyRemove(
 ///
 /// Default copies the locked exact version as `git` plus `version`, so a later update cannot float
 /// to a newer compatible tag. `--to` writes that exact version instead of the locked one.
-/// `--commit` writes `git` plus `ref` plus `as` using the locked SHA, so a moved tag is not
-/// reselected. A transitive package is promoted to a direct edge using the lock's Git URL. Path
-/// dependencies are already pins. An overlay stays in slang-package-overlay.json; this command only
-/// edits committed Git intent. Because an overlay row does not have a locked SHA, `--commit`
-/// requires a Git-only lock row. Its effective version is also local intent, so default pin
-/// requires a Git-only row while `--to` makes the version explicit. This command does not rewrite
-/// the lock; inspect status and run update afterward, the same as `dependency add`.
-static SlangResult _dependencyPin(
-    const String& projectRoot,
-    const String& name,
-    const String& requestedVersion,
-    bool hasRequestedVersion,
-    bool pinCommit,
-    String& outError)
-{
-    if (hasRequestedVersion && pinCommit)
-    {
-        outError = "dependency pin --to cannot be combined with --commit.";
-        return SLANG_FAIL;
-    }
-    if (hasRequestedVersion)
-    {
-        PackageVersion ignored;
-        SLANG_RETURN_ON_FAIL(parseExactVersion(requestedVersion, ignored, outError));
-    }
-
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    Index existingIndex = _findDependencyIndex(manifest, name);
-    if (existingIndex >= 0 && manifest.dependencies[existingIndex].path.getLength())
-    {
-        outError = String("Path dependency is already pinned: ") + name;
-        return SLANG_FAIL;
-    }
-
-    String lockPath = Path::combine(projectRoot, kLockFileName);
-    if (!File::exists(lockPath))
-    {
-        outError = "dependency pin requires slang-package-lock.json. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    Index lockedIndex = findLockedPackageIndex(lock, name);
-    if (lockedIndex < 0)
-    {
-        outError = String("Lock file does not contain package '") + name + "'.";
-        return SLANG_FAIL;
-    }
-    const LockedPackage& locked = lock.packages[lockedIndex];
-    if (!isGitBackedLockedPackage(locked))
-    {
-        outError = String("Cannot pin a path-only package: ") + name;
-        return SLANG_FAIL;
-    }
-    if (existingIndex >= 0 && manifest.dependencies[existingIndex].git != locked.git)
-    {
-        outError = String("Lock file uses a different Git URL for dependency '") + name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-    if (locked.path.getLength() && pinCommit)
-    {
-        outError = String("Cannot pin overlaid package '") + name +
-                   "' by commit because its lock row selects a local path. Disable the override "
-                   "and run 'slang package update', use --to with a published version, or use "
-                   "'slang package unedit " +
-                   name + " --adopt' to keep the working-tree commit.";
-        return SLANG_FAIL;
-    }
-    if (locked.path.getLength() && !hasRequestedVersion)
-    {
-        outError = String("Cannot infer a published Git version for overlaid package '") + name +
-                   "' because its lock row selects a local path. Pass --to VERSION.";
-        return SLANG_FAIL;
-    }
-    if (pinCommit)
-        SLANG_RELEASE_ASSERT(locked.commit.getLength());
-    String pinVersion = hasRequestedVersion ? requestedVersion : locked.version;
-    if (!pinCommit && !pinVersion.getLength())
-    {
-        outError = String("Lock file does not record a version for package '") + name + "'.";
-        return SLANG_FAIL;
-    }
-
-    Dependency dependency;
-    dependency.name = name;
-    dependency.git = locked.git;
-    if (pinCommit)
-    {
-        dependency.ref = locked.commit;
-        dependency.as = locked.version;
-    }
-    else
-        dependency.version = pinVersion;
-    return _dependencyAdd(projectRoot, dependency, outError);
-}
 
 static SlangResult _dependencyList(const String& projectRoot, String& outError)
 {
@@ -1255,7 +1159,8 @@ static SlangResult _refuseIfOwnedCheckoutsAreDirty(
     List<String> dirtyFacts;
     for (const auto& package : lock.packages)
     {
-        if (findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
+        if (isEditedLockedPackage(package) ||
+            findActiveLocalPackageIndex(localPackages, package.name) >= 0 ||
             !isGitBackedLockedPackage(package) || package.path.getLength())
         {
             continue;
@@ -1615,7 +1520,8 @@ static SlangResult _update(
             outError,
             &warnings,
             &report,
-            offline));
+            offline,
+            previousLockPtr));
     }
     else
     {
@@ -1626,7 +1532,8 @@ static SlangResult _update(
             outError,
             &warnings,
             &report,
-            offline));
+            offline,
+            previousLockPtr));
     }
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(
         projectRoot,
@@ -1805,6 +1712,12 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     }
     for (const auto& package : lock.packages)
     {
+        if (isEditedLockedPackage(package))
+        {
+            outError = String("Cannot validate a workspace that has an edited dependency: ") +
+                       package.name + ". Run 'slang package unedit " + package.name + "'.";
+            return SLANG_FAIL;
+        }
         if (!isLocalOverrideLockedPackage(package))
             continue;
         outError = String("Package lock requires local override '") + package.name +
@@ -2962,653 +2875,6 @@ static SlangResult _docs(const String& projectRoot, bool printOnly, String& outE
     return SLANG_OK;
 }
 
-static SlangResult _registerLocalPackage(
-    const String& projectRoot,
-    const String& name,
-    const String& path,
-    const String& as,
-    List<LocalPackage>& ioPackages,
-    String& outError)
-{
-    if (findLocalPackageIndex(ioPackages, name) >= 0)
-    {
-        outError = String("Package already has a registered local tree: ") + name;
-        return SLANG_FAIL;
-    }
-
-    String inputPath = Path::isAbsolute(path) ? path : Path::combine(projectRoot, path);
-    String canonicalPath;
-    SlangPathType type;
-    if (SLANG_FAILED(Path::getPathType(inputPath, &type)) || type != SLANG_PATH_TYPE_DIRECTORY ||
-        SLANG_FAILED(Path::getCanonical(inputPath, canonicalPath)))
-    {
-        outError = String("Local package directory does not exist: ") + path;
-        return SLANG_FAIL;
-    }
-    String relativePath = Path::getRelativePath(projectRoot, canonicalPath);
-    if (Path::isAbsolute(relativePath))
-    {
-        outError = "Local package must be on the same filesystem as the project.";
-        return SLANG_FAIL;
-    }
-
-    LocalPackage package;
-    package.name = name;
-    package.path = relativePath;
-    package.as = as;
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(readLocalPackageManifest(projectRoot, package, manifest, outError));
-    ioPackages.add(package);
-    ioPackages.sort([](const LocalPackage& left, const LocalPackage& right)
-                    { return left.name < right.name; });
-    return writeProjectLocalPackages(projectRoot, ioPackages, outError);
-}
-
-static SlangResult _edit(const String& projectRoot, const String& name, String& outError)
-{
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    LockedPackage* package = _findLockedPackage(lock, name);
-    if (!package)
-    {
-        outError = String("Package is not present in the lock file: ") + name;
-        return SLANG_FAIL;
-    }
-    if (package->path.getLength())
-    {
-        outError =
-            isPathOnlyLockedPackage(*package)
-                ? String("Manifest path dependency is already editable in place: ") + package->path
-                : String("Package already uses a local override at: ") + package->path;
-        return SLANG_FAIL;
-    }
-    String destination = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), name);
-    SlangPathType type;
-    if (SLANG_FAILED(Path::getPathType(destination, &type)) || type != SLANG_PATH_TYPE_DIRECTORY)
-    {
-        outError = String("Dependency checkout is not materialized; run 'slang package fetch': ") +
-                   destination;
-        return SLANG_FAIL;
-    }
-    // Local file changes are not an obstacle here, they are the reason to run this command: the
-    // user has work in `deps/NAME` and wants the tool to stop managing that tree. Fetch and update
-    // refuse to replace a dirty checkout, so requiring a pristine tree would leave the one
-    // command that preserves the work unavailable in exactly the state that needs it.
-    //
-    // What must still hold is that the tree is the repository the lock names. `edit` turns that
-    // existing checkout into an in-place override; it is not a way to substitute an unrelated
-    // repository under the workspace-owned dependency path.
-    if (isGitBackedLockedPackage(*package))
-    {
-        String origin;
-        if (SLANG_FAILED(getRepositoryOrigin(destination, origin, outError)))
-        {
-            outError = String("Dependency checkout is not a Git repository: ") + destination;
-            appendErrorAdvice(
-                outError,
-                "Run 'slang package fetch --clean' to restore it from the lock, then edit it.");
-            return SLANG_FAIL;
-        }
-        if (origin != package->git)
-        {
-            outError =
-                String("Dependency checkout is not the repository the lock names: ") + destination;
-            appendErrorAdvice(
-                outError,
-                String("The lock selects ") + package->git +
-                    ". Run 'slang package fetch --clean' to restore that repository, or use an "
-                    "override if this directory should participate in resolution.");
-            return SLANG_FAIL;
-        }
-    }
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(_registerLocalPackage(
-        projectRoot,
-        name,
-        destination,
-        package->version,
-        localPackages,
-        outError));
-    SLANG_RETURN_ON_FAIL(
-        _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    fprintf(stdout, "Package '%s' is now editable.\n", name.getBuffer());
-    return SLANG_OK;
-}
-
-/// Replace an in-place override with a committed Git pin at its current `HEAD`.
-///
-/// The manifest records the pin so a later update cannot silently select another release; the lock
-/// records the exact commit that fetch installs. Omit `requestedRef` to freeze `HEAD` as a commit
-/// or as a unique release tag that points at `HEAD`. Pass `requestedRef` to keep following that
-/// branch or tag. Omit `requestedVersion` to derive `as` from the nearest release tag
-/// reachable from `HEAD`.
-static SlangResult _adoptInPlaceOverride(
-    const String& projectRoot,
-    const String& name,
-    const String& requestedVersion,
-    const String& requestedRef,
-    bool assumeYes,
-    String& outError)
-{
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    Index dependencyIndex = _findDependencyIndex(manifest, name);
-    if (dependencyIndex < 0 || manifest.dependencies[dependencyIndex].path.getLength())
-    {
-        outError = String("unedit --adopt requires a direct Git dependency: ") + name;
-        return SLANG_FAIL;
-    }
-
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    Index lockedIndex = findLockedPackageIndex(lock, name);
-    if (lockedIndex < 0 || !isGitBackedLockedPackage(lock.packages[lockedIndex]))
-    {
-        outError = String("Package is not a locked Git dependency: ") + name;
-        return SLANG_FAIL;
-    }
-
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0 || !isInPlaceLocalPackage(manifest, localPackages[localIndex]))
-    {
-        outError = String("Package is not editable: ") + name;
-        return SLANG_FAIL;
-    }
-
-    String checkout;
-    SLANG_RETURN_ON_FAIL(
-        getLocalPackageRoot(projectRoot, localPackages[localIndex], checkout, outError));
-    String origin;
-    SLANG_RETURN_ON_FAIL(getRepositoryOrigin(checkout, origin, outError));
-    if (origin != lock.packages[lockedIndex].git)
-    {
-        outError = String("Editable checkout is not the repository the lock names: ") + name;
-        return SLANG_FAIL;
-    }
-
-    String headCommit;
-    SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
-    GitWorkingTreeStatus status;
-    SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(checkout, headCommit, status, outError));
-    if (status.changedFileCount || status.stashCount)
-    {
-        outError = String("unedit --adopt requires committed files and no stashes: ") + checkout;
-        return SLANG_FAIL;
-    }
-
-    Manifest localManifest;
-    SLANG_RETURN_ON_FAIL(
-        readLocalPackageManifest(projectRoot, localPackages[localIndex], localManifest, outError));
-    SLANG_RETURN_ON_FAIL(
-        validateLockedPackageManifest(lock.packages[lockedIndex], localManifest, outError));
-
-    String ref = headCommit;
-    String version = requestedVersion;
-    if (requestedRef.getLength())
-    {
-        if (isGitObjectId(requestedRef))
-        {
-            outError = String("unedit --adopt --ref cannot be a commit ID: ") + requestedRef +
-                       ". Omit --ref to freeze HEAD.";
-            return SLANG_FAIL;
-        }
-        String resolvedCommit;
-        SLANG_RETURN_ON_FAIL(
-            resolveLocalRevision(checkout, requestedRef, resolvedCommit, outError));
-        if (resolvedCommit != headCommit)
-        {
-            outError = String("unedit --adopt --ref '") + requestedRef +
-                       "' does not point at HEAD. Check out that ref first.";
-            return SLANG_FAIL;
-        }
-        ref = requestedRef;
-    }
-    List<String> warnings;
-    if (version.getLength())
-    {
-        PackageVersion ignoredVersion;
-        SLANG_RETURN_ON_FAIL(parseExactVersion(version, ignoredVersion, outError));
-    }
-    else
-    {
-        PackageVersion taggedVersion;
-        bool foundTag = false;
-        String headTag;
-        SLANG_RETURN_ON_FAIL(
-            findVersionTagAtHead(checkout, headTag, taggedVersion, foundTag, outError, &warnings));
-        if (foundTag)
-        {
-            version = formatExactVersion(taggedVersion);
-            if (!requestedRef.getLength())
-                ref = headTag;
-        }
-        else
-        {
-            String nearestTag;
-            SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
-                checkout,
-                headCommit,
-                nearestTag,
-                taggedVersion,
-                foundTag,
-                outError,
-                &warnings));
-            if (!foundTag)
-            {
-                for (const auto& warning : warnings)
-                    fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-                outError = String("Editable checkout HEAD has no semantic-version tag in its "
-                                  "history: ") +
-                           name + ". Pass --as VERSION to adopt this commit.";
-                return SLANG_FAIL;
-            }
-            version = formatExactVersion(taggedVersion);
-        }
-    }
-
-    Dependency& dependency = manifest.dependencies[dependencyIndex];
-    dependency.version = String();
-    dependency.ref = ref;
-    dependency.as = version;
-
-    LockedPackage& package = lock.packages[lockedIndex];
-    package.path = String();
-    package.ref = ref;
-    package.version = version;
-    package.commit = headCommit;
-
-    localPackages.removeAt(localIndex);
-    SLANG_RETURN_ON_FAIL(validateWorkspaceResolvedProject(
-        projectRoot,
-        manifest,
-        lock,
-        localPackages,
-        outError,
-        &warnings));
-
-    fprintf(
-        stdout,
-        "Will pin dependency '%s' to %s (%s) as %s.\n",
-        name.getBuffer(),
-        ref.getBuffer(),
-        headCommit.getBuffer(),
-        version.getBuffer());
-    bool approved = false;
-    SLANG_RETURN_ON_FAIL(_confirmApply(
-        assumeYes,
-        requestedRef.getLength() ? "Adopt this ref in the manifest and lock?"
-                                 : "Adopt this commit in the manifest and lock?",
-        approved,
-        outError));
-    if (!approved)
-        return SLANG_OK;
-
-    SLANG_RETURN_ON_FAIL(_writeValidatedProjectManifest(projectRoot, manifest, outError));
-    SLANG_RETURN_ON_FAIL(writeLockFile(Path::combine(projectRoot, kLockFileName), lock, outError));
-    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(
-        _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    for (const auto& warning : warnings)
-        fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
-    fprintf(
-        stdout,
-        "Adopted '%s' at %s as %s.\n",
-        name.getBuffer(),
-        ref.getBuffer(),
-        version.getBuffer());
-    return SLANG_OK;
-}
-
-static SlangResult _unedit(
-    const String& projectRoot,
-    const String& name,
-    bool allowClean,
-    bool assumeYes,
-    String& outError)
-{
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    LockedPackage* package = _findLockedPackage(lock, name);
-    if (!package)
-    {
-        outError = String("Package is not present in the lock file: ") + name;
-        return SLANG_FAIL;
-    }
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0 || !isInPlaceLocalPackage(manifest, localPackages[localIndex]))
-    {
-        outError = String("Package is not editable: ") + name;
-        return SLANG_FAIL;
-    }
-    if (package->path.getLength())
-    {
-        outError = String("The lock still records an in-place override for package: ") + name;
-        appendErrorAdvice(
-            outError,
-            String("To keep the committed checkout, run 'slang package unedit ") + name +
-                " --adopt' (and pass '--as VERSION' when no release tag is in history). To return "
-                "to the "
-                "published graph, run 'slang package override disable " +
-                name + "', then 'slang package update' and 'slang package unedit " + name + "'.");
-        return SLANG_FAIL;
-    }
-    String destination;
-    SLANG_RETURN_ON_FAIL(
-        getLocalPackageRoot(projectRoot, localPackages[localIndex], destination, outError));
-    String canonicalExpected;
-    if (SLANG_FAILED(Path::getCanonical(
-            Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), name),
-            canonicalExpected)) ||
-        destination != canonicalExpected)
-    {
-        outError = String("Editable package is not at its workspace dependency path: ") + name;
-        return SLANG_FAIL;
-    }
-    SlangPathType type;
-    if (SLANG_FAILED(Path::getPathType(destination, &type)) || type != SLANG_PATH_TYPE_DIRECTORY)
-    {
-        outError = String("Package is not editable: ") + name;
-        return SLANG_FAIL;
-    }
-    String headCommit;
-    SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(destination, headCommit, outError));
-    GitWorkingTreeStatus status;
-    SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, headCommit, status, outError));
-    const bool hasLocalState = status.changedFileCount != 0 || status.stashCount != 0;
-    const bool headMoved = status.headCommit != package->commit;
-    if ((hasLocalState || headMoved) && !allowClean)
-    {
-        outError =
-            hasLocalState
-                ? String("Editable checkout has uncommitted files or stashes: ") + destination
-                : String("Editable checkout HEAD differs from the locked commit: ") + destination;
-        String advice =
-            hasLocalState
-                ? String("Commit the files you want to keep and apply any stashes, then run "
-                         "'slang package unedit ") +
-                      name +
-                      " --adopt' (and pass '--as VERSION' when no release tag is in history). To "
-                      "discard all "
-                      "local state instead, run 'slang package unedit " +
-                      name + " --clean'."
-                : String("To keep these commits, run 'slang package unedit ") + name +
-                      " --adopt' (and pass '--as VERSION' when no release tag is in history). To "
-                      "discard them "
-                      "and restore the locked commit, run 'slang package unedit " +
-                      name + " --clean'.";
-        appendErrorAdvice(outError, advice);
-        return SLANG_FAIL;
-    }
-    if (allowClean)
-    {
-        const bool needsRestore = hasLocalState || headMoved;
-        if (needsRestore)
-        {
-            bool approved = false;
-            SLANG_RETURN_ON_FAIL(_confirmApply(
-                assumeYes,
-                "Discard this editable checkout state and restore the locked commit?",
-                approved,
-                outError));
-            if (!approved)
-                return SLANG_OK;
-
-            bool didMaterialize = false;
-            String cachePath =
-                Path::combine(Path::combine(projectRoot, ".slang", "cache"), package->name);
-            // The state that triggered this confirmation makes materialization replace the whole
-            // repository, so no surviving ref can move. If the checkout becomes clean before the
-            // mutation, keep ref moves disallowed because they were not listed in this prompt.
-            SLANG_RETURN_ON_FAIL(materializeLockedRevision(
-                package->git,
-                package->commit,
-                package->commit,
-                destination,
-                true,
-                false,
-                didMaterialize,
-                outError,
-                cachePath));
-        }
-    }
-    localPackages.removeAt(localIndex);
-    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(
-        _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    fprintf(
-        stdout,
-        "Package '%s' is no longer editable; its checkout remains at '%s'.\n",
-        name.getBuffer(),
-        Path::getRelativePath(projectRoot, destination).getBuffer());
-    return SLANG_OK;
-}
-
-/// Return whether `path` is the workspace checkout for `name`.
-///
-/// `edit color-encoding` and `override add color-encoding deps/color-encoding` name the same local
-/// registration, so callers use this role check instead of storing a second edit representation.
-static SlangResult _isWorkspaceDependencyCheckout(
-    const String& projectRoot,
-    const Manifest& manifest,
-    const String& name,
-    const String& path,
-    bool& outIsCheckout,
-    String& outRelativePath,
-    String& outError)
-{
-    outIsCheckout = false;
-    outRelativePath = String();
-    String inputPath = Path::isAbsolute(path) ? path : Path::combine(projectRoot, path);
-    String canonicalPath;
-    SlangPathType type;
-    if (SLANG_FAILED(Path::getPathType(inputPath, &type)) || type != SLANG_PATH_TYPE_DIRECTORY ||
-        SLANG_FAILED(Path::getCanonical(inputPath, canonicalPath)))
-    {
-        outError = String("Local package directory does not exist: ") + path;
-        return SLANG_FAIL;
-    }
-    String expected;
-    if (SLANG_FAILED(Path::getCanonical(
-            Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest), name),
-            expected)))
-    {
-        outError = String("Cannot canonicalize dependency checkout: ") + name;
-        return SLANG_FAIL;
-    }
-    outIsCheckout = canonicalPath == expected;
-    if (outIsCheckout)
-        outRelativePath = Path::getRelativePath(projectRoot, canonicalPath);
-    return SLANG_OK;
-}
-
-static SlangResult _overrideAdd(
-    const String& projectRoot,
-    const String& name,
-    const String& path,
-    const String& as,
-    String& outError)
-{
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    LockedPackage* lockedPackage = _findLockedPackage(lock, name);
-    if (!lockedPackage && !as.getLength())
-    {
-        outError = String("Override for package '") + name +
-                   "' requires an 'as' version because it is not present in the lock.";
-        return SLANG_FAIL;
-    }
-    if (lockedPackage && isPathOnlyLockedPackage(*lockedPackage))
-    {
-        outError = String("Manifest path dependency cannot be overridden: ") + name;
-        return SLANG_FAIL;
-    }
-    String providedVersion = as.getLength() ? as : lockedPackage->version;
-    PackageVersion ignoredVersion;
-    SLANG_RETURN_ON_FAIL(parseExactVersion(providedVersion, ignoredVersion, outError));
-
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex >= 0)
-    {
-        bool isCheckout = false;
-        String relativePath;
-        SLANG_RETURN_ON_FAIL(_isWorkspaceDependencyCheckout(
-            projectRoot,
-            manifest,
-            name,
-            path,
-            isCheckout,
-            relativePath,
-            outError));
-        if (!isInPlaceLocalPackage(manifest, localPackages[localIndex]) || !isCheckout)
-        {
-            outError = String("Package already has a registered local tree: ") + name;
-            return SLANG_FAIL;
-        }
-        // `edit` already registered this exact in-place override. Re-adding it may supply a new
-        // effective version, but it does not create another local-package representation.
-        localPackages[localIndex].path = relativePath;
-        localPackages[localIndex].as = providedVersion;
-        localPackages[localIndex].enabled = true;
-        SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
-        SLANG_RETURN_ON_FAIL(
-            _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-        fprintf(
-            stdout,
-            "Package '%s' is now an override at '%s' as %s. Run 'slang package update' to adopt "
-            "its manifest.\n",
-            name.getBuffer(),
-            relativePath.getBuffer(),
-            providedVersion.getBuffer());
-        return SLANG_OK;
-    }
-
-    SLANG_RETURN_ON_FAIL(
-        _registerLocalPackage(projectRoot, name, path, providedVersion, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(
-        _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    fprintf(
-        stdout,
-        "Package '%s' now uses '%s'. Run 'slang package update' to adopt its manifest.\n",
-        name.getBuffer(),
-        path.getBuffer());
-    return SLANG_OK;
-}
-
-static SlangResult _overrideRemove(const String& projectRoot, const String& name, String& outError)
-{
-    Manifest manifest;
-    SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    Index packageIndex = findLockedPackageIndex(lock, name);
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0)
-    {
-        outError = String("Package has no registered local tree: ") + name;
-        return SLANG_FAIL;
-    }
-    if (isInPlaceLocalPackage(manifest, localPackages[localIndex]))
-    {
-        outError = String("Package is editable; use 'slang package unedit ") + name + "'.";
-        return SLANG_FAIL;
-    }
-    if (packageIndex >= 0 && lock.packages[packageIndex].path.getLength())
-    {
-        outError = String("The lock still points at this local package. Run "
-                          "'slang package update' before 'override remove'.");
-        return SLANG_FAIL;
-    }
-    localPackages.removeAt(localIndex);
-    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
-    SLANG_RETURN_ON_FAIL(
-        _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    fprintf(stdout, "Package '%s' no longer uses a local override.\n", name.getBuffer());
-    return SLANG_OK;
-}
-
-static SlangResult _setOverrideEnabled(
-    const String& projectRoot,
-    const String& name,
-    bool enabled,
-    String& outError)
-{
-    LockFile lock;
-    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index localIndex = findLocalPackageIndex(localPackages, name);
-    if (localIndex < 0)
-    {
-        outError = String("Package has no local override: ") + name;
-        return SLANG_FAIL;
-    }
-    if (localPackages[localIndex].enabled == enabled)
-    {
-        fprintf(
-            stdout,
-            "Override '%s' is already %s.\n",
-            name.getBuffer(),
-            enabled ? "enabled" : "disabled");
-        return SLANG_OK;
-    }
-
-    localPackages[localIndex].enabled = enabled;
-    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
-
-    Index lockedIndex = findLockedPackageIndex(lock, name);
-    bool lockUsesOverride =
-        lockedIndex >= 0 && isLocalOverrideLockedPackage(lock.packages[lockedIndex]);
-    if (enabled || !lockUsesOverride)
-    {
-        SLANG_RETURN_ON_FAIL(
-            _writeValidatedSearchPathsAfterLocalChange(projectRoot, lock, localPackages, outError));
-    }
-    fprintf(
-        stdout,
-        "Override '%s' is now %s. Run 'slang package update' to select the %s graph.\n",
-        name.getBuffer(),
-        enabled ? "enabled" : "disabled",
-        enabled ? "local" : "published");
-    return SLANG_OK;
-}
-
-static SlangResult _listOverrides(const String& projectRoot, String& outError)
-{
-    List<LocalPackage> localPackages;
-    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
-    Index count = 0;
-    for (const auto& package : localPackages)
-    {
-        if (count++ == 0)
-            fprintf(stdout, "Overrides:\n");
-        fprintf(
-            stdout,
-            "  %s: %s at %s%s%s\n",
-            package.name.getBuffer(),
-            package.enabled ? "enabled" : "disabled",
-            package.path.getBuffer(),
-            package.as.getLength() ? " as " : "",
-            package.as.getBuffer());
-    }
-    if (!count)
-        fprintf(stdout, "Overrides: none.\n");
-    return SLANG_OK;
-}
 
 /// Accept `--skip-validate` and reject every other flag for `bundle` and `build`.
 static SlangResult _readDistributionOptions(
@@ -3695,7 +2961,11 @@ SlangResult executeInDirectory(
         {
             String flag = argv[i];
             if (flag == "--ignore-overrides")
-                ignoreOverrides = true;
+            {
+                outError = "update --ignore-overrides has been removed. Edits are a branch in "
+                           "the lock, and update does not move an edited checkout.";
+                return SLANG_FAIL;
+            }
             else if (flag == "--clean")
                 allowClean = true;
             else if (flag == "--dry-run")
@@ -3849,7 +3119,10 @@ SlangResult executeInDirectory(
                 if (option == "--git")
                     dependency.git = value;
                 else if (option == "--path")
-                    dependency.path = value;
+                {
+                    outError = "Path dependencies are no longer supported.";
+                    return SLANG_FAIL;
+                }
                 else if (option == "--version")
                     dependency.version = value;
                 else if (option == "--ref")
@@ -3862,85 +3135,93 @@ SlangResult executeInDirectory(
                     return SLANG_FAIL;
                 }
             }
-            bool validPath = dependency.path.getLength() && dependency.as.getLength() &&
-                             !dependency.git.getLength() && !dependency.version.getLength() &&
-                             !dependency.ref.getLength();
             bool validGitVersion = dependency.git.getLength() && dependency.version.getLength() &&
                                    !dependency.path.getLength() && !dependency.ref.getLength() &&
                                    !dependency.as.getLength();
             bool validGitRef = dependency.git.getLength() && dependency.ref.getLength() &&
                                !dependency.path.getLength() && !dependency.version.getLength();
-            if (!(validPath || validGitVersion || validGitRef))
+            if (!(validGitVersion || validGitRef))
             {
-                outError = "Dependency add requires exactly one of: --git URL --version RANGE, "
-                           "--git URL --ref REF [--as VERSION], or --path PATH --as VERSION.";
+                outError = "Dependency add requires --git URL --version RANGE, or --git URL "
+                           "--ref REF [--as VERSION].";
                 return SLANG_FAIL;
             }
             return _dependencyAdd(projectRoot, dependency, outError);
         }
-        if (argc >= 4 && String(argv[2]) == "pin")
+        if (String(argv[2]) == "pin")
         {
-            String name = argv[3];
-            if (!isValidPackageName(name))
-            {
-                outError = String("Invalid dependency name: ") + name;
-                return SLANG_FAIL;
-            }
-            String requestedVersion;
-            bool hasRequestedVersion = false;
-            bool pinCommit = false;
-            for (int i = 4; i < argc; ++i)
-            {
-                String option = argv[i];
-                if (option == "--to")
-                {
-                    if (hasRequestedVersion)
-                    {
-                        outError = "Duplicate dependency pin option: --to";
-                        return SLANG_FAIL;
-                    }
-                    if (i + 1 >= argc)
-                    {
-                        outError = "Missing value for dependency option: --to";
-                        return SLANG_FAIL;
-                    }
-                    requestedVersion = argv[++i];
-                    hasRequestedVersion = true;
-                    if (!requestedVersion.getLength() || requestedVersion.startsWith("-"))
-                    {
-                        outError = "dependency pin --to requires an exact version.";
-                        return SLANG_FAIL;
-                    }
-                }
-                else if (option == "--commit")
-                {
-                    if (pinCommit)
-                    {
-                        outError = "Duplicate dependency pin option: --commit";
-                        return SLANG_FAIL;
-                    }
-                    pinCommit = true;
-                }
-                else
-                {
-                    outError = String("Unknown dependency pin option: ") + option;
-                    return SLANG_FAIL;
-                }
-            }
-            return _dependencyPin(
-                projectRoot,
-                name,
-                requestedVersion,
-                hasRequestedVersion,
-                pinCommit,
-                outError);
+            outError = "dependency pin has been removed. Use 'slang package pin <name> <version>'.";
+            return SLANG_FAIL;
         }
-        outError = "Invalid dependency command. Use 'dependency add', 'dependency pin', "
-                   "'dependency remove', or 'dependency list'.";
+        outError = "Invalid dependency command. Use 'dependency add', 'dependency remove', "
+                   "or 'dependency list'.";
         return SLANG_FAIL;
     }
-    if (command == "edit" && argc == 3)
-        return _edit(projectRoot, argv[2], outError);
+    if (command == "pin")
+    {
+        if (argc < 3 || argc > 4)
+        {
+            outError = "pin requires a package name and, when it is not edited, a version.";
+            return SLANG_FAIL;
+        }
+        String name = argv[2];
+        if (!isValidPackageName(name))
+        {
+            outError = String("Invalid package name: ") + name;
+            return SLANG_FAIL;
+        }
+        String version;
+        bool hasVersion = argc == 4;
+        if (hasVersion)
+            version = argv[3];
+        return pinLockedPackage(projectRoot, name, version, hasVersion, outError);
+    }
+    if (command == "unpin" && argc == 3)
+    {
+        String name = argv[2];
+        if (!isValidPackageName(name))
+        {
+            outError = String("Invalid package name: ") + name;
+            return SLANG_FAIL;
+        }
+        return unpinLockedPackage(projectRoot, name, outError);
+    }
+    if (command == "edit")
+    {
+        if (argc >= 3 && String(argv[2]) == "advance")
+        {
+            if (argc != 4)
+            {
+                outError = "edit advance requires a package name.";
+                return SLANG_FAIL;
+            }
+            return advancePackageEdit(projectRoot, argv[3], outError);
+        }
+        String name;
+        String branch;
+        bool create = false;
+        if (argc >= 3)
+            name = argv[2];
+        for (int i = 3; i < argc; ++i)
+        {
+            String flag = argv[i];
+            if (flag == "--branch" && i + 1 < argc)
+                branch = argv[++i];
+            else if (flag == "--create")
+                create = true;
+            else
+            {
+                outError = String("Unknown edit option: ") + flag;
+                return SLANG_FAIL;
+            }
+        }
+        if (!isValidPackageName(name) || !branch.getLength())
+        {
+            outError = "edit requires a package name and --branch <branch>.";
+            return SLANG_FAIL;
+        }
+        return beginPackageEdit(projectRoot, name, branch, create, outError);
+    }
     if (command == "unedit")
     {
         if (argc < 3)
@@ -3948,69 +3229,67 @@ SlangResult executeInDirectory(
             outError = "unedit requires a package name.";
             return SLANG_FAIL;
         }
-        bool allowClean = false;
-        bool adopt = false;
-        bool assumeYes = false;
-        String as;
-        String ref;
+        String name = argv[2];
+        if (!isValidPackageName(name))
+        {
+            outError = String("Invalid package name: ") + name;
+            return SLANG_FAIL;
+        }
+        UneditMode mode = UneditMode::Plain;
+        bool clean = false;
+        String tagVersion;
         for (int i = 3; i < argc; ++i)
         {
             String flag = argv[i];
             if (flag == "--clean")
-                allowClean = true;
-            else if (flag == "--adopt")
-                adopt = true;
-            else if (flag == "--as" && i + 1 < argc)
-                as = argv[++i];
-            else if (flag == "--ref" && i + 1 < argc)
-                ref = argv[++i];
-            else if (flag == "--yes")
-                assumeYes = true;
+                clean = true;
+            else if (flag == "--advance")
+            {
+                if (mode != UneditMode::Plain)
+                {
+                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
+                    return SLANG_FAIL;
+                }
+                mode = UneditMode::Advance;
+            }
+            else if (flag == "--restore")
+            {
+                if (mode != UneditMode::Plain)
+                {
+                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
+                    return SLANG_FAIL;
+                }
+                mode = UneditMode::Restore;
+            }
+            else if (flag == "--tag" && i + 1 < argc)
+            {
+                if (mode != UneditMode::Plain)
+                {
+                    outError = "unedit accepts only one of --advance, --restore, and --tag.";
+                    return SLANG_FAIL;
+                }
+                mode = UneditMode::Tag;
+                tagVersion = argv[++i];
+            }
+            else if (flag == "--yes" || flag == "--adopt" || flag == "--as" || flag == "--ref")
+            {
+                outError = String(flag) + " has been removed from unedit.";
+                return SLANG_FAIL;
+            }
             else
             {
                 outError = String("Unknown unedit option: ") + flag;
                 return SLANG_FAIL;
             }
         }
-        if (allowClean && adopt)
-        {
-            outError = "unedit --clean cannot be combined with --adopt.";
-            return SLANG_FAIL;
-        }
-        if (as.getLength() && !adopt)
-        {
-            outError = "unedit --as requires --adopt.";
-            return SLANG_FAIL;
-        }
-        if (ref.getLength() && !adopt)
-        {
-            outError = "unedit --ref requires --adopt.";
-            return SLANG_FAIL;
-        }
-        if (assumeYes && !allowClean && !adopt)
-        {
-            outError = "unedit --yes requires --clean or --adopt.";
-            return SLANG_FAIL;
-        }
-        if (adopt)
-            return _adoptInPlaceOverride(projectRoot, argv[2], as, ref, assumeYes, outError);
-        return _unedit(projectRoot, argv[2], allowClean, assumeYes, outError);
+        return endPackageEdit(projectRoot, name, mode, tagVersion, clean, outError);
     }
-    if (command == "override" && argc == 3 && String(argv[2]) == "list")
-        return _listOverrides(projectRoot, outError);
-    if (command == "override" && argc == 4 && String(argv[2]) == "enable")
-        return _setOverrideEnabled(projectRoot, argv[3], true, outError);
-    if (command == "override" && argc == 4 && String(argv[2]) == "disable")
-        return _setOverrideEnabled(projectRoot, argv[3], false, outError);
-    if (command == "override" && argc == 4 && String(argv[2]) == "remove")
-        return _overrideRemove(projectRoot, argv[3], outError);
-    if (command == "override" && (argc == 5 || argc == 6) && String(argv[2]) == "add")
-        return _overrideAdd(
-            projectRoot,
-            argv[3],
-            argv[4],
-            argc == 6 ? String(argv[5]) : String(),
-            outError);
+    if (command == "override")
+    {
+        outError = "The override command has been removed. An edit checks out a branch of the "
+                   "dependency at deps/<name>.";
+        return SLANG_FAIL;
+    }
 
     outError = String("Invalid command or arguments. Run '") + argv[0] + " help'.";
     return SLANG_FAIL;

@@ -147,15 +147,18 @@ inline String getWorkspaceOutputDirectory(const Manifest& manifest)
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:
 ///
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
-///   `workspace.dependencies/<name>` at that commit.
-/// - Path-only: `path` and `version` are set; `git` is empty. The package is used in place and is
-///   trusted only when a manifest `path` edge selected it.
-/// - Local override: `git` and `path` are both set. The Git identity is retained, but the tree at
-///   `path` is used instead; `version` is the version it provides and `slang-package-overlay.json`
-///   must register the same path.
+///   `workspace.dependencies/<name>` at that commit. `ref` is the canonical tag for `version`.
+/// - Edit: `branch` is set and `commit` is empty. The checkout is expected to be on that branch.
+///   `version` is the release the solver keeps matching. `restoreVersion` and `restoreCommit` are
+///   the release that was current when the edit started. `unedit` is the only command that reads
+///   them.
+///
+/// `pinned` is a lock boolean. While it is set, `update` does not move a release row's version.
+/// `edit` and `unedit` leave the boolean as they found it. A `path` field is rejected when a lock
+/// is read.
 ///
 /// Declared `exports` and `dependencies` are not stored. Fetch and status reload them from the
-/// overlay working tree, or from the pinned version's manifest.
+/// edited working tree, or from the locked version's manifest.
 struct LockedPackage
 {
     String name;
@@ -164,6 +167,16 @@ struct LockedPackage
     String version;
     String commit;
     String path;
+    /// When true, `update` keeps this row's version. The flag lives in the lock, not the
+    /// manifest, and `edit` / `unedit` leave it as they found it.
+    bool pinned = false;
+    /// Branch the checkout is expected to be on. Empty for a release row, which stores `commit`
+    /// instead.
+    String branch;
+    /// Release that was current when an edit started. `unedit --restore` returns here. Empty on a
+    /// release row. `edit advance` does not move this commit.
+    String restoreVersion;
+    String restoreCommit;
     /// Filled during resolve only; not read from or written to the lock file.
     List<Dependency> dependencies;
 };
@@ -171,6 +184,13 @@ struct LockedPackage
 inline bool isGitBackedLockedPackage(const LockedPackage& package)
 {
     return package.git.getLength() != 0;
+}
+
+/// An edit row names a branch and keeps the pre-edit release beside it. A release row stores a
+/// commit and leaves `branch` empty.
+inline bool isEditedLockedPackage(const LockedPackage& package)
+{
+    return package.branch.getLength() != 0;
 }
 
 inline bool isPathOnlyLockedPackage(const LockedPackage& package)

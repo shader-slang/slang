@@ -96,6 +96,20 @@ static SlangResult _runGit(
     return SLANG_OK;
 }
 
+static SlangResult _runGitCode(
+    const String& workingDirectory,
+    const List<String>& arguments,
+    int& outCode,
+    ExecuteResult& outResult,
+    String& outError)
+{
+    CommandLine commandLine;
+    SLANG_RETURN_ON_FAIL(
+        _executeGit(workingDirectory, arguments, commandLine, outResult, outError));
+    outCode = (int)outResult.resultCode;
+    return SLANG_OK;
+}
+
 static String _offlineUpdateAdvice()
 {
     return "run 'slang package update' without --offline";
@@ -1032,6 +1046,292 @@ SlangResult getWorkingTreeStatus(
     for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
         if (line.trim().getLength())
             ++outStatus.stashCount;
+    return SLANG_OK;
+}
+
+SlangResult getCheckedOutBranch(
+    const String& repositoryPath,
+    String& outBranch,
+    bool& outDetached,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("rev-parse");
+    arguments.add("--abbrev-ref");
+    arguments.add("HEAD");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    outBranch = result.standardOutput.trim();
+    outDetached = outBranch == "HEAD";
+    return SLANG_OK;
+}
+
+SlangResult localBranchExists(
+    const String& repositoryPath,
+    const String& branch,
+    bool& outExists,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("show-ref");
+    arguments.add("--verify");
+    arguments.add("--quiet");
+    arguments.add(String("refs/heads/") + branch);
+    ExecuteResult result;
+    int code = 0;
+    SLANG_RETURN_ON_FAIL(_runGitCode(repositoryPath, arguments, code, result, outError));
+    if (code != 0 && code != 1)
+    {
+        outError = result.standardError.trim();
+        if (!outError.getLength())
+            outError = String("Cannot tell whether branch exists: ") + branch;
+        return SLANG_FAIL;
+    }
+    outExists = code == 0;
+    return SLANG_OK;
+}
+
+SlangResult checkoutLocalBranch(
+    const String& repositoryPath,
+    const String& branch,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("checkout");
+    arguments.add(branch);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult createLocalBranch(
+    const String& repositoryPath,
+    const String& branch,
+    const String& commit,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("branch");
+    arguments.add(branch);
+    arguments.add(commit);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult checkoutDetachedCommit(
+    const String& repositoryPath,
+    const String& commit,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("checkout");
+    arguments.add("--detach");
+    arguments.add(commit);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult discardUncommittedState(const String& repositoryPath, String& outError)
+{
+    ExecuteResult result;
+    List<String> arguments;
+    arguments.add("reset");
+    arguments.add("--hard");
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    arguments.clear();
+    arguments.add("clean");
+    arguments.add("-fd");
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    arguments.clear();
+    arguments.add("stash");
+    arguments.add("clear");
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError)
+{
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("-a");
+    arguments.add(tag);
+    arguments.add("-m");
+    arguments.add(tag);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+SlangResult listTagNames(const String& repositoryPath, List<String>& outTags, String& outError)
+{
+    outTags.clear();
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("--list");
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = line.trim();
+        if (tag.getLength())
+            outTags.add(tag);
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _commitParents(
+    const String& repositoryPath,
+    const String& commit,
+    List<String>& outParents,
+    String& outError)
+{
+    outParents.clear();
+    List<String> arguments;
+    arguments.add("rev-list");
+    arguments.add("--parents");
+    arguments.add("-n");
+    arguments.add("1");
+    arguments.add(commit);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    List<UnownedStringSlice> fields;
+    String line = String(result.standardOutput.trim());
+    StringUtil::splitOnWhitespace(line.getUnownedSlice(), fields);
+    for (Index i = 1; i < fields.getCount(); ++i)
+        outParents.add(String(fields[i]));
+    return SLANG_OK;
+}
+
+static SlangResult _commitContains(
+    const String& repositoryPath,
+    const String& ancestor,
+    const String& commit,
+    bool& outContains,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("merge-base");
+    arguments.add("--is-ancestor");
+    arguments.add(ancestor);
+    arguments.add(commit);
+    ExecuteResult result;
+    int code = 0;
+    SLANG_RETURN_ON_FAIL(_runGitCode(repositoryPath, arguments, code, result, outError));
+    if (code != 0 && code != 1)
+    {
+        outError = result.standardError.trim();
+        if (!outError.getLength())
+            outError = "git merge-base --is-ancestor failed.";
+        return SLANG_FAIL;
+    }
+    outContains = code == 0;
+    return SLANG_OK;
+}
+
+static SlangResult _canonicalTagsAtCommit(
+    const String& repositoryPath,
+    const String& commit,
+    List<EditLineTag>& ioTags,
+    String& outError)
+{
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("--points-at");
+    arguments.add(commit);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = line.trim();
+        PackageVersion version;
+        if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, nullptr))
+            continue;
+        EditLineTag found;
+        found.tag = tag;
+        found.commit = commit;
+        found.version = version;
+        ioTags.add(found);
+    }
+    return SLANG_OK;
+}
+
+SlangResult collectCanonicalTagsOnEditLine(
+    const String& repositoryPath,
+    const String& headCommit,
+    const String& pinCommit,
+    List<EditLineTag>& outTags,
+    bool& outReachedPin,
+    String& outError)
+{
+    outTags.clear();
+    outReachedPin = false;
+    String pin;
+    SLANG_RETURN_ON_FAIL(resolveLocalRevision(repositoryPath, pinCommit, pin, outError));
+    String current;
+    SLANG_RETURN_ON_FAIL(resolveLocalRevision(repositoryPath, headCommit, current, outError));
+    const Index kMaxSteps = 100000;
+    for (Index step = 0; step < kMaxSteps; ++step)
+    {
+        SLANG_RETURN_ON_FAIL(_canonicalTagsAtCommit(repositoryPath, current, outTags, outError));
+        if (current == pin)
+        {
+            outReachedPin = true;
+            return SLANG_OK;
+        }
+        List<String> parents;
+        SLANG_RETURN_ON_FAIL(_commitParents(repositoryPath, current, parents, outError));
+        if (!parents.getCount())
+            return SLANG_OK;
+        List<String> containing;
+        for (const auto& parent : parents)
+        {
+            bool contains = false;
+            SLANG_RETURN_ON_FAIL(_commitContains(repositoryPath, pin, parent, contains, outError));
+            if (contains)
+                containing.add(parent);
+        }
+        if (!containing.getCount())
+            return SLANG_OK;
+        bool firstContains = false;
+        for (const auto& parent : containing)
+        {
+            if (parent == parents[0])
+                firstContains = true;
+        }
+        current = firstContains ? parents[0] : containing[0];
+    }
+    outError = "Edit-line walk exceeded the commit limit.";
+    return SLANG_FAIL;
+}
+
+SlangResult countCommitsAfter(
+    const String& repositoryPath,
+    const String& ancestor,
+    const String& descendant,
+    Index& outCount,
+    String& outError)
+{
+    outCount = 0;
+    List<String> arguments;
+    arguments.add("rev-list");
+    arguments.add("--count");
+    arguments.add(ancestor + ".." + descendant);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    String text = result.standardOutput.trim();
+    Index count = 0;
+    if (!text.getLength())
+    {
+        outError = "git rev-list --count returned no count.";
+        return SLANG_FAIL;
+    }
+    for (auto c : text.getUnownedSlice())
+    {
+        if (c < '0' || c > '9')
+        {
+            outError = String("git rev-list --count returned '") + text + "'.";
+            return SLANG_FAIL;
+        }
+        count = count * 10 + Index(c - '0');
+    }
+    outCount = count;
     return SLANG_OK;
 }
 

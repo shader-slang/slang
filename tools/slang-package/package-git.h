@@ -60,6 +60,80 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
+/// Return the branch checked out at `HEAD`.
+///
+/// `outDetached` is true when `HEAD` is not a branch. `outBranch` is `HEAD` in that case.
+SlangResult getCheckedOutBranch(
+    const String& repositoryPath,
+    String& outBranch,
+    bool& outDetached,
+    String& outError);
+
+/// Return whether `refs/heads/<branch>` exists in `repositoryPath`.
+SlangResult localBranchExists(
+    const String& repositoryPath,
+    const String& branch,
+    bool& outExists,
+    String& outError);
+
+/// Check out an existing local branch. The branch is not created or reset.
+SlangResult checkoutLocalBranch(
+    const String& repositoryPath,
+    const String& branch,
+    String& outError);
+
+/// Create `branch` at `commit` without moving `HEAD`.
+SlangResult createLocalBranch(
+    const String& repositoryPath,
+    const String& branch,
+    const String& commit,
+    String& outError);
+
+/// Check out `commit` with a detached `HEAD`.
+SlangResult checkoutDetachedCommit(
+    const String& repositoryPath,
+    const String& commit,
+    String& outError);
+
+/// Discard uncommitted files, untracked files, and stashes. Commits are left in place.
+SlangResult discardUncommittedState(const String& repositoryPath, String& outError);
+
+/// Create an annotated tag at `HEAD`. The tag is local and is not pushed.
+SlangResult createAnnotatedTag(const String& repositoryPath, const String& tag, String& outError);
+
+/// List every tag name in the repository, including names that are not release tags.
+SlangResult listTagNames(const String& repositoryPath, List<String>& outTags, String& outError);
+
+/// One canonical release tag visited while walking an edit line back to its restore commit.
+struct EditLineTag
+{
+    String tag;
+    String commit;
+    PackageVersion version;
+};
+
+/// Collect canonical release tags on the ancestry line from `headCommit` back to `pinCommit`.
+///
+/// At a merge, a parent is eligible when `pinCommit` is an ancestor of that parent. When more
+/// than one parent contains the pin, the walk takes the first parent: that is the line that was
+/// checked out when the merge was created. `outReachedPin` is false when the walk ends without
+/// visiting `pinCommit`.
+SlangResult collectCanonicalTagsOnEditLine(
+    const String& repositoryPath,
+    const String& headCommit,
+    const String& pinCommit,
+    List<EditLineTag>& outTags,
+    bool& outReachedPin,
+    String& outError);
+
+/// Count commits reachable from `descendant` and not from `ancestor`.
+SlangResult countCommitsAfter(
+    const String& repositoryPath,
+    const String& ancestor,
+    const String& descendant,
+    Index& outCount,
+    String& outError);
+
 /// Find the one canonical release tag that points at `HEAD`, or report that none exists.
 ///
 /// A non-canonical release tag is not a match. When `outWarnings` is set, each such tag is

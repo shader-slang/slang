@@ -353,6 +353,11 @@ static SlangResult _readDependencies(
                 outError = String("Unknown field in dependency '") + dependency.name + "': " + key;
                 return SLANG_FAIL;
             }
+            if (key == "path")
+            {
+                outError = String("Path dependencies are no longer supported: ") + dependency.name;
+                return SLANG_FAIL;
+            }
         }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "git", dependency.git, outError));
@@ -1061,9 +1066,16 @@ static SlangResult _readLockedPackage(
     for (auto field : container->getObject(pair.value))
     {
         String key = container->getStringFromKey(field.key);
-        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit")
+        if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit" &&
+            key != "pinned" && key != "branch" && key != "restore_version" &&
+            key != "restore_commit")
         {
             outError = String("Unknown field in locked package '") + outPackage.name + "': " + key;
+            return SLANG_FAIL;
+        }
+        if (key == "path")
+        {
+            outError = String("Path dependencies are no longer supported: ") + outPackage.name;
             return SLANG_FAIL;
         }
     }
@@ -1071,6 +1083,22 @@ static SlangResult _readLockedPackage(
         _readOptionalString(container, pair.value, "git", outPackage.git, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "path", outPackage.path, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readOptionalBool(container, pair.value, "pinned", false, outPackage.pinned, outError));
+    SLANG_RETURN_ON_FAIL(
+        _readOptionalString(container, pair.value, "branch", outPackage.branch, outError));
+    SLANG_RETURN_ON_FAIL(_readOptionalString(
+        container,
+        pair.value,
+        "restore_version",
+        outPackage.restoreVersion,
+        outError));
+    SLANG_RETURN_ON_FAIL(_readOptionalString(
+        container,
+        pair.value,
+        "restore_commit",
+        outPackage.restoreCommit,
+        outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(container, pair.value, "version", outPackage.version, outError));
     PackageVersion ignoredVersion;
@@ -1081,51 +1109,66 @@ static SlangResult _readLockedPackage(
     }
     if (outPackage.path.getLength())
     {
+        outError = String("Path dependencies are no longer supported: ") + outPackage.name;
+        return SLANG_FAIL;
+    }
+    if (!outPackage.git.getLength())
+    {
+        outError = String("Locked package must contain 'git': ") + outPackage.name;
+        return SLANG_FAIL;
+    }
+    if (!_isSafeGitLocation(outPackage.git))
+    {
+        outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
+        return SLANG_FAIL;
+    }
+    if (outPackage.branch.getLength())
+    {
+        if (!_isSafeGitRef(outPackage.branch))
+        {
+            outError = String("Locked package has an unsafe branch name: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
         if (_find(container, pair.value, "ref").isValid() ||
             _find(container, pair.value, "commit").isValid())
         {
-            outError = String("Locked local package cannot also contain ref or commit: ") +
-                       outPackage.name;
-            return SLANG_FAIL;
-        }
-        if (!_isSafeLocalPath(outPackage.path))
-        {
-            outError = String("Locked local path must be relative: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        if (outPackage.git.getLength() && !_isSafeGitLocation(outPackage.git))
-        {
-            outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-    }
-    else
-    {
-        if (!outPackage.git.getLength())
-        {
-            outError = String("Locked package must contain 'git' or 'path': ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        if (!_isSafeGitLocation(outPackage.git))
-        {
-            outError = String("Locked package has an unsafe Git location: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "ref", outPackage.ref, outError));
-        if (!_isSafeGitRef(outPackage.ref))
-        {
-            outError = String("Locked package has an unsafe Git ref: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "commit", outPackage.commit, outError));
-        if (!_isCommitHash(outPackage.commit))
-        {
             outError =
-                String("Locked commit must be an exact hexadecimal object ID: ") + outPackage.name;
+                String("Edited package cannot also contain ref or commit: ") + outPackage.name;
             return SLANG_FAIL;
         }
+        PackageVersion restoreVersion;
+        if (SLANG_FAILED(parseExactVersion(outPackage.restoreVersion, restoreVersion, outError)))
+        {
+            outError = String("Edited package requires restore_version: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        if (!_isCommitHash(outPackage.restoreCommit))
+        {
+            outError = String("Edited package requires restore_commit: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+    if (outPackage.restoreVersion.getLength() || outPackage.restoreCommit.getLength())
+    {
+        outError = String("Release package cannot contain a restore pin without a branch: ") +
+                   outPackage.name;
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(
+        _readRequiredString(container, pair.value, "ref", outPackage.ref, outError));
+    if (!_isSafeGitRef(outPackage.ref))
+    {
+        outError = String("Locked package has an unsafe Git ref: ") + outPackage.name;
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(
+        _readRequiredString(container, pair.value, "commit", outPackage.commit, outError));
+    if (!_isCommitHash(outPackage.commit))
+    {
+        outError =
+            String("Locked commit must be an exact hexadecimal object ID: ") + outPackage.name;
+        return SLANG_FAIL;
     }
     return SLANG_OK;
 }
@@ -1192,7 +1235,12 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
             _writeKey(writer, "git");
             writer.addStringValue(package.git.getUnownedSlice(), SourceLoc());
         }
-        if (package.path.getLength())
+        if (package.branch.getLength())
+        {
+            _writeKey(writer, "branch");
+            writer.addStringValue(package.branch.getUnownedSlice(), SourceLoc());
+        }
+        else if (package.path.getLength())
         {
             _writeKey(writer, "path");
             writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
@@ -1206,6 +1254,18 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         }
         _writeKey(writer, "version");
         writer.addStringValue(package.version.getUnownedSlice(), SourceLoc());
+        if (package.pinned)
+        {
+            _writeKey(writer, "pinned");
+            writer.addBoolValue(true, SourceLoc());
+        }
+        if (package.branch.getLength())
+        {
+            _writeKey(writer, "restore_version");
+            writer.addStringValue(package.restoreVersion.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "restore_commit");
+            writer.addStringValue(package.restoreCommit.getUnownedSlice(), SourceLoc());
+        }
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());

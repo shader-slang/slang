@@ -306,6 +306,15 @@ static void _appendSelectionReason(StringBuilder& builder, const ResolveChange& 
             _appendConstraintLines(builder, explanation->constraints, "      ");
         }
         break;
+    case ResolveSelectionKind::Edited:
+        builder << "    " << (unchanged ? "remains edited branch " : "selected edited branch ")
+                << explanation->ref << " as " << explanation->version << "\n";
+        if (explanation->constraints.getCount())
+        {
+            builder << "    as " << explanation->version << " satisfies:\n";
+            _appendConstraintLines(builder, explanation->constraints, "      ");
+        }
+        break;
     }
 
     _appendRejectedPrevious(builder, change);

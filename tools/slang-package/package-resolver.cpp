@@ -193,6 +193,51 @@ public:
         outManifest.gitRevision = candidate.commit;
         return SLANG_OK;
     }
+
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        String checkout = Path::combine(Path::combine(projectRoot, depsDirectory), packageName);
+        String origin;
+        SLANG_RETURN_ON_FAIL(getRepositoryOrigin(checkout, origin, outError));
+        if (origin != held.git)
+        {
+            outError = String("Edited package '") + packageName +
+                       "' checkout origin does not match the lock.";
+            return SLANG_FAIL;
+        }
+        String branch;
+        bool detached = false;
+        SLANG_RETURN_ON_FAIL(getCheckedOutBranch(checkout, branch, detached, outError));
+        if (detached || branch != held.branch)
+        {
+            String actual =
+                detached ? String("a detached HEAD") : String("branch '") + branch + "'";
+            outError = String("Edited package '") + packageName + "' is checked out on " + actual +
+                       ", but the lock records branch '" + held.branch +
+                       "'. update leaves this checkout unchanged.";
+            return SLANG_FAIL;
+        }
+        String manifestPath = Path::combine(checkout, kPackageFileName);
+        String manifestText;
+        if (SLANG_FAILED(File::readAllText(manifestPath, manifestText)))
+        {
+            outError = String("Cannot read edited package manifest: ") + manifestPath;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            readManifestText(manifestPath, manifestText, outManifest.manifest, outError));
+        String headCommit;
+        SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
+        outManifest.ownerKey = String("edit:") + packageName + "@" + held.branch;
+        outManifest.lockRoot = Path::combine(depsDirectory, packageName);
+        outManifest.gitRepositoryPath = checkout;
+        outManifest.gitRevision = headCommit;
+        return SLANG_OK;
+    }
 };
 
 class LocalPackageResolverSource : public IPackageResolverSource
@@ -211,6 +256,15 @@ public:
         gitSource.allowRemote = allowRemote;
         gitSource.warnings = warnings;
         return gitSource.initialize(outError);
+    }
+
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError) override
+    {
+        return gitSource.loadCheckoutManifest(packageName, held, outManifest, outError);
     }
 
     String depsDirectory;
@@ -345,6 +399,7 @@ public:
 
     IPackageResolverSource* source = nullptr;
     String projectRoot;
+    const LockFile* heldLock = nullptr;
     List<String>* warnings = nullptr;
     ResolveReport* report = nullptr;
     const Manifest* rootManifest = nullptr;
@@ -744,7 +799,8 @@ private:
             explanation.name = package.name;
             explanation.version = package.locked.version;
             explanation.git = package.locked.git;
-            explanation.ref = package.locked.ref;
+            explanation.ref =
+                package.locked.branch.getLength() ? package.locked.branch : package.locked.ref;
             explanation.path = package.locked.path;
             explanation.selectionKind = package.selectionKind;
             explanation.constraints = package.constraintNotes;
@@ -992,24 +1048,13 @@ private:
         const ResolvedManifest& declaringManifest,
         String& outError)
     {
-        Index index = findPackage(dependency.name);
         if (dependency.path.getLength())
         {
-            if (index < 0)
-            {
-                if (packages.getCount() >= kMaxPackageCount)
-                {
-                    outError = "Dependency graph exceeds the package limit.";
-                    return SLANG_FAIL;
-                }
-                ResolutionPackage package;
-                package.name = dependency.name;
-                packages.add(package);
-                index = packages.getCount() - 1;
-            }
-            return selectPathDependency(packages[index], dependency, declaringManifest, outError);
+            outError = String("Path dependencies are no longer supported: ") + dependency.name;
+            return SLANG_FAIL;
         }
 
+        Index index = findPackage(dependency.name);
         VersionConstraint constraint;
         if (dependency.version.getLength())
             SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
@@ -1119,6 +1164,106 @@ private:
         return "does not satisfy all incoming requirements";
     }
 
+    const LockedPackage* findHeld(const String& name) const
+    {
+        if (!heldLock)
+            return nullptr;
+        Index index = findLockedPackageIndex(*heldLock, name);
+        if (index < 0)
+            return nullptr;
+        const LockedPackage& held = heldLock->packages[index];
+        if (!held.branch.getLength() && !held.pinned)
+            return nullptr;
+        return &held;
+    }
+
+    /// Keep a pinned or edited row instead of searching for a newer tag.
+    ///
+    /// Consider `noise` pinned at 1.2 while `v1.3` also satisfies the manifest range. `update`
+    /// passes the existing lock in, and this selection is the only candidate: the recorded
+    /// version stays, and an edited checkout is read where it sits.
+    SlangResult selectHeld(
+        Index unresolvedIndex,
+        const ResolutionPackage& unresolved,
+        const LockedPackage& held,
+        String& outError,
+        ResolveFailure& outFailure)
+    {
+        if (held.git != unresolved.git)
+        {
+            outError = String("Locked package '") + unresolved.name + "' records Git URL '" +
+                       held.git + "', which does not match the manifest.";
+            return SLANG_FAIL;
+        }
+        PackageVersion version;
+        SLANG_RETURN_ON_FAIL(parseExactVersion(held.version, version, outError));
+        if (!matchesAll(unresolved, version))
+        {
+            outError = String("Locked version ") + formatExactVersion(version) + " of package '" +
+                       unresolved.name + "' " + describeConstraintRejection(unresolved, version) +
+                       ".";
+            return SLANG_FAIL;
+        }
+
+        ResolvedManifest manifest;
+        if (held.branch.getLength())
+        {
+            SLANG_RETURN_ON_FAIL(
+                source->loadCheckoutManifest(unresolved.name, held, manifest, outError));
+        }
+        else
+        {
+            TagCandidate candidate;
+            candidate.ref = held.ref;
+            candidate.commit = held.commit;
+            candidate.version = version;
+            SLANG_RETURN_ON_FAIL(loadCandidateManifest(unresolved, candidate, manifest, outError));
+        }
+        if (manifest.manifest.name != unresolved.name)
+        {
+            outError = String("Package name '") + manifest.manifest.name +
+                       "' does not match dependency name '" + unresolved.name + "'.";
+            return SLANG_FAIL;
+        }
+
+        ResolutionPackage& selected = packages[unresolvedIndex];
+        selected.selected = true;
+        selected.selectionKind = held.branch.getLength() ? ResolveSelectionKind::Edited
+                                                         : ResolveSelectionKind::PinnedRef;
+        selected.locked = held;
+        selected.locked.name = selected.name;
+        selected.locked.git = selected.git;
+        selected.locked.version = formatExactVersion(version);
+        selected.locked.path = String();
+        selected.locked.dependencies = manifest.manifest.dependencies;
+        if (held.branch.getLength())
+        {
+            selected.locked.ref = String();
+            selected.locked.commit = String();
+        }
+        else
+        {
+            selected.locked.branch = String();
+            selected.locked.restoreVersion = String();
+            selected.locked.restoreCommit = String();
+            selected.locked.ref = held.ref;
+            selected.locked.commit = held.commit;
+            selected.locked.pinned = true;
+        }
+        selected.resolvedManifest = manifest;
+
+        String dependencyError;
+        for (const auto& dependency : manifest.manifest.dependencies)
+        {
+            if (SLANG_FAILED(addDependency(dependency, manifest, dependencyError)))
+            {
+                outError = dependencyError;
+                return SLANG_FAIL;
+            }
+        }
+        return search(outError, outFailure);
+    }
+
     /// Search the reachable unresolved packages depth-first, trying each package's newest eligible
     /// candidate first and restoring a full snapshot after a rejected branch.
     ///
@@ -1141,6 +1286,9 @@ private:
             return SLANG_OK;
 
         ResolutionPackage unresolved = packages[unresolvedIndex];
+        if (const LockedPackage* held = findHeld(unresolved.name))
+            return selectHeld(unresolvedIndex, unresolved, *held, outError, outFailure);
+
         List<TagCandidate> candidates;
         List<Retraction> retractions;
         String pinnedRef;
@@ -1356,7 +1504,8 @@ SlangResult resolveDependencies(
     String& outError,
     List<String>* outWarnings,
     ResolveReport* outReport,
-    bool offline)
+    bool offline,
+    const LockFile* heldLock)
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1367,6 +1516,7 @@ SlangResult resolveDependencies(
     Resolver resolver;
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
+    resolver.heldLock = heldLock;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);
@@ -1380,7 +1530,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     String& outError,
     List<String>* outWarnings,
     ResolveReport* outReport,
-    bool offline)
+    bool offline,
+    const LockFile* heldLock)
 {
     LocalPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1392,6 +1543,7 @@ SlangResult resolveDependenciesFromLocalPackages(
     Resolver resolver;
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
+    resolver.heldLock = heldLock;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);

@@ -63,6 +63,23 @@ public:
         const TagCandidate& candidate,
         ResolvedManifest& outManifest,
         String& outError) = 0;
+
+    /// Read `slang-package.json` from the working tree of an edited checkout.
+    ///
+    /// The solver uses this for a lock row that names a branch. The checkout is not moved, and
+    /// the manifest is the files on disk, including changes that are not committed yet.
+    virtual SlangResult loadCheckoutManifest(
+        const String& packageName,
+        const LockedPackage& held,
+        ResolvedManifest& outManifest,
+        String& outError)
+    {
+        SLANG_UNUSED(packageName);
+        SLANG_UNUSED(held);
+        SLANG_UNUSED(outManifest);
+        outError = "Edited package checkout cannot be read from this package source.";
+        return SLANG_FAIL;
+    }
 };
 
 struct ResolveReport;
@@ -95,7 +112,8 @@ SlangResult resolveDependencies(
     String& outError,
     List<String>* outWarnings = nullptr,
     ResolveReport* outReport = nullptr,
-    bool offline = false);
+    bool offline = false,
+    const LockFile* heldLock = nullptr);
 
 /// Resolve dependencies using registered local manifests and Git for the remaining packages.
 SlangResult resolveDependenciesFromLocalPackages(
@@ -106,7 +124,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     String& outError,
     List<String>* outWarnings = nullptr,
     ResolveReport* outReport = nullptr,
-    bool offline = false);
+    bool offline = false,
+    const LockFile* heldLock = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang

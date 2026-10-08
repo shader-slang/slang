@@ -8,8 +8,8 @@ Slang Package Command Reference
 
 ## Name
 
-`slang package` — manage Slang source-package dependencies, local overrides, locked source trees,
-and generated bundle output.
+`slang package` — manage Slang source-package dependencies, locked source trees, and generated
+bundle output.
 
 `slang pkg` is an equivalent short form. The installed `slang-package` executable accepts the same
 arguments.
@@ -25,16 +25,15 @@ slang-package <command> [<arguments>]
 ## Description
 
 The package tool manages source dependencies described by `slang-package.json`. It resolves Git
-release tags and local path dependencies into `slang-package-lock.json`, materializes locked Git
-source under `deps/` by default, and records machine-local overrides in
-`slang-package-overlay.json`.
+release tags into `slang-package-lock.json` and materializes each dependency under `deps/` by
+default. Every dependency is a Git repository. There is no path dependency and no overlay.
 
 Except for `init` and `help`, commands may be run from the package root or any ordinary
 subdirectory. The tool searches parent directories for the nearest `slang-package.json`; a nested
 package therefore forms its own workspace.
 
-Package commands do not change Slang's `import` syntax. `fetch`, `update`, and local-registration
-commands regenerate `slang-package-includes.txt` for compiler sessions that consume the
+Package commands do not change Slang's `import` syntax. `fetch` and `update` regenerate
+`slang-package-includes.txt` for compiler sessions that consume the
 materialized graph. `bundle` creates a flattened source bundle and documentation.
 
 ## Commands
@@ -43,10 +42,11 @@ The commands are:
 
 - [`help`](#help) — show a command summary.
 - [`init`](#init) — create a package skeleton.
-- [`dependency`](#dependency) — add, pin, remove, or list direct dependencies.
-- [`override`](#override) — register and control machine-local package trees.
-- [`edit`](#edit) — make a materialized Git dependency editable in place.
-- [`unedit`](#unedit) — return an edited dependency to package-tool ownership or adopt its commit.
+- [`dependency`](#dependency) — add, remove, or list direct dependencies.
+- [`pin`](#pin) — hold a solved release, or hold the current edit without moving it.
+- [`unpin`](#unpin) — clear a pin. An edit stays on its branch.
+- [`edit`](#edit) — check out a branch of a solved dependency.
+- [`unedit`](#unedit) — end an edit on a release tag.
 - [`fetch`](#fetch) — reproduce and materialize the lock.
 - [`update`](#update) — resolve dependencies and rewrite the lock.
 - [`status`](#status) — report lock, checkout, and graph readiness.
@@ -99,7 +99,8 @@ The directory name becomes the package name and must be a valid package name. Th
   version can be determined;
 - writes a placeholder `LICENSE` if one does not already exist; and
 - adds `.slang/`, `deps/`, `out/`, `slang-package-overlay.json`, and
-  `slang-package-includes.txt` to `.gitignore`.
+  `slang-package-includes.txt` to `.gitignore`. The overlay name stays ignored so an old file is
+  not committed. A file that still contains entries is an error.
 
 The generated license is intentionally a reminder, not a distributable license. Replace its
 contents before running bare `validate`.
@@ -121,19 +122,19 @@ Direct dependencies are kept in package-name order.
 ```text
 slang package dependency add <name> --git <url> --version <range>
 slang package dependency add <name> --git <url> --ref <ref> [--as <version>]
-slang package dependency add <name> --path <path> --as <version>
 ```
 
 #### Description
 
 Add a direct dependency, or replace the existing direct declaration with the same name. Exactly
-one of the three source forms must be used:
+one of the two source forms must be used:
 
 - **Git version range** selects a dotted release tag from the Git repository.
-- **Git ref** pins a branch, tag, or commit. `--as` declares the exact version that the
+- **Git ref** selects a branch, tag, or commit. `--as` declares the exact version that the
   selected source provides. When omitted, the resolver derives it from the nearest
   release tag reachable from the resolved commit.
-- **Path** uses a local directory in place and requires an exact version through `--as`.
+
+`--path` is rejected. A dependency is a Git repository checked out at `deps/<name>`.
 
 `<name>` identifies the package in the graph and must match the selected package manifest.
 
@@ -156,46 +157,9 @@ as written, so `^0.0.0` is narrower than `^0`. A bare version matches that one r
 : Select an opaque Git branch, tag, or commit instead of choosing a semantic-version release.
 
 `--as <version>`
-: Declare the exact dotted version provided by a Git ref or path dependency, such as `1.4.0` or
-`1.4.0.2`.
+: Declare the exact dotted version provided by a Git ref, such as `1.4.0` or `1.4.0.2`.
 
-`--path <path>`
-: Select a local package directory. Relative paths are resolved from the package that declares
-them.
-
-### `dependency pin`
-
-#### Synopsis
-
-```text
-slang package dependency pin <name>
-slang package dependency pin <name> --to <version>
-slang package dependency pin <name> --commit
-```
-
-#### Description
-
-Write a direct Git declaration from the package's current lock selection. An existing direct
-declaration is replaced; a transitive package is promoted to a direct dependency. A lock file and
-a Git-backed lock row are required.
-
-Without an option, the command writes the lock's exact version as the manifest's Git version
-constraint. `--to` writes another exact version. `--commit` writes the locked commit as `ref` and
-the locked version as `as`, preventing a later update from following a moved tag.
-
-The command changes only `slang-package.json`; it does not rewrite the current lock. An active
-override remains registered.
-
-#### Options
-
-`--to <version>`
-: Pin the declaration to the exact version supplied. It cannot be combined with `--commit`.
-When the lock currently selects an override, this option is required because the local version
-need not identify a published Git release.
-
-`--commit`
-: Pin the declaration to the exact locked commit. This is unavailable for a path-only or overlaid
-lock row because such a row does not provide an independently selected Git commit.
+`dependency pin` has been removed. Use [`pin`](#pin) to hold a solved version in the lock.
 
 ### `dependency remove`
 
@@ -221,165 +185,128 @@ slang package dependency list
 
 #### Description
 
-List direct dependencies from `slang-package.json`, including each Git version range, Git ref and
-optional provided version, or path and provided version. It does not display transitive
+List direct dependencies from `slang-package.json`, including each Git version range or Git ref and
+optional provided version. It does not display transitive
 dependencies; use `tree` for the selected graph.
 
-## `override`
+## `pin`
+
+### Synopsis
+
+```text
+slang package pin <name> <version>
+slang package pin <name>
+```
 
 ### Description
 
-Manage local package substitutions in gitignored `slang-package-overlay.json`. Overrides are
-machine-local development state, not publishable dependency declarations. An enabled override's
-working-tree manifest and effective version participate in normal resolution.
+Set the pin boolean on a lock row. The boolean lives in `slang-package-lock.json`, not in
+`slang-package.json`. The manifest range is left as it was. `update` will not move a pinned
+version. `edit` and `unedit` leave the boolean as they found it. `edit advance` and an ending of
+`unedit` can move the version and leave the boolean set.
 
-Override commands do not copy or modify the registered directory. After changing the selected
-local or published graph, run `update`.
+`<version>` is an exact dotted version, and it is required when the dependency is not edited. The
+command resolves the canonical tag for that release, such as `v1.2` for `1.2` or `1.2.0`, stores
+that version and the tag's commit, and sets the boolean. The version has to satisfy every incoming
+constraint. When it does not, or when no canonical tag exists, `pin` fails and leaves the row
+unchanged.
 
-### `override add`
+While the dependency is edited, `pin <name>` sets the boolean and leaves the version and the
+branch alone. Passing `<version>` in that state fails.
 
-#### Synopsis
+## `unpin`
 
-```text
-slang package override add <name> <path> [<version>]
-```
-
-#### Description
-
-Register an existing local package directory as an enabled override. `<path>` may be absolute or
-relative to the workspace, but must be on the same filesystem. The directory must contain a valid
-`slang-package.json` whose package name is `<name>`.
-
-The workspace must already have a lock file. The package itself does not need to be in that lock
-when an explicit version is supplied.
-
-The optional version is an exact dotted version used for solver compatibility. When
-omitted, the command uses the package's current locked version. Supply it when the package is not
-already in the lock.
-
-Using the workspace checkout path, such as `deps/<name>`, updates the same in-place registration
-created by `edit`; it does not create a second kind of local state.
-
-### `override enable`
-
-#### Synopsis
+### Synopsis
 
 ```text
-slang package override enable <name>
+slang package unpin <name>
 ```
 
-#### Description
+### Description
 
-Enable a registered override. The registration is retained, and the next normal `update` selects
-the local tree if it satisfies all incoming constraints.
-
-### `override disable`
-
-#### Synopsis
-
-```text
-slang package override disable <name>
-```
-
-#### Description
-
-Disable a registered override without forgetting its path or provided version. The next `update`
-selects the published graph. A disabled in-place checkout is subject to the normal ownership and
-dirty-tree checks; update still refuses to discard local work unless `--clean` permits it.
-
-### `override remove`
-
-#### Synopsis
-
-```text
-slang package override remove <name>
-```
-
-#### Description
-
-Remove an out-of-tree override registration. The command refuses to remove an in-place edit; use
-`unedit` instead. It also refuses while the lock still selects the local path. Disable the
-override and run `update` before removing that registration.
-
-### `override list`
-
-#### Synopsis
-
-```text
-slang package override list
-```
-
-#### Description
-
-List every registered override with its enabled state, path, and effective version. Disabled
-registrations are included.
+Clear the pin boolean. This works during an edit. The branch stays checked out. After `unedit`,
+the next `update` may select a different tag.
 
 ## `edit`
 
 ### Synopsis
 
 ```text
-slang package edit <name>
+slang package edit <name> --branch <branch>
+slang package edit <name> --branch <branch> --create
+slang package edit advance <name>
 ```
 
 ### Description
 
-Turn the existing materialized Git checkout under `workspace.dependencies` (`deps/<name>` by
-default) into an enabled in-place override. The
-checkout stays at the same path, so current search paths remain usable, but `fetch` and `update`
-stop treating the tree as package-tool-owned.
+`edit` applies to a dependency that is already resolved. The branch name is required. Without
+`--create`, the branch must already exist and the command checks it out in `deps/<name>`. With
+`--create`, a missing branch is created from the commit the dependency is resolved to. `--create`
+does not reset a branch that already exists.
 
-The package must be in the lock and already materialized. For a Git package, the checkout must
-still have the origin recorded by the lock. Local file changes are allowed: preserving existing
-work is a primary use of this command.
+The lock row keeps the version it already had and replaces the commit with the branch. The pin
+boolean is unchanged. Editing a pinned dependency starts the branch at the pinned commit. Editing
+a dependency that is not pinned does not set the boolean. The row also keeps `restore_version` and
+`restore_commit`, the release that was current when the edit started. `edit advance` does not move
+that restore pin. `fetch` does not check it out. `unedit` is the only command that reads it.
 
-Path-only dependencies are already editable in place and do not need `edit`.
+`edit advance` looks for canonical release tags on one line of history: from the branch tip back
+to the restore commit. At a merge, a parent that does not contain that commit is skipped. When
+more than one parent contains it, the walk takes the first parent. The greatest canonical tag on
+that walk that is newer than the stored version and that still satisfies incoming constraints is
+written into the version field. The branch stays, and the checkout does not move. When no such tag
+exists, or the walk never visits the restore commit, the command says so and leaves the row
+unchanged. `update` does not run this, and it does not change an edited checkout.
 
 ## `unedit`
 
 ### Synopsis
 
 ```text
-slang package unedit <name>
-slang package unedit <name> --clean [--yes]
-slang package unedit <name> --adopt [--ref <ref>] [--as <version>] [--yes]
+slang package unedit <name> [--restore | --advance | --tag <version>] [--clean]
 ```
 
 ### Description
 
-Remove the in-place override created by `edit`.
+End an edit on a release row: a version and a commit. Declining a prompt leaves the edit. There
+is no `--yes`. An ending that needs approval asks, and a run without a terminal fails and leaves
+the edit. `--advance`, `--restore`, and `--tag` select one ending and cannot be combined. None of
+them changes the pin boolean.
 
-Plain `unedit` succeeds only when the lock is a Git-only pin and the checkout is clean at the
-locked commit. It leaves the checkout in place and returns ownership to the package tool.
+The command looks for a canonical release tag on the same line of history `edit advance` uses.
+The candidate is the greatest such tag that is strictly newer than the restore release and that
+still satisfies the dependency constraints. A tag that arrived only through a merge of some other
+line is not a candidate.
 
-#### Options
+When that newer tag is the commit that is checked out, the lock switches to that version and
+commit. The checkout does not move, and there is no prompt.
 
-`--clean`
-: Discard uncommitted files, stashes, and commits that differ from the lock, restore the locked
-commit from `.slang/cache`, and remove the edit registration. The command asks for confirmation
-only when state must be discarded.
+When the newer tag is behind the checked-out commit, the command tells how many commits would
+leave the workspace and asks whether to check out the tag. Approving writes that version and that
+tag's commit. Declining does not fall through to the older release.
 
-`--adopt`
-: Keep the editable checkout's committed `HEAD`. The package must be a direct Git dependency, its
-files must be committed, and it must have no stashes. The command rewrites both manifest and lock
-as a Git pin and removes the edit registration.
+When a newer tag exists and none of them satisfy the constraints, the command says which tag was
+rejected and why, then offers only the restore release.
 
-`--ref <ref>`
-: With `--adopt`, keep following a branch or tag that currently points at `HEAD`. A commit ID is
-not accepted here; omit `--ref` to freeze `HEAD`.
+When no newer satisfying tag exists, the only ending is the restore pin. That requires approval
+even when the checkout is already on that commit.
 
-`--as <version>`
-: With `--adopt`, declare the exact dotted version provided by `HEAD`. If omitted, the command
-uses a unique release tag at `HEAD`, or the nearest release-tag ancestor. It fails when
-no such tag exists.
+`--advance` selects the newer tag and fails when no newer tag on that line satisfies the
+constraints. It asks only when the checkout would move.
 
-`--yes`
-: Approve the destructive or manifest-changing operation without an interactive prompt. It
-requires either `--clean` or `--adopt`.
+`--restore` checks out the version and commit saved when the edit started. A newer legal tag is
+named and then left unused. This always asks.
 
-`--clean` and `--adopt` cannot be combined. Adoption does not copy `HEAD` into `.slang/cache`;
-push the commit to the package origin before expecting `validate`, `fetch` in a fresh workspace,
-or other upstream checks to find it.
+`--tag <version>` creates a local annotated tag on the checked-out commit, then selects it the
+way `--advance` does without moving `HEAD`. `<version>` is an exact dotted version. The tag name
+is `v` plus the canonical spelling, so `1.4.0` creates `v1.4`. The command fails before creating
+the tag when the release already has a tag, the version is not strictly greater than the version
+stored on the edit, the version is not strictly greater than every canonical tag already on the
+edit line, or the version does not satisfy the constraints. The tag is not pushed.
+
+`--clean` discards uncommitted files, untracked files, and stashes so `HEAD` may move. It does
+not approve dropping commits that follow a tag. Apply it only for an ending that would move
+`HEAD`. A dirty checkout blocks that move until the changes are committed or `--clean` is passed.
 
 ## `fetch`
 
@@ -396,7 +323,7 @@ repository under `.slang/cache` from its origin, verifies that every locked ref 
 available there, validates the locked graph, and materializes Git packages at their locked commits
 under the configured dependency directory.
 
-Path dependencies and enabled overrides remain in place. A clean tool-owned checkout already at
+An edited checkout is left on its recorded branch. A clean tool-owned checkout already at
 the correct origin and commit is left untouched. The command regenerates
 `slang-package-includes.txt`.
 
@@ -431,7 +358,7 @@ local state. Use `edit` to preserve that work or `--clean` to discard it.
 ### Synopsis
 
 ```text
-slang package update [--ignore-overrides] [--clean] [--dry-run]
+slang package update [--clean] [--dry-run]
                      [--minimal] [--offline] [--yes] [--skip-validate]
 ```
 
@@ -443,11 +370,16 @@ takes newer compatible releases and applies publisher retractions.
 
 Online update refreshes Git repositories only under `.slang/cache`; resolution and workspace
 materialization then use those caches. Before changing `deps/` or the lock, update verifies graph
-identity, dependency constraints, trusted path selection, workspace exclusions, toolchain
+identity, dependency constraints, workspace exclusions, toolchain
 requirements, and cache availability.
 
-After materialization, update checks publishability for new or changed Git and registered local
-trees, and checks module layout and import-path uniqueness across the complete selected graph. The
+`update` does not fetch, merge, reset, or otherwise change an edited checkout, and it does not
+move that row's version or pin. It reads the tree as it exists and solves the transitive
+dependencies declared by that manifest. When `HEAD` is not on the recorded branch, `update`
+reports the mismatch and leaves the checkout alone.
+
+After materialization, update checks publishability for new or changed Git trees, and checks
+module layout and import-path uniqueness across the complete selected graph. The
 new lock is written only after those checks succeed.
 
 When the proposed lock differs, local checkout state would be discarded, or an existing named Git
@@ -457,10 +389,7 @@ given.
 
 ### Options
 
-`--ignore-overrides`
-: Ignore enabled out-of-tree overrides for this solve without changing
-`slang-package-overlay.json`. Enabled in-place overrides remain active so the command cannot
-replace a user-owned checkout under the configured dependency directory.
+`--ignore-overrides` has been removed.
 
 `--clean`
 : Permit replacement of dirty or otherwise mismatched tool-owned checkouts. The affected
@@ -502,12 +431,13 @@ graph is buildable.
 
 The first line reports the package name, lock state, package count, and one of `buildable`,
 `incomplete`, or `not buildable`. Additional lines appear only for drift such as a missing or
-stale lock, missing cache pins or checkouts, dirty checkouts, edits, enabled overrides, or source
-layout errors. Suggested corrective commands are printed where appropriate.
+stale lock, missing cache pins or checkouts, dirty checkouts, edits, or source layout errors.
+Suggested corrective commands are printed where appropriate.
 
 Like `git status`, reportable drift is information and does not itself make the command fail.
-`status` returns failure only when required root, lock, or overlay JSON cannot be read and parsed
-well enough to produce a report.
+`status` returns failure only when the required root manifest or an existing lock cannot be read
+and parsed well enough to produce a report, and when `slang-package-overlay.json` still contains
+entries.
 
 The command does not contact remotes, modify package state, inspect `out/`, or look for newer
 releases.
@@ -534,7 +464,6 @@ There are four related sets of checks:
    - Every manifest uses the supported, closed JSON schema and has a matching package identity.
    - Every declared dependency selects one trusted lock row, all constraints and pinned refs still
      match, and every lock row is reachable.
-   - Path dependencies exist and point to the selected versions.
    - Workspace exclusions do not reject a locked Git release.
    - All `tools.slang-toolchain` constraints in the selected graph accept the installed compiler.
 
@@ -542,8 +471,8 @@ There are four related sets of checks:
    - Each Git cache is refreshed from its origin.
    - Every locked Git ref and locked commit exists in the cache. A moved ref may now resolve to a
      different commit without invalidating the commit identity already recorded by the lock.
-   - A commit present only in `deps/<name>` does not pass. An adopted commit must be pushed to the
-     origin so the cache can retrieve it.
+   - A commit present only in `deps/<name>` does not pass. Push it to the origin so the cache can
+     retrieve it.
 
 3. **Source-layout checks**
    - The manifest exports at least one directory, every export exists, and every export remains
@@ -562,8 +491,6 @@ There are four related sets of checks:
    - `license_files` lists at least one file.
    - Every listed license is a non-empty, readable file inside the package.
    - No listed license contains the placeholder written by `init`.
-   - Every path dependency remains inside the package, so it will still exist when the package is
-     shared independently.
 
 The command forms apply those checks differently.
 
@@ -581,14 +508,12 @@ To pass:
 
 - replace the generated license placeholder;
 - keep every exported source file in the required `module`/`implementing` layout;
-- ensure every workspace path dependency stays within the workspace;
-- have no enabled edit or override;
-- when dependencies exist, have a current `slang-package-lock.json`;
-- have no lock row that still requires a local override; and
-- push every adopted Git commit to its origin so it can be fetched into `.slang/cache`.
+- have no edited dependency;
+- when dependencies exist, have a current `slang-package-lock.json`; and
+- push every locked Git commit to its origin so it can be fetched into `.slang/cache`.
 
-A package with no dependencies does not need a lock. Disabled override registrations may remain,
-but the selected lock itself must be portable.
+A package with no dependencies does not need a lock. A pinned release row can be committed. An
+edited lock cannot. A non-empty `slang-package-overlay.json` is an error.
 
 Bare validation does not repeat license and source-layout checks for every unchanged transitive
 package. Those packages still participate in graph legality and toolchain checks.
@@ -599,12 +524,12 @@ package. Those packages still participate in graph legality and toolchain checks
 slang package validate <name>
 ```
 
-Validate one package tree named by the current lock. The tree may be an enabled override, a path
-lock row, or a materialized Git checkout. The package's dependencies are checked against the
-workspace lock; a nested lock inside that package is not used.
+Validate one package tree named by the current lock. The tree is the materialized Git checkout.
+The package's dependencies are checked against the workspace lock; a nested lock inside that
+package is not used.
 
-This form allows an enabled override, making it suitable for checking a library before publishing
-a remote tag. It does not materialize missing packages or re-run the complete workspace graph
+This form is suitable for checking a library before publishing a remote tag. It does not
+materialize missing packages or re-run the complete workspace graph
 walk, including graph-wide toolchain selection and import-uniqueness checks. The package must
 already be present in the lock.
 
@@ -632,11 +557,11 @@ slang package tree
 ### Description
 
 Print the current selected dependency graph from the workspace root. Each edge shows the selected
-package version and the declaring requirement: a version range, Git ref, or path. Shared
+package version and the declaring requirement: a version range or Git ref. Shared
 subtrees are expanded once and marked `(*)` on later occurrences.
 
-The command requires a current lock and loads manifests from active overrides, locked path trees,
-or locked Git commits. It does not resolve newer versions, contact remotes, or modify state.
+The command requires a current lock and loads manifests from edited working trees or locked Git
+commits. It does not resolve newer versions, contact remotes, or modify state.
 
 ## `why`
 
@@ -673,8 +598,7 @@ never rewritten by bundle.
 
 A buildable graph requires legal lock identities and constraints, existing export directories,
 correct `module` and `implementing` declarations, and unique primary import paths across the
-closure. Bundle intentionally permits placeholder licenses, enabled overrides, and local path
-dependencies because those do not prevent compilation.
+closure. Bundle permits a placeholder license because that does not prevent compilation.
 
 ### Output
 
@@ -740,7 +664,7 @@ Confirmation can cover:
 - a new or changed lock during `update`;
 - checkout state discarded by `--clean`;
 - existing tags or origin-tracking branches in `deps/` that would move; and
-- manifest and lock changes made by `unedit --adopt`.
+- an `unedit` ending that would leave the branch or move `HEAD`. `unedit` has no `--yes`.
 
 ## Files
 
@@ -749,15 +673,17 @@ Confirmation can cover:
 retractions, workspace policy, toolchain requirements, and build settings.
 
 `slang-package-lock.json`
-: Committed exact selected graph. Git-pin rows record `git`, `ref`, `commit`, and `version`.
-Override rows record `git`, `path`, and `version`. Path-only rows record `path` and `version`.
+: Committed exact selected graph. A release row records `git`, `ref`, `commit`, and `version`.
+An edit row records `git`, `branch`, `version`, `restore_version`, and `restore_commit`, and is
+not something to commit. `pinned` is recorded only when the boolean is set. A `path` field is
+rejected.
 
 `slang-package-overlay.json`
-: Gitignored machine-local edit and override registrations.
+: No longer used. `init` still lists it in `.gitignore`. A file that contains entries is an error.
 
 `slang-package-includes.txt`
-: Gitignored generated list of absolute dependency export directories. `fetch`, `update`, and
-applicable local-registration changes regenerate it.
+: Gitignored generated list of absolute dependency export directories. `fetch` and `update`
+regenerate it.
 
 `.slang/cache/`
 : Workspace-local Git repositories refreshed from package origins. Online resolution updates this

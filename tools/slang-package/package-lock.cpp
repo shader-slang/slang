@@ -75,7 +75,9 @@ SlangResult validateLockedDependency(
             return SLANG_FAIL;
         }
     }
-    if (dependency.ref.getLength())
+    // An edit replaces the commit locator with a branch, so the manifest's `ref` is not what the
+    // lock row is tracking until `unedit` lands on a release again.
+    if (dependency.ref.getLength() && !isEditedLockedPackage(lockedPackage))
     {
         if (!lockedPackage.path.getLength() && lockedPackage.ref != dependency.ref)
         {
@@ -183,7 +185,9 @@ SlangResult requireAllLockPackagesTrusted(
 bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 {
     return left.name == right.name && left.git == right.git && left.ref == right.ref &&
-           left.version == right.version && left.commit == right.commit && left.path == right.path;
+           left.version == right.version && left.commit == right.commit &&
+           left.path == right.path && left.pinned == right.pinned && left.branch == right.branch &&
+           left.restoreVersion == right.restoreVersion && left.restoreCommit == right.restoreCommit;
 }
 
 bool lockFilesEqual(const LockFile& left, const LockFile& right)

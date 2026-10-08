@@ -14,6 +14,7 @@ enum class ResolveSelectionKind
     PinnedRef,
     Path,
     Override,
+    Edited,
 };
 
 enum class ResolveChangeKind

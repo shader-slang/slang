@@ -15,7 +15,13 @@ naming is in [Writing Module Files, Import, and Include](module-files).
 
 The short form `slang pkg` accepts the same commands. Slang uses a single dash for
 multi-character options, for example `-help`, not `--help`, except for `slang package` flags such
-as `--dry-run` and `--ignore-overrides`.
+as `--dry-run` and `--yes`.
+
+Path dependencies, the `override` command, `dependency pin`, `update --ignore-overrides`, and
+`unedit --adopt` / `--yes` are gone. An edit checks out a branch of `deps/<name>`. Pin is a
+boolean on the lock. The commands that do this are in
+[Slang Package Command Reference](source-package-command-reference). Parts of this walkthrough
+that still show the removed commands are out of date.
 
 ## The example graph
 
