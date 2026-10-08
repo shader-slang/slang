@@ -42,6 +42,12 @@ void lowerPortableStructuralRayTracingStageInputOperations(
 /// Lower structural stage-input operations that have native OptiX representations.
 void lowerOptiXStructuralRayTracingStageInputOperations(IRModule* module, DiagnosticSink* sink);
 
+/// Materializes zero-storage triangle and curve attribute views after specialization.
+///
+/// Their property accesses carry separate builtin operations. Only procedural attribute values
+/// need a native stage parameter or candidate-state field.
+void lowerBuiltinStructuralRayTracingHitAttributeViews(IRModule* module);
+
 /// Thread compiler-provided payload parameters through generated Metal visible-stage adapters.
 void lowerMetalStructuralRayTracingStageInputOperations(
     IRModule* module,

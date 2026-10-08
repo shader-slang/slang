@@ -72,7 +72,7 @@ struct ShadowAnyHit : rt::IAnyHitShader
 
     void invoke(rt::AnyHitInput<Context> input)
     {
-        input.payload.visibility = input.triangle.frontFacing ? 1.0 : 0.0;
+        input.payload.visibility = input.attributes.frontFacing ? 1.0 : 0.0;
     }
 }
 
@@ -173,59 +173,37 @@ void main()
     output[0] = radiance.radiance + radiance.bounce + uint(shadow.visibility);
 }
 
-// ShadowPayload is payload partition zero because ShadowHitGroup appears first. Its candidate
-// adapter additionally requires `triangle_data`, while the independent radiance partition does
-// not; this checks that IFT requirements are partitioned along with visible-function signatures.
-// METAL: struct Schema_payload0_rayData_0
-// METAL: ShadowPayload_0 payload_{{[0-9]+}};
-// METAL: struct Schema_payload1_rayData_0
-// METAL: RadiancePayload_0 payload_{{[0-9]+}};
-// METAL: struct rt_TraceProgramDescriptorResources_default_0
-// METAL: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data> intersectionFunctions0_0;
-// METAL: visible_function_table<void(Schema_payload0_rayData_0 thread*)> missFunctions0_0;
-// METAL: visible_function_table<void(Schema_payload0_rayData_0 thread*, float)> closestHitFunctions0_0;
-// METAL: intersection_function_table<metal::raytracing::instancing> intersectionFunctions1_0;
-// METAL: visible_function_table<void(Schema_payload1_rayData_0 thread*)> missFunctions1_0;
-// METAL: visible_function_table<void(Schema_payload1_rayData_0 thread*)> closestHitFunctions1_0;
-// METAL: uint32_t device* callableFunctions_0;
-// METAL: uint32_t device* records_0;
+// Payload carriers remain typed, but both calls share one schema-wide set of tables. The union
+// of stage requirements gives the shared IFT triangle_data and the shared closest-hit signature
+// a distance argument, even though only the shadow shaders need those inputs.
+// METAL-DAG: struct Schema_payload0_rayData_0
+// METAL-DAG: struct Schema_payload1_rayData_0
+// METAL-DAG: struct Schema_resources{{.*}}
+// METAL-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data> intersectionFunctions_0;
+// METAL-DAG: visible_function_table<void(void thread*)> missFunctions_0;
+// METAL-DAG: visible_function_table<void(void thread*, float)> closestHitFunctions_0;
+// METAL-DAG: visible_function_table<void(void thread*)> callableFunctions_0;
+// METAL-DAG: uint device* records_0;
 
-// Each trace statically selects its payload partition instead of dynamically selecting a carrier.
-// METAL: program_resources_{{[0-9]+}}->intersectionFunctions1_0
-// METAL: program_resources_{{[0-9]+}}->missFunctions1_0
-// METAL: program_resources_{{[0-9]+}}->closestHitFunctions1_0
+// The records buffer has one physical hit/miss stride across all payload views.
 // METAL: thread Schema_payload1_rayData_0
 // METAL: _slang_miss_record = {{.*}} * int(48)
 // METAL: _slang_hit_record = {{.*}} * int(48)
-// METAL: program_resources_{{[0-9]+}}->intersectionFunctions0_0
-// METAL: program_resources_{{[0-9]+}}->missFunctions0_0
-// METAL: program_resources_{{[0-9]+}}->closestHitFunctions0_0
 // METAL: thread Schema_payload0_rayData_0
 // METAL: _slang_miss_record = {{.*}} * int(48)
 // METAL: _slang_hit_record = {{.*}} * int(48)
 
-// The records buffer is schema-wide, so the two payload partitions must resolve the same physical
-// record index with the same section strides. A per-payload 32/48 split would address overlapping
-// records and fail these checks.
-
-// Candidate and visible-function adapters may only exchange their own payload's ray-data type.
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload0_rayData_0 thread*
-// METAL: visibility_0
-// METAL-NOT: radiance_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload0_rayData_0 thread*
-// METAL: visibility_0
-// METAL-NOT: radiance_0
+// The single triangle dispatcher selects a typed carrier by the schema-wide functionIndex,
+// copies it from ray_data into thread storage, then writes changes back to that same carrier.
 // METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing, metal::raytracing::triangle_data)]]
-// METAL-SAME: ray_data Schema_payload0_rayData_0&
-// METAL: visibility_0
-// METAL-NOT: radiance_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload1_rayData_0 thread*
-// METAL: radiance_0
-// METAL-NOT: visibility_0
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_payload1_rayData_0 thread*
-// METAL: radiance_0
-// METAL-NOT: visibility_0
-// METAL-LABEL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data Schema_payload1_rayData_0&
-// METAL: radiance_0
-// METAL-NOT: visibility_0
+// METAL-SAME: ray_data StructuralRayDataHeader_0&
+// METAL: case int(1):
+// METAL: Schema_payload1_rayData_0 ray_data*
+// METAL: thread Schema_payload1_rayData_0
+// METAL: radiance_0 =
+// METAL: case int(0):
+// METAL: Schema_payload0_rayData_0 ray_data*
+// METAL: thread Schema_payload0_rayData_0
+// METAL: visibility_0 =
+// METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing, metal::raytracing::triangle_data)]]
+// METAL-NOT: intersection(triangle,

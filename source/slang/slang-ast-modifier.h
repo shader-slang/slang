@@ -126,6 +126,16 @@ class FromCoreModuleModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Marks source being compiled as the packaged `slang.raytracing` standard module.
+///
+/// The build driver, not source syntax, creates this modifier. It authorizes the module's one
+/// dedicated magic AST type without granting the broader set of core-module back doors.
+FIDDLE()
+class FromSlangRayTracingModuleModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class PrefixModifier : public Modifier
 {

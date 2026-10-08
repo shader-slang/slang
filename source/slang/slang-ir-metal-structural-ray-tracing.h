@@ -41,6 +41,9 @@ enum class MetalStructuralRayTracingStageRequirement : UInt
     ObjectSpaceRay = 1 << 14,
     ObjectToWorld = 1 << 15,
     WorldToObject = 1 << 16,
+    InstanceCount = 1 << 17,
+    InstanceIndexAtLevel = 1 << 18,
+    InstanceIDAtLevel = 1 << 19,
 };
 
 enum class MetalStructuralRayTracingGeometryKind : UInt

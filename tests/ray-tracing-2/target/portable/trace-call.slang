@@ -53,10 +53,10 @@ void traceHelper(rt::RayTraversalDesc desc, inout MyPayload payload)
 void main()
 {
     rt::RayTraversalDesc desc;
-    desc.ray.origin = float3(0.0, 0.0, 0.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 1000.0;
+    desc.ray.Origin = float3(0.0, 0.0, 0.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 1000.0;
     desc.rayFlags = RAY_FLAG_FORCE_OPAQUE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 1;
@@ -76,5 +76,5 @@ void main()
 // SPIRV: OpTraceRayKHR
 // METAL: {{\[\[kernel\]\]}} void main_0(
 // METAL-SAME: metal::raytracing::acceleration_structure
-// METAL-SAME: rt_TraceProgramDescriptorResources
+// METAL-SAME: Schema_resources
 // METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(

@@ -1349,6 +1349,9 @@ typedef uint32_t SlangSizeT;
 
         DisableNotes = 161, // stringValue0: comma-separated note codes or names.
 
+        // CLI-only authority for the packaged ray-tracing module's opaque descriptor declaration.
+        CompileSlangRayTracingModule = 162,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -2275,17 +2278,13 @@ public:                                                              \
         SlangReflectionTraceProgramSchema* schema);
     SLANG_API SlangReflectionType* spReflectionTraceProgramSchema_getTraceContextType(
         SlangReflectionTraceProgramSchema* schema);
-    /** Return whether linked conformances can add hit groups to this schema.
-
-    The returned entry list is already finalized for the reflected program. This flag describes
-    how the schema was declared; callers do not need to perform another discovery step.
-    */
+    /** Reserved compatibility query. Explicit schema sections always return false. */
     SLANG_API bool spReflectionTraceProgramSchema_isHitGroupSectionOpen(
         SlangReflectionTraceProgramSchema* schema);
-    /** Return whether linked conformances can add miss shaders to this schema. */
+    /** Reserved compatibility query. Explicit schema sections always return false. */
     SLANG_API bool spReflectionTraceProgramSchema_isMissShaderSectionOpen(
         SlangReflectionTraceProgramSchema* schema);
-    /** Return whether linked conformances can add callable shaders to this schema. */
+    /** Reserved compatibility query. Explicit schema sections always return false. */
     SLANG_API bool spReflectionTraceProgramSchema_isCallableShaderSectionOpen(
         SlangReflectionTraceProgramSchema* schema);
     /** Get the payload partitions selected for this program's finalized schema.
@@ -2343,8 +2342,9 @@ public:                                                              \
         SlangReflectionTraceProgramSchema* schema);
     /** Enumerate the resources in a compiler-synthesized Metal program descriptor.
 
-    Non-Metal targets return zero resources. Each hit/miss table has a non-negative payload index;
-    callable and record resources are schema-wide and report -1. Use
+    Non-Metal targets return zero resources. Metal exposes five schema-wide resources shared by all
+    payloads: intersection, miss, closest-hit, and callable tables, followed by the record buffer.
+    Every resource reports payload index -1. Use
     `spReflectionTraceProgramSchema_getDescriptorResourceMetalArgumentBufferIndex` to place each
     resource; enumeration order is not a host binding contract.
     */
@@ -2387,27 +2387,34 @@ public:                                                              \
     */
     SLANG_API size_t
     spReflectionRayTracingPayload_getNativePayloadSize(SlangReflectionRayTracingPayload* payload);
-    /** Get hit groups in their dense function-index order for this payload. */
+    /** Get hit groups in schema declaration order, filtered for this payload.
+
+    Function indices still address the entire schema section, so this filtered view may have gaps.
+    */
     SLANG_API SlangUInt
     spReflectionRayTracingPayload_getHitGroupCount(SlangReflectionRayTracingPayload* payload);
     SLANG_API SlangReflectionRayTracingHitGroup* spReflectionRayTracingPayload_getHitGroup(
         SlangReflectionRayTracingPayload* payload,
         SlangUInt index);
-    /** Get miss shaders in their dense function-index order for this payload. */
+    /** Get miss shaders in schema declaration order, filtered for this payload.
+
+    Function indices still address the entire schema section, so this filtered view may have gaps.
+    */
     SLANG_API SlangUInt
     spReflectionRayTracingPayload_getMissShaderCount(SlangReflectionRayTracingPayload* payload);
     SLANG_API SlangReflectionRayTracingMissShader* spReflectionRayTracingPayload_getMissShader(
         SlangReflectionRayTracingPayload* payload,
         SlangUInt index);
-    /** Get the number of physical slots required by this payload's fixed-index Metal IFT.
+    /** Get the number of physical slots required by the schema-wide fixed-index Metal IFT.
 
-    A payload with candidate logic always has generated triangle and bounding-box entries at
+    A schema with candidate logic always has generated triangle and bounding-box entries at
     indices zero and one. It also has a curve entry at index two when the schema contains a curve
-    group. Non-Metal targets and payloads without candidate logic return zero.
+    group. Every payload view of that schema reports the same table. Non-Metal targets and schemas
+    without candidate logic return zero.
     */
     SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionTableSize(
         SlangReflectionRayTracingPayload* payload);
-    /** Enumerate the generated functions in this payload's Metal IFT. */
+    /** Enumerate the generated functions in the schema-wide Metal IFT. */
     SLANG_API SlangUInt spReflectionRayTracingPayload_getIntersectionFunctionCount(
         SlangReflectionRayTracingPayload* payload);
     SLANG_API SlangReflectionRayTracingIntersectionFunction*
@@ -2428,7 +2435,7 @@ public:                                                              \
     SLANG_API char const* spReflectionRayTracingIntersectionFunction_getEntryPointName(
         SlangReflectionRayTracingIntersectionFunction* function);
 
-    /** Get the dense index within this payload partition's hit-group function table.
+    /** Get the dense index within the schema-wide hit-group function table.
 
     Returns -1 for a schema-free declaration catalogue entry because a schema has not assigned a
     function-table index.
@@ -2449,7 +2456,7 @@ public:                                                              \
     */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingHitGroup_getRecordTypeLayout(
         SlangReflectionRayTracingHitGroup* group);
-    /** Return whether this group was discovered from a linked open-section conformance. */
+    /** Reserved compatibility query. Explicitly listed groups always return false. */
     SLANG_API bool spReflectionRayTracingHitGroup_isLinked(
         SlangReflectionRayTracingHitGroup* group);
     SLANG_API SlangReflectionType* spReflectionRayTracingHitGroup_getPrimitiveType(
@@ -2471,7 +2478,7 @@ public:                                                              \
     SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingHitGroup_getIntersection(
         SlangReflectionRayTracingHitGroup* group);
 
-    /** Get the dense index within this payload partition's miss function table.
+    /** Get the dense index within the schema-wide miss function table.
 
     Returns -1 for a schema-free declaration catalogue entry.
     */
@@ -2491,7 +2498,7 @@ public:                                                              \
     */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingMissShader_getRecordTypeLayout(
         SlangReflectionRayTracingMissShader* shader);
-    /** Return whether this shader was discovered from a linked open-section conformance. */
+    /** Reserved compatibility query. Explicitly listed shaders always return false. */
     SLANG_API bool spReflectionRayTracingMissShader_isLinked(
         SlangReflectionRayTracingMissShader* shader);
     SLANG_API SlangReflectionRayTracingStage* spReflectionRayTracingMissShader_getMiss(
@@ -2517,7 +2524,7 @@ public:                                                              \
     */
     SLANG_API SlangReflectionTypeLayout* spReflectionRayTracingCallableShader_getRecordTypeLayout(
         SlangReflectionRayTracingCallableShader* shader);
-    /** Return whether this shader was discovered from a linked open-section conformance. */
+    /** Reserved compatibility query. Explicitly listed shaders always return false. */
     SLANG_API bool spReflectionRayTracingCallableShader_isLinked(
         SlangReflectionRayTracingCallableShader* shader);
     SLANG_API SlangReflectionType* spReflectionRayTracingCallableShader_getDataType(
@@ -2532,7 +2539,7 @@ public:                                                              \
     /** Get the physical target symbol for this stage, when it is independently bindable.
 
     Metal returns null for AnyHit and Intersection because they are folded into a reflected
-    payload/geometry intersection-function dispatcher. Metal also returns null for every stage
+    schema/geometry intersection-function dispatcher. Metal also returns null for every stage
     obtained from the schema-free declaration catalogue because its physical symbol depends on a
     schema, payload partition, and function index.
     */
@@ -5717,8 +5724,9 @@ struct StructuralRayTracingMetalPayloadInfo
     /// Deterministic payload ordinal within `schemaName`.
     uint32_t payloadIndex = 0;
 
-    /// Bitwise combination of `MetalIntersectionFunctionSignature` values required by this
-    /// payload's finalized Metal intersection-function table.
+    /// Bitwise combination of `MetalIntersectionFunctionSignature` values required by the
+    /// schema's finalized shared Metal intersection-function table. All payloads of that schema
+    /// report the same signature.
     MetalIntersectionFunctionSignature intersectionFunctionSignature =
         MetalIntersectionFunctionSignature::None;
 };

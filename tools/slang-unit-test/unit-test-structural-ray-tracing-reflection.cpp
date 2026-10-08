@@ -208,7 +208,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(hitGroupA0 != nullptr);
     SLANG_CHECK(hitGroupA1 != nullptr);
     SLANG_CHECK(hitGroupA0->getFunctionIndex() == 0);
-    SLANG_CHECK(hitGroupA1->getFunctionIndex() == 1);
+    SLANG_CHECK(hitGroupA1->getFunctionIndex() == 2);
     SLANG_CHECK(UnownedStringSlice(hitGroupA0->getType()->getName()) == "HitGroupA0");
     SLANG_CHECK(UnownedStringSlice(hitGroupA0->getRecordType()->getName()) == "HitRecordA");
     SLANG_CHECK(hitGroupA0->getRecordTypeLayout() != nullptr);
@@ -257,7 +257,7 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(missA0 != nullptr);
     SLANG_CHECK(missA1 != nullptr);
     SLANG_CHECK(missA0->getFunctionIndex() == 0);
-    SLANG_CHECK(missA1->getFunctionIndex() == 1);
+    SLANG_CHECK(missA1->getFunctionIndex() == 2);
     SLANG_CHECK(UnownedStringSlice(missA0->getType()->getName()) == "MissA0");
     SLANG_CHECK(UnownedStringSlice(missA0->getRecordType()->getName()) == "MissRecordA");
     SLANG_CHECK(missA0->getRecordTypeLayout() != nullptr);
@@ -272,11 +272,15 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(payloadB->getTypeLayout() != nullptr);
     SLANG_CHECK(payloadB->getNativePayloadSize() == 0);
     SLANG_CHECK(payloadB->getHitGroupCount() == 1);
-    SLANG_CHECK(payloadB->getHitGroup(0)->getFunctionIndex() == 0);
+    SLANG_CHECK(payloadB->getHitGroup(0)->getFunctionIndex() == 1);
     SLANG_CHECK(payloadB->getMissShaderCount() == 1);
-    SLANG_CHECK(payloadB->getMissShader(0)->getFunctionIndex() == 0);
-    SLANG_CHECK(payloadB->getIntersectionFunctionTableSize() == 0);
-    SLANG_CHECK(payloadB->getIntersectionFunctionCount() == 0);
+    SLANG_CHECK(payloadB->getMissShader(0)->getFunctionIndex() == 1);
+    // Even a payload without AnyHit uses the schema's shared primitive dispatchers.
+    SLANG_CHECK(payloadB->getIntersectionFunctionTableSize() == 2);
+    SLANG_CHECK(payloadB->getIntersectionFunctionCount() == 2);
+    SLANG_CHECK(
+        UnownedStringSlice(payloadB->getIntersectionFunction(0)->getEntryPointName()) ==
+        triangleIntersection->getEntryPointName());
 
     SLANG_CHECK(schema->getCallableShaderCount() == 2);
     auto callable0 = schema->getCallableShader(0);
@@ -304,17 +308,18 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     SLANG_CHECK(schema->getMaxNativeHitAttributeSize() == 0);
     SLANG_CHECK(schema->getMetalRecordHeaderSize() == 16);
 
-    SLANG_CHECK(schema->getDescriptorResourceCount() == 8);
-    bool populatedMetalBindings[8] = {};
-    for (SlangUInt resourceIndex = 0; resourceIndex < 8; ++resourceIndex)
+    SLANG_CHECK(schema->getDescriptorResourceCount() == 5);
+    bool populatedMetalBindings[5] = {};
+    for (SlangUInt resourceIndex = 0; resourceIndex < 5; ++resourceIndex)
     {
         // The lowering and reflection producers share the semantic resource-to-argument-index
         // mapping. Verify the public result is a complete one-to-one binding map rather than an
         // undocumented invitation for hosts to use `resourceIndex` as the Metal argument ID.
         const SlangInt bindingIndex =
             schema->getDescriptorResourceMetalArgumentBufferIndex(resourceIndex);
-        SLANG_CHECK(bindingIndex >= 0 && bindingIndex < 8);
-        if (bindingIndex >= 0 && bindingIndex < 8)
+        SLANG_CHECK(bindingIndex >= 0 && bindingIndex < 5);
+        SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(resourceIndex) == -1);
+        if (bindingIndex >= 0 && bindingIndex < 5)
         {
             SLANG_CHECK(!populatedMetalBindings[bindingIndex]);
             populatedMetalBindings[bindingIndex] = true;
@@ -322,32 +327,32 @@ SLANG_UNIT_TEST(structuralRayTracingReflection)
     }
     for (bool populated : populatedMetalBindings)
         SLANG_CHECK(populated);
-    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(8) == -1);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(5) == -1);
     SLANG_CHECK(
         schema->getDescriptorResourceKind(0) ==
         SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE);
-    SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(0) == 0);
     SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(0) == 0);
     SLANG_CHECK(
-        UnownedStringSlice(schema->getDescriptorResourceName(0)) == "intersectionFunctions0");
+        UnownedStringSlice(schema->getDescriptorResourceName(0)) == "intersectionFunctions");
+    SLANG_CHECK(
+        schema->getDescriptorResourceKind(1) ==
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_MISS_VISIBLE_FUNCTION_TABLE);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(1) == 1);
+    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(1)) == "missFunctions");
+    SLANG_CHECK(
+        schema->getDescriptorResourceKind(2) ==
+        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CLOSEST_HIT_VISIBLE_FUNCTION_TABLE);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(2) == 2);
+    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(2)) == "closestHitFunctions");
     SLANG_CHECK(
         schema->getDescriptorResourceKind(3) ==
-        SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE);
-    SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(3) == 1);
-    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(3) == 3);
-    SLANG_CHECK(
-        UnownedStringSlice(schema->getDescriptorResourceName(3)) == "intersectionFunctions1");
-    SLANG_CHECK(
-        schema->getDescriptorResourceKind(6) ==
         SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE);
-    SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(6) == -1);
-    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(6) == 6);
-    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(6)) == "callableFunctions");
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(3) == 3);
+    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(3)) == "callableFunctions");
     SLANG_CHECK(
-        schema->getDescriptorResourceKind(7) == SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS);
-    SLANG_CHECK(schema->getDescriptorResourcePayloadIndex(7) == -1);
-    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(7) == 7);
-    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(7)) == "records");
+        schema->getDescriptorResourceKind(4) == SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS);
+    SLANG_CHECK(schema->getDescriptorResourceMetalArgumentBufferIndex(4) == 4);
+    SLANG_CHECK(UnownedStringSlice(schema->getDescriptorResourceName(4)) == "records");
 
     SLANG_CHECK(program->findTraceProgramSchema("HitContextA") == nullptr);
 }
@@ -582,7 +587,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
                 typealias Context = HitContext;
                 void invoke(rt::ClosestHitInput<HitContext> input)
                 {
-                    input.payload.value = input.triangle.barycentricCoord.x;
+                    input.payload.value = input.attributes.barycentricCoord.x;
                 }
             }
 
@@ -675,8 +680,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         void traceHelper(inout StageNamespace::Payload payload)
         {
             rt::RayTraversalDesc desc = {};
-            desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
-            desc.ray.tMax = 1.0f;
+            desc.ray.Direction = float3(0.0f, 0.0f, 1.0f);
+            desc.ray.TMax = 1.0f;
             desc.instanceMask = 0xff;
             rt::RayTracer<StageNamespace::Schema> tracer;
             tracer.trace(desc, scene, traceProgram, payload);
@@ -685,8 +690,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         void traceGenericHelper(inout StageNamespace::Payload payload)
         {
             rt::RayTraversalDesc desc = {};
-            desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
-            desc.ray.tMax = 1.0f;
+            desc.ray.Direction = float3(0.0f, 0.0f, 1.0f);
+            desc.ray.TMax = 1.0f;
             desc.instanceMask = 0xff;
             rt::RayTracer<StageNamespace::GenericSchema<uint>> tracer;
             tracer.trace(desc, scene, genericTraceProgram, payload);
@@ -695,8 +700,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointRename)
         void traceFloatGenericHelper(inout StageNamespace::Payload payload)
         {
             rt::RayTraversalDesc desc = {};
-            desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
-            desc.ray.tMax = 1.0f;
+            desc.ray.Direction = float3(0.0f, 0.0f, 1.0f);
+            desc.ray.TMax = 1.0f;
             desc.instanceMask = 0xff;
             rt::RayTracer<StageNamespace::GenericSchema<float>> tracer;
             tracer.trace(desc, scene, floatGenericTraceProgram, payload);
@@ -1297,7 +1302,7 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadataOperationOrder)
             typealias Context = HitContextA;
             void invoke(rt::AnyHitInput<Context> input)
             {
-                input.payload.value = input.triangle.frontFacing ? 1 : 0;
+                input.payload.value = input.attributes.frontFacing ? 1 : 0;
             }
         }
 
@@ -1439,309 +1444,8 @@ SLANG_UNIT_TEST(structuralRayTracingMetalTargetMetadataOperationOrder)
          uint32_t(slang::MetalIntersectionFunctionSignature::TriangleData)) != 0);
     SLANG_CHECK(
         (forwardSignatures[1] &
-         uint32_t(slang::MetalIntersectionFunctionSignature::TriangleData)) == 0);
-}
-
-SLANG_UNIT_TEST(structuralRayTracingOpenSchemaReflection)
-{
-    // This test models the host workflow open schemas are designed for. The schema module names
-    // only tag interfaces, while an independently composed module contributes concrete entries.
-    // The host asks the ordinary composite program for reflection; it does not construct or add a
-    // TypeConformance component for `Schema` itself.
-    const char* contextSource = R"(
-        module structural_open_reflection_context;
-
-        import slang.raytracing;
-
-        public struct ListedPayload { uint value; }
-        public struct LinkedPayload { float2 value; }
-        public struct ListedRecord { uint value; }
-        public struct LinkedRecord { float4 value; }
-        public struct CallableData { uint value; }
-
-        public struct TraceContext : rt::ITraceContext
-        {
-            typealias AccelerationStructure = rt::AccelerationStructure;
-            typealias Motion = rt::NoMotion;
-        }
-
-        public struct OtherTraceContext : rt::ITraceContext
-        {
-            typealias AccelerationStructure = rt::AccelerationStructure;
-            typealias Motion = rt::NoMotion;
-        }
-
-        public typealias CommonTraceContext = TraceContext;
-        public typealias CommonCallableData = CallableData;
-
-        public struct ListedHitContext : rt::IHitContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias Payload = ListedPayload;
-            typealias Primitive = rt::TrianglePrimitive;
-            typealias Record = ListedRecord;
-        }
-
-        public struct LinkedHitContext : rt::IHitContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias Payload = LinkedPayload;
-            typealias Primitive = rt::TrianglePrimitive;
-            typealias Record = LinkedRecord;
-        }
-
-        public struct MismatchedHitContext : rt::IHitContext
-        {
-            typealias TraceContext = OtherTraceContext;
-            typealias Payload = LinkedPayload;
-            typealias Primitive = rt::TrianglePrimitive;
-            typealias Record = LinkedRecord;
-        }
-
-        public struct ListedMissContext : rt::IPayloadContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias Payload = ListedPayload;
-            typealias Record = ListedRecord;
-        }
-
-        public struct LinkedMissContext : rt::IPayloadContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias Payload = LinkedPayload;
-            typealias Record = LinkedRecord;
-        }
-
-        public struct ListedCallableContext : rt::ICallableContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias CallableData = CommonCallableData;
-            typealias Record = ListedRecord;
-        }
-
-        public struct LinkedCallableContext : rt::ICallableContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias CallableData = CommonCallableData;
-            typealias Record = LinkedRecord;
-        }
-
-        public interface IHitTag : rt::IHitGroup {}
-        public interface IMismatchedHitTag : rt::IHitGroup {}
-        public interface IMissTag : rt::IMissShader {}
-        public interface ICallableTag : rt::ICallableShader {}
-    )";
-
-    const char* schemaSource = R"(
-        module structural_open_reflection_schema;
-
-        import slang.raytracing;
-        import structural_open_reflection_context;
-
-        typealias SchemaTraceContext = TraceContext;
-
-        struct ListedClosestHit : rt::IClosestHitShader
-        {
-            typealias Context = ListedHitContext;
-            void invoke(rt::ClosestHitInput<Context> input) {}
-        }
-
-        struct ListedHitGroup : IHitTag
-        {
-            typealias Context = ListedHitContext;
-            typealias ClosestHit = ListedClosestHit;
-            typealias AnyHit = rt::NoAnyHit<Context>;
-            typealias Intersection = rt::NoIntersection<Context>;
-        }
-
-        struct ListedMiss : IMissTag
-        {
-            typealias Context = ListedMissContext;
-            void invoke(rt::MissInput<Context> input) {}
-        }
-
-        struct ListedCallable : ICallableTag
-        {
-            typealias Context = ListedCallableContext;
-            void invoke(rt::CallableInput<Context> input) {}
-        }
-
-        public struct Schema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = SchemaTraceContext;
-            typealias HitGroups = rt::OpenHitGroups<IHitTag, ListedHitGroup>;
-            typealias MissShaders = rt::OpenMissShaders<IMissTag, ListedMiss>;
-            typealias CallableShaders = rt::OpenCallableShaders<ICallableTag, ListedCallable>;
-        }
-
-        public struct MismatchedSchema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = SchemaTraceContext;
-            typealias HitGroups = rt::OpenHitGroups<IMismatchedHitTag>;
-            typealias MissShaders = rt::NoMissShaders;
-            typealias CallableShaders = rt::NoCallableShaders;
-        }
-    )";
-
-    const char* pluginSource = R"(
-        module structural_open_reflection_plugin;
-
-        import slang.raytracing;
-        import structural_open_reflection_context;
-
-        struct LinkedClosestHit : rt::IClosestHitShader
-        {
-            typealias Context = LinkedHitContext;
-            void invoke(rt::ClosestHitInput<Context> input) {}
-        }
-
-        struct LinkedHitGroup : IHitTag
-        {
-            typealias Context = LinkedHitContext;
-            typealias ClosestHit = LinkedClosestHit;
-            typealias AnyHit = rt::NoAnyHit<Context>;
-            typealias Intersection = rt::NoIntersection<Context>;
-        }
-
-        struct MismatchedHitGroup : IMismatchedHitTag
-        {
-            typealias Context = MismatchedHitContext;
-            typealias ClosestHit = rt::NoClosestHit<Context>;
-            typealias AnyHit = rt::NoAnyHit<Context>;
-            typealias Intersection = rt::NoIntersection<Context>;
-        }
-
-        struct LinkedMiss : IMissTag
-        {
-            typealias Context = LinkedMissContext;
-            void invoke(rt::MissInput<Context> input) {}
-        }
-
-        struct LinkedCallable : ICallableTag
-        {
-            typealias Context = LinkedCallableContext;
-            void invoke(rt::CallableInput<Context> input) {}
-        }
-    )";
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-
-    slang::CompilerOptionEntry experimentalOption = {};
-    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
-    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
-    experimentalOption.value.intValue0 = 1;
-
-    slang::TargetDesc target = {};
-    target.format = SLANG_HLSL;
-    target.profile = globalSession->findProfile("sm_6_5");
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &target;
-    sessionDesc.compilerOptionEntryCount = 1;
-    sessionDesc.compilerOptionEntries = &experimentalOption;
-
-    ComPtr<slang::ISession> session;
-    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-
-    auto loadModule = [&](const char* moduleName, const char* source) -> ComPtr<slang::IModule>
-    {
-        ComPtr<slang::IBlob> diagnostics;
-        ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
-            moduleName,
-            moduleName,
-            source,
-            diagnostics.writeRef()));
-        if (!module && diagnostics)
-            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-        return module;
-    };
-
-    auto contextModule = loadModule("structural_open_reflection_context", contextSource);
-    SLANG_CHECK_ABORT(contextModule != nullptr);
-    auto schemaModule = loadModule("structural_open_reflection_schema", schemaSource);
-    SLANG_CHECK_ABORT(schemaModule != nullptr);
-    auto pluginModule = loadModule("structural_open_reflection_plugin", pluginSource);
-    SLANG_CHECK_ABORT(pluginModule != nullptr);
-
-    slang::IComponentType* components[] = {schemaModule, pluginModule};
-    ComPtr<slang::IComponentType> program;
-    ComPtr<slang::IBlob> diagnostics;
-    auto composeResult = session->createCompositeComponentType(
-        components,
-        SLANG_COUNT_OF(components),
-        program.writeRef(),
-        diagnostics.writeRef());
-    if (SLANG_FAILED(composeResult) && diagnostics)
-        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(composeResult));
-
-    auto layout = program->getLayout(0, diagnostics.writeRef());
-    if (!layout && diagnostics)
-        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-    SLANG_CHECK_ABORT(layout != nullptr);
-    auto schema = layout->findTraceProgramSchema("Schema");
-    SLANG_CHECK_ABORT(schema != nullptr);
-
-    // Open flags report the source contract, while all returned collections are already finalized
-    // for the composed program. Listed entries retain index zero and linked entries follow them.
-    SLANG_CHECK(schema->isHitGroupSectionOpen());
-    SLANG_CHECK(schema->isMissShaderSectionOpen());
-    SLANG_CHECK(schema->isCallableShaderSectionOpen());
-    SLANG_CHECK(schema->getPayloadCount() == 2);
-    auto listedPayload = schema->getPayload(0);
-    auto linkedPayload = schema->getPayload(1);
-    SLANG_CHECK_ABORT(listedPayload && linkedPayload);
-    SLANG_CHECK(UnownedStringSlice(listedPayload->getType()->getName()) == "ListedPayload");
-    SLANG_CHECK(UnownedStringSlice(linkedPayload->getType()->getName()) == "LinkedPayload");
-    SLANG_CHECK(listedPayload->getTypeLayout() != nullptr);
-    SLANG_CHECK(linkedPayload->getTypeLayout() != nullptr);
-
-    SLANG_CHECK(listedPayload->getHitGroupCount() == 1);
-    SLANG_CHECK(linkedPayload->getHitGroupCount() == 1);
-    auto listedHit = listedPayload->getHitGroup(0);
-    auto linkedHit = linkedPayload->getHitGroup(0);
-    SLANG_CHECK_ABORT(listedHit && linkedHit);
-    SLANG_CHECK(!listedHit->isLinked());
-    SLANG_CHECK(linkedHit->isLinked());
-    SLANG_CHECK(UnownedStringSlice(listedHit->getType()->getName()) == "ListedHitGroup");
-    SLANG_CHECK(UnownedStringSlice(linkedHit->getType()->getName()) == "LinkedHitGroup");
-    SLANG_CHECK(listedHit->getRecordTypeLayout() != nullptr);
-    SLANG_CHECK(linkedHit->getRecordTypeLayout() != nullptr);
-
-    SLANG_CHECK(listedPayload->getMissShaderCount() == 1);
-    SLANG_CHECK(linkedPayload->getMissShaderCount() == 1);
-    auto listedMiss = listedPayload->getMissShader(0);
-    auto linkedMiss = linkedPayload->getMissShader(0);
-    SLANG_CHECK_ABORT(listedMiss && linkedMiss);
-    SLANG_CHECK(!listedMiss->isLinked());
-    SLANG_CHECK(linkedMiss->isLinked());
-    SLANG_CHECK(UnownedStringSlice(listedMiss->getType()->getName()) == "ListedMiss");
-    SLANG_CHECK(UnownedStringSlice(linkedMiss->getType()->getName()) == "LinkedMiss");
-    SLANG_CHECK(listedMiss->getRecordTypeLayout() != nullptr);
-    SLANG_CHECK(linkedMiss->getRecordTypeLayout() != nullptr);
-
-    SLANG_CHECK(schema->getCallableShaderCount() == 2);
-    auto listedCallable = schema->getCallableShader(0);
-    auto linkedCallable = schema->getCallableShader(1);
-    SLANG_CHECK_ABORT(listedCallable && linkedCallable);
-    SLANG_CHECK(!listedCallable->isLinked());
-    SLANG_CHECK(linkedCallable->isLinked());
-    SLANG_CHECK(UnownedStringSlice(listedCallable->getType()->getName()) == "ListedCallable");
-    SLANG_CHECK(UnownedStringSlice(linkedCallable->getType()->getName()) == "LinkedCallable");
-    SLANG_CHECK(listedCallable->getRecordTypeLayout() != nullptr);
-    SLANG_CHECK(linkedCallable->getRecordTypeLayout() != nullptr);
-
-    // The completed schema is cached on the ordinary program layout, so repeated host queries do
-    // not relink or construct a second reflection object.
-    SLANG_CHECK(layout->findTraceProgramSchema("Schema") == schema);
-
-    // This second schema is valid in its defining module, but the composed plugin contributes a
-    // hit group with a different trace context. The pointer-only reflection query must not publish
-    // that invalid finalized schema. It cannot return the link-time diagnostic; the corresponding
-    // code-generation diagnostic is covered by open-schema-trace-context-mismatch.slang.
-    SLANG_CHECK(layout->findTraceProgramSchema("MismatchedSchema") == nullptr);
+         uint32_t(slang::MetalIntersectionFunctionSignature::TriangleData)) != 0);
+    SLANG_CHECK(forwardSignatures[0] == forwardSignatures[1]);
 }
 
 SLANG_UNIT_TEST(structuralRayTracingEmptyPayloadInvariantAppliesToReflectionOnlySchemas)
@@ -1794,14 +1498,6 @@ SLANG_UNIT_TEST(structuralRayTracingEmptyPayloadInvariantAppliesToReflectionOnly
             typealias CallableShaders = rt::NoCallableShaders;
         }
 
-        struct OpenSchema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias HitGroups = rt::NoHitGroups;
-            typealias MissShaders = rt::OpenMissShaders<IMissTag>;
-            typealias CallableShaders = rt::NoCallableShaders;
-        }
-
         struct ValidClosedSchema : rt::ITraceProgramSchema
         {
             typealias TraceContext = ::TraceContext;
@@ -1810,13 +1506,6 @@ SLANG_UNIT_TEST(structuralRayTracingEmptyPayloadInvariantAppliesToReflectionOnly
             typealias CallableShaders = rt::NoCallableShaders;
         }
 
-        struct ValidOpenSchema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias HitGroups = rt::NoHitGroups;
-            typealias MissShaders = rt::OpenMissShaders<IValidMissTag>;
-            typealias CallableShaders = rt::NoCallableShaders;
-        }
     )";
 
     ComPtr<slang::IGlobalSession> globalSession;
@@ -1853,395 +1542,18 @@ SLANG_UNIT_TEST(structuralRayTracingEmptyPayloadInvariantAppliesToReflectionOnly
     SLANG_CHECK_ABORT(layout != nullptr);
 
     // None of these schemas is activated by an entry point or trace. Positive controls prove that
-    // ordinary reflection succeeds through both paths; the invalid closed list and linked open
-    // section must fail specifically because each contains two empty payload identities.
+    // ordinary reflection succeeds; the invalid explicit list must fail specifically because it
+    // contains two empty payload identities.
     SLANG_CHECK(layout->findTraceProgramSchema("ValidClosedSchema") != nullptr);
-    SLANG_CHECK(layout->findTraceProgramSchema("ValidOpenSchema") != nullptr);
     SLANG_CHECK(layout->findTraceProgramSchema("ClosedSchema") == nullptr);
-    SLANG_CHECK(layout->findTraceProgramSchema("OpenSchema") == nullptr);
-}
-
-SLANG_UNIT_TEST(structuralRayTracingInvalidOpenSchemaManifestIsNotCached)
-{
-    const char* source = R"(
-        import slang.raytracing;
-
-        struct EmptyPayloadA {}
-        struct EmptyPayloadB {}
-        struct PayloadWithData { uint value; }
-
-        struct TraceContext : rt::ITraceContext
-        {
-            typealias AccelerationStructure = rt::AccelerationStructure;
-            typealias Motion = rt::NoMotion;
-        }
-
-        interface IMissTag : rt::IMissShader {}
-
-        struct MissContextA : rt::IPayloadContext
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias Payload = EmptyPayloadA;
-            typealias Record = void;
-        }
-
-        struct MissContextB : rt::IPayloadContext
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias Payload = EmptyPayloadB;
-            typealias Record = void;
-        }
-
-        struct MissA : IMissTag
-        {
-            typealias Context = MissContextA;
-            void invoke(rt::MissInput<Context> input) {}
-        }
-
-        struct MissB : IMissTag
-        {
-            typealias Context = MissContextB;
-            void invoke(rt::MissInput<Context> input) {}
-        }
-
-        struct DataMissContext : rt::IPayloadContext
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias Payload = PayloadWithData;
-            typealias Record = void;
-        }
-
-        struct DataMiss : rt::IMissShader
-        {
-            typealias Context = DataMissContext;
-            void invoke(rt::MissInput<Context> input) {}
-        }
-
-        struct Schema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = ::TraceContext;
-            typealias HitGroups = rt::NoHitGroups;
-            typealias MissShaders = rt::OpenMissShaders<IMissTag, DataMiss>;
-            typealias CallableShaders = rt::NoCallableShaders;
-        }
-
-        rt::AccelerationStructure scene;
-        rt::TraceProgramDescriptor<Schema> program;
-
-        [shader("raygeneration")]
-        void main()
-        {
-            rt::RayTracer<Schema> tracer;
-            PayloadWithData payload = {};
-            tracer.trace<PayloadWithData>({}, scene, program, payload);
-        }
-    )";
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-
-    slang::CompilerOptionEntry experimentalOption = {};
-    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
-    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
-    experimentalOption.value.intValue0 = 1;
-
-    slang::TargetDesc target = {};
-    target.format = SLANG_HLSL;
-    target.profile = globalSession->findProfile("sm_6_5");
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &target;
-    sessionDesc.compilerOptionEntryCount = 1;
-    sessionDesc.compilerOptionEntries = &experimentalOption;
-
-    ComPtr<slang::ISession> session;
-    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-
-    ComPtr<slang::IBlob> diagnostics;
-    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
-        "structuralInvalidOpenManifest",
-        "structural-invalid-open-manifest.slang",
-        source,
-        diagnostics.writeRef()));
-    if (!module && diagnostics)
-        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-    SLANG_CHECK_ABORT(module != nullptr);
-
-    ComPtr<slang::IEntryPoint> entryPoint;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findEntryPointByName("main", entryPoint.writeRef())));
-    slang::IComponentType* components[] = {module, entryPoint};
-    ComPtr<slang::IComponentType> program;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
-        components,
-        SLANG_COUNT_OF(components),
-        program.writeRef(),
-        diagnostics.writeRef())));
-    ComPtr<slang::IComponentType> linkedProgram;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(program->link(linkedProgram.writeRef(), diagnostics.writeRef())));
-
-    // Reflection requests a finalized schema even when no payload-less trace is present. The two
-    // linked empty payload identities therefore invalidate the same schema before reflection can
-    // publish it; choosing `PayloadWithData` in `main` cannot hide that schema-wide conflict.
-    auto layout = program->getLayout(0, diagnostics.writeRef());
-    SLANG_CHECK_ABORT(layout != nullptr);
-    SLANG_CHECK(layout->findTraceProgramSchema("Schema") == nullptr);
-
-    auto expectAmbiguousPayloadDiagnostic = [&]()
-    {
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> requestDiagnostics;
-        auto result =
-            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), requestDiagnostics.writeRef());
-        SLANG_CHECK(SLANG_FAILED(result));
-        SLANG_CHECK_ABORT(requestDiagnostics != nullptr);
-        UnownedStringSlice text(
-            (const char*)requestDiagnostics->getBufferPointer(),
-            (const char*)requestDiagnostics->getBufferPointer() +
-                requestDiagnostics->getBufferSize());
-        SLANG_CHECK(
-            text.indexOf(
-                toSlice("linked structural ray-tracing schema has multiple empty payloads")) != -1);
-    };
-
-    // Both requests share one TargetProgram. The first invalid manifest must not enter that
-    // program's cache; otherwise the second request would reuse a trace-less module and lose the
-    // link-time ambiguity diagnostic.
-    expectAmbiguousPayloadDiagnostic();
-    expectAmbiguousPayloadDiagnostic();
-}
-
-SLANG_UNIT_TEST(structuralRayTracingSerializedOpenSchemaReflection)
-{
-    // A standard or plugin module is normally shipped as serialized AST and IR. Compile the three
-    // independently composable pieces first, then discard that session so no transient compiler
-    // registry can make reflection pass accidentally.
-    const char* contextSource = R"(
-        module structural_serialized_reflection_context;
-
-        import slang.raytracing;
-
-        public struct Payload { uint value; }
-        public struct Record { uint4 value; }
-
-        public struct TraceContext : rt::ITraceContext
-        {
-            typealias AccelerationStructure = rt::AccelerationStructure;
-            typealias Motion = rt::NoMotion;
-        }
-
-        public typealias CommonTraceContext = TraceContext;
-        public typealias CommonPayload = Payload;
-        public typealias CommonRecord = Record;
-
-        public struct HitContext : rt::IHitContext
-        {
-            typealias TraceContext = CommonTraceContext;
-            typealias Payload = CommonPayload;
-            typealias Primitive = rt::TrianglePrimitive;
-            typealias Record = CommonRecord;
-        }
-
-        public interface IHitTag : rt::IHitGroup {}
-    )";
-
-    const char* schemaSource = R"(
-        module structural_serialized_reflection_schema;
-
-        import slang.raytracing;
-        import structural_serialized_reflection_context;
-
-        typealias SchemaTraceContext = TraceContext;
-
-        public struct Schema : rt::ITraceProgramSchema
-        {
-            typealias TraceContext = SchemaTraceContext;
-            typealias HitGroups = rt::OpenHitGroups<IHitTag>;
-            typealias MissShaders = rt::NoMissShaders;
-            typealias CallableShaders = rt::NoCallableShaders;
-        }
-    )";
-
-    const char* pluginSource = R"(
-        module structural_serialized_reflection_plugin;
-
-        import slang.raytracing;
-        import structural_serialized_reflection_context;
-
-        struct LinkedClosestHit : rt::IClosestHitShader
-        {
-            typealias Context = HitContext;
-            void invoke(rt::ClosestHitInput<Context> input) {}
-        }
-
-        struct LinkedHitGroup : IHitTag
-        {
-            typealias Context = HitContext;
-            typealias ClosestHit = LinkedClosestHit;
-            typealias AnyHit = rt::NoAnyHit<Context>;
-            typealias Intersection = rt::NoIntersection<Context>;
-        }
-
-        public struct GenericClosestHit<T> : rt::IClosestHitShader
-        {
-            typealias Context = HitContext;
-            void invoke(rt::ClosestHitInput<Context> input) {}
-        }
-
-        public struct GenericHitGroup<T> : IHitTag
-        {
-            typealias Context = HitContext;
-            typealias ClosestHit = GenericClosestHit<T>;
-            typealias AnyHit = rt::NoAnyHit<Context>;
-            typealias Intersection = rt::NoIntersection<Context>;
-        }
-    )";
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-
-    slang::CompilerOptionEntry compilerOptions[2] = {};
-    compilerOptions[0].name = slang::CompilerOptionName::ExperimentalFeature;
-    compilerOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
-    compilerOptions[0].value.intValue0 = 1;
-    // Obfuscation ensures that recovery cannot accidentally depend on an IR linkage decoration.
-    // The producer persists the original module export-table key in compiler-owned metadata.
-    compilerOptions[1].name = slang::CompilerOptionName::Obfuscate;
-    compilerOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
-    compilerOptions[1].value.intValue0 = 1;
-
-    slang::TargetDesc target = {};
-    target.format = SLANG_HLSL;
-    target.profile = globalSession->findProfile("sm_6_5");
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &target;
-    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(compilerOptions);
-    sessionDesc.compilerOptionEntries = compilerOptions;
-
-    ComPtr<slang::IBlob> contextBlob;
-    ComPtr<slang::IBlob> schemaBlob;
-    ComPtr<slang::IBlob> pluginBlob;
-    {
-        ComPtr<slang::ISession> sourceSession;
-        SLANG_CHECK_ABORT(
-            globalSession->createSession(sessionDesc, sourceSession.writeRef()) == SLANG_OK);
-
-        auto compileAndSerialize =
-            [&](const char* moduleName, const char* source, ComPtr<slang::IBlob>& outBlob)
-        {
-            ComPtr<slang::IBlob> diagnostics;
-            ComPtr<slang::IModule> module(sourceSession->loadModuleFromSourceString(
-                moduleName,
-                moduleName,
-                source,
-                diagnostics.writeRef()));
-            if (!module && diagnostics)
-                fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-            SLANG_CHECK_ABORT(module != nullptr);
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->serialize(outBlob.writeRef())));
-        };
-
-        compileAndSerialize("structural_serialized_reflection_context", contextSource, contextBlob);
-        compileAndSerialize("structural_serialized_reflection_schema", schemaSource, schemaBlob);
-        compileAndSerialize("structural_serialized_reflection_plugin", pluginSource, pluginBlob);
-    }
-
-    ComPtr<slang::ISession> loadedSession;
-    SLANG_CHECK_ABORT(
-        globalSession->createSession(sessionDesc, loadedSession.writeRef()) == SLANG_OK);
-
-    auto loadSerialized = [&](const char* moduleName, ISlangBlob* blob) -> ComPtr<slang::IModule>
-    {
-        ComPtr<slang::IBlob> diagnostics;
-        ComPtr<slang::IModule> module(slang_loadModuleFromIRBlob(
-            loadedSession,
-            moduleName,
-            moduleName,
-            blob->getBufferPointer(),
-            blob->getBufferSize(),
-            diagnostics.writeRef()));
-        if (!module && diagnostics)
-            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-        return module;
-    };
-
-    auto contextModule = loadSerialized("structural_serialized_reflection_context", contextBlob);
-    SLANG_CHECK_ABORT(contextModule != nullptr);
-    auto schemaModule = loadSerialized("structural_serialized_reflection_schema", schemaBlob);
-    SLANG_CHECK_ABORT(schemaModule != nullptr);
-    auto pluginModule = loadSerialized("structural_serialized_reflection_plugin", pluginBlob);
-    SLANG_CHECK_ABORT(pluginModule != nullptr);
-
-    // A generic declaration is not an automatic member of an open section because it denotes an
-    // unbounded family. The host selects one finite specialization with an ordinary semantic
-    // TypeConformance component. Creating that component in this fresh session must retain the
-    // `uint` argument and register the exact type; declaration-key recovery deliberately does not
-    // reconstruct generic arguments from serialized IR.
-    auto pluginLayout = pluginModule->getLayout(0, nullptr);
-    auto contextLayout = contextModule->getLayout(0, nullptr);
-    SLANG_CHECK_ABORT(pluginLayout && contextLayout);
-    auto genericHitGroupType = pluginLayout->findTypeByName("GenericHitGroup<uint>");
-    auto hitTagType = contextLayout->findTypeByName("IHitTag");
-    SLANG_CHECK_ABORT(genericHitGroupType && hitTagType);
-    ComPtr<slang::ITypeConformance> genericHitGroupConformance;
-    ComPtr<slang::IBlob> conformanceDiagnostics;
-    auto conformanceResult = loadedSession->createTypeConformanceComponentType(
-        genericHitGroupType,
-        hitTagType,
-        genericHitGroupConformance.writeRef(),
-        -1,
-        conformanceDiagnostics.writeRef());
-    if (SLANG_FAILED(conformanceResult) && conformanceDiagnostics)
-        fprintf(stderr, "%s\n", (const char*)conformanceDiagnostics->getBufferPointer());
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(conformanceResult));
-
-    slang::IComponentType* components[] = {schemaModule, pluginModule, genericHitGroupConformance};
-    ComPtr<slang::IComponentType> program;
-    ComPtr<slang::IBlob> diagnostics;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadedSession->createCompositeComponentType(
-        components,
-        SLANG_COUNT_OF(components),
-        program.writeRef(),
-        diagnostics.writeRef())));
-    auto layout = program->getLayout(0, diagnostics.writeRef());
-    if (!layout && diagnostics)
-        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-    SLANG_CHECK_ABORT(layout != nullptr);
-
-    // Reflection must recover the exact checked type selected by the linked identity. Parsing the
-    // source name here would be incorrect because two modules can declare the same qualified name
-    // and generic specializations do not have a source spelling that encodes their identity.
-    auto schema = layout->findTraceProgramSchema("Schema");
-    SLANG_CHECK_ABORT(schema != nullptr);
-    SLANG_CHECK(schema->isHitGroupSectionOpen());
-    SLANG_CHECK(schema->getPayloadCount() == 1);
-    auto payload = schema->getPayload(0);
-    SLANG_CHECK_ABORT(payload != nullptr);
-    SLANG_CHECK(payload->getHitGroupCount() == 2);
-    bool foundLinkedGroup = false;
-    bool foundGenericGroup = false;
-    for (SlangUInt i = 0; i < payload->getHitGroupCount(); ++i)
-    {
-        auto group = payload->getHitGroup(i);
-        SLANG_CHECK_ABORT(group != nullptr);
-        SLANG_CHECK(group->isLinked());
-        SLANG_CHECK(group->getRecordTypeLayout() != nullptr);
-        foundLinkedGroup |= UnownedStringSlice(group->getType()->getName()) == "LinkedHitGroup";
-        foundGenericGroup |= group->getType() == genericHitGroupType;
-    }
-    SLANG_CHECK(foundLinkedGroup);
-    SLANG_CHECK(foundGenericGroup);
 }
 
 SLANG_UNIT_TEST(structuralRayTracingEntryCatalogueWithoutSchema)
 {
     // This module deliberately declares structural stages without declaring an
     // `ITraceProgramSchema`. `CatalogueHitGroup` also reaches `IHitGroup` through two tag
-    // interfaces. Lowering records every matching tag on the one conformance, but the public
-    // declaration catalogue must contain the semantic hit-group type exactly once.
+    // interfaces. Lowering records its concrete entry contract, and the public declaration
+    // catalogue must contain the semantic hit-group type exactly once.
     const char* source = R"(
         module structural_entry_catalogue_no_schema;
 

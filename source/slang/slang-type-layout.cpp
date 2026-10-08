@@ -5458,6 +5458,22 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return TypeLayoutResult(typeLayout, info);
     }
+    else if (as<TraceProgramDescriptorType>(type))
+    {
+        // The opaque descriptor reserves one Metal argument-buffer binding. Its five resource
+        // fields are compiler-generated after specialization, so source layout must not infer
+        // storage from the fieldless library declaration. Native SBT targets erase the handle.
+        if (isMetalTarget(context.targetReq))
+        {
+            return createSimpleTypeLayout(
+                rules->GetObjectLayout(
+                    ShaderParameterKind::ParameterBlock,
+                    context.objectLayoutOptions),
+                type,
+                rules);
+        }
+        return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
+    }
     else if (as<SubpassInputType>(type))
     {
         // SubpassInputType fills 2 slots, 'shader resource' and 'input_attachment_index'

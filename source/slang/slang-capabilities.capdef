@@ -1527,6 +1527,10 @@ alias structural_raytracing_closesthit = closesthit | _closesthit + metal;
 /// Logical any-hit role used by the structural ray-tracing API.
 /// [Compound]
 alias structural_raytracing_anyhit = anyhit | _anyhit + metal;
+/// Logical hit roles that can read built-in triangle attributes, including Metal dispatch.
+/// [Compound]
+alias structural_raytracing_anyhit_closesthit = structural_raytracing_anyhit
+                                              | structural_raytracing_closesthit;
 /// Logical intersection role used by the structural ray-tracing API.
 /// [Compound]
 alias structural_raytracing_intersection = intersection | _intersection + metal;

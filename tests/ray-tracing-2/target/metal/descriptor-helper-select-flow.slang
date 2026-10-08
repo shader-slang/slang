@@ -109,36 +109,34 @@ void main()
 
 // Both source fields and the helper's complete value flow use the schema-specific physical type.
 // METAL-LABEL: struct Programs_default_0
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 first_0;
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 second_0;
+// METAL-DAG: Schema_resources{{[A-Za-z0-9_]*}} constant* first_0;
+// METAL-DAG: Schema_resources{{[A-Za-z0-9_]*}} constant* second_0;
 // METAL-DAG: boundAlternatives_0;
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 unused_0;
-// METAL: void chooseProgram_0(
-// METAL-SAME: const rt_TraceProgramDescriptor_default_0 constant* first_{{[0-9]+}},
-// METAL-SAME: const rt_TraceProgramDescriptor_default_0 constant* second_{{[0-9]+}},
-// METAL-SAME: rt_TraceProgramDescriptorResources_default_0 constant* thread*
+// METAL-DAG: Schema_resources{{[A-Za-z0-9_]*}} constant* unused_0;
 // METAL: void copyProgram_0(
-// METAL-SAME: rt_TraceProgramDescriptorResources_default_0 constant* thread*
-// METAL-SAME: rt_TraceProgramDescriptorResources_default_0 constant*
-// METAL: void applyProgramSelector_0(
-// METAL-SAME: const rt_TraceProgramDescriptor_default_0 constant*
-// METAL-SAME: const rt_TraceProgramDescriptor_default_0 constant*
-// METAL-SAME: rt_TraceProgramDescriptorResources_default_0 constant* thread*
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant* thread*
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant*
+// METAL: Schema_resources{{[A-Za-z0-9_]*}} constant* chooseProgram_0(
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant*
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant*
+// METAL: Schema_resources{{[A-Za-z0-9_]*}} constant* applyProgramSelector_0(
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant*
+// METAL-SAME: Schema_resources{{[A-Za-z0-9_]*}} constant*
 // METAL: applyProgramSelector_0(
 
 // Higher-order specialization must remove the source `functype` everywhere, including portions
 // of the emitted module outside the ordered `METAL` checks above.
 // NO_FUNCTYPE-NOT: Func<
-// NO_FUNCTYPE: void applyProgramSelector_0(
+// NO_FUNCTYPE: constant* applyProgramSelector_0(
 // NO_FUNCTYPE-NOT: Func<
 
-// AST-to-IR lowering must preserve the checked Schema argument even though the ordinary source
-// storage does not mention it. Metal preparation consumes the wrapper after replacing all of its
+// AST-to-IR lowering must preserve the checked Schema argument on the opaque resource type.
+// Metal preparation replaces that type along with all of its
 // dependent tuple, pointer, function, and user-struct types.
-// PRE: StructuralRayTracingProgramDescriptor
-// IR-NOT: StructuralRayTracingProgramDescriptor
+// PRE: TraceProgramDescriptor
+// IR-NOT: TraceProgramDescriptor(
 // IR-DAG: structFieldLayout(%boundAlternatives{{[0-9]*}}, [[BOUND_TUPLE_VAR_LAYOUT:%[0-9]+]])
 // IR-DAG: [[BOUND_TUPLE_VAR_LAYOUT]]{{.*}}= varLayout([[BOUND_TUPLE_LAYOUT:%[0-9]+]]
 // IR-DAG: [[BOUND_TUPLE_LAYOUT]]{{.*}}= structTypeLayout(
-// IR-DAG: nameHint("rt.TraceProgramDescriptor")
-// IR-NOT: StructuralRayTracingProgramDescriptor
+// IR-DAG: nameHint("Schema.resources")
+// IR-NOT: TraceProgramDescriptor(

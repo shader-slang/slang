@@ -82,10 +82,10 @@ void raygenMain()
 // The selected FirstMiss adapter owns b0. The schema-only SecondMiss adapter begins at the selected
 // binding count and therefore owns b1 in the same compiler-reserved space. Reusing b0 would make
 // DXC reject the combined library because the two registers have different element types.
-// HLSL-DAG: cbuffer record_0 : register(b0, space2)
+// HLSL-DAG: cbuffer record_0 : register(b0, space1)
 // HLSL-DAG: SelectedRecord_0 record_0;
-// HLSL-DAG: cbuffer record_{{[0-9]+}} : register(b1, space2)
+// HLSL-DAG: cbuffer record_{{[0-9]+}} : register(b1, space1)
 // HLSL-DAG: SchemaRecord_0 record_{{[0-9]+}};
 
-// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb0{{.*}}space2
-// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb1{{.*}}space2
+// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb0{{.*}}space1
+// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb1{{.*}}space1

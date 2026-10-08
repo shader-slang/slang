@@ -1029,12 +1029,16 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     SLANG_CHECK_ABORT(shadowMiss != nullptr);
 
     auto radianceClosestHit = radianceHit->getClosestHit();
+    auto radianceAnyHit = radianceHit->getAnyHit();
     auto radianceMissStage = radianceMiss->getMiss();
     auto shadowClosestHit = shadowHit->getClosestHit();
+    auto shadowAnyHit = shadowHit->getAnyHit();
     auto shadowMissStage = shadowMiss->getMiss();
     SLANG_CHECK_ABORT(radianceClosestHit != nullptr);
+    SLANG_CHECK_ABORT(radianceAnyHit != nullptr);
     SLANG_CHECK_ABORT(radianceMissStage != nullptr);
     SLANG_CHECK_ABORT(shadowClosestHit != nullptr);
+    SLANG_CHECK_ABORT(shadowAnyHit != nullptr);
     SLANG_CHECK_ABORT(shadowMissStage != nullptr);
 
     auto radianceHitFunctionIndex = radianceHit->getFunctionIndex();
@@ -1043,30 +1047,40 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     auto shadowMissFunctionIndex = shadowMiss->getFunctionIndex();
     SLANG_CHECK_ABORT(radianceHitFunctionIndex == 0);
     SLANG_CHECK_ABORT(radianceMissFunctionIndex == 0);
-    SLANG_CHECK_ABORT(shadowHitFunctionIndex == 0);
-    SLANG_CHECK_ABORT(shadowMissFunctionIndex == 0);
+    SLANG_CHECK_ABORT(shadowHitFunctionIndex == 1);
+    SLANG_CHECK_ABORT(shadowMissFunctionIndex == 1);
 
     const char* radianceClosestHitLinkedName = radianceClosestHit->getEntryPointName();
+    const char* radianceAnyHitLinkedName = radianceAnyHit->getEntryPointName();
     const char* radianceMissLinkedName = radianceMissStage->getEntryPointName();
     const char* shadowClosestHitLinkedName = shadowClosestHit->getEntryPointName();
+    const char* shadowAnyHitLinkedName = shadowAnyHit->getEntryPointName();
     const char* shadowMissLinkedName = shadowMissStage->getEntryPointName();
     SLANG_CHECK_ABORT(radianceClosestHitLinkedName != nullptr);
+    SLANG_CHECK_ABORT(radianceAnyHitLinkedName != nullptr);
     SLANG_CHECK_ABORT(radianceMissLinkedName != nullptr);
     SLANG_CHECK_ABORT(shadowClosestHitLinkedName != nullptr);
+    SLANG_CHECK_ABORT(shadowAnyHitLinkedName != nullptr);
     SLANG_CHECK_ABORT(shadowMissLinkedName != nullptr);
 
     // Stage lookup consumes the qualified source type name. The linked pipeline and SBT consume
     // the distinct, target-safe entry-point name reported by structural stage reflection.
     ComPtr<ISlangBlob> radianceClosestHitSourceName;
+    ComPtr<ISlangBlob> radianceAnyHitSourceName;
     ComPtr<ISlangBlob> radianceMissSourceName;
     ComPtr<ISlangBlob> shadowClosestHitSourceName;
+    ComPtr<ISlangBlob> shadowAnyHitSourceName;
     ComPtr<ISlangBlob> shadowMissSourceName;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         radianceClosestHit->getType()->getFullName(radianceClosestHitSourceName.writeRef())));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        radianceAnyHit->getType()->getFullName(radianceAnyHitSourceName.writeRef())));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         radianceMissStage->getType()->getFullName(radianceMissSourceName.writeRef())));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         shadowClosestHit->getType()->getFullName(shadowClosestHitSourceName.writeRef())));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(shadowAnyHit->getType()->getFullName(shadowAnyHitSourceName.writeRef())));
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(shadowMissStage->getType()->getFullName(shadowMissSourceName.writeRef())));
     SLANG_CHECK_ABORT(
@@ -1079,12 +1093,18 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
         {static_cast<const char*>(radianceClosestHitSourceName->getBufferPointer()),
          SLANG_STAGE_CLOSEST_HIT,
          radianceClosestHitLinkedName},
+        {static_cast<const char*>(radianceAnyHitSourceName->getBufferPointer()),
+         SLANG_STAGE_ANY_HIT,
+         radianceAnyHitLinkedName},
         {static_cast<const char*>(radianceMissSourceName->getBufferPointer()),
          SLANG_STAGE_MISS,
          radianceMissLinkedName},
         {static_cast<const char*>(shadowClosestHitSourceName->getBufferPointer()),
          SLANG_STAGE_CLOSEST_HIT,
          shadowClosestHitLinkedName},
+        {static_cast<const char*>(shadowAnyHitSourceName->getBufferPointer()),
+         SLANG_STAGE_ANY_HIT,
+         shadowAnyHitLinkedName},
         {static_cast<const char*>(shadowMissSourceName->getBufferPointer()),
          SLANG_STAGE_MISS,
          shadowMissLinkedName},
@@ -1093,23 +1113,25 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     GFX_CHECK_CALL_ABORT(
         loadProgram(device, module, kEntries, SLANG_COUNT_OF(kEntries), program.writeRef()));
 
-    // Both payload partitions start their function indices at zero. Indexing separate host-side
-    // name tables preserves that partition boundary before their hit and miss functions enter the
-    // respective sections of one native SBT.
-    const char* radianceHitGroupNamesByFunctionIndex[1] = {};
-    const char* shadowHitGroupNamesByFunctionIndex[1] = {};
-    const char* radianceMissNamesByFunctionIndex[1] = {};
-    const char* shadowMissNamesByFunctionIndex[1] = {};
-    radianceHitGroupNamesByFunctionIndex[radianceHitFunctionIndex] = "radianceHitFunction0";
-    shadowHitGroupNamesByFunctionIndex[shadowHitFunctionIndex] = "shadowHitFunction0";
-    radianceMissNamesByFunctionIndex[radianceMissFunctionIndex] = radianceMissLinkedName;
-    shadowMissNamesByFunctionIndex[shadowMissFunctionIndex] = shadowMissLinkedName;
+    // Function indices identify programs across the entire section, regardless of payload type.
+    // The native SBT below independently chooses the order of physical records.
+    const char* hitGroupNamesByFunctionIndex[2] = {};
+    const char* missNamesByFunctionIndex[2] = {};
+    hitGroupNamesByFunctionIndex[radianceHitFunctionIndex] = "radianceHitFunction";
+    hitGroupNamesByFunctionIndex[shadowHitFunctionIndex] = "shadowHitFunction";
+    missNamesByFunctionIndex[radianceMissFunctionIndex] = radianceMissLinkedName;
+    missNamesByFunctionIndex[shadowMissFunctionIndex] = shadowMissLinkedName;
 
     HitGroupDesc hitGroups[2] = {};
-    hitGroups[0].hitGroupName = radianceHitGroupNamesByFunctionIndex[radianceHitFunctionIndex];
+    // The shader requires both candidate-stage writes and committed-hit writes. Register the
+    // reflected any-hit exports explicitly: declaring them in the schema does not populate the
+    // host-owned native hit groups automatically.
+    hitGroups[0].hitGroupName = hitGroupNamesByFunctionIndex[radianceHitFunctionIndex];
     hitGroups[0].closestHitEntryPoint = radianceClosestHitLinkedName;
-    hitGroups[1].hitGroupName = shadowHitGroupNamesByFunctionIndex[shadowHitFunctionIndex];
+    hitGroups[0].anyHitEntryPoint = radianceAnyHitLinkedName;
+    hitGroups[1].hitGroupName = hitGroupNamesByFunctionIndex[shadowHitFunctionIndex];
     hitGroups[1].closestHitEntryPoint = shadowClosestHitLinkedName;
+    hitGroups[1].anyHitEntryPoint = shadowAnyHitLinkedName;
 
     RayTracingPipelineDesc pipelineDesc = {};
     pipelineDesc.program = program;
@@ -1125,12 +1147,12 @@ void runStructuralRayTracingMultiplePayloads(IDevice* device)
     // Deliberately reverse the payload order in the physical SBT. The shader's runtime selectors
     // use record zero for shadow rays and record one for radiance rays.
     const char* kHitGroupNames[] = {
-        shadowHitGroupNamesByFunctionIndex[shadowHitFunctionIndex],
-        radianceHitGroupNamesByFunctionIndex[radianceHitFunctionIndex],
+        hitGroupNamesByFunctionIndex[shadowHitFunctionIndex],
+        hitGroupNamesByFunctionIndex[radianceHitFunctionIndex],
     };
     const char* kMissNames[] = {
-        shadowMissNamesByFunctionIndex[shadowMissFunctionIndex],
-        radianceMissNamesByFunctionIndex[radianceMissFunctionIndex],
+        missNamesByFunctionIndex[shadowMissFunctionIndex],
+        missNamesByFunctionIndex[radianceMissFunctionIndex],
     };
 
     ShaderTableDesc shaderTableDesc = {};

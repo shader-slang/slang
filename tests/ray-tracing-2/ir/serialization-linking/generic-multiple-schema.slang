@@ -19,8 +19,8 @@ void traceValue<T>(
     inout GenericPayload<T> payload)
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     rt::RayTracer<GenericSchema<T>> tracer;
@@ -48,8 +48,8 @@ void mainFloat()
 void mainBoth()
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     GenericPayload<uint> uintPayload = {1};
@@ -73,23 +73,23 @@ void mainBoth()
 // The descriptor-bearing generic helper comes from the serialized module. Its emitted Metal
 // signature proves that linking retained the schema operand until the consumer selected the
 // schema-specific physical descriptor.
-// METAL: struct rt_TraceProgramDescriptorResources_default_0
+// METAL: struct [[UINT_RESOURCES:GenericSchema_Sh[0-9A-Fa-f]+_resources[A-Za-z0-9_]*]]
 // METAL: metal::raytracing::intersection_function_table<metal::raytracing::instancing> intersectionFunctions_0;
-// METAL: void preserveProgram_0(rt_TraceProgramDescriptorResources_default_0 constant* thread*
+// METAL: [[UINT_RESOURCES]] constant* preserveProgram_0(
 // METAL: preserveProgram_0(
 // METAL: void mainUint(
 
 // Compiling both specializations on Metal proves the
 // serialized helper retained enough schema identity to receive two distinct physical descriptor
 // types, even though those types have the same source storage shape.
-// METAL_BOTH-DAG: struct rt_TraceProgramDescriptorResources_default_0
-// METAL_BOTH-DAG: struct rt_TraceProgramDescriptorResources_default_1
-// METAL_BOTH-DAG: void preserveProgram_{{[0-9]+}}(rt_TraceProgramDescriptorResources_default_0 constant* thread*
-// METAL_BOTH-DAG: void preserveProgram_{{[0-9]+}}(rt_TraceProgramDescriptorResources_default_1 constant* thread*
-// BOTH_IR: StructuralRayTracingProgramDescriptor
-// BOTH_IR: StructuralRayTracingProgramDescriptor
+// METAL_BOTH-DAG: struct [[UINT_RESOURCES:GenericSchema_Sh[0-9A-Fa-f]+_resources[A-Za-z0-9_]*]]
+// METAL_BOTH-DAG: struct [[FLOAT_RESOURCES:GenericSchema_Sh[0-9A-Fa-f]+_resources[A-Za-z0-9_]*]]
+// METAL_BOTH-DAG: [[UINT_RESOURCES]] constant* preserveProgram_{{[0-9]+}}(
+// METAL_BOTH-DAG: [[FLOAT_RESOURCES]] constant* preserveProgram_{{[0-9]+}}(
+// BOTH_IR: TraceProgramDescriptor
+// BOTH_IR: TraceProgramDescriptor
 
 // The leading and trailing checks cover wrappers emitted before and after the selected function.
-// LOWERED_IR-NOT: StructuralRayTracingProgramDescriptor(
+// LOWERED_IR-NOT: TraceProgramDescriptor(
 // LOWERED_IR: func %mainBoth
-// LOWERED_IR-NOT: StructuralRayTracingProgramDescriptor(
+// LOWERED_IR-NOT: TraceProgramDescriptor(

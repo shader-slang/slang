@@ -145,10 +145,10 @@ void rayGenerationMain()
     uint physicalRecordIndex = rayIndex & 1;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex < 2 ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = rayIndex < 2 ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     // The host deliberately places the same reflected hit and miss functions in two physical SBT
@@ -177,8 +177,8 @@ void rayGenerationMain()
 // SPIRV-DAG: OpEntryPoint AnyHitKHR {{.*}} "RuntimeAnyHit"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "AlternateMiss"
-// METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar device*)> missFunctions_0;
-// METAL-DAG: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar device*)> closestHitFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(void thread*, uchar device*)> missFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(void thread*, uchar device*)> closestHitFunctions_0;
 // METAL: _slang_miss_record = {{.*}}missIndex_0 * int(32)
 // METAL: _slang_miss_function_index = *((device uint*)_slang_miss_record)
 // METAL: if (_slang_miss_function_index != 0xffffffffU)

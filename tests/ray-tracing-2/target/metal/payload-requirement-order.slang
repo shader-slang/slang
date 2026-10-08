@@ -42,7 +42,7 @@ struct AnyHitA : rt::IAnyHitShader
 
     void invoke(rt::AnyHitInput<Context> input)
     {
-        input.payload.value = input.triangle.frontFacing ? 1 : 0;
+        input.payload.value = input.attributes.frontFacing ? 1 : 0;
     }
 }
 
@@ -117,12 +117,10 @@ void main()
 // payload's descriptor or tag requirements.
 // FORWARD-DAG: struct Schema_payload0_rayData_0
 // FORWARD-DAG: struct Schema_payload1_rayData_0
-// FORWARD-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::max_levels<3>> intersectionFunctions0_0;
-// FORWARD-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::max_levels<3>> intersectionFunctions1_0;
+// FORWARD-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::max_levels<3>> intersectionFunctions_0;
 // REVERSE-DAG: struct Schema_payload0_rayData_0
 // REVERSE-DAG: struct Schema_payload1_rayData_0
-// REVERSE-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::max_levels<3>> intersectionFunctions0_0;
-// REVERSE-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::max_levels<3>> intersectionFunctions1_0;
+// REVERSE-DAG: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::max_levels<3>> intersectionFunctions_0;
 
 // The array-ref type and trie lookup depend only on Metal's native instance-path ABI, not on a
 // payload or schema. Count their semantic decorations before emission, avoiding generated numeric

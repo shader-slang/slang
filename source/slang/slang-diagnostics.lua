@@ -4572,13 +4572,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-callable-stage-mismatch",
-    38063,
-    "callable dispatch is not available from this ray-tracing stage",
-    span { loc = "location", message = "'callShader' cannot be reached from structural ~stage logic" }
-)
-
-err(
     "invalid-structural-ray-tracing-max-level-count",
     38064,
     "invalid structural ray-tracing acceleration-structure depth",
@@ -4728,20 +4721,6 @@ err(
 )
 
 err(
-    "structural-ray-tracing-open-tag-not-entry-interface",
-    38083,
-    "invalid structural ray-tracing open-section tag",
-    span { loc = "location", message = "open ~section tag '~tag:Type' must be an interface inheriting '~entryInterface:String'" }
-)
-
-err(
-    "structural-ray-tracing-linked-empty-payload-not-found",
-    38084,
-    "linked structural ray-tracing schema has no empty payload",
-    span { loc = "location", message = "schema '~schemaType:IRInst' has no concrete empty payload served by a hit group or miss shader after its open sections are linked" }
-)
-
-err(
     "structural-ray-tracing-linked-ambiguous-empty-payload",
     38085,
     "linked structural ray-tracing schema has multiple empty payloads",
@@ -4760,13 +4739,6 @@ err(
     38087,
     "duplicate structural ray-tracing entry",
     span { loc = "location", message = "~section entry '~entry:IRInst' is listed more than once in schema '~schema:IRInst'" }
-)
-
-err(
-    "structural-ray-tracing-open-tag-not-entry-interface-ir",
-    38088,
-    "invalid structural ray-tracing open-section tag",
-    span { loc = "location", message = "open ~section tag '~tag:IRInst' must be an interface inheriting '~entryInterface:String'" }
 )
 
 err(

@@ -68,6 +68,30 @@ struct ShadowMissContext : rt::IPayloadContext
 // host obtains both through reflection and uses each name for its intended purpose.
 namespace Stages
 {
+    // Metal shares one triangle dispatcher across these differently sized payloads. Write through
+    // both candidate adapters so the test checks typed ray_data copyback as well as VFT dispatch.
+    struct RadianceAnyHit : rt::IAnyHitShader
+    {
+        typealias Context = RadianceHitContext;
+
+        void invoke(rt::AnyHitInput<Context> input)
+        {
+            input.payload.radiance = 61;
+            for (uint i = 0; i < 7; ++i)
+                input.payload.padding[i] = 3 * (i + 1);
+        }
+    }
+
+    struct ShadowAnyHit : rt::IAnyHitShader
+    {
+        typealias Context = ShadowHitContext;
+
+        void invoke(rt::AnyHitInput<Context> input)
+        {
+            input.payload.visibility = input.attributes.barycentricCoord.x > 0 ? 1 : 0;
+        }
+    }
+
     struct RadianceClosestHit : rt::IClosestHitShader
     {
         typealias Context = RadianceHitContext;
@@ -75,10 +99,10 @@ namespace Stages
         void invoke(rt::ClosestHitInput<Context> input)
         {
             input.payload.stage = 10;
-            input.payload.radiance = 101;
+            input.payload.radiance += 40;
             input.payload.bounce = 1;
             for (uint i = 0; i < 7; ++i)
-                input.payload.padding[i] += 10 * (i + 1);
+                input.payload.padding[i] += 8 * (i + 1);
         }
     }
 
@@ -89,7 +113,7 @@ namespace Stages
         void invoke(rt::ClosestHitInput<Context> input)
         {
             input.payload.stage = 20;
-            input.payload.visibility = 1;
+            // Keep the visibility written by the shadow candidate; losing copyback must fail.
         }
     }
 
@@ -123,7 +147,7 @@ struct RadianceHitGroup : rt::IHitGroup
 {
     typealias Context = RadianceHitContext;
     typealias ClosestHit = Stages.RadianceClosestHit;
-    typealias AnyHit = rt::NoAnyHit<Context>;
+    typealias AnyHit = Stages.RadianceAnyHit;
     typealias Intersection = rt::NoIntersection<Context>;
 }
 
@@ -131,7 +155,7 @@ struct ShadowHitGroup : rt::IHitGroup
 {
     typealias Context = ShadowHitContext;
     typealias ClosestHit = Stages.ShadowClosestHit;
-    typealias AnyHit = rt::NoAnyHit<Context>;
+    typealias AnyHit = Stages.ShadowAnyHit;
     typealias Intersection = rt::NoIntersection<Context>;
 }
 
@@ -156,11 +180,12 @@ void rayGenerationMain()
     bool hitsTriangle = rayIndex < 2;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = hitsTriangle ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
-    desc.rayFlags = RAY_FLAG_NONE;
+    desc.ray.Origin = hitsTriangle ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
+    // Candidate adapters must run even when the host's shared triangle scene is marked opaque.
+    desc.rayFlags = RAY_FLAG_FORCE_NON_OPAQUE;
     desc.instanceMask = 0xff;
 
     // The host puts the shadow records before the radiance records. These runtime selectors bind

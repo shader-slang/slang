@@ -479,6 +479,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     {
         translationUnitSyntax->modifiers.first = astBuilder->create<FromCoreModuleModifier>();
     }
+    else if (m_isSlangRayTracingModuleCode)
+    {
+        // Keep this authority narrower than `FromCoreModuleModifier`: the separately compiled
+        // module may declare its opaque descriptor AST type, but receives no other core-only
+        // behavior.
+        translationUnitSyntax->modifiers.first =
+            astBuilder->create<FromSlangRayTracingModuleModifier>();
+    }
 
     // We use a custom handler for preprocessor callbacks, to
     // ensure that relevant state that is only visible during

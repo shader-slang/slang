@@ -74,10 +74,10 @@ RWStructuredBuffer<uint> output;
 void main()
 {
     rt::RayTraversalDesc desc;
-    desc.ray.origin = float3(0.0, 0.0, 0.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 1000.0;
+    desc.ray.Origin = float3(0.0, 0.0, 0.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 1000.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;
@@ -90,11 +90,11 @@ void main()
     output[0] = payload.value;
 }
 
+// METAL: struct Schema_resources{{.*}}
+// METAL: metal::visible_function_table<void(void thread*)> missFunctions_0;
+// METAL: metal::visible_function_table<void(void thread*)> closestHitFunctions_0;
 // METAL: struct Schema_rayData_0
 // METAL: TestPayload_0 payload_{{[0-9]+}};
-// METAL: struct rt_TraceProgramDescriptorResources_default_0
-// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*)> missFunctions_0;
-// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*)> closestHitFunctions_0;
 // METAL: {{\[\[kernel\]\]}} void main_0(
 // METAL: thread Schema_rayData_0 [[RAY_DATA:rayData_[0-9]+]];
 // METAL: metal::raytracing::intersector<metal::raytracing::instancing> _slang_intersector;
@@ -109,7 +109,7 @@ void main()
 // METAL: _slang_hit_record = {{.*}}_slang_hit_record_index * int(16)
 // METAL: _slang_hit_function_index = *((device uint*)_slang_hit_record)
 // METAL: [_slang_hit_function_index](&rayData_{{[0-9]+}});
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
-// METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;
-// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
-// METAL: (&[[HIT_DATA]]->payload_{{[0-9]+}})->value_0 = 1U;
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread* [[MISS_DATA:rayData_[0-9]+]])
+// METAL: [[MISS_DATA]]{{.*}})->payload_{{[0-9]+}})->value_0 = 2U;
+// METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread* [[HIT_DATA:rayData_[0-9]+]])
+// METAL: [[HIT_DATA]]{{.*}})->payload_{{[0-9]+}})->value_0 = 1U;

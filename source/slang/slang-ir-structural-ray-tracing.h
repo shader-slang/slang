@@ -39,10 +39,9 @@ bool isCompilerOwnedStructuralRayTracingIROp(IROp op);
 
 /// Lowers every schema-carrying program-descriptor type in `module`.
 ///
-/// A schema found in `targetTypesBySchema` maps to its target-specific descriptor type. Every
-/// other descriptor maps to `fallbackType` when it is non-null, or back to its ordinary source
-/// storage representation otherwise. The explicit fallback lets a target erase descriptors that
-/// have no physical runtime representation while Metal can retain unspecialized source templates.
+/// A schema found in `targetTypesBySchema` maps to its target-specific descriptor type. Other
+/// descriptors map to a non-null `fallbackType`, or remain opaque when no fallback is supplied.
+/// Native SBT targets explicitly erase the handle; Metal supplies the physical argument buffer.
 void lowerStructuralRayTracingProgramDescriptorTypes(
     IRModule* module,
     const Dictionary<IRType*, IRType*>& targetTypesBySchema,
@@ -135,21 +134,7 @@ bool identifyStructuralRayTracingStageInterfaces(
     const StructuralRayTracingDeclRegistry& registry,
     StructuralRayTracingStageKind* outMissingStage = nullptr);
 
-/// Completes every reachable open schema operation from retained linked conformance tables.
-///
-/// The linker calls this after ordinary IR specialization and before payload-location assignment
-/// or target synthesis. Listed metadata remains in source order; matching linked entries are
-/// deduplicated by their canonical semantic type identity, sorted by qualified source name, and
-/// appended with dense indices. Returns false after emitting any invalid-tag diagnostic.
-bool completeOpenStructuralRayTracingSchemas(IRModule* module, DiagnosticSink* sink);
-
-/// Finalizes the empty-payload contract after open schema sections have been completed.
-///
-/// A finalized schema may serve at most one semantic empty-payload type, regardless of which trace
-/// overload happens to activate it. After checking that schema-wide invariant, this operation
-/// resolves implicit-empty-payload traces from their producer-owned deferred records and final
-/// linked entries. It never reconstructs an AST overload or interprets a generic/function
-/// signature by position.
+/// Validates that each specialized schema serves at most one semantically empty payload type.
 bool finalizeStructuralRayTracingSchemaPayloads(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

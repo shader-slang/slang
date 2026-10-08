@@ -32,7 +32,7 @@ struct HitContext : rt::IHitContext
 
 void applyClosestHitTriangleData(rt::ClosestHitInput<HitContext> input)
 {
-    let triangle = input.triangle;
+    let triangle = input.attributes;
     input.payload.value = triangle.barycentricCoord.x + (triangle.frontFacing ? 1.0 : 0.0);
 }
 
@@ -61,7 +61,7 @@ struct ClosestHit : rt::IClosestHitShader
 
 void applyAnyHitTriangleData(rt::AnyHitInput<HitContext> input)
 {
-    let triangle = input.triangle;
+    let triangle = input.attributes;
     input.payload.value = triangle.barycentricCoord.y + (triangle.frontFacing ? 2.0 : 0.0);
 }
 

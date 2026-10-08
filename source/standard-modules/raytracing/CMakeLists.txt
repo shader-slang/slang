@@ -54,7 +54,7 @@ set(RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS
 add_custom_command(
     OUTPUT ${raytracing_module_file}
     COMMAND
-        ${RAYTRACING_SLANG_COMPILER}
+        ${RAYTRACING_SLANG_COMPILER} -compile-slang-raytracing-module
         ${RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS} -I
         ${CMAKE_CURRENT_SOURCE_DIR} raytracing.slang -o raytracing.slang-module
     DEPENDS

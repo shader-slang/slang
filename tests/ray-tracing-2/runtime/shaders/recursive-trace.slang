@@ -14,7 +14,7 @@
 // SPIRV-COUNT-2: OpTraceRayKHR
 // SPIRV_CLOSEST: OpEntryPoint ClosestHitKHR {{.*}} "main"
 // SPIRV_CLOSEST: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
-// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(void thread*, uchar thread*)> closestHitFunctions_0;
 // METAL: .intersect(
 // METAL: (thread uchar*)kernelContext
 // METAL: .intersect(
@@ -112,10 +112,10 @@ RWStructuredBuffer<RuntimeResult> results;
 rt::RayTraversalDesc makeTraceDesc(float3 origin)
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = origin;
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = origin;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;

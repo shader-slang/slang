@@ -88,11 +88,11 @@ struct Intersection : rt::IIntersectionShader
     {
         let ray = input.objectSpaceRay;
         CustomAttributes attributes;
-        attributes.value = ray.origin.x + ray.direction.x + input.worldSpaceOrigin.x +
+        attributes.value = ray.Origin.x + ray.Direction.x + input.worldSpaceOrigin.x +
                            input.worldSpaceDirection.x + float(input.primitiveIndex) +
                            float(input.geometryIndex);
-        if (!input.reportHit(ray.tMin, attributes))
-            input.reportHit(ray.tMax, 1, attributes);
+        if (!input.reportHit(ray.TMin, attributes))
+            input.reportHit(ray.TMax, 1, attributes);
     }
 }
 

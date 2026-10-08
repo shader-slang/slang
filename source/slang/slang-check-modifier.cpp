@@ -13,6 +13,53 @@
 
 namespace Slang
 {
+
+// Returns whether `decl` is the opaque descriptor declaration being compiled under the dedicated
+// ray-tracing-standard-module build authority. Unlike core-module magic types, this declaration is
+// built after loading core and deliberately receives none of core's other back doors.
+//
+// Requiring the compiler-created module marker is important: a user module named `raytracing` (even
+// one that copies the `rt::TraceProgramDescriptor` declaration) must not acquire a magic AST type.
+// The packaged-module load path remains the separate trust boundary that registers the exact
+// declaration for source-level structural semantics.
+static bool _isRayTracingDescriptorDeclUnderBuildAuthority(Decl* decl)
+{
+    auto typeDecl = as<AggTypeDecl>(decl);
+    if (!typeDecl || !decl->getName() || decl->getName()->text != "TraceProgramDescriptor")
+    {
+        return false;
+    }
+
+    // The generic struct is nested under its `GenericDecl`; the namespace is the generic's parent.
+    auto lexicalParent = decl->parentDecl;
+    auto genericDecl = as<GenericDecl>(lexicalParent);
+    if (!genericDecl || genericDecl->inner != decl ||
+        genericDecl->getDirectMemberDeclsOfType<GenericTypeParamDecl>().getCount() != 1 ||
+        genericDecl->getDirectMemberDeclsOfType<GenericTypePackParamDecl>().getCount() != 0 ||
+        genericDecl->getDirectMemberDeclsOfType<GenericValueParamDecl>().getCount() != 0 ||
+        genericDecl->getDirectMemberDeclsOfType<GenericValuePackParamDecl>().getCount() != 0 ||
+        genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>().getCount() != 1)
+    {
+        return false;
+    }
+    lexicalParent = genericDecl->parentDecl;
+    auto namespaceDecl = as<NamespaceDecl>(lexicalParent);
+    auto moduleDecl = getModuleDecl(decl);
+    return namespaceDecl && namespaceDecl->getName() && namespaceDecl->getName()->text == "rt" &&
+           moduleDecl && moduleDecl->getName() && moduleDecl->getName()->text == "raytracing" &&
+           moduleDecl->hasModifier<FromSlangRayTracingModuleModifier>();
+}
+
+// Returns whether the current magic-type modifier grants the descriptor's one authorized AST
+// identity. Checking the current modifier, rather than only the declaration, prevents a valid
+// descriptor marker from authorizing a second unrelated magic type on the same declaration.
+static bool _isAuthorizedRayTracingDescriptorMagicTypeDecl(Decl* decl, MagicTypeModifier* modifier)
+{
+    return modifier &&
+           modifier->magicNodeType.getTag() == ASTNodeType::TraceProgramDescriptorType &&
+           _isRayTracingDescriptorDeclUnderBuildAuthority(decl);
+}
+
 IntVal* SemanticsVisitor::checkLinkTimeConstantIntVal(Expr* expr)
 {
     expr = CheckExpr(expr);
@@ -1956,15 +2003,37 @@ Modifier* SemanticsVisitor::checkModifier(
         // These modifiers bind a declaration to compiler-internal type / requirement
         // registration and are valid only in the core module; drop them on a user declaration
         // here at `ModifiersChecked`, before any `Type` for the declaration can be formed, so no
-        // downstream consumer sees them. (`__intrinsic_type` is not in this set: it only records
-        // an IR opcode and is valid user syntax.)
-        if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
+        // downstream consumer sees them. Most `__intrinsic_type` uses remain valid user syntax;
+        // the descriptor opcode receives a separate exact-declaration check below.
+        auto magicTypeModifier = as<MagicTypeModifier>(m);
+        if ((magicTypeModifier || as<BuiltinTypeModifier>(m) ||
              as<BuiltinRequirementModifier>(m)) &&
-            !isFromCoreModule(decl))
+            !isFromCoreModule(decl) &&
+            !_isAuthorizedRayTracingDescriptorMagicTypeDecl(decl, magicTypeModifier))
         {
             if (!ignoreUnallowedModifier)
                 getSink()->diagnose(Diagnostics::BuiltinOnlyModifierOnNonCoreDecl{.modifier = m});
             return nullptr;
+        }
+
+        // The parser-level gate prevents ordinary source from naming this opcode. Also validate
+        // the declaration while the internal module-build option is active, so that option cannot
+        // attach the descriptor IR identity to an unrelated type.
+        if (auto intrinsicTypeModifier = as<IntrinsicTypeModifier>(m))
+        {
+            if (intrinsicTypeModifier->irOp == kIROp_TraceProgramDescriptorType &&
+                !_isAuthorizedRayTracingDescriptorMagicTypeDecl(
+                    decl,
+                    decl->findModifier<MagicTypeModifier>()))
+            {
+                if (!ignoreUnallowedModifier)
+                {
+                    getSink()->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
+                        .operation = intrinsicTypeModifier->opToken.getContent(),
+                        .location = intrinsicTypeModifier->opToken.loc});
+                }
+                return nullptr;
+            }
         }
 
         bool isGLSLInput = getShared()->isGLSLSourceLanguage();

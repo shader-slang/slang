@@ -64,8 +64,8 @@ rt::TraceProgramDescriptor<Schema> program;
 void main()
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     RuntimePayload payload = { rayGenerationOnly[0] };
@@ -85,4 +85,4 @@ void main()
 
 // The schema has no bounding-box candidate logic, so its reject-all table entry needs no buffer.
 // METAL-LABEL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing){{\]\]}}
-// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload{{\]\]}})
+// METAL-SAME: ray_data StructuralRayDataHeader_0& rayData_{{[0-9]+}} {{\[\[}}payload{{\]\]}})

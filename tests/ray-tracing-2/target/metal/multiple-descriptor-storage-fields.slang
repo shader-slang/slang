@@ -87,21 +87,18 @@ void main()
 
 // Both descriptor fields use the same schema-specific nominal type in generated Metal.
 // METAL-LABEL: struct FrameParameters_default_0
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 firstProgram_0;
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 secondProgram_0;
+// METAL-DAG: Schema_resources{{.*}} constant* firstProgram_0;
+// METAL-DAG: Schema_resources{{.*}} constant* secondProgram_0;
 
 // More importantly, both outer field layouts must point at the same physical descriptor layout.
-// Schema has two payloads, so that physical layout contains eight argument-buffer resources rather
-// than the five source placeholders. Before the regression fix only the first field was rebuilt;
-// the second field's var layout still pointed at the five-resource source descriptor layout.
+// Both must be rewritten from the opaque source handle to the same parameter-group layout,
+// including the complete five-resource element layout. Rewriting only the first field would leave
+// the second field pointing at an opaque layout that does not describe those resources.
 // IR-DAG: [[FIRST_FIELD_LAYOUT:%[0-9]+]]{{.*}}= structFieldLayout(%firstProgram{{[0-9]*}}, [[FIRST_VAR_LAYOUT:%[0-9]+]])
 // IR-DAG: [[SECOND_FIELD_LAYOUT:%[0-9]+]]{{.*}}= structFieldLayout(%secondProgram{{[0-9]*}}, [[SECOND_VAR_LAYOUT:%[0-9]+]])
 // IR-DAG: [[FIRST_VAR_LAYOUT]]{{.*}}= varLayout([[PHYSICAL_DESCRIPTOR_LAYOUT:%[0-9]+]]
 // IR-DAG: [[SECOND_VAR_LAYOUT]]{{.*}}= varLayout([[PHYSICAL_DESCRIPTOR_LAYOUT]]
-// IR-DAG: [[PHYSICAL_DESCRIPTOR_LAYOUT]]{{.*}}= structTypeLayout({{[^,]+}}, [[RESOURCES_FIELD_LAYOUT:%[0-9]+]])
-// IR-DAG: [[RESOURCES_FIELD_LAYOUT]]{{.*}}= structFieldLayout(%resources{{[0-9]*}}, [[RESOURCES_VAR_LAYOUT:%[0-9]+]])
-// IR-DAG: [[RESOURCES_VAR_LAYOUT]]{{.*}}= varLayout([[PARAMETER_GROUP_LAYOUT:%[0-9]+]]
-// IR-DAG: [[PARAMETER_GROUP_LAYOUT]]{{.*}}= parameterGroupTypeLayout({{[^,]+}}, [[ELEMENT_VAR_LAYOUT:%[0-9]+]], [[PHYSICAL_RESOURCES_LAYOUT:%[0-9]+]])
+// IR-DAG: [[PHYSICAL_DESCRIPTOR_LAYOUT]]{{.*}}= parameterGroupTypeLayout({{[^,]+}}, [[ELEMENT_VAR_LAYOUT:%[0-9]+]], [[PHYSICAL_RESOURCES_LAYOUT:%[0-9]+]],
 // IR-DAG: [[ELEMENT_VAR_LAYOUT]]{{.*}}= varLayout([[PHYSICAL_RESOURCES_LAYOUT]]
 // IR-DAG: [[PHYSICAL_RESOURCES_LAYOUT]]{{.*}}= structTypeLayout([[ARGUMENT_BUFFER_SIZE:%[0-9]+]]
-// IR-DAG: [[ARGUMENT_BUFFER_SIZE]]{{.*}}= size(22 : Int, 8 : Int)
+// IR-DAG: [[ARGUMENT_BUFFER_SIZE]]{{.*}}= size(22 : Int, 5 : Int)

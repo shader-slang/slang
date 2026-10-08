@@ -672,8 +672,6 @@ bool validateStructuralRayTracingSchemaOperation(IRInst* operation, DiagnosticSi
             auto payloadPointerType =
                 as<IRPtrTypeBase>(traceOperation->getPayload()->getDataType());
             SLANG_RELEASE_ASSERT(
-                !traceOperation
-                     ->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>() &&
                 !as<IRVoidLit>(traceOperation->getFallback()) &&
                 !as<IRVoidType>(traceOperation->getPayloadType()) &&
                 isSemanticallyEmptyStructuralRayTracingPayloadType(
@@ -1397,10 +1395,74 @@ static void _collectStructuralEntryPoints(IRModule* module, List<IRFunc*>& entry
     }
 }
 
+void lowerBuiltinStructuralRayTracingHitAttributeViews(IRModule* module)
+{
+    // Consider `input.attributes.barycentricCoord` in a generic closest-hit helper. Source
+    // checking cannot decide whether `Context.Primitive.Attributes` is a builtin view until the
+    // context specializes. Entry-point and schema metadata retain the primitive classification
+    // and its exact attribute type, so consume that metadata here rather than interpreting a
+    // user field name such as `barycentricCoord` as a builtin.
+    //
+    // `TriangleData` and `CurveData` have no storage: their property getters already carry the
+    // operations that read the native hit. Constructing the empty view does not load an attribute
+    // block or add a second native parameter beside the actual barycentrics. A procedural
+    // application's attribute struct remains a transported value with ordinary field access.
+    HashSet<IRType*> builtinViewTypes;
+    List<IRFunc*> entryPoints;
+    _collectStructuralEntryPoints(module, entryPoints);
+    for (auto entryPoint : entryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto kind = StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue());
+        if (kind == StructuralRayTracingHitAttributesKind::Triangle ||
+            kind == StructuralRayTracingHitAttributesKind::Curve)
+        {
+            builtinViewTypes.add(info->getHitAttributesType());
+        }
+    }
+
+    List<IRInst*> programOperations;
+    _collectProgramOperations(module->getModuleInst(), programOperations);
+    for (auto operation : programOperations)
+    {
+        for (auto decoration : operation->getDecorations())
+        {
+            auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
+            if (!group)
+                continue;
+            auto kind =
+                StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue());
+            if (kind == StructuralRayTracingHitAttributesKind::Triangle ||
+                kind == StructuralRayTracingHitAttributesKind::Curve)
+            {
+                builtinViewTypes.add(group->getHitAttributesType());
+            }
+        }
+    }
+
+    List<IRInst*> operations;
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    IRBuilder builder(module);
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetHitAttributes ||
+            !builtinViewTypes.contains(operation->getDataType()))
+        {
+            continue;
+        }
+        auto viewType = as<IRStructType>(operation->getDataType());
+        SLANG_RELEASE_ASSERT(viewType && !viewType->getFields().getFirst());
+        builder.setInsertBefore(operation);
+        operation->replaceUsesWith(builder.emitMakeStruct(viewType, 0, nullptr));
+        operation->removeAndDeallocate();
+    }
+}
+
 void lowerMetalStructuralRayTracingStageInputOperations(
     IRModule* module,
     const Dictionary<IRFunc*, IRInst*>& entryPointPayloadValues)
 {
+    lowerBuiltinStructuralRayTracingHitAttributeViews(module);
     List<IRInst*> operations;
     _collectStageInputOperations(module->getModuleInst(), operations);
     List<IRFunc*> structuralEntryPoints;
@@ -1588,9 +1650,86 @@ void lowerMetalStructuralRayTracingStageInputOperations(
     for (auto operation : loweredOperations)
         operation->removeAndDeallocate();
 
+    loweredOperations.clear();
     operations.clear();
     _collectStageInputOperations(module->getModuleInst(), operations);
     IRBuilder builder(module);
+    // A separately selected Metal stage is an ordinary helper, not a native entry point. Its
+    // caller must supply the native state explicitly. For example, two reads of `worldSpaceOrigin`
+    // in a closest-hit helper use one float3 parameter; reading `getInstanceID(level)` instead
+    // needs the complete ID array because `level` can change each time the helper is called.
+    // Generated visible/intersection adapters have already consumed these reads above. Threading
+    // only the remaining source-helper reads therefore cannot invent a native Metal parameter or
+    // replace state with a library placeholder.
+    HashSet<IROp> threadedKinds;
+    for (auto operation : operations)
+    {
+        auto op = operation->getOp();
+        switch (op)
+        {
+        case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
+        case kIROp_StructuralRayTracingGetTriangleFrontFacing:
+        case kIROp_StructuralRayTracingGetCurveParameter:
+        case kIROp_StructuralRayTracingGetRayTMin:
+        case kIROp_StructuralRayTracingGetRayTCurrent:
+        case kIROp_StructuralRayTracingGetRayTime:
+        case kIROp_StructuralRayTracingGetRayFlags:
+        case kIROp_StructuralRayTracingGetHitKind:
+        case kIROp_StructuralRayTracingGetWorldRayOrigin:
+        case kIROp_StructuralRayTracingGetWorldRayDirection:
+        case kIROp_StructuralRayTracingGetObjectSpaceRay:
+        case kIROp_StructuralRayTracingGetPrimitiveIndex:
+        case kIROp_StructuralRayTracingGetGeometryIndex:
+        case kIROp_StructuralRayTracingGetInstanceIndex:
+        case kIROp_StructuralRayTracingGetInstanceID:
+        case kIROp_StructuralRayTracingGetInstanceCount:
+        case kIROp_StructuralRayTracingGetInstanceIndexAtLevel:
+        case kIROp_StructuralRayTracingGetInstanceIDAtLevel:
+        case kIROp_StructuralRayTracingGetObjectToWorld:
+        case kIROp_StructuralRayTracingGetWorldToObject:
+        case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+        case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+            break;
+        default:
+            continue;
+        }
+        if (!threadedKinds.add(op))
+            continue;
+        bool readsPath = op == kIROp_StructuralRayTracingGetInstanceIndexAtLevel ||
+                         op == kIROp_StructuralRayTracingGetInstanceIDAtLevel;
+        auto parameterType =
+            readsPath ? builder.getPtrType(builder.getUIntType(), AddressSpace::ThreadLocal)
+                      : operation->getDataType();
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            parameterType,
+            LayoutResourceKind::VaryingInput,
+            getIROpInfo(op).name,
+            nullptr,
+            false,
+            false);
+        for (auto candidate : operations)
+        {
+            if (candidate->getOp() != op)
+                continue;
+            auto parameter = threader.findOrCreateParameter(candidate);
+            IRInst* value = parameter;
+            if (readsPath)
+            {
+                SLANG_RELEASE_ASSERT(candidate->getOperandCount() == 3);
+                builder.setInsertBefore(candidate);
+                value =
+                    builder.emitLoad(builder.emitGetOffsetPtr(parameter, candidate->getOperand(2)));
+            }
+            candidate->replaceUsesWith(value);
+            loweredOperations.add(candidate);
+        }
+    }
+    for (auto operation : loweredOperations)
+        operation->removeAndDeallocate();
+    loweredOperations.clear();
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
     for (auto operation : operations)
     {
         auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
@@ -1825,6 +1964,7 @@ void lowerPortableStructuralRayTracingStageInputOperations(
     const HashSet<IRFunc*>& selectedStructuralEntryPointAdapters)
 {
     SLANG_RELEASE_ASSERT(targetProgram);
+    lowerBuiltinStructuralRayTracingHitAttributeViews(module);
     auto targetRequest = targetProgram->getTargetReq();
     auto programLayout = targetProgram->getExistingLayout();
     SLANG_RELEASE_ASSERT(programLayout);
@@ -2408,9 +2548,6 @@ void lowerPortableStructuralRayTracingOperations(IRModule* module, TargetRequest
         IRInst* call = nullptr;
         if (auto traceOperation = as<IRStructuralRayTracingTrace>(operation))
         {
-            SLANG_RELEASE_ASSERT(
-                !traceOperation
-                     ->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>());
             call = _emitStructuralRayTracingFallbackCall(
                 builder,
                 traceOperation->getDataType(),

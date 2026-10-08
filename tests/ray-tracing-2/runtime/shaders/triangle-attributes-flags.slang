@@ -46,7 +46,7 @@ struct RuntimeAnyHit : rt::IAnyHitShader
     typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
-        let triangle = input.triangle;
+        let triangle = input.attributes;
         input.payload.stage = 1;
         input.payload.anyHitCount++;
         input.payload.barycentricX = uint(triangle.barycentricCoord.x * 100.0 + 0.5);
@@ -71,7 +71,7 @@ struct RuntimeClosestHit : rt::IClosestHitShader
     typealias Context = HitContext;
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
-        let triangle = input.triangle;
+        let triangle = input.attributes;
         input.payload.stage = 3;
         input.payload.barycentricX = uint(triangle.barycentricCoord.x * 100.0 + 0.5);
         input.payload.barycentricY = uint(triangle.barycentricCoord.y * 100.0 + 0.5);
@@ -152,10 +152,10 @@ void rayGenerationMain()
     }
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = float3(0.25, 0.25, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = float3(0.25, 0.25, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = flags;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;

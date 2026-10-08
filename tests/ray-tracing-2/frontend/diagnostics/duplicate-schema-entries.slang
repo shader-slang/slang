@@ -55,21 +55,17 @@ struct Callable : rt::ICallableShader
     void invoke(rt::CallableInput<Context> input) {}
 }
 
-interface IHitTag : rt::IHitGroup {}
-interface IMissTag : rt::IMissShader {}
-interface ICallableTag : rt::ICallableShader {}
 
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
-    typealias HitGroups = rt::OpenHitGroups<IHitTag, HitGroup, HitGroup>;
-    typealias MissShaders = rt::OpenMissShaders<IMissTag, Miss, Miss>;
-    typealias CallableShaders = rt::OpenCallableShaders<ICallableTag, Callable, Callable>;
+    typealias HitGroups = rt::HitGroupList<HitGroup, HitGroup>;
+    typealias MissShaders = rt::MissShaderList<Miss, Miss>;
+    typealias CallableShaders = rt::CallableShaderList<Callable, Callable>;
 }
 
-// Open sections use their explicit pack as the ordered prefix of the linked implementation set.
-// Repeating a type in that prefix is invalid even though a listed type that also conforms to its
-// tag is valid and will be unioned only once during link completion.
+// Each explicit section is an ordered set of program declarations. Repeating a program in the
+// list is invalid; repeating physical SBT records for that program is a separate host decision.
 //CHECK-COUNT-3: error[E38074]: duplicate structural ray-tracing entry
 //CHECK-DAG: hit-group entry 'HitGroup' is listed more than once in schema 'Schema'
 //CHECK-DAG: miss-shader entry 'Miss' is listed more than once in schema 'Schema'

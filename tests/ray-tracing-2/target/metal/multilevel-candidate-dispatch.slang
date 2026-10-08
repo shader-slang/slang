@@ -28,7 +28,11 @@ struct TriangleContext : rt::IHitContext
 struct TriangleAnyHit : rt::IAnyHitShader
 {
     typealias Context = TriangleContext;
-    void invoke(rt::AnyHitInput<TriangleContext> input) { input.payload.value += 1; }
+    void invoke(rt::AnyHitInput<TriangleContext> input)
+    {
+        for (uint level = 0; level < input.instanceCount; ++level)
+            input.payload.value += input.getInstanceIndex(level) + input.getInstanceID(level);
+    }
 }
 
 struct TriangleGroup : rt::IHitGroup
@@ -57,7 +61,10 @@ struct BoxIntersection : rt::IIntersectionShader
     typealias Context = BoxContext;
     void invoke(rt::IntersectionInput<BoxContext> input)
     {
-        BoxAttributes attributes = {1};
+        uint pathValue = 0;
+        for (uint level = 0; level < input.instanceCount; ++level)
+            pathValue += input.getInstanceIndex(level) + input.getInstanceID(level);
+        BoxAttributes attributes = {pathValue};
         input.reportHit(1.0, attributes);
     }
 }
@@ -68,6 +75,8 @@ struct BoxAnyHit : rt::IAnyHitShader
     void invoke(rt::AnyHitInput<BoxContext> input)
     {
         input.payload.value += input.attributes.value;
+        for (uint level = 0; level < input.instanceCount; ++level)
+            input.payload.value += input.getInstanceIndex(level) + input.getInstanceID(level);
     }
 }
 
@@ -101,8 +110,10 @@ void main()
 
 // METAL-DAG: {{\[\[}}intersection(triangle, metal::raytracing::instancing, metal::raytracing::max_levels<3>)]]
 // METAL-DAG: metal::array_ref<uint> instanceIndex_{{[0-9]+}} {{\[\[}}instance_id]]
+// METAL-DAG: metal::array_ref<uint> {{[a-zA-Z0-9_]+}} {{\[\[}}user_instance_id]]
 // METAL-DAG: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing, metal::raytracing::max_levels<3>)]]
 // METAL-DAG: metal::array_ref<uint> instanceIndex_{{[0-9]+}} {{\[\[}}instance_id]]
+// METAL-DAG: metal::array_ref<uint> {{[a-zA-Z0-9_]+}} {{\[\[}}user_instance_id]]
 
 // Both candidate dispatchers call the same full-path trie lookup. The count begins after its
 // definition and therefore covers one call from each generated intersection function.

@@ -36,14 +36,14 @@ void callCallableFromHelper()
     rt::RayTracer<TestSchema> tracer;
     TestCallableData data = {0};
     tracer.callShader<TestCallableContext>(0, program, data);
-//CHECK:   ^^^^^^^^^^ callable dispatch is not available from this ray-tracing stage
-//CHECK:   ^^^^^^^^^^ 'callShader' cannot be reached from structural any-hit logic
 }
 
 struct BadAnyHit : rt::IAnyHitShader
 {
     typealias Context = TestHitContext;
     void invoke(rt::AnyHitInput<TestHitContext> input)
+//CHECK: ^^^^^^ dependencies not compatible on stage
+//CHECK: ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported
     {
         callCallableFromHelper();
     }

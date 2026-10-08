@@ -491,6 +491,13 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
         elementTags = (TypeTag)(((int)elementTags & ~(int)TypeTag::Unsized) | (int)TypeTag::Opaque);
         return elementTags;
     }
+    // The descriptor declaration has no fields by design, but it is a host-bound handle rather
+    // than an ordinary empty value. Classifying its dedicated AST type as opaque prevents generic
+    // layout and initialization checks from treating it like a fieldless user struct.
+    else if (as<TraceProgramDescriptorType>(type))
+    {
+        return TypeTag::Opaque;
+    }
     else if (
         as<UntypedBufferResourceType>(type) || as<ResourceType>(type) ||
         as<SamplerStateType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||

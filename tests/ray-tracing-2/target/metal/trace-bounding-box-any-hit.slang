@@ -80,10 +80,10 @@ RWStructuredBuffer<uint> output;
 void main()
 {
     rt::RayTraversalDesc desc;
-    desc.ray.origin = float3(0.0, 0.0, 0.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 1000.0;
+    desc.ray.Origin = float3(0.0, 0.0, 0.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 1000.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;
@@ -97,7 +97,7 @@ void main()
 }
 
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL-SAME: ray_data StructuralRayDataHeader_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: visitCount_0 =
 // METAL: normal_0.z
 // METAL: accept_{{[0-9]+}} = false

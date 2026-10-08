@@ -29,7 +29,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext);
 
 /// Gets the finalized target manifest used by structural ray-tracing codegen and reflection.
 ///
-/// This performs link/specialization/open-section completion but does not enter target emission.
+/// This performs linking and specialization but does not enter target emission.
 RefPtr<IRModule> getOrCreateStructuralRayTracingProgramManifest(
     TargetProgram* targetProgram,
     DiagnosticSink* sink);

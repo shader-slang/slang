@@ -928,13 +928,13 @@ return {
 	["Decoration.structuralRayTracingProgramPayloadLocation"] = 952,
 	["Decoration.structuralRayTracingSemanticallyEmptyPayload"] = 953,
 	["Decoration.structuralRayTracingMetalPayloadMetadata"] = 954,
-	["Decoration.structuralRayTracingOpenSection"] = 955,
-	["Decoration.structuralRayTracingTaggedConformance"] = 956,
-	["Decoration.structuralRayTracingDeferredEmptyPayload"] = 957,
 	["structuralRayTracingProgramSchema"] = 958,
 	["Decoration.structuralRayTracingVulkanPayloadStorage"] = 959,
 	["Decoration.structuralRayTracingLegacyAPIUse"] = 960,
-	["Type.StructuralRayTracingProgramDescriptor"] = 961,
 	["Decoration.layoutFieldType"] = 962,
-	["Decoration.preserveValueParameterABI"] = 963
+	["Decoration.preserveValueParameterABI"] = 963,
+	["Type.TraceProgramDescriptor"] = 964,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceCount"] = 965,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceIndexAtLevel"] = 966,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceIDAtLevel"] = 967
 }

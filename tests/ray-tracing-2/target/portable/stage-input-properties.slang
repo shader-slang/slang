@@ -66,8 +66,8 @@ struct ClosestHit : rt::IClosestHitShader
     {
         let objectRay = input.objectSpaceRay;
         output[0] = float4(
-            input.worldSpaceOrigin.x + input.worldSpaceDirection.x + objectRay.origin.x +
-                objectRay.direction.x,
+            input.worldSpaceOrigin.x + input.worldSpaceDirection.x + objectRay.Origin.x +
+                objectRay.Direction.x,
             input.distance + input.minDistance,
             float(input.hitKind + input.rayFlags) + input.objectToWorld[0][0] +
                 input.worldToObject[0][0],
@@ -134,7 +134,7 @@ struct AnyHit : rt::IAnyHitShader
                 input.minDistance + float(input.rayFlags + input.primitiveIndex +
                                           input.geometryIndex + input.instanceIndex +
                                           input.instanceID) +
-                objectRay.origin.x + objectRay.direction.x + input.objectToWorld[0][0] +
+                objectRay.Origin.x + objectRay.Direction.x + input.objectToWorld[0][0] +
                 input.worldToObject[0][0] + float(input.dispatchRaysIndex.x) +
                 float(input.dispatchRaysDimensions.x) >
             0.0)
@@ -158,7 +158,7 @@ struct Intersection : rt::IIntersectionShader
     {
         let ray = input.objectSpaceRay;
         CustomAttributes attributes;
-        attributes.value = ray.origin.x + ray.direction.x + input.worldSpaceOrigin.x +
+        attributes.value = ray.Origin.x + ray.Direction.x + input.worldSpaceOrigin.x +
                            input.worldSpaceDirection.x + float(input.primitiveIndex) +
                            float(input.geometryIndex + input.instanceIndex + input.instanceID +
                                  input.rayFlags) +
@@ -167,8 +167,8 @@ struct Intersection : rt::IIntersectionShader
                            float(input.dispatchRaysDimensions.x);
         // Keep both report-hit paths: Metal lowering must preserve dominance-compatible block
         // order when it turns their results into block parameters for the candidate arm.
-        if (!input.reportHit(ray.tMin + input.objectToWorld[0][0], attributes))
-            input.reportHit(ray.tMax, 1, attributes);
+        if (!input.reportHit(ray.TMin + input.objectToWorld[0][0], attributes))
+            input.reportHit(ray.TMax, 1, attributes);
     }
 }
 

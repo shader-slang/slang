@@ -2981,10 +2981,6 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable,
         SourceLoc conformanceLoc);
-    void diagnoseInvalidStructuralRayTracingOpenSectionTag(
-        Type* entryListType,
-        AssocTypeDecl* associatedTypeRequirement,
-        Decl* satisfyingDecl);
     void diagnoseDuplicateStructuralRayTracingSchemaEntries(
         Type* entryListType,
         AssocTypeDecl* associatedTypeRequirement,
@@ -4241,7 +4237,6 @@ void registerRayTracingAPICall(
     Linkage* linkage,
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
-    SourceLoc callLoc,
     DiagnosticSink* sink);
 
 

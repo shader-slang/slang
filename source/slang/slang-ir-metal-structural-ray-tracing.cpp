@@ -170,6 +170,9 @@ struct MetalStageRequirements
     bool geometryIndex = false;
     bool instanceIndex = false;
     bool instanceID = false;
+    bool instanceCount = false;
+    bool instanceIndexAtLevel = false;
+    bool instanceIDAtLevel = false;
 };
 
 static void _collectMetalStageRequirements(
@@ -248,6 +251,15 @@ static void _collectMetalStageRequirements(
             case kIROp_StructuralRayTracingGetInstanceID:
                 requirements.instanceID = true;
                 break;
+            case kIROp_StructuralRayTracingGetInstanceCount:
+                requirements.instanceCount = true;
+                break;
+            case kIROp_StructuralRayTracingGetInstanceIndexAtLevel:
+                requirements.instanceIndexAtLevel = true;
+                break;
+            case kIROp_StructuralRayTracingGetInstanceIDAtLevel:
+                requirements.instanceIDAtLevel = true;
+                break;
             case kIROp_StructuralRayTracingGetObjectToWorld:
                 requirements.objectToWorld = true;
                 break;
@@ -303,6 +315,9 @@ static MetalStageRequirements _combineMetalStageRequirements(
     SLANG_COMBINE_REQUIREMENT(geometryIndex);
     SLANG_COMBINE_REQUIREMENT(instanceIndex);
     SLANG_COMBINE_REQUIREMENT(instanceID);
+    SLANG_COMBINE_REQUIREMENT(instanceCount);
+    SLANG_COMBINE_REQUIREMENT(instanceIndexAtLevel);
+    SLANG_COMBINE_REQUIREMENT(instanceIDAtLevel);
 #undef SLANG_COMBINE_REQUIREMENT
     return result;
 }
@@ -327,6 +342,9 @@ static UInt _getMetalStageRequirementMask(const MetalStageRequirements& requirem
     SLANG_ADD_REQUIREMENT(geometryIndex, GeometryIndex);
     SLANG_ADD_REQUIREMENT(instanceIndex, InstanceIndex);
     SLANG_ADD_REQUIREMENT(instanceID, InstanceID);
+    SLANG_ADD_REQUIREMENT(instanceCount, InstanceCount);
+    SLANG_ADD_REQUIREMENT(instanceIndexAtLevel, InstanceIndexAtLevel);
+    SLANG_ADD_REQUIREMENT(instanceIDAtLevel, InstanceIDAtLevel);
     SLANG_ADD_REQUIREMENT(objectSpaceRay, ObjectSpaceRay);
     SLANG_ADD_REQUIREMENT(objectToWorld, ObjectToWorld);
     SLANG_ADD_REQUIREMENT(worldToObject, WorldToObject);
@@ -369,14 +387,47 @@ static MetalStageRequirements _getMetalStageRequirements(
     return result;
 }
 
+// All payload carriers start with this compiler-owned header. A schema-wide intersection
+// dispatcher reads only the header until the logical SBT record identifies the typed stage arm.
+// The payload itself remains in ray_data storage; no pointer into thread storage crosses traversal.
+class MetalRayDataHeaderInfo : public RefObject
+{
+public:
+    IRStructType* type = nullptr;
+    IRStructKey* recordsKey = nullptr;
+    IRStructKey* sbtOffsetKey = nullptr;
+    IRStructKey* sbtStrideKey = nullptr;
+};
+
+static RefPtr<MetalRayDataHeaderInfo> _createMetalRayDataHeader(IRModule* module)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    RefPtr<MetalRayDataHeaderInfo> header = new MetalRayDataHeaderInfo();
+    header->type = builder.createStructType();
+    builder.addNameHintDecoration(header->type, toSlice("StructuralRayDataHeader"));
+    header->recordsKey = builder.createStructKey();
+    header->sbtOffsetKey = builder.createStructKey();
+    header->sbtStrideKey = builder.createStructKey();
+    builder.addNameHintDecoration(header->recordsKey, toSlice("records"));
+    builder.addNameHintDecoration(header->sbtOffsetKey, toSlice("sbtOffset"));
+    builder.addNameHintDecoration(header->sbtStrideKey, toSlice("sbtStride"));
+    builder.createStructField(
+        header->type,
+        header->recordsKey,
+        builder.getPtrType(builder.getUIntType(), AddressSpace::Global));
+    builder.createStructField(header->type, header->sbtOffsetKey, builder.getUIntType());
+    builder.createStructField(header->type, header->sbtStrideKey, builder.getUIntType());
+    return header;
+}
+
 class MetalRayDataInfo : public RefObject
 {
 public:
     IRStructType* type = nullptr;
     IRStructKey* payloadKey = nullptr;
-    IRStructKey* recordDataKey = nullptr;
-    IRStructKey* sbtOffsetKey = nullptr;
-    IRStructKey* sbtStrideKey = nullptr;
+    RefPtr<MetalRayDataHeaderInfo> header;
+    IRStructKey* headerKey = nullptr;
     IRStructKey* minDistanceKey = nullptr;
     IRStructKey* rayTimeKey = nullptr;
     IRStructKey* rayFlagsKey = nullptr;
@@ -395,6 +446,7 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
     IRType* payloadType,
     Index payloadIndex,
     bool hasMultiplePayloadPartitions,
+    MetalRayDataHeaderInfo* header,
     TargetRequest* targetRequest)
 {
     IRBuilder builder(module);
@@ -412,6 +464,11 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         name << ".payload" << payloadIndex;
     name << ".rayData";
     builder.addNameHintDecoration(result->type, name.getUnownedSlice());
+
+    result->header = header;
+    result->headerKey = builder.createStructKey();
+    builder.addNameHintDecoration(result->headerKey, toSlice("dispatch"));
+    builder.createStructField(result->type, result->headerKey, header->type);
 
     result->payloadKey = builder.createStructKey();
     builder.addNameHintDecoration(result->payloadKey, UnownedTerminatedStringSlice("payload"));
@@ -437,14 +494,12 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         builder.createStructField(result->type, sentinelKey, builder.getUIntType());
     }
 
-    bool needsRecordData = false;
     bool needsMinDistance = false;
     bool needsRayTime = false;
     bool needsRayFlags = false;
     bool needsDispatchRaysIndex = false;
     bool needsDispatchRaysDimensions = false;
     bool needsCustomHitKind = false;
-    bool needsCandidateRecordSelection = false;
     for (auto decoration : schemaOperation->getDecorations())
     {
         if (auto missEntry = as<IRStructuralRayTracingMissShaderInfoDecoration>(decoration))
@@ -452,7 +507,6 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             if (!_isStructuralMissShaderForPayload(missEntry, payloadType))
                 continue;
             auto requirements = _getMetalStageRequirements(missEntry->getMiss());
-            needsRecordData |= requirements.record || requirements.callableDispatch;
             needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay;
             needsRayTime |= requirements.rayTime;
             needsRayFlags |= requirements.rayFlags;
@@ -480,15 +534,6 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             auto closestHitRequirements = _getMetalStageRequirements(closestHitInvoke);
             auto anyHitRequirements = _getMetalStageRequirements(anyHitInvoke);
             auto intersectionRequirements = _getMetalStageRequirements(intersectionInvoke);
-            needsRecordData |=
-                closestHitRequirements.record || closestHitRequirements.callableDispatch;
-            needsRecordData |= anyHitRequirements.record;
-            needsRecordData |= intersectionRequirements.record;
-            if (anyHitInvoke || intersectionInvoke)
-            {
-                needsCandidateRecordSelection = true;
-                needsRecordData = true;
-            }
             needsMinDistance |=
                 closestHitRequirements.minDistance || closestHitRequirements.objectSpaceRay ||
                 anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
@@ -509,14 +554,6 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         auto requirements = _getMetalStageRequirements(closestHitInvoke);
         auto anyHitRequirements = _getMetalStageRequirements(anyHitInvoke);
         auto intersectionRequirements = _getMetalStageRequirements(intersectionInvoke);
-        needsRecordData |= requirements.record || requirements.callableDispatch;
-        needsRecordData |= anyHitRequirements.record;
-        needsRecordData |= intersectionRequirements.record;
-        if (anyHitInvoke || intersectionInvoke)
-        {
-            needsCandidateRecordSelection = true;
-            needsRecordData = true;
-        }
         needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay ||
                             anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
                             intersectionRequirements.minDistance ||
@@ -550,31 +587,6 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         builder.addNameHintDecoration(key, fieldName.getUnownedSlice());
         builder.createStructField(result->type, key, attributesType);
         result->customAttributeKeys.add(attributesType, key);
-    }
-
-    if (needsRecordData)
-    {
-        result->recordDataKey = builder.createStructKey();
-        builder.addNameHintDecoration(
-            result->recordDataKey,
-            UnownedTerminatedStringSlice("descriptorData"));
-        builder.createStructField(
-            result->type,
-            result->recordDataKey,
-            builder.getPtrType(builder.getUIntType(), AddressSpace::Global));
-    }
-    if (needsCandidateRecordSelection)
-    {
-        result->sbtOffsetKey = builder.createStructKey();
-        builder.addNameHintDecoration(
-            result->sbtOffsetKey,
-            UnownedTerminatedStringSlice("sbtOffset"));
-        builder.createStructField(result->type, result->sbtOffsetKey, builder.getUIntType());
-        result->sbtStrideKey = builder.createStructKey();
-        builder.addNameHintDecoration(
-            result->sbtStrideKey,
-            UnownedTerminatedStringSlice("sbtStride"));
-        builder.createStructField(result->type, result->sbtStrideKey, builder.getUIntType());
     }
 
     if (needsMinDistance)
@@ -731,9 +743,9 @@ static bool _addMetalMotionTags(IRInst* schemaOperation, DiagnosticSink* sink, U
     return true;
 }
 
-// Returns whether one hit group needs Metal's trace-wide `world_space_data` tag. Keep this
-// predicate shared with tag inference: a direct primitive-AS trace must be rejected exactly when
-// the same stage uses would otherwise produce an invalid Metal intersector type.
+// Returns whether one hit group reads state that needs `world_space_data` with instancing.
+// Without instances, object space already is world space and the transforms are identity, so tag
+// inference does not add an instancing-only tag for those source operations.
 static bool _doesMetalHitGroupRequireWorldSpaceData(
     IRStructuralRayTracingHitGroupInfoDecoration* group)
 {
@@ -751,27 +763,6 @@ static bool _doesMetalHitGroupRequireWorldSpaceData(
     return anyHit.worldSpaceOrigin || anyHit.worldSpaceDirection || intersection.worldSpaceOrigin ||
            intersection.worldSpaceDirection || closestHit.objectSpaceRay || all.objectToWorld ||
            all.worldToObject;
-}
-
-static bool _validateMetalWorldSpaceDataTopology(
-    IRInst* schemaOperation,
-    UInt topologyTagMask,
-    DiagnosticSink* sink)
-{
-    if ((topologyTagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
-        return true;
-
-    for (auto decoration : schemaOperation->getDecorations())
-    {
-        auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
-        if (group && _doesMetalHitGroupRequireWorldSpaceData(group))
-        {
-            sink->diagnose(Diagnostics::StructuralRayTracingWorldSpaceDataRequiresInstancing{
-                .location = schemaOperation->sourceLoc});
-            return false;
-        }
-    }
-    return true;
 }
 
 struct MetalTraceContextRequirements
@@ -796,8 +787,7 @@ static bool _tryGetMetalTraceContextRequirements(
             outRequirements.tagMask,
             outRequirements.maxLevels) ||
         !_validateMetalCurveSupport(schemaOperation, targetRequest, sink) ||
-        !_addMetalMotionTags(schemaOperation, sink, outRequirements.tagMask) ||
-        !_validateMetalWorldSpaceDataTopology(schemaOperation, outRequirements.tagMask, sink))
+        !_addMetalMotionTags(schemaOperation, sink, outRequirements.tagMask))
     {
         return false;
     }
@@ -1264,7 +1254,8 @@ static UInt _getSharedMetalTagMask(
             result |= UInt(MetalStructuralRayTracingTag::TriangleData);
         if (all.curveParameter)
             result |= UInt(MetalStructuralRayTracingTag::CurveData);
-        if (_doesMetalHitGroupRequireWorldSpaceData(group))
+        if ((topologyTagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0 &&
+            _doesMetalHitGroupRequireWorldSpaceData(group))
         {
             result |= UInt(MetalStructuralRayTracingTag::WorldSpaceData);
         }
@@ -1331,6 +1322,7 @@ struct MetalInstancePathABI
     IRType* parameterType = nullptr;
     IRFunc* getCount = nullptr;
     IRFunc* getElement = nullptr;
+    IRFunc* getEmpty = nullptr;
 
     bool isMultiLevel() const { return getElement != nullptr; }
 };
@@ -1376,7 +1368,86 @@ static MetalInstancePathABI _createMetalInstancePathABI(IRModule* module, bool i
         CapabilitySet::makeEmpty(),
         UnownedTerminatedStringSlice("($0)[$1]"));
 
-    return {arrayRefType, getCount, getElement};
+    auto getEmpty = builder.createFunc();
+    getEmpty->setFullType(builder.getFuncType(0, nullptr, arrayRefType));
+    builder.addTargetIntrinsicDecoration(
+        getEmpty,
+        CapabilitySet::makeEmpty(),
+        UnownedTerminatedStringSlice("metal::array_ref<uint>()"));
+    return {arrayRefType, getCount, getElement, getEmpty};
+}
+
+// Carries the complete native instance path through source-stage helpers. The source API indexes
+// that path at runtime; retaining an array view is essential because its outer entries distinguish
+// instances such as [3, 7] and [4, 7], even though the innermost ID is the same.
+struct MetalInstanceInputValues
+{
+    IRInst* count = nullptr;
+    IRInst* indices = nullptr;
+    IRInst* ids = nullptr;
+    IRFunc* getElement = nullptr;
+};
+
+static IRInst* _lowerMetalInstanceInputOperation(
+    IRInst* operation,
+    const MetalInstanceInputValues& values)
+{
+    if (operation->getOp() == kIROp_StructuralRayTracingGetInstanceCount)
+    {
+        SLANG_RELEASE_ASSERT(values.count);
+        return values.count;
+    }
+    IRInst* path = nullptr;
+    if (operation->getOp() == kIROp_StructuralRayTracingGetInstanceIndexAtLevel)
+        path = values.indices;
+    else if (operation->getOp() == kIROp_StructuralRayTracingGetInstanceIDAtLevel)
+        path = values.ids;
+    else
+        return nullptr;
+    SLANG_RELEASE_ASSERT(path && values.getElement && operation->getOperandCount() == 3);
+    IRBuilder builder(operation);
+    builder.setInsertBefore(operation);
+    IRInst* arguments[] = {
+        path,
+        builder.emitCast(builder.getIntType(), operation->getOperand(2)),
+    };
+    return builder.emitCallInst(builder.getUIntType(), values.getElement, 2, arguments);
+}
+
+// Produces a path view from native intersection parameters, or an empty view for primitive-AS
+// traversal. Indexing an empty path remains outside the API precondition `level < instanceCount`;
+// it is not replaced by an invented instance identifier.
+static MetalInstanceInputValues _getMetalCandidateInstanceInputs(
+    IRBuilder& builder,
+    const MetalStageRequirements& requirements,
+    const MetalInstancePathABI& abi,
+    bool hasInstancing,
+    IRInst* indices,
+    IRInst* ids)
+{
+    MetalInstanceInputValues result;
+    result.getElement = abi.getElement;
+    if (requirements.instanceCount)
+    {
+        if (hasInstancing)
+        {
+            SLANG_RELEASE_ASSERT(abi.isMultiLevel() && indices);
+            auto count = builder.emitCallInst(builder.getIntType(), abi.getCount, 1, &indices);
+            result.count = builder.emitCast(builder.getUIntType(), count);
+        }
+        else
+            result.count = builder.getIntValue(builder.getUIntType(), 0);
+    }
+    if (requirements.instanceIndexAtLevel || requirements.instanceIDAtLevel)
+    {
+        SLANG_RELEASE_ASSERT(abi.isMultiLevel());
+        auto empty = !hasInstancing
+                         ? builder.emitCallInst(abi.parameterType, abi.getEmpty, 0, nullptr)
+                         : nullptr;
+        result.indices = hasInstancing ? indices : empty;
+        result.ids = hasInstancing ? ids : empty;
+    }
+    return result;
 }
 
 // Builds the one lookup used by both candidate-stage and committed closest-hit dispatch.
@@ -1514,6 +1585,14 @@ static IRMatrixType* _getFloat4x3Type(IRBuilder& builder)
         builder.getIntValue(builder.getIntType(), kMatrixLayoutMode_RowMajor));
 }
 
+static IRInst* _emitMetalIdentityTransform(IRBuilder& builder)
+{
+    auto zero = builder.getFloatValue(builder.getFloatType(), 0.0);
+    auto one = builder.getFloatValue(builder.getFloatType(), 1.0);
+    IRInst* elements[] = {one, zero, zero, zero, one, zero, zero, zero, one, zero, zero, zero};
+    return builder.emitMakeMatrix(_getFloat4x3Type(builder), SLANG_COUNT_OF(elements), elements);
+}
+
 static void _addStructuralStageInfo(
     IRBuilder& builder,
     IRFunc* adapter,
@@ -1552,6 +1631,7 @@ static void _inlineCandidateOperationCalls(IRFunc* adapter);
 
 struct MetalVisibleInputValues
 {
+    MetalInstanceInputValues instancePath;
     IRInst* record = nullptr;
     IRInst* hitAttributes = nullptr;
     IRInst* triangleBarycentricCoord = nullptr;
@@ -1590,7 +1670,7 @@ static void _lowerMetalVisibleInputOperations(
     _collectStageInputOperations(adapter, operations);
     for (auto operation : operations)
     {
-        IRInst* replacement = nullptr;
+        IRInst* replacement = _lowerMetalInstanceInputOperation(operation, values.instancePath);
         switch (operation->getOp())
         {
         case kIROp_StructuralRayTracingGetRecord:
@@ -1737,6 +1817,7 @@ static IRFunc* _generateVisibleStageAdapter(
     StructuralRayTracingHitAttributesKind hitAttributesKind,
     UnownedStringSlice physicalName,
     const MetalStageRequirements& tableRequirements,
+    const MetalInstancePathABI& instanceABI,
     MetalRayDataInfo* rayDataInfo,
     IRType* descriptorResourcesPointerType,
     IRMetalVisibleFunctionTable* visibleFunctionTableType)
@@ -1744,7 +1825,7 @@ static IRFunc* _generateVisibleStageAdapter(
     auto invoke = as<IRFunc>(invokeValue);
     if (!invoke && stageKind != StructuralRayTracingStageKind::ClosestHit)
         return nullptr;
-    // Every physical closest-hit function in one payload partition has the same table-wide
+    // Every physical closest-hit function in the schema has the same table-wide
     // signature. A concrete `invoke` also fixes its Context, including Record and primitive
     // attributes. Key a real closest-hit adapter by that executable function and the ray-data ABI,
     // rather than by the hit group that references it, so repeated logical records share one
@@ -1797,8 +1878,9 @@ static IRFunc* _generateVisibleStageAdapter(
 
     builder.setInsertInto(adapter);
     builder.emitBlock();
-    auto rayData = builder.emitParam(rayDataPointerType);
-    builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+    auto erasedRayData =
+        builder.emitParam(builder.getPtrType(builder.getVoidType(), AddressSpace::ThreadLocal));
+    builder.addNameHintDecoration(erasedRayData, UnownedTerminatedStringSlice("rayData"));
 
     auto emitNamedParam = [&](IRType* type, const char* name)
     {
@@ -1833,6 +1915,13 @@ static IRFunc* _generateVisibleStageAdapter(
         values.instanceIndex = emitNamedParam(builder.getUIntType(), "instanceIndex");
     if (tableRequirements.instanceID)
         values.instanceID = emitNamedParam(builder.getUIntType(), "instanceID");
+    values.instancePath.getElement = instanceABI.getElement;
+    if (tableRequirements.instanceCount)
+        values.instancePath.count = emitNamedParam(builder.getUIntType(), "instanceCount");
+    if (tableRequirements.instanceIndexAtLevel)
+        values.instancePath.indices = emitNamedParam(instanceABI.parameterType, "instanceIndices");
+    if (tableRequirements.instanceIDAtLevel)
+        values.instancePath.ids = emitNamedParam(instanceABI.parameterType, "instanceIDs");
     if (tableRequirements.objectSpaceRay)
     {
         values.objectSpaceOrigin =
@@ -1866,6 +1955,7 @@ static IRFunc* _generateVisibleStageAdapter(
         return adapter;
     }
 
+    auto rayData = builder.emitBitCast(rayDataPointerType, erasedRayData);
     auto payload = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
     payloadValues[adapter] = payload;
     if (rayDataInfo->minDistanceKey)
@@ -1924,9 +2014,9 @@ static IRFunc* _generateVisibleStageAdapter(
     _lowerMetalVisibleInputOperations(adapter, values);
     if (descriptorResources)
     {
-        SLANG_ASSERT(rayDataInfo->recordDataKey);
+        auto header = builder.emitFieldAddress(rayData, rayDataInfo->headerKey);
         auto records =
-            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->recordDataKey));
+            builder.emitLoad(builder.emitFieldAddress(header, rayDataInfo->header->recordsKey));
         _rebindMetalCallableDispatches(adapter, descriptorResources, records);
     }
     generated.add(generatedKey, adapter);
@@ -1996,8 +2086,9 @@ static IRFunc* _generateCallableStageAdapter(
 
     builder.setInsertInto(adapter);
     builder.emitBlock();
-    auto data = builder.emitParam(dataPointerType);
-    builder.addNameHintDecoration(data, UnownedTerminatedStringSlice("data"));
+    auto erasedData =
+        builder.emitParam(builder.getPtrType(builder.getVoidType(), AddressSpace::ThreadLocal));
+    builder.addNameHintDecoration(erasedData, UnownedTerminatedStringSlice("data"));
     IRInst* dispatchRaysIndex = nullptr;
     IRInst* dispatchRaysDimensions = nullptr;
     if (signatureRequirements.dispatchRaysIndex)
@@ -2030,6 +2121,7 @@ static IRFunc* _generateCallableStageAdapter(
     auto descriptorData = builder.emitParam(descriptorDataType);
     builder.addNameHintDecoration(descriptorData, UnownedTerminatedStringSlice("descriptorData"));
 
+    auto data = builder.emitBitCast(dataPointerType, erasedData);
     IRInst* record = nullptr;
     if (requirements.record)
         record = _emitMetalRecordValueFromDataAddress(
@@ -2346,6 +2438,7 @@ static void _lowerAnyHitTerminations(IRFunc* adapter, const MetalCandidateResult
 
 struct MetalCandidateInputValues
 {
+    MetalInstanceInputValues instancePath;
     IRInst* record = nullptr;
     IRInst* triangleBarycentricCoord = nullptr;
     IRInst* triangleFrontFacing = nullptr;
@@ -2379,7 +2472,7 @@ static void _lowerMetalCandidateInputOperations(
     _collectStageInputOperations(function, operations);
     for (auto operation : operations)
     {
-        IRInst* replacement = nullptr;
+        IRInst* replacement = _lowerMetalInstanceInputOperation(operation, values.instancePath);
         switch (operation->getOp())
         {
         case kIROp_StructuralRayTracingGetRecord:
@@ -2497,6 +2590,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     auto hitAttributesKind =
         StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue());
     auto requirements = _getMetalStageRequirements(invoke);
+    const bool hasInstancing = (tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0;
     SLANG_RELEASE_ASSERT(!requirements.instanceIndex || !instanceABI.isMultiLevel());
     SLANG_RELEASE_ASSERT(!signatureRequirements.instanceID || !instanceABI.isMultiLevel());
     List<IRType*> parameterTypes;
@@ -2522,16 +2616,19 @@ static IRFunc* _generateBuiltInCandidateAdapter(
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.instanceIndex)
         parameterTypes.add(instanceABI.parameterType);
-    if (signatureRequirements.instanceID)
-        parameterTypes.add(builder.getUIntType());
+    if (signatureRequirements.instanceID ||
+        (hasInstancing && signatureRequirements.instanceIDAtLevel))
+        parameterTypes.add(instanceABI.parameterType);
     if (signatureRequirements.objectSpaceRay)
     {
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        if (hasInstancing || !signatureRequirements.worldSpaceOrigin)
+            parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        if (hasInstancing || !signatureRequirements.worldSpaceDirection)
+            parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     }
-    if (signatureRequirements.objectToWorld)
+    if (hasInstancing && signatureRequirements.objectToWorld)
         parameterTypes.add(_getFloat4x3Type(builder));
-    if (signatureRequirements.worldToObject)
+    if (hasInstancing && signatureRequirements.worldToObject)
         parameterTypes.add(_getFloat4x3Type(builder));
     parameterTypes.add(builder.getPtrType(builder.getUInt8Type(), AddressSpace::Global));
     auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
@@ -2596,7 +2693,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
             builder,
             builder.getVectorType(builder.getFloatType(), 3),
             "worldSpaceOrigin",
-            "world_space_origin");
+            hasInstancing ? "world_space_origin" : "origin");
     }
     if (signatureRequirements.worldSpaceDirection)
     {
@@ -2604,7 +2701,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
             builder,
             builder.getVectorType(builder.getFloatType(), 3),
             "worldSpaceDirection",
-            "world_space_direction");
+            hasInstancing ? "world_space_direction" : "direction");
     }
     if (signatureRequirements.primitiveIndex)
     {
@@ -2622,6 +2719,8 @@ static IRFunc* _generateBuiltInCandidateAdapter(
             "geometryIndex",
             "geometry_id");
     }
+    IRInst* nativeInstanceIndices = nullptr;
+    IRInst* nativeInstanceIDs = nullptr;
     if (signatureRequirements.instanceIndex)
     {
         auto nativeInstanceIndex = _emitMetalSystemValueParam(
@@ -2629,34 +2728,42 @@ static IRFunc* _generateBuiltInCandidateAdapter(
             instanceABI.parameterType,
             "instanceIndex",
             "instance_id");
+        nativeInstanceIndices = nativeInstanceIndex;
         // Multi-level instance paths are required internally for SBT lookup, but the public stage
         // input deliberately has no scalar instance-index property for that topology. Preserve the
         // native array_ref parameter for the dispatcher without inventing a user-visible scalar.
         if (!instanceABI.isMultiLevel())
             inputs.instanceIndex = nativeInstanceIndex;
     }
-    if (signatureRequirements.instanceID)
+    if (signatureRequirements.instanceID ||
+        (hasInstancing && signatureRequirements.instanceIDAtLevel))
     {
-        inputs.instanceID = _emitMetalSystemValueParam(
+        nativeInstanceIDs = _emitMetalSystemValueParam(
             builder,
-            builder.getUIntType(),
+            instanceABI.parameterType,
             "instanceID",
             "user_instance_id");
+        if (!instanceABI.isMultiLevel())
+            inputs.instanceID = nativeInstanceIDs;
     }
     if (signatureRequirements.objectSpaceRay)
     {
-        inputs.objectSpaceOrigin = _emitMetalSystemValueParam(
-            builder,
-            builder.getVectorType(builder.getFloatType(), 3),
-            "objectSpaceOrigin",
-            "origin");
-        inputs.objectSpaceDirection = _emitMetalSystemValueParam(
-            builder,
-            builder.getVectorType(builder.getFloatType(), 3),
-            "objectSpaceDirection",
-            "direction");
+        inputs.objectSpaceOrigin = !hasInstancing && inputs.worldSpaceOrigin
+                                       ? inputs.worldSpaceOrigin
+                                       : _emitMetalSystemValueParam(
+                                             builder,
+                                             builder.getVectorType(builder.getFloatType(), 3),
+                                             "objectSpaceOrigin",
+                                             "origin");
+        inputs.objectSpaceDirection = !hasInstancing && inputs.worldSpaceDirection
+                                          ? inputs.worldSpaceDirection
+                                          : _emitMetalSystemValueParam(
+                                                builder,
+                                                builder.getVectorType(builder.getFloatType(), 3),
+                                                "objectSpaceDirection",
+                                                "direction");
     }
-    if (signatureRequirements.objectToWorld)
+    if (hasInstancing && signatureRequirements.objectToWorld)
     {
         inputs.objectToWorld = _emitMetalSystemValueParam(
             builder,
@@ -2664,7 +2771,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
             "objectToWorld",
             "object_to_world_transform");
     }
-    if (signatureRequirements.worldToObject)
+    if (hasInstancing && signatureRequirements.worldToObject)
     {
         inputs.worldToObject = _emitMetalSystemValueParam(
             builder,
@@ -2678,6 +2785,17 @@ static IRFunc* _generateBuiltInCandidateAdapter(
     auto rayData = builder.emitParam(rayDataPointerType);
     builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
     payloadValues[adapter] = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
+    if (!hasInstancing && signatureRequirements.objectToWorld)
+        inputs.objectToWorld = _emitMetalIdentityTransform(builder);
+    if (!hasInstancing && signatureRequirements.worldToObject)
+        inputs.worldToObject = _emitMetalIdentityTransform(builder);
+    inputs.instancePath = _getMetalCandidateInstanceInputs(
+        builder,
+        requirements,
+        instanceABI,
+        hasInstancing,
+        nativeInstanceIndices,
+        nativeInstanceIDs);
     if (rayDataInfo->minDistanceKey)
     {
         inputs.minDistance =
@@ -2759,6 +2877,7 @@ static IRFunc* _generateBuiltInCandidateAdapter(
 
 struct MetalProceduralCandidateState
 {
+    MetalInstanceInputValues instancePath;
     IRVar* hasCandidate = nullptr;
     IRVar* currentMaxDistance = nullptr;
     IRVar* distance = nullptr;
@@ -2851,13 +2970,14 @@ static void _lowerAnyHitDecisionInputs(
     IRInst* objectToWorld,
     IRInst* worldToObject,
     IRInst* dispatchRaysIndex,
-    IRInst* dispatchRaysDimensions)
+    IRInst* dispatchRaysDimensions,
+    const MetalInstanceInputValues& instancePath)
 {
     List<IRInst*> operations;
     _collectStageInputOperations(helper, operations);
     for (auto operation : operations)
     {
-        IRInst* replacement = nullptr;
+        IRInst* replacement = _lowerMetalInstanceInputOperation(operation, instancePath);
         switch (operation->getOp())
         {
         case kIROp_StructuralRayTracingGetRecord:
@@ -2941,7 +3061,8 @@ static void _lowerAnyHitDecisionInputs(
 static IRFunc* _generateAnyHitDecisionHelper(
     IRModule* module,
     const MetalCandidateResultInfo& resultInfo,
-    IRStructuralRayTracingHitGroupInfoDecoration* group)
+    IRStructuralRayTracingHitGroupInfoDecoration* group,
+    const MetalInstancePathABI& instanceABI)
 {
     auto invoke =
         getStructuralRayTracingHitGroupStageInvoke(group, StructuralRayTracingStageKind::AnyHit);
@@ -2978,6 +3099,12 @@ static IRFunc* _generateAnyHitDecisionHelper(
         parameterTypes.add(builder.getUIntType());
     if (requirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (requirements.instanceCount)
+        parameterTypes.add(builder.getUIntType());
+    if (requirements.instanceIndexAtLevel)
+        parameterTypes.add(instanceABI.parameterType);
+    if (requirements.instanceIDAtLevel)
+        parameterTypes.add(instanceABI.parameterType);
     if (requirements.objectSpaceRay)
     {
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
@@ -3057,6 +3184,14 @@ static IRFunc* _generateAnyHitDecisionHelper(
         instanceIndex = builder.emitParam(builder.getUIntType());
     if (requirements.instanceID)
         instanceID = builder.emitParam(builder.getUIntType());
+    MetalInstanceInputValues instancePath;
+    instancePath.getElement = instanceABI.getElement;
+    if (requirements.instanceCount)
+        instancePath.count = builder.emitParam(builder.getUIntType());
+    if (requirements.instanceIndexAtLevel)
+        instancePath.indices = builder.emitParam(instanceABI.parameterType);
+    if (requirements.instanceIDAtLevel)
+        instancePath.ids = builder.emitParam(instanceABI.parameterType);
     IRInst* objectSpaceOrigin = nullptr;
     IRInst* objectSpaceDirection = nullptr;
     IRInst* objectToWorld = nullptr;
@@ -3120,7 +3255,8 @@ static IRFunc* _generateAnyHitDecisionHelper(
         objectToWorld,
         worldToObject,
         dispatchRaysIndex,
-        dispatchRaysDimensions);
+        dispatchRaysDimensions,
+        instancePath);
     _lowerAnyHitTerminations(helper, resultInfo);
     return helper;
 }
@@ -3190,6 +3326,12 @@ static void _lowerProceduralReportHitOperations(
                 arguments.add(state.instanceIndex);
             if (anyHitRequirements.instanceID)
                 arguments.add(state.instanceID);
+            if (anyHitRequirements.instanceCount)
+                arguments.add(state.instancePath.count);
+            if (anyHitRequirements.instanceIndexAtLevel)
+                arguments.add(state.instancePath.indices);
+            if (anyHitRequirements.instanceIDAtLevel)
+                arguments.add(state.instancePath.ids);
             if (anyHitRequirements.objectSpaceRay)
             {
                 arguments.add(state.objectSpaceOrigin);
@@ -3271,7 +3413,7 @@ static void _lowerProceduralIntersectionInputs(
     {
         IRBuilder builder(operation);
         builder.setInsertBefore(operation);
-        IRInst* replacement = nullptr;
+        IRInst* replacement = _lowerMetalInstanceInputOperation(operation, state.instancePath);
         switch (operation->getOp())
         {
         case kIROp_StructuralRayTracingGetRecord:
@@ -3376,6 +3518,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         getStructuralRayTracingHitGroupStageInvoke(group, StructuralRayTracingStageKind::AnyHit));
     auto requirements =
         _combineMetalStageRequirements(intersectionRequirements, anyHitRequirements);
+    const bool hasInstancing = (tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0;
     SLANG_RELEASE_ASSERT(!requirements.instanceIndex || !instanceABI.isMultiLevel());
     SLANG_RELEASE_ASSERT(!signatureRequirements.instanceID || !instanceABI.isMultiLevel());
     List<IRType*> parameterTypes;
@@ -3386,9 +3529,9 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     }
-    if (signatureRequirements.objectToWorld)
+    if (hasInstancing && signatureRequirements.objectToWorld)
         parameterTypes.add(_getFloat4x3Type(builder));
-    if (signatureRequirements.worldToObject)
+    if (hasInstancing && signatureRequirements.worldToObject)
         parameterTypes.add(_getFloat4x3Type(builder));
     if (signatureRequirements.primitiveIndex)
         parameterTypes.add(builder.getUIntType());
@@ -3396,11 +3539,14 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         parameterTypes.add(builder.getUIntType());
     if (signatureRequirements.instanceIndex)
         parameterTypes.add(instanceABI.parameterType);
-    if (signatureRequirements.instanceID)
-        parameterTypes.add(builder.getUIntType());
-    if (signatureRequirements.worldSpaceOrigin)
+    if (signatureRequirements.instanceID ||
+        (hasInstancing && signatureRequirements.instanceIDAtLevel))
+        parameterTypes.add(instanceABI.parameterType);
+    if (signatureRequirements.worldSpaceOrigin &&
+        (hasInstancing || !signatureRequirements.objectSpaceRay))
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-    if (signatureRequirements.worldSpaceDirection)
+    if (signatureRequirements.worldSpaceDirection &&
+        (hasInstancing || !signatureRequirements.objectSpaceRay))
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     if (signatureHasAnyHit)
         parameterTypes.add(builder.getBoolType());
@@ -3455,7 +3601,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     }
     IRInst* objectToWorld = nullptr;
     IRInst* worldToObject = nullptr;
-    if (signatureRequirements.objectToWorld)
+    if (hasInstancing && signatureRequirements.objectToWorld)
     {
         objectToWorld = _emitMetalSystemValueParam(
             builder,
@@ -3463,7 +3609,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
             "objectToWorld",
             "object_to_world_transform");
     }
-    if (signatureRequirements.worldToObject)
+    if (hasInstancing && signatureRequirements.worldToObject)
     {
         worldToObject = _emitMetalSystemValueParam(
             builder,
@@ -3487,6 +3633,8 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
             "geometryIndex",
             "geometry_id");
     }
+    IRInst* nativeInstanceIndices = nullptr;
+    IRInst* nativeInstanceIDs = nullptr;
     if (signatureRequirements.instanceIndex)
     {
         auto nativeInstanceIndex = _emitMetalSystemValueParam(
@@ -3494,37 +3642,45 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
             instanceABI.parameterType,
             "instanceIndex",
             "instance_id");
+        nativeInstanceIndices = nativeInstanceIndex;
         // See the built-in candidate adapter above: the path is part of the native dispatch ABI,
         // while a scalar source-stage property exists only for the single-level topology.
         if (!instanceABI.isMultiLevel())
             instanceIndex = nativeInstanceIndex;
     }
-    if (signatureRequirements.instanceID)
+    if (signatureRequirements.instanceID ||
+        (hasInstancing && signatureRequirements.instanceIDAtLevel))
     {
-        instanceID = _emitMetalSystemValueParam(
+        nativeInstanceIDs = _emitMetalSystemValueParam(
             builder,
-            builder.getUIntType(),
+            instanceABI.parameterType,
             "instanceID",
             "user_instance_id");
+        if (!instanceABI.isMultiLevel())
+            instanceID = nativeInstanceIDs;
     }
     IRInst* worldSpaceOrigin = nullptr;
     IRInst* worldSpaceDirection = nullptr;
     IRInst* opaque = nullptr;
     if (signatureRequirements.worldSpaceOrigin)
     {
-        worldSpaceOrigin = _emitMetalSystemValueParam(
-            builder,
-            builder.getVectorType(builder.getFloatType(), 3),
-            "worldSpaceOrigin",
-            "world_space_origin");
+        worldSpaceOrigin = !hasInstancing && objectSpaceOrigin
+                               ? objectSpaceOrigin
+                               : _emitMetalSystemValueParam(
+                                     builder,
+                                     builder.getVectorType(builder.getFloatType(), 3),
+                                     "worldSpaceOrigin",
+                                     hasInstancing ? "world_space_origin" : "origin");
     }
     if (signatureRequirements.worldSpaceDirection)
     {
-        worldSpaceDirection = _emitMetalSystemValueParam(
-            builder,
-            builder.getVectorType(builder.getFloatType(), 3),
-            "worldSpaceDirection",
-            "world_space_direction");
+        worldSpaceDirection = !hasInstancing && objectSpaceDirection
+                                  ? objectSpaceDirection
+                                  : _emitMetalSystemValueParam(
+                                        builder,
+                                        builder.getVectorType(builder.getFloatType(), 3),
+                                        "worldSpaceDirection",
+                                        hasInstancing ? "world_space_direction" : "direction");
     }
     if (signatureHasAnyHit)
     {
@@ -3538,6 +3694,17 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     payloadValues[adapter] = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
 
     MetalProceduralCandidateState state;
+    if (!hasInstancing && signatureRequirements.objectToWorld)
+        objectToWorld = _emitMetalIdentityTransform(builder);
+    if (!hasInstancing && signatureRequirements.worldToObject)
+        worldToObject = _emitMetalIdentityTransform(builder);
+    state.instancePath = _getMetalCandidateInstanceInputs(
+        builder,
+        requirements,
+        instanceABI,
+        hasInstancing,
+        nativeInstanceIndices,
+        nativeInstanceIDs);
     state.minDistance = minDistance;
     if (rayDataInfo->rayTimeKey)
     {
@@ -3630,7 +3797,8 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         geometryIndex,
         instanceIndex,
         instanceID);
-    auto anyHitDecision = _generateAnyHitDecisionHelper(module, filterResultInfo, group);
+    auto anyHitDecision =
+        _generateAnyHitDecisionHelper(module, filterResultInfo, group, instanceABI);
     if (anyHitDecision)
         generatedHelpers.add(anyHitDecision);
     _lowerProceduralReportHitOperations(
@@ -3703,13 +3871,12 @@ static void _copyMetalCandidateParameterDecorations(
         builder.addTargetSystemValueDecoration(destination, semantic->getSemantic());
 }
 
-// Creates the one native intersection function used by a payload partition and primitive kind.
+// Creates the one native intersection function used by a schema and primitive kind.
 // The host selects only this fixed IFT entry. The dispatcher then resolves the runtime SBT record,
 // reads its function index, and invokes the matching source-stage arm with that record's data.
 static IRFunc* _generateMetalCandidateDispatcher(
     IRModule* module,
     Dictionary<MetalCandidateDispatcherKey, IRFunc*>& generated,
-    Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     const MetalCandidateResultInfo& resultInfo,
     const List<MetalCandidateDispatcherArm>& arms,
     MetalStructuralRayTracingGeometryKind geometryKind,
@@ -3717,15 +3884,14 @@ static IRFunc* _generateMetalCandidateDispatcher(
     IRIntegerValue maxLevels,
     IRFunc* instanceHitGroupContributionLookup,
     IRIntegerValue hitRecordStride,
-    MetalRayDataInfo* rayDataInfo,
+    MetalRayDataHeaderInfo* rayDataHeader,
     IRInst* schemaIdentity,
     UnownedStringSlice physicalName)
 {
-    // The exact export name and candidate arms are schema-owned. Keep that semantic identity in
-    // the dedup key even though each partition currently also receives a fresh nominal ray-data
-    // type; this prevents a future carrier canonicalization from cross-reusing physical symbols.
+    // The export name and candidate arms are schema-owned. The shared header gives every payload
+    // the same native entry signature; the selected arm determines the concrete carrier type.
     MetalCandidateDispatcherKey key =
-        {schemaIdentity, rayDataInfo->type, tagMask, maxLevels, geometryKind};
+        {schemaIdentity, rayDataHeader->type, tagMask, maxLevels, geometryKind};
     if (auto existing = generated.tryGetValue(key))
         return *existing;
 
@@ -3735,12 +3901,13 @@ static IRFunc* _generateMetalCandidateDispatcher(
     List<IRType*> parameterTypes;
     IRFuncType* signature = nullptr;
     UInt helperRecordParameterIndex = 0;
+    auto erasedRayDataType = builder.getPtrType(rayDataHeader->type, AddressSpace::MetalRayData);
     if (arms.getCount() == 0)
     {
         // An absent primitive kind has no source arm from which to derive demand-driven native
-        // parameters. It only needs the payload-partition ray data to match the table selected by
+        // parameters. It only needs the common ray-data header to match the table selected by
         // the trace; its body rejects immediately without touching the SBT record buffer.
-        parameterTypes.add(builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal));
+        parameterTypes.add(erasedRayDataType);
     }
     else
     {
@@ -3750,7 +3917,9 @@ static IRFunc* _generateMetalCandidateDispatcher(
         for (UInt i = 0; i < signature->getParamCount(); ++i)
         {
             if (i != helperRecordParameterIndex)
-                parameterTypes.add(signature->getParamType(i));
+                parameterTypes.add(
+                    i + 1 == signature->getParamCount() ? erasedRayDataType
+                                                        : signature->getParamType(i));
         }
     }
     dispatcher->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
@@ -3774,7 +3943,7 @@ static IRFunc* _generateMetalCandidateDispatcher(
     {
         auto rayData = builder.emitParam(parameterTypes[0]);
         builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
-        candidateRayDataParams[dispatcher] = rayData;
+        builder.addTargetSystemValueDecoration(rayData, toSlice("payload"));
         builder.emitReturn(_emitMetalCandidateResult(
             builder,
             resultInfo,
@@ -3813,14 +3982,14 @@ static IRFunc* _generateMetalCandidateDispatcher(
             rayData = parameter;
     }
     SLANG_RELEASE_ASSERT(rayData && geometryIndex);
-    candidateRayDataParams[dispatcher] = rayData;
+    builder.addTargetSystemValueDecoration(rayData, toSlice("payload"));
 
-    SLANG_RELEASE_ASSERT(
-        rayDataInfo->recordDataKey && rayDataInfo->sbtOffsetKey && rayDataInfo->sbtStrideKey);
     auto descriptorData =
-        builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->recordDataKey));
-    auto sbtOffset = builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->sbtOffsetKey));
-    auto sbtStride = builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->sbtStrideKey));
+        builder.emitLoad(builder.emitFieldAddress(rayData, rayDataHeader->recordsKey));
+    auto sbtOffset =
+        builder.emitLoad(builder.emitFieldAddress(rayData, rayDataHeader->sbtOffsetKey));
+    auto sbtStride =
+        builder.emitLoad(builder.emitFieldAddress(rayData, rayDataHeader->sbtStrideKey));
     auto uintType = builder.getUIntType();
     auto hitRecordIndex =
         builder.emitAdd(uintType, builder.emitMul(uintType, geometryIndex, sbtStride), sbtOffset);
@@ -3853,26 +4022,45 @@ static IRFunc* _generateMetalCandidateDispatcher(
     List<IRInst*> switchCases;
     for (auto& arm : arms)
     {
-        SLANG_RELEASE_ASSERT(arm.helper->getDataType() == signature);
+        auto armSignature = cast<IRFuncType>(arm.helper->getDataType());
+        SLANG_RELEASE_ASSERT(armSignature->getParamCount() == signature->getParamCount());
         auto caseBlock = builder.createBlock();
         dispatcher->addBlock(caseBlock);
         switchCases.add(arm.group->getFunctionIndex());
         switchCases.add(caseBlock);
         builder.setInsertInto(caseBlock);
+        // The selected record fixes the source stage and therefore its exact payload carrier.
+        // Copy through that type instead of casting ray_data storage into thread address space.
+        auto carrierType =
+            cast<IRPtrTypeBase>(armSignature->getParamType(armSignature->getParamCount() - 1))
+                ->getValueType();
+        auto typedRayData = builder.emitBitCast(
+            builder.getPtrType(carrierType, AddressSpace::MetalRayData),
+            rayData);
+        auto localRayData = builder.emitVar(carrierType);
+        builder.emitStore(localRayData, builder.emitLoad(typedRayData));
         List<IRInst*> arguments;
         UInt wrapperIndex = 0;
         for (UInt helperIndex = 0; helperIndex < signature->getParamCount(); ++helperIndex)
         {
             if (helperIndex == helperRecordParameterIndex)
                 arguments.add(recordDataAddress);
+            else if (helperIndex + 1 == signature->getParamCount())
+                arguments.add(localRayData);
             else
+            {
+                SLANG_RELEASE_ASSERT(
+                    armSignature->getParamType(helperIndex) ==
+                    signature->getParamType(helperIndex));
                 arguments.add(dispatcherParameters[wrapperIndex++]);
+            }
         }
         auto candidateResult = builder.emitCallInst(
             resultInfo.type,
             arm.helper,
             arguments.getCount(),
             arguments.getBuffer());
+        builder.emitStore(typedRayData, builder.emitLoad(localRayData));
         builder.emitReturn(candidateResult);
     }
 
@@ -3914,45 +4102,6 @@ static IRFunc* _generateMetalCandidateDispatcher(
     return dispatcher;
 }
 
-static void _collectReturns(IRInst* parent, List<IRReturn*>& returns)
-{
-    for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
-    {
-        _collectReturns(child, returns);
-        if (auto returnInst = as<IRReturn>(child))
-            returns.add(returnInst);
-    }
-}
-
-static void _convertCandidateParameterToRayData(IRFunc* adapter, IRParam* rayDataParam)
-{
-    auto rayDataPointerType = cast<IRPtrTypeBase>(rayDataParam->getDataType());
-    auto rayDataType = rayDataPointerType->getValueType();
-
-    auto firstBlock = adapter->getFirstBlock();
-    SLANG_ASSERT(firstBlock);
-    auto firstOrdinaryInst = firstBlock->getFirstOrdinaryInst();
-    SLANG_ASSERT(firstOrdinaryInst);
-
-    IRBuilder builder(adapter);
-    builder.setInsertBefore(firstOrdinaryInst);
-    auto rayDataStorage = builder.emitVar(rayDataType);
-    builder.addNameHintDecoration(rayDataStorage, UnownedTerminatedStringSlice("rayDataStorage"));
-    rayDataParam->replaceUsesWith(rayDataStorage);
-    builder.emitStore(rayDataStorage, builder.emitLoad(rayDataParam));
-
-    List<IRReturn*> returns;
-    _collectReturns(adapter, returns);
-    for (auto returnInst : returns)
-    {
-        builder.setInsertBefore(returnInst);
-        builder.emitStore(rayDataParam, builder.emitLoad(rayDataStorage));
-    }
-
-    rayDataParam->setFullType(builder.getRefParamType(rayDataType, AddressSpace::Generic));
-    builder.addTargetSystemValueDecoration(rayDataParam, toSlice("payload"));
-    fixUpFuncType(adapter);
-}
 
 static void _getStructFields(IRStructType* type, List<IRStructField*>& fields)
 {
@@ -3962,7 +4111,6 @@ static void _getStructFields(IRStructType* type, List<IRStructField*>& fields)
 
 struct MetalTraceDescriptorInfo
 {
-    IRStructField* descriptorResourcesField = nullptr;
     IRPtrType* descriptorResourcesPointerType = nullptr;
     IRStructField* intersectionFunctionsField = nullptr;
     IRStructField* missFunctionsField = nullptr;
@@ -3979,34 +4127,13 @@ struct MetalPayloadPartitionDescriptorInfo
 {
     Index payloadIndex = -1;
     IRType* payloadType = nullptr;
-    // These are schema-wide facts for this payload partition. They are collected from every
-    // structural trace before any table or adapter is materialized, so neither generated MSL nor
-    // post-emit metadata depends on which trace operation happens to be visited first.
-    UInt tagMask = 0;
-    IRIntegerValue maxLevels = 0;
-    MetalStageRequirements missRequirements;
-    MetalStageRequirements closestHitRequirements;
     RefPtr<MetalRayDataInfo> rayDataInfo;
-    // These references select the module-owned scalar or multi-level ABI pair. Candidate
-    // dispatchers and post-trace closest-hit dispatch must share the selected lookup: resolving the
-    // same hit through two interpretations of Metal's instance path would select different logical
-    // SBT records.
-    MetalInstancePathABI instanceABI;
-    IRFunc* instanceHitGroupContributionLookup = nullptr;
-    IRStructField* intersectionFunctionsField = nullptr;
-    IRStructField* missFunctionsField = nullptr;
-    IRStructField* closestHitFunctionsField = nullptr;
-    IRType* intersectionFunctionTableType = nullptr;
-    IRType* missFunctionTableType = nullptr;
-    IRType* closestHitFunctionTableType = nullptr;
 };
 
 // Stores the one physical Metal descriptor shape synthesized for a concrete program schema.
 //
-// Hit and miss functions exchange the payload through their visible-function signature, so two
-// payload types cannot share a table even when they belong to the same logical SBT. The schema
-// therefore owns an ordered list of payload partitions, while callable functions and records stay
-// schema-wide.
+// Every table is schema-wide. Payload partitions describe typed ray-data carriers and source
+// stage eligibility, not additional host resources or independent function-index namespaces.
 class MetalProgramDescriptorInfo : public RefObject
 {
 public:
@@ -4014,16 +4141,25 @@ public:
     IRStringLit* programLayoutSourceTypeName = nullptr;
     IRInst* descriptor = nullptr;
     IRInst* representativeSchemaOperation = nullptr;
-    IRStructType* sourceDescriptorType = nullptr;
-    IRStructType* physicalDescriptorType = nullptr;
-    IRStructField* sourceDescriptorResourcesField = nullptr;
-    List<IRStructField*> sourceResourceFields;
-    IRStructField* descriptorResourcesField = nullptr;
+    IRType* physicalDescriptorType = nullptr;
     IRPtrType* descriptorResourcesPointerType = nullptr;
+    IRStructField* intersectionFunctionsField = nullptr;
+    IRStructField* missFunctionsField = nullptr;
+    IRStructField* closestHitFunctionsField = nullptr;
     IRStructField* callableFunctionsField = nullptr;
     IRStructField* recordsField = nullptr;
     IRType* callableFunctionTableType = nullptr;
     IRType* callableDataType = nullptr;
+    IRType* intersectionFunctionTableType = nullptr;
+    IRType* missFunctionTableType = nullptr;
+    IRType* closestHitFunctionTableType = nullptr;
+    UInt tagMask = 0;
+    IRIntegerValue maxLevels = 0;
+    MetalStageRequirements missRequirements;
+    MetalStageRequirements closestHitRequirements;
+    MetalInstancePathABI instanceABI;
+    IRFunc* instanceHitGroupContributionLookup = nullptr;
+    RefPtr<MetalRayDataHeaderInfo> rayDataHeader;
     MetalStageRequirements callableRequirements;
     bool arePayloadEntriesMaterialized = false;
     bool areCallableEntriesMaterialized = false;
@@ -4060,16 +4196,6 @@ public:
     void addOperation(IRInst* operation) { operations.add(operation); }
 };
 
-static IRStructFieldLayoutAttr* _findStructFieldLayout(IRStructTypeLayout* layout, IRInst* fieldKey)
-{
-    for (auto fieldLayout : layout->getFieldLayoutAttrs())
-    {
-        if (fieldLayout->getFieldKey() == fieldKey)
-            return fieldLayout;
-    }
-    return nullptr;
-}
-
 static void _copyMetalTypeLayoutAttributes(IRTypeLayout* source, IRTypeLayout::Builder& destination)
 {
     for (auto sizeAttr : source->getSizeAttrs())
@@ -4094,92 +4220,9 @@ static IRVarLayout* _cloneMetalVarLayout(
     return result.build();
 }
 
-// Stores one generated field at the argument-buffer index selected by its semantic role.
-static void _setMetalPhysicalDescriptorResource(
-    List<IRStructField*>& fields,
-    Index payloadCount,
-    IRStructField* field,
-    StructuralRayTracingDescriptorResourceKind kind,
-    Index payloadIndex)
-{
-    const Index argumentBufferIndex =
-        getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
-            kind,
-            payloadIndex,
-            payloadCount);
-    SLANG_RELEASE_ASSERT(
-        field && argumentBufferIndex >= 0 && argumentBufferIndex < fields.getCount() &&
-        !fields[argumentBufferIndex]);
-    fields[argumentBufferIndex] = field;
-}
-
-// Place every generated field at the index selected by the shared Metal descriptor ABI. The MSL
-// emitter preserves this declaration order and Metal assigns implicit `[[id]]` values from it, so
-// changing source collection order cannot silently change host bindings.
-static void _getMetalPhysicalDescriptorFields(
-    MetalProgramDescriptorInfo* info,
-    List<IRStructField*>& fields)
-{
-    const Index payloadCount = info->payloadPartitions.getCount();
-    const Index fieldCount = getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
-                                 StructuralRayTracingDescriptorResourceKind::Records,
-                                 -1,
-                                 payloadCount) +
-                             1;
-    for (Index i = 0; i < fieldCount; ++i)
-        fields.add(nullptr);
-    for (auto& partition : info->payloadPartitions)
-    {
-        _setMetalPhysicalDescriptorResource(
-            fields,
-            payloadCount,
-            partition.intersectionFunctionsField,
-            StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
-            partition.payloadIndex);
-        _setMetalPhysicalDescriptorResource(
-            fields,
-            payloadCount,
-            partition.missFunctionsField,
-            StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
-            partition.payloadIndex);
-        _setMetalPhysicalDescriptorResource(
-            fields,
-            payloadCount,
-            partition.closestHitFunctionsField,
-            StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
-            partition.payloadIndex);
-    }
-    _setMetalPhysicalDescriptorResource(
-        fields,
-        payloadCount,
-        info->callableFunctionsField,
-        StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable,
-        -1);
-    _setMetalPhysicalDescriptorResource(
-        fields,
-        payloadCount,
-        info->recordsField,
-        StructuralRayTracingDescriptorResourceKind::Records,
-        -1);
-
-    // The MSL struct emitter uses IR field declaration order for implicit argument IDs. Verify
-    // that the earlier descriptor-type producer created fields in the shared ABI order instead of
-    // merely attaching matching layout offsets to differently ordered declarations.
-    auto resourcesType = cast<IRStructType>(fields[0]->getParent());
-    Index declarationIndex = 0;
-    for (auto declaredField : resourcesType->getFields())
-    {
-        SLANG_RELEASE_ASSERT(
-            declarationIndex < fields.getCount() && fields[declarationIndex] == declaredField);
-        ++declarationIndex;
-    }
-    SLANG_RELEASE_ASSERT(declarationIndex == fields.getCount());
-}
-
-// Build the target layout that corresponds to one source descriptor layout. This follows the
-// descriptor's exact type-layout path rather than replacing every layout with the standard
-// module's shared field keys: specialization erases the phantom `Schema` parameter from the source
-// struct, so those keys alone cannot distinguish two schemas in one linked module.
+// Builds the argument-buffer layout after the opaque source descriptor becomes a physical
+// ParameterBlock. The source contributes one bound buffer; its five private fields always occupy
+// IDs 0..4, irrespective of the payload types that use the descriptor.
 static IRTypeLayout* _getMetalPhysicalDescriptorLayout(
     IRBuilder& builder,
     MetalProgramDescriptorInfo* info,
@@ -4188,91 +4231,42 @@ static IRTypeLayout* _getMetalPhysicalDescriptorLayout(
     if (auto existing = info->physicalDescriptorLayouts.tryGetValue(sourceTypeLayout))
         return *existing;
 
-    auto sourceDescriptorLayout = as<IRStructTypeLayout>(sourceTypeLayout);
-    SLANG_RELEASE_ASSERT(sourceDescriptorLayout);
-    auto sourceResourcesFieldLayout = _findStructFieldLayout(
-        sourceDescriptorLayout,
-        info->sourceDescriptorResourcesField->getKey());
-    SLANG_RELEASE_ASSERT(sourceResourcesFieldLayout);
-    auto sourceParameterGroupLayout =
-        as<IRParameterGroupTypeLayout>(sourceResourcesFieldLayout->getLayout()->getTypeLayout());
-    SLANG_RELEASE_ASSERT(sourceParameterGroupLayout);
-    auto sourceResourcesLayout =
-        as<IRStructTypeLayout>(sourceParameterGroupLayout->getElementVarLayout()->getTypeLayout());
-    SLANG_RELEASE_ASSERT(sourceResourcesLayout);
-
-    List<IRStructField*> physicalFields;
-    _getMetalPhysicalDescriptorFields(info, physicalFields);
-    auto sourceTableFieldLayout =
-        _findStructFieldLayout(sourceResourcesLayout, info->sourceResourceFields[0]->getKey());
-    SLANG_RELEASE_ASSERT(sourceTableFieldLayout);
-    auto sourceTableVarLayout = sourceTableFieldLayout->getLayout();
+    IRStructField* fields[] = {
+        info->intersectionFunctionsField,
+        info->missFunctionsField,
+        info->closestHitFunctionsField,
+        info->callableFunctionsField,
+        info->recordsField,
+    };
+    IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
+    fieldTypeLayoutBuilder.addResourceUsage(
+        LayoutResourceKind::MetalArgumentBufferElement,
+        LayoutSize(1));
+    auto fieldTypeLayout = fieldTypeLayoutBuilder.build();
 
     IRStructTypeLayout::Builder resourcesLayoutBuilder(&builder);
-    for (auto sizeAttr : sourceResourcesLayout->getSizeAttrs())
+    resourcesLayoutBuilder.addResourceUsage(
+        LayoutResourceKind::MetalArgumentBufferElement,
+        LayoutSize(5));
+    for (Index i = 0; i < SLANG_COUNT_OF(fields); ++i)
     {
-        if (sizeAttr->getResourceKind() == LayoutResourceKind::MetalArgumentBufferElement)
-        {
-            resourcesLayoutBuilder.addResourceUsage(
-                LayoutResourceKind::MetalArgumentBufferElement,
-                LayoutSize(physicalFields.getCount()));
-        }
-        else
-        {
-            resourcesLayoutBuilder.addResourceUsage(sizeAttr);
-        }
+        IRVarLayout::Builder fieldLayoutBuilder(&builder, fieldTypeLayout);
+        auto offset = fieldLayoutBuilder.findOrAddResourceInfo(
+            LayoutResourceKind::MetalArgumentBufferElement);
+        offset->offset = LayoutOffset(i);
+        resourcesLayoutBuilder.addField(fields[i]->getKey(), fieldLayoutBuilder.build());
     }
-    for (auto alignmentAttr : sourceResourcesLayout->getAlignmentAttrs())
-        resourcesLayoutBuilder.addAlignment(alignmentAttr);
-    for (Index fieldIndex = 0; fieldIndex < physicalFields.getCount(); ++fieldIndex)
-    {
-        auto field = physicalFields[fieldIndex];
-        SLANG_RELEASE_ASSERT(field);
-        auto fieldLayout = _cloneMetalVarLayout(
-            builder,
-            sourceTableVarLayout,
-            sourceTableVarLayout->getTypeLayout());
-        auto argumentBufferOffset =
-            fieldLayout->findOffsetAttr(LayoutResourceKind::MetalArgumentBufferElement);
-        SLANG_RELEASE_ASSERT(argumentBufferOffset);
-        IRVarLayout::Builder indexedFieldLayoutBuilder(&builder, fieldLayout->getTypeLayout());
-        indexedFieldLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
-        for (auto offsetAttr : fieldLayout->getOffsetAttrs())
-        {
-            auto offset =
-                indexedFieldLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-            offset->offset =
-                offsetAttr->getResourceKind() == LayoutResourceKind::MetalArgumentBufferElement
-                    ? LayoutOffset(fieldIndex)
-                    : offsetAttr->getOffset();
-            offset->space = offsetAttr->getSpace();
-        }
-        resourcesLayoutBuilder.addField(field->getKey(), indexedFieldLayoutBuilder.build());
-    }
-    auto physicalResourcesLayout = resourcesLayoutBuilder.build();
-
+    auto resourcesLayout = resourcesLayoutBuilder.build();
+    IRVarLayout::Builder containerLayoutBuilder(&builder, sourceTypeLayout);
+    IRVarLayout::Builder elementLayoutBuilder(&builder, resourcesLayout);
     IRParameterGroupTypeLayout::Builder parameterGroupLayoutBuilder(&builder);
-    _copyMetalTypeLayoutAttributes(sourceParameterGroupLayout, parameterGroupLayoutBuilder);
-    parameterGroupLayoutBuilder.setContainerVarLayout(
-        sourceParameterGroupLayout->getContainerVarLayout());
-    parameterGroupLayoutBuilder.setElementVarLayout(_cloneMetalVarLayout(
-        builder,
-        sourceParameterGroupLayout->getElementVarLayout(),
-        physicalResourcesLayout));
-    parameterGroupLayoutBuilder.setOffsetElementTypeLayout(physicalResourcesLayout);
-    auto physicalParameterGroupLayout = parameterGroupLayoutBuilder.build();
-
-    IRStructTypeLayout::Builder descriptorLayoutBuilder(&builder);
-    _copyMetalTypeLayoutAttributes(sourceDescriptorLayout, descriptorLayoutBuilder);
-    descriptorLayoutBuilder.addField(
-        info->descriptorResourcesField->getKey(),
-        _cloneMetalVarLayout(
-            builder,
-            sourceResourcesFieldLayout->getLayout(),
-            physicalParameterGroupLayout));
-    auto physicalDescriptorLayout = descriptorLayoutBuilder.build();
-    info->physicalDescriptorLayouts.add(sourceTypeLayout, physicalDescriptorLayout);
-    return physicalDescriptorLayout;
+    _copyMetalTypeLayoutAttributes(sourceTypeLayout, parameterGroupLayoutBuilder);
+    parameterGroupLayoutBuilder.setContainerVarLayout(containerLayoutBuilder.build());
+    parameterGroupLayoutBuilder.setElementVarLayout(elementLayoutBuilder.build());
+    parameterGroupLayoutBuilder.setOffsetElementTypeLayout(resourcesLayout);
+    auto result = parameterGroupLayoutBuilder.build();
+    info->physicalDescriptorLayouts.add(sourceTypeLayout, result);
+    return result;
 }
 
 // Returns the semantic value type for each canonical struct-layout field-key representation.
@@ -4520,108 +4514,85 @@ static IRStructField* _createMetalDescriptorResourceField(
     return builder.createStructField(resourcesType, key, placeholderType);
 }
 
-// Replace the fixed source placeholder with the target-specific `3 * payloadCount + 2` resource
-// struct. Payload partitions have already been collected in shader declaration order.
+// Creates target-owned resources for an opaque descriptor. There is no source wrapper or public
+// storage field to recover: the schema identity selects exactly one physical ParameterBlock.
 static void _synthesizeMetalProgramDescriptor(IRModule* module, MetalProgramDescriptorInfo* info)
 {
-    auto descriptorWrapper =
-        as<IRStructuralRayTracingProgramDescriptorType>(info->descriptor->getDataType());
-    SLANG_RELEASE_ASSERT(
-        descriptorWrapper && descriptorWrapper->getSchemaType() == info->programLayout);
-    auto descriptorType = cast<IRStructType>(descriptorWrapper->getStorageType());
-    List<IRStructField*> descriptorFields;
-    _getStructFields(descriptorType, descriptorFields);
-    SLANG_RELEASE_ASSERT(descriptorFields.getCount() == 1);
-
-    auto sourceParameterBlock =
-        as<IRUniformParameterGroupType>(descriptorFields[0]->getFieldType());
-    auto sourceResourcesType =
-        sourceParameterBlock ? as<IRStructType>(sourceParameterBlock->getElementType()) : nullptr;
-    SLANG_RELEASE_ASSERT(sourceResourcesType);
-
-    List<IRStructField*> sourceFields;
-    _getStructFields(sourceResourcesType, sourceFields);
-    SLANG_RELEASE_ASSERT(sourceFields.getCount() == 5);
-    info->sourceDescriptorType = descriptorType;
-    info->sourceDescriptorResourcesField = descriptorFields[0];
-    for (auto field : sourceFields)
-        info->sourceResourceFields.add(field);
-
+    auto descriptorType = as<IRTraceProgramDescriptorType>(info->descriptor->getDataType());
+    SLANG_RELEASE_ASSERT(descriptorType && descriptorType->getSchema() == info->programLayout);
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
-    auto physicalResourcesType = builder.createStructType();
-    if (auto nameHint = sourceResourcesType->findDecoration<IRNameHintDecoration>())
-        builder.addNameHintDecoration(physicalResourcesType, nameHint->getName());
+    auto resourcesType = builder.createStructType();
+    StringBuilder name;
+    name << info->programLayoutSourceTypeName->getStringSlice() << ".resources";
+    builder.addNameHintDecoration(resourcesType, name.getUnownedSlice());
 
-    auto tablePlaceholderType = sourceFields[0]->getFieldType();
-    auto payloadCount = info->payloadPartitions.getCount();
-    for (Index i = 0; i < info->payloadPartitions.getCount(); ++i)
+    IRInst* intersectionTableArgs[] = {
+        builder.getIntValue(builder.getIntType(), info->tagMask),
+        builder.getIntValue(builder.getIntType(), info->maxLevels),
+    };
+    auto intersectionTableType =
+        builder.getType(kIROp_MetalIntersectionFunctionTable, 2, intersectionTableArgs);
+    auto erasedPointerType = builder.getPtrType(builder.getVoidType(), AddressSpace::ThreadLocal);
+    IRType* noOpParams[] = {erasedPointerType};
+    auto noOpSignature = builder.getFuncType(1, noOpParams, builder.getVoidType());
+    auto makeVisibleTableType = [&](StructuralRayTracingStageKind stage)
     {
-        auto& partition = info->payloadPartitions[i];
-        partition.intersectionFunctionsField = _createMetalDescriptorResourceField(
-            builder,
-            physicalResourcesType,
-            tablePlaceholderType,
-            StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
-            i,
-            payloadCount);
-        partition.missFunctionsField = _createMetalDescriptorResourceField(
-            builder,
-            physicalResourcesType,
-            tablePlaceholderType,
-            StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
-            i,
-            payloadCount);
-        partition.closestHitFunctionsField = _createMetalDescriptorResourceField(
-            builder,
-            physicalResourcesType,
-            tablePlaceholderType,
-            StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
-            i,
-            payloadCount);
-    }
+        IRInst* args[] = {
+            noOpSignature,
+            builder.getIntValue(builder.getIntType(), IRIntegerValue(stage)),
+        };
+        return builder.getType(kIROp_MetalVisibleFunctionTable, 2, args);
+    };
+    info->intersectionFunctionsField = _createMetalDescriptorResourceField(
+        builder,
+        resourcesType,
+        intersectionTableType,
+        StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
+        -1,
+        0);
+    info->missFunctionsField = _createMetalDescriptorResourceField(
+        builder,
+        resourcesType,
+        makeVisibleTableType(StructuralRayTracingStageKind::Miss),
+        StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
+        -1,
+        0);
+    info->closestHitFunctionsField = _createMetalDescriptorResourceField(
+        builder,
+        resourcesType,
+        makeVisibleTableType(StructuralRayTracingStageKind::ClosestHit),
+        StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
+        -1,
+        0);
     info->callableFunctionsField = _createMetalDescriptorResourceField(
         builder,
-        physicalResourcesType,
-        sourceFields[3]->getFieldType(),
+        resourcesType,
+        makeVisibleTableType(StructuralRayTracingStageKind::Callable),
         StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable,
         -1,
-        payloadCount);
+        0);
     info->recordsField = _createMetalDescriptorResourceField(
         builder,
-        physicalResourcesType,
-        sourceFields[4]->getFieldType(),
+        resourcesType,
+        builder.getPtrType(builder.getUIntType(), AddressSpace::Global),
         StructuralRayTracingDescriptorResourceKind::Records,
         -1,
-        payloadCount);
-    List<IRInst*> parameterBlockOperands;
-    parameterBlockOperands.add(physicalResourcesType);
-    for (UInt i = 1; i < sourceParameterBlock->getOperandCount(); ++i)
-        parameterBlockOperands.add(sourceParameterBlock->getOperand(i));
-    auto physicalParameterBlock = builder.getType(
-        sourceParameterBlock->getOp(),
-        parameterBlockOperands.getCount(),
-        parameterBlockOperands.getBuffer());
-    info->physicalDescriptorType = builder.createStructType();
-    if (auto nameHint = descriptorType->findDecoration<IRNameHintDecoration>())
-        builder.addNameHintDecoration(info->physicalDescriptorType, nameHint->getName());
-    info->descriptorResourcesField = builder.createStructField(
-        info->physicalDescriptorType,
-        descriptorFields[0]->getKey(),
-        physicalParameterBlock);
-
+        0);
+    IRInst* parameterBlockArgs[] = {resourcesType};
+    info->physicalDescriptorType = builder.getType(kIROp_ParameterBlockType, 1, parameterBlockArgs);
     info->descriptorResourcesPointerType =
         builder.getPtrType(builder.getUIntType(), AddressSpace::Uniform);
 }
 
 static IRFuncType* _getMetalVisibleFunctionSignature(
     IRBuilder& builder,
-    IRType* rayDataType,
     const MetalStageRequirements& requirements,
+    const MetalInstancePathABI& instanceABI,
     IRType* descriptorResourcesPointerType)
 {
     List<IRType*> parameterTypes;
-    parameterTypes.add(builder.getPtrType(rayDataType, AddressSpace::ThreadLocal));
+    parameterTypes.add(builder.getPtrType(builder.getVoidType(), AddressSpace::ThreadLocal));
     if (requirements.distance || requirements.objectSpaceRay)
         parameterTypes.add(builder.getFloatType());
     if (requirements.hitKind)
@@ -4644,6 +4615,12 @@ static IRFuncType* _getMetalVisibleFunctionSignature(
         parameterTypes.add(builder.getUIntType());
     if (requirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (requirements.instanceCount)
+        parameterTypes.add(builder.getUIntType());
+    if (requirements.instanceIndexAtLevel)
+        parameterTypes.add(instanceABI.parameterType);
+    if (requirements.instanceIDAtLevel)
+        parameterTypes.add(instanceABI.parameterType);
     if (requirements.objectSpaceRay)
     {
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
@@ -4673,8 +4650,8 @@ static bool _prepareTraceDescriptor(
     auto descriptorResourcesPointerType = programInfo->descriptorResourcesPointerType;
 
     auto intType = builder.getIntType();
-    auto tagMask = builder.getIntValue(intType, IRIntegerValue(partition->tagMask));
-    auto maxLevels = builder.getIntValue(intType, partition->maxLevels);
+    auto tagMask = builder.getIntValue(intType, IRIntegerValue(programInfo->tagMask));
+    auto maxLevels = builder.getIntValue(intType, programInfo->maxLevels);
     IRInst* intersectionTableOperands[] = {tagMask, maxLevels};
     auto intersectionFunctionTableType = builder.getType(
         kIROp_MetalIntersectionFunctionTable,
@@ -4684,8 +4661,8 @@ static bool _prepareTraceDescriptor(
     IRInst* missTableTypeOperands[] = {
         _getMetalVisibleFunctionSignature(
             builder,
-            rayDataInfo->type,
-            partition->missRequirements,
+            programInfo->missRequirements,
+            programInfo->instanceABI,
             descriptorResourcesPointerType),
         builder.getIntValue(
             builder.getIntType(),
@@ -4698,8 +4675,8 @@ static bool _prepareTraceDescriptor(
     IRInst* closestHitTableTypeOperands[] = {
         _getMetalVisibleFunctionSignature(
             builder,
-            rayDataInfo->type,
-            partition->closestHitRequirements,
+            programInfo->closestHitRequirements,
+            programInfo->instanceABI,
             descriptorResourcesPointerType),
         builder.getIntValue(
             builder.getIntType(),
@@ -4710,28 +4687,27 @@ static bool _prepareTraceDescriptor(
         SLANG_COUNT_OF(closestHitTableTypeOperands),
         closestHitTableTypeOperands);
 
-    if (partition->intersectionFunctionTableType)
+    if (programInfo->intersectionFunctionTableType)
     {
         SLANG_RELEASE_ASSERT(
-            partition->intersectionFunctionTableType == intersectionFunctionTableType &&
-            partition->missFunctionTableType == missFunctionTableType &&
-            partition->closestHitFunctionTableType == closestHitFunctionTableType);
+            programInfo->intersectionFunctionTableType == intersectionFunctionTableType &&
+            programInfo->missFunctionTableType == missFunctionTableType &&
+            programInfo->closestHitFunctionTableType == closestHitFunctionTableType);
     }
     else
     {
-        partition->intersectionFunctionTableType = intersectionFunctionTableType;
-        partition->missFunctionTableType = missFunctionTableType;
-        partition->closestHitFunctionTableType = closestHitFunctionTableType;
-        partition->intersectionFunctionsField->setFieldType(intersectionFunctionTableType);
-        partition->missFunctionsField->setFieldType(missFunctionTableType);
-        partition->closestHitFunctionsField->setFieldType(closestHitFunctionTableType);
+        programInfo->intersectionFunctionTableType = intersectionFunctionTableType;
+        programInfo->missFunctionTableType = missFunctionTableType;
+        programInfo->closestHitFunctionTableType = closestHitFunctionTableType;
+        programInfo->intersectionFunctionsField->setFieldType(intersectionFunctionTableType);
+        programInfo->missFunctionsField->setFieldType(missFunctionTableType);
+        programInfo->closestHitFunctionsField->setFieldType(closestHitFunctionTableType);
     }
 
-    outInfo.descriptorResourcesField = programInfo->descriptorResourcesField;
     outInfo.descriptorResourcesPointerType = descriptorResourcesPointerType;
-    outInfo.intersectionFunctionsField = partition->intersectionFunctionsField;
-    outInfo.missFunctionsField = partition->missFunctionsField;
-    outInfo.closestHitFunctionsField = partition->closestHitFunctionsField;
+    outInfo.intersectionFunctionsField = programInfo->intersectionFunctionsField;
+    outInfo.missFunctionsField = programInfo->missFunctionsField;
+    outInfo.closestHitFunctionsField = programInfo->closestHitFunctionsField;
     outInfo.callableFunctionsField = programInfo->callableFunctionsField;
     outInfo.recordsField = programInfo->recordsField;
     outInfo.intersectionFunctionTableType = intersectionFunctionTableType;
@@ -4742,15 +4718,12 @@ static bool _prepareTraceDescriptor(
 
 static bool _prepareCallableDescriptor(
     IRBuilder& builder,
-    IRType* dataType,
     MetalProgramDescriptorInfo* programInfo,
     const MetalStageRequirements& requirements,
     MetalTraceDescriptorInfo& outInfo)
 {
     List<IRType*> parameterTypes;
-    parameterTypes.add(builder.getPtrType(
-        _getMetalCallableDataStorageType(builder, dataType),
-        AddressSpace::ThreadLocal));
+    parameterTypes.add(builder.getPtrType(builder.getVoidType(), AddressSpace::ThreadLocal));
     auto uint3Type =
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
     if (requirements.dispatchRaysIndex)
@@ -4785,7 +4758,6 @@ static bool _prepareCallableDescriptor(
         programInfo->callableFunctionsField->setFieldType(callableFunctionTableType);
     }
 
-    outInfo.descriptorResourcesField = programInfo->descriptorResourcesField;
     outInfo.descriptorResourcesPointerType = programInfo->descriptorResourcesPointerType;
     outInfo.callableFunctionsField = programInfo->callableFunctionsField;
     outInfo.recordsField = programInfo->recordsField;
@@ -4796,21 +4768,10 @@ static bool _prepareCallableDescriptor(
 static IRInst* _loadDescriptorResource(
     IRBuilder& builder,
     IRInst* descriptor,
-    const MetalTraceDescriptorInfo& descriptorInfo,
     IRStructField* resourceField)
 {
-    auto resources =
-        builder.emitFieldExtract(descriptor, descriptorInfo.descriptorResourcesField->getKey());
-    auto resourceAddress = builder.emitFieldAddress(resources, resourceField->getKey());
+    auto resourceAddress = builder.emitFieldAddress(descriptor, resourceField->getKey());
     return builder.emitLoad(resourceAddress);
-}
-
-static IRInst* _getDescriptorResources(
-    IRBuilder& builder,
-    IRInst* descriptor,
-    const MetalTraceDescriptorInfo& descriptorInfo)
-{
-    return builder.emitFieldExtract(descriptor, descriptorInfo.descriptorResourcesField->getKey());
 }
 
 static MetalStructuralRayTracingGeometryKind _getGeometryKind(
@@ -4903,7 +4864,6 @@ static bool _materializeMetalPayloadPartition(
     HashSet<IRFunc*>& candidateHelperSet,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
     Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
-    Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     MetalRayDataInfo* rayDataInfo,
     const MetalCandidateResultInfo& filterResultInfo,
     const MetalCandidateResultInfo& proceduralResultInfo)
@@ -4913,10 +4873,10 @@ static bool _materializeMetalPayloadPartition(
     IRBuilder builder(module);
     auto payloadPartition = programInfo->findPayloadPartition(payloadType);
     SLANG_RELEASE_ASSERT(payloadPartition);
-    auto tagMask = payloadPartition->tagMask;
-    auto maxLevels = payloadPartition->maxLevels;
-    const auto& missRequirements = payloadPartition->missRequirements;
-    const auto& closestHitRequirements = payloadPartition->closestHitRequirements;
+    auto tagMask = programInfo->tagMask;
+    auto maxLevels = programInfo->maxLevels;
+    const auto& missRequirements = programInfo->missRequirements;
+    const auto& closestHitRequirements = programInfo->closestHitRequirements;
     MetalTraceDescriptorInfo descriptorInfo;
     if (!_prepareTraceDescriptor(
             builder,
@@ -4940,7 +4900,7 @@ static bool _materializeMetalPayloadPartition(
     for (auto decoration : schemaOperation->getDecorations())
     {
         auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
-        if (!group || !_isStructuralHitGroupForPayload(group, payloadType))
+        if (!group)
             continue;
         auto anyHitInvoke = getStructuralRayTracingHitGroupStageInvoke(
             group,
@@ -4988,7 +4948,7 @@ static bool _materializeMetalPayloadPartition(
     }
     const bool candidateUsesInstancing =
         (tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0;
-    const auto& candidateInstanceABI = payloadPartition->instanceABI;
+    const auto& candidateInstanceABI = programInfo->instanceABI;
     SLANG_RELEASE_ASSERT(!hasCandidateLogic || candidateInstanceABI.parameterType);
     auto prepareCandidateSignature = [&](MetalStageRequirements& requirements)
     {
@@ -5029,6 +4989,7 @@ static bool _materializeMetalPayloadPartition(
                     StructuralRayTracingHitAttributesKind::None,
                     physicalName.getUnownedSlice(),
                     missRequirements,
+                    programInfo->instanceABI,
                     rayDataInfo,
                     descriptorInfo.descriptorResourcesPointerType,
                     cast<IRMetalVisibleFunctionTable>(descriptorInfo.missFunctionTableType)))
@@ -5076,6 +5037,7 @@ static bool _materializeMetalPayloadPartition(
                     hitAttributesKind,
                     physicalName.getUnownedSlice(),
                     closestHitRequirements,
+                    programInfo->instanceABI,
                     rayDataInfo,
                     descriptorInfo.descriptorResourcesPointerType,
                     cast<IRMetalVisibleFunctionTable>(descriptorInfo.closestHitFunctionTableType)))
@@ -5103,7 +5065,7 @@ static bool _materializeMetalPayloadPartition(
                     signatureRequirements,
                     candidateInstanceABI,
                     tagMask,
-                    rayDataInfo))
+                    programInfo->findPayloadPartition(group->getPayloadType())->rayDataInfo))
             {
                 arms.add({group, helper});
                 candidateHelperSet.add(helper);
@@ -5116,15 +5078,14 @@ static bool _materializeMetalPayloadPartition(
         if (auto dispatcher = _generateMetalCandidateDispatcher(
                 module,
                 generatedCandidateDispatchers,
-                candidateRayDataParams,
                 filterResultInfo,
                 arms,
                 geometryKind,
                 tagMask,
                 maxLevels,
-                payloadPartition->instanceHitGroupContributionLookup,
+                programInfo->instanceHitGroupContributionLookup,
                 programInfo->hitRecordStride,
-                rayDataInfo,
+                programInfo->rayDataHeader,
                 programInfo->programLayout,
                 physicalName.getUnownedSlice()))
         {
@@ -5134,10 +5095,10 @@ static bool _materializeMetalPayloadPartition(
     };
     if (hasCandidateLogic)
     {
-        // Once a payload needs an IFT, the primitive kind selected by the acceleration structure
+        // Once the schema needs an IFT, the primitive kind selected by the acceleration structure
         // must always resolve to a defined entry. Triangle and bounding-box occupy fixed indices
         // zero and one; an absent kind gets a reject-all dispatcher. Curve index two exists only
-        // when the payload schema actually contains a curve group.
+        // when the schema actually contains a curve group.
         generateBuiltInDispatcher(
             triangleCandidateGroups,
             triangleCandidateRequirements,
@@ -5166,7 +5127,7 @@ static bool _materializeMetalPayloadPartition(
                     boundingBoxHasAnyHit,
                     candidateInstanceABI,
                     tagMask,
-                    rayDataInfo))
+                    programInfo->findPayloadPartition(group->getPayloadType())->rayDataInfo))
             {
                 boundingBoxArms.add({group, helper});
                 candidateHelperSet.add(helper);
@@ -5179,15 +5140,14 @@ static bool _materializeMetalPayloadPartition(
         if (auto dispatcher = _generateMetalCandidateDispatcher(
                 module,
                 generatedCandidateDispatchers,
-                candidateRayDataParams,
                 proceduralResultInfo,
                 boundingBoxArms,
                 MetalStructuralRayTracingGeometryKind::BoundingBox,
                 tagMask,
                 maxLevels,
-                payloadPartition->instanceHitGroupContributionLookup,
+                programInfo->instanceHitGroupContributionLookup,
                 programInfo->hitRecordStride,
-                rayDataInfo,
+                programInfo->rayDataHeader,
                 programInfo->programLayout,
                 boundingBoxPhysicalName.getUnownedSlice()))
         {
@@ -5205,25 +5165,16 @@ static bool _materializeMetalPayloadPartition(
     auto intersectionFunctions = _loadDescriptorResource(
         builder,
         trace->getDescriptor(),
-        descriptorInfo,
         descriptorInfo.intersectionFunctionsField);
-    auto missFunctions = _loadDescriptorResource(
-        builder,
-        trace->getDescriptor(),
-        descriptorInfo,
-        descriptorInfo.missFunctionsField);
+    auto missFunctions =
+        _loadDescriptorResource(builder, trace->getDescriptor(), descriptorInfo.missFunctionsField);
     auto closestHitFunctions = _loadDescriptorResource(
         builder,
         trace->getDescriptor(),
-        descriptorInfo,
         descriptorInfo.closestHitFunctionsField);
-    auto records = _loadDescriptorResource(
-        builder,
-        trace->getDescriptor(),
-        descriptorInfo,
-        descriptorInfo.recordsField);
-    auto descriptorResources =
-        _getDescriptorResources(builder, trace->getDescriptor(), descriptorInfo);
+    auto records =
+        _loadDescriptorResource(builder, trace->getDescriptor(), descriptorInfo.recordsField);
+    auto descriptorResources = trace->getDescriptor();
 
     IRInst* origin;
     IRInst* direction;
@@ -5253,16 +5204,14 @@ static bool _materializeMetalPayloadPartition(
     builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
     auto rayDataPayload = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
     builder.emitStore(rayDataPayload, builder.emitLoad(trace->getPayload()));
-    if (rayDataInfo->recordDataKey)
-    {
-        builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->recordDataKey), records);
-    }
-    if (rayDataInfo->sbtOffsetKey)
-    {
-        SLANG_ASSERT(rayDataInfo->sbtStrideKey);
-        builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->sbtOffsetKey), sbtOffset);
-        builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->sbtStrideKey), sbtStride);
-    }
+    auto header = builder.emitFieldAddress(rayData, rayDataInfo->headerKey);
+    builder.emitStore(builder.emitFieldAddress(header, rayDataInfo->header->recordsKey), records);
+    builder.emitStore(
+        builder.emitFieldAddress(header, rayDataInfo->header->sbtOffsetKey),
+        sbtOffset);
+    builder.emitStore(
+        builder.emitFieldAddress(header, rayDataInfo->header->sbtStrideKey),
+        sbtStride);
     if (rayDataInfo->minDistanceKey)
     {
         builder.emitStore(
@@ -5303,8 +5252,7 @@ static bool _materializeMetalPayloadPartition(
     }
 
     auto intType = builder.getIntType();
-    IRInst* instanceHitGroupContributionLookup =
-        payloadPartition->instanceHitGroupContributionLookup;
+    IRInst* instanceHitGroupContributionLookup = programInfo->instanceHitGroupContributionLookup;
     SLANG_RELEASE_ASSERT(!candidateUsesInstancing || instanceHitGroupContributionLookup);
     if (!instanceHitGroupContributionLookup)
         instanceHitGroupContributionLookup = builder.getIntValue(intType, 0);
@@ -5375,7 +5323,6 @@ static bool _materializeMetalCallableTable(
     MetalTraceDescriptorInfo descriptorInfo;
     if (!_prepareCallableDescriptor(
             builder,
-            programInfo->callableDataType,
             programInfo,
             programInfo->callableRequirements,
             descriptorInfo))
@@ -5421,19 +5368,16 @@ static bool _lowerCallableDispatch(
     MetalTraceDescriptorInfo descriptorInfo;
     if (!_prepareCallableDescriptor(
             builder,
-            programInfo->callableDataType,
             programInfo,
             programInfo->callableRequirements,
             descriptorInfo))
         return false;
 
     builder.setInsertBefore(callOperation);
-    auto descriptorResources =
-        _getDescriptorResources(builder, callOperation->getDescriptor(), descriptorInfo);
+    auto descriptorResources = callOperation->getDescriptor();
     auto records = _loadDescriptorResource(
         builder,
         callOperation->getDescriptor(),
-        descriptorInfo,
         descriptorInfo.recordsField);
     auto uint3Type =
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
@@ -5759,12 +5703,11 @@ static MetalProgramDescriptorInfo* _findOrAddMetalProgramDescriptorInfo(
         descriptor = call->getDescriptor();
     }
 
-    auto descriptorType =
-        as<IRStructuralRayTracingProgramDescriptorType>(descriptor->getDataType());
+    auto descriptorType = as<IRTraceProgramDescriptorType>(descriptor->getDataType());
     // AST-to-IR lowering preserves the exact checked schema on the descriptor type. A mismatch
     // here means specialization or linking broke a compiler-owned type invariant; it is not a
     // recoverable user error.
-    SLANG_RELEASE_ASSERT(descriptorType && descriptorType->getSchemaType() == programLayout);
+    SLANG_RELEASE_ASSERT(descriptorType && descriptorType->getSchema() == programLayout);
 
     if (auto found = infosByProgramLayout.tryGetValue(programLayout))
     {
@@ -5901,12 +5844,12 @@ static UInt _getMetalIntersectionFunctionSignature(UInt tagMask, IRIntegerValue 
     return result;
 }
 
-// Unions every trace's target requirements into its schema payload partition before any physical
-// table type is created. Consider two entry points that use the same schema and payload but appear
+// Unions every trace's target requirements across its schema before any physical table type is
+// created. Consider two entry points that use the same schema with different payloads and appear
 // in the opposite link order. Both must produce one identical IFT type and one identical metadata
 // record; allowing the first operation to freeze the type would make code generation
 // order-sensitive.
-static void _collectMetalPayloadPartitionRequirements(
+static void _collectMetalSchemaRequirements(
     MetalProgramDescriptorInfo* info,
     const Dictionary<IRInst*, MetalTraceContextRequirements>& traceContextRequirements,
     UInt capabilityTagMask)
@@ -5917,20 +5860,20 @@ static void _collectMetalPayloadPartitionRequirements(
         SLANG_RELEASE_ASSERT(traceRequirements);
         for (auto& partition : info->payloadPartitions)
         {
-            partition.tagMask |= _getSharedMetalTagMask(
+            info->tagMask |= _getSharedMetalTagMask(
                 operation,
                 partition.payloadType,
                 traceRequirements->tagMask,
                 capabilityTagMask);
-            partition.maxLevels = Math::Max(partition.maxLevels, traceRequirements->maxLevels);
-            partition.missRequirements = _combineMetalStageRequirements(
-                partition.missRequirements,
+            info->maxLevels = Math::Max(info->maxLevels, traceRequirements->maxLevels);
+            info->missRequirements = _combineMetalStageRequirements(
+                info->missRequirements,
                 _getMetalStageRequirements(
                     operation,
                     StructuralRayTracingStageKind::Miss,
                     partition.payloadType));
-            partition.closestHitRequirements = _combineMetalStageRequirements(
-                partition.closestHitRequirements,
+            info->closestHitRequirements = _combineMetalStageRequirements(
+                info->closestHitRequirements,
                 _getMetalStageRequirements(
                     operation,
                     StructuralRayTracingStageKind::ClosestHit,
@@ -5953,9 +5896,8 @@ static void _addMetalPayloadMetadataDecorations(IRModule* module, MetalProgramDe
             builder.getIntValue(builder.getIntType(), partition.payloadIndex),
             builder.getIntValue(
                 builder.getIntType(),
-                IRIntegerValue(_getMetalIntersectionFunctionSignature(
-                    partition.tagMask,
-                    partition.maxLevels))),
+                IRIntegerValue(
+                    _getMetalIntersectionFunctionSignature(info->tagMask, info->maxLevels))),
         };
         builder.addDecoration(
             module->getModuleInst(),
@@ -5991,25 +5933,29 @@ static void _prepareMetalProgramDescriptors(
     for (auto info : orderedInfos)
     {
         _calculateMetalRecordStrides(info, targetRequest);
-        _collectMetalPayloadPartitionRequirements(
-            info,
-            traceContextRequirements,
-            capabilityTagMask);
+        _collectMetalSchemaRequirements(info, traceContextRequirements, capabilityTagMask);
         _synthesizeMetalProgramDescriptor(module, info);
     }
 
-    // Replace the canonical descriptor wrapper once per schema. `replaceUsesWith` recursively
+    // Replace the canonical opaque descriptor once per schema. `replaceUsesWith` recursively
     // updates and deduplicates every hoistable dependent type, including helper signatures,
     // pointers, tuples, and generic user structs. No SSA use-graph reconstruction is needed: the
-    // schema identity was preserved by the AST-to-IR producer before its source storage erased the
-    // phantom generic argument.
+    // schema identity is an explicit operand of the source descriptor's compiler-owned IR type.
     Dictionary<IRType*, IRType*> physicalTypesBySchema;
     for (auto info : orderedInfos)
     {
         SLANG_RELEASE_ASSERT(info->programLayout && info->physicalDescriptorType);
         physicalTypesBySchema.add(cast<IRType>(info->programLayout), info->physicalDescriptorType);
     }
-    lowerStructuralRayTracingProgramDescriptorTypes(module, physicalTypesBySchema, nullptr);
+    // A descriptor that never participates in a trace needs only its opaque bound-buffer handle.
+    // No shader can inspect its fields, so keep the handle without inventing table signatures.
+    IRBuilder descriptorBuilder(module);
+    auto unusedDescriptorType =
+        descriptorBuilder.getPtrType(descriptorBuilder.getVoidType(), AddressSpace::Uniform);
+    lowerStructuralRayTracingProgramDescriptorTypes(
+        module,
+        physicalTypesBySchema,
+        unusedDescriptorType);
 
     // Layouts are rebuilt after type replacement. One paired type/layout walk handles all schemas
     // at once, so a field key shared by two generic struct specializations can never make one
@@ -6019,6 +5965,18 @@ static void _prepareMetalProgramDescriptors(
     for (auto info : orderedInfos)
     {
         _addMetalPayloadMetadataDecorations(module, info);
+        info->rayDataHeader = _createMetalRayDataHeader(module);
+        // A direct primitive-AS trace has no native max_levels tag, but the source multilevel
+        // API still describes its (empty) path with an array view rather than a scalar ID.
+        const bool hasInstancePathArray =
+            info->maxLevels > 0 ||
+            (info->tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) == 0;
+        info->instanceABI = instancePathABICache.getABI(hasInstancePathArray ? 1 : 0);
+        if ((info->tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
+        {
+            info->instanceHitGroupContributionLookup =
+                instancePathABICache.getContributionLookup(info->maxLevels);
+        }
         for (Index i = 0; i < info->payloadPartitions.getCount(); ++i)
         {
             SLANG_RELEASE_ASSERT(info->representativeSchemaOperation);
@@ -6029,13 +5987,8 @@ static void _prepareMetalProgramDescriptors(
                 partition.payloadType,
                 i,
                 info->payloadPartitions.getCount() > 1,
+                info->rayDataHeader,
                 targetRequest);
-            partition.instanceABI = instancePathABICache.getABI(partition.maxLevels);
-            if ((partition.tagMask & UInt(MetalStructuralRayTracingTag::Instancing)) != 0)
-            {
-                partition.instanceHitGroupContributionLookup =
-                    instancePathABICache.getContributionLookup(partition.maxLevels);
-            }
         }
     }
 }
@@ -6047,6 +6000,7 @@ void prepareMetalStructuralRayTracing(
     TargetRequest* targetRequest,
     DiagnosticSink* sink)
 {
+    lowerBuiltinStructuralRayTracingHitAttributeViews(module);
     List<IRInst*> operations;
     _collectStructuralProgramOperations(module->getModuleInst(), operations);
     bool hasStructuralEntryPoint = false;
@@ -6065,12 +6019,16 @@ void prepareMetalStructuralRayTracing(
     }
     if (operations.getCount() == 0 && !hasStructuralEntryPoint)
     {
-        // A descriptor type without a selected trace/callable operation has no executable schema
-        // metadata from which to derive Metal function-table signatures. Retain its documented
-        // ParameterBlock-compatible source storage rather than guessing a physical table shape,
-        // and ensure the compiler-only wrapper never reaches general Metal legalization.
+        // Without a trace or callable use, the descriptor is just an opaque bound-buffer handle.
+        // Preserve that handle through helpers without fabricating unused table signatures.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
-        lowerStructuralRayTracingProgramDescriptorTypes(module, noTargetDescriptorTypes, nullptr);
+        IRBuilder descriptorBuilder(module);
+        auto unusedDescriptorType =
+            descriptorBuilder.getPtrType(descriptorBuilder.getVoidType(), AddressSpace::Uniform);
+        lowerStructuralRayTracingProgramDescriptorTypes(
+            module,
+            noTargetDescriptorTypes,
+            unusedDescriptorType);
         _diagnoseUnloweredMetalRayGenerationEntryPoints(entryPoints, sink);
         return;
     }
@@ -6138,7 +6096,6 @@ void prepareMetalStructuralRayTracing(
     HashSet<IRFunc*> candidateHelperSet;
     Dictionary<IRFunc*, IRInst*> payloadValues;
     Dictionary<IRFunc*, MetalDispatchValues> dispatchValues;
-    Dictionary<IRFunc*, IRParam*> candidateRayDataParams;
     MetalAccelerationStructurePhysicalizationContext accelerationStructures(module, sink);
     HashSet<IRFunc*> physicalRayGenerationEntryPoints;
     auto filterResultInfo =
@@ -6235,7 +6192,6 @@ void prepareMetalStructuralRayTracing(
                     candidateHelperSet,
                     payloadValues,
                     dispatchValues,
-                    candidateRayDataParams,
                     schemaPartition.rayDataInfo,
                     filterResultInfo,
                     proceduralResultInfo);
@@ -6274,8 +6230,6 @@ void prepareMetalStructuralRayTracing(
         }
 
         auto trace = cast<IRStructuralRayTracingTrace>(operation);
-        SLANG_RELEASE_ASSERT(
-            !trace->findDecoration<IRStructuralRayTracingDeferredEmptyPayloadDecoration>());
         auto traceRequirements = traceContextRequirements.tryGetValue(operation);
         SLANG_RELEASE_ASSERT(traceRequirements);
         if (!accelerationStructures.physicalize(
@@ -6312,7 +6266,6 @@ void prepareMetalStructuralRayTracing(
                     candidateHelperSet,
                     payloadValues,
                     dispatchValues,
-                    candidateRayDataParams,
                     partition->rayDataInfo,
                     filterResultInfo,
                     proceduralResultInfo))
@@ -6338,9 +6291,6 @@ void prepareMetalStructuralRayTracing(
     }
     for (auto adapter : candidateAdapterSet)
     {
-        auto rayDataParam = candidateRayDataParams.tryGetValue(adapter);
-        SLANG_ASSERT(rayDataParam);
-        _convertCandidateParameterToRayData(adapter, *rayDataParam);
         if (auto readNone = adapter->findDecoration<IRReadNoneDecoration>())
             readNone->removeAndDeallocate();
     }

@@ -101,11 +101,12 @@ void main()
 // PTX-DAG: _optix_call_direct_callable
 // PTX-DAG: __direct_callable__TestCallable
 
-// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
+// METAL: metal::visible_function_table<void(void thread*, uint3, uint3, uchar device*, uint constant*, uint device*)> callableFunctions_0;
 // METAL: device uchar* [[CALLABLE_RECORD:_slang_callable_record]] =
 // METAL: uint [[FUNCTION_INDEX:_slang_callable_function_index]] =
 // METAL: callableFunctions_0{{\[}}[[FUNCTION_INDEX]]{{\]}}(&data_{{[0-9]+}}, dispatchRaysIndex_{{[0-9]+}}, dispatchRaysDimensions_{{[0-9]+}}, [[CALLABLE_RECORD]] + 16,
-// METAL: {{\[\[visible\]\]}} void {{.*}}(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint3 dispatchRaysIndex_{{[0-9]+}}, uint3 dispatchRaysDimensions_{{[0-9]+}}, uchar device* [[RECORD_DATA:recordData_[0-9]+]], uint constant* descriptorResources_{{[0-9]+}}, uint device* descriptorData_{{[0-9]+}})
-// METAL: [[DATA]]->value_{{[0-9]+}} = [[DATA]]->value_{{[0-9]+}} +
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread* [[DATA:data_[0-9]+]], uint3 dispatchRaysIndex_{{[0-9]+}}, uint3 dispatchRaysDimensions_{{[0-9]+}}, uchar device* [[RECORD_DATA:recordData_[0-9]+]], uint constant* descriptorResources_{{[0-9]+}}, uint device* descriptorData_{{[0-9]+}})
+// METAL: TestCallableData_0 thread* [[TYPED_DATA:_S[0-9]+]] = (TestCallableData_0 thread*){{.*}}[[DATA]]
+// METAL: [[TYPED_DATA]]->value_{{[0-9]+}} = [[TYPED_DATA]]->value_{{[0-9]+}} +
 // METAL-SAME: (*(TestCallableRecord_0 device*)
 // METAL-SAME: [[RECORD_DATA]]

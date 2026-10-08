@@ -229,6 +229,11 @@ public:
     /// Does the code we are compiling represent part of the Slang core module?
     bool m_isCoreModuleCode = false;
 
+    /// Is this the build-system-owned compilation of the packaged `slang.raytracing` module?
+    /// This authority is deliberately separate from `m_isCoreModuleCode`, because the optional
+    /// module may use its dedicated descriptor type but must not acquire general core back doors.
+    bool m_isSlangRayTracingModuleCode = false;
+
     Name* m_defaultModuleName = nullptr;
 
     /// The irDumpOptions

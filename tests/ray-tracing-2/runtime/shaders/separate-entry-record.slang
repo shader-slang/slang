@@ -103,10 +103,10 @@ void rayGenerationMain()
     uint rayIndex = DispatchRaysIndex().x;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex == 0 ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = rayIndex == 0 ? float3(0.25, 0.25, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;
@@ -123,8 +123,8 @@ void rayGenerationMain()
 }
 
 // HLSL_CLOSEST-DAG: cbuffer existingConstants{{.*}} : register(b0)
-// HLSL_CLOSEST-DAG: cbuffer record{{.*}} : register(b0, space2)
+// HLSL_CLOSEST-DAG: cbuffer record{{.*}} : register(b0, space1)
 // HLSL_CLOSEST: [shader("closesthit")]void SeparateClosestHit(
 // HLSL_MISS-DAG: cbuffer existingConstants{{.*}} : register(b0)
-// HLSL_MISS-DAG: cbuffer record{{.*}} : register(b0, space2)
+// HLSL_MISS-DAG: cbuffer record{{.*}} : register(b0, space1)
 // HLSL_MISS: [shader("miss")]void SeparateMiss(

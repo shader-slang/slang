@@ -106,6 +106,7 @@ struct ParserOptions
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     bool isInLanguageServer = false;
     bool isCoreModule = false;
+    bool isSlangRayTracingModule = false;
     ParsingStage stage = ParsingStage::Body;
     CompilerOptionSet optionSet;
 };
@@ -10098,6 +10099,8 @@ Stmt* parseUnparsedStmt(
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
+    options.isSlangRayTracingModule =
+        translationUnit->compileRequest->m_isSlangRayTracingModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -10127,6 +10130,8 @@ void parseSourceFile(
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
     options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
+    options.isSlangRayTracingModule =
+        translationUnit->compileRequest->m_isSlangRayTracingModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -10179,7 +10184,7 @@ static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* 
         getSyntaxClass<T>());
 }
 
-static IROp parseIROp(Parser* parser, Token& outToken)
+static IROp parseIROp(Parser* parser, Token& outToken, bool allowRayTracingDescriptorType = false)
 {
     IROp op;
     if (AdvanceIf(parser, TokenType::OpSub))
@@ -10209,7 +10214,13 @@ static IROp parseIROp(Parser* parser, Token& outToken)
     // Metal-only dispatch-system-value operations. User modules must not spell any structural
     // ray-tracing IR operation directly; their source-level access is provided exclusively by the
     // registered `slang.raytracing` contracts.
-    if (!parser->options.isCoreModule && isCompilerOwnedStructuralRayTracingIROp(op))
+    // Only the packaged module may declare the opaque descriptor type. This does not authorize
+    // spelling the descriptor opcode as an intrinsic operation or declaring other internal types.
+    bool isAuthorizedDescriptorType = op == kIROp_TraceProgramDescriptorType &&
+                                      parser->options.isSlangRayTracingModule &&
+                                      allowRayTracingDescriptorType;
+    if (!parser->options.isCoreModule && !isAuthorizedDescriptorType &&
+        isCompilerOwnedStructuralRayTracingIROp(op))
     {
         parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
             .operation = outToken.getContent(),
@@ -10747,7 +10758,7 @@ static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
 {
     IntrinsicTypeModifier* modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
-    modifier->irOp = parseIROp(parser, modifier->opToken);
+    modifier->irOp = parseIROp(parser, modifier->opToken, true);
     while (AdvanceIf(parser, TokenType::Comma))
     {
         auto operand =

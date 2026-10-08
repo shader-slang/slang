@@ -435,7 +435,7 @@ void calcRequiredLoweringPassSet(
     if (inst->getOp() == kIROp_StructuralRayTracingTrace ||
         inst->getOp() == kIROp_StructuralRayTracingCallShader)
         result.structuralRayTracingTrace = true;
-    if (inst->getOp() == kIROp_StructuralRayTracingProgramDescriptorType)
+    if (inst->getOp() == kIROp_TraceProgramDescriptorType)
         result.structuralRayTracingProgramDescriptor = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
@@ -1919,10 +1919,11 @@ Result linkAndOptimizeIR(
         if (requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
         {
             Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
+            IRBuilder builder(irModule);
             SLANG_PASS(
                 lowerStructuralRayTracingProgramDescriptorTypes,
                 noTargetDescriptorTypes,
-                nullptr);
+                builder.getVoidType());
         }
         SLANG_PASS(performForceInlining);
         // Autodiff can leave void differential parameters and matching call arguments, but the
@@ -1966,18 +1967,17 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::Metal &&
         requiredLoweringPassSet.structuralRayTracingProgramDescriptor)
     {
-        // The schema operand has served its target-independent specialization role. D3D tracing
-        // selects the host-owned native SBT and therefore has no shader-visible descriptor
-        // storage. Erasing the type also erases descriptors retained by global-parameter layout
-        // metadata; lowering those to the source ParameterBlock shape would leak Slang-only syntax
-        // into HLSL passed to DXC. Other portable targets retain that source shape until their
-        // existing target-specific global-context/resource lowering has consumed it.
+        // The schema operand has served its target-independent specialization role. Native ray
+        // tracing selects the host-owned SBT, so only Metal needs shader-visible descriptor
+        // storage. Erase every descriptor type, including fields inside bound aggregates and
+        // descriptors retained by layout metadata after their last trace operation is removed.
+        // The normal void-type cleanup then removes these storage-free fields and parameters.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
         IRBuilder builder(irModule);
         SLANG_PASS(
             lowerStructuralRayTracingProgramDescriptorTypes,
             noTargetDescriptorTypes,
-            isD3DTarget(targetRequest) ? builder.getVoidType() : nullptr);
+            builder.getVoidType());
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].

@@ -155,10 +155,10 @@ void rayGenerationMain()
     uint dispatchWidth = DispatchRaysDimensions().x;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex < 4 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = rayIndex < 4 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
     desc.sbtOffset = 0;

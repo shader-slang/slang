@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
 
-// METAL: metal::visible_function_table<void(Schema_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(void thread*, uchar thread*)> closestHitFunctions_0;
 // METAL: ](&rayData_{{[0-9]+}}, (thread uchar*)&kernelContext_0);
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
-// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
+// METAL-DAG: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread* {{.*}}, uchar thread* kernelContext_{{[0-9]+}})
 
 import slang.raytracing;
 
@@ -77,8 +77,8 @@ rt::TraceProgramDescriptor<Schema> program;
 void main()
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     RuntimePayload payload = {};

@@ -56,8 +56,8 @@ struct RuntimeClosestHit : rt::IClosestHitShader
         input.payload.distance = quantize(input.distance, 1000.0);
         input.payload.worldOriginX = quantize(input.worldSpaceOrigin.x, 100.0);
         input.payload.worldDirectionZ = quantize(input.worldSpaceDirection.z, 100.0);
-        input.payload.objectOriginX = quantize(objectRay.origin.x, 100.0);
-        input.payload.objectDirectionZ = quantize(objectRay.direction.z, 100.0);
+        input.payload.objectOriginX = quantize(objectRay.Origin.x, 100.0);
+        input.payload.objectDirectionZ = quantize(objectRay.Direction.z, 100.0);
         input.payload.objectToWorldXX = quantize(input.objectToWorld[0][0], 100.0);
         input.payload.worldToObjectXX = quantize(input.worldToObject[0][0], 100.0);
         input.payload.primitiveIndex = input.primitiveIndex;
@@ -120,10 +120,10 @@ void rayGenerationMain()
 {
     uint rayIndex = DispatchRaysIndex().x;
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex == 0 ? float3(0.5, 0.25, 0.0) : float3(3.0, 3.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = rayIndex == 0 ? float3(0.5, 0.25, 0.0) : float3(3.0, 3.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
     desc.instanceMask = 0xff;
 

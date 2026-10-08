@@ -2111,23 +2111,11 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getHLSLExports() { return m_hlslExports.getArrayView(); }
 
-    /// Query concrete conformance values carrying compiler-produced open-section metadata.
-    ///
-    /// Most values are direct witness tables. An explicitly composed concrete specialization can
-    /// instead be an `IRSpecialize`; `specializeModule` turns that owner into the same final table
-    /// shape. Merely indexing these values does not root them. The final linker consults this list
-    /// only after a reachable structural operation requests an exact open tag, which keeps closed
-    /// schemas on the ordinary no-retention path.
-    ArrayView<IRInst*> getStructuralRayTracingTaggedConformances()
-    {
-        return m_structuralRayTracingTaggedConformances.getArrayView();
-    }
-
     /// Query reflection-only schema requests emitted by exact type conformances.
     ///
-    /// Closed requests retain specialized entry types for target ABI reflection; open requests
-    /// also drive tagged-conformance selection. These roots are not ordinary exports: only
-    /// whole-program manifest construction clones them, which prevents reflection-only summaries
+    /// Requests retain explicitly listed specialized entry types for target ABI reflection.
+    /// These roots are not ordinary exports: only whole-program manifest construction clones
+    /// them, which prevents reflection-only summaries
     /// from reaching target emission.
     ArrayView<IRInst*> getStructuralRayTracingProgramSchemas()
     {
@@ -2157,7 +2145,6 @@ private:
 
     // Acceleration caches for linker decisions that previously scanned all global instructions.
     List<IRInst*> m_hlslExports;
-    List<IRInst*> m_structuralRayTracingTaggedConformances;
     List<IRInst*> m_structuralRayTracingProgramSchemas;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
@@ -2301,8 +2288,10 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 31;
-    const static UInt k_maxSupportedModuleVersion = 55;
+    const static UInt k_minSupportedModuleVersion = 56;
+    // Version 56 replaces source-storage descriptor wrappers with opaque schema resources and
+    // adds explicit multilevel instance-input operations.
+    const static UInt k_maxSupportedModuleVersion = 56;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

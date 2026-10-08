@@ -90,18 +90,18 @@ void HigherOrderRaygen()
 
 // The selected closest-hit stage has Record = void, while the recursively traced schema's miss
 // stage reads a non-void Record. That synthesized miss adapter still needs a local cbuffer binding.
-// RECURSIVE: cbuffer record{{.*}} : register(b0, space2)
+// RECURSIVE: cbuffer record{{.*}} : register(b0, space1)
 // RECURSIVE: [shader("closesthit")]void RecursiveClosestHit(
 // RECURSIVE: [shader("miss")]void RecordMiss(
 
-// HIGHER_ORDER: cbuffer record{{.*}} : register(b0, space2)
+// HIGHER_ORDER: cbuffer record{{.*}} : register(b0, space1)
 // HIGHER_ORDER: [shader("raygeneration")]void HigherOrderRaygen()
 // HIGHER_ORDER: [shader("miss")]void RecordMiss(
 
-// DXIL_RECURSIVE: record{{.*}} cbuffer{{.*}} cb0,space2
+// DXIL_RECURSIVE: record{{.*}} cbuffer{{.*}} cb0,space1
 // DXIL_RECURSIVE: RecursiveClosestHit
 // DXIL_RECURSIVE: RecordMiss
 
-// DXIL_HIGHER_ORDER: record{{.*}} cbuffer{{.*}} cb0,space2
+// DXIL_HIGHER_ORDER: record{{.*}} cbuffer{{.*}} cb0,space1
 // DXIL_HIGHER_ORDER: HigherOrderRaygen
 // DXIL_HIGHER_ORDER: RecordMiss

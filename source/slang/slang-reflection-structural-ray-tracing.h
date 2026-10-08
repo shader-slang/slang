@@ -22,7 +22,7 @@ public:
 class StructuralRayTracingHitGroupReflection : public RefObject
 {
 public:
-    /// Identifies this group within the hit-group function table for its payload partition.
+    /// Identifies this group within the schema-wide hit-group function table.
     /// Schema-free declaration catalogue entries retain -1 because no schema selected a slot.
     Index functionIndex = -1;
     Type* groupType = nullptr;
@@ -32,7 +32,7 @@ public:
     TypeLayout* recordTypeLayout = nullptr;
     Type* primitiveType = nullptr;
     Type* intersectionAttributesType = nullptr;
-    /// True when whole-program open-section completion selected this group.
+    /// Reserved compatibility field; explicit lists always leave this false.
     bool isLinked = false;
     /// Exact target symbol installed in this group's closest-hit table slot.
     ///
@@ -47,7 +47,7 @@ public:
 class StructuralRayTracingMissShaderReflection : public RefObject
 {
 public:
-    /// Identifies this shader within the miss function table for its payload partition.
+    /// Identifies this shader within the schema-wide miss function table.
     /// Schema-free declaration catalogue entries retain -1 because no schema selected a slot.
     Index functionIndex = -1;
     Type* shaderType = nullptr;
@@ -55,7 +55,7 @@ public:
     Type* recordType = nullptr;
     /// Layout the host uses for the application data stored after this shader's record header.
     TypeLayout* recordTypeLayout = nullptr;
-    /// True when whole-program open-section completion selected this shader.
+    /// Reserved compatibility field; explicit lists always leave this false.
     bool isLinked = false;
     RefPtr<StructuralRayTracingStageReflection> miss;
 };
@@ -72,7 +72,7 @@ public:
     /// Layout the host uses for the application data stored after this shader's record header.
     TypeLayout* recordTypeLayout = nullptr;
     Type* callableDataType = nullptr;
-    /// True when whole-program open-section completion selected this shader.
+    /// Reserved compatibility field; explicit lists always leave this false.
     bool isLinked = false;
     RefPtr<StructuralRayTracingStageReflection> callable;
 };
@@ -84,7 +84,7 @@ enum class StructuralRayTracingMetalIntersectionFunctionImplementationKind
     OpaqueCurve,
 };
 
-/// Describes one installed entry in a payload partition's Metal intersection-function table.
+/// Describes one installed entry in the schema-wide Metal intersection-function table.
 class StructuralRayTracingIntersectionFunctionReflection : public RefObject
 {
 public:
@@ -105,7 +105,7 @@ public:
     /// Native host pipeline ABI requirement for this payload, in bytes.
     size_t nativePayloadSize = 0;
 
-    /// Number of physical slots required by this payload's fixed-index Metal IFT.
+    /// Number of physical slots required by the schema-wide fixed-index Metal IFT.
     Index intersectionFunctionTableSize = 0;
     List<RefPtr<StructuralRayTracingIntersectionFunctionReflection>> intersectionFunctions;
 
@@ -121,7 +121,7 @@ public:
     {
         StructuralRayTracingDescriptorResourceKind kind =
             StructuralRayTracingDescriptorResourceKind::Count;
-        /// Payload index for per-payload resources, or -1 for schema-wide resources.
+        /// Reserved compatibility field; all descriptor resources are schema-wide and use -1.
         Index payloadIndex = -1;
         String name;
     };
@@ -133,7 +133,7 @@ public:
     String name;
     Type* schemaType = nullptr;
     Type* traceContextType = nullptr;
-    /// These flags describe the source schema; the entry lists below are already link-finalized.
+    /// Reserved compatibility flags; explicit list sections always leave these false.
     bool hitGroupSectionOpen = false;
     bool missShaderSectionOpen = false;
     bool callableShaderSectionOpen = false;
@@ -152,7 +152,7 @@ public:
     List<RefPtr<StructuralRayTracingPayloadReflection>> payloads;
     List<RefPtr<StructuralRayTracingCallableShaderReflection>> callableShaders;
 
-    /// Logical Metal descriptor resources. Their semantic kind and payload partition determine
+    /// Logical Metal descriptor resources. Their semantic kind determines
     /// the physical argument-buffer index through the shared compiler ABI mapping.
     /// Other targets have none.
     List<DescriptorResource> descriptorResources;

@@ -797,16 +797,14 @@ local insts = {
 					},
 				},
 			},
-			-- Preserves the schema argument of `TraceProgramDescriptor<Schema>` after the
-			-- descriptor's ordinary source storage type has erased that phantom parameter.
-			-- Target lowering replaces this wrapper with either the source storage type or a
-			-- target-specific physical descriptor type.
+			-- Opaque host-bound descriptor. Preserve the checked schema and conformance witness;
+			-- target lowering owns its representation, with no source-visible storage wrapper.
 			{
-				StructuralRayTracingProgramDescriptor = {
-					struct_name = "StructuralRayTracingProgramDescriptorType",
+				TraceProgramDescriptor = {
+					struct_name = "TraceProgramDescriptorType",
 					operands = {
-						{ "storageType", "IRType" },
-						{ "schemaType", "IRType" },
+						{ "schema", "IRType" },
+						{ "schemaWitness" },
 					},
 					hoistable = true,
 				},
@@ -1247,6 +1245,9 @@ local insts = {
 			{ structuralRayTracingGetGeometryIndex = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetInstanceIndex = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetInstanceID = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceCount = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetInstanceIndexAtLevel = { operands = { { "fallback" }, { "input" }, { "level" } } } },
+			{ structuralRayTracingGetInstanceIDAtLevel = { operands = { { "fallback" }, { "input" }, { "level" } } } },
 			{ structuralRayTracingGetObjectToWorld = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetWorldToObject = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetDispatchRaysIndex = { operands = { { "fallback" }, { "input" } } } },
@@ -1322,9 +1323,6 @@ local insts = {
 				{ "schemaSourceTypeName", "IRStringLit" },
 				{ "schemaTypeIdentity", "IRStringLit" },
 				{ "traceContextType", "IRType" },
-				{ "hitGroupSectionOpen", "IRBoolLit" },
-				{ "missShaderSectionOpen", "IRBoolLit" },
-				{ "callableShaderSectionOpen", "IRBoolLit" },
 				{ "hitGroupTypeIdentities", "IRMakeValuePack" },
 				{ "missShaderTypeIdentities", "IRMakeValuePack" },
 				{ "callableShaderTypeIdentities", "IRMakeValuePack" },
@@ -2403,41 +2401,10 @@ local insts = {
 				},
 			},
 			{
-				structuralRayTracingOpenSection = {
-					struct_name = "StructuralRayTracingOpenSectionDecoration",
-					operands = {
-						{ "sectionKind", "IRIntLit" },
-						{ "tagType", "IRType" },
-						{ "isValidTag", "IRBoolLit" },
-					},
-				},
-			},
-			{
-				structuralRayTracingDeferredEmptyPayload = {
-					struct_name = "StructuralRayTracingDeferredEmptyPayloadDecoration",
-					operands = {
-						{ "fallbackGeneric" },
-						{ "fallbackGenericArgumentsWithoutPayload", "IRMakeValuePack" },
-						{ "payloadGenericArgumentIndex", "IRIntLit" },
-						{ "fallbackArgumentsWithoutPayload", "IRMakeValuePack" },
-						{ "payloadFallbackArgumentIndex", "IRIntLit" },
-					},
-				},
-			},
-			{
 				structuralRayTracingVulkanPayloadStorage = {
 					struct_name = "StructuralRayTracingVulkanPayloadStorageDecoration",
 					operands = {
 						{ "storage", "IRGlobalVar" },
-					},
-				},
-			},
-			{
-				structuralRayTracingTaggedConformance = {
-					struct_name = "StructuralRayTracingTaggedConformanceDecoration",
-					operands = {
-						{ "sectionKind", "IRIntLit" },
-						{ "tagType", "IRType" },
 					},
 				},
 			},

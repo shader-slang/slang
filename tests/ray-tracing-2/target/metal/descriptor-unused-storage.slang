@@ -36,23 +36,23 @@ uint retainDescriptorType(rt::TraceProgramDescriptor<Schema> value, uint marker)
 void main()
 {
     // No trace operation activates this schema, so there are no executable Metal table
-    // signatures to synthesize. The compiler retains the documented source ParameterBlock shape
-    // and consumes the schema-carrying wrapper before ordinary Metal legalization.
+    // signatures to synthesize. The compiler retains the opaque bound-buffer handle and consumes
+    // the schema-carrying resource type before ordinary Metal legalization.
     output[0] = retainDescriptorType(program, 0);
 }
 
-// Prove that this test actually starts with the compiler-owned wrapper and retains a descriptor-
+// Prove that this test actually starts with the compiler-owned resource and retains a descriptor-
 // bearing helper. Otherwise a post-pass `-NOT` check could pass without exercising the lowering.
 // PRE: result code = 0
-// PRE: StructuralRayTracingProgramDescriptor
+// PRE: TraceProgramDescriptor
 // PRE: func %retainDescriptorType
 // PRE: call %retainDescriptorType
 
-// Descriptor-only Metal preparation must consume every wrapper while preserving the helper and
+// Descriptor-only Metal preparation must lower every opaque resource while preserving the helper and
 // its observable call. The leading and trailing checks cover the complete IR dump.
 // IR: result code = 0
-// IR-NOT: StructuralRayTracingProgramDescriptor
+// IR-NOT: TraceProgramDescriptor(
 // IR: func %retainDescriptorType
-// IR-NOT: StructuralRayTracingProgramDescriptor
+// IR-NOT: TraceProgramDescriptor(
 // IR: call %retainDescriptorType
-// IR-NOT: StructuralRayTracingProgramDescriptor
+// IR-NOT: TraceProgramDescriptor(

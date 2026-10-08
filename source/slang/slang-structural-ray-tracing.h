@@ -63,7 +63,7 @@ enum class StructuralRayTracingMetadataKind
     Count,
 };
 
-/// Identifies one independently openable entry section of a trace program schema.
+/// Identifies an entry section of a trace program schema or the independent entry catalogue.
 ///
 /// This enum is serialized into compiler-owned IR metadata. It deliberately describes semantic
 /// entry roles rather than the physical order of associated types or generic arguments.
@@ -96,6 +96,9 @@ enum class StructuralRayTracingStageInputOperationKind
     GeometryIndex,
     InstanceIndex,
     InstanceID,
+    InstanceCount,
+    InstanceIndexAtLevel,
+    InstanceIDAtLevel,
     ObjectToWorld,
     WorldToObject,
     DispatchRaysIndex,
@@ -276,9 +279,8 @@ inline UInt64 getStructuralRayTracingMetalRecordStride(UInt64 dataSize)
 
 /// Returns the logical field name for one synthesized Metal descriptor resource.
 ///
-/// Per-payload fields include their partition index only when a schema has multiple payloads,
-/// matching the IR producer. Reflection exposes this logical name independently from the
-/// separately reflected Metal argument-buffer index.
+/// All payloads share the same five resources. Reflection exposes the logical resource name
+/// independently from its separately reflected Metal argument-buffer index.
 String getStructuralRayTracingMetalDescriptorResourceName(
     StructuralRayTracingDescriptorResourceKind kind,
     Index payloadIndex,
@@ -288,8 +290,8 @@ String getStructuralRayTracingMetalDescriptorResourceName(
 ///
 /// The compiler and host reflection must use this same mapping: Metal lowering lays out the
 /// physical descriptor fields at these indices, while reflection tells the application where to
-/// write each table or record-buffer resource. The returned indices densely cover
-/// `[0, 3 * payloadCount + 2)`.
+/// write each table or record-buffer resource. The returned indices densely cover `[0, 5)`,
+/// regardless of how many payload types appear in the schema.
 Index getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
     StructuralRayTracingDescriptorResourceKind kind,
     Index payloadIndex,
@@ -322,12 +324,6 @@ struct StructuralRayTracingEntryPack
     TypePackSubtypeWitness* witnesses = nullptr;
 };
 
-struct StructuralRayTracingOpenSectionInfo
-{
-    Type* tagType = nullptr;
-    StructuralRayTracingEntryPack listedEntries;
-};
-
 StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
@@ -355,25 +351,11 @@ public:
     StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
     InterfaceDecl* getMetadataInterface(StructuralRayTracingMetadataKind kind) const;
-    AggTypeDecl* getOpenSectionType(StructuralRayTracingSectionKind kind) const;
     InterfaceDecl* getSectionEntryInterface(StructuralRayTracingSectionKind kind) const;
-    bool tryGetOpenSectionInfo(
+    /// Projects an exact checked conformance to the trusted entry contract used by the catalogue.
+    SubtypeWitness* projectSectionEntryWitness(
         ASTBuilder* astBuilder,
-        Type* sectionType,
-        StructuralRayTracingSectionKind expectedKind,
-        StructuralRayTracingOpenSectionInfo& outInfo) const;
-    bool isValidOpenSectionTag(
-        ASTBuilder* astBuilder,
-        Type* tagType,
-        StructuralRayTracingSectionKind kind) const;
-    void collectOpenSectionTags(
-        ASTBuilder* astBuilder,
-        Type* declaredTagType,
-        StructuralRayTracingSectionKind kind,
-        List<Type*>& outTagTypes) const;
-    SubtypeWitness* projectOpenSectionEntryWitness(
-        ASTBuilder* astBuilder,
-        SubtypeWitness* tagWitness,
+        SubtypeWitness* witness,
         StructuralRayTracingSectionKind kind) const;
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
@@ -433,12 +415,8 @@ public:
         RayTracingAPIFamily family,
         Decl* decl,
         Decl** outOtherDecl);
-    void registerFunctionCall(
-        FunctionDeclBase* caller,
-        FunctionDeclBase* callee,
-        SourceLoc callLoc);
+    void registerFunctionCall(FunctionDeclBase* caller, FunctionDeclBase* callee);
     bool functionReachesStructuralTrace(FunctionDeclBase* function) const;
-    bool findReachableCallShader(FunctionDeclBase* function, SourceLoc& outCallLoc) const;
 
     /// Records the checked AST type represented by a compiler-produced opaque identity.
     ///
@@ -456,9 +434,6 @@ private:
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
-    AggTypeDecl* m_openSectionTypes[int(StructuralRayTracingSectionKind::Count)] = {};
-    GenericTypeParamDecl* m_openSectionTagParameters[int(StructuralRayTracingSectionKind::Count)] =
-        {};
     AssocTypeDecl*
         m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
     GenericTypeConstraintDecl* m_associatedTypeConstraintRequirements[int(
@@ -479,9 +454,10 @@ private:
     HashSet<AggTypeDecl*> m_stageDeclarationsWithCheckedRepresentation;
     HashSet<Type*> m_stageTypesWithCheckedRepresentation;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
+    // Retain calls only to identify ray-generation entries that reach structural dispatch.
+    // Stage legality uses ordinary capability inference, not a second callable-stage analysis.
     Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
     HashSet<FunctionDeclBase*> m_structuralProgramCallers;
-    Dictionary<FunctionDeclBase*, SourceLoc> m_callShaderCallers;
     mutable std::mutex m_reflectionTypesMutex;
     mutable Dictionary<String, Type*> m_reflectionTypes;
 };
@@ -511,9 +487,9 @@ String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
 
 /// Returns the exact exported Metal name for one miss visible-function-table entry.
 ///
-/// Unlike a portable stage entry point, a Metal adapter's ABI also depends on its schema and
-/// payload partition. The reflected function indices are part of the name so repeated uses of one
-/// source stage still name distinct physical table entries deterministically.
+/// A Metal adapter uses the schema-wide uniform signature and casts its erased carrier to the
+/// source stage's concrete payload view. Its schema-section function index identifies its table
+/// position independently from the host's physical record order.
 String getStructuralRayTracingMetalMissFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex,
@@ -522,8 +498,8 @@ String getStructuralRayTracingMetalMissFunctionName(
 
 /// Returns the exact exported Metal name for one closest-hit visible-function-table entry.
 ///
-/// The concrete stage name identifies the executable code. Its schema and payload partition
-/// identify the generated Metal ray-data ABI, so repeated hit groups using that stage share one
+/// The concrete stage name identifies the executable code and typed carrier view. The enclosing
+/// schema supplies the shared table signature, so repeated hit groups using that stage share one
 /// physical visible function.
 String getStructuralRayTracingMetalClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
@@ -532,10 +508,9 @@ String getStructuralRayTracingMetalClosestHitFunctionName(
 
 /// Returns the exact exported Metal name for a synthesized no-op closest-hit table entry.
 ///
-/// A payload partition uses one dense visible-function table, so every group using `NoClosestHit`
-/// needs a signature-compatible physical function at its function index. The no-op has the
-/// payload table's common signature and can therefore be shared by every placeholder index,
-/// including when the partition contains no source closest-hit stage at all.
+/// Every group using `NoClosestHit` needs a signature-compatible physical function at its index in
+/// the shared visible-function table. All placeholders in a payload view share one no-op adapter,
+/// including when that view contains no source closest-hit stage.
 String getStructuralRayTracingMetalNoOpClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex);
@@ -546,10 +521,10 @@ String getStructuralRayTracingMetalCallableFunctionName(
     Index functionIndex,
     UnownedStringSlice stageSourceTypeName);
 
-/// Returns the exact exported Metal name for a payload partition's candidate dispatcher.
+/// Returns the exact exported Metal name for a schema's candidate dispatcher.
 ///
 /// Any-hit and intersection source stages are implementation arms of this combined function on
-/// Metal, so this schema/payload/geometry name is the symbol that host reflection must expose.
+/// Metal, so this schema/geometry name is the symbol that host reflection must expose.
 String getStructuralRayTracingMetalCandidateDispatcherName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex,

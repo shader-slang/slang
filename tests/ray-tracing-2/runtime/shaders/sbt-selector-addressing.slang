@@ -98,12 +98,12 @@ void rayGenerationMain()
     // Geometry zero occupies x=[0, 1], geometry one occupies x=[2, 3], and the third ray misses
     // both. The host places both geometries in one BLAS so `geometryIndex` contributes 0 or 1 to
     // the native SBT addressing formula.
-    desc.ray.origin = rayIndex == 0   ? float3(0.25, 0.25, 0.0)
+    desc.ray.Origin = rayIndex == 0   ? float3(0.25, 0.25, 0.0)
                       : rayIndex == 1 ? float3(2.25, 0.25, 0.0)
                                       : float3(4.25, 0.25, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
 

@@ -80,14 +80,20 @@ void main()
     tracer.trace(desc, scene, program, payload);
 }
 
+// The native IFT receives the shared header; only the selected record determines the concrete
+// payload and custom-attribute carrier that the closest-hit adapter will subsequently read.
+// METAL: struct StructuralRayDataHeader_0
+// METAL: uint device* records_{{[0-9]+}};
+// METAL: uint sbtOffset_{{[0-9]+}};
+// METAL: uint sbtStride_{{[0-9]+}};
 // METAL: struct Schema_rayData_0
+// METAL: StructuralRayDataHeader_0 dispatch_{{[0-9]+}};
 // METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: SphereAttributes_0 SphereAttributes_attributes_{{[0-9]+}};
-// METAL: uint device* descriptorData_{{[0-9]+}};
 // METAL: uint customHitKind_{{[0-9]+}};
-// METAL: visible_function_table<void(Schema_rayData_0 thread*, float, uint, float3, float3, uchar device*)>
+// METAL: visible_function_table<void(void thread*, float, uint, float3, float3, uchar device*)>
 // METAL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(
-// METAL-SAME: Schema_rayData_0 thread* rayData_{{[0-9]+}},
+// METAL-SAME: void thread* rayData_{{[0-9]+}},
 // METAL-SAME: float distance_{{[0-9]+}},
 // METAL-SAME: uint hitKind_{{[0-9]+}},
 // METAL-SAME: float3 worldSpaceOrigin_{{[0-9]+}},
@@ -99,6 +105,6 @@ void main()
 // METAL: recordData_{{[0-9]+}}
 // METAL: .bias_{{[0-9]+}}
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data Schema_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL-SAME: ray_data StructuralRayDataHeader_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: SphereAttributes_attributes_{{[0-9]+}} =
 // METAL: customHitKind_{{[0-9]+}} = 17U;

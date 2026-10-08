@@ -74,9 +74,8 @@ static StructuralRayTracingPayloadReflection* _findOrAddPayload(
 }
 
 // Checks the schema-wide empty-payload invariant from the checked AST entries already collected
-// for reflection. Closed schemas do not need a linked IR manifest merely to answer this question:
-// their sealed hit and miss lists are the complete source of payload identities. Open schemas are
-// still finalized through linked IR before their entries reach this catalogue.
+// for reflection. A linked IR manifest is unnecessary for this question: the sealed hit and miss
+// lists are the complete source of payload identities.
 static bool _hasUnambiguousStructuralRayTracingEmptyPayload(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder)
@@ -115,7 +114,7 @@ struct _StructuralRayTracingHitGroupContract
 
 // Resolves the source contract shared by schema reflection and the schema-free catalogue.
 //
-// Consider `struct Glass : IMaterialHit`, where `IMaterialHit : rt::IHitGroup`. The tagged-
+// Consider `struct Glass : IMaterialHit`, where `IMaterialHit : rt::IHitGroup`. The concrete-
 // conformance producer records `Glass` before DCE, while checked AST semantics still own its
 // context, primitive, record, and stages. This function projects those associated types from the
 // exact `Glass : rt::IHitGroup` witness. It deliberately does not assign a function-table index or
@@ -195,19 +194,16 @@ static bool _createHitGroupReflection(
     return true;
 }
 
-// Appends one checked hit-group type to its payload partition.
-//
-// Closed-schema reflection passes `functionIndex == -1` and obtains declaration-order indices.
-// Open-schema reflection passes the finalized IR index so reflection agrees exactly with the
-// linked adapters and with the record header the host writes.
+// Appends one checked hit-group type to its payload view, retaining its schema-section index.
+// For HitGroupList<Radiance0, Shadow, Radiance1>, the radiance view contains indices zero and two,
+// not zero and one. Both payloads address one physical closest-hit function table.
 static bool _addHitGroup(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupType,
     SubtypeWitness* groupWitness,
-    Index functionIndex,
-    bool isLinked)
+    Index functionIndex)
 {
     _StructuralRayTracingHitGroupContract contract;
     if (!_createHitGroupReflection(astBuilder, registry, groupType, groupWitness, contract) ||
@@ -217,11 +213,9 @@ static bool _addHitGroup(
     }
 
     auto payload = _findOrAddPayload(result, contract.payloadType);
-    if (functionIndex >= 0 && functionIndex != payload->hitGroups.getCount())
-        return false;
+    SLANG_RELEASE_ASSERT(functionIndex >= 0);
     auto group = contract.reflection;
-    group->functionIndex = functionIndex >= 0 ? functionIndex : payload->hitGroups.getCount();
-    group->isLinked = isLinked;
+    group->functionIndex = functionIndex;
     payload->hitGroups.add(group);
     return true;
 }
@@ -240,7 +234,7 @@ static bool _addHitGroups(
     {
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
-        if (!_addHitGroup(result, astBuilder, registry, groupType, groupWitness, -1, false))
+        if (!_addHitGroup(result, astBuilder, registry, groupType, groupWitness, i))
         {
             return false;
         }
@@ -303,16 +297,14 @@ static bool _createMissShaderReflection(
     return true;
 }
 
-// Appends one checked miss-shader type to its payload partition, preserving a finalized linked
-// index when one was supplied by open-section completion.
+// Appends one checked miss shader to its payload view while retaining its schema-section index.
 static bool _addMissShader(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* shaderType,
     SubtypeWitness* shaderWitness,
-    Index functionIndex,
-    bool isLinked)
+    Index functionIndex)
 {
     _StructuralRayTracingMissShaderContract contract;
     if (!_createMissShaderReflection(astBuilder, registry, shaderType, shaderWitness, contract) ||
@@ -322,11 +314,9 @@ static bool _addMissShader(
     }
 
     auto payload = _findOrAddPayload(result, contract.payloadType);
-    if (functionIndex >= 0 && functionIndex != payload->missShaders.getCount())
-        return false;
+    SLANG_RELEASE_ASSERT(functionIndex >= 0);
     auto shader = contract.reflection;
-    shader->functionIndex = functionIndex >= 0 ? functionIndex : payload->missShaders.getCount();
-    shader->isLinked = isLinked;
+    shader->functionIndex = functionIndex;
     payload->missShaders.add(shader);
     return true;
 }
@@ -345,7 +335,7 @@ static bool _addMissShaders(
     {
         auto shaderType = pack.types->getElementType(i);
         auto shaderWitness = pack.witnesses->getWitness(i);
-        if (!_addMissShader(result, astBuilder, registry, shaderType, shaderWitness, -1, false))
+        if (!_addMissShader(result, astBuilder, registry, shaderType, shaderWitness, i))
         {
             return false;
         }
@@ -403,17 +393,13 @@ static bool _createCallableShaderReflection(
 }
 
 // Appends one checked callable-shader type to the schema-wide callable table.
-//
-// Unlike hit and miss indices, callable indices do not restart for each payload because callable
-// data is independent of ray payload data.
 static bool _addCallableShader(
     StructuralRayTracingProgramSchemaReflection* result,
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
     Type* shaderType,
     SubtypeWitness* shaderWitness,
-    Index functionIndex,
-    bool isLinked)
+    Index functionIndex)
 {
     _StructuralRayTracingCallableShaderContract contract;
     if (!_createCallableShaderReflection(
@@ -428,10 +414,8 @@ static bool _addCallableShader(
     }
 
     auto shader = contract.reflection;
-    if (functionIndex >= 0 && functionIndex != result->callableShaders.getCount())
-        return false;
-    shader->functionIndex = functionIndex >= 0 ? functionIndex : result->callableShaders.getCount();
-    shader->isLinked = isLinked;
+    SLANG_RELEASE_ASSERT(functionIndex == result->callableShaders.getCount());
+    shader->functionIndex = functionIndex;
     if (result->callableShaders.getCount() != 0 &&
         !result->callableShaders[0]->callableDataType->equals(shader->callableDataType))
     {
@@ -458,7 +442,7 @@ static bool _addCallableShaders(
     {
         auto shaderType = pack.types->getElementType(i);
         auto shaderWitness = pack.witnesses->getWitness(i);
-        if (!_addCallableShader(result, astBuilder, registry, shaderType, shaderWitness, -1, false))
+        if (!_addCallableShader(result, astBuilder, registry, shaderType, shaderWitness, i))
         {
             return false;
         }
@@ -594,9 +578,9 @@ static Type* _findOrRecoverStructuralRayTracingReflectionType(
     return recoveredType;
 }
 
-// Reconstructs the ordinary source-level entry witness used by existing closed-schema reflection.
-// The manifest selects identity and index; checked AST semantics remain the source of associated
-// payload, context, record, and stage types exposed through the public API.
+// Resolves the ordinary source-level entry witness for a declaration in the schema-free catalogue.
+// Checked AST semantics own the associated payload, context, record, and stage types exposed
+// through the public API.
 static SubtypeWitness* _getStructuralRayTracingEntryWitness(
     Linkage* linkage,
     const StructuralRayTracingDeclRegistry& registry,
@@ -611,97 +595,6 @@ static SubtypeWitness* _getStructuralRayTracingEntryWitness(
     SemanticsContext semanticsContext(sharedSemanticsContext);
     SemanticsVisitor visitor(semanticsContext);
     return visitor.isSubtype(entryType, interfaceType, IsSubTypeOptions::None);
-}
-
-// Converts one finalized manifest section back into the public source-type reflection model.
-static bool _addFinalizedStructuralRayTracingSection(
-    StructuralRayTracingProgramSchemaReflection* result,
-    ComponentType* program,
-    Linkage* linkage,
-    StructuralRayTracingDeclRegistry& registry,
-    IRStructuralRayTracingProgramSchema* schema,
-    StructuralRayTracingSectionKind kind,
-    IRMakeValuePack* typeIdentities)
-{
-    auto astBuilder = linkage->getASTBuilder();
-    for (UInt i = 0; i < typeIdentities->getOperandCount(); ++i)
-    {
-        auto identity = as<IRStringLit>(typeIdentities->getOperand(i));
-        if (!identity)
-            return false;
-        auto identityText = identity->getStringSlice();
-        auto entryInfo = _findFinalizedStructuralRayTracingEntryInfo(schema, kind, identityText);
-        if (!entryInfo)
-            return false;
-        auto declLookupName = _getStructuralRayTracingEntryDeclLookupName(entryInfo, kind);
-        auto entryType = declLookupName ? _findOrRecoverStructuralRayTracingReflectionType(
-                                              program,
-                                              registry,
-                                              identityText,
-                                              declLookupName->getStringSlice())
-                                        : nullptr;
-        if (!entryType)
-            return false;
-        auto entryWitness =
-            _getStructuralRayTracingEntryWitness(linkage, registry, entryType, kind);
-        if (!entryWitness)
-            return false;
-
-        switch (kind)
-        {
-        case StructuralRayTracingSectionKind::HitGroups:
-            {
-                auto info = cast<IRStructuralRayTracingHitGroupInfoDecoration>(entryInfo);
-                if (!_addHitGroup(
-                        result,
-                        astBuilder,
-                        registry,
-                        entryType,
-                        entryWitness,
-                        Index(info->getFunctionIndex()->getValue()),
-                        info->getIsLinked()->getValue()))
-                {
-                    return false;
-                }
-                break;
-            }
-        case StructuralRayTracingSectionKind::MissShaders:
-            {
-                auto info = cast<IRStructuralRayTracingMissShaderInfoDecoration>(entryInfo);
-                if (!_addMissShader(
-                        result,
-                        astBuilder,
-                        registry,
-                        entryType,
-                        entryWitness,
-                        Index(info->getFunctionIndex()->getValue()),
-                        info->getIsLinked()->getValue()))
-                {
-                    return false;
-                }
-                break;
-            }
-        case StructuralRayTracingSectionKind::CallableShaders:
-            {
-                auto info = cast<IRStructuralRayTracingCallableShaderInfoDecoration>(entryInfo);
-                if (!_addCallableShader(
-                        result,
-                        astBuilder,
-                        registry,
-                        entryType,
-                        entryWitness,
-                        Index(info->getFunctionIndex()->getValue()),
-                        info->getIsLinked()->getValue()))
-                {
-                    return false;
-                }
-                break;
-            }
-        default:
-            SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
-        }
-    }
-    return true;
 }
 
 // Finds the link-finalized summary for an exact schema identity.
@@ -753,48 +646,9 @@ static RefPtr<IRModule> _getFinalizedStructuralRayTracingProgramSchemaManifest(
     return getOrCreateStructuralRayTracingProgramManifest(targetProgram, sink);
 }
 
-// Populates public reflection from the three entry lists completed in the target manifest.
-static bool _addFinalizedStructuralRayTracingProgramSchema(
-    StructuralRayTracingProgramSchemaReflection* result,
-    ComponentType* program,
-    Linkage* linkage,
-    StructuralRayTracingDeclRegistry& registry,
-    IRStructuralRayTracingProgramSchema* schema)
-{
-    result->name = schema->getSchemaSourceTypeName()->getStringSlice();
-    result->hitGroupSectionOpen = schema->getHitGroupSectionOpen()->getValue();
-    result->missShaderSectionOpen = schema->getMissShaderSectionOpen()->getValue();
-    result->callableShaderSectionOpen = schema->getCallableShaderSectionOpen()->getValue();
-    return _addFinalizedStructuralRayTracingSection(
-               result,
-               program,
-               linkage,
-               registry,
-               schema,
-               StructuralRayTracingSectionKind::HitGroups,
-               schema->getHitGroupTypeIdentities()) &&
-           _addFinalizedStructuralRayTracingSection(
-               result,
-               program,
-               linkage,
-               registry,
-               schema,
-               StructuralRayTracingSectionKind::MissShaders,
-               schema->getMissShaderTypeIdentities()) &&
-           _addFinalizedStructuralRayTracingSection(
-               result,
-               program,
-               linkage,
-               registry,
-               schema,
-               StructuralRayTracingSectionKind::CallableShaders,
-               schema->getCallableShaderTypeIdentities());
-}
-
 static void _addMetalIntersectionFunctionReflection(
     StructuralRayTracingPayloadReflection* payload,
     UnownedStringSlice schemaSourceTypeName,
-    Index payloadIndex,
     StructuralRayTracingMetalCandidateKind geometryKind,
     StructuralRayTracingMetalIntersectionFunctionImplementationKind implementationKind)
 {
@@ -808,7 +662,7 @@ static void _addMetalIntersectionFunctionReflection(
     {
         function->entryPointName = getStructuralRayTracingMetalCandidateDispatcherName(
             schemaSourceTypeName,
-            payloadIndex,
+            -1,
             geometryKind);
     }
     payload->intersectionFunctionTableSize = Math::Max(
@@ -819,7 +673,7 @@ static void _addMetalIntersectionFunctionReflection(
 
 // Replaces portable source-stage names with the exact schema-specific Metal symbols and describes
 // the fixed-index IFT that the host must construct. AnyHit and Intersection do not have
-// independently bindable Metal symbols: the compiler folds them into one dispatcher per payload
+// independently bindable Metal symbols: the compiler folds them into one dispatcher per schema
 // and geometry kind, including reject-all dispatchers for absent triangle or bounding-box kinds.
 static bool _populateMetalFunctionReflection(
     StructuralRayTracingProgramSchemaReflection* result,
@@ -834,11 +688,11 @@ static bool _populateMetalFunctionReflection(
         return false;
     auto schemaSourceTypeName = result->name.getUnownedSlice();
 
+    bool hasCurve = false;
+    bool hasCandidateLogic = false;
     for (Index payloadIndex = 0; payloadIndex < result->payloads.getCount(); ++payloadIndex)
     {
         auto payload = result->payloads[payloadIndex];
-        bool hasCurve = false;
-        bool hasCandidateLogic = false;
         for (auto group : payload->hitGroups)
         {
             if (group->closestHit)
@@ -897,25 +751,24 @@ static bool _populateMetalFunctionReflection(
                 shader->functionIndex,
                 stageSourceTypeName.getUnownedSlice());
         }
-
-        // A payload with no candidate logic does not consume an IFT. Once candidate logic exists,
-        // however, traces of that payload pass one table for every traversed geometry. Always
-        // expose exported triangle and bounding-box dispatchers at indices zero and one: a kind
-        // absent from the schema is implemented by a reject-all stub, preventing an unrelated
-        // record function index from silently accepting a candidate of the wrong primitive kind.
+    }
+    for (Index payloadIndex = 0; payloadIndex < result->payloads.getCount(); ++payloadIndex)
+    {
+        auto payload = result->payloads[payloadIndex];
+        // Every payload view describes the same schema-wide IFT. If any hit group needs candidate
+        // logic, every trace uses the shared dispatchers, including payloads with no AnyHit.
+        // Absent triangle and bounding-box kinds use reject-all dispatchers.
         if (!hasCandidateLogic)
             continue;
 
         _addMetalIntersectionFunctionReflection(
             payload,
             schemaSourceTypeName,
-            payloadIndex,
             StructuralRayTracingMetalCandidateKind::Triangle,
             StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
         _addMetalIntersectionFunctionReflection(
             payload,
             schemaSourceTypeName,
-            payloadIndex,
             StructuralRayTracingMetalCandidateKind::BoundingBox,
             StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
         if (hasCurve)
@@ -923,7 +776,6 @@ static bool _populateMetalFunctionReflection(
             _addMetalIntersectionFunctionReflection(
                 payload,
                 schemaSourceTypeName,
-                payloadIndex,
                 StructuralRayTracingMetalCandidateKind::Curve,
                 StructuralRayTracingMetalIntersectionFunctionImplementationKind::ExportedFunction);
         }
@@ -1159,27 +1011,11 @@ static bool _populateMetalRecordStrides(
     result->metalRecordHeaderSize = size_t(kStructuralRayTracingMetalRecordHeaderSize);
 
     auto payloadCount = result->payloads.getCount();
-    for (Index payloadIndex = 0; payloadIndex < payloadCount; ++payloadIndex)
-    {
-        const StructuralRayTracingDescriptorResourceKind payloadResourceKinds[] = {
-            StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
-            StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
-            StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
-        };
-        for (auto kind : payloadResourceKinds)
-        {
-            StructuralRayTracingProgramSchemaReflection::DescriptorResource resource;
-            resource.kind = kind;
-            resource.payloadIndex = payloadIndex;
-            resource.name = getStructuralRayTracingMetalDescriptorResourceName(
-                kind,
-                payloadIndex,
-                payloadCount);
-            result->descriptorResources.add(_Move(resource));
-        }
-    }
     for (auto kind :
-         {StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable,
+         {StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable,
+          StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable,
+          StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable,
+          StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable,
           StructuralRayTracingDescriptorResourceKind::Records})
     {
         StructuralRayTracingProgramSchemaReflection::DescriptorResource resource;
@@ -1263,10 +1099,10 @@ _getStructuralRayTracingEntryCatalogueCandidateList(
     }
 }
 
-// Finds the semantic entry record placed on a tagged conformance by AST-to-IR lowering. The
+// Finds the semantic entry record placed on a concrete conformance by AST-to-IR lowering. The
 // records have intentionally different operand layouts, so this lookup is by typed decoration and
 // section role rather than by an operand index shared accidentally by two record kinds.
-static IRDecoration* _findStructuralRayTracingTaggedConformanceEntryInfo(
+static IRDecoration* _findStructuralRayTracingConformanceEntryInfo(
     IRInst* conformanceOwner,
     StructuralRayTracingSectionKind kind)
 {
@@ -1285,8 +1121,8 @@ static IRDecoration* _findStructuralRayTracingTaggedConformanceEntryInfo(
 }
 
 // Canonical identity is both the deduplication key and the catalogue order. A composite can visit
-// the same declaration through more than one component, and one conformance can carry several
-// open tags for the same section. Neither should create multiple host-visible declarations.
+// the same declaration through more than one component. This should not create multiple
+// host-visible declarations.
 static void _sortAndDeduplicateStructuralRayTracingEntryCatalogueCandidates(
     List<_StructuralRayTracingEntryCatalogueCandidate>& candidates)
 {
@@ -1316,7 +1152,7 @@ static void _sortAndDeduplicateStructuralRayTracingEntryCatalogueCandidates(
     candidates.swapWith(uniqueCandidates);
 }
 
-// Collects declaration identities from the pre-DCE module index. This query deliberately does not
+// Collects declaration identities from pre-DCE module metadata. This query deliberately does not
 // link a manifest and does not scan target-optimized IR. Merely asking what declarations exist
 // therefore cannot introduce a liveness root for their stage implementations.
 static void _collectStructuralRayTracingEntryCatalogueCandidates(
@@ -1326,29 +1162,17 @@ static void _collectStructuralRayTracingEntryCatalogueCandidates(
     program->enumerateIRModules(
         [&](IRModule* module)
         {
-            auto linkingInfo = module->_getOrCreateLinkingInfo();
-            for (auto conformanceOwner : linkingInfo->getStructuralRayTracingTaggedConformances())
+            for (auto conformanceOwner : module->getGlobalInsts())
             {
-                UInt recordedKindMask = 0;
-                for (auto decoration : conformanceOwner->getDecorations())
+                for (auto kind :
+                     {StructuralRayTracingSectionKind::HitGroups,
+                      StructuralRayTracingSectionKind::MissShaders,
+                      StructuralRayTracingSectionKind::CallableShaders})
                 {
-                    auto tagged = as<IRStructuralRayTracingTaggedConformanceDecoration>(decoration);
-                    if (!tagged)
-                        continue;
-
-                    auto kindValue = tagged->getSectionKind()->getValue();
-                    SLANG_RELEASE_ASSERT(
-                        kindValue >= 0 &&
-                        kindValue < IRIntegerValue(StructuralRayTracingSectionKind::Count));
-                    auto kind = StructuralRayTracingSectionKind(kindValue);
-                    UInt kindBit = UInt(1) << UInt(kindValue);
-                    if (recordedKindMask & kindBit)
-                        continue;
-                    recordedKindMask |= kindBit;
-
                     auto entryInfo =
-                        _findStructuralRayTracingTaggedConformanceEntryInfo(conformanceOwner, kind);
-                    SLANG_RELEASE_ASSERT(entryInfo);
+                        _findStructuralRayTracingConformanceEntryInfo(conformanceOwner, kind);
+                    if (!entryInfo)
+                        continue;
                     auto identity = _getStructuralRayTracingEntryTypeIdentity(entryInfo, kind);
                     auto lookupName = _getStructuralRayTracingEntryDeclLookupName(entryInfo, kind);
                     SLANG_RELEASE_ASSERT(
@@ -1616,31 +1440,12 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
         return nullptr;
     result->schemaType = schemaType;
     result->traceContextType = traceContextType;
-    StructuralRayTracingOpenSectionInfo openSectionInfo;
-    bool hasOpenHitGroups = registry.tryGetOpenSectionInfo(
-        astBuilder,
-        hitGroupsType,
-        StructuralRayTracingSectionKind::HitGroups,
-        openSectionInfo);
-    bool hasOpenMissShaders = registry.tryGetOpenSectionInfo(
-        astBuilder,
-        missShadersType,
-        StructuralRayTracingSectionKind::MissShaders,
-        openSectionInfo);
-    bool hasOpenCallableShaders = registry.tryGetOpenSectionInfo(
-        astBuilder,
-        callableShadersType,
-        StructuralRayTracingSectionKind::CallableShaders,
-        openSectionInfo);
-    bool hasOpenSection = hasOpenHitGroups || hasOpenMissShaders || hasOpenCallableShaders;
-
-    bool entriesAdded = false;
     RefPtr<IRModule> manifest;
     IRStructuralRayTracingProgramSchema* finalizedSchema = nullptr;
     auto targetRequest = programLayout->getTargetReq();
     bool needsNativeABISizes =
         isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isCUDATarget(targetRequest);
-    if (hasOpenSection || needsNativeABISizes)
+    if (needsNativeABISizes)
     {
         manifest = _getFinalizedStructuralRayTracingProgramSchemaManifest(
             programLayout,
@@ -1652,27 +1457,14 @@ StructuralRayTracingProgramSchemaReflection* findStructuralRayTracingProgramSche
                                          schemaTypeIdentity.getUnownedSlice())
                                    : nullptr;
     }
-    if (hasOpenSection)
-    {
-        entriesAdded = sink.getErrorCount() == 0 && finalizedSchema &&
-                       _addFinalizedStructuralRayTracingProgramSchema(
-                           result,
-                           programLayout->getProgram(),
-                           linkage,
-                           registry,
-                           finalizedSchema);
-    }
-    else
-    {
-        // Closed schemas enumerate entries and validate source-level invariants directly from
-        // their checked, sealed AST lists. Native targets may also create a manifest for physical
-        // ABI sizes, but it does not become a second source of list membership or function indices.
-        entriesAdded = sink.getErrorCount() == 0 &&
-                       _addHitGroups(result, astBuilder, registry, hitGroupsType) &&
-                       _addMissShaders(result, astBuilder, registry, missShadersType) &&
-                       _addCallableShaders(result, astBuilder, registry, callableShadersType) &&
-                       _hasUnambiguousStructuralRayTracingEmptyPayload(result, astBuilder);
-    }
+    // Enumerate entries and validate source-level invariants from their checked, sealed AST lists.
+    // Native targets also create a manifest for physical ABI sizes, but it does not become a second
+    // source of list membership or function indices.
+    bool entriesAdded = sink.getErrorCount() == 0 &&
+                        _addHitGroups(result, astBuilder, registry, hitGroupsType) &&
+                        _addMissShaders(result, astBuilder, registry, missShadersType) &&
+                        _addCallableShaders(result, astBuilder, registry, callableShadersType) &&
+                        _hasUnambiguousStructuralRayTracingEmptyPayload(result, astBuilder);
 
     if (sink.getErrorCount() != 0 || !entriesAdded ||
         !_populateStructuralRayTracingTypeLayouts(result, targetRequest) ||

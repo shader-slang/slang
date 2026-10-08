@@ -110,11 +110,11 @@ void main()
     tracer.trace(desc, scene, program, payload);
 }
 
-// Function indices are dense within a payload partition. Hit and miss sections use independent
-// index spaces, so PayloadA and PayloadB both start at zero in each section.
+// Function indices are dense across each entire schema section, independent of payload type.
+// The filtered PayloadA view contains indices 0 and 2, while PayloadB contains index 1.
 // IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA0_, "HitGroupA0", {{.*}}, 0 : Int
-// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupB0_, "HitGroupB0", {{.*}}, 0 : Int
-// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA1_, "HitGroupA1", {{.*}}, 1 : Int
+// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupB0_, "HitGroupB0", {{.*}}, 1 : Int
+// IR-DAG: [structuralRayTracingHitGroupInfo(%HitGroupA1_, "HitGroupA1", {{.*}}, 2 : Int
 // IR-DAG: [structuralRayTracingMissShaderInfo(0 : Int, %MissContextA{{.*}}%MissA0_,
-// IR-DAG: [structuralRayTracingMissShaderInfo(0 : Int, %MissContextB{{.*}}%MissB0_,
-// IR-DAG: [structuralRayTracingMissShaderInfo(1 : Int, %MissContextA{{.*}}%MissA1_,
+// IR-DAG: [structuralRayTracingMissShaderInfo(1 : Int, %MissContextB{{.*}}%MissB0_,
+// IR-DAG: [structuralRayTracingMissShaderInfo(2 : Int, %MissContextA{{.*}}%MissA1_,

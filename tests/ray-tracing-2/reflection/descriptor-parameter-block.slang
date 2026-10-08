@@ -78,8 +78,8 @@ ParameterBlock<FrameParameters> frame;
 void main()
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     Payload payload = {};
@@ -96,8 +96,7 @@ void main()
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "Miss"
 // METAL-DAG: struct FrameParameters_default_0
 // METAL-DAG: metal::raytracing::acceleration_structure<metal::raytracing::instancing> scene_0;
-// METAL-DAG: rt_TraceProgramDescriptor_default_0 program_0;
-// METAL-DAG: rt_TraceProgramDescriptorResources_default_0 constant* resources_0;
+// METAL-DAG: Schema_resources{{.*}} constant* program_0;
 // METAL-DAG: uint device* output_0;
 // REFLECT: "name": "frame"
 // REFLECT: "kind": "parameterBlock"
@@ -106,6 +105,5 @@ void main()
 // REFLECT-DAG: "baseShape": "accelerationStructure"
 // REFLECT-DAG: "name": "program"
 // REFLECT-DAG: "name": "TraceProgramDescriptor"
-// REFLECT-DAG: "name": "resources"
-// REFLECT-DAG: "kind": "parameterBlock"
 // REFLECT-DAG: "name": "output"
+// REFLECT-NOT: "name": "resources"

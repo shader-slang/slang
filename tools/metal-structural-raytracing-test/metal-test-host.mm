@@ -17,13 +17,6 @@ using Slang::ComPtr;
 namespace
 {
 
-struct NativePayloadPartition
-{
-    id<MTLIntersectionFunctionTable> intersectionTable;
-    id<MTLVisibleFunctionTable> missTable;
-    id<MTLVisibleFunctionTable> closestHitTable;
-};
-
 struct FrameParameters
 {
     uint64_t scene;
@@ -45,7 +38,11 @@ struct NativeProgram
     slang::TraceProgramSchemaReflection* schema = nullptr;
 
     id<MTLComputePipelineState> pipeline;
-    std::vector<NativePayloadPartition> payloads;
+    // Every payload uses these same physical tables. Reflection's payload views only filter the
+    // eligible programs; their function indices still address these complete schema sections.
+    id<MTLIntersectionFunctionTable> intersectionTable;
+    id<MTLVisibleFunctionTable> missTable;
+    id<MTLVisibleFunctionTable> closestHitTable;
     id<MTLVisibleFunctionTable> callableTable;
 };
 
@@ -267,14 +264,14 @@ bool createProgram(
 
     NSMutableArray<id<MTLFunction>>* allFunctions = [NSMutableArray array];
     // A single physical function can occupy several logical VFT slots. In particular, every
-    // `NoClosestHit` slot in one payload partition names the same synthesized no-op function.
+    // `NoClosestHit` slot can name the same synthesized no-op function.
     // Metal requires `linkedFunctions` to contain each exported symbol only once, so cache visible
     // functions by their reflected physical name while still placing the shared function into
     // every requested table slot below.
     NSMutableDictionary<NSString*, id<MTLFunction>>* visibleFunctionsByName =
         [NSMutableDictionary dictionary];
 
-    struct PayloadFunctionObjects
+    struct SchemaFunctionObjects
     {
         std::vector<id<MTLFunction>> intersectionFunctions;
         std::vector<SlangStructuralRayTracingIntersectionFunctionImplementationKind>
@@ -285,7 +282,17 @@ bool createProgram(
             slang::MetalIntersectionFunctionSignature::None;
     };
     const auto payloadCount = outProgram.schema->getPayloadCount();
-    std::vector<PayloadFunctionObjects> payloadFunctions(payloadCount);
+    SchemaFunctionObjects functions;
+    size_t hitFunctionCount = 0;
+    size_t missFunctionCount = 0;
+    for (uint32_t payloadIndex = 0; payloadIndex < payloadCount; ++payloadIndex)
+    {
+        auto payload = outProgram.schema->getPayload(payloadIndex);
+        hitFunctionCount += payload->getHitGroupCount();
+        missFunctionCount += payload->getMissShaderCount();
+    }
+    functions.missFunctions.resize(missFunctionCount);
+    functions.closestHitFunctions.resize(hitFunctionCount);
     std::vector<id<MTLFunction>> callableFunctions(outProgram.schema->getCallableShaderCount());
 
     NSError* error = nil;
@@ -305,20 +312,27 @@ bool createProgram(
         return true;
     };
 
+    bool hasClosestHitFunction = false;
     for (uint32_t payloadIndex = 0; payloadIndex < payloadCount; ++payloadIndex)
     {
         auto reflectedPayload = outProgram.schema->getPayload(payloadIndex);
         if (!reflectedPayload)
             return fail(@"the trace-program schema has a missing payload partition");
 
-        auto& functions = payloadFunctions[payloadIndex];
-        functions.intersectionFunctions.resize(
-            reflectedPayload->getIntersectionFunctionTableSize());
-        functions.intersectionKinds.resize(
-            reflectedPayload->getIntersectionFunctionTableSize(),
-            SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_IMPLEMENTATION_UNKNOWN);
-        functions.missFunctions.resize(reflectedPayload->getMissShaderCount());
-        functions.closestHitFunctions.resize(reflectedPayload->getHitGroupCount());
+        if (payloadIndex == 0)
+        {
+            functions.intersectionFunctions.resize(
+                reflectedPayload->getIntersectionFunctionTableSize());
+            functions.intersectionKinds.resize(
+                reflectedPayload->getIntersectionFunctionTableSize(),
+                SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_IMPLEMENTATION_UNKNOWN);
+        }
+        else if (
+            reflectedPayload->getIntersectionFunctionTableSize() !=
+            functions.intersectionFunctions.size())
+        {
+            return fail(@"payload views disagree about the shared Metal intersection table");
+        }
 
         bool foundTargetInfo = false;
         for (uint32_t metadataIndex = 0;
@@ -336,6 +350,9 @@ bool createProgram(
             {
                 if (foundTargetInfo)
                     return fail(@"structural ray-tracing target metadata has a duplicate payload");
+                if (payloadIndex != 0 &&
+                    functions.intersectionSignature != info.intersectionFunctionSignature)
+                    return fail(@"payload views disagree about the shared Metal tag set");
                 functions.intersectionSignature = info.intersectionFunctionSignature;
                 foundTargetInfo = true;
             }
@@ -345,6 +362,9 @@ bool createProgram(
 
         for (SlangUInt i = 0; i < reflectedPayload->getIntersectionFunctionCount(); ++i)
         {
+            // All views describe the same primitive dispatchers. Load and link each only once.
+            if (payloadIndex != 0)
+                break;
             auto reflectedFunction = reflectedPayload->getIntersectionFunction(i);
             if (!reflectedFunction)
                 return fail(@"schema reflection returned a missing intersection function");
@@ -390,7 +410,6 @@ bool createProgram(
             }
         }
 
-        bool hasClosestHitFunction = false;
         for (SlangUInt i = 0; i < reflectedPayload->getHitGroupCount(); ++i)
         {
             auto group = reflectedPayload->getHitGroup(i);
@@ -409,13 +428,13 @@ bool createProgram(
             }
             hasClosestHitFunction = true;
         }
-        if (hasClosestHitFunction)
+    }
+    if (hasClosestHitFunction)
+    {
+        for (auto function : functions.closestHitFunctions)
         {
-            for (auto function : functions.closestHitFunctions)
-            {
-                if (!function)
-                    return fail(@"the reflected Metal closest-hit VFT contains a hole");
-            }
+            if (!function)
+                return fail(@"the reflected Metal closest-hit VFT contains a hole");
         }
     }
 
@@ -445,20 +464,16 @@ bool createProgram(
     if (!outProgram.pipeline)
         return fail(error.localizedDescription);
 
-    outProgram.payloads.resize(payloadCount);
-    for (uint32_t payloadIndex = 0; payloadIndex < payloadCount; ++payloadIndex)
     {
-        auto& payload = outProgram.payloads[payloadIndex];
-        auto& functions = payloadFunctions[payloadIndex];
-        payload.missTable =
+        outProgram.missTable =
             createVisibleFunctionTable(outProgram.pipeline, functions.missFunctions);
-        payload.closestHitTable =
+        outProgram.closestHitTable =
             createVisibleFunctionTable(outProgram.pipeline, functions.closestHitFunctions);
 
         auto intersectionTableDescriptor = [MTLIntersectionFunctionTableDescriptor new];
         intersectionTableDescriptor.functionCount =
             functions.intersectionFunctions.empty() ? 1 : functions.intersectionFunctions.size();
-        payload.intersectionTable = [outProgram.pipeline
+        outProgram.intersectionTable = [outProgram.pipeline
             newIntersectionFunctionTableWithDescriptor:intersectionTableDescriptor];
         auto signature = static_cast<MTLIntersectionFunctionSignature>(
             uint32_t(functions.intersectionSignature));
@@ -469,19 +484,20 @@ bool createProgram(
             case SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_EXPORTED_FUNCTION:
                 if (!functions.intersectionFunctions[i])
                     return fail(@"an exported Metal IFT entry has no linked function");
-                [payload.intersectionTable
+                [outProgram.intersectionTable
                     setFunction:[outProgram.pipeline
                                     functionHandleWithFunction:functions.intersectionFunctions[i]]
                         atIndex:i];
                 break;
             case SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_TRIANGLE:
-                [payload.intersectionTable
+                [outProgram.intersectionTable
                     setOpaqueTriangleIntersectionFunctionWithSignature:signature
                                                                atIndex:i];
                 break;
             case SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_OPAQUE_CURVE:
-                [payload.intersectionTable setOpaqueCurveIntersectionFunctionWithSignature:signature
-                                                                                   atIndex:i];
+                [outProgram.intersectionTable
+                    setOpaqueCurveIntersectionFunctionWithSignature:signature
+                                                            atIndex:i];
                 break;
             case SLANG_STRUCTURAL_RAY_TRACING_INTERSECTION_FUNCTION_IMPLEMENTATION_UNKNOWN:
                 break;
@@ -489,7 +505,7 @@ bool createProgram(
                 return fail(@"schema reflection returned an unknown Metal IFT implementation");
             }
         }
-        if (!payload.missTable || !payload.closestHitTable || !payload.intersectionTable)
+        if (!outProgram.missTable || !outProgram.closestHitTable || !outProgram.intersectionTable)
             return false;
     }
     outProgram.callableTable = createVisibleFunctionTable(outProgram.pipeline, callableFunctions);
@@ -644,8 +660,8 @@ id<MTLBuffer> createDefaultTraceRecords(
     const NativeProgram& program,
     uint32_t instanceCount = 1)
 {
-    // A one-level scene needs only the trie's flat root node. Every native instance maps to physical
-    // hit record zero, whose compiler-owned header selects logical shader zero.
+    // A one-level scene needs only the trie's flat root node. Every native instance maps to
+    // physical hit record zero, whose compiler-owned header selects logical shader zero.
     std::vector<uint32_t> instancePathTrie(instanceCount);
     const RecordInitializer records[] = {
         {RecordSection::Hit, 0, 0, 0, nullptr, 0},
@@ -681,32 +697,24 @@ id<MTLBuffer> createProgramResourceBuffer(
 
         const SlangInt payloadIndex =
             program.schema->getDescriptorResourcePayloadIndex(resourceIndex);
+        if (payloadIndex != -1)
+            return nil;
         uint64_t resource = 0;
         switch (program.schema->getDescriptorResourceKind(resourceIndex))
         {
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_INTERSECTION_FUNCTION_TABLE:
-            if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
-                return nil;
-            resource = program.payloads[size_t(payloadIndex)].intersectionTable.gpuResourceID._impl;
+            resource = program.intersectionTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_MISS_VISIBLE_FUNCTION_TABLE:
-            if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
-                return nil;
-            resource = program.payloads[size_t(payloadIndex)].missTable.gpuResourceID._impl;
+            resource = program.missTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CLOSEST_HIT_VISIBLE_FUNCTION_TABLE:
-            if (payloadIndex < 0 || size_t(payloadIndex) >= program.payloads.size())
-                return nil;
-            resource = program.payloads[size_t(payloadIndex)].closestHitTable.gpuResourceID._impl;
+            resource = program.closestHitTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_CALLABLE_VISIBLE_FUNCTION_TABLE:
-            if (payloadIndex != -1)
-                return nil;
             resource = program.callableTable.gpuResourceID._impl;
             break;
         case SLANG_STRUCTURAL_RAY_TRACING_DESCRIPTOR_RECORDS:
-            if (payloadIndex != -1)
-                return nil;
             resource = records.gpuAddress;
             break;
         default:
@@ -779,12 +787,9 @@ bool dispatch(
     if (frameBuffer)
         [encoder useResource:frameBuffer usage:MTLResourceUsageRead];
     [encoder useResource:programResources usage:MTLResourceUsageRead];
-    for (const auto& payload : program.payloads)
-    {
-        [encoder useResource:payload.intersectionTable usage:MTLResourceUsageRead];
-        [encoder useResource:payload.missTable usage:MTLResourceUsageRead];
-        [encoder useResource:payload.closestHitTable usage:MTLResourceUsageRead];
-    }
+    [encoder useResource:program.intersectionTable usage:MTLResourceUsageRead];
+    [encoder useResource:program.missTable usage:MTLResourceUsageRead];
+    [encoder useResource:program.closestHitTable usage:MTLResourceUsageRead];
     [encoder useResource:program.callableTable usage:MTLResourceUsageRead];
     [encoder useResource:records usage:MTLResourceUsageRead];
     [encoder useResource:results usage:MTLResourceUsageWrite];
@@ -1266,9 +1271,9 @@ bool runMultiplePayloads(
     }
 
     const uint32_t instanceHitGroupContribution = 0;
-    // The shader selects physical record zero for shadow rays and one for radiance rays. Reflection
-    // keeps each record's function index scoped to its payload table, so both logical indices are
-    // zero even though the physical record ordering is reversed.
+    // The shader selects physical record zero for shadow rays and one for radiance rays. The
+    // initializers select the first entry of each reflected payload view; createRecords resolves
+    // its schema-wide function index rather than using the view index as a table index.
     const RecordInitializer recordsToWrite[] = {
         {RecordSection::Hit, 0, 1, 0, nullptr, 0},
         {RecordSection::Hit, 1, 0, 0, nullptr, 0},
@@ -1502,7 +1507,7 @@ bool runCandidateGlobalBuffer(
     NativeProgram program = {};
     if (!createProgram(globalSession, device, repositoryRoot, description, program))
         return false;
-    if (program.payloads.size() != 1)
+    if (program.schema->getPayloadCount() != 1)
         return fail(@"candidate-global-buffer did not reflect one payload partition");
 
     MetalRayTracingScene scene = {};
@@ -1527,9 +1532,7 @@ bool runCandidateGlobalBuffer(
     // ray-generation parameter and the generated `[[intersection]]` parameter with this same
     // `[[buffer(n)]]` index. The compute encoder supplies the former below; the IFT owns the
     // independent resource-binding namespace that supplies the latter.
-    [program.payloads[0].intersectionTable setBuffer:values
-                                              offset:0
-                                             atIndex:NSUInteger(valuesBinding)];
+    [program.intersectionTable setBuffer:values offset:0 atIndex:NSUInteger(valuesBinding)];
 
     id<MTLBuffer> results = [device newBufferWithLength:sizeof(uint32_t)
                                                 options:MTLResourceStorageModeShared];
@@ -1662,25 +1665,16 @@ bool runMultilevelHit(
     if (!buildMetalMultilevelScene(device, queue, scene, &sceneError))
         return fail(sceneError);
 
-    // Both rays reach leaf instance index zero, but through distinct outer indices. The root words
-    // direct [0] and [1] to child nodes at trie-relative word offsets two and three. Indexing each
+    // The first two rays reach leaf index zero through distinct outer indices. The root words
+    // direct [0] and [1] to child nodes at trie-relative word offsets three and four. Indexing each
     // child by the shared leaf index zero then yields physical-record contributions zero and one.
-    // Looking only at the leaf index would incorrectly select the first record for both rays.
-    const uint32_t instancePathTrie[] = {2, 3, 0, 1};
-    const uint32_t closestHitIncrements[] = {1, 10};
+    // Path [2] ends at the root and selects record two, exercising a shorter instanceCount.
+    const uint32_t instancePathTrie[] = {3, 4, 2, 0, 1};
+    const uint32_t closestHitIncrements[] = {1, 10, 20};
     const RecordInitializer recordsToWrite[] = {
-        {RecordSection::Hit,
-         0,
-         0,
-         0,
-         &closestHitIncrements[0],
-         sizeof(closestHitIncrements[0])},
-        {RecordSection::Hit,
-         1,
-         0,
-         1,
-         &closestHitIncrements[1],
-         sizeof(closestHitIncrements[1])},
+        {RecordSection::Hit, 0, 0, 0, &closestHitIncrements[0], sizeof(closestHitIncrements[0])},
+        {RecordSection::Hit, 1, 0, 1, &closestHitIncrements[1], sizeof(closestHitIncrements[1])},
+        {RecordSection::Hit, 2, 0, 2, &closestHitIncrements[2], sizeof(closestHitIncrements[2])},
         {RecordSection::Miss, 0, 0, 0, nullptr, 0},
     };
     const RecordBufferDescription recordDescription = {
@@ -1693,10 +1687,10 @@ bool runMultilevelHit(
     if (!records)
         return false;
     id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
-    // AnyHit identifies the candidate record (900 or 112), while the record data independently
-    // identifies the committed record (+1 or +10). Both dispatches must therefore resolve the same
-    // full path; the third ray misses.
-    static const uint32_t kExpected[] = {901, 122, 2};
+    // AnyHit identifies the candidate record, while application data independently identifies the
+    // committed record (+1, +10, or +20). Both dispatches must resolve the same actual path.
+    // The fourth ray misses.
+    static const uint32_t kExpected[] = {901, 122, 242, 2};
     id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
                                                 options:MTLResourceStorageModeShared];
     if (!dispatch(
@@ -1707,7 +1701,7 @@ bool runMultilevelHit(
             programResources,
             records,
             results,
-            3,
+            4,
             false,
             false))
         return false;

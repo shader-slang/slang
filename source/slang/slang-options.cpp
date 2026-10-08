@@ -1306,6 +1306,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Compile the core module from embedded sources. "
          "Will return a failure if there is already a core module available."},
+        {OptionKind::CompileSlangRayTracingModule,
+         "-compile-slang-raytracing-module",
+         nullptr,
+         "Compile the packaged slang.raytracing module with its narrow internal type authority."},
         {OptionKind::Doc, "-doc", nullptr, "Write documentation for -compile-core-module"},
         {OptionKind::IrCompression,
          "-ir-compression",
@@ -3041,6 +3045,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::CompileCoreModule:
             m_compileCoreModule = true;
+            break;
+        case OptionKind::CompileSlangRayTracingModule:
+            m_frontEndReq->m_isSlangRayTracingModuleCode = true;
             break;
         case OptionKind::ArchiveType:
             {

@@ -69,12 +69,12 @@ void main()
     output[0] = payload.value;
 }
 
-// One real closest-hit stage enables a dense Metal VFT for the payload partition. The
+// One real closest-hit stage enables a dense Metal VFT for the schema. The
 // `NoClosestHit` group at function index zero must therefore receive a signature-compatible no-op
 // instead of leaving a host-visible hole in that table.
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread*
+// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread*
 // METAL: value_{{[0-9]+}} = 42U;
 // METAL: }
-// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(Schema_rayData_0 thread*
+// METAL-LABEL: {{\[\[visible\]\]}} void __slang_structural_rt_{{[0-9a-f]+}}(void thread*
 // METAL: return;
 // METAL: }

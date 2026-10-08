@@ -86,12 +86,12 @@ void main()
     float rayTime = rayIndex == 0 ? 0.0 : (rayIndex == 1 ? 1.0 : 0.5);
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex == 0 ? float3(0.25, 0.25, 0.0)
+    desc.ray.Origin = rayIndex == 0 ? float3(0.25, 0.25, 0.0)
                                     : (rayIndex == 1 ? float3(2.25, 0.25, 0.0)
                                                      : float3(10.0, 10.0, 0.0));
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.time = rayTime;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;

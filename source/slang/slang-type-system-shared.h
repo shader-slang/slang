@@ -168,6 +168,10 @@ enum class AddressSpace : uint64_t
     // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
     NodePayloadAMDX,
 
+    // Metal intersection functions carry traversal-owned state in the ray_data address space.
+    // It must not be confused with thread-local copies used by ordinary stage helpers.
+    MetalRayData,
+
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
 };

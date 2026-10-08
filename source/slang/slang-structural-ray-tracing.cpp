@@ -3,6 +3,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
+#include "slang-ir-insts.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
@@ -41,8 +42,8 @@ bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl)
 
 String getStructuralRayTracingMetalDescriptorResourceName(
     StructuralRayTracingDescriptorResourceKind kind,
-    Index payloadIndex,
-    Index payloadCount)
+    Index,
+    Index)
 {
     StringBuilder result;
     switch (kind)
@@ -66,42 +67,29 @@ String getStructuralRayTracingMetalDescriptorResourceName(
         SLANG_UNEXPECTED("invalid structural ray-tracing descriptor resource kind");
     }
 
-    if (payloadIndex >= 0 && payloadCount > 1)
-        result << payloadIndex;
     return result.produceString();
 }
 
 Index getStructuralRayTracingMetalDescriptorResourceArgumentBufferIndex(
     StructuralRayTracingDescriptorResourceKind kind,
-    Index payloadIndex,
-    Index payloadCount)
+    Index,
+    Index)
 {
-    SLANG_RELEASE_ASSERT(payloadCount >= 0);
-
-    Index resourceOffset = 0;
     switch (kind)
     {
     case StructuralRayTracingDescriptorResourceKind::IntersectionFunctionTable:
-        resourceOffset = 0;
-        break;
+        return 0;
     case StructuralRayTracingDescriptorResourceKind::MissVisibleFunctionTable:
-        resourceOffset = 1;
-        break;
+        return 1;
     case StructuralRayTracingDescriptorResourceKind::ClosestHitVisibleFunctionTable:
-        resourceOffset = 2;
-        break;
+        return 2;
     case StructuralRayTracingDescriptorResourceKind::CallableVisibleFunctionTable:
-        SLANG_RELEASE_ASSERT(payloadIndex == -1);
-        return payloadCount * 3;
+        return 3;
     case StructuralRayTracingDescriptorResourceKind::Records:
-        SLANG_RELEASE_ASSERT(payloadIndex == -1);
-        return payloadCount * 3 + 1;
+        return 4;
     default:
         SLANG_UNEXPECTED("invalid structural ray-tracing descriptor resource kind");
     }
-
-    SLANG_RELEASE_ASSERT(payloadIndex >= 0 && payloadIndex < payloadCount);
-    return payloadIndex * 3 + resourceOffset;
 }
 
 static String _getStructuralRayTracingSourceDeclName(Decl* decl)
@@ -283,7 +271,7 @@ static String _getStructuralRayTracingMetalFunctionName(
     SLANG_RELEASE_ASSERT(schemaSourceTypeName.getLength() != 0);
 
     StringBuilder key;
-    key << "metal.v1";
+    key << "metal.v2";
     switch (role)
     {
     case StructuralRayTracingMetalFunctionRole::Miss:
@@ -316,11 +304,10 @@ static String _getStructuralRayTracingMetalFunctionName(
         break;
     case StructuralRayTracingMetalFunctionRole::Candidate:
         SLANG_RELEASE_ASSERT(
-            payloadIndex >= 0 && candidateKind != StructuralRayTracingMetalCandidateKind::Count);
+            payloadIndex == -1 && candidateKind != StructuralRayTracingMetalCandidateKind::Count);
         key << "|candidate";
         _appendStructuralRayTracingMetalNamePart(key, schemaSourceTypeName);
-        key << "|" << payloadIndex << "|"
-            << _getStructuralRayTracingMetalCandidateKey(candidateKind);
+        key << "|" << _getStructuralRayTracingMetalCandidateKey(candidateKind);
         break;
     default:
         SLANG_UNEXPECTED("invalid structural ray-tracing Metal function role");
@@ -347,10 +334,10 @@ String getStructuralRayTracingMetalClosestHitFunctionName(
     Index payloadIndex,
     UnownedStringSlice stageSourceTypeName)
 {
-    // A closest-hit source type fixes its Context and therefore its Record, Payload, and primitive
-    // attributes. The enclosing schema and payload partition fix the table-wide Metal ray-data
-    // ABI. Logical hit-group indices do not change either part of the generated function, so they
-    // must not create distinct host-visible symbols for the same concrete stage.
+    // A closest-hit source type fixes its Context and therefore the typed payload/attribute view
+    // used behind the uniform visible-function signature. The schema fixes the shared table's
+    // remaining arguments. Logical hit-group indices do not change either part of the adapter,
+    // so they must not create distinct host-visible symbols for the same concrete stage.
     return _getStructuralRayTracingMetalFunctionName(
         StructuralRayTracingMetalFunctionRole::ClosestHit,
         schemaSourceTypeName,
@@ -363,9 +350,9 @@ String getStructuralRayTracingMetalNoOpClosestHitFunctionName(
     UnownedStringSlice schemaSourceTypeName,
     Index payloadIndex)
 {
-    // Use one schema-and-payload identity rather than a group identity. All closest-hit functions
-    // in a payload partition have the same physical signature, so the host can install this one
-    // no-op at every `NoClosestHit` function index without linking redundant functions.
+    // Reuse one no-op for all placeholders in this payload view rather than creating one per group.
+    // The adapter has the schema-wide uniform signature and occupies the requested positions in
+    // the shared closest-hit table.
     return _getStructuralRayTracingMetalFunctionName(
         StructuralRayTracingMetalFunctionRole::ClosestHitNoOp,
         schemaSourceTypeName,
@@ -389,13 +376,13 @@ String getStructuralRayTracingMetalCallableFunctionName(
 
 String getStructuralRayTracingMetalCandidateDispatcherName(
     UnownedStringSlice schemaSourceTypeName,
-    Index payloadIndex,
+    Index,
     StructuralRayTracingMetalCandidateKind candidateKind)
 {
     return _getStructuralRayTracingMetalFunctionName(
         StructuralRayTracingMetalFunctionRole::Candidate,
         schemaSourceTypeName,
-        payloadIndex,
+        -1,
         -1,
         UnownedStringSlice(),
         candidateKind);
@@ -456,54 +443,6 @@ static const char* _getMetadataInterfaceName(StructuralRayTracingMetadataKind ki
     default:
         return nullptr;
     }
-}
-
-static const char* _getOpenSectionTypeName(StructuralRayTracingSectionKind kind)
-{
-    switch (kind)
-    {
-    case StructuralRayTracingSectionKind::HitGroups:
-        return "OpenHitGroups";
-    case StructuralRayTracingSectionKind::MissShaders:
-        return "OpenMissShaders";
-    case StructuralRayTracingSectionKind::CallableShaders:
-        return "OpenCallableShaders";
-    default:
-        return nullptr;
-    }
-}
-
-/// Finds the ordinary type parameter that supplies an open section's tag.
-///
-/// Consider `OpenHitGroups<Tag, each Group>`. The checked generic declaration also contains the
-/// pack's conformance constraint and compiler-generated pack-count constraints. The tag role is
-/// the unique non-pack type parameter, not whichever serialized argument happens to come first.
-static GenericTypeParamDecl* _findOpenSectionTagParameter(AggTypeDecl* sectionType)
-{
-    auto genericDecl = as<GenericDecl>(sectionType ? sectionType->parentDecl : nullptr);
-    if (!genericDecl || genericDecl->inner != sectionType)
-        return nullptr;
-
-    GenericTypeParamDecl* tagParameter = nullptr;
-    Index packParameterCount = 0;
-    for (auto member : genericDecl->getDirectMemberDecls())
-    {
-        if (auto parameter = as<GenericTypeParamDecl>(member))
-        {
-            if (tagParameter)
-                return nullptr;
-            tagParameter = parameter;
-        }
-        else if (as<GenericTypePackParamDecl>(member))
-        {
-            ++packParameterCount;
-        }
-        else if (isGenericParam(member) && !isGenericConstraintParameterDecl(member))
-        {
-            return nullptr;
-        }
-    }
-    return tagParameter && packParameterCount == 1 ? tagParameter : nullptr;
 }
 
 static Decl* _findNamedDeclInContainer(
@@ -654,6 +593,12 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::InstanceIndex;
     if (text == "instanceID")
         return StructuralRayTracingStageInputOperationKind::InstanceID;
+    if (text == "instanceCount")
+        return StructuralRayTracingStageInputOperationKind::InstanceCount;
+    if (text == "getInstanceIndex")
+        return StructuralRayTracingStageInputOperationKind::InstanceIndexAtLevel;
+    if (text == "getInstanceID")
+        return StructuralRayTracingStageInputOperationKind::InstanceIDAtLevel;
     if (text == "objectToWorld")
         return StructuralRayTracingStageInputOperationKind::ObjectToWorld;
     if (text == "worldToObject")
@@ -702,6 +647,7 @@ static void _registerStageInputOperations(
 static void _registerStageInputExtensionOperations(
     ContainerDecl* container,
     AggTypeDecl* const* inputTypes,
+    InterfaceDecl* commonHitInputInterface,
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>& operations)
 {
     for (auto member : container->getDirectMemberDecls())
@@ -714,6 +660,25 @@ static void _registerStageInputExtensionOperations(
         {
             auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
             auto targetDecl = targetType ? targetType->getDeclRef().getDecl() : nullptr;
+            // The standard module factors shared properties into
+            // `extension<Input : ICommonHitInput> Input`. Recognize that checked constraint
+            // against the exact trusted interface, not arbitrary user properties with the same
+            // name. These accessors still describe the concrete stage input after specialization.
+            if (auto genericDecl = as<GenericDecl>(extensionDecl->parentDecl))
+            {
+                for (auto constraint :
+                     genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+                {
+                    auto interfaceRef = isDeclRefTypeOf<InterfaceDecl>(constraint->sup.type);
+                    if (!constraint->isEqualityConstraint && interfaceRef &&
+                        interfaceRef.getDecl() == commonHitInputInterface &&
+                        constraint->sub.type->equals(extensionDecl->targetType.type))
+                    {
+                        _registerStageInputOperations(extensionDecl, operations);
+                        break;
+                    }
+                }
+            }
             for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
             {
                 if (targetDecl == inputTypes[i])
@@ -725,7 +690,11 @@ static void _registerStageInputExtensionOperations(
         }
 
         if (auto childContainer = as<ContainerDecl>(candidate))
-            _registerStageInputExtensionOperations(childContainer, inputTypes, operations);
+            _registerStageInputExtensionOperations(
+                childContainer,
+                inputTypes,
+                commonHitInputInterface,
+                operations);
     }
 }
 
@@ -1841,9 +1810,12 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         m_stageInvokeRequirements[i] = invokeRequirements[i];
         _registerStageInputOperations(inputTypes[i], m_stageInputOperations);
     }
+    auto commonHitInputInterface = as<InterfaceDecl>(_findNamedDecl(module, "ICommonHitInput"));
+    SLANG_RELEASE_ASSERT(commonHitInputInterface);
     _registerStageInputExtensionOperations(
         module->getModuleDecl(),
         inputTypes,
+        commonHitInputInterface,
         m_stageInputOperations);
     auto traceProgramSchemaInterface =
         as<InterfaceDecl>(_findNamedDecl(module, "ITraceProgramSchema"));
@@ -1851,6 +1823,30 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     auto traceProgramDescriptorType =
         as<AggTypeDecl>(_findNamedDecl(module, "TraceProgramDescriptor"));
     m_traceProgramDescriptorType = traceProgramDescriptorType;
+    // Consider `TraceProgramDescriptor<MySchema>`. The existing intrinsic-type lowering emits
+    // the schema type and its conformance witness directly from the checked substitution. Check
+    // that the packaged declaration supplies exactly those operands before consumers use it.
+    auto descriptorGeneric = as<GenericDecl>(
+        traceProgramDescriptorType ? traceProgramDescriptorType->parentDecl : nullptr);
+    auto descriptorParameter = _getOnlyGenericTypeParameter(descriptorGeneric);
+    auto descriptorMagic = traceProgramDescriptorType
+                               ? traceProgramDescriptorType->findModifier<MagicTypeModifier>()
+                               : nullptr;
+    auto descriptorIntrinsic =
+        traceProgramDescriptorType
+            ? traceProgramDescriptorType->findModifier<IntrinsicTypeModifier>()
+            : nullptr;
+    SLANG_RELEASE_ASSERT(
+        descriptorParameter && descriptorMagic && descriptorIntrinsic &&
+        descriptorMagic->magicNodeType.getTag() == ASTNodeType::TraceProgramDescriptorType &&
+        descriptorIntrinsic->irOp == kIROp_TraceProgramDescriptorType &&
+        descriptorIntrinsic->irOperands.getCount() == 0 &&
+        descriptorGeneric->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>().getCount() ==
+            1 &&
+        _findConformanceConstraint(
+            descriptorGeneric,
+            DeclRefType::create(module->getASTBuilder(), makeDeclRef(descriptorParameter)),
+            traceProgramSchemaInterface));
     auto accelerationStructureRequirement = getAssociatedTypeRequirement(
         StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure);
     auto motionRequirement =
@@ -1900,18 +1896,6 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         auto kind = StructuralRayTracingMetadataKind(i);
         m_metadataInterfaces[i] =
             as<InterfaceDecl>(_findNamedDecl(module, _getMetadataInterfaceName(kind)));
-    }
-    for (int i = 0; i < int(StructuralRayTracingSectionKind::Count); ++i)
-    {
-        auto kind = StructuralRayTracingSectionKind(i);
-        auto sectionType = as<AggTypeDecl>(_findNamedDecl(module, _getOpenSectionTypeName(kind)));
-        auto tagParameter = _findOpenSectionTagParameter(sectionType);
-        // The open-list declarations are part of the same trusted contract as the trace overloads.
-        // A compiler/module mismatch is not recoverable user input, so reject it at the one
-        // registration boundary instead of making every lowering consumer guess at the shape.
-        SLANG_RELEASE_ASSERT(sectionType && tagParameter);
-        m_openSectionTypes[i] = sectionType;
-        m_openSectionTagParameters[i] = tagParameter;
     }
     return true;
 }
@@ -2215,14 +2199,6 @@ InterfaceDecl* StructuralRayTracingDeclRegistry::getMetadataInterface(
     return m_metadataInterfaces[index];
 }
 
-AggTypeDecl* StructuralRayTracingDeclRegistry::getOpenSectionType(
-    StructuralRayTracingSectionKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingSectionKind::Count))
-        return nullptr;
-    return m_openSectionTypes[index];
-}
 
 InterfaceDecl* StructuralRayTracingDeclRegistry::getSectionEntryInterface(
     StructuralRayTracingSectionKind kind) const
@@ -2236,122 +2212,23 @@ InterfaceDecl* StructuralRayTracingDeclRegistry::getSectionEntryInterface(
     case StructuralRayTracingSectionKind::CallableShaders:
         return getStageInterface(StructuralRayTracingStageKind::Callable);
     default:
-        return nullptr;
+        SLANG_UNEXPECTED("invalid structural ray-tracing section kind");
     }
 }
 
-bool StructuralRayTracingDeclRegistry::tryGetOpenSectionInfo(
+SubtypeWitness* StructuralRayTracingDeclRegistry::projectSectionEntryWitness(
     ASTBuilder* astBuilder,
-    Type* sectionType,
-    StructuralRayTracingSectionKind expectedKind,
-    StructuralRayTracingOpenSectionInfo& outInfo) const
-{
-    outInfo = {};
-    auto index = int(expectedKind);
-    if (!astBuilder || index < 0 || index >= int(StructuralRayTracingSectionKind::Count))
-        return false;
-
-    sectionType = sectionType ? as<Type>(sectionType->resolve()) : nullptr;
-    auto sectionDeclRefType = as<DeclRefType>(sectionType);
-    auto sectionDeclRef = sectionDeclRefType ? sectionDeclRefType->getDeclRef() : DeclRef<Decl>();
-    if (!sectionDeclRef || sectionDeclRef.getDecl() != m_openSectionTypes[index])
-        return false;
-
-    auto sectionGeneric = as<GenericDecl>(m_openSectionTypes[index]->parentDecl);
-    auto application = SubstitutionSet(sectionDeclRef).findGenericAppDeclRef(sectionGeneric);
-    auto tagParameter = m_openSectionTagParameters[index];
-    auto tagArgumentIndex = getGenericArgumentIndex(sectionGeneric, tagParameter);
-    if (!application || tagArgumentIndex < 0 || tagArgumentIndex >= application->getArgCount())
-        return false;
-
-    // Read the tag through the declaration-derived generic role. The listed pack is decoded by
-    // semantic value kind, using the same checked representation consumed by closed lists.
-    outInfo.tagType = as<Type>(application->getArg(tagArgumentIndex)->resolve());
-    outInfo.listedEntries = getStructuralRayTracingEntryPack(astBuilder, sectionType);
-    SLANG_RELEASE_ASSERT(outInfo.tagType);
-    return true;
-}
-
-bool StructuralRayTracingDeclRegistry::isValidOpenSectionTag(
-    ASTBuilder* astBuilder,
-    Type* tagType,
+    SubtypeWitness* witness,
     StructuralRayTracingSectionKind kind) const
 {
-    auto tagDeclRefType = as<DeclRefType>(tagType ? tagType->resolve() : nullptr);
-    if (!astBuilder || !tagDeclRefType || !tagDeclRefType->getDeclRef().as<InterfaceDecl>())
-        return false;
-
-    auto entryInterface = getSectionEntryInterface(kind);
-    if (!entryInterface)
-        return false;
-    auto entryInterfaceType = DeclRefType::create(astBuilder, makeDeclRef(entryInterface));
-    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
-    auto sharedSemantics =
-        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
-    if (!sharedSemantics)
-        return false;
-
-    SemanticsContext semanticsContext(sharedSemantics);
-    SemanticsVisitor visitor(semanticsContext);
-    return visitor.tryGetInterfaceConformanceWitness(tagType, entryInterfaceType) != nullptr;
-}
-
-void StructuralRayTracingDeclRegistry::collectOpenSectionTags(
-    ASTBuilder* astBuilder,
-    Type* declaredTagType,
-    StructuralRayTracingSectionKind kind,
-    List<Type*>& outTagTypes) const
-{
-    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
-    auto sharedSemantics =
-        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
-    if (!astBuilder || !sharedSemantics || !declaredTagType)
-        return;
-
-    HashSet<Type*> seenTags;
-    auto addTag = [&](Type* tagType)
-    {
-        tagType = tagType ? tagType->getCanonicalType() : nullptr;
-        auto tagDeclRefType = as<DeclRefType>(tagType);
-        if (!tagDeclRefType || !tagDeclRefType->getDeclRef().as<InterfaceDecl>() ||
-            !isValidOpenSectionTag(astBuilder, tagType, kind) || !seenTags.add(tagType))
-        {
-            return;
-        }
-        outTagTypes.add(tagType);
-    };
-
-    // Consider this checked hierarchy:
-    //
-    //     interface IBaseHit : rt::IHitGroup {}
-    //     interface IDerivedHit : IBaseHit {}
-    //     struct Glass : IDerivedHit { ... }
-    //
-    // Normal conformance semantics make `Glass` a member of `OpenHitGroups<IBaseHit>`. The
-    // flattened inheritance facets are the semantic source of truth for every specialized
-    // ancestor interface of `IDerivedHit`; catalog those exact types on Glass's canonical witness
-    // table now. Linked completion can then compare opaque IR type identities directly, without
-    // reconstructing or walking an interface hierarchy after AST information is gone.
-    declaredTagType = declaredTagType->getCanonicalType();
-    addTag(declaredTagType);
-    for (auto facet : sharedSemantics->getInheritanceInfo(declaredTagType).facets)
-        addTag(facet->getType());
-}
-
-SubtypeWitness* StructuralRayTracingDeclRegistry::projectOpenSectionEntryWitness(
-    ASTBuilder* astBuilder,
-    SubtypeWitness* tagWitness,
-    StructuralRayTracingSectionKind kind) const
-{
-    auto entryInterface = getSectionEntryInterface(kind);
     auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
     auto sharedSemantics =
         trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
     return _projectStructuralRayTracingWitnessToInterface(
         astBuilder,
         sharedSemantics,
-        tagWitness,
-        entryInterface);
+        witness,
+        getSectionEntryInterface(kind));
 }
 
 StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::
@@ -2458,8 +2335,7 @@ bool StructuralRayTracingDeclRegistry::registerAPIUse(
 
 void StructuralRayTracingDeclRegistry::registerFunctionCall(
     FunctionDeclBase* caller,
-    FunctionDeclBase* callee,
-    SourceLoc callLoc)
+    FunctionDeclBase* callee)
 {
     if (!caller || !callee || !isInitialized())
         return;
@@ -2467,8 +2343,6 @@ void StructuralRayTracingDeclRegistry::registerFunctionCall(
     m_functionCallees.getOrAddValue(caller, HashSet<FunctionDeclBase*>()).add(callee);
     if (isTraceMethod(callee) || isCallShaderMethod(callee))
         m_structuralProgramCallers.add(caller);
-    if (isCallShaderMethod(callee))
-        m_callShaderCallers[caller] = callLoc;
 }
 
 bool StructuralRayTracingDeclRegistry::functionReachesStructuralTrace(
@@ -2496,33 +2370,5 @@ bool StructuralRayTracingDeclRegistry::functionReachesStructuralTrace(
     return false;
 }
 
-bool StructuralRayTracingDeclRegistry::findReachableCallShader(
-    FunctionDeclBase* function,
-    SourceLoc& outCallLoc) const
-{
-    if (!function)
-        return false;
-
-    HashSet<FunctionDeclBase*> visited;
-    List<FunctionDeclBase*> workList;
-    workList.add(function);
-    for (Index i = 0; i < workList.getCount(); ++i)
-    {
-        auto current = workList[i];
-        if (!visited.add(current))
-            continue;
-        if (auto callLoc = m_callShaderCallers.tryGetValue(current))
-        {
-            outCallLoc = *callLoc;
-            return true;
-        }
-        if (auto callees = m_functionCallees.tryGetValue(current))
-        {
-            for (auto callee : *callees)
-                workList.add(callee);
-        }
-    }
-    return false;
-}
 
 } // namespace Slang

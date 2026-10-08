@@ -29,8 +29,8 @@ struct TestAnyHit : rt::IAnyHitShader
     typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
-        input.payload.parameter = input.curve.parameter;
-        if (input.curve.parameter < 0.5)
+        input.payload.parameter = input.attributes.parameter;
+        if (input.attributes.parameter < 0.5)
             input.ignoreHit();
     }
 }

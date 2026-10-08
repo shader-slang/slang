@@ -1,6 +1,11 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 
+// Known failure on both targets: https://github.com/shader-slang/slang/issues/13509
+// Member lookup on input.attributes does not apply the enclosing primitive equality, so reading
+// barycentricCoord reports E30027. A stage with a concrete Context works; this generic regression
+// stays enabled without a workaround so the independent compiler fix can restore both checks.
+
 // A reusable stage may constrain a generic hit context to one primitive kind. The concrete
 // specialization appears below in HitGroup's module-scope associated type, which exercises the
 // source pattern that previously failed in shader-slang/slang#12822. The constraint also makes the
@@ -35,7 +40,7 @@ struct TriangleAnyHit<C> : rt::IAnyHitShader
 
     void invoke(rt::AnyHitInput<Context> input)
     {
-        if (input.triangle.barycentricCoord.x < 0.0)
+        if (input.attributes.barycentricCoord.x < 0.0)
             input.ignoreHit();
     }
 }

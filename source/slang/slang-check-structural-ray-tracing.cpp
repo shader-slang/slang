@@ -83,7 +83,7 @@ static bool _validateStructuralRayTracingStageFields(
 // A standalone `-entry StatefulClosestHit` request finds the struct by name, but a ray-generation
 // entry point reaches the same stage only through an `ITraceProgramSchema` witness. Both paths
 // later synthesize a receiver without a source value. Checking the concrete conformance keeps that
-// compiler-created receiver valid for closed schemas, open-section entries, and standalone stages.
+// compiler-created receiver valid for schema entries and standalone stages.
 // The registry suppresses duplicate diagnostics per inspected declaration because conformance
 // checking may publish the same completed witness more than once, and several stages may share one
 // stateful base struct.
@@ -105,7 +105,7 @@ static bool _validateStructuralRayTracingStageStorage(
         stageDeclRef && (stageDeclRef.getDecl()->findModifier<BuiltinTypeModifier>() ||
                          stageDeclRef.getDecl()->findModifier<MagicTypeModifier>());
 
-    // A user-defined interface may inherit a stage contract to act as an open-section tag. It is
+    // A user-defined interface may refine a stage contract with additional requirements. It is
     // not itself an executable implementation and therefore has no receiver to validate here.
     if (stageDeclRef.as<InterfaceDecl>())
         return true;
@@ -179,11 +179,10 @@ void registerRayTracingAPICall(
     Linkage* linkage,
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
-    SourceLoc callLoc,
     DiagnosticSink* sink)
 {
     auto& registry = linkage->getStructuralRayTracingDeclRegistry();
-    registry.registerFunctionCall(caller, callee, callLoc);
+    registry.registerFunctionCall(caller, callee);
     if (!registry.isInitialized() || !caller || !callee)
         return;
 
@@ -248,99 +247,29 @@ void SemanticsVisitor::registerStructuralRayTracingStageConformance(
         stageKind);
 }
 
-struct _StructuralRayTracingSchemaSectionInfo
-{
-    StructuralRayTracingSectionKind kind = StructuralRayTracingSectionKind::Count;
-    const char* name = nullptr;
-    const char* entryInterfaceName = nullptr;
-};
 
-static bool _tryGetStructuralRayTracingSchemaSectionInfo(
+// Returns the section name for a trusted schema requirement used in duplicate-entry diagnostics,
+// or null for other associated-type requirements.
+static const char* _getStructuralRayTracingSchemaSectionName(
     const StructuralRayTracingDeclRegistry& registry,
-    AssocTypeDecl* requirement,
-    _StructuralRayTracingSchemaSectionInfo& outInfo)
+    AssocTypeDecl* requirement)
 {
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramHitGroups))
     {
-        outInfo = {StructuralRayTracingSectionKind::HitGroups, "hit-group", "IHitGroup"};
-        return true;
+        return "hit-group";
     }
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramMissShaders))
     {
-        outInfo = {StructuralRayTracingSectionKind::MissShaders, "miss-shader", "IMissShader"};
-        return true;
+        return "miss-shader";
     }
     if (requirement == registry.getAssociatedTypeRequirement(
                            StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders))
     {
-        outInfo = {
-            StructuralRayTracingSectionKind::CallableShaders,
-            "callable-shader",
-            "ICallableShader"};
-        return true;
+        return "callable-shader";
     }
-    return false;
-}
-
-void SemanticsVisitor::diagnoseInvalidStructuralRayTracingOpenSectionTag(
-    Type* entryListType,
-    AssocTypeDecl* associatedTypeRequirement,
-    Decl* satisfyingDecl)
-{
-    auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
-    if (!registry.isInitialized())
-        return;
-
-    _StructuralRayTracingSchemaSectionInfo section;
-    if (!_tryGetStructuralRayTracingSchemaSectionInfo(registry, associatedTypeRequirement, section))
-    {
-        return;
-    }
-
-    SLANG_RELEASE_ASSERT(entryListType && satisfyingDecl);
-    StructuralRayTracingOpenSectionInfo openSection;
-    if (!registry.tryGetOpenSectionInfo(
-            getASTBuilder(),
-            entryListType->getCanonicalType(),
-            section.kind,
-            openSection))
-    {
-        return;
-    }
-
-    auto tagType = openSection.tagType->getCanonicalType();
-    if (as<ThisType>(tagType))
-    {
-        // Slang represents an interface's abstract `This` as `ThisType`, never as a
-        // `DeclRefType<ThisTypeDecl>`. The concrete declaration is therefore not known until a
-        // conformance substitutes `This`; retain the checked type for the existing IR validation.
-        return;
-    }
-    auto tagDeclRefType = as<DeclRefType>(tagType);
-    auto tagDecl = tagDeclRefType ? tagDeclRefType->getDeclRef().getDecl() : nullptr;
-    if (tagDecl && (isGenericParam(tagDecl) || as<GlobalGenericParamDecl>(tagDecl) ||
-                    as<AssocTypeDecl>(tagDecl) || as<ThisTypeDecl>(tagDecl)))
-    {
-        // A generic schema can defer the tag's exact declaration until specialization. The IR
-        // request retains the checked substituted type and diagnoses a non-interface argument at
-        // the target link where that type becomes concrete.
-        return;
-    }
-    if (as<ErrorType>(tagType) ||
-        (tagDeclRefType && tagDeclRefType->getDeclRef().as<InterfaceDecl>()))
-        return;
-
-    // `OpenHitGroups<ConcreteHit>` satisfies the ordinary `Tag : IHitGroup` generic constraint,
-    // but it cannot discover other conformers because a concrete type is not an interface tag.
-    // Diagnose that complete source contract while its associated-type declaration still provides
-    // a precise location. Generic substitutions retain the IR validation above as their backstop.
-    getSink()->diagnose(Diagnostics::StructuralRayTracingOpenTagNotEntryInterface{
-        .section = section.name,
-        .tag = tagType,
-        .entryInterface = section.entryInterfaceName,
-        .location = satisfyingDecl->loc});
+    return nullptr;
 }
 
 void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
@@ -353,26 +282,25 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     if (!registry.isInitialized())
         return;
 
-    _StructuralRayTracingSchemaSectionInfo section;
-    if (!_tryGetStructuralRayTracingSchemaSectionInfo(registry, associatedTypeRequirement, section))
+    auto sectionName =
+        _getStructuralRayTracingSchemaSectionName(registry, associatedTypeRequirement);
+    if (!sectionName)
         return;
 
     SLANG_RELEASE_ASSERT(entryListType && schemaType && satisfyingDecl);
 
     // Consider this example:
     //
-    //     typealias HitGroups = OpenHitGroups<IHitTag, OpaqueHit, OpaqueHit>;
+    //     typealias HitGroups = HitGroupList<OpaqueHit, OpaqueHit>;
     //
     // The type pack in this checked associated-type witness is the source declaration's exact
-    // list of known implementations. Each implementation receives one dense function index; it
+    // list of implementations. Each implementation receives one dense function index; it
     // does not stand for a physical SBT record. A host can therefore reuse `OpaqueHit` in any
     // number of records, but listing it twice here would assign one implementation two indices and
     // make reflection ambiguous. Reject that source contract before lowering, because the IR and
     // reflection representations intentionally rely on unique entries.
     //
-    // This check concerns only repeated explicit pack elements. If a listed open-section entry
-    // also conforms to the section tag, link completion still forms a union and retains that type
-    // once. Canonical AST identity makes aliases name the same entry without reconstructing or
+    // Canonical AST identity makes aliases name the same entry without reconstructing or
     // structurally comparing types here.
     auto entries =
         getStructuralRayTracingEntryPack(getASTBuilder(), entryListType->getCanonicalType());
@@ -384,7 +312,7 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
             continue;
 
         getSink()->diagnose(Diagnostics::DuplicateStructuralRayTracingEntry{
-            .section = section.name,
+            .section = sectionName,
             .entry = entryType,
             .schema = schemaType->getCanonicalType(),
             .location = satisfyingDecl->loc});
@@ -495,40 +423,6 @@ static void _registerAttributedLegacyEntryPoints(
     }
 }
 
-static void _diagnoseInvalidCallableDispatchStages(
-    StructuralRayTracingDeclRegistry& registry,
-    ContainerDecl* containerDecl,
-    DiagnosticSink* sink)
-{
-    for (auto member : containerDecl->getDirectMemberDecls())
-    {
-        auto innerMember = member;
-        if (auto genericDecl = as<GenericDecl>(innerMember))
-            innerMember = genericDecl->inner;
-
-        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
-        {
-            auto stageKind = registry.getStageKind(functionDecl);
-            if (stageKind == StructuralRayTracingStageKind::AnyHit ||
-                stageKind == StructuralRayTracingStageKind::Intersection)
-            {
-                SourceLoc callLoc;
-                if (registry.findReachableCallShader(functionDecl, callLoc))
-                {
-                    auto stageName = stageKind == StructuralRayTracingStageKind::AnyHit
-                                         ? "any-hit"
-                                         : "intersection";
-                    sink->diagnose(Diagnostics::StructuralRayTracingCallableStageMismatch{
-                        .stage = stageName,
-                        .location = callLoc});
-                }
-            }
-        }
-
-        if (auto childContainer = as<ContainerDecl>(innerMember))
-            _diagnoseInvalidCallableDispatchStages(registry, childContainer, sink);
-    }
-}
 
 static void _diagnoseInvalidStructuralStageCapabilities(
     StructuralRayTracingDeclRegistry& registry,
@@ -546,12 +440,7 @@ static void _diagnoseInvalidStructuralStageCapabilities(
             auto stageKind = registry.getStageKind(functionDecl);
             auto stage = _getNativeStage(stageKind);
             auto capabilities = functionDecl->inferredCapabilityRequirements;
-            SourceLoc callShaderLoc;
-            auto hasSpecificCallableDiagnostic =
-                (stageKind == StructuralRayTracingStageKind::AnyHit ||
-                 stageKind == StructuralRayTracingStageKind::Intersection) &&
-                registry.findReachableCallShader(functionDecl, callShaderLoc);
-            if (!hasSpecificCallableDiagnostic && stage != Stage::Unknown && capabilities &&
+            if (stage != Stage::Unknown && capabilities &&
                 capabilities->isIncompatibleWith(getAtomFromStage(stage)))
             {
                 sink->diagnose(Diagnostics::DeclHasDependenciesNotCompatibleOnStage{
@@ -660,7 +549,6 @@ void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, Diagn
     if (!registry.isInitialized())
         return;
     _registerAttributedLegacyEntryPoints(linkage, module, module->getModuleDecl(), sink);
-    _diagnoseInvalidCallableDispatchStages(registry, module->getModuleDecl(), sink);
     _diagnoseInvalidStructuralStageCapabilities(registry, module->getModuleDecl(), sink);
     _diagnoseInvalidStructuralStageInputParameters(registry, module->getModuleDecl(), sink);
 }

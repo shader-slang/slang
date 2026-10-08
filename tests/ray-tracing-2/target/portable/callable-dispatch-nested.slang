@@ -94,9 +94,10 @@ void main()
 // SPIRV-DAG: OpEntryPoint CallableKHR %SecondCallable "SecondCallable"
 // SPIRV: OpExecuteCallableKHR %uint_1
 
-// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uchar device*, uint constant*, uint device*, uchar thread*)> callableFunctions_0;
-// METAL: {{\[\[visible\]\]}} void {{.*}}(TestCallableData_0 thread* {{data_[0-9]+}}, uint3 {{dispatchRaysIndex_[0-9]+}}, uint3 {{dispatchRaysDimensions_[0-9]+}}, uchar device* {{recordData_[0-9]+}}, uint constant* {{descriptorResources_[0-9]+}}, uint device* {{descriptorData_[0-9]+}}, uchar thread* {{kernelContext_[0-9]+}})
-// METAL: {{\[\[visible\]\]}} void {{.*}}(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint3 [[INDEX:dispatchRaysIndex_[0-9]+]], uint3 [[DIMENSIONS:dispatchRaysDimensions_[0-9]+]], uchar device* [[RECORD_DATA:recordData_[0-9]+]], uint constant* {{descriptorResources_[0-9]+}}, uint device* {{descriptorData_[0-9]+}}, uchar thread* [[CONTEXT:kernelContext_[0-9]+]])
+// METAL: metal::visible_function_table<void(void thread*, uint3, uint3, uchar device*, uint constant*, uint device*, uchar thread*)> callableFunctions_0;
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread* {{data_[0-9]+}}, uint3 {{dispatchRaysIndex_[0-9]+}}, uint3 {{dispatchRaysDimensions_[0-9]+}}, uchar device* {{recordData_[0-9]+}}, uint constant* {{descriptorResources_[0-9]+}}, uint device* {{descriptorData_[0-9]+}}, uchar thread* {{kernelContext_[0-9]+}})
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread* [[DATA:data_[0-9]+]], uint3 [[INDEX:dispatchRaysIndex_[0-9]+]], uint3 [[DIMENSIONS:dispatchRaysDimensions_[0-9]+]], uchar device* [[RECORD_DATA:recordData_[0-9]+]], uint constant* {{descriptorResources_[0-9]+}}, uint device* {{descriptorData_[0-9]+}}, uchar thread* [[CONTEXT:kernelContext_[0-9]+]])
+// METAL: TestCallableData_0 thread* [[TYPED_DATA:_S[0-9]+]] = (TestCallableData_0 thread*){{.*}}[[DATA]]
 // METAL: device uchar* [[CALLABLE_RECORD:_slang_callable_record]] =
 // METAL: uint [[FUNCTION_INDEX:_slang_callable_function_index]] =
-// METAL: callableFunctions_0{{\[}}[[FUNCTION_INDEX]]{{\]}}([[DATA]], [[INDEX]], [[DIMENSIONS]], [[CALLABLE_RECORD]] + 16, {{.*}}(thread uchar*)[[CONTEXT]]);
+// METAL: callableFunctions_0{{\[}}[[FUNCTION_INDEX]]{{\]}}([[TYPED_DATA]], [[INDEX]], [[DIMENSIONS]], [[CALLABLE_RECORD]] + 16, {{.*}}(thread uchar*)[[CONTEXT]]);

@@ -89,11 +89,9 @@ ConstantBuffer<HitInputAlias> invalidStageInputBuffer;
 // Structural metadata is compile-time schema information, so it remains a valid generic argument.
 typealias LegalMetadataArgument = Phantom<rt::ITraceProgramSchema>;
 
-// Open-section tags and listed stages are themselves generic arguments, but the resulting type is
-// compiler-recognized structural metadata rather than an ordinary user container.
-interface IOpenMissTag : rt::IMissShader {}
-
-typealias LegalOpenSection = rt::OpenMissShaders<IOpenMissTag>;
+// Listed stages are valid arguments to the compiler-recognized schema list, unlike the ordinary
+// user containers rejected above.
+typealias LegalStageList = rt::HitGroupList<>;
 
 void useType<T>() {}
 void useTypes<each T>() {}

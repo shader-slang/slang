@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -38,18 +38,43 @@ struct InvalidClosestHit : rt::IClosestHitShader
     void invoke(rt::ClosestHitInput<TriangleContext> input)
     {
         let attributes = input.attributes;
-//CHECK:                       ^^^^^^^^^^ member not found
-//CHECK:                       ^^^^^^^^^^ 'attributes' is not a member of 'rt.ClosestHitInput<TriangleContext>'.
+        let value = attributes.value;
+//CHECK: 'value' is not a member of 'rt.TriangleData'.
     }
 }
 
-struct InvalidProceduralClosestHit : rt::IClosestHitShader
+struct InvalidProceduralAnyHit : rt::IAnyHitShader
 {
     typealias Context = ProceduralContext;
-    void invoke(rt::ClosestHitInput<ProceduralContext> input)
+    void invoke(rt::AnyHitInput<ProceduralContext> input)
     {
-        let triangle = input.triangle;
-//CHECK:                     ^^^^^^^^ member not found
-//CHECK:                     ^^^^^^^^ 'triangle' is not a member of 'rt.ClosestHitInput<ProceduralContext>'.
+        let attributes = input.attributes;
+        let frontFacing = attributes.frontFacing;
+//CHECK: 'frontFacing' is not a member of 'CustomAttributes'.
+    }
+}
+
+// A generic stage must prove the attribute type before assuming a triangle view. A concrete
+// specialization cannot make an otherwise invalid generic body well-typed.
+struct InvalidGenericClosestHit<C : rt::IHitContext> : rt::IClosestHitShader
+{
+    typealias Context = C;
+
+    void invoke(rt::ClosestHitInput<Context> input)
+    {
+        rt::TriangleData attributes = input.attributes;
+//CHECK: expected an expression of type 'rt.TriangleData', got 'C.Primitive.Attributes'
+    }
+}
+
+struct InvalidGenericAnyHit<C : rt::IHitContext> : rt::IAnyHitShader
+{
+    typealias Context = C;
+
+    void invoke(rt::AnyHitInput<Context> input)
+    {
+        let attributes = input.attributes;
+        let barycentricCoord = attributes.barycentricCoord;
+//CHECK: 'barycentricCoord' is not a member of 'C.Primitive.Attributes'.
     }
 }

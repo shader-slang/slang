@@ -14,8 +14,8 @@ rt::TraceProgramDescriptor<Schema> program;
 void main()
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMax = 100.0;
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMax = 100.0;
     desc.instanceMask = 0xff;
 
     PayloadValue<FirstTag> first = {};

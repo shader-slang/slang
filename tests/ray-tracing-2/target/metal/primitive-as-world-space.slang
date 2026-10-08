@@ -1,4 +1,13 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+
+// Direct primitive-AS traversal has identical object and world coordinates. It needs neither
+// instancing nor world_space_data to expose these properties, and its transforms are identity.
+// METAL-NOT: metal::raytracing::instancing
+// METAL-NOT: metal::raytracing::world_space_data
+// METAL: {{\[\[}}intersection(triangle)]]
+// METAL-SAME: {{\[\[}}origin]]
+// METAL-SAME: {{\[\[}}direction]]
+// METAL-NOT: metal::raytracing::world_space_data
 
 import slang.raytracing;
 
@@ -27,6 +36,7 @@ struct TestAnyHit : rt::IAnyHitShader
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.value = input.worldSpaceOrigin.x + input.worldSpaceDirection.y;
+        input.payload.value += input.objectToWorld[0][0] + input.worldToObject[0][0];
     }
 }
 
@@ -56,6 +66,4 @@ void main()
     TestPayload payload = {};
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
-//CHECK:        ^ structural ray-tracing world-space candidate data requires instancing
-//CHECK:        ^ Metal cannot provide world-space data to intersection or any-hit logic when tracing a direct primitive acceleration structure
 }

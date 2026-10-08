@@ -74,7 +74,7 @@ void main()
 // bits. Their target adapters use role-local scalar backing storage; the source type stays empty.
 // SPIRV: OpEntryPoint CallableKHR {{.*}} "EmptyCallable"
 // SPIRV: OpExecuteCallableKHR
-// METAL: metal::visible_function_table<void(int thread*
+// METAL: metal::visible_function_table<void(void thread*
 // METAL: struct LayoutSensitiveRecord
 // METAL-NOT: marker
 // METAL: int value{{.*}};

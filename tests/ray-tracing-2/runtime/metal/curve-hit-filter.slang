@@ -42,7 +42,7 @@ struct RuntimeAnyHit : rt::IAnyHitShader
     {
         input.payload.anyHitCount++;
         input.payload.parameterValid =
-            input.curve.parameter >= 0.0 && input.curve.parameter <= 1.0;
+            input.attributes.parameter >= 0.0 && input.attributes.parameter <= 1.0;
     }
 }
 
@@ -97,10 +97,10 @@ void main()
     uint rayIndex = DispatchRaysIndex().x;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex == 0 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
-    desc.ray.direction = float3(0.0, 0.0, 1.0);
-    desc.ray.tMin = 0.001;
-    desc.ray.tMax = 100.0;
+    desc.ray.Origin = rayIndex == 0 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.Direction = float3(0.0, 0.0, 1.0);
+    desc.ray.TMin = 0.001;
+    desc.ray.TMax = 100.0;
     desc.rayFlags = RAY_FLAG_NONE;
     desc.instanceMask = 0xff;
 

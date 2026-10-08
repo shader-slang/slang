@@ -80,26 +80,22 @@ void main()
     twoPayloadTracer.trace(desc, scene, twoPayloadProgram, payloadB);
 }
 
-// The source descriptor's ParameterBlock storage has the same shape for every schema. The
-// compiler-owned wrapper retains the phantom schema argument until Metal creates one physical
-// descriptor type per schema: the first has one payload resource triple, while the second has two.
-// METAL-LABEL: struct rt_TraceProgramDescriptorResources_default_0
+// The opaque source descriptor retains its schema argument until Metal creates one nominal
+// physical descriptor type per schema.
+// Each schema owns its own argument-buffer type, but both layouts have exactly the same five
+// resource roles regardless of the number of payload views.
+// METAL-LABEL: struct OnePayloadSchema_resources{{.*}}
 // METAL: intersectionFunctions_0;
 // METAL: missFunctions_0;
 // METAL: closestHitFunctions_0;
 // METAL: callableFunctions_0;
 // METAL: records_0;
-// METAL-LABEL: struct rt_TraceProgramDescriptorResources_default_1
-// METAL: intersectionFunctions0_0;
-// METAL: missFunctions0_0;
-// METAL: closestHitFunctions0_0;
-// METAL: intersectionFunctions1_0;
-// METAL: missFunctions1_0;
-// METAL: closestHitFunctions1_0;
+// METAL-LABEL: struct TwoPayloadSchema_resources{{.*}}
+// METAL: intersectionFunctions_1;
+// METAL: missFunctions_1;
+// METAL: closestHitFunctions_1;
 // METAL: callableFunctions_1;
 // METAL: records_1;
-
-// Each source descriptor is retagged only to its own schema's physical representation.
 // METAL-LABEL: struct KernelContext_0
-// METAL: rt_TraceProgramDescriptorResources_default_0 constant* onePayloadProgram_resources_0;
-// METAL: rt_TraceProgramDescriptorResources_default_1 constant* twoPayloadProgram_resources_0;
+// METAL: OnePayloadSchema_resources{{.*}} constant* onePayloadProgram_0;
+// METAL: TwoPayloadSchema_resources{{.*}} constant* twoPayloadProgram_0;

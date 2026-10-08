@@ -406,7 +406,8 @@ bool buildMetalMultilevelScene(
         return false;
 
     // The outer transform places the sibling triangles apart so one ray can select each path.
-    // Their full native instance-index paths are [0, 0] and [1, 0].
+    // Their full native instance-index paths are [0, 0] and [1, 0]. A third instance directly
+    // references the primitive AS and has path [2], testing the actual count below max_levels.
     MTLAccelerationStructureUserIDInstanceDescriptor outerInstances[] = {
         makeInstance(
             0,
@@ -418,6 +419,11 @@ bool buildMetalMultilevelScene(
             21,
             MTLAccelerationStructureInstanceOptionNone,
             makeTransform(2.0f, 0.0f, 0.0f)),
+        makeInstance(
+            2,
+            22,
+            MTLAccelerationStructureInstanceOptionNone,
+            makeTransform(4.0f, 0.0f, 0.0f)),
     };
     return buildInstanceAccelerationStructureLevel(
         device,
@@ -426,7 +432,8 @@ bool buildMetalMultilevelScene(
         SLANG_COUNT_OF(outerInstances),
         @[
             outScene.innerInstanceAccelerationStructure,
-            outScene.siblingInnerInstanceAccelerationStructure
+            outScene.siblingInnerInstanceAccelerationStructure,
+            outScene.primitiveAccelerationStructure
         ],
         outScene.instanceDescriptorBuffer,
         outScene.instanceAccelerationStructure,

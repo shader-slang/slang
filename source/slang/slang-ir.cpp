@@ -5111,10 +5111,6 @@ void ModuleLinkingInfo::_build(IRModule* module)
         if (as<IRGlobalParam>(inst))
             m_globalParams.add(inst);
 
-        if (inst->findDecoration<IRStructuralRayTracingTaggedConformanceDecoration>())
-        {
-            m_structuralRayTracingTaggedConformances.add(inst);
-        }
 
         if (as<IRStructuralRayTracingProgramSchema>(inst))
             m_structuralRayTracingProgramSchemas.add(inst);

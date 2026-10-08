@@ -93,6 +93,6 @@ void main()
 // METAL: metal::visible_function_table<{{.*}}> missFunctions
 // METAL: metal::visible_function_table<{{.*}}> closestHitFunctions
 // METAL: metal::visible_function_table<{{.*}}> callableFunctions
-// METAL: {{\[\[visible\]\]}} void {{.*}}(CallableData_0 thread*
-// METAL: {{\[\[visible\]\]}} void {{.*}}(Schema_rayData_0 thread*
-// METAL: {{\[\[visible\]\]}} void {{.*}}(Schema_rayData_0 thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*

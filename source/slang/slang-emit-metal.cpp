@@ -834,26 +834,64 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             }
             if (hasRequirement(
                     closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::InstanceCount))
+            {
+                m_writer->emit(hasInstancing ? ", _slang_result.instance_count" : ", 0u");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::InstanceIndexAtLevel))
+            {
+                m_writer->emit(
+                    hasInstancing ? ", metal::array_ref<uint>(_slang_result.instance_id, "
+                                    "_slang_result.instance_count)"
+                                  : ", metal::array_ref<uint>()");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::InstanceIDAtLevel))
+            {
+                m_writer->emit(
+                    hasInstancing ? ", metal::array_ref<uint>(_slang_result.user_instance_id, "
+                                    "_slang_result.instance_count)"
+                                  : ", metal::array_ref<uint>()");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
                     MetalStructuralRayTracingStageRequirement::ObjectSpaceRay))
             {
-                m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
-                emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
-                m_writer->emit(", 1.0f))");
-                m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
-                emitOperand(trace->getDirection(), getInfo(EmitOp::General));
-                m_writer->emit(", 0.0f))");
+                if (hasInstancing)
+                {
+                    m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
+                    emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+                    m_writer->emit(", 1.0f))");
+                    m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
+                    emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+                    m_writer->emit(", 0.0f))");
+                }
+                else
+                {
+                    m_writer->emit(", ");
+                    emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+                    m_writer->emit(", ");
+                    emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+                }
             }
             if (hasRequirement(
                     closestHitRequirements,
                     MetalStructuralRayTracingStageRequirement::ObjectToWorld))
             {
-                m_writer->emit(", _slang_result.object_to_world_transform");
+                m_writer->emit(
+                    hasInstancing ? ", _slang_result.object_to_world_transform"
+                                  : ", metal::float4x3(1.0f)");
             }
             if (hasRequirement(
                     closestHitRequirements,
                     MetalStructuralRayTracingStageRequirement::WorldToObject))
             {
-                m_writer->emit(", _slang_result.world_to_object_transform");
+                m_writer->emit(
+                    hasInstancing ? ", _slang_result.world_to_object_transform"
+                                  : ", metal::float4x3(1.0f)");
             }
             if (hasRequirement(
                     closestHitRequirements,
@@ -1208,38 +1246,25 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     return false;
 }
 
-void MetalSourceEmitter::_emitStoreImpl(IRStore* store)
+// Metal requires the [[payload]] parameter to be a ray_data reference. Its canonical IR value
+// is still an address, so all operand uses take that reference's address. This also makes casts
+// from the common header to a selected payload carrier obey ordinary pointer emission.
+void MetalSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec)
 {
-    auto param = as<IRParam>(store->getPtr());
+    auto param = as<IRParam>(inst);
     auto semantic = param ? param->findDecoration<IRTargetSystemValueDecoration>() : nullptr;
     auto function = param ? as<IRFunc>(param->getParent()->getParent()) : nullptr;
     if (semantic && semantic->getSemantic() == toSlice("payload") && function &&
         function->findDecoration<IRMetalIntersectionFunctionDecoration>())
     {
-        m_writer->emit(getName(param));
-        m_writer->emit(" = ");
-        emitOperand(store->getVal(), getInfo(EmitOp::General));
-        m_writer->emit(";\n");
+        Super::emitVarExpr(param, outerPrec);
         return;
     }
-    Super::_emitStoreImpl(store);
+    Super::emitOperandImpl(inst, outerPrec);
 }
 
 bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    if (auto load = as<IRLoad>(inst))
-    {
-        auto param = as<IRParam>(load->getPtr());
-        auto semantic = param ? param->findDecoration<IRTargetSystemValueDecoration>() : nullptr;
-        auto function = param ? as<IRFunc>(param->getParent()->getParent()) : nullptr;
-        if (semantic && semantic->getSemantic() == toSlice("payload") && function &&
-            function->findDecoration<IRMetalIntersectionFunctionDecoration>())
-        {
-            emitOperand(param, inOuterPrec);
-            return true;
-        }
-    }
-
     switch (inst->getOp())
     {
     case kIROp_MakeArray:
@@ -1995,6 +2020,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 m_writer->emit(" object_data");
                 m_writer->emit("*");
                 break;
+            case AddressSpace::MetalRayData:
+                m_writer->emit(" ray_data*");
+                break;
             default:
                 SLANG_UNEXPECTED("Unknown addressspace encountered.");
                 break;
@@ -2471,6 +2499,9 @@ void MetalSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
         break;
     case AddressSpace::MetalObjectData:
         m_writer->emit("object_data ");
+        break;
+    case AddressSpace::MetalRayData:
+        m_writer->emit("ray_data ");
         break;
     default:
         break;

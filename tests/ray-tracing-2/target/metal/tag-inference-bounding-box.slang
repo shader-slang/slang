@@ -33,7 +33,7 @@ struct TestIntersection : rt::IIntersectionShader
     typealias Context = HitContext;
     void invoke(rt::IntersectionInput<HitContext> input)
     {
-        float value = input.objectSpaceRay.origin.x + input.objectSpaceRay.direction.y;
+        float value = input.objectSpaceRay.Origin.x + input.objectSpaceRay.Direction.y;
         value += input.primitiveIndex + input.geometryIndex;
         value += input.worldSpaceOrigin.z + input.worldSpaceDirection.z;
         Attributes attributes = { value };
@@ -86,6 +86,7 @@ void main()
 // METAL-SAME: float3 worldSpaceOrigin_{{[0-9]+}} {{\[\[}}world_space_origin]]
 // METAL-SAME: float3 worldSpaceDirection_{{[0-9]+}} {{\[\[}}world_space_direction]]
 // METAL-SAME: bool opaque_{{[0-9]+}} {{\[\[}}opaque]]
+// METAL: thread Schema_rayData_0 [[CARRIER:[a-zA-Z_0-9]+]] =
 // METAL: if(opaque_
 // METAL: break;
-// METAL: rayDataStorage_{{[0-9]+}})->payload_{{[0-9]+}})->value_{{[0-9]+}} = worldSpaceOrigin_
+// METAL: (&(&[[CARRIER]])->payload_{{[0-9]+}})->value_{{[0-9]+}} = worldSpaceOrigin_

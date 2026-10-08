@@ -29,9 +29,9 @@ struct TestAnyHit : rt::IAnyHitShader
     typealias Context = HitContext;
     void invoke(rt::AnyHitInput<HitContext> input)
     {
-        input.payload.value = input.triangle.barycentricCoord.x + input.distance;
+        input.payload.value = input.attributes.barycentricCoord.x + input.distance;
         input.payload.value += input.worldSpaceOrigin.x + input.worldSpaceDirection.y;
-        if (!input.triangle.frontFacing || input.hitKind == HIT_KIND_TRIANGLE_BACK_FACE)
+        if (!input.attributes.frontFacing || input.hitKind == HIT_KIND_TRIANGLE_BACK_FACE)
             input.ignoreHit();
     }
 }

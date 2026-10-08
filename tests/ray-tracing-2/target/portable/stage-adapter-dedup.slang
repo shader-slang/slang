@@ -142,9 +142,14 @@ void main()
 // METAL-NOT: CustomAttributes_0
 // METAL: };
 
-// Metal keeps the schema-specific ray-data type in the physical signature, but a logical group
-// index is not part of a stage adapter's identity. FirstSchema consequently emits two adapters:
-// one for SharedClosestHit and one for SharedCustomClosestHit, even though four groups reference
-// them. SecondSchema requires its own adapter because it has a different ray-data ABI type.
-// METAL-COUNT-2: {{\[\[visible\]\]}} void {{.*}}(FirstSchema_rayData_0 thread*
-// METAL-COUNT-1: {{\[\[visible\]\]}} void {{.*}}(SecondSchema_rayData_0 thread*
+// Metal uses one erased visible-function signature, but each adapter recovers its schema's typed
+// carrier. A logical group index is not part of adapter identity: FirstSchema emits only two
+// adapters even though four groups reference those stages. SecondSchema needs its own adapter
+// because it recovers a different carrier type inside the function body.
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*
+// METAL: FirstSchema_rayData_0 thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*
+// METAL: FirstSchema_rayData_0 thread*
+// METAL: {{\[\[visible\]\]}} void {{.*}}(void thread*
+// METAL: SecondSchema_rayData_0 thread*
+// METAL-NOT: {{\[\[visible\]\]}}

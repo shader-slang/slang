@@ -46,8 +46,8 @@ void traceValue<T>(
     inout Payload<T> payload)
 {
     rt::RayTraversalDesc desc = {};
-    desc.ray.direction = float3(0.0f, 0.0f, 1.0f);
-    desc.ray.tMax = 1.0f;
+    desc.ray.Direction = float3(0.0f, 0.0f, 1.0f);
+    desc.ray.TMax = 1.0f;
     desc.instanceMask = 0xff;
 
     rt::RayTracer<GenericSchema<T>> tracer;
@@ -64,8 +64,8 @@ void raygenMain()
 // The `input.record` access in `GenericMiss<T>` remains a compiler-owned operation over symbolic
 // `T` until the schema is specialized. Binding reservation must follow that use without requiring
 // `T` to be a concrete type, and the generated uint adapter must receive an ordinary D3D cbuffer.
-// HLSL: cbuffer record_0 : register(b0, space2)
+// HLSL: cbuffer record_0 : register(b0, space1)
 // HLSL: [shader("miss")]void GenericMiss_Sh{{[0-9A-Fa-f]+}}(
 
 // DXIL: ; cbuffer record_0
-// DXIL: ; record_0{{.*}}cbuffer{{.*}}cb0{{.*}}space2
+// DXIL: ; record_0{{.*}}cbuffer{{.*}}cb0{{.*}}space1

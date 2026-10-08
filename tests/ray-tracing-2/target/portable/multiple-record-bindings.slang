@@ -80,10 +80,10 @@ void raygenMain()
 // both Record types makes DXC reject the combined library before FileCheck runs.
 // The checks also pin each type to its register. This catches assigning bindings while iterating a
 // hash set: such code still emits {b0, b1}, but can nondeterministically swap the stage mapping.
-// HLSL: cbuffer record_0 : register(b0, space2)
+// HLSL: cbuffer record_0 : register(b0, space1)
 // HLSL: SecondRecord_0 record_0;
-// HLSL: cbuffer record_1 : register(b1, space2)
+// HLSL: cbuffer record_1 : register(b1, space1)
 // HLSL: FirstRecord_0 record_1;
 
-// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb0{{.*}}space2
-// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb1{{.*}}space2
+// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb0{{.*}}space1
+// DXIL-DAG: ; record_{{[0-9]+}}{{.*}}cbuffer{{.*}}cb1{{.*}}space1
