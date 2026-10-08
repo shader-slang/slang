@@ -131,6 +131,12 @@ Apply this to `desc.ray` and other values of `RayDesc`, including object-space r
 
 These are additive declarations or behavior corrections rather than the main source migrations:
 
+- **Intersection payload:** `IntersectionInput<Context>.payload` now gives mutable access to
+  `Context.Payload` on Metal and CUDA/OptiX, guarded by
+  `structural_raytracing_intersection_payload`. D3D/Vulkan reject use of the property; intersection
+  shaders that do not access it remain portable. Empty payloads still cannot be accessed explicitly.
+  The full implementation must lower this accessor to Metal's `ray_data` payload and OptiX payload
+  state; adapter implementation remains outside PR1.
 - **Transforms:** `objectToWorld` and `worldToObject` are common properties on closest-hit,
   any-hit, and intersection inputs. They represent the complete composed instance path; direct
   primitive-AS traversal uses identity.

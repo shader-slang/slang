@@ -40,27 +40,32 @@ public interface IHitGroup
     __constraint Intersection.Context == Context;
 }
 
-/// Marks the hit-group section of a trace program schema.
+/// Represents a compile-time list of `IHitGroup` implementation types.
 ///
-/// The interface is sealed so the compiler only needs to decode `HitGroupList` and `NoHitGroups`.
+/// Use this interface as a generic or associated-type constraint. Supply `HitGroupList<...>` for
+/// explicit entries or `NoHitGroups` for an empty list.
+/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
+/// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IHitGroupList
 {}
 
-/// Marks the miss-shader section of a trace program schema.
+/// Represents a compile-time list of `IMissShader` implementation types.
 ///
-/// The interface is sealed so the compiler only needs to decode `MissShaderList` and
-/// `NoMissShaders`. A miss SBT record binds one shader, so miss entries do not need a wrapper group
-/// type.
+/// Use this interface as a generic or associated-type constraint. Supply `MissShaderList<...>` for
+/// explicit entries or `NoMissShaders` for an empty list.
+/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
+/// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface IMissShaderList
 {}
 
-/// Marks the callable-shader section of a trace program schema.
+/// Represents a compile-time list of `ICallableShader` implementation types.
 ///
-/// The interface is sealed so the compiler only needs to decode `CallableShaderList` and
-/// `NoCallableShaders`. A callable SBT record binds one shader, so callable entries do not need a
-/// wrapper group type.
+/// Use this interface as a generic or associated-type constraint. Supply `CallableShaderList<...>`
+/// for explicit entries or `NoCallableShaders` for an empty list.
+/// It is sealed because the compiler enumerates these built-in list forms directly; the interface
+/// provides no way for a user-defined list to expose its entries.
 [sealed]
 public interface ICallableShaderList
 {}

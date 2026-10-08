@@ -61,8 +61,8 @@ public interface IStageContext
 
 /// Describes a stage context whose stages read and write a ray payload.
 ///
-/// Closest-hit, any-hit, and miss stages use this payload contract. An intersection stage shares
-/// the hit group's `IHitContext`, but its stage input does not expose the payload.
+/// Closest-hit, any-hit, and miss stages use this payload contract. Intersection stages can also
+/// access the payload on Metal and CUDA/OptiX, where the target supports it.
 /// A miss shader needs no primitive-specific state because traversal found no accepted hit, so
 /// `IPayloadContext` is its complete contract and no separate `IMissContext` is needed. It may also
 /// reuse an `IHitContext` when it shares that context's payload and record types.
@@ -72,10 +72,10 @@ public interface IPayloadContext : IStageContext
     ///
     /// @par Constraints
     /// This associated type has no conformance constraint. The trace call's payload and the
-    /// receiving stage's payload must have the same type. Although an intersection stage uses
-    /// an `IHitContext`, its input does not provide access to this payload. An ordinary user
-    /// struct with no instance fields is an implicit payload: omit the explicit `trace` payload
-    /// argument and do not access `input.payload` for that type.
+    /// receiving stage's payload must have the same type. Intersection-stage access additionally
+    /// requires `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX). An ordinary
+    /// user struct with no instance fields is an implicit payload: omit the explicit `trace`
+    /// payload argument and do not access `input.payload` for that type.
     associatedtype Payload;
 }
 

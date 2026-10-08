@@ -28,12 +28,6 @@ namespace rt
 ///     record-data buffer                  4
 /// @endverbatim
 ///
-/// Adding a payload type does not add resources or split the SBT record sections. Generated
-/// visible-function adapters use a uniform signature per table, with `thread void*` for concrete
-/// payload or callable state. Each adapter recovers its concrete type; source stage inputs remain
-/// strongly typed. The shared intersection table uses schema-wide intersection tags and generated
-/// primitive dispatchers that select candidate logic from the hit record.
-///
 /// Consider two geometries with radiance and shadow ray types. The host can arrange hit records
 /// as one logical two-dimensional table, even when the ray types use different payload types:
 ///
@@ -49,24 +43,28 @@ namespace rt
 ///     Callable records: selected independently by the callShader record index.
 /// @endverbatim
 ///
-/// Generated Metal dispatch selects `instanceContribution + geometryIndex * sbtStride + sbtOffset`.
-/// `sbtStride` counts records, not bytes. The reflected section stride converts the index to a
-/// byte offset.
-/// The ray-type columns are a host convention, not payload-type indices. A selected record holds
-/// a function index and application record data. Function indices are schema-wide within each
-/// section, so several records can name the same program without duplicating its table entry.
-/// The host must ensure the selected hit or miss program accepts the trace's payload type.
+/// Metal preserves the SBT record index `i`; each record replaces the native shader identifier
+/// with a function index `f` and retains its application data:
 ///
-/// Resource IDs, function indices, and SBT record indices are distinct. In particular, Metal's
-/// native intersection-table slot selects a primitive dispatcher, which computes the full hit
-/// record index above; that slot is not itself the two-dimensional SBT index.
-/// A standalone descriptor's argument buffer is bound at the entry point's reflected
-/// `[[buffer(B)]]` index. `B` follows normal parameter binding allocation and is not a fixed slot
-/// such as zero.
-/// A descriptor inside another ParameterBlock follows that containing parameter's reflected layout.
-/// The host must use reflection for the outer binding, resource IDs, function indices, and record
-/// layouts. TODO: implement the shared-table target layout, adapters, and their
-/// reflection in the adapter slice; this frontend slice diagnoses descriptors reaching codegen.
+/// @verbatim
+///     i = instanceContribution + geometryIndex * sbtStride + sbtOffset
+///
+///     D3D/Vulkan hit record i             Metal record at hitSectionOffset + i * hitStride
+///     shader identifier / group handle -> header.functionIndex = f
+///     application record data          -> Context.Record bytes following the header
+///
+///     Candidate hit:
+///       intersectionTable[primitiveSlot] -> compute i -> read f -> hit group f's candidate logic
+///     Committed hit:
+///       compute i -> read f -> closestHitTable[f]
+/// @endverbatim
+///
+/// `sbtStride` counts records; `hitStride` counts bytes. The native intersection-table slot selects
+/// a primitive dispatcher, not record `i`. The dispatcher selects group `f`'s intersection and
+/// any-hit logic. Both paths supply record `i`'s application data through `input.record`.
+/// Several records can share `f`. Miss and callable records likewise select their table entries
+/// through a function index stored in the record header.
+/// @todo Implement the shared Metal tables and record layout in the target-adapter slice.
 /// @tparam Schema The trace context and finite shader lists describing the bound program.
 ///
 /// @par Constraints

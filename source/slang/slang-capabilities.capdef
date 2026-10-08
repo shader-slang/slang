@@ -1530,6 +1530,9 @@ alias structural_raytracing_anyhit_closesthit = structural_raytracing_anyhit
 /// Logical intersection role used by the structural ray-tracing API.
 /// [Compound]
 alias structural_raytracing_intersection = intersection | _intersection + metal;
+/// Intersection-stage ray payload access on CUDA/OptiX and Metal.
+/// [Compound]
+alias structural_raytracing_intersection_payload = intersection + cuda | _intersection + metal;
 /// Logical miss role used by the structural ray-tracing API.
 /// [Compound]
 alias structural_raytracing_miss = miss | _miss + metal;

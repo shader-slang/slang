@@ -1075,6 +1075,7 @@ public extension<Context> AnyHitInput<Context>
 
 /// Provides the record and ray state used by a procedural intersection stage.
 ///
+/// Payload access is additionally available on Metal and CUDA/OptiX.
 /// `reportHit` submits each candidate and its `Context.Primitive.Attributes` value. On D3D,
 /// Vulkan, and OptiX it maps to the native report-intersection operation.
 /// @todo Metal adapter synthesis must preserve the same candidate-filtering behavior in the
@@ -1090,6 +1091,20 @@ public extension<Context> AnyHitInput<Context>
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
+    /// @todo Synthesize access to Metal's `ray_data` payload or OptiX payload state.
+    ///
+    /// @par Constraints
+    /// Requires `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX).
+    /// The `ref` accessor exposes exactly `Context.Payload` for mutation through this `in` view.
+    /// An ordinary user struct with no instance fields is an implicit payload and cannot be
+    /// accessed through this property.
+    [require(structural_raytracing_intersection_payload)]
+    public property Context.Payload payload
+    {
+        ref;
+    }
+
     /// Reads the host-provided data in the selected shader-binding-table record.
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///

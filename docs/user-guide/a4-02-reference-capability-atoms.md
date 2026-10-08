@@ -1536,6 +1536,9 @@ Compound Capabilities
 `structural_raytracing_intersection`
 > Logical intersection role used by the structural ray-tracing API.
 
+`structural_raytracing_intersection_payload`
+> Intersection-stage ray payload access on CUDA/OptiX and Metal.
+
 `structural_raytracing_miss`
 > Logical miss role used by the structural ray-tracing API.
 
