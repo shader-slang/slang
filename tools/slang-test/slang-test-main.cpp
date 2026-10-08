@@ -2883,6 +2883,10 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return startPos;
     };
     int callId = 2;
+    // Items of the most recent COMPLETE, and the item picked by SAVE_COMPLETION_ITEM, so that a
+    // later RESOLVE_SAVED_ITEM can resolve an item that belongs to an earlier completion request.
+    List<LanguageServerProtocol::CompletionItem> lastCompletionItems;
+    LanguageServerProtocol::CompletionItem savedCompletionItem;
     for (auto line : lines)
     {
         line = line.trimStart();
@@ -2916,6 +2920,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
             else if (SLANG_SUCCEEDED(connection->getMessage(&completionItems)))
             {
+                lastCompletionItems = completionItems;
                 for (auto item : completionItems)
                 {
                     actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
@@ -2930,6 +2935,49 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                         actualOutputSB << " sort(" << item.sortText.value << ")";
                     actualOutputSB << "\n";
                 }
+            }
+        }
+        else if (line.startsWith("SAVE_COMPLETION_ITEM:"))
+        {
+            auto label = line.tail(UnownedStringSlice("SAVE_COMPLETION_ITEM:").getLength()).trim();
+            bool found = false;
+            for (auto item : lastCompletionItems)
+            {
+                if (item.label.getUnownedSlice() == label)
+                {
+                    savedCompletionItem = item;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return TestResult::Fail;
+        }
+        else if (line.startsWith("RESOLVE_SAVED_ITEM:"))
+        {
+            // This resolves the item saved by SAVE_COMPLETION_ITEM, which may come from an earlier
+            // completion request than the most recent one. The directive is matched with its
+            // trailing colon like the other directives, so that it cannot collide with a
+            // directive that merely shares a prefix; it takes no argument.
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &savedCompletionItem,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::CompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "detail: " << resolved.detail << "\n";
             }
         }
         else if (line.startsWith("DISABLE_WORKSPACE_SEARCH"))
