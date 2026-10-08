@@ -12,6 +12,7 @@
 #include "shader-coverage-common/coverage-counters.h"
 #include "shader-coverage-common/coverage-rhi.h"
 
+#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -453,7 +454,7 @@ void writeLcov(
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
-            rec.lines[entry.line] += count;
+            rec.lines[entry.line] = std::max(rec.lines[entry.line], count);
             break;
         case slang::CoverageEntryKind::Function:
             rec.funcs.push_back({entry.line, entry.functionName ? entry.functionName : "", count});

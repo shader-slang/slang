@@ -3,7 +3,6 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
-#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir.h"
@@ -1315,15 +1314,17 @@ struct CoverageInstrumenter
     // Lower a single coverage marker op, recording its source-entry
     // metadata against `slot` and then removing the marker op.
     //
-    // `emitRuntimeProbe` selects the runtime update independently of metadata.
-    // Coalesced single-block lines share a probe but retain separate entries;
-    // repeated markers of one source line retain only its canonical entry.
-    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe, bool recordEntry = true)
+    // `emitRuntimeProbe` selects whether this marker also emits the
+    // counter update. Coalesced line markers share one slot and one
+    // probe, so only the last marker of a group emits it while the
+    // others contribute metadata alone — that is what removes probe
+    // sequences from the emitted shader. Every marker still produces
+    // its own entry, so per-line reporting is unchanged.
+    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe)
     {
         CoverageTracingEntry entry;
         populateEntryForMarker(markerOp, slot, entry);
-        if (recordEntry)
-            outMetadata.m_coverageEntries.add(entry);
+        outMetadata.m_coverageEntries.add(entry);
 
         if (!emitRuntimeProbe)
         {
@@ -1409,170 +1410,11 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& markerOps)
     {
-        // A source line can span several blocks: `if (p) return a; else return b;`
-        // must count one visit, not the condition plus the selected return. We
-        // group the markers of one function, file and line into a region and count
-        // the region through one block, chosen below.
-        struct LineRegion
-        {
-            IRFunc* func = nullptr;
-            String file;
-            uint32_t line = 0;
-            UInt slot = 0;
-            IRBlock* countedBlock = nullptr;
-            HashSet<IRBlock*> blocks;
-        };
-        List<LineRegion> regions;
-        Dictionary<IRFunc*, Dictionary<String, Dictionary<uint32_t, Index>>> regionIndices;
-        Dictionary<IRInst*, Index> markerRegion;
         List<UInt> slots;
         List<bool> emitsProbe;
-        List<bool> recordsEntry;
-        slots.setCount(markerOps.getCount());
-        emitsProbe.setCount(markerOps.getCount());
-        recordsEntry.setCount(markerOps.getCount());
-        for (Index i = 0; i < markerOps.getCount(); ++i)
-        {
-            auto marker = markerOps[i];
-            emitsProbe[i] = recordsEntry[i] = true;
-            if (marker->getOp() != kIROp_IncrementCoverageCounter)
-                continue;
-            auto func = getParentFunc(marker);
-            auto block = as<IRBlock>(marker->getParent());
-            SLANG_RELEASE_ASSERT(func && block);
-            String file;
-            uint32_t line = 0, column = 0;
-            resolveHumaneLoc(sourceManager, marker, file, line, column);
-            auto& fileRegions = regionIndices.getOrAddValue(
-                func,
-                Dictionary<String, Dictionary<uint32_t, Index>>());
-            auto& lineRegions = fileRegions.getOrAddValue(file, Dictionary<uint32_t, Index>());
-            Index regionIndex;
-            recordsEntry[i] = !lineRegions.tryGetValue(line, regionIndex);
-            if (recordsEntry[i])
-            {
-                regionIndex = regions.getCount();
-                lineRegions.add(line, regionIndex);
-                LineRegion region;
-                region.func = func;
-                region.file = file;
-                region.line = line;
-                regions.add(region);
-            }
-            auto& region = regions[regionIndex];
-            emitsProbe[i] = !region.blocks.contains(block);
-            region.blocks.add(block);
-            markerRegion.add(marker, regionIndex);
-        }
-
-        // Preserve coalescing for lines confined to one block. Different source
-        // lines that execute together may still share a slot; a line spanning
-        // multiple blocks needs its own region counter instead.
-        List<UInt> coalescedSlots;
-        List<bool> coalescedProbes;
-        UInt coalescedCount = 0;
-        assignCoverageCounterSlots(markerOps, coalescedSlots, coalescedProbes, coalescedCount);
-        Dictionary<UInt, UInt> singleBlockSlots;
-        HashSet<UInt> emittedSingleBlockSlots;
-        UInt nextSlot = 0;
-        for (Index i = 0; i < markerOps.getCount(); ++i)
-        {
-            Index regionIndex;
-            if (!markerRegion.tryGetValue(markerOps[i], regionIndex))
-            {
-                slots[i] = nextSlot++;
-                continue;
-            }
-            auto& region = regions[regionIndex];
-            if (recordsEntry[i])
-            {
-                UInt sharedSlot;
-                if (region.blocks.getCount() == 1 &&
-                    singleBlockSlots.tryGetValue(coalescedSlots[i], sharedSlot))
-                    region.slot = sharedSlot;
-                else
-                {
-                    region.slot = nextSlot++;
-                    if (region.blocks.getCount() == 1)
-                        singleBlockSlots.add(coalescedSlots[i], region.slot);
-                }
-            }
-            slots[i] = region.slot;
-            if (region.blocks.getCount() == 1)
-                emitsProbe[i] = emittedSingleBlockSlots.add(region.slot);
-        }
-
-        // A line that spans several blocks counts one visit through a single
-        // counted block per region; the other blocks of the region record nothing.
-        //
-        // If the region contains a loop header, that header is the counted block:
-        // it runs once per iteration and once more on exit, which is how often a
-        // reader expects `for (uint i = 0; i < n; ++i)` to be reported even though
-        // its initializer, test, and increment lie in different blocks. Otherwise
-        // the counted block is whichever block of the region dominates the rest, as
-        // in `if (p) return a; else return b;` on one line, where only the
-        // condition's probe is needed. Regions with several entry points keep a
-        // probe at each block that no other block of the region dominates.
-        struct FunctionLoops
-        {
-            RefPtr<IRDominatorTree> dom;
-            HashSet<IRBlock*> loopHeaders;
-        };
-        Dictionary<IRFunc*, FunctionLoops> functionLoops;
-        auto getLoops = [&](IRFunc* func) -> FunctionLoops&
-        {
-            auto& loops = functionLoops.getOrAddValue(func, FunctionLoops());
-            if (!loops.dom)
-            {
-                loops.dom = computeDominatorTree(func);
-                for (auto block : func->getBlocks())
-                    for (auto successor : block->getSuccessors())
-                        if (loops.dom->dominates(successor, block))
-                            loops.loopHeaders.add(successor);
-            }
-            return loops;
-        };
-        for (auto& region : regions)
-        {
-            if (region.blocks.getCount() == 1)
-                continue;
-            auto& loops = getLoops(region.func);
-            // Prefer the innermost header: one that no other header of the region
-            // dominates.
-            for (auto block : region.func->getBlocks())
-            {
-                if (!region.blocks.contains(block) || !loops.loopHeaders.contains(block))
-                    continue;
-                if (!region.countedBlock || loops.dom->dominates(region.countedBlock, block))
-                    region.countedBlock = block;
-            }
-        }
-        for (Index i = 0; i < markerOps.getCount(); ++i)
-        {
-            Index regionIndex;
-            if (!emitsProbe[i] || !markerRegion.tryGetValue(markerOps[i], regionIndex))
-                continue;
-            auto& region = regions[regionIndex];
-            if (region.blocks.getCount() == 1)
-                continue;
-            auto block = as<IRBlock>(markerOps[i]->getParent());
-            if (region.countedBlock)
-            {
-                emitsProbe[i] = block == region.countedBlock;
-                continue;
-            }
-            auto& dom = getLoops(region.func).dom;
-            for (auto parent = dom->getImmediateDominator(block); parent;
-                 parent = dom->getImmediateDominator(parent))
-            {
-                if (region.blocks.contains(parent))
-                {
-                    emitsProbe[i] = false;
-                    break;
-                }
-            }
-        }
-        const auto counterCount = (Index)nextSlot;
+        UInt coalescedCounterCount = 0;
+        assignCoverageCounterSlots(markerOps, slots, emitsProbe, coalescedCounterCount);
+        const auto counterCount = (Index)coalescedCounterCount;
         // This concerns the counter *index* type, which is independent of
         // the per-slot storage width recorded just below: the public
         // metadata stores counter indices as uint32_t because the
@@ -1608,13 +1450,13 @@ struct CoverageInstrumenter
             SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
         }
         outMetadata.m_coverageEntries.reserve(markerOps.getCount());
-        // Each canonical line produces one source entry. Different lines that
-        // provably execute together can share a counter slot, so entry count
-        // and counter count can differ. The public metadata API
+        // Every marker produces one source entry, but line markers that
+        // provably execute together share a counter slot, so entry count
+        // and counter count now genuinely differ. The public metadata API
         // has always kept the two separate; hosts size the readback buffer
         // from the counter count and attribute results per entry.
         for (Index i = 0; i < markerOps.getCount(); ++i)
-            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i], recordsEntry[i]);
+            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i]);
     }
 };
 

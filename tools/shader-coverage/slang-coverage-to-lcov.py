@@ -13,7 +13,10 @@ Pipeline:
        Counter slots are assigned according to the coverage metadata.
        Line coverage coalesces entries that execute together onto a
        shared counter, so several entries may name the same slot and
-       there are fewer counters than entries. Accumulate per entry.
+       there are fewer counters than entries. Read each entry through
+       its own counter, and take the maximum over the line entries of
+       one source line: its first marker runs on every visit, so the
+       maximum counts the visits to the line, not the statements on it.
        Function and branch modes use one direct counter
        per marker op, but consumers must treat the manifest as
        authoritative.
@@ -274,7 +277,7 @@ def main():
         count = counters[idx]
 
         if kind == "line":
-            hits_by_line[source][line] += count
+            hits_by_line[source][line] = max(hits_by_line[source][line], count)
         elif kind == "function":
             function_name = entry.get("function") or entry.get("function_mangled")
             if not function_name:
@@ -309,10 +312,7 @@ def main():
     # A function entry is not a line entry, but genhtml needs a line record at
     # every FN line, so a function-only manifest proves its declaration line.
     for source, functions in functions_by_source.items():
-        function_lines = collections.defaultdict(int)
         for line, count in functions.values():
-            function_lines[line] += count
-        for line, count in function_lines.items():
             hits_by_line[source].setdefault(line, count)
 
     # A decision is evaluated if any outcome executed; BRDA reports "-" for the

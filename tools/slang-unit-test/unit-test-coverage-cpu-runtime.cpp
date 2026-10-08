@@ -7,6 +7,7 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <algorithm>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -697,7 +698,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             for (auto expected : expectedLines)
             {
                 auto line = findLineContaining(source, expected.tag);
+                // The count of a source line is the maximum over its line entries.
                 uint32_t entries = 0;
+                uint64_t lineCount = 0;
                 for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
                 {
                     slang::CoverageEntryInfo entry;
@@ -705,9 +708,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                     if (entry.kind != slang::CoverageEntryKind::Line || entry.line != line)
                         continue;
                     ++entries;
-                    SLANG_CHECK(dispatch.getCount(entry) == (booleanMode ? 1 : expected.count));
+                    lineCount = std::max(lineCount, dispatch.getCount(entry));
                 }
-                SLANG_CHECK(entries == 1);
+                SLANG_CHECK(entries >= 1);
+                SLANG_CHECK(lineCount == (booleanMode ? 1 : expected.count));
             }
             uint32_t rhsLine, rhsColumn;
             findSourcePosition(source, "< 200", rhsLine, rhsColumn);
