@@ -18,6 +18,8 @@ struct GitRequirement
 {
     String owner;
     String git;
+    /// Git URL written on the dependency edge before the remap index replaces it.
+    String declaredGit;
     String ref;
     String as;
     VersionConstraint constraint;
@@ -400,6 +402,8 @@ public:
     IPackageResolverSource* source = nullptr;
     String projectRoot;
     const LockFile* heldLock = nullptr;
+    /// Name-to-Git-URL map from the lock's remap index. Null when this resolve uses manifest URLs.
+    const List<RepositoryLocation>* remapUrls = nullptr;
     List<String>* warnings = nullptr;
     ResolveReport* report = nullptr;
     const Manifest* rootManifest = nullptr;
@@ -807,6 +811,38 @@ private:
             explanation.skips = package.skips;
             report->packages.add(explanation);
         }
+        for (Index i = 0; i < packages.getCount(); ++i)
+        {
+            if (!reachable[i] || !packages[i].selected)
+                continue;
+            const ResolutionPackage& package = packages[i];
+            if (!remapUrls)
+                continue;
+            Index repositoryIndex = findRepositoryLocationIndex(*remapUrls, package.name);
+            if (repositoryIndex < 0)
+                continue;
+            String adoptedGit = (*remapUrls)[repositoryIndex].git;
+            if (!adoptedGit.getLength() || adoptedGit != package.git)
+                continue;
+            String declaredGit;
+            if (package.gitRequirements.getCount())
+                declaredGit = package.gitRequirements[0].declaredGit;
+            String previousGit;
+            if (heldLock)
+            {
+                Index lockedIndex = findLockedPackageIndex(*heldLock, package.name);
+                if (lockedIndex >= 0)
+                    previousGit = heldLock->packages[lockedIndex].git;
+            }
+            String fromGit = previousGit.getLength() ? previousGit : declaredGit;
+            if (!fromGit.getLength() || fromGit == adoptedGit)
+                continue;
+            RepositoryAdoption adoption;
+            adoption.packageName = package.name;
+            adoption.fromGit = fromGit;
+            adoption.toGit = adoptedGit;
+            report->repositoryAdoptions.add(adoption);
+        }
     }
 
     SlangResult loadPathManifest(
@@ -995,9 +1031,24 @@ private:
         return SLANG_OK;
     }
 
-    /// Record one Git edge after checking that its source and optional pin agree with every other
-    /// Git edge for the package. Keeping shadowed edges here lets the solver restore them if the
-    /// path edge that currently wins later becomes unreachable.
+    /// Return the Git URL to resolve for `packageName`.
+    ///
+    /// The remap index supplies the URL this lock uses for a package name. Edges that still name
+    /// the manifest URL resolve from the remapped one, so those edges agree on a single repository.
+    /// The substitution itself is reported from the selected graph, after search finishes.
+    String effectiveGitUrl(const String& packageName, const String& declaredGit)
+    {
+        if (!remapUrls)
+            return declaredGit;
+        Index repositoryIndex = findRepositoryLocationIndex(*remapUrls, packageName);
+        if (repositoryIndex < 0)
+            return declaredGit;
+        String remappedGit = (*remapUrls)[repositoryIndex].git;
+        return remappedGit.getLength() ? remappedGit : declaredGit;
+    }
+
+    /// Record one Git edge after checking that its source agrees with every other Git edge for the
+    /// package.
     SlangResult addGitRequirement(
         ResolutionPackage& package,
         const Dependency& dependency,
@@ -1005,7 +1056,8 @@ private:
         const VersionConstraint& constraint,
         String& outError)
     {
-        if (package.git.getLength() && package.git != dependency.git)
+        String git = effectiveGitUrl(dependency.name, dependency.git);
+        if (package.git.getLength() && package.git != git)
         {
             outError =
                 String("Package '") + dependency.name + "' is required from more than one Git URL.";
@@ -1031,10 +1083,11 @@ private:
             }
         }
 
-        package.git = dependency.git;
+        package.git = git;
         GitRequirement requirement;
         requirement.owner = declaringManifest.ownerKey;
-        requirement.git = dependency.git;
+        requirement.git = git;
+        requirement.declaredGit = dependency.git;
         requirement.ref = dependency.ref;
         requirement.as = dependency.as;
         requirement.constraint = constraint;
@@ -1189,14 +1242,51 @@ private:
         String& outError,
         ResolveFailure& outFailure)
     {
-        if (held.git != unresolved.git)
+        LockedPackage recorded = held;
+        if (recorded.git != unresolved.git)
         {
-            outError = String("Locked package '") + unresolved.name + "' records Git URL '" +
-                       held.git + "', which does not match the manifest.";
-            return SLANG_FAIL;
+            // An edited checkout is tied to the remote it was created from. A pin keeps its
+            // version and takes the canonical tag of that version on the repository the manifest
+            // now names.
+            if (recorded.branch.getLength())
+            {
+                outError = String("Package '") + unresolved.name + "' is edited on branch '" +
+                           recorded.branch + "'. Unedit it before changing its Git URL.";
+                return SLANG_FAIL;
+            }
+            if (!recorded.pinned)
+            {
+                outError = String("Locked package '") + unresolved.name + "' records Git URL '" +
+                           recorded.git + "', which does not match the manifest.";
+                return SLANG_FAIL;
+            }
+            PackageVersion pinnedVersion;
+            SLANG_RETURN_ON_FAIL(parseExactVersion(recorded.version, pinnedVersion, outError));
+            List<TagCandidate> candidates;
+            SLANG_RETURN_ON_FAIL(
+                source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
+            const TagCandidate* matched = nullptr;
+            for (const auto& candidate : candidates)
+            {
+                if (candidate.version == pinnedVersion)
+                {
+                    matched = &candidate;
+                    break;
+                }
+            }
+            if (!matched)
+            {
+                outError = String("Version ") + formatExactVersion(pinnedVersion) +
+                           " of package '" + unresolved.name + "' has no canonical tag at " +
+                           unresolved.git + ".";
+                return SLANG_FAIL;
+            }
+            recorded.ref = matched->ref;
+            recorded.commit = matched->commit;
+            recorded.git = unresolved.git;
         }
         PackageVersion version;
-        SLANG_RETURN_ON_FAIL(parseExactVersion(held.version, version, outError));
+        SLANG_RETURN_ON_FAIL(parseExactVersion(recorded.version, version, outError));
         if (!matchesAll(unresolved, version))
         {
             outError = String("Locked version ") + formatExactVersion(version) + " of package '" +
@@ -1206,16 +1296,16 @@ private:
         }
 
         ResolvedManifest manifest;
-        if (held.branch.getLength())
+        if (recorded.branch.getLength())
         {
             SLANG_RETURN_ON_FAIL(
-                source->loadCheckoutManifest(unresolved.name, held, manifest, outError));
+                source->loadCheckoutManifest(unresolved.name, recorded, manifest, outError));
         }
         else
         {
             TagCandidate candidate;
-            candidate.ref = held.ref;
-            candidate.commit = held.commit;
+            candidate.ref = recorded.ref;
+            candidate.commit = recorded.commit;
             candidate.version = version;
             SLANG_RETURN_ON_FAIL(loadCandidateManifest(unresolved, candidate, manifest, outError));
         }
@@ -1228,24 +1318,24 @@ private:
 
         ResolutionPackage& selected = packages[unresolvedIndex];
         selected.selected = true;
-        selected.selectionKind = held.branch.getLength() ? ResolveSelectionKind::Edited
-                                                         : ResolveSelectionKind::PinnedRef;
-        selected.locked = held;
+        selected.selectionKind = recorded.branch.getLength() ? ResolveSelectionKind::Edited
+                                                             : ResolveSelectionKind::PinnedRef;
+        selected.locked = recorded;
         selected.locked.name = selected.name;
         selected.locked.git = selected.git;
         selected.locked.version = formatExactVersion(version);
         selected.locked.path = String();
         selected.locked.dependencies = manifest.manifest.dependencies;
-        if (held.branch.getLength())
+        if (recorded.branch.getLength())
         {
-            selected.locked.ref = held.ref;
-            selected.locked.commit = held.commit;
+            selected.locked.ref = recorded.ref;
+            selected.locked.commit = recorded.commit;
         }
         else
         {
             selected.locked.branch = String();
-            selected.locked.ref = held.ref;
-            selected.locked.commit = held.commit;
+            selected.locked.ref = recorded.ref;
+            selected.locked.commit = recorded.commit;
             selected.locked.pinned = true;
         }
         selected.resolvedManifest = manifest;
@@ -1485,13 +1575,17 @@ SlangResult resolveDependenciesWithSource(
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings,
-    ResolveReport* outReport)
+    ResolveReport* outReport,
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
 {
     Resolver resolver;
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
+    resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
     return resolver.resolve(manifest, outLock, outError);
 }
 
@@ -1503,7 +1597,8 @@ SlangResult resolveDependencies(
     List<String>* outWarnings,
     ResolveReport* outReport,
     bool offline,
-    const LockFile* heldLock)
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1515,6 +1610,7 @@ SlangResult resolveDependencies(
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);
@@ -1529,7 +1625,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     List<String>* outWarnings,
     ResolveReport* outReport,
     bool offline,
-    const LockFile* heldLock)
+    const LockFile* heldLock,
+    const List<RepositoryLocation>* remapUrls)
 {
     LocalPackageResolverSource source;
     source.projectRoot = projectRoot;
@@ -1542,6 +1639,7 @@ SlangResult resolveDependenciesFromLocalPackages(
     resolver.source = &source;
     resolver.projectRoot = projectRoot;
     resolver.heldLock = heldLock;
+    resolver.remapUrls = remapUrls;
     resolver.warnings = outWarnings;
     resolver.report = outReport;
     return resolver.resolve(manifest, outLock, outError);

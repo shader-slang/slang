@@ -35,7 +35,8 @@ static void _printHelp(bool experimental = false)
         "\n"
         "Manifest (slang-package.json):\n"
         "  init              Create a package in the current directory.\n"
-        "  dependency add <name> --git <url> (--version <range> | --ref <ref> [--as <ver>])\n"
+        "  dependency add <name> [--git <url>] (--version <range> | --ref <ref> [--as <ver>])\n"
+        "                    Without --git, SLANG_PACKAGE_INDEX supplies the Git URL.\n"
         "  dependency remove <name> | list\n"
         "\n"
         "Lock (slang-package-lock.json):\n"
@@ -49,12 +50,14 @@ static void _printHelp(bool experimental = false)
         "                    branch. Intermediate tags are not separate steps.\n"
         "  unedit <name> [--restore | --advance | --tag <version>] [--clean]\n"
         "                    End an edit on a release tag. There is no --yes.\n"
-        "  fetch [--clean] [--yes] [--skip-validate]\n"
+        "  fetch [--clean] [--yes] [--skip-validate] [--remap-urls <url>]\n"
         "                    Install the lock. Missing lock runs update. --clean discards "
         "checkout state.\n"
+        "                    --remap-urls records an index and resolves listed packages from it.\n"
         "  update [--clean] [--dry-run] [--minimal] [--offline] [--yes]\n"
-        "         [--skip-validate]\n"
+        "         [--skip-validate] [--remap-urls <url> | --no-remap]\n"
         "                    Re-resolve and rewrite the lock. --offline uses .slang/cache only.\n"
+        "                    A lock remap index is reused. --no-remap clears it.\n"
         "  status            Lock and graph readiness (details only when dirty).\n"
         "  validate [name] [--all]\n"
         "                    Check this package for sharing; NAME or --all checks locked trees.\n"
@@ -1236,6 +1239,8 @@ static SlangResult _update(
     bool assumeYes,
     bool skipValidate,
     bool offline,
+    const String& remapIndexLocation,
+    bool clearRemap,
     String& outError);
 
 static SlangResult _fetch(
@@ -1243,6 +1248,7 @@ static SlangResult _fetch(
     bool allowClean,
     bool assumeYes,
     bool skipValidate,
+    const String& remapIndexLocation,
     String& outError)
 {
     Manifest manifest;
@@ -1268,6 +1274,23 @@ static SlangResult _fetch(
             false,
             assumeYes,
             skipValidate,
+            false,
+            remapIndexLocation,
+            false,
+            outError);
+    }
+    if (remapIndexLocation.getLength())
+    {
+        return _update(
+            projectRoot,
+            false,
+            allowClean,
+            false,
+            false,
+            assumeYes,
+            skipValidate,
+            false,
+            remapIndexLocation,
             false,
             outError);
     }
@@ -1419,6 +1442,63 @@ static void _localPackagesForUpdate(
     }
 }
 
+static bool _isRemapIndexUrl(const String& location)
+{
+    return location.startsWith("https://") || location.startsWith("http://");
+}
+
+static SlangResult _loadRemapIndex(
+    const String& location,
+    List<RepositoryLocation>& outPackages,
+    String& outError)
+{
+    if (!_isRemapIndexUrl(location))
+    {
+        outError = "A remap index must be an http or https URL.";
+        return SLANG_FAIL;
+    }
+    return readPackageIndex(location, outPackages, outError);
+}
+
+static void _printGitUrlChanges(const char* heading, List<RepositoryAdoption> changes)
+{
+    if (!changes.getCount())
+        return;
+    changes.sort([](const RepositoryAdoption& left, const RepositoryAdoption& right)
+                 { return left.packageName < right.packageName; });
+    fprintf(stdout, "%s\n", heading);
+    for (const auto& change : changes)
+    {
+        fprintf(
+            stdout,
+            "  %s\n    %s -> %s\n",
+            change.packageName.getBuffer(),
+            change.fromGit.getBuffer(),
+            change.toGit.getBuffer());
+    }
+}
+
+static void _collectRestoredGitUrls(
+    const LockFile* previous,
+    const LockFile& next,
+    List<RepositoryAdoption>& outChanges)
+{
+    outChanges.clear();
+    if (!previous)
+        return;
+    for (const auto& package : next.packages)
+    {
+        Index index = findLockedPackageIndex(*previous, package.name);
+        if (index < 0 || previous->packages[index].git == package.git)
+            continue;
+        RepositoryAdoption change;
+        change.packageName = package.name;
+        change.fromGit = previous->packages[index].git;
+        change.toGit = package.git;
+        outChanges.add(change);
+    }
+}
+
 static SlangResult _update(
     const String& projectRoot,
     bool ignoreOverrides,
@@ -1428,6 +1508,8 @@ static SlangResult _update(
     bool assumeYes,
     bool skipValidate,
     bool offline,
+    const String& remapIndexLocation,
+    bool clearRemap,
     String& outError)
 {
     Manifest manifest;
@@ -1450,6 +1532,20 @@ static SlangResult _update(
     {
         SLANG_RETURN_ON_FAIL(readLockFile(lockPath, previousLock, outError));
         previousLockPtr = &previousLock;
+    }
+    String activeRemapIndex;
+    List<RepositoryLocation> remapPackages;
+    const List<RepositoryLocation>* remapUrls = nullptr;
+    if (!clearRemap)
+    {
+        activeRemapIndex = remapIndexLocation.getLength()
+                               ? remapIndexLocation
+                               : (previousLockPtr ? previousLock.remapIndex : String());
+        if (activeRemapIndex.getLength())
+        {
+            SLANG_RETURN_ON_FAIL(_loadRemapIndex(activeRemapIndex, remapPackages, outError));
+            remapUrls = &remapPackages;
+        }
     }
     // Inspect the checkouts the existing lock owns before resolving. A dirty tool-owned tree means
     // this update cannot be applied at all, and the user should learn that instead of reading a
@@ -1522,7 +1618,8 @@ static SlangResult _update(
             &warnings,
             &report,
             offline,
-            previousLockPtr));
+            previousLockPtr,
+            remapUrls));
     }
     else
     {
@@ -1534,8 +1631,10 @@ static SlangResult _update(
             &warnings,
             &report,
             offline,
-            previousLockPtr));
+            previousLockPtr,
+            remapUrls));
     }
+    lock.remapIndex = activeRemapIndex;
     SLANG_RETURN_ON_FAIL(_validateLocalPackages(
         projectRoot,
         manifest,
@@ -1556,6 +1655,19 @@ static SlangResult _update(
     // happened.
     String reportText =
         formatResolveReport(manifest, previousLockPtr, lock, report, /* planned */ true, minimal);
+    _printGitUrlChanges("Package Git URLs remapped from the index:", report.repositoryAdoptions);
+    if (clearRemap)
+    {
+        List<RepositoryAdoption> restored;
+        _collectRestoredGitUrls(previousLockPtr, lock, restored);
+        _printGitUrlChanges("Package Git URLs restored from the manifest:", restored);
+    }
+    if (clearRemap && previousLockPtr && previousLockPtr->remapIndex.getLength())
+        fprintf(stdout, "Remap index removed.\n");
+    else if (
+        activeRemapIndex.getLength() &&
+        (!previousLockPtr || previousLockPtr->remapIndex != activeRemapIndex))
+        fprintf(stdout, "Remap index: %s\n", activeRemapIndex.getBuffer());
     if (ignoredEnabledOverrides)
     {
         fprintf(
@@ -1608,7 +1720,9 @@ static SlangResult _update(
     // should review, and `--clean` discards local checkout state, but re-running `update` on an
     // already-current graph only checks and validates what the lock already says.
     const bool lockChanges = !previousLockPtr || !lockFilesEqual(*previousLockPtr, lock);
-    if (lockChanges || cleanReplacements.getCount() || movingRefFacts.getCount())
+    const bool adoptingRepositories = report.repositoryAdoptions.getCount() != 0;
+    if (lockChanges || cleanReplacements.getCount() || movingRefFacts.getCount() ||
+        adoptingRepositories)
     {
         bool approved = false;
         SLANG_RETURN_ON_FAIL(_confirmApply(assumeYes, "Apply this update?", approved, outError));
@@ -2598,14 +2712,15 @@ static SlangResult _writeDistribution(
         if (_lockedGitCheckoutIsMissing(projectRoot, manifest, lock, localPackages))
         {
             _announceSubcommand("a locked Git checkout is missing", "slang package fetch");
-            SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, false, skipValidate, outError));
+            SLANG_RETURN_ON_FAIL(
+                _fetch(projectRoot, false, false, skipValidate, String(), outError));
             ranFetch = true;
         }
     }
     else if (manifest.dependencies.getCount())
     {
         _announceSubcommand("slang-package-lock.json is missing", "slang package fetch");
-        SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, true, skipValidate, outError));
+        SLANG_RETURN_ON_FAIL(_fetch(projectRoot, false, true, skipValidate, String(), outError));
         ranFetch = true;
     }
 
@@ -2972,6 +3087,7 @@ SlangResult executeInDirectory(
         bool allowClean = false;
         bool assumeYes = false;
         bool skipValidate = false;
+        String remapIndexLocation;
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
@@ -2981,13 +3097,38 @@ SlangResult executeInDirectory(
                 assumeYes = true;
             else if (flag == "--skip-validate")
                 skipValidate = true;
+            else if (flag == "--remap-urls")
+            {
+                if (remapIndexLocation.getLength())
+                {
+                    outError = "fetch --remap-urls was given more than once.";
+                    return SLANG_FAIL;
+                }
+                if (i + 1 >= argc || String(argv[i + 1]).startsWith("--"))
+                {
+                    outError = "fetch --remap-urls requires an http or https package index URL.";
+                    return SLANG_FAIL;
+                }
+                remapIndexLocation = argv[++i];
+                if (!_isRemapIndexUrl(remapIndexLocation))
+                {
+                    outError = "A remap index must be an http or https URL.";
+                    return SLANG_FAIL;
+                }
+            }
             else
             {
                 outError = String("Unknown fetch option: ") + flag;
                 return SLANG_FAIL;
             }
         }
-        return _fetch(projectRoot, allowClean, assumeYes, skipValidate, outError);
+        return _fetch(
+            projectRoot,
+            allowClean,
+            assumeYes,
+            skipValidate,
+            remapIndexLocation,
+            outError);
     }
     if (command == "update")
     {
@@ -2998,6 +3139,8 @@ SlangResult executeInDirectory(
         bool assumeYes = false;
         bool skipValidate = false;
         bool offline = false;
+        bool clearRemap = false;
+        String remapIndexLocation;
         for (int i = 2; i < argc; ++i)
         {
             String flag = argv[i];
@@ -3019,6 +3162,27 @@ SlangResult executeInDirectory(
                 assumeYes = true;
             else if (flag == "--skip-validate")
                 skipValidate = true;
+            else if (flag == "--no-remap")
+                clearRemap = true;
+            else if (flag == "--remap-urls")
+            {
+                if (remapIndexLocation.getLength())
+                {
+                    outError = "update --remap-urls was given more than once.";
+                    return SLANG_FAIL;
+                }
+                if (i + 1 >= argc || String(argv[i + 1]).startsWith("--"))
+                {
+                    outError = "update --remap-urls requires an http or https package index URL.";
+                    return SLANG_FAIL;
+                }
+                remapIndexLocation = argv[++i];
+                if (!_isRemapIndexUrl(remapIndexLocation))
+                {
+                    outError = "A remap index must be an http or https URL.";
+                    return SLANG_FAIL;
+                }
+            }
             else
             {
                 outError = String("Unknown update option: ") + flag;
@@ -3030,6 +3194,11 @@ SlangResult executeInDirectory(
             outError = "update --dry-run cannot be combined with --clean.";
             return SLANG_FAIL;
         }
+        if (clearRemap && remapIndexLocation.getLength())
+        {
+            outError = "update --remap-urls cannot be combined with --no-remap.";
+            return SLANG_FAIL;
+        }
         return _update(
             projectRoot,
             ignoreOverrides,
@@ -3039,6 +3208,8 @@ SlangResult executeInDirectory(
             assumeYes,
             skipValidate,
             offline,
+            remapIndexLocation,
+            clearRemap,
             outError);
     }
     if (command == "validate")
@@ -3174,6 +3345,38 @@ SlangResult executeInDirectory(
                 {
                     outError = String("Unknown dependency add option: ") + option;
                     return SLANG_FAIL;
+                }
+            }
+            if (!dependency.git.getLength())
+            {
+                StringBuilder indexLocationValue;
+                if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                        UnownedStringSlice::fromLiteral("SLANG_PACKAGE_INDEX"),
+                        indexLocationValue)))
+                {
+                    String indexLocation = indexLocationValue.produceString();
+                    if (indexLocation.getLength())
+                    {
+                        List<RepositoryLocation> indexPackages;
+                        SLANG_RETURN_ON_FAIL(
+                            readPackageIndex(indexLocation, indexPackages, outError));
+                        bool found = false;
+                        for (const auto& repository : indexPackages)
+                        {
+                            if (repository.packageName == dependency.name)
+                            {
+                                dependency.git = repository.git;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found)
+                        {
+                            outError =
+                                String("Package index does not list '") + dependency.name + "'.";
+                            return SLANG_FAIL;
+                        }
+                    }
                 }
             }
             bool validGitVersion = dependency.git.getLength() && dependency.version.getLength() &&

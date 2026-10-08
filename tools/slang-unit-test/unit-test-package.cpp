@@ -12,6 +12,7 @@
 #include "package-tool.h"
 #include "package-types.h"
 #include "package-validate.h"
+#include "scoped-env-var.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -646,6 +647,196 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"version\":\"1.0.0\",\"reason\":\"bad\"}]}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("invalid-exclusion.json", invalidExclusionText, manifest, error)));
+}
+
+SLANG_UNIT_TEST(PackageIndexJSON)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String indexPath = Path::combine(temp.path, "index.json");
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        indexPath,
+        "{\n"
+        "  \"schema_version\": 1,\n"
+        "  \"packages\": {\n"
+        "    \"noise\": \"https://example.com/noise.git\"\n"
+        "  }\n"
+        "}\n")));
+    List<RepositoryLocation> packages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readPackageIndex(indexPath, packages, error)));
+    SLANG_CHECK(packages.getCount() == 1);
+    SLANG_CHECK(packages[0].packageName == "noise");
+    SLANG_CHECK(packages[0].git == "https://example.com/noise.git");
+
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(indexPath, "{\"schema_version\":1,\"packages\":{}}\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readPackageIndex(indexPath, packages, error)));
+    SLANG_CHECK(packages.getCount() == 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(indexPath, "{\"schema_version\":1,\"packages\":{},\"extra\":true}\n")));
+    SLANG_CHECK(SLANG_FAILED(readPackageIndex(indexPath, packages, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
+
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(indexPath, "{\"schema_version\":2,\"packages\":{}}\n")));
+    SLANG_CHECK(SLANG_FAILED(readPackageIndex(indexPath, packages, error)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        indexPath,
+        "{\"schema_version\":1,\"packages\":{\"..\":\"https://example.com/noise.git\"}}\n")));
+    SLANG_CHECK(SLANG_FAILED(readPackageIndex(indexPath, packages, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid package name")) >= 0);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        indexPath,
+        "{\"schema_version\":1,\"packages\":{\"noise\":\"ext::sh -c bad\"}}\n")));
+    SLANG_CHECK(SLANG_FAILED(readPackageIndex(indexPath, packages, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid Git URL")) >= 0);
+
+    String lockPath = Path::combine(temp.path, "slang-package-lock.json");
+    PackageTool::LockFile lock;
+    lock.remapIndex = "https://example.com/index.json";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLockFile(lockPath, lock, error)));
+    PackageTool::LockFile readLock;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, readLock, error)));
+    SLANG_CHECK(readLock.remapIndex == "https://example.com/index.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        lockPath,
+        "{\"schema_version\":1,\"remap_index\":\"/tmp/index.json\",\"packages\":{}}\n")));
+    SLANG_CHECK(SLANG_FAILED(readLockFile(lockPath, readLock, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("http or https")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolDependencyAddUsesPackageIndex)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    String indexPath = Path::combine(temp.path, "index.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        indexPath,
+        "{\"schema_version\":1,\"packages\":{"
+        "\"noise\":\"https://example.com/noise.git\","
+        "\"other\":\"https://example.com/from-index.git\"}}\n")));
+
+    {
+        SlangUnitTest::ScopedEnvVar indexEnvironment("SLANG_PACKAGE_INDEX", indexPath.getBuffer());
+        const char* addArguments[] = {
+            "slang-package",
+            "dependency",
+            "add",
+            "noise",
+            "--version",
+            ">=1.0.0 <2.0.0",
+        };
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            executeInDirectory(temp.path, SLANG_COUNT_OF(addArguments), addArguments, error)));
+        Manifest manifest;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            readManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
+        SLANG_CHECK(manifest.dependencies.getCount() == 1);
+        SLANG_CHECK(manifest.dependencies[0].name == "noise");
+        SLANG_CHECK(manifest.dependencies[0].git == "https://example.com/noise.git");
+        SLANG_CHECK(manifest.dependencies[0].version == ">=1.0.0 <2.0.0");
+
+        const char* explicitGitArguments[] = {
+            "slang-package",
+            "dependency",
+            "add",
+            "other",
+            "--git",
+            "https://example.com/explicit.git",
+            "--version",
+            ">=1.0.0 <2.0.0",
+        };
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+            temp.path,
+            SLANG_COUNT_OF(explicitGitArguments),
+            explicitGitArguments,
+            error)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            readManifest(Path::combine(temp.path, "slang-package.json"), manifest, error)));
+        SLANG_CHECK(manifest.dependencies.getCount() == 2);
+        SLANG_CHECK(manifest.dependencies[0].name == "noise");
+        SLANG_CHECK(manifest.dependencies[1].name == "other");
+        SLANG_CHECK(manifest.dependencies[1].git == "https://example.com/explicit.git");
+
+        const char* missingArguments[] = {
+            "slang-package",
+            "dependency",
+            "add",
+            "absent",
+            "--version",
+            "1.0.0",
+        };
+        SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+            temp.path,
+            SLANG_COUNT_OF(missingArguments),
+            missingArguments,
+            error)));
+        SLANG_CHECK(
+            error.getUnownedSlice().indexOf(UnownedStringSlice("does not list 'absent'")) >= 0);
+    }
+
+    const char* unsetArguments[] = {
+        "slang-package",
+        "dependency",
+        "add",
+        "plain",
+        "--version",
+        "1.0.0",
+    };
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(unsetArguments), unsetArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires --git")) >= 0);
+
+    const char* missingLocationArguments[] = {"slang-package", "update", "--remap-urls"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(missingLocationArguments),
+        missingLocationArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("http or https")) >= 0);
+
+    const char* localIndexArguments[] = {
+        "slang-package",
+        "update",
+        "--remap-urls",
+        indexPath.getBuffer(),
+    };
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(localIndexArguments),
+        localIndexArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("http or https")) >= 0);
+
+    const char* conflictArguments[] = {
+        "slang-package",
+        "update",
+        "--no-remap",
+        "--remap-urls",
+        "https://example.com/index.json",
+    };
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(conflictArguments),
+        conflictArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("cannot be combined")) >= 0);
+
+    const char* fetchMissingArguments[] = {"slang-package", "fetch", "--remap-urls"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(fetchMissingArguments),
+        fetchMissingArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("http or https")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)
@@ -3268,6 +3459,120 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     const LockedPackage* b = _findLockedPackage(lock, "b");
     SLANG_CHECK(a && a->ref == "v1.0.0");
     SLANG_CHECK(b && b->ref == "v1.4.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverRemapsGitUrls)
+{
+    InMemoryPackageSource source;
+    source.addRelease("memory:upstream", "1.0.0", _makeManifest("noise"));
+    source.addRelease("memory:fork", "1.0.0", _makeManifest("noise"));
+    source.addRelease("memory:fork", "1.2.0", _makeManifest("noise"));
+
+    Manifest root = _makeManifest("root");
+    _addDependency(root, "noise", "memory:upstream", ">=1.0.0 <2.0.0");
+    List<RepositoryLocation> remap;
+    RepositoryLocation repository;
+    repository.packageName = "noise";
+    repository.git = "memory:fork";
+    remap.add(repository);
+
+    PackageTool::LockFile lock;
+    ResolveReport report;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(
+        ".",
+        root,
+        source,
+        lock,
+        error,
+        nullptr,
+        &report,
+        nullptr,
+        &remap)));
+    const LockedPackage* noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK(noise && noise->git == "memory:fork");
+    SLANG_CHECK(noise && noise->ref == "v1.2.0");
+    SLANG_CHECK_ABORT(report.repositoryAdoptions.getCount() == 1);
+    SLANG_CHECK(report.repositoryAdoptions[0].fromGit == "memory:upstream");
+    SLANG_CHECK(report.repositoryAdoptions[0].toGit == "memory:fork");
+
+    PackageTool::LockFile held = lock;
+    report = ResolveReport();
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(
+        ".",
+        root,
+        source,
+        lock,
+        error,
+        nullptr,
+        &report,
+        &held,
+        &remap)));
+    SLANG_CHECK(report.repositoryAdoptions.getCount() == 0);
+    noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK(noise && noise->git == "memory:fork");
+
+    LockedPackage pinned;
+    pinned.name = "noise";
+    pinned.git = "memory:upstream";
+    pinned.ref = "v1.0.0";
+    pinned.commit = "v1.0.0";
+    pinned.version = "1.0.0";
+    pinned.pinned = true;
+    held.packages.clear();
+    held.packages.add(pinned);
+    report = ResolveReport();
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(
+        ".",
+        root,
+        source,
+        lock,
+        error,
+        nullptr,
+        &report,
+        &held,
+        &remap)));
+    noise = _findLockedPackage(lock, "noise");
+    SLANG_CHECK(noise && noise->git == "memory:fork");
+    SLANG_CHECK(noise && sameExactRelease(noise->version, "1.0.0"));
+    SLANG_CHECK(noise && noise->ref == "v1.0.0");
+    SLANG_CHECK(noise && noise->pinned);
+    SLANG_CHECK(report.repositoryAdoptions.getCount() == 1);
+
+    pinned.branch = "feature";
+    pinned.pinned = false;
+    held.packages.clear();
+    held.packages.add(pinned);
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(
+        ".",
+        root,
+        source,
+        lock,
+        error,
+        nullptr,
+        &report,
+        &held,
+        &remap)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unedit it before")) >= 0);
+
+    pinned.branch = String();
+    pinned.pinned = true;
+    pinned.version = "9.9.9";
+    pinned.ref = "v9.9.9";
+    pinned.commit = "v9.9.9";
+    held.packages.clear();
+    held.packages.add(pinned);
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(
+        ".",
+        root,
+        source,
+        lock,
+        error,
+        nullptr,
+        &report,
+        &held,
+        &remap)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("no canonical tag")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageResolverReportsNoPublishedCandidates)

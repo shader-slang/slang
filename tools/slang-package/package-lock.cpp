@@ -48,14 +48,15 @@ SlangResult validateLockedDependency(
     }
     if (lockedPackage.path.getLength())
     {
-        if (isLocalOverrideLockedPackage(lockedPackage) && lockedPackage.git != dependency.git)
+        if (!lock.remapIndex.getLength() && isLocalOverrideLockedPackage(lockedPackage) &&
+            lockedPackage.git != dependency.git)
         {
             outError = String("Lock file path for Git dependency '") + dependency.name +
                        "' uses a different Git location. Run 'slang package update'.";
             return SLANG_FAIL;
         }
     }
-    else if (lockedPackage.git != dependency.git)
+    else if (!lock.remapIndex.getLength() && lockedPackage.git != dependency.git)
     {
         outError = String("Lock file uses a different Git URL for dependency '") + dependency.name +
                    "'. Run 'slang package update'.";
@@ -191,7 +192,8 @@ bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 
 bool lockFilesEqual(const LockFile& left, const LockFile& right)
 {
-    if (left.packages.getCount() != right.packages.getCount())
+    if (left.remapIndex != right.remapIndex ||
+        left.packages.getCount() != right.packages.getCount())
         return false;
     for (const auto& package : left.packages)
     {

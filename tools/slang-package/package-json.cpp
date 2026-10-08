@@ -6,7 +6,11 @@
 #include "compiler-core/slang-json-parser.h"
 #include "compiler-core/slang-json-value.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-command-line.h"
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 #include "core/slang-string.h"
 
 namespace Slang
@@ -222,6 +226,8 @@ static bool _workspacePathsOverlap(const String& left, const String& right)
     }
     return true;
 }
+
+static bool _isHttpUrl(const String& location);
 
 static bool _isSafeGitLocation(const String& location)
 {
@@ -561,6 +567,57 @@ static SlangResult _readExclusions(
         }
         outExclusions.add(exclusion);
     }
+    return SLANG_OK;
+}
+
+static SlangResult _readRepositoryMap(
+    JSONContainer* container,
+    const JSONValue& object,
+    const char* key,
+    List<RepositoryLocation>& outRepositories,
+    String& outError)
+{
+    JSONValue repositories = _find(container, object, key);
+    if (!repositories.isValid())
+        return SLANG_OK;
+    if (repositories.getKind() != JSONValue::Kind::Object)
+    {
+        outError = String("Field '") + key + "' must be an object.";
+        return SLANG_FAIL;
+    }
+    for (auto pair : container->getObject(repositories))
+    {
+        RepositoryLocation repository;
+        repository.packageName = container->getStringFromKey(pair.key);
+        if (!isValidPackageName(repository.packageName))
+        {
+            outError = String("Invalid package name in '") + key + "': " + repository.packageName;
+            return SLANG_FAIL;
+        }
+        if (pair.value.getKind() != JSONValue::Kind::String)
+        {
+            outError =
+                String("Git URL for package '") + repository.packageName + "' must be a string.";
+            return SLANG_FAIL;
+        }
+        repository.git = container->getString(pair.value);
+        if (!_isSafeGitLocation(repository.git))
+        {
+            outError = String("Invalid Git URL for package '") + repository.packageName + "'.";
+            return SLANG_FAIL;
+        }
+        for (const auto& existing : outRepositories)
+        {
+            if (existing.packageName == repository.packageName)
+            {
+                outError = String("Duplicate package in '") + key + "': " + repository.packageName;
+                return SLANG_FAIL;
+            }
+        }
+        outRepositories.add(repository);
+    }
+    outRepositories.sort([](const RepositoryLocation& left, const RepositoryLocation& right)
+                         { return left.packageName < right.packageName; });
     return SLANG_OK;
 }
 
@@ -1165,10 +1222,24 @@ SlangResult readLockFile(const String& path, LockFile& outLock, String& outError
     for (auto pair : json.container->getObject(json.root))
     {
         String key = json.container->getStringFromKey(pair.key);
-        if (key != "schema_version" && key != "packages")
+        if (key != "schema_version" && key != "packages" && key != "remap_index")
         {
             outError = String("Unknown field in ") + kLockFileName + ": " + key;
             return SLANG_FAIL;
+        }
+        if (key == "remap_index")
+        {
+            if (pair.value.getKind() != JSONValue::Kind::String)
+            {
+                outError = "Field 'remap_index' must be a string.";
+                return SLANG_FAIL;
+            }
+            outLock.remapIndex = json.container->getString(pair.value);
+            if (!_isHttpUrl(outLock.remapIndex) || !_isSafeGitLocation(outLock.remapIndex))
+            {
+                outError = "Field 'remap_index' must be an http or https URL.";
+                return SLANG_FAIL;
+            }
         }
     }
     SLANG_RETURN_ON_FAIL(_requireFormatVersion(json.container, json.root, kLockFileName, outError));
@@ -1201,6 +1272,11 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
     writer.startObject(SourceLoc());
     _writeFormatVersion(writer);
+    if (lock.remapIndex.getLength())
+    {
+        _writeKey(writer, "remap_index");
+        writer.addStringValue(lock.remapIndex.getUnownedSlice(), SourceLoc());
+    }
     _writeKey(writer, "packages");
     writer.startObject(SourceLoc());
     for (const auto& package : lock.packages)
@@ -1362,6 +1438,137 @@ SlangResult writeLocalPackages(
         return SLANG_FAIL;
     }
     return SLANG_OK;
+}
+
+static bool _isHttpUrl(const String& location)
+{
+    return location.startsWith("https://") || location.startsWith("http://");
+}
+
+static SlangResult _findCurlExecutable(String& outPath, String& outError)
+{
+    StringBuilder pathValue;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice::fromLiteral("PATH"),
+            pathValue)))
+    {
+        outError = "Cannot locate curl because PATH is unavailable.";
+        return SLANG_FAIL;
+    }
+    List<UnownedStringSlice> directories;
+#if SLANG_WINDOWS_FAMILY
+    StringUtil::split(pathValue.getUnownedSlice(), ';', directories);
+    const char* executableName = "curl.exe";
+#else
+    StringUtil::split(pathValue.getUnownedSlice(), ':', directories);
+    const char* executableName = "curl";
+#endif
+    for (auto directory : directories)
+    {
+        if (directory.getLength() == 0)
+            continue;
+        String candidate = Path::combine(directory, executableName);
+        if (File::exists(candidate))
+        {
+            outPath = candidate;
+            return SLANG_OK;
+        }
+    }
+    outError = "Unable to find the preinstalled curl command on PATH.";
+    return SLANG_FAIL;
+}
+
+static SlangResult _readPackageIndexText(
+    const String& sourceName,
+    const String& text,
+    List<RepositoryLocation>& outPackages,
+    String& outError)
+{
+    outPackages.clear();
+    ParsedJSON json;
+    SLANG_RETURN_ON_FAIL(_parseJSONText(sourceName, text, json, outError));
+    SLANG_RETURN_ON_FAIL(
+        _requireFormatVersion(json.container, json.root, sourceName.getBuffer(), outError));
+    for (auto pair : json.container->getObject(json.root))
+    {
+        String key = json.container->getStringFromKey(pair.key);
+        if (key != kFormatVersionKey && key != "packages")
+        {
+            outError = String("Unknown field in package index: ") + key;
+            return SLANG_FAIL;
+        }
+    }
+    JSONValue packages = _find(json.container, json.root, "packages");
+    if (!packages.isValid())
+    {
+        outError = String("Field 'packages' is required in ") + sourceName + ".";
+        return SLANG_FAIL;
+    }
+    return _readRepositoryMap(json.container, json.root, "packages", outPackages, outError);
+}
+
+SlangResult readPackageIndex(
+    const String& location,
+    List<RepositoryLocation>& outPackages,
+    String& outError)
+{
+    outPackages.clear();
+    if (!location.getLength() || location.getBuffer()[0] == '-')
+    {
+        outError = "Package index location is missing.";
+        return SLANG_FAIL;
+    }
+    String text;
+    String sourceName = location;
+    if (_isHttpUrl(location))
+    {
+        if (!_isSafeGitLocation(location))
+        {
+            outError = String("Invalid package index URL: ") + location;
+            return SLANG_FAIL;
+        }
+        String curl;
+        SLANG_RETURN_ON_FAIL(_findCurlExecutable(curl, outError));
+        CommandLine commandLine;
+        commandLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Path, curl));
+        commandLine.addArg("-fsSL");
+        commandLine.addArg("--max-time");
+        commandLine.addArg("60");
+        commandLine.addArg(location);
+        ExecuteResult result;
+        result.init();
+        if (SLANG_FAILED(ProcessUtil::execute(commandLine, result)) || result.resultCode != 0)
+        {
+            outError = String("Cannot read package index: ") + location;
+            String detail = String(result.standardError.getUnownedSlice().trim());
+            if (detail.getLength())
+                outError = outError + "\n" + detail;
+            return SLANG_FAIL;
+        }
+        text = result.standardOutput;
+    }
+    else
+    {
+        String path = location;
+        if (!Path::isAbsolute(path))
+        {
+            String currentDirectory;
+            if (SLANG_FAILED(Path::getCanonical(".", currentDirectory)))
+            {
+                outError = String("Cannot determine the current directory while reading ") +
+                           location + ".";
+                return SLANG_FAIL;
+            }
+            path = Path::combine(currentDirectory, location);
+        }
+        sourceName = path;
+        if (SLANG_FAILED(File::readAllText(path, text)))
+        {
+            outError = String("Cannot read package index: ") + location;
+            return SLANG_FAIL;
+        }
+    }
+    return _readPackageIndexText(sourceName, text, outPackages, outError);
 }
 
 } // namespace PackageTool

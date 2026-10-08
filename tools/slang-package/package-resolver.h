@@ -99,7 +99,9 @@ SlangResult resolveDependenciesWithSource(
     LockFile& outLock,
     String& outError,
     List<String>* outWarnings = nullptr,
-    ResolveReport* outReport = nullptr);
+    ResolveReport* outReport = nullptr,
+    const LockFile* heldLock = nullptr,
+    const List<RepositoryLocation>* remapUrls = nullptr);
 
 /// Resolve dependencies from Git repositories, using a cache under the workspace root.
 ///
@@ -113,7 +115,8 @@ SlangResult resolveDependencies(
     List<String>* outWarnings = nullptr,
     ResolveReport* outReport = nullptr,
     bool offline = false,
-    const LockFile* heldLock = nullptr);
+    const LockFile* heldLock = nullptr,
+    const List<RepositoryLocation>* remapUrls = nullptr);
 
 /// Resolve dependencies using registered local manifests and Git for the remaining packages.
 SlangResult resolveDependenciesFromLocalPackages(
@@ -125,7 +128,8 @@ SlangResult resolveDependenciesFromLocalPackages(
     List<String>* outWarnings = nullptr,
     ResolveReport* outReport = nullptr,
     bool offline = false,
-    const LockFile* heldLock = nullptr);
+    const LockFile* heldLock = nullptr,
+    const List<RepositoryLocation>* remapUrls = nullptr);
 
 } // namespace PackageTool
 } // namespace Slang

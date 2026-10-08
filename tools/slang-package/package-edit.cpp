@@ -105,6 +105,9 @@ static SlangResult _resolveFrozen(
             continue;
         package.pinned = true;
     }
+    List<RepositoryLocation> remapPackages;
+    if (lock.remapIndex.getLength())
+        SLANG_RETURN_ON_FAIL(readPackageIndex(lock.remapIndex, remapPackages, outError));
     List<String> warnings;
     SLANG_RETURN_ON_FAIL(resolveDependencies(
         projectRoot,
@@ -114,7 +117,9 @@ static SlangResult _resolveFrozen(
         &warnings,
         nullptr,
         false,
-        &held));
+        &held,
+        lock.remapIndex.getLength() ? &remapPackages : nullptr));
+    outLock.remapIndex = lock.remapIndex;
     for (const auto& warning : warnings)
         fprintf(stderr, "slang-package: warning: %s\n", warning.getBuffer());
     for (auto& package : outLock.packages)

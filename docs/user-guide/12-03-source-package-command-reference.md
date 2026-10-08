@@ -120,8 +120,8 @@ Direct dependencies are kept in package-name order.
 #### Synopsis
 
 ```text
-slang package dependency add <name> --git <url> --version <range>
-slang package dependency add <name> --git <url> --ref <ref> [--as <version>]
+slang package dependency add <name> [--git <url>] --version <range>
+slang package dependency add <name> [--git <url>] --ref <ref> [--as <version>]
 ```
 
 #### Description
@@ -135,6 +135,26 @@ one of the two source forms must be used:
   release tag reachable from the resolved commit.
 
 `--path` is rejected. A dependency is a Git repository checked out at `deps/<name>`.
+
+When `--git` is omitted, the command reads `SLANG_PACKAGE_INDEX`. That variable is a local path
+or an `http`/`https` URL of a package index. A relative path is resolved from the current
+directory. The index is JSON:
+
+```json
+{
+    "schema_version": 1,
+    "packages": {
+        "noise": "https://example.com/noise.git"
+    }
+}
+```
+
+`schema_version` must be the integer `1`. `packages` maps a package name to one Git URL. The
+command writes that URL into `slang-package.json` as if `--git` had been passed. `--version` or
+`--ref` is still required. An explicit `--git` is used as given and the variable is not read. If
+the variable is unset or empty, omitting `--git` fails. A variable that is set but names an index
+that cannot be read fails, and so does a name the index does not list. `fetch` and `update` do
+not read `SLANG_PACKAGE_INDEX`. Remapping an existing graph uses [`--remap-urls`](#update).
 
 `<name>` identifies the package in the graph and must match the selected package manifest.
 
@@ -335,7 +355,7 @@ not approve dropping commits that follow a tag. Apply it only for an ending that
 ### Synopsis
 
 ```text
-slang package fetch [--clean] [--yes] [--skip-validate]
+slang package fetch [--clean] [--yes] [--skip-validate] [--remap-urls <url>]
 ```
 
 ### Description
@@ -352,6 +372,11 @@ the correct origin and commit is left untouched. The command regenerates
 When dependencies exist but the lock is absent, `fetch` runs `update` to create the first lock and
 uses the same confirmation behavior. When neither a lock nor a dependency graph exists, use
 `update` to create an empty lock.
+
+`fetch` installs the Git URLs recorded in the lock and does not read a remap index. With an
+existing lock, `--remap-urls <url>` re-resolves instead, using that index for every listed package
+name and saving the URL in the lock. `<url>` must be `http` or `https`. A later `update` keeps
+using the index stored in the lock. `fetch` cannot clear that policy; use `update --no-remap`.
 
 Fetch installs the commit recorded in the lock even when its original tag has since moved. It
 does not select newer releases or apply publisher retractions. Workspace exclusions are current
@@ -372,6 +397,10 @@ requiring approval, it has no effect.
 materialization. The legal workspace-graph and upstream-cache checks still run. The command
 prints a warning.
 
+`--remap-urls <url>`
+: Re-resolve and record `<url>` as the lock's remap index. The same rules as
+[`update --remap-urls`](#update) apply. Passing the option twice, or omitting `<url>`, is an error.
+
 Without `--clean`, `fetch` stops before modifying any tree when a tool-owned checkout contains
 local state. Use `edit` to preserve that work or `--clean` to discard it.
 
@@ -382,6 +411,7 @@ local state. Use `edit` to preserve that work or `--clean` to discard it.
 ```text
 slang package update [--clean] [--dry-run]
                      [--minimal] [--offline] [--yes] [--skip-validate]
+                     [--remap-urls <url> | --no-remap]
 ```
 
 ### Description
@@ -404,10 +434,28 @@ After materialization, update checks publishability for new or changed Git trees
 module layout and import-path uniqueness across the complete selected graph. The
 new lock is written only after those checks succeed.
 
-When the proposed lock differs, local checkout state would be discarded, or an existing named Git
-ref in `deps/` would move, update asks for confirmation. Declining interactively changes nothing
-and succeeds. A non-interactive invocation that requires confirmation fails unless `--yes` is
-given.
+When the proposed lock differs, a package Git URL would change, local checkout state would be
+discarded, or an existing named Git ref in `deps/` would move, update asks for confirmation.
+Declining interactively changes nothing and succeeds. A non-interactive invocation that requires
+confirmation fails unless `--yes` is given.
+
+When the lock records a remap index, `update` reads that index and resolves every listed package
+name from its Git URL. Names the index does not list keep the manifest URL. The manifest itself is
+left unchanged. If the index cannot be read, the command fails and the lock stays.
+
+`--remap-urls <url>` sets or replaces that index. `<url>` must be `http` or `https`. It is not
+taken from `SLANG_PACKAGE_INDEX`. The command lists each package whose Git URL would change, then
+one confirmation covers that list together with any other update changes. `--yes` approves it.
+Declining writes nothing. After approval the lock stores both `<url>` and the resolved Git URLs.
+
+`--no-remap` clears the index and re-resolves from the manifest Git URLs. It lists packages whose
+URLs would change back and uses the same confirmation. `--no-remap` and `--remap-urls` together
+are an error.
+
+An edited package whose URL would change stops the command before the prompt. Unedit it first.
+A pin keeps its version. The canonical tag for that version must exist on the repository the
+resolve is using; if it does not, the solve fails and the lock stays. The checkout of an edited
+package is not moved onto another URL.
 
 ### Options
 
@@ -436,6 +484,16 @@ network-free preview.
 `--skip-validate`
 : Skip post-materialization source-layout checks and publishability checks for changed package
 trees. The legal graph and cache checks still run, and the command prints a warning.
+
+`--remap-urls <url>`
+: Resolve listed packages from the Git URLs in the package index at `<url>`, and record `<url>` in
+the lock. `<url>` must be `http` or `https`. URL changes are listed and confirmed with the rest of
+the update. Passing the option twice, or omitting `<url>`, is an error. It cannot be combined
+with `--no-remap`.
+
+`--no-remap`
+: Drop the lock's remap index and resolve from the manifest Git URLs. URL changes are listed and
+confirmed with the rest of the update.
 
 ## `status`
 
@@ -684,6 +742,7 @@ for non-interactive operation.
 Confirmation can cover:
 
 - a new or changed lock during `update`;
+- a package Git URL changed by a remap index, or restored by `update --no-remap`;
 - checkout state discarded by `--clean`;
 - existing tags or origin-tracking branches in `deps/` that would move; and
 - an `unedit` ending that would leave the branch or move `HEAD`. `unedit` has no `--yes`.
@@ -692,10 +751,12 @@ Confirmation can cover:
 
 `slang-package.json`
 : Committed package intent: package identity, exports, licenses, dependency constraints,
-retractions, workspace policy, toolchain requirements, and build settings.
+retractions, workspace policy, toolchain requirements, and build settings. Dependency Git URLs
+stay as published. A remap does not rewrite them.
 
 `slang-package-lock.json`
-: Committed exact selected graph. A release row records `git`, `ref`, `commit`, and `version`.
+: Committed exact selected graph. Optional `remap_index` is the `http` or `https` package index
+`update` reads on later resolves. A release row records `git`, `ref`, `commit`, and `version`.
 An edit row records `git`, `branch`, `ref`, `version`, and `commit`. The tag and commit are the
 release the branch is representing, and that row is not something to commit. `pinned` is recorded
 only when the boolean is set. A `path` field is

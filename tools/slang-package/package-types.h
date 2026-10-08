@@ -51,6 +51,33 @@ struct Exclusion
     String reason;
 };
 
+/// One package name and the Git URL a workspace or package index uses for it.
+struct RepositoryLocation
+{
+    String packageName;
+    String git;
+};
+
+/// A Git URL substitution applied while resolving, reported before `update` writes anything.
+struct RepositoryAdoption
+{
+    String packageName;
+    String fromGit;
+    String toGit;
+};
+
+inline Index findRepositoryLocationIndex(
+    const List<RepositoryLocation>& repositories,
+    const String& name)
+{
+    for (Index i = 0; i < repositories.getCount(); ++i)
+    {
+        if (repositories[i].packageName == name)
+            return i;
+    }
+    return -1;
+}
+
 /// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain
 /// these fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
@@ -210,6 +237,9 @@ inline bool isTrustedLockSelection(const Dependency& dependency, const LockedPac
 
 struct LockFile
 {
+    /// `http` or `https` package index applied whenever dependencies are re-resolved. Empty means
+    /// the manifests' Git URLs are used. `fetch` installs the locked URLs and does not read it.
+    String remapIndex;
     List<LockedPackage> packages;
 };
 

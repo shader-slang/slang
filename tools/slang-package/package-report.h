@@ -93,6 +93,8 @@ struct ResolveReport
     List<ToolchainConstraint> toolchainConstraints;
     String installedToolchain;
     ResolveFailure failure;
+    /// Git URL substitutions caused by the lock's remap index during this solve.
+    List<RepositoryAdoption> repositoryAdoptions;
 };
 
 /// Format the package conflict that prevented dependency resolution from succeeding.
