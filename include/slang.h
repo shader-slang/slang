@@ -1359,6 +1359,10 @@ typedef uint32_t SlangSizeT;
 
         DiagnosticFormat = 162, // intValue0: SlangDiagnosticFormat (default, vs)
 
+        // `bool`: Enables additional backwards-compatibility features for legacy HLSL inputs,
+        // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
+        EnableExtendedHLSLBackwardsCompatibility = 163,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
