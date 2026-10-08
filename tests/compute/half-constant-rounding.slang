@@ -11,11 +11,9 @@
 // Explicit bit patterns force constant conversion through the compiler's FloatToHalf path.
 // Expected encodings are independent of the compiler: ties choose the even Half encoding,
 // and the Float32 neighbor above half the minimum subnormal must round to that subnormal.
-// Load the same Float32 values at runtime so neither narrowing expression can fold.
-// Each runtime result must match the independently checked constant result below.
-//TEST_INPUT:ubuffer(data=[1065357312 1065365504 3212840960 855638016 855638017 947904512 947904511 1199566848 1199566847 2147483648 3003121665 874512384], stride=4):name=inputBits
-StructuredBuffer<uint> inputBits;
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// Runtime nearest-even coverage lives in half-runtime-rounding.slang. Vulkan may use
+// a different runtime rounding mode, so this test checks compiler constants only.
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -39,44 +37,9 @@ void computeMain()
     outputBuffer[10] = uint(bit_cast<uint16_t>(half(bit_cast<float>(0xb3000001u))));
     // The midpoint between subnormal encodings 2 and 3 chooses encoding 2.
     outputBuffer[11] = uint(bit_cast<uint16_t>(half(bit_cast<float>(0x34200000u))));
-
-    for (uint i = 0; i < 12; ++i)
-    {
-        float value = asfloat(inputBits[i]);
-        outputBuffer[12 + i] = uint(bit_cast<uint16_t>(half(value)));
-        outputBuffer[24 + i] = f32tof16(value);
-    }
 }
 
 // CHECK: type: uint32_t
-// CHECK-NEXT: {{^15360$}}
-// CHECK-NEXT: {{^15362$}}
-// CHECK-NEXT: {{^48128$}}
-// CHECK-NEXT: {{^0$}}
-// CHECK-NEXT: {{^1$}}
-// CHECK-NEXT: {{^1024$}}
-// CHECK-NEXT: {{^1023$}}
-// CHECK-NEXT: {{^31744$}}
-// CHECK-NEXT: {{^31743$}}
-// CHECK-NEXT: {{^32768$}}
-// CHECK-NEXT: {{^32769$}}
-// CHECK-NEXT: {{^2$}}
-
-// Runtime Half casts.
-// CHECK-NEXT: {{^15360$}}
-// CHECK-NEXT: {{^15362$}}
-// CHECK-NEXT: {{^48128$}}
-// CHECK-NEXT: {{^0$}}
-// CHECK-NEXT: {{^1$}}
-// CHECK-NEXT: {{^1024$}}
-// CHECK-NEXT: {{^1023$}}
-// CHECK-NEXT: {{^31744$}}
-// CHECK-NEXT: {{^31743$}}
-// CHECK-NEXT: {{^32768$}}
-// CHECK-NEXT: {{^32769$}}
-// CHECK-NEXT: {{^2$}}
-
-// Runtime packing through f32tof16.
 // CHECK-NEXT: {{^15360$}}
 // CHECK-NEXT: {{^15362$}}
 // CHECK-NEXT: {{^48128$}}
