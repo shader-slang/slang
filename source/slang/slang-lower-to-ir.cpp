@@ -4144,9 +4144,22 @@ static void emitBranchCoverageMarker(
 
 // Record evaluation of an expression at its own source location. Conditions and conditional
 // arms are not statements: without this marker, a multiline conditional can have branch coverage
-// on a line for which no line coverage exists.
-static void emitExpressionLineCoverage(IRGenContext* context, Expr* expr)
+// on a line for which no line coverage exists. `dominatingExpr` is an expression whose marker
+// already runs on every path to `expr`, such as the condition of the `?:` that selects `expr`;
+// when both start on one source line the line is already counted, so no second probe is added.
+static void emitExpressionLineCoverage(
+    IRGenContext* context,
+    Expr* expr,
+    Expr* dominatingExpr = nullptr)
 {
+    if (dominatingExpr)
+    {
+        auto sourceManager = context->getLinkage()->getSourceManager();
+        if (expr->loc.isValid() && dominatingExpr->loc.isValid() &&
+            sourceManager->getHumaneLoc(expr->loc, SourceLocType::Emit).line ==
+                sourceManager->getHumaneLoc(dominatingExpr->loc, SourceLocType::Emit).line)
+            return;
+    }
     if ((context->traceCoverage || context->traceBranchCoverage) && expr->loc.isValid() &&
         getParentFunc(context->irBuilder->getInsertLoc().getInst()))
     {
@@ -4201,9 +4214,12 @@ static uint32_t allocateConditionBranchSiteID(IRGenContext* context, Expr* condE
 // Lower the right operand of `&&` or `||` and report its decision. Its value is merged with the
 // short-circuited path before anything branches on it, so a two-way branch of its own carries the
 // arm markers.
-static IRInst* lowerShortCircuitRightOperand(IRGenContext* context, Expr* operand)
+static IRInst* lowerShortCircuitRightOperand(
+    IRGenContext* context,
+    Expr* operand,
+    Expr* leftOperand)
 {
-    emitExpressionLineCoverage(context, operand);
+    emitExpressionLineCoverage(context, operand, leftOperand);
     auto value = getSimpleVal(context, lowerRValueExpr(context, operand));
     auto site = allocateConditionBranchSiteID(context, operand);
     if (site == 0)
@@ -7306,7 +7322,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             coverageBranchSiteID,
             1,
             slang::CoverageBranchArmKind::TrueArm);
-        emitExpressionLineCoverage(context, expr->arguments[1]);
+        emitExpressionLineCoverage(context, expr->arguments[1], expr->arguments[0]);
         auto trueVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
         builder->emitBranch(afterBlock, 1, &trueVal);
         builder->insertBlock(elseBlock);
@@ -7318,7 +7334,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             coverageBranchSiteID,
             2,
             slang::CoverageBranchArmKind::FalseArm);
-        emitExpressionLineCoverage(context, expr->arguments[2]);
+        emitExpressionLineCoverage(context, expr->arguments[2], expr->arguments[0]);
         auto falseVal = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[2]));
         builder->emitBranch(afterBlock, 1, &falseVal);
         builder->insertBlock(afterBlock);
@@ -7361,9 +7377,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             coverageBranchSiteID,
             1,
             slang::CoverageBranchArmKind::TrueArm);
-        auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
-                           ? lowerShortCircuitRightOperand(context, expr->arguments[1])
-                           : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
+        auto trueVal =
+            expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
+                ? lowerShortCircuitRightOperand(context, expr->arguments[1], expr->arguments[0])
+                : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
 
         builder->emitBranch(afterBlock, 1, &trueVal);
 
@@ -7379,9 +7396,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             coverageBranchSiteID,
             2,
             slang::CoverageBranchArmKind::FalseArm);
-        auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
-                            ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
-                            : lowerShortCircuitRightOperand(context, expr->arguments[1]);
+        auto falseVal =
+            expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
+                ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
+                : lowerShortCircuitRightOperand(context, expr->arguments[1], expr->arguments[0]);
 
         builder->emitBranch(afterBlock, 1, &falseVal);
 
