@@ -507,6 +507,131 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
         (void**)playedBackSession.writeRef())));
 }
 
+// Records createGlobalSession/createSession/loadModule/findEntryPointByName, lets `userBody` run
+// the user's addRef/release calls on the returned entry point while recording, replays the
+// recording and returns the played-back entry point proxy. `userBody` returns true if the user
+// still owns a reference at the end of its calls, which is then released once the replay is over.
+// The replay context is left in playback mode with the orphan notes intact.
+template<typename UserBody>
+static ISlangUnknown* recordAndReplayEntryPoint(UserBody userBody)
+{
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    Slang::ComPtr<slang::ISession> session;
+    slang::IModule* module = nullptr;
+    uint64_t entryPointHandle = kNullHandle;
+    slang::IEntryPoint* recordedEntryPoint = nullptr;
+    bool userStillOwns = false;
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        if (SLANG_FAILED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())))
+            return nullptr;
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = globalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
+            return nullptr;
+        Slang::ComPtr<slang::IBlob> diagnostics;
+        module = session->loadModuleFromSourceString(
+            "orphan-note-module",
+            "orphan-note-module.slang",
+            "[shader(\"compute\")] [numthreads(1, 1, 1)] void main() {}",
+            diagnostics.writeRef());
+        if (!module)
+            return nullptr;
+        Slang::ComPtr<slang::IEntryPoint> entryPoint;
+        if (SLANG_FAILED(module->findEntryPointByName("main", entryPoint.writeRef())))
+            return nullptr;
+        entryPointHandle = ctx().getProxyHandle(entryPoint.get());
+        // The ComPtr's own destructor would record one more release; the body decides what the
+        // user does, so take the reference over without releasing it.
+        slang::IEntryPoint* rawEntryPoint = entryPoint.detach();
+        userStillOwns = userBody(rawEntryPoint);
+        if (userStillOwns)
+            recordedEntryPoint = rawEntryPoint;
+    }
+
+    ctx().switchToPlayback();
+    ctx().executeAll();
+    ctx().disable();
+    if (recordedEntryPoint)
+        recordedEntryPoint->release();
+    // The played-back proxies are looked up by the handle they were recorded with.
+    return ctx().getProxy(entryPointHandle);
+}
+
+// Reference count of a played-back proxy, read without recording or replaying a call.
+static uint32_t playbackProxyRefCount(ISlangUnknown* proxy)
+{
+    SuppressRefCountRecording guard;
+    uint32_t count = proxy->addRef();
+    proxy->release();
+    return count - 1;
+}
+
+// A replayed user release() of an entry point proxy consumes the creation reference that the
+// orphan note stands for. The note must be cancelled then: the proxy is also owned by its
+// component's m_returnedEntryPoints, so a sweep that released the (already given up) creation
+// reference would drop the proxy to zero while that list still points at it, and the list's
+// release would then touch freed memory (use-after-free under ASAN at teardown).
+SLANG_UNIT_TEST(replayContextOrphanNoteCancelledByReplayedRelease)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ISlangUnknown* entryPoint = recordAndReplayEntryPoint(
+        [](slang::IEntryPoint* ep)
+        {
+            ep->release();
+            return false;
+        });
+    SLANG_CHECK(entryPoint != nullptr);
+    if (!entryPoint)
+        return;
+
+    // The recorded user released their only reference: nothing is left for the sweep to release.
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(entryPoint) == 0);
+    // The only remaining reference is the one held by the component's returned-entry-point list.
+    SLANG_CHECK(playbackProxyRefCount(entryPoint) == 1);
+
+    // Teardown must neither release the proxy a second time nor touch freed memory.
+    ctx().reset();
+}
+
+// A user addRef() followed by release() leaves the user's original reference in place, so the
+// creation reference is still outstanding at the end of the replay and the sweep has to release
+// it: cancelling the note for the release alone would leak the proxy.
+SLANG_UNIT_TEST(replayContextOrphanNoteKeptForBalancedAddRefRelease)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ISlangUnknown* entryPoint = recordAndReplayEntryPoint(
+        [](slang::IEntryPoint* ep)
+        {
+            ep->addRef();
+            ep->release();
+            return true;
+        });
+    SLANG_CHECK(entryPoint != nullptr);
+    if (!entryPoint)
+        return;
+
+    // The creation reference was never given up by the recorded stream.
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(entryPoint) == 1);
+    // creation reference + the component's returned-entry-point list
+    SLANG_CHECK(playbackProxyRefCount(entryPoint) == 2);
+
+    ctx().reset();
+}
+
 // A test-only proxy that owns another ITestCalculator, so that releasing it
 // cascade-destroys the one it holds. It mirrors the two things ProxyBase does
 // that the orphan sweep depends on: it unregisters itself from the context when
