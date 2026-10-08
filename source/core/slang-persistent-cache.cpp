@@ -155,13 +155,16 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
     readIndex(m_indexFileName, cacheIndex);
 
     // Increase the age of all entries in the cache and get the index of
-    // the oldest entry.
+    // the oldest entry. Also look for an existing entry with the same key.
+    Index existingEntryIndex = -1;
     Index oldestEntryIndex = -1;
     uint32_t oldestEntryAge = 0;
     for (Index entryIndex = 0; entryIndex < cacheIndex.getCount(); ++entryIndex)
     {
         auto& entry = cacheIndex[entryIndex];
         ++entry.age;
+        if (existingEntryIndex < 0 && entry.key == key)
+            existingEntryIndex = entryIndex;
         if (entry.age > oldestEntryAge)
         {
             oldestEntryIndex = entryIndex;
@@ -175,7 +178,14 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
         File::writeAllBytes(entryFileName, data->getBufferPointer(), data->getBufferSize()));
 
     // Update the index.
-    if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
+    if (existingEntryIndex >= 0)
+    {
+        // The key is already in the cache and its file has been overwritten above. Refresh the
+        // existing entry; evicting or adding an entry here would delete the file we just wrote
+        // (if the oldest entry is the one being rewritten) or create a duplicate index entry.
+        cacheIndex[existingEntryIndex].age = 0;
+    }
+    else if (m_maxEntryCount > 0 && cacheIndex.getCount() >= m_maxEntryCount)
     {
         // Replace oldest entry.
         SLANG_ASSERT(oldestEntryIndex >= 0);
@@ -196,8 +206,11 @@ SlangResult PersistentCache::writeEntry(const Key& key, ISlangBlob* data)
     }
     else
     {
-        // If writing the index failed, remove the entry file to avoid growing the cache.
-        Path::remove(entryFileName);
+        // If writing the index failed, the file of a new key is removed to avoid growing the
+        // cache. The file of an existing key stays: the index on disk still refers to that key,
+        // and removing the file would leave an index entry without a file.
+        if (existingEntryIndex < 0)
+            Path::remove(entryFileName);
     }
 
     return result;

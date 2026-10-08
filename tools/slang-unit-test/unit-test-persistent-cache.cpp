@@ -309,6 +309,57 @@ struct EvictionTest : public PersistentCacheTest
 };
 
 
+// Tests rewriting an entry that is already in the cache.
+// Rewriting a key must refresh that entry in place: it must not evict an entry (least of all the
+// entry being rewritten, which would delete the file that was just written) and must not add a
+// second index entry for the same key.
+struct RewriteTest : public PersistentCacheTest
+{
+    RewriteTest()
+        : PersistentCacheTest(2)
+    {
+    }
+
+    void run()
+    {
+        List<Entry> entries;
+        for (size_t i = 0; i < 3; ++i)
+        {
+            auto data = createRandomBlob(4096);
+            auto key = SHA1::compute(data->getBufferPointer(), data->getBufferSize());
+            entries.add(Entry{key, data});
+        }
+
+        // Fill the cache. Entry 0 is now the least recently used entry.
+        writeEntry(entries[0]);
+        writeEntry(entries[1]);
+
+        // Rewrite the LRU entry of a full cache.
+        writeEntry(entries[0]);
+        SLANG_CHECK(cache->getStats().entryCount == 2);
+        SLANG_CHECK(readEntry(entries[0]) == true);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // Rewriting the same key twice must not create duplicate index entries: if it did, the
+        // two copies would count twice against the entry limit and evicting one would delete the
+        // file the other one refers to.
+        SLANG_CHECK(cache->clear() == SLANG_OK);
+        writeEntry(entries[0]);
+        writeEntry(entries[0]);
+        SLANG_CHECK(cache->getStats().entryCount == 1);
+        writeEntry(entries[1]);
+        SLANG_CHECK(cache->getStats().entryCount == 2);
+        SLANG_CHECK(readEntry(entries[0]) == true);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+
+        // Writing a new key still evicts the LRU entry (entry 0 was read before entry 1).
+        writeEntry(entries[2]);
+        SLANG_CHECK(readEntry(entries[2]) == true);
+        SLANG_CHECK(readEntry(entries[0]) == false);
+        SLANG_CHECK(readEntry(entries[1]) == true);
+    }
+};
+
 // Tests the cache to be robust against various corruptions.
 // These can happen if the cache files are manipulated externally.
 // The cache might also be corrupted if the application is terminated while writing.
@@ -627,6 +678,12 @@ SLANG_UNIT_TEST(persistentCacheBasic)
 SLANG_UNIT_TEST(persistentCacheEviction)
 {
     EvictionTest test;
+    test.run();
+}
+
+SLANG_UNIT_TEST(persistentCacheRewrite)
+{
+    RewriteTest test;
     test.run();
 }
 
