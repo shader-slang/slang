@@ -109,7 +109,7 @@ jobs:
           cd tools/compile-perf
           python3 -c "import bench, report, breakdown, daily_movers, \
               new_release_check, sweep, sweep_report, track, trend, \
-              compare_repro, ladder_scaling, fetch_releases, slack_status"
+              compare_repro, ladder_scaling, fetch_releases, slack_status, triage"
 
       - name: Test compile-perf sampling, provenance and confirmation
         run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
@@ -153,7 +153,7 @@ jobs:
           cd tools/compile-perf
           python -c "import bench, report, breakdown, daily_movers, \
               new_release_check, sweep, sweep_report, track, trend, \
-              compare_repro, ladder_scaling, fetch_releases, slack_status"
+              compare_repro, ladder_scaling, fetch_releases, slack_status, triage"
 
       - name: Test compile-perf sampling, provenance and confirmation
         run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'
