@@ -1464,7 +1464,20 @@ LanguageServerResult<LanguageServerProtocol::CompletionItem> LanguageServerCore:
     }
 
     LanguageServerProtocol::CompletionItem resolvedItem = args;
-    int itemId = stringToInt(args.data);
+    // `data` is "<completion version serial>:<candidate index>", or "-1" for items that have no
+    // candidate (keywords). The index is only meaningful for the completion version that produced
+    // the item, so an item from an earlier completion request is returned unresolved instead of
+    // being resolved against an unrelated declaration.
+    int itemId = -1;
+    {
+        auto colon = args.data.indexOf(':');
+        if (colon == -1 || stringToInt(args.data.subString(0, colon)) !=
+                               int(m_workspace->getCompletionVersionSerial()))
+        {
+            return resolvedItem;
+        }
+        itemId = stringToInt(args.data.subString(colon + 1, args.data.getLength() - colon - 1));
+    }
     auto version = m_workspace->getCurrentCompletionVersion();
     if (!version || !version->linkage)
     {
