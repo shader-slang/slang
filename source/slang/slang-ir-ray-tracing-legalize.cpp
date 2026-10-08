@@ -5,8 +5,13 @@
 // one-field struct. Keep the original empty values and copies intact for type legalization to
 // erase normally; neither source types nor ordinary helper signatures acquire padding.
 //
-// D3D uses local arguments and entry-point parameters. GLSL and SPIR-V use payload globals:
-// GLSL queries their locations, while SPIR-V dispatches reference the globals directly.
+// D3D uses local arguments and entry-point parameters. D3D additionally requires every nonempty
+// payload to be a struct, so a non-struct one gets a one-field wrapper struct: a receiving
+// shader's parameter is retyped in place, while each dispatch and each ordinary call to that
+// shader passes a copy-in/copy-out wrapper temporary. A D3D hit attribute must be a struct too;
+// a non-struct one is wrapped by value at ReportHit and read through the wrapper's field in a
+// closesthit/anyhit shader, whose ordinary callers copy it in only. GLSL and SPIR-V use payload
+// globals: GLSL queries their locations, while SPIR-V dispatches reference the globals directly.
 // CUDA/OptiX needs no artificial storage and does not run this pass.
 #include "slang-ir-ray-tracing-legalize.h"
 
@@ -78,6 +83,35 @@ static bool requiresPayloadAccessQualifiers(TargetProgram* targetProgram)
            profile.getVersion() >= ProfileVersion::DX_6_7;
 }
 
+// Return whether a D3D native interface needs a value of this type in a one-field wrapper struct.
+// D3D accepts only struct payloads and hit attributes. An empty value is never wrapped: an empty
+// payload gets dummy storage instead, and an empty hit attribute gets no storage.
+static bool needsForcedStructWrapper(IRType* type)
+{
+    return !as<IRStructType>(type) && !isEmptyType(type);
+}
+
+// Return whether param is a closesthit/anyhit shader's hit-attribute parameter. Parameter binding
+// gives an `in` parameter on those stages the HitAttributes resource kind, so the layout, not the
+// parameter's position or type, identifies the role.
+static bool isHitAttributesParam(IRParam* param)
+{
+    auto layout = findVarLayout(param);
+    return layout && layout->usesResourceKind(LayoutResourceKind::HitAttributes);
+}
+
+// A role names the D3D interface that a one-field wrapper struct adapts. Each role has its own
+// wrapper per value type: only a ray payload wrapper is a [raypayload] struct with access
+// qualifiers at SM 6.7, and only a hit-attribute wrapper is received as a read-only `borrow in`
+// parameter rather than an `inout` one.
+enum class ForcedStructRole
+{
+    RayPayload,
+    CallableData,
+    HitAttributes,
+    Count,
+};
+
 
 // Return the required payload operand's index, counting the opcode as operand zero, or -1 for
 // an unrelated instruction. On success, isRayPayload distinguishes ray from callable data.
@@ -146,8 +180,7 @@ struct RayTracingPayloadLegalizationContext
     IRStructType* dummyRayPayloadType = nullptr;
     IRStructType* dummyCallablePayloadType = nullptr;
     Dictionary<IRGlobalVar*, IRGlobalVar*> physicalGlobals;
-    Dictionary<IRType*, IRStructType*> forcedStructTypes;
-    Dictionary<IRType*, IRStructType*> forcedRayPayloadTypes;
+    Dictionary<IRType*, IRStructType*> forcedStructTypes[Index(ForcedStructRole::Count)];
 
     // Return the cached dummy struct for this payload role, creating it on first use. Its single
     // uint field provides physical storage without changing the original empty source type.
@@ -228,8 +261,10 @@ struct RayTracingPayloadLegalizationContext
     // and type legalization remove it later. dummy is separate storage created by the caller.
     //
     // Replacing only the argument would leave an Empty parameter that type legalization can
-    // erase, and the call would disagree with its declaration. Preserve the parameter's pointer
-    // kind/address space, change its value type, then rebuild the IRFunc's type. These IRParams
+    // erase, and the call would disagree with its declaration. A pointer argument replaces a
+    // pointer parameter, so we preserve the parameter's pointer kind/address space and change its
+    // value type; a by-value argument, such as ReportHit's wrapped attributes, replaces a by-value
+    // parameter, which takes the argument's type. We then rebuild the IRFunc's type. These IRParams
     // describe a target intrinsic's signature; they are not an ordinary helper body whose typed
     // uses would also need rewriting. The callers adapt every call to that specialization using
     // shared physical types, so repeated calls finish with the same declaration and argument type.
@@ -254,14 +289,18 @@ struct RayTracingPayloadLegalizationContext
         auto param = getParamAt(callee->getFirstBlock(), index);
         SLANG_RELEASE_ASSERT(param);
         IRBuilder builder(module);
-        auto paramType = cast<IRPtrTypeBase>(param->getDataType());
-        auto valueType = cast<IRPtrTypeBase>(arg->getDataType())->getValueType();
-        param->setFullType(builder.getPtrTypeWithAddressSpace(valueType, paramType));
+        IRType* paramType = arg->getFullType();
+        if (auto argPtrType = as<IRPtrTypeBase>(arg->getDataType()))
+            paramType = builder.getPtrTypeWithAddressSpace(
+                argPtrType->getValueType(),
+                cast<IRPtrTypeBase>(param->getDataType()));
+        param->setFullType(paramType);
         fixUpFuncType(callee);
         call->setArg(index, arg);
     }
 
-    // Return the cached one-field struct for a non-struct D3D argument, creating it on first use.
+    // Return the cached one-field wrapper struct for a non-struct D3D payload or hit attribute,
+    // creating it on first use. Sending arguments and receiving shader parameters both use it.
     // Consider this example:
     //
     //     uint p = 7;
@@ -281,25 +320,41 @@ struct RayTracingPayloadLegalizationContext
     //     nativeTraceRay(..., temporary);
     //     store(p, load(field));
     //
-    // Unlike an empty dummy, data carries the real input and output. Other struct-only markers
-    // use ForceVarIntoStructTemporarily_t without ray-payload decoration. The cache is keyed by
-    // source value type and separated by that role: every call to a specialized native function
-    // must use the same struct type, not a fresh nominally distinct struct for each call.
-    IRStructType* getForcedStructType(IRType* valueType, bool isRayPayload)
+    // Unlike an empty dummy, data carries the real value: input and output for a payload, input
+    // only for a hit attribute. Callable data, like the non-ray struct-only marker, uses
+    // ForceVarIntoStructTemporarily_t, and hit attributes use HitAttributes_t; neither has
+    // ray-payload decoration. The cache is keyed by source value type and separated by role:
+    // every call to a specialized native function must use the same struct type, not a fresh
+    // nominally distinct struct for each call. A receiver in the same module shares that wrapper
+    // as well; a separately compiled one relies only on the wrapper having its value type's layout.
+    IRStructType* getForcedStructType(IRType* valueType, ForcedStructRole role)
     {
-        auto& types = isRayPayload ? forcedRayPayloadTypes : forcedStructTypes;
+        auto& types = forcedStructTypes[Index(role)];
         if (auto found = types.tryGetValue(valueType))
             return *found;
         IRBuilder builder(module);
         builder.setInsertInto(module);
         auto type = builder.createStructType();
-        builder.addNameHintDecoration(
-            type,
-            UnownedStringSlice(isRayPayload ? "RayPayload_t" : "ForceVarIntoStructTemporarily_t"));
+        const char* name = nullptr;
+        switch (role)
+        {
+        case ForcedStructRole::RayPayload:
+            name = "RayPayload_t";
+            break;
+        case ForcedStructRole::CallableData:
+            name = "ForceVarIntoStructTemporarily_t";
+            break;
+        case ForcedStructRole::HitAttributes:
+            name = "HitAttributes_t";
+            break;
+        default:
+            SLANG_UNREACHABLE("invalid forced struct role");
+        }
+        builder.addNameHintDecoration(type, UnownedStringSlice(name));
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, UnownedStringSlice("data"));
         builder.createStructField(type, key, valueType);
-        if (isRayPayload)
+        if (role == ForcedStructRole::RayPayload)
             addRayPayloadDecorationIfNeeded(builder, type);
         types.add(valueType, type);
         return type;
@@ -341,23 +396,62 @@ struct RayTracingPayloadLegalizationContext
     // native call in the same way.
     //
     // CallShader's HLSL arm is a native intrinsic identified by KnownBuiltinDeclName::CallShader;
-    // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local.
+    // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local,
+    // and a nonempty non-struct one gets the ForceVarIntoStructTemporarily_t wrapper with
+    // copy-in/copy-out, the type wrapNonStructEntryPointParam also gives a callable shader's
+    // parameter.
     // TraceRay's HLSL arm instead passes p through ForceVarIntoRayPayloadStructTemporarily, which
     // identifies the argument needing a DummyRayPayload local. Both use
     // replaceNativeCallArgumentAndUpdateSignature to keep the native call and signature consistent.
-    // Nonempty structs pass through unchanged; nonempty scalars behind a struct-only marker keep
-    // their real values through the wrapper and copy-in/copy-out sequence shown above.
+    // Behind either struct-only marker, structs, including empty ones, pass through unchanged and
+    // other nonempty values keep their real values through the wrapper and copy-in/copy-out
+    // sequence shown in getForcedStructType's comment. Only the ray-payload marker selects dummy
+    // storage for an empty non-struct value; no source uses the non-ray marker, so
+    // emitForcedStructTemporary asserts rather than wraps such a value reaching it.
+    //
+    // ReportHit's HLSL arm, identified by KnownBuiltinDeclName::ReportHit, takes its attributes
+    // by value and never writes them back, so a nonempty non-struct attribute becomes a
+    // makeStruct value, with no addressable temporary and no copy-back. Its HitAttributes_t is
+    // the type wrapNonStructEntryPointParam gives a receiver's parameter.
     void legalizeD3DCall(IRCall* call)
     {
-        if (getBuiltinFuncEnum(call->getCallee()) == KnownBuiltinDeclName::CallShader)
+        switch (getBuiltinFuncEnum(call->getCallee()))
         {
-            SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
-            auto ptrType = cast<IRPtrTypeBase>(call->getArg(1)->getDataType());
-            if (isEmptyType(ptrType->getValueType()))
+        case KnownBuiltinDeclName::CallShader:
+            {
+                SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
+                auto payload = call->getArg(1);
+                auto valueType = cast<IRPtrTypeBase>(payload->getDataType())->getValueType();
+                if (isEmptyType(valueType))
+                    replaceNativeCallArgumentAndUpdateSignature(
+                        call,
+                        1,
+                        createDummyPayloadArgument(call, false));
+                else if (needsForcedStructWrapper(valueType))
+                    replaceNativeCallArgumentAndUpdateSignature(
+                        call,
+                        1,
+                        emitForcedStructTemporary(call, payload, ForcedStructRole::CallableData));
+                return;
+            }
+        case KnownBuiltinDeclName::ReportHit:
+            {
+                SLANG_RELEASE_ASSERT(call->getArgCount() == 3);
+                auto attributes = call->getArg(2);
+                auto valueType = attributes->getDataType();
+                if (!needsForcedStructWrapper(valueType))
+                    return;
+                auto type = getForcedStructType(valueType, ForcedStructRole::HitAttributes);
+                IRBuilder builder(call);
+                builder.setInsertBefore(call);
                 replaceNativeCallArgumentAndUpdateSignature(
                     call,
-                    1,
-                    createDummyPayloadArgument(call, false));
+                    2,
+                    builder.emitMakeStruct(type, 1, &attributes));
+                return;
+            }
+        default:
+            break;
         }
 
         for (UInt i = 0; i < call->getArgCount(); ++i)
@@ -370,8 +464,6 @@ struct RayTracingPayloadLegalizationContext
 
             auto logical = marker->getOperand(0);
             auto valueType = cast<IRPtrTypeBase>(logical->getDataType())->getValueType();
-            IRBuilder builder(call);
-            builder.setInsertBefore(call);
             if (isRayPayload && isEmptyType(valueType))
             {
                 replaceNativeCallArgumentAndUpdateSignature(
@@ -383,25 +475,62 @@ struct RayTracingPayloadLegalizationContext
             {
                 replaceNativeCallArgumentAndUpdateSignature(call, i, logical);
                 if (isRayPayload)
+                {
+                    IRBuilder builder(module);
                     addRayPayloadDecorationIfNeeded(builder, structType);
+                }
             }
             else
             {
-                auto type = getForcedStructType(valueType, isRayPayload);
-                auto field = *type->getFields().begin();
-                auto var = builder.emitVar(type);
-                builder.addNameHintDecoration(
-                    var,
-                    UnownedStringSlice(
-                        isRayPayload ? "rayPayload" : "forceVarIntoStructTemporarily"));
-                auto data =
-                    builder.emitFieldAddress(builder.getPtrType(valueType), var, field->getKey());
-                builder.emitStore(data, builder.emitLoad(logical));
-                replaceNativeCallArgumentAndUpdateSignature(call, i, var);
-                builder.setInsertAfter(call);
-                builder.emitStore(logical, builder.emitLoad(data));
+                replaceNativeCallArgumentAndUpdateSignature(
+                    call,
+                    i,
+                    emitForcedStructTemporary(
+                        call,
+                        logical,
+                        isRayPayload ? ForcedStructRole::RayPayload
+                                     : ForcedStructRole::CallableData));
             }
         }
+    }
+
+    // Return a wrapper temporary for call to use in place of logical, a pointer to nonempty
+    // non-struct storage. Before call we copy logical's value into the wrapper's data field, and
+    // after call we copy it back, except for hit attributes, whose receiving parameter is
+    // `borrow in`; the caller installs the returned temporary as the argument.
+    IRInst* emitForcedStructTemporary(IRCall* call, IRInst* logical, ForcedStructRole role)
+    {
+        auto valueType = cast<IRPtrTypeBase>(logical->getDataType())->getValueType();
+        SLANG_RELEASE_ASSERT(needsForcedStructWrapper(valueType));
+        auto type = getForcedStructType(valueType, role);
+        auto field = *type->getFields().begin();
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        auto var = builder.emitVar(type);
+        const char* name = nullptr;
+        switch (role)
+        {
+        case ForcedStructRole::RayPayload:
+            name = "rayPayload";
+            break;
+        case ForcedStructRole::CallableData:
+            name = "forceVarIntoStructTemporarily";
+            break;
+        case ForcedStructRole::HitAttributes:
+            name = "hitAttributes";
+            break;
+        default:
+            SLANG_UNREACHABLE("invalid forced struct role");
+        }
+        builder.addNameHintDecoration(var, UnownedStringSlice(name));
+        auto data = builder.emitFieldAddress(builder.getPtrType(valueType), var, field->getKey());
+        builder.emitStore(data, builder.emitLoad(logical));
+        if (role != ForcedStructRole::HitAttributes)
+        {
+            builder.setInsertAfter(call);
+            builder.emitStore(logical, builder.emitLoad(data));
+        }
+        return var;
     }
 
     // Prepare a decorated empty global's physical interface before instruction rewriting.
@@ -545,8 +674,79 @@ struct RayTracingPayloadLegalizationContext
         }
     }
 
-    // Give an all-empty receiving interface physical storage while keeping its body logically
-    // empty. Adapting dispatches cannot cover a receiver compiled without its callers. Consider:
+    // Give a D3D receiving shader's nonempty non-struct payload or hit-attribute parameter the
+    // wrapper struct that getForcedStructType supplies to senders of the same value type, because
+    // D3D accepts only struct payloads and hit attributes. Consider this example:
+    //
+    //     [shader("miss")] void missMain(inout float4 p) { p.x = 1; helper(p); }
+    //
+    // This function changes the IR to the equivalent of:
+    //
+    //     [shader("miss")] void missMain(inout RayPayload_t p) { p.data.x = 1; helper(p.data); }
+    //
+    // The body accesses the payload in place through the data field, like a source struct
+    // payload's field, so a write stays in the payload even when a later AcceptHitAndEndSearch
+    // ends the shader. An ordinary call to the entry point passes a wrapper temporary instead,
+    // the same copy-in/copy-out convention HLSL applies to any inout argument.
+    //
+    // A closesthit shader's `in float2 attributes` has already become a read-only `borrow in`
+    // pointer through translateEntryPointInParamToBorrow. It becomes `borrow in HitAttributes_t`,
+    // the type ReportHit's wrapped argument has, and each read loads its data field. An ordinary
+    // caller's wrapper temporary is copied in only, as for any `in` argument.
+    void wrapNonStructEntryPointParam(IRFunc* func, IRParam* param, ForcedStructRole role)
+    {
+        auto ptrType = cast<IRPtrTypeBase>(param->getDataType());
+        auto valueType = ptrType->getValueType();
+        SLANG_RELEASE_ASSERT(isD3DTarget(targetProgram->getTargetReq()));
+        SLANG_RELEASE_ASSERT(needsForcedStructWrapper(valueType));
+        auto type = getForcedStructType(valueType, role);
+        IRBuilder builder(module);
+        param->setFullType(builder.getPtrTypeWithAddressSpace(type, ptrType));
+        fixUpFuncType(func);
+
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        auto data = builder.emitFieldAddress(
+            builder.getPtrType(valueType),
+            param,
+            (*type->getFields().begin())->getKey());
+        traverseUses(
+            param,
+            [&](IRUse* use)
+            {
+                if (use->getUser() != data)
+                    use->set(data);
+            });
+
+        auto paramIndex = func->getFirstBlock()->getParamIndex(param);
+        replaceOrdinaryCallArguments(
+            func,
+            paramIndex,
+            [&](IRCall* call)
+            { return emitForcedStructTemporary(call, call->getArg(paramIndex), role); });
+    }
+
+    // Replace argument paramIndex of every ordinary call to the entry point func with
+    // makeArgument(call). An entry point can have ordinary call sites on D3D, and
+    // fixEntryPointCallsites separates their callable bodies only later in the pipeline, so those
+    // calls must already match func's adapted physical signature.
+    template<typename F>
+    void replaceOrdinaryCallArguments(IRFunc* func, Index paramIndex, const F& makeArgument)
+    {
+        traverseUses(
+            func,
+            [&](IRUse* use)
+            {
+                auto call = as<IRCall>(use->getUser());
+                if (!call || call->getCallee() != func)
+                    return;
+                call->setArg(paramIndex, makeArgument(call));
+            });
+    }
+
+    // Give a receiving shader interface the physical payload storage its target requires: an
+    // all-empty interface gets dummy storage while its body stays logically empty, and on D3D a
+    // nonempty non-struct payload or hit-attribute parameter gets a wrapper struct. Adapting
+    // senders cannot cover a receiver compiled without them. Consider this all-empty example:
     //
     //     struct Empty {};
     //     void helper(inout Empty p) { /* ordinary shader work */ }
@@ -563,6 +763,9 @@ struct RayTracingPayloadLegalizationContext
     // The original Empty type and helper signature remain unchanged. Rewriting just p's type
     // would instead pass DummyRayPayload to helper(inout Empty), so the original body uses are
     // redirected to logical before changing the entry-point parameter and function type.
+    //
+    // wrapNonStructEntryPointParam shows the corresponding D3D change for inout float4 and for
+    // a hit attribute.
     //
     // On Khronos targets, the receiving interface is a global. This function leaves p and its
     // uses unchanged and adds the following IR, schematically:
@@ -600,23 +803,44 @@ struct RayTracingPayloadLegalizationContext
             return;
         }
 
+        const bool isD3D = isD3DTarget(targetProgram->getTargetReq());
         List<IRParam*> payloadParams;
         bool allEmpty = true;
         for (auto param : func->getParams())
         {
+            // D3D receives hit attributes only through an `in` parameter, which
+            // translateEntryPointInParamToBorrow has made `borrow in`. Each nonempty non-struct one
+            // is wrapped. Other spellings, such as `__ref`, and a signature with more than one
+            // hit-attribute parameter are invalid on D3D; we leave them for DXC to diagnose.
+            if (isD3D && isHitAttributesParam(param))
+            {
+                auto borrowType = as<IRBorrowInParamType>(param->getDataType());
+                if (borrowType && needsForcedStructWrapper(borrowType->getValueType()))
+                    wrapNonStructEntryPointParam(func, param, ForcedStructRole::HitAttributes);
+                continue;
+            }
+
             auto ptrType = as<IROutParamTypeBase>(param->getDataType());
             if (!ptrType)
                 continue;
             payloadParams.add(param);
-            allEmpty &= isEmptyType(ptrType->getValueType());
-            if (isRayPayload && isD3DTarget(targetProgram->getTargetReq()))
+            auto valueType = ptrType->getValueType();
+            allEmpty &= isEmptyType(valueType);
+            if (!isD3D)
+                continue;
+            if (auto type = as<IRStructType>(valueType))
             {
-                if (auto type = as<IRStructType>(ptrType->getValueType()))
+                if (isRayPayload)
                 {
                     IRBuilder builder(module);
                     addRayPayloadDecorationIfNeeded(builder, type);
                 }
             }
+            else if (needsForcedStructWrapper(valueType))
+                wrapNonStructEntryPointParam(
+                    func,
+                    param,
+                    isRayPayload ? ForcedStructRole::RayPayload : ForcedStructRole::CallableData);
         }
         if (payloadParams.getCount() == 0 || !allEmpty)
             return;
@@ -647,28 +871,11 @@ struct RayTracingPayloadLegalizationContext
             param->setFullType(builder.getPtrTypeWithAddressSpace(type, ptrType));
             fixUpFuncType(func);
 
-            // An entry point can also have ordinary call sites on D3D: fixEntryPointCallsites
-            // separates their callable bodies later in the pipeline. Supply the physical
-            // argument now to keep those calls well typed; the body still uses its logical local.
-            Index paramIndex = 0;
-            for (auto p : func->getParams())
-            {
-                if (p == param)
-                    break;
-                ++paramIndex;
-            }
-            traverseUses(
+            // Ordinary calls get fresh dummy storage; the body still uses its logical local.
+            replaceOrdinaryCallArguments(
                 func,
-                [&](IRUse* use)
-                {
-                    if (auto call = as<IRCall>(use->getUser()))
-                    {
-                        if (call->getCallee() == func)
-                            call->setArg(
-                                paramIndex,
-                                createDummyPayloadArgument(call, isRayPayload));
-                    }
-                });
+                func->getFirstBlock()->getParamIndex(param),
+                [&](IRCall* call) { return createDummyPayloadArgument(call, isRayPayload); });
         }
     }
 };
