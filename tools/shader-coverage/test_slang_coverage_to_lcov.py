@@ -79,7 +79,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stdout,
             "TN:shader_coverage\n"
             "SF:shader.slang\n"
-            "DA:12,12\n"
+            "DA:12,7\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -158,7 +158,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRDA:13,1,2,11\n"
             "BRF:1\n"
             "BRH:1\n"
-            "DA:12,12\n"
+            "DA:12,7\n"
             "end_of_record\n",
         )
         # Counterless source entries stay in the manifest/metadata, but
@@ -844,10 +844,10 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
     def test_entries_may_share_a_counter_slot(self):
         # Coalesced line coverage points several source entries at one
-        # counter. The converter must accumulate per *entry*, so a slot
-        # shared by two lines reports that slot's value on each line,
-        # and two entries on the same line still sum — this is what
-        # keeps LCOV output unchanged when coalescing is enabled.
+        # counter. The converter reads each entry through its own counter,
+        # so a slot shared by two lines reports that slot's value on each
+        # line, and two entries on the same line report their maximum: the
+        # visits to the line, not the sum of its statements.
         manifest = {
             "version": 2,
             "counter_count": 1,
@@ -865,9 +865,8 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertIn("DA:10,5\n", result.stdout)
         self.assertIn("DA:11,5\n", result.stdout)
-        # Two entries on line 12 sum, exactly as they would with two
-        # dedicated slots holding 5 each.
-        self.assertIn("DA:12,10\n", result.stdout)
+        # Two entries on line 12 describe one execution of the line.
+        self.assertIn("DA:12,5\n", result.stdout)
         self.assertEqual(result.stderr, "")
 
     def test_binary_counters_unsupported_stride_errors(self):

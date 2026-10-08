@@ -192,16 +192,16 @@ counters are inserted, with examples, see
      uniforms (CPU, CUDA). Graphics targets don't pack and the
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
-   - **Assigns canonical line counters** per function/file/line. Multiple
-     markers on one line are counted through a single block of the line's
-     CFG region: its loop header if it has one, else the block dominating
-     the rest of the line.
-     Lines confined to one block retain coalescing when they execute together.
-     Function and branch markers retain dedicated counters.
-   - **Rewrites markers** as atomic counter updates in count mode, or
-     stores of `1` in boolean mode. Metadata
-     records each canonical line once; consumers read each entry through
-     its `counterIndex`.
+   - **Assigns a counter slot to each coverage marker op** (per-inst
+     UID, consecutive index in traversal order). Multiple line markers
+     on the same source line get distinct slots, or share one when they
+     provably execute together, and the LCOV exporter aggregates them by
+     taking the maximum per line. Function and branch markers produce their
+     own `CoverageEntryInfo::kind` values and use the same counter buffer.
+   - **Rewrites each op** as `AtomicAdd(__slang_coverage[slot], 1,
+Relaxed)` in the default counting mode, or as a plain non-atomic
+     store of `1` under `-trace-coverage-boolean` (hit/not-hit; see
+     `CoverageCounterMode` in the roadmap section).
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its

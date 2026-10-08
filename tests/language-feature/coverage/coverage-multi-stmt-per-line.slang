@@ -1,9 +1,17 @@
 // Locks in how multiple statements on one source line are handled.
 //
-// Repeated statements on one source line describe one line execution.
-// They produce one canonical line entry, while different lines that
-// execute together may share its runtime slot. Consumers must use each
-// entry's counterIndex and deduplicate aliases per source line.
+// Each `IncrementCoverageCounter` op keeps its own source coverage
+// entry, with its own column, so the metadata never deduplicates by
+// (file, line) — the three statements on line 24 below produce three
+// entries. That entry-level distinctness is asserted by the
+// `coverageTracingMetadata` unit test, which reads the metadata API.
+//
+// What they do *not* each get is a counter. All four statements here
+// sit in one basic block, so they provably execute the same number of
+// times and are coalesced onto a single counter and a single probe.
+// This is what keeps instrumented shader code small; per-line reporting
+// is unaffected, because hosts take the maximum over a line's entries and
+// every entry still reads this one slot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage
 

@@ -312,7 +312,10 @@ def main():
     # A function entry is not a line entry, but genhtml needs a line record at
     # every FN line, so a function-only manifest proves its declaration line.
     for source, functions in functions_by_source.items():
+        function_lines = collections.defaultdict(int)
         for line, count in functions.values():
+            function_lines[line] += count
+        for line, count in function_lines.items():
             hits_by_line[source].setdefault(line, count)
 
     # A decision is evaluated if any outcome executed; BRDA reports "-" for the

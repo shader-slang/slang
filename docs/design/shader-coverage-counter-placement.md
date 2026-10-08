@@ -40,10 +40,12 @@ such as blocks, statement sequences, and empty statements, are skipped.
 It also marks the evaluated scalar conditions of `if`, loops, `?:`,
 `&&`, and `||`, and the selected arms of `?:`.
 
-This is statement coverage, not basic-block coverage, and it reports
-visits to a source line rather than the number of statements on that
-line. Each function/file/line has one canonical metadata entry; see
-[Lines that span several blocks](#lines-that-span-several-blocks).
+This is statement coverage, not basic-block coverage. Multiple
+statements on the same source line can get multiple counters, and the
+LCOV conversion step aggregates those counters back to the source line
+by taking their maximum, so a line reports its visits rather than the
+number of statements on it; see
+[Lines with several markers](#lines-with-several-markers).
 
 Conceptually, this source:
 
@@ -105,18 +107,21 @@ same number of times. A basic block has one entry and one exit, so
 reaching any instruction in it means reaching all of them.
 
 The `someFunction` example above therefore emits three counters for its
-markers: one for the entry block (`uint i = 0`), one for the loop header
-(the `while` line, counted through its condition), and one for the loop
-body, where the four body statements are one straight-line region:
+markers: one for the entry block (`uint i = 0` and the `while` statement),
+one for the loop header (the evaluated loop condition), and one for the
+loop body, where the four body statements are one straight-line region:
 
 ```slang
 void someFunction(uint N)
 {
+    // `uint i = 0` and the `while` statement are in the same block: one
+    // probe covers both, and it sits at the last of the two.
     uint i = 0;
-    coverageAtomic("region: i = 0");
-    while (i < N)           // loop header: condition evaluated N + 1 times
+    coverageAtomic("region: i = 0, while");
+    // The loop header block holds the evaluated condition: N + 1 times.
+    while (i < N)
     {
-        coverageAtomic("region: while");
+        coverageAtomic("region: while condition");
         // The four body statements are one straight-line region.
         buf[0] = buf[1] + buf[2];
         buf[3] = buf[4] + buf[5];
@@ -158,10 +163,11 @@ Function and branch markers always take a dedicated counter. They are
 already one probe per function or per arm, and their counts carry
 per-site meaning that sharing would destroy.
 
-Reported results are unaffected. Every source line keeps its own entry
-with its own file/line attribution, so lines that share a slot each
-report that slot's value. `counterCount` is therefore markedly below
-the entry count — roughly half on the bundled demos.
+Reported results are unaffected. Every source entry survives with its
+own file/line attribution, and hosts read each entry through its own
+counter, so several entries reading one slot produce exactly the LCOV
+records that dedicated slots did. `counterCount` is therefore markedly
+below the entry count — roughly half on the bundled demos.
 
 Known gap: any core-module intrinsic that abandons the invocation lowers
 to a `GenericAsm` terminator like every other intrinsic, and the exit
@@ -173,46 +179,34 @@ the invocation at the target level, but Slang's IR models them as
 ordinary `void` functions that return normally, so the analysis cannot
 currently see them.
 
-### Lines that span several blocks
+### Lines with several markers
 
-A source line can span several blocks, and it must still report one
-visit per execution, not one count per statement or block. For example,
-four calls to either function below report four executions of its body
-line:
+A source line can carry several markers in different blocks, and it must
+still report one count per visit, not one count per statement. For
+example, four calls to either function below report four executions of
+its body line:
 
 ```slang
 int sequential(int x) { int y = x; y += 2; return y; }
 int conditional(int x) { if (x > 0) return 1; else return 2; }
 ```
 
-The coverage pass groups markers by function, source file, and line.
-Blocks containing that line form a region; compiler-generated blocks
-without line markers are transparent. A region is counted through one
-block, and the other blocks of the region record nothing:
+Each marker keeps its own entry, and the LCOV exporter takes the maximum
+over the entries of a line. A visit to a line passes its first marker,
+and a loop test on the line runs once per iteration, so the largest
+count is the number of times the line was visited:
 
-- If the region contains a loop header, that header is the counted
-  block. It runs once per iteration and once more on exit, so a `for`
-  header reports its condition evaluations even though its initializer,
-  test, and increment lie in different blocks.
-- Otherwise the counted block is the one that dominates the rest of the
-  region. In `conditional` above only the condition's probe is needed,
-  not either return's.
+- In `conditional`, the condition runs on every call and a return runs
+  on only some, so the line reports the condition's count.
+- A `for` header has an initializer, a test, and an increment in
+  different blocks, and reports the test's count: its condition
+  evaluations, `N + 1` per loop of `N` iterations.
+- A loop written on one source line reports its test the same way.
 
-Both rules need one dominator tree per function and no runtime state, in
-count and boolean mode alike.
-
-Control flow written entirely on one source line is the exception. A
-loop confined to one line counts executions of its counted block, which
-is its header only when the loop has a test, so `for (;;) { ... }` on a
-single line counts entries. Hit/miss is exact for ordinary code, but a
-line that nests a loop inside a conditional can report no hit when the
-condition is false although the line was visited.
-
-Each function/file/line has one canonical metadata entry. Distinct source
-functions on the same line contribute separate counts. Lines confined to a
-single block can still share a runtime slot when the existing fallthrough
-analysis proves they execute together. Calls that may abandon the invocation
-split these coalescing groups.
+Lowering also records a marker at each evaluated condition and at the
+selected value of a conditional expression, so these are visits of their
+own lines, and so a branch entry never lands on a line that has no line
+entry.
 
 ## gcov and LCOV compatibility
 
@@ -247,8 +241,6 @@ The normal `coverageCpuRuntimeLineRegions` and
 `coverageCpuRuntimeExpressionBranches` unit tests also exercise these semantics
 without requiring GCC, gcov, or genhtml. They cover both counter widths and modes,
 one-line loops, nested loops, early exits, skipped operands, and nested expressions.
-`coverage-line-region-probes.slang` checks that a multi-block line issues one
-probe and compiles the region control flow to SPIR-V.
 
 ## Function Coverage: `-trace-function-coverage`
 
