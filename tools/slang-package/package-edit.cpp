@@ -397,27 +397,23 @@ SlangResult beginPackageEdit(
     }
     if (!exists)
         SLANG_RETURN_ON_FAIL(createLocalBranch(checkout, branch, package.commit, outError));
-    String restoreCommit = package.commit;
+    String representedCommit = package.commit;
     if (SLANG_FAILED(checkoutLocalBranch(checkout, branch, outError)))
     {
         String restoreError;
-        checkoutDetachedCommit(checkout, restoreCommit, restoreError);
+        checkoutDetachedCommit(checkout, representedCommit, restoreError);
         return SLANG_FAIL;
     }
 
     bool pinned = package.pinned;
     String version = package.version;
     package.branch = branch;
-    package.restoreVersion = version;
-    package.restoreCommit = restoreCommit;
-    package.ref = String();
-    package.commit = String();
     package.pinned = pinned;
     LockFile resolved;
     if (SLANG_FAILED(_resolveFrozen(projectRoot, manifest, lock, name, pinned, resolved, outError)))
     {
         String restoreError;
-        checkoutDetachedCommit(checkout, restoreCommit, restoreError);
+        checkoutDetachedCommit(checkout, representedCommit, restoreError);
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(_writeLock(projectRoot, resolved, outError));
@@ -451,7 +447,7 @@ static SlangResult _loadEditLine(
     return collectCanonicalTagsOnEditLine(
         checkout,
         outHead,
-        package.restoreCommit,
+        package.commit,
         outTags,
         outReachedPin,
         outError);
@@ -544,8 +540,8 @@ SlangResult advancePackageEdit(const String& projectRoot, const String& name, St
     SLANG_RETURN_ON_FAIL(_loadEditLine(checkout, package, head, tags, reachedPin, outError));
     if (!reachedPin)
     {
-        outError = String("The edit line of '") + name + "' does not reach restore commit " +
-                   package.restoreCommit + ". The row was not changed.";
+        outError = String("The edit line of '") + name + "' does not reach commit " +
+                   package.commit + ". The row was not changed.";
         return SLANG_FAIL;
     }
     PackageVersion frozen;
@@ -575,6 +571,8 @@ SlangResult advancePackageEdit(const String& projectRoot, const String& name, St
     }
     bool pinned = package.pinned;
     package.version = formatExactVersion(tag.version);
+    package.ref = tag.tag;
+    package.commit = tag.commit;
     LockFile resolved;
     SLANG_RETURN_ON_FAIL(
         _resolveFrozen(projectRoot, manifest, lock, name, pinned, resolved, outError));
@@ -639,8 +637,6 @@ static SlangResult _landRelease(
     package.ref = tag;
     package.commit = commit;
     package.branch = String();
-    package.restoreVersion = String();
-    package.restoreCommit = String();
     package.pinned = true;
     LockFile resolved;
     if (SLANG_FAILED(
@@ -694,10 +690,8 @@ SlangResult endPackageEdit(
     bool reachedPin = false;
     SLANG_RETURN_ON_FAIL(_loadEditLine(checkout, package, head, tags, reachedPin, outError));
 
-    PackageVersion restoreVersion;
-    SLANG_RETURN_ON_FAIL(parseExactVersion(package.restoreVersion, restoreVersion, outError));
-    PackageVersion frozen;
-    SLANG_RETURN_ON_FAIL(parseExactVersion(package.version, frozen, outError));
+    PackageVersion represented;
+    SLANG_RETURN_ON_FAIL(parseExactVersion(package.version, represented, outError));
     bool found = false;
     EditLineTag newer;
     String rejected;
@@ -708,7 +702,7 @@ SlangResult endPackageEdit(
             manifest,
             lock,
             name,
-            restoreVersion,
+            represented,
             tags,
             found,
             newer,
@@ -732,7 +726,7 @@ SlangResult endPackageEdit(
             outError = String("Release ") + formatExactVersion(requested) + " already has a tag.";
             return SLANG_FAIL;
         }
-        if (!(requested > frozen))
+        if (!(requested > represented))
         {
             outError = String("Tag version must be greater than the edited version ") +
                        package.version + ".";
@@ -772,13 +766,13 @@ SlangResult endPackageEdit(
         StringBuilder prompt;
         if (preface.getLength())
             prompt << preface << " ";
-        prompt << "Return '" << name << "' to " << package.restoreVersion << " at "
-               << package.restoreCommit << "?";
+        prompt << "Return '" << name << "' to " << package.version << " at " << package.commit
+               << "?";
         bool approved = false;
         SLANG_RETURN_ON_FAIL(_confirm(prompt.getBuffer(), approved, outError));
         if (!approved)
             return SLANG_OK;
-        bool moves = head != package.restoreCommit;
+        bool moves = head != package.commit;
         if (moves)
         {
             bool dirty = false;
@@ -791,17 +785,16 @@ SlangResult endPackageEdit(
             }
             if (dirty)
                 SLANG_RETURN_ON_FAIL(discardUncommittedState(checkout, outError));
-            SLANG_RETURN_ON_FAIL(checkoutDetachedCommit(checkout, package.restoreCommit, outError));
+            SLANG_RETURN_ON_FAIL(checkoutDetachedCommit(checkout, package.commit, outError));
         }
-        String tagName = String("v") + formatExactVersion(restoreVersion);
         return _landRelease(
             projectRoot,
             manifest,
             lock,
             index,
-            formatExactVersion(restoreVersion),
-            tagName,
-            package.restoreCommit,
+            package.version,
+            package.ref,
+            package.commit,
             package.pinned,
             package.branch,
             moves,
@@ -822,25 +815,24 @@ SlangResult endPackageEdit(
 
     if (mode == UneditMode::Advance && (!reachedPin || !found))
     {
-        outError =
-            !reachedPin
-                ? String("The edit line of '") + name + "' does not reach restore commit " +
-                      package.restoreCommit + "."
-                : (rejected.getLength() ? rejected
-                                        : String("No canonical tag on branch '") + package.branch +
-                                              "' is newer than " + package.restoreVersion +
-                                              " and satisfies the constraints.");
+        outError = !reachedPin ? String("The edit line of '") + name + "' does not reach commit " +
+                                     package.commit + "."
+                               : (rejected.getLength()
+                                      ? rejected
+                                      : String("No canonical tag on branch '") + package.branch +
+                                            "' is newer than " + package.version +
+                                            " and satisfies the constraints.");
         return SLANG_FAIL;
     }
 
     if (!reachedPin || !found)
     {
-        String preface = !reachedPin ? String("The edit line does not reach restore commit ") +
-                                           package.restoreCommit + "."
-                                     : (rejected.getLength()
-                                            ? rejected
-                                            : String("No newer canonical tag on branch '") +
-                                                  package.branch + "' satisfies the constraints.");
+        String preface =
+            !reachedPin
+                ? String("The edit line does not reach commit ") + package.commit + "."
+                : (rejected.getLength() ? rejected
+                                        : String("No newer canonical tag on branch '") +
+                                              package.branch + "' satisfies the constraints.");
         return restore(preface);
     }
 

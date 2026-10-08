@@ -1067,8 +1067,7 @@ static SlangResult _readLockedPackage(
     {
         String key = container->getStringFromKey(field.key);
         if (key != "git" && key != "path" && key != "ref" && key != "version" && key != "commit" &&
-            key != "pinned" && key != "branch" && key != "restore_version" &&
-            key != "restore_commit")
+            key != "pinned" && key != "branch")
         {
             outError = String("Unknown field in locked package '") + outPackage.name + "': " + key;
             return SLANG_FAIL;
@@ -1087,18 +1086,6 @@ static SlangResult _readLockedPackage(
         _readOptionalBool(container, pair.value, "pinned", false, outPackage.pinned, outError));
     SLANG_RETURN_ON_FAIL(
         _readOptionalString(container, pair.value, "branch", outPackage.branch, outError));
-    SLANG_RETURN_ON_FAIL(_readOptionalString(
-        container,
-        pair.value,
-        "restore_version",
-        outPackage.restoreVersion,
-        outError));
-    SLANG_RETURN_ON_FAIL(_readOptionalString(
-        container,
-        pair.value,
-        "restore_commit",
-        outPackage.restoreCommit,
-        outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(container, pair.value, "version", outPackage.version, outError));
     PackageVersion ignoredVersion;
@@ -1129,31 +1116,22 @@ static SlangResult _readLockedPackage(
             outError = String("Locked package has an unsafe branch name: ") + outPackage.name;
             return SLANG_FAIL;
         }
-        if (_find(container, pair.value, "ref").isValid() ||
-            _find(container, pair.value, "commit").isValid())
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, pair.value, "ref", outPackage.ref, outError));
+        if (!_isSafeGitRef(outPackage.ref))
         {
-            outError =
-                String("Edited package cannot also contain ref or commit: ") + outPackage.name;
+            outError = String("Locked package has an unsafe Git ref: ") + outPackage.name;
             return SLANG_FAIL;
         }
-        PackageVersion restoreVersion;
-        if (SLANG_FAILED(parseExactVersion(outPackage.restoreVersion, restoreVersion, outError)))
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, pair.value, "commit", outPackage.commit, outError));
+        if (!_isCommitHash(outPackage.commit))
         {
-            outError = String("Edited package requires restore_version: ") + outPackage.name;
-            return SLANG_FAIL;
-        }
-        if (!_isCommitHash(outPackage.restoreCommit))
-        {
-            outError = String("Edited package requires restore_commit: ") + outPackage.name;
+            outError = String("Edited package requires the commit of the release it represents: ") +
+                       outPackage.name;
             return SLANG_FAIL;
         }
         return SLANG_OK;
-    }
-    if (outPackage.restoreVersion.getLength() || outPackage.restoreCommit.getLength())
-    {
-        outError = String("Release package cannot contain a restore pin without a branch: ") +
-                   outPackage.name;
-        return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(container, pair.value, "ref", outPackage.ref, outError));
@@ -1239,6 +1217,10 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         {
             _writeKey(writer, "branch");
             writer.addStringValue(package.branch.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "ref");
+            writer.addStringValue(package.ref.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "commit");
+            writer.addStringValue(package.commit.getUnownedSlice(), SourceLoc());
         }
         else if (package.path.getLength())
         {
@@ -1258,13 +1240,6 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         {
             _writeKey(writer, "pinned");
             writer.addBoolValue(true, SourceLoc());
-        }
-        if (package.branch.getLength())
-        {
-            _writeKey(writer, "restore_version");
-            writer.addStringValue(package.restoreVersion.getUnownedSlice(), SourceLoc());
-            _writeKey(writer, "restore_commit");
-            writer.addStringValue(package.restoreCommit.getUnownedSlice(), SourceLoc());
         }
         writer.endObject(SourceLoc());
     }

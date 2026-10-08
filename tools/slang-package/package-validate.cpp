@@ -622,6 +622,28 @@ static SlangResult _loadResolvedPackage(
         return validateLockedPackageManifest(package, out.manifest, outError);
     }
 
+    // An edit's manifest is the working tree. `commit` is the release that tree is representing,
+    // and `fetch` does not check it out, so reading that commit here would hide the files the
+    // developer is editing.
+    if (isEditedLockedPackage(package))
+    {
+        String checkout = Path::combine(projectRoot, depsDirectory, package.name);
+        if (SLANG_FAILED(
+                readManifest(Path::combine(checkout, kPackageFileName), out.manifest, outError)))
+        {
+            outError =
+                String("Cannot read edited package manifest '") + package.name + "': " + outError;
+            return SLANG_FAIL;
+        }
+        out.packageRoot = checkout;
+        out.gitRepositoryPath = checkout;
+        String headCommit;
+        if (SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, headCommit, outError)))
+            out.gitRevision = headCommit;
+        outError = String();
+        return validateLockedPackageManifest(package, out.manifest, outError);
+    }
+
     if (incoming.path.getLength() && parent.gitRevision.getLength())
     {
         String gitRelativeRoot =
@@ -785,7 +807,8 @@ static SlangResult _validateUpstreamResolvedProject(
 {
     for (const auto& package : lock.packages)
     {
-        if (!isGitBackedLockedPackage(package) || !package.commit.getLength())
+        if (!isGitBackedLockedPackage(package) || !package.commit.getLength() ||
+            isEditedLockedPackage(package))
             continue;
 
         String cachePath =

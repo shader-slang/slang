@@ -700,9 +700,9 @@ SLANG_UNIT_TEST(PackageLockRoundTripsEditAndPin)
     edited.git = "https://example.com/noise.git";
     edited.version = "1.2";
     edited.branch = "edit-noise";
+    edited.ref = "v1.2";
+    edited.commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     edited.pinned = true;
-    edited.restoreVersion = "1.2";
-    edited.restoreCommit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     lock.packages.add(edited);
     LockedPackage pinned;
     pinned.name = "helper";
@@ -731,10 +731,8 @@ SLANG_UNIT_TEST(PackageLockRoundTripsEditAndPin)
     SLANG_CHECK(noise->branch == "edit-noise");
     SLANG_CHECK(noise->pinned);
     SLANG_CHECK(noise->version == "1.2");
-    SLANG_CHECK(noise->restoreVersion == "1.2");
-    SLANG_CHECK(noise->restoreCommit == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    SLANG_CHECK(noise->commit.getLength() == 0);
-    SLANG_CHECK(noise->ref.getLength() == 0);
+    SLANG_CHECK(noise->ref == "v1.2");
+    SLANG_CHECK(noise->commit == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     SLANG_CHECK(helper->pinned);
     SLANG_CHECK(helper->ref == "v1.0");
     SLANG_CHECK(helper->commit == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");

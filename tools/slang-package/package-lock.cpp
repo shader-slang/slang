@@ -186,8 +186,7 @@ bool lockedPackagesEqual(const LockedPackage& left, const LockedPackage& right)
 {
     return left.name == right.name && left.git == right.git && left.ref == right.ref &&
            left.version == right.version && left.commit == right.commit &&
-           left.path == right.path && left.pinned == right.pinned && left.branch == right.branch &&
-           left.restoreVersion == right.restoreVersion && left.restoreCommit == right.restoreCommit;
+           left.path == right.path && left.pinned == right.pinned && left.branch == right.branch;
 }
 
 bool lockFilesEqual(const LockFile& left, const LockFile& right)

@@ -244,19 +244,19 @@ slang package edit advance <name>
 `--create`, a missing branch is created from the commit the dependency is resolved to. `--create`
 does not reset a branch that already exists.
 
-The lock row keeps the version it already had and replaces the commit with the branch. The pin
-boolean is unchanged. Editing a pinned dependency starts the branch at the pinned commit. Editing
-a dependency that is not pinned does not set the boolean. The row also keeps `restore_version` and
-`restore_commit`, the release that was current when the edit started. `edit advance` does not move
-that restore pin. `fetch` does not check it out. `unedit` is the only command that reads it.
+The lock row keeps the version, tag, and commit it already had, and records the branch beside
+them. The pin boolean is unchanged. Editing a pinned dependency starts the branch at the pinned
+commit. Editing a dependency that is not pinned does not set the boolean. `fetch` does not check
+out the represented commit.
 
 `edit advance` looks for canonical release tags on one line of history: from the branch tip back
-to the restore commit. At a merge, a parent that does not contain that commit is skipped. When
-more than one parent contains it, the walk takes the first parent. The greatest canonical tag on
-that walk that is newer than the stored version and that still satisfies incoming constraints is
-written into the version field. The branch stays, and the checkout does not move. When no such tag
-exists, or the walk never visits the restore commit, the command says so and leaves the row
-unchanged. `update` does not run this, and it does not change an edited checkout.
+to the commit of the release the row is representing. At a merge, a parent that does not contain
+that commit is skipped. When more than one parent contains it, the walk takes the first parent.
+The greatest canonical tag on that walk that is newer than the stored version and that still
+satisfies incoming constraints replaces the version, the tag, and the commit. The branch stays,
+and the checkout does not move. When no such tag exists, or the walk never visits that commit, the
+command says so and leaves the row unchanged. `update` does not run this, and it does not change
+an edited checkout.
 
 ## `unedit`
 
@@ -274,9 +274,9 @@ the edit. `--advance`, `--restore`, and `--tag` select one ending and cannot be 
 them changes the pin boolean.
 
 The command looks for a canonical release tag on the same line of history `edit advance` uses.
-The candidate is the greatest such tag that is strictly newer than the restore release and that
-still satisfies the dependency constraints. A tag that arrived only through a merge of some other
-line is not a candidate.
+The candidate is the greatest such tag that is strictly newer than the represented release and
+that still satisfies the dependency constraints. A tag that arrived only through a merge of some
+other line is not a candidate.
 
 When that newer tag is the commit that is checked out, the lock switches to that version and
 commit. The checkout does not move, and there is no prompt.
@@ -286,16 +286,17 @@ leave the workspace and asks whether to check out the tag. Approving writes that
 tag's commit. Declining does not fall through to the older release.
 
 When a newer tag exists and none of them satisfy the constraints, the command says which tag was
-rejected and why, then offers only the restore release.
+rejected and why, then offers only the release the edit is already representing.
 
-When no newer satisfying tag exists, the only ending is the restore pin. That requires approval
+When no newer satisfying tag exists, the only ending is that same release. That requires approval
 even when the checkout is already on that commit.
 
 `--advance` selects the newer tag and fails when no newer tag on that line satisfies the
 constraints. It asks only when the checkout would move.
 
-`--restore` checks out the version and commit saved when the edit started. A newer legal tag is
-named and then left unused. This always asks.
+`--restore` checks out the version and commit the edit is representing. After `edit advance`,
+that is the commit just advanced to. A newer legal tag is named and then left unused. This always
+asks.
 
 `--tag <version>` creates a local annotated tag on the checked-out commit, then selects it the
 way `--advance` does without moving `HEAD`. `<version>` is an exact dotted version. The tag name
@@ -674,8 +675,9 @@ retractions, workspace policy, toolchain requirements, and build settings.
 
 `slang-package-lock.json`
 : Committed exact selected graph. A release row records `git`, `ref`, `commit`, and `version`.
-An edit row records `git`, `branch`, `version`, `restore_version`, and `restore_commit`, and is
-not something to commit. `pinned` is recorded only when the boolean is set. A `path` field is
+An edit row records `git`, `branch`, `ref`, `version`, and `commit`. The tag and commit are the
+release the branch is representing, and that row is not something to commit. `pinned` is recorded
+only when the boolean is set. A `path` field is
 rejected.
 
 `slang-package-overlay.json`

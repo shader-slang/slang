@@ -1947,6 +1947,46 @@ SlangResult getWorkspaceStatusReport(const String& projectRoot, String& outRepor
             continue;
         }
 
+        // An edit is supposed to move ahead of the release it represents. That commit is what
+        // `unedit --restore` returns to, not the commit status should demand HEAD sit on.
+        if (isEditedLockedPackage(package))
+        {
+            String branch;
+            bool detached = false;
+            issue = String();
+            if (SLANG_FAILED(getCheckedOutBranch(packageRoot, branch, detached, issue)))
+            {
+                addFact(package.name + ": " + issue.trim());
+                continue;
+            }
+            if (detached || branch != package.branch)
+            {
+                String actual =
+                    detached ? String("a detached HEAD") : String("branch '") + branch + "'";
+                addFact(
+                    package.name + ": checked out on " + actual + ", lock records branch '" +
+                    package.branch + "'");
+                continue;
+            }
+            String headCommit;
+            issue = String();
+            if (SLANG_FAILED(getRepositoryHeadCommit(packageRoot, headCommit, issue)))
+            {
+                addFact(package.name + ": " + issue.trim());
+                continue;
+            }
+            GitWorkingTreeStatus gitStatus;
+            issue = String();
+            if (SLANG_FAILED(getWorkingTreeStatus(packageRoot, headCommit, gitStatus, issue)))
+            {
+                addFact(package.name + ": " + issue.trim());
+                continue;
+            }
+            if (gitStatus.changedFileCount || gitStatus.stashCount)
+                addFact(package.name + ": " + _describeDirtyCheckout(gitStatus, headCommit));
+            continue;
+        }
+
         GitWorkingTreeStatus gitStatus;
         issue = String();
         if (SLANG_FAILED(getWorkingTreeStatus(packageRoot, package.commit, gitStatus, issue)))

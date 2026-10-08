@@ -1238,14 +1238,12 @@ private:
         selected.locked.dependencies = manifest.manifest.dependencies;
         if (held.branch.getLength())
         {
-            selected.locked.ref = String();
-            selected.locked.commit = String();
+            selected.locked.ref = held.ref;
+            selected.locked.commit = held.commit;
         }
         else
         {
             selected.locked.branch = String();
-            selected.locked.restoreVersion = String();
-            selected.locked.restoreCommit = String();
             selected.locked.ref = held.ref;
             selected.locked.commit = held.commit;
             selected.locked.pinned = true;

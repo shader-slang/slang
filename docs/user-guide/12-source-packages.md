@@ -172,8 +172,9 @@ are removed. A manifest may instead pin an opaque branch or
 tag with `ref` and omit `as` to derive the solver identity from the nearest release tag on that
 line, or write `as` to assign it explicitly. `schema_version` in `slang-package.json` is only the
 file format version. A release row records the Git URL, canonical tag, exact version, and commit.
-An edit row records the Git URL, branch, and the version the solver keeps matching, plus the
-restore version and commit from when the edit started. `pinned` is a boolean on the row and is
+An edit row records the Git URL, branch, and the version, canonical tag, and commit of the release
+that branch is representing. `edit advance` moves that version, tag, and commit together. `pinned`
+is a boolean on the row and is
 omitted when it is false.
 
 The optional top-level `retractions` array is publisher advice not to select releases matching a
@@ -248,8 +249,9 @@ Use an explicit `fetch` to materialize without distributing, to pass `--clean`, 
 first lock interactively.
 
 Every lock row records selection identity only. A release row stores `git`, `ref`, `version`, and
-`commit`. An edit row stores `git`, `branch`, and `version`, and also `restore_version` and
-`restore_commit` for the release that was current when the edit started. `pinned` is written only
+`commit`. An edit row stores `git`, `branch`, `ref`, `version`, and `commit`. The tag and commit
+are the release the branch is representing, and `fetch` does not check that commit out. `pinned`
+is written only
 when the boolean is set. Declared `exports` and `dependencies` are not copied into the lock.
 Commands reload them from an edited checkout's working tree, or from the manifest at the locked
 commit. `status` uses that live graph to check whether the current lock still satisfies every
@@ -406,10 +408,11 @@ under `deps/`. Fetched source remains visible there; generated files go under `o
 
 `slang package edit NAME --branch BRANCH` checks out `BRANCH` in the already-resolved
 `deps/NAME` checkout. `--create` creates a missing branch from the commit the dependency is
-resolved to and does not reset a branch that already exists. The lock keeps the version it already
-had and replaces the commit with the branch. The pin boolean is unchanged. `edit advance NAME`
-moves that stored version to the greatest newer canonical tag on the line of history from the
-branch tip back to the commit saved when the edit started. The checkout does not move.
+resolved to and does not reset a branch that already exists. The lock keeps the version, tag, and
+commit it already had, and records the branch beside them. The pin boolean is unchanged.
+`edit advance NAME` moves that version, tag, and commit to the greatest newer canonical tag on the
+line of history from the branch tip back to the commit the row is representing. The checkout does
+not move.
 
 `slang package unedit NAME` ends the edit on a release tag. `--advance`, `--restore`, and
 `--tag VERSION` select one ending and cannot be combined. There is no `--yes`. Declining a prompt
@@ -417,12 +420,13 @@ leaves the edit. A run without a terminal that needs approval fails and leaves t
 the endings changes the pin boolean.
 
 Plain `unedit` selects the greatest canonical tag on that same line that is strictly newer than
-the restore release and that still satisfies incoming constraints. When that tag is the checked-out
-commit, the lock switches to it without a prompt and without moving `HEAD`. When the tag is behind
-`HEAD`, the command says how many commits would leave the workspace and asks whether to check out
-the tag. Declining does not fall through to the older release. When no newer tag satisfies the
-constraints, the only ending offered is the restore release, and that still asks. `--advance`
-requires a newer legal tag. `--restore` returns to the freeze-time release and always asks.
+the represented release and that still satisfies incoming constraints. When that tag is the
+checked-out commit, the lock switches to it without a prompt and without moving `HEAD`. When the
+tag is behind `HEAD`, the command says how many commits would leave the workspace and asks whether
+to check out the tag. Declining does not fall through to the represented release. When no newer
+tag satisfies the constraints, the only ending offered is the release the edit is already
+representing, and that still asks. `--advance` requires a newer legal tag. `--restore` returns to
+that same represented release, including after `edit advance`, and always asks.
 `--tag VERSION` creates a local annotated tag, `v` plus the canonical spelling, on `HEAD` and then
 selects it. The tag is not pushed. The command fails before creating the tag when the release
 already has a tag, the version is not strictly greater than the stored version and every canonical

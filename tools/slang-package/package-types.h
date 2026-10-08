@@ -148,10 +148,10 @@ inline String getWorkspaceOutputDirectory(const Manifest& manifest)
 ///
 /// - Git pin: `git`, `ref`, `version`, and `commit` are set; `path` is empty. Fetch materializes
 ///   `workspace.dependencies/<name>` at that commit. `ref` is the canonical tag for `version`.
-/// - Edit: `branch` is set and `commit` is empty. The checkout is expected to be on that branch.
-///   `version` is the release the solver keeps matching. `restoreVersion` and `restoreCommit` are
-///   the release that was current when the edit started. `unedit` is the only command that reads
-///   them.
+/// - Edit: `branch`, `ref`, `version`, and `commit` are set. The checkout is expected to be on
+///   `branch`. `version`, `ref`, and `commit` are the release the solver is matching. `edit
+///   advance` moves all three together. `unedit --restore` returns to that same commit. `fetch`
+///   does not check it out.
 ///
 /// `pinned` is a lock boolean. While it is set, `update` does not move a release row's version.
 /// `edit` and `unedit` leave the boolean as they found it. A `path` field is rejected when a lock
@@ -170,13 +170,10 @@ struct LockedPackage
     /// When true, `update` keeps this row's version. The flag lives in the lock, not the
     /// manifest, and `edit` / `unedit` leave it as they found it.
     bool pinned = false;
-    /// Branch the checkout is expected to be on. Empty for a release row, which stores `commit`
-    /// instead.
+    /// Branch the checkout is expected to be on. Empty for a release row. An edit row still stores
+    /// `ref` and `commit`: those name the release the row is representing, not the commit `fetch`
+    /// should check out.
     String branch;
-    /// Release that was current when an edit started. `unedit --restore` returns here. Empty on a
-    /// release row. `edit advance` does not move this commit.
-    String restoreVersion;
-    String restoreCommit;
     /// Filled during resolve only; not read from or written to the lock file.
     List<Dependency> dependencies;
 };
@@ -186,8 +183,8 @@ inline bool isGitBackedLockedPackage(const LockedPackage& package)
     return package.git.getLength() != 0;
 }
 
-/// An edit row names a branch and keeps the pre-edit release beside it. A release row stores a
-/// commit and leaves `branch` empty.
+/// An edit row names a branch and the release that branch is representing. A release row leaves
+/// `branch` empty.
 inline bool isEditedLockedPackage(const LockedPackage& package)
 {
     return package.branch.getLength() != 0;
