@@ -260,6 +260,7 @@ static bool isResourceArgumentForwardedFromCallerParameter(IRCall* call, IRInst*
 static bool isD3DCallEligibleForResourceInputInlining(
     CodeGenContext* codeGenContext,
     ResourceParameterSpecializationCondition& specializationCondition,
+    Dictionary<IRFunc*, bool>& isRecursiveByCallee,
     IRCall* call)
 {
     auto callee = as<IRFunc>(call->getCallee());
@@ -304,8 +305,17 @@ static bool isD3DCallEligibleForResourceInputInlining(
 
         // Inlining a recursive callee would copy another call from the same cycle. Ordinary
         // validation diagnoses that cycle before specialization; when validation is disabled,
-        // leaving the call unchanged still guarantees that this inlining step terminates.
-        return !isFunctionRecursive(callee);
+        // leaving the call unchanged still guarantees that this inlining step terminates. Several
+        // calls can have the same callee. `collectD3DCallsEligibleForResourceInputInlining` passes
+        // one cache through the complete module traversal, so we compute each callee's recursion
+        // status at most once.
+        bool isRecursive;
+        if (!isRecursiveByCallee.tryGetValue(callee, isRecursive))
+        {
+            isRecursive = isFunctionRecursive(callee);
+            isRecursiveByCallee.add(callee, isRecursive);
+        }
+        return !isRecursive;
     }
     return false;
 }
@@ -318,6 +328,7 @@ static bool isD3DCallEligibleForResourceInputInlining(
 static void collectD3DCallsEligibleForResourceInputInlining(
     CodeGenContext* codeGenContext,
     ResourceParameterSpecializationCondition& specializationCondition,
+    Dictionary<IRFunc*, bool>& isRecursiveByCallee,
     IRInst* inst,
     List<IRCall*>& outCalls)
 {
@@ -326,6 +337,7 @@ static void collectD3DCallsEligibleForResourceInputInlining(
         if (isD3DCallEligibleForResourceInputInlining(
                 codeGenContext,
                 specializationCondition,
+                isRecursiveByCallee,
                 call))
         {
             outCalls.add(call);
@@ -337,6 +349,7 @@ static void collectD3DCallsEligibleForResourceInputInlining(
         collectD3DCallsEligibleForResourceInputInlining(
             codeGenContext,
             specializationCondition,
+            isRecursiveByCallee,
             child,
             outCalls);
     }
@@ -358,11 +371,18 @@ static bool tryInlineD3DCallsWithUnsupportedResourceInputs(
     specializationCondition.targetRequest = codeGenContext->getTargetReq();
 
     List<IRCall*> callsToInline;
-    collectD3DCallsEligibleForResourceInputInlining(
-        codeGenContext,
-        specializationCondition,
-        module->getModuleInst(),
-        callsToInline);
+    {
+        // `isFunctionRecursive` searches the current direct-call graph. We pass one cache through
+        // the complete module traversal, which does not mutate that graph. The inner scope destroys
+        // the cache before the loop below invokes `inlineCall`, which can change the graph.
+        Dictionary<IRFunc*, bool> isRecursiveByCallee;
+        collectD3DCallsEligibleForResourceInputInlining(
+            codeGenContext,
+            specializationCondition,
+            isRecursiveByCallee,
+            module->getModuleInst(),
+            callsToInline);
+    }
 
     bool changed = false;
     for (auto call : callsToInline)

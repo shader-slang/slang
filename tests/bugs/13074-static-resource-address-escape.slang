@@ -33,6 +33,19 @@ uintptr_t getCachedTextureAddress()
 [numthreads(1, 1, 1)]
 void main()
 {
+    // Inline SPIR-V receives the address of `cachedTexture`. The `legalizeResourceGlobalVars` pass
+    // does not interpret the assembly deeply enough to prove that replacing `cachedTexture` with
+    // function-local addresses preserves the assembly's behavior. The pass therefore diagnoses
+    // this use instead of replacing `cachedTexture`.
+    spirv_asm
+/*CHECK:
+    ^^^^^^^^^ address use may observe the identity of mutable resource storage
+    ^^^^^^^^^ the program may retain the address of mutable resource variable 'cachedTexture' or observe its storage identity; replacing the variable with function-local storage might change that behavior
+*/
+    {
+        OpStore &cachedTexture $texture;
+    };
+
     Ptr<Texture2D<float4>> cached = getCachedTexture();
     retainCachedTexture(&cachedTexture, cached);
 //CHECK:               ^ address use may observe the identity of mutable resource storage

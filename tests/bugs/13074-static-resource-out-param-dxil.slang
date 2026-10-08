@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL): -O0 -target hlsl -entry main -profile ps_6_6 -validate-ir
-//TEST:SIMPLE(filecheck=DXIL): -O0 -target dxil -entry main -profile ps_6_6 -validate-ir
+//TEST(dxc):SIMPLE(filecheck=DXIL): -O0 -target dxil -entry main -profile ps_6_6 -validate-ir
 
 // A mutable `static` resource can be assigned from a non-uniform descriptor-heap index and then
 // read by a separate helper. Resource-global replacement gives `loadSelectedTexture` a resource

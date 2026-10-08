@@ -2677,14 +2677,25 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     _validateCircularVarDefinition(varDecl);
 }
 
-/// Return whether `type` is a resource value, or a fixed-size array of resource values, that
-/// per-invocation replacement can keep intact in each generated local or parameter.
+/// Return whether `type` meets the type requirements of the later post-link
+/// `legalizeResourceGlobalVars` pass.
 static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
 {
-    // A modifier does not change the resource category of the type that it wraps. We remove type
-    // modifiers as we walk through each array dimension. We reject an unbounded array at the point
-    // where we see it, so this predicate enforces its fixed-size-array contract independently of
-    // its callers.
+    // The post-link `legalizeResourceGlobalVars` pass replaces a mutable file- or namespace-scope
+    // resource variable with storage owned by each entry-point invocation. For each variable that
+    // it accepts, the pass creates a local in every function whose execution may read or write the
+    // value. It also adds a parameter to each such non-entry-point function, and it rewrites direct
+    // calls to pass the caller's replacement value or address. A function whose only use is a
+    // direct non-runtime reference, such as debug metadata, receives a local but no parameter. The
+    // pass then rewrites the function-body uses and removes the original `IRGlobalVar`.
+    //
+    // This predicate answers only whether `type` can pass through that transformation as one IR
+    // value on every target. Other checks decide whether the declaration's storage modifiers are
+    // eligible, and the pass diagnoses uses that it cannot rewrite. The design comment at the top
+    // of `slang-ir-legalize-resource-globals.cpp` explains the complete transformation.
+
+    // A type modifier does not change the representation that the replacement pass must carry.
+    // We therefore look through each modifier before classifying the underlying type.
     for (;;)
     {
         if (auto modifiedType = as<ModifiedType>(type))
@@ -2693,6 +2704,9 @@ static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
             continue;
         }
 
+        // A fixed-size array remains one IR value after linking and specialization resolve its
+        // element count, so we continue with its element type. An unsized array has no element
+        // count to resolve and cannot be allocated as a local.
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
             if (arrayType->isUnsized())
@@ -2704,36 +2718,44 @@ static bool _isResourceTypeSupportedForPerInvocationReplacement(Type* type)
         break;
     }
 
-    // The replacement pass creates one local for the whole value in each affected function. A
-    // non-entry-point function with runtime access also receives one generated parameter. The pass
-    // does not split an aggregate or coordinate separate replacements for its fields, so we reject
-    // structs and parameter groups. We also reject combined texture-samplers and append or consume
-    // buffers because some target pipelines split those types into several values. Textures,
-    // samplers, structured buffers, and byte-address buffers have one target-independent value and
-    // satisfy the replacement contract.
-    //
-    // An acceleration structure remains one value, but replacement would create a function-local
-    // acceleration-structure variable that Khronos and WGSL targets reject. `__DynamicResource`
-    // also remains one value, but its Khronos legalization requires each cast to identify one
-    // module-scope parameter or one indexed element. A mutable local could combine values from
-    // several such inputs and lose that identity. We reject both forms on every target until the
-    // replacement pass can preserve their target-specific requirements.
+    // `ResourceType` covers textures and typed buffers. A non-combined resource stays in one IR
+    // value. HLSL, Metal, WGSL, and CPU-like targets split a combined texture-sampler into separate
+    // texture and sampler values, so we reject combined resources for every target.
     if (auto resourceType = as<ResourceType>(type))
         return !resourceType->isCombined();
 
+    // A sampler also stays in one IR value.
     if (as<SamplerStateType>(type))
         return true;
+
+    // These structured-buffer types stay in one IR value. We list them instead of accepting their
+    // common base class because append and consume buffers also carry a counter.
     if (as<HLSLStructuredBufferType>(type))
         return true;
     if (as<HLSLRWStructuredBufferType>(type))
         return true;
     if (as<HLSLRasterizerOrderedStructuredBufferType>(type))
         return true;
+
+    // These byte-address buffer types also stay in one IR value.
     if (as<HLSLByteAddressBufferType>(type))
         return true;
     if (as<HLSLRWByteAddressBufferType>(type))
         return true;
-    return as<HLSLRasterizerOrderedByteAddressBufferType>(type) != nullptr;
+    if (as<HLSLRasterizerOrderedByteAddressBufferType>(type))
+        return true;
+
+    // Every remaining opaque type lacks an established representation for this transformation. An
+    // append or consume buffer carries a counter in addition to its buffer data, and a struct or
+    // parameter group may be legalized into several IR values. The pass cannot carry either shape
+    // with one local and, in a helper, at most one parameter.
+    //
+    // Acceleration structures remain single values, but GLSL, SPIR-V, and WGSL do not permit those
+    // values in function-local variables. On GLSL and SPIR-V, a `__DynamicResource` cast must
+    // retain the identity of the module-scope parameter, or indexed element, that supplied its
+    // value; assignment through a local could erase that identity. Because this front-end rule is
+    // target-independent, we reject these types on every target as well.
+    return false;
 }
 
 /// Return whether `decl` is a mutable `static` variable declared at file or namespace scope.

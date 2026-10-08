@@ -1289,23 +1289,49 @@ struct LegalizeResourceGlobalVarsPass
     /// preserve part of the entry value is derived separately from its whole-value-on-return proof.
     void determineEntryValueRequirements(ResourceGlobalToRewrite& global)
     {
+        // The fixed point in `determineWholeValueAssignmentsOnEveryReturn` has finalized every
+        // `assignsWholeValueOnEveryReturn` fact, so a function's whole-value continuation
+        // guarantees remain stable during this analysis. The direct-read scan and the caller-
+        // propagation loop can both query the same function, so we collect each set on its first
+        // query and reuse it for later queries. Phase 4 rebuilds and removes calls stored in these
+        // sets, so we keep the raw instruction pointers local to this phase-3 routine.
+        List<HashSet<IRInst*>> wholeValueContinuationGuaranteesByFunction;
+        wholeValueContinuationGuaranteesByFunction.setCount(functions.getCount());
+        auto wholeValueContinuationGuaranteesHaveBeenCollected =
+            List<bool>::makeRepeated(false, functions.getCount());
+        auto getWholeValueContinuationGuarantees =
+            [&](Index functionIndex) -> HashSet<IRInst*> const&
+        {
+            if (!wholeValueContinuationGuaranteesHaveBeenCollected[functionIndex])
+            {
+                collectWholeValueContinuationGuarantees(
+                    global,
+                    functionIndex,
+                    wholeValueContinuationGuaranteesByFunction[functionIndex]);
+                wholeValueContinuationGuaranteesHaveBeenCollected[functionIndex] = true;
+            }
+            return wholeValueContinuationGuaranteesByFunction[functionIndex];
+        };
+
         // We first find direct reads reachable without a prior whole-value continuation guarantee.
-        // We then propagate those read requirements from callees to callers. This is a least fixed
-        // point: each requirement can change only from false to true.
         for (auto const& terminalUse : global.terminalAddressUses)
         {
             if (!hasAccessDirection(terminalUse.access, ResourceAccess::Read))
                 continue;
+            auto const& wholeValueContinuationGuarantees =
+                getWholeValueContinuationGuarantees(terminalUse.functionIndex);
             if (canInstructionExecuteWhileEntryValueRemains(
-                    global,
                     terminalUse.functionIndex,
-                    terminalUse.use->getUser()))
+                    terminalUse.use->getUser(),
+                    wholeValueContinuationGuarantees))
             {
                 global.perFunctionInfo[terminalUse.functionIndex]
                     .mayReadValueBeforeWholeValueAssignment = true;
             }
         }
 
+        // We then propagate read requirements from callees to callers. This is a least fixed point:
+        // each requirement can change only from false to true.
         bool changed = false;
         do
         {
@@ -1318,10 +1344,12 @@ struct LegalizeResourceGlobalVarsPass
                 auto& caller = global.perFunctionInfo[edge.callerIndex];
                 if (caller.mayReadValueBeforeWholeValueAssignment)
                     continue;
+                auto const& wholeValueContinuationGuarantees =
+                    getWholeValueContinuationGuarantees(edge.callerIndex);
                 if (!canInstructionExecuteWhileEntryValueRemains(
-                        global,
                         edge.callerIndex,
-                        edge.call))
+                        edge.call,
+                        wholeValueContinuationGuarantees))
                     continue;
                 caller.mayReadValueBeforeWholeValueAssignment = true;
                 changed = true;
@@ -1333,11 +1361,13 @@ struct LegalizeResourceGlobalVarsPass
     ///
     /// An unreachable instruction cannot execute. A reachable instruction can execute while some
     /// part of the entry value remains when an entry-to-instruction path crosses no instruction
-    /// with a whole-value continuation guarantee.
+    /// with a whole-value continuation guarantee. `wholeValueContinuationGuarantees` must contain
+    /// every such instruction for the current resource global in the function identified by
+    /// `functionIndex`.
     bool canInstructionExecuteWhileEntryValueRemains(
-        ResourceGlobalToRewrite& global,
         Index functionIndex,
-        IRInst* instruction)
+        IRInst* instruction,
+        HashSet<IRInst*> const& wholeValueContinuationGuarantees)
     {
         // The dominator tree identifies blocks that the entry cannot reach. When the function has
         // no whole-value continuation guarantee, every reachable instruction can execute while
@@ -1348,11 +1378,6 @@ struct LegalizeResourceGlobalVarsPass
         if (getDominatorTree(functionIndex)->isUnreachable(instructionBlock))
             return false;
 
-        HashSet<IRInst*> wholeValueContinuationGuarantees;
-        collectWholeValueContinuationGuarantees(
-            global,
-            functionIndex,
-            wholeValueContinuationGuarantees);
         if (wholeValueContinuationGuarantees.getCount() == 0)
             return true;
         return canReachInstructionWithoutWholeValueContinuationGuarantee(
