@@ -2850,7 +2850,15 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
     bool diagnosticsReceived = false;
     // Set by `SET_WORKSPACE_FLAVOR:`; the next response wait then skips the server's refresh
-    // requests. Other tests keep treating an unexpected server call as the response.
+    // requests and log messages. Other tests keep treating an unexpected server call as the
+    // response.
+    //
+    // This deliberately differs from `sendConfig` above, which blocks until exactly two refresh
+    // requests arrive: a server that ignores the setting sends none, so `sendConfig` would hang
+    // instead of failing the test. The flag is one-shot (cleared when the next response wait
+    // returns), so every `SET_WORKSPACE_FLAVOR:` directive must be followed by a
+    // response-producing directive (e.g. `HOVER:`); otherwise a later, unrelated wait would
+    // still skip these calls.
     bool skipRefreshRequests = false;
     auto waitForNonDiagnosticResponse = [&]() -> SlangResult
     {
@@ -2871,9 +2879,11 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     goto repeat;
                 }
                 if (skipRefreshRequests && (call.method == "workspace/semanticTokens/refresh" ||
-                                            call.method == "workspace/inlayHint/refresh"))
+                                            call.method == "workspace/inlayHint/refresh" ||
+                                            call.method == "window/logMessage"))
                 {
-                    // Sent by the server after a configuration change; not a response.
+                    // Sent by the server after a configuration change (or, for an unknown
+                    // value, a warning about it); not a response.
                     goto repeat;
                 }
             }

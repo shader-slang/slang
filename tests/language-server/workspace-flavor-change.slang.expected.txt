@@ -21,6 +21,18 @@ content:
 {REDACTED}.slang(9)
 
 --------
+workspaceFlavor: unknownFlavor
+--------
+range: 16,12 - 16,18
+content:
+```
+#define marker vfxMarker 
+
+```
+
+{REDACTED}.slang(9)
+
+--------
 workspaceFlavor: standard
 --------
 range: 16,12 - 16,18

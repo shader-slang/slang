@@ -18,6 +18,9 @@ void test()
 //HOVER:17,13
 //SET_WORKSPACE_FLAVOR:vfx
 //HOVER:17,13
+// An unknown flavor value must keep the previous flavor (vfx), not reset it to standard.
+//SET_WORKSPACE_FLAVOR:unknownFlavor
+//HOVER:17,13
 //SET_WORKSPACE_FLAVOR:standard
 //HOVER:17,13
 }
