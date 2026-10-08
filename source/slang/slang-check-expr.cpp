@@ -3597,6 +3597,10 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
+    // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its operands.
+    auto enclosingTryClauseType = m_enclosingTryClauseType;
+    m_enclosingTryClauseType = TryClauseType::None;
+
     bool needDeref = false;
     auto baseExpr = checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
@@ -3616,6 +3620,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
         arg = subVisitor.CheckTerm(arg);
     }
+    m_enclosingTryClauseType = enclosingTryClauseType;
 
     // If anything went wrong in the base expression,
     // then just move along...
@@ -5208,11 +5213,16 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
+    // An enclosing `try` covers this call but not the calls in its operands, so we check the
+    // arguments and the callee outside it and restore it before this call is resolved.
+    auto enclosingTryClauseType = m_enclosingTryClauseType;
+    m_enclosingTryClauseType = TryClauseType::None;
     // Next check the argument expressions
     for (auto& arg : expr->arguments)
     {
         arg = CheckExpr(arg);
     }
+    m_enclosingTryClauseType = enclosingTryClauseType;
 
     // if the expression is '&&' or '||', we will convert it
     // to use short-circuit evaluation.
@@ -5260,7 +5270,9 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
+    m_enclosingTryClauseType = TryClauseType::None;
     expr->functionExpr = CheckTerm(expr->functionExpr);
+    m_enclosingTryClauseType = enclosingTryClauseType;
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
@@ -7636,6 +7648,10 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     if (expr->type)
         return expr;
 
+    // As in `visitInvokeExpr`, an enclosing `try` covers the cast but not its operand.
+    auto enclosingTryClauseType = m_enclosingTryClauseType;
+    m_enclosingTryClauseType = TryClauseType::None;
+
     // Check the term we are applying first
     auto funcExpr = expr->functionExpr;
     funcExpr = CheckTerm(funcExpr);
@@ -7653,6 +7669,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     {
         arg = CheckTerm(arg);
     }
+    m_enclosingTryClauseType = enclosingTryClauseType;
 
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
     {

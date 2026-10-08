@@ -14,13 +14,15 @@ int f() throws MyError { throw MyError.Failed; }
 int constructorStyleIdentity() throws MyError
 {
     return try int(f());
-//CHECK:                   ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:            ^ callee may throw, use 'try'
+//CHECK:            ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int castStyleIdentity() throws MyError
 {
     return try (int)f();
-//CHECK:                  ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:             ^ callee may throw, use 'try'
+//CHECK:             ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int constructorStyleIdentityExplicit() throws MyError

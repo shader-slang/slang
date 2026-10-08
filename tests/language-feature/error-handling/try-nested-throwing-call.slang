@@ -36,7 +36,8 @@ int gp(Pair p) throws MyError { return p.a + p.b; }
 int argument() throws MyError
 {
     return try g(f());
-//CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:          ^ callee may throw, use 'try'
+//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int argumentInDoCatch()
@@ -44,7 +45,8 @@ int argumentInDoCatch()
     do
     {
         return try g(f());
-//CHECK:                   ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:              ^ callee may throw, use 'try'
+//CHECK:              ^ the callee may throw an error, and therefore must be called within a 'try' clause
     }
     catch (e : MyError)
     {
@@ -55,20 +57,24 @@ int argumentInDoCatch()
 int memberCallBase() throws MyError
 {
     return try mk().get();
-//CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:         ^ callee may throw, use 'try'
+//CHECK:         ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int operatorOperand() throws MyError
 {
     return try g(f() + 1);
-//CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:          ^ callee may throw, use 'try'
+//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int nonThrowingOuterCall() throws MyError
 {
     return try k(f());
-//CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
-//CHECK:        ^^^ 'k' called from a 'try' clause does not throw an error, make sure the callee is marked as 'throws'
+//CHECK:          ^ callee may throw, use 'try'
+//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:   ^^^ callee in 'try' does not throw
+//CHECK:   ^^^ 'k' called from a 'try' clause does not throw an error, make sure the callee is marked as 'throws'
 }
 
 int subscriptIndex() throws MyError
@@ -76,30 +82,35 @@ int subscriptIndex() throws MyError
     S s;
     s.x = 1;
     return try s[f()];
-//CHECK:                ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:          ^ callee may throw, use 'try'
+//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int subscriptBase() throws MyError
 {
     return try mkS()[0];
-//CHECK:                ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:          ^ callee may throw, use 'try'
+//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 float conversionCast() throws MyError
 {
     return try (float)f();
-//CHECK:                    ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:               ^ callee may throw, use 'try'
+//CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int initializerListArgument() throws MyError
 {
     return try gp({ f(), 1 });
-//CHECK:                 ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:             ^ callee may throw, use 'try'
+//CHECK:             ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int arrayIndexArgument() throws MyError
 {
     int a[2] = { 3, 4 };
     return try g(a[f() & 1]);
-//CHECK:                 ^ the callee may throw an error, and therefore must be called within a 'try' clause
+//CHECK:            ^ callee may throw, use 'try'
+//CHECK:            ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }

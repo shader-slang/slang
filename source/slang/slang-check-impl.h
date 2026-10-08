@@ -1738,7 +1738,8 @@ protected:
     /// The linked list of lexically surrounding statements.
     OuterStmtInfo* m_outerStmts = nullptr;
 
-    /// The type of a try clause (if any) enclosing current expr.
+    /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
+    /// the call it wraps, so checks of that call's operands run with this reset to `None`.
     TryClauseType m_enclosingTryClauseType = TryClauseType::None;
 
     /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
