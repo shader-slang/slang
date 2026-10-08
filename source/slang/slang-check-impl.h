@@ -1935,6 +1935,12 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
+    /// Diagnose use of a deprecated or removed declaration at `loc`.
+    ///
+    /// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language
+    /// version to decide whether removal applies; reports nothing when no module is available.
+    /// Inspects `originalExpr`, when non-null, to suppress repeats and uses at the declaration's
+    /// name location.
     void diagnoseDeprecatedAndRemovedDeclRefUsage(
         DeclRef<Decl> declRef,
         SourceLoc loc,
@@ -1961,6 +1967,12 @@ public:
             getDefaultDeclRef(declToSpecialize));
     }
 
+    /// Construct a checked variable or member expression for `declRef`.
+    ///
+    /// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
+    /// Selects the expression kind from the base and whether the declaration is static. The result
+    /// includes the declaration's type and the read/write restrictions of any instance-member
+    /// access.
     DeclRefExpr* ConstructDeclRefExpr(
         DeclRef<Decl> declRef,
         Expr* baseExpr,
@@ -3566,8 +3578,23 @@ public:
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
+    /// Determine whether `type` has the storage property identified by `tag`.
+    ///
+    /// Returns whether `getTypeTags` establishes the property. A false result does not prove
+    /// that a later specialization or linked replacement will lack it.
     bool doesTypeHaveTag(Type* type, TypeTag tag);
 
+    /// Compute the storage properties of `type`, including its specialized instance fields.
+    ///
+    /// Checks aggregate and field declarations only far enough to use their types. Field
+    /// initializers are checked only when needed to infer a type or array bound. For example,
+    /// `struct Box<T> { T value; };` has an opaque field when instantiated as `Box<Texture2D>`,
+    /// but not as `Box<float>`.
+    /// Returns established flags, rather than proof that absent properties cannot occur.
+    /// Unsubstituted generic parameters have no established flags. Includes `TypeTag::Incomplete`
+    /// for externally replaceable definitions and link-time aliases, and when recursive
+    /// inspection stops at a cycle or the nesting limit. Ordinary type validation diagnoses
+    /// invalid recursion; linked-type validation checks restrictions after replacement.
     TypeTag getTypeTags(Type* type);
 
     Type* getConstantBufferElementType(Type* type);

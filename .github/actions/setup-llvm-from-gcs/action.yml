@@ -9,7 +9,7 @@ inputs:
   platform:
     required: true
   llvm-hash:
-    description: "Hash of build-llvm.sh for cache key"
+    description: "Hash of build-llvm.sh and LLVM patches for cache key"
     required: true
   build-if-missing:
     description: "Build LLVM if not found in GCS"
@@ -60,9 +60,9 @@ runs:
         echo "📊 LLVM installation size:"
         du -sh build/llvm-project-install
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Use the shell-visible checkout; github.workspace can name the host path in containers.
+        echo "LLVM_DIR=$(pwd)/build/llvm-project-install" >> $GITHUB_ENV
+        echo "Clang_DIR=$(pwd)/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
@@ -77,14 +77,14 @@ runs:
         fi
 
         ./external/build-llvm.sh \
-          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+          --install-prefix "$(pwd)/build/llvm-project-install" \
           --repo "${REPO_URL}"
 
         echo "✅ LLVM build complete"
 
         # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "LLVM_DIR=$(pwd)/build/llvm-project-install" >> $GITHUB_ENV
+        echo "Clang_DIR=$(pwd)/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
@@ -92,7 +92,7 @@ runs:
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
-        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+        LLVM_DIR="$(pwd)/build/llvm-project-install"
 
         if [ ! -d "${LLVM_DIR}" ]; then
           echo "ERROR: LLVM directory not found at ${LLVM_DIR}"
