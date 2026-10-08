@@ -29,6 +29,7 @@ in. Every prefix currently in use:
 | `container-`     | The CI container images.                                            |
 | `scaler-`        | The GCP runner scaler binary and auto-deployment artifact.          |
 | `sccache-`       | The shared compiler cache.                                          |
+| `llvm-`          | LLVM prebuilt population.                                           |
 | `issue-`         | Issue-triggered automation.                                         |
 | `reuse-`         | REUSE/SPDX license compliance.                                      |
 | `slash-command-` | The PR-comment command dispatcher.                                  |
@@ -163,9 +164,9 @@ a SlangPy PR and it will be cherry-picked for SlangPy workflow just in Slang rep
 There are two workflow YML related to this process. Slang uses `ci-slangpy-trigger-test.yml`
 and it simply triggers the existing workflow on SlangPy repo, `ci-latest-slang.yml`.
 Note that their names are similar:
+
 - `ci-slangpy-trigger-test.yml` is in Slang repo
 - `ci-latest-slang.yml` is in SlangPy repo; not Slang repo.
-
 
 You can specify which PR to cherry-pick by setting the following in `ci-slangpy-trigger-test.yml`:
 
@@ -180,9 +181,11 @@ will ignore this setting.
 
 In order to workaround the limitation, you need to manually trigger the workflow
 with `branch` name and the PR number from "Action" page:
+
 - https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml
 
 Click "Run workflow" button on the right side of the page. It will ask two info:
+
 - "Use workflow from" that takes a branch name
 - "Slang PR number to test against SlangPy"
 
@@ -191,6 +194,7 @@ a branch in the https://github.com/shader-slang/slang/; not a forked repo.
 
 Once the SlangPy workflow is triggered, you need to track the result from the SlangPy
 side:
+
 - https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml
 
 The manual run reports its result back to the PR, onto the same `SlangPy Tests`
@@ -200,7 +204,6 @@ failure, and the PR page will end up green.
 It is worth noting that if you needed this feature of cherry-pick with the backward
 compatibility breaking change, you probably need to announce the breaking change to
 the community before merging the change.
-
 
 ## 2. Reusable building blocks (`workflow_call`)
 
@@ -283,13 +286,14 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 6. Release, tag, and publishing
 
-| Workflow                                                       | Trigger                | Purpose                                                                                                                                                                |
-| -------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `release.yml`                                                  | version tag            | Builds and publishes the release binaries.                                                                                                                             |
-| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly   | Extra Linux builds against older glibc.                                                                                                                                |
-| `container-publish-images.yml`                                 | push/PR on `docker/**` | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
-| `scaler-release.yml`                                           | push/PR on scaler code | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
-| `perf-push-benchmark-results.yml`                              | push to master         | Publishes MDL benchmark numbers.                                                                                                                                       |
+| Workflow                                                       | Trigger                               | Purpose                                                                                                                                                                |
+| -------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release.yml`                                                  | version tag                           | Builds and publishes the release binaries.                                                                                                                             |
+| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly                  | Extra Linux builds against older glibc.                                                                                                                                |
+| `container-publish-images.yml`                                 | push/PR on `docker/**`                | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `scaler-release.yml`                                           | push/PR on scaler code                | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
+| `perf-push-benchmark-results.yml`                              | push to master                        | Publishes MDL benchmark numbers.                                                                                                                                       |
+| `llvm-populate.yml`                                            | LLVM recipe changes on master, manual | Builds missing LLVM prebuilts and publishes them to GCS.                                                                                                               |
 
 ## 7. Manual only
 

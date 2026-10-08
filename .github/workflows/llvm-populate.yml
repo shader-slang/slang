@@ -24,7 +24,7 @@ jobs:
     name: LLVM ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     # A native Windows ARM64 LLVM build can take nearly two hours by itself.
-    # Population needs time for that cold build and compression, without Slang.
+    # Allow roughly twice that time for runner variance, compression, and staging.
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -84,6 +84,11 @@ jobs:
         env:
           LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         run: |
+          # Match setup-llvm-from-gcs's key and restore layout: archive the
+          # install contents directly, without an enclosing directory.
+          # Slang's CMake configuration requires both installed packages.
+          test -f build/llvm-project-install/lib/cmake/llvm/LLVMConfig.cmake
+          test -f build/llvm-project-install/lib/cmake/clang/ClangConfig.cmake
           archive_path="${RUNNER_TEMP}/${LLVM_KEY}.tar.gz"
           tar_path="$archive_path"
           # Git Bash's GNU tar interprets a Windows drive-letter colon as a
@@ -92,6 +97,7 @@ jobs:
             tar_path=$(cygpath -u "$archive_path")
           fi
           tar -czf "$tar_path" -C build/llvm-project-install .
+          tar -tzf "$tar_path" > /dev/null
           echo "path=$archive_path" >> "$GITHUB_OUTPUT"
 
       - name: Stage new prebuilt for publication
@@ -156,6 +162,9 @@ jobs:
           for archive in llvm-prebuilts/*.tar.gz; do
             filename=$(basename "$archive")
             gcloud storage cp "$archive" "gs://slang-ci-cache/llvm-prebuilts/${filename}"
-            curl --fail --head --retry 3 --retry-delay 5 \
+            published_archive="${RUNNER_TEMP}/published-${filename}"
+            curl --fail --location --retry 3 --retry-delay 5 --output "$published_archive" \
               "https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${filename}"
+            cmp "$archive" "$published_archive"
+            rm "$published_archive"
           done

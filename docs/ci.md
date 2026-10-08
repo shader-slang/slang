@@ -24,7 +24,8 @@ Linux GCC x86_64, ARM64, and WASM; macOS Clang ARM64; and Windows MSVC x86_64 an
 ARM64. The WASM entry builds host LLVM, preserving the key requested by the WASM
 Slang build. Each native builder has a four-hour timeout and stages an archive
 only on a cache miss. A separate Ubuntu job authenticates, installs the Cloud
-SDK, publishes completed archives, and checks their public URLs. Publication is
+SDK, publishes completed archives, and downloads each public object to check it
+matches the staged archive byte for byte. Publication is
 restricted to the upstream repository's `master` ref.
 
 To repair missing prebuilts, a maintainer can select **Populate LLVM prebuilts**
