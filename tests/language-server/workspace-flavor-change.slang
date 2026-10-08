@@ -23,4 +23,9 @@ void test()
 //HOVER:17,13
 //SET_WORKSPACE_FLAVOR:standard
 //HOVER:17,13
+//SET_WORKSPACE_FLAVOR:vfx
+//HOVER:17,13
+// An empty value selects the default flavor (standard), whatever the previous flavor was.
+//SET_WORKSPACE_FLAVOR:
+//HOVER:17,13
 }

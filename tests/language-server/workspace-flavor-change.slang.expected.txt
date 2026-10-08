@@ -43,3 +43,27 @@ content:
 ```
 
 {REDACTED}.slang(12)
+
+--------
+workspaceFlavor: vfx
+--------
+range: 16,12 - 16,18
+content:
+```
+#define marker vfxMarker 
+
+```
+
+{REDACTED}.slang(9)
+
+--------
+workspaceFlavor: 
+--------
+range: 16,12 - 16,18
+content:
+```
+#define marker standardMarker 
+
+```
+
+{REDACTED}.slang(12)

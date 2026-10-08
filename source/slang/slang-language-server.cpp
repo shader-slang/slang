@@ -2509,8 +2509,11 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
         String str;
         if (SLANG_SUCCEEDED(converter.convert(value, &str)))
         {
-            // An empty value selects the default (standard) flavor. An unrecognized value is
-            // logged and the previous flavor is kept, as updatePredefinedLanguageVersion does.
+            // As in updatePredefinedLanguageVersion, an unrecognized non-empty value is logged and
+            // the previous flavor is kept. An empty value differs: that function clears an empty
+            // version to UNKNOWN (the compiler default), but there is no unset flavor, so an
+            // empty value selects `standard`, the default the VS Code extension declares for
+            // `slang.workspaceFlavor`.
             WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
             if (str.getLength() == 0 || str == "standard")
             {
