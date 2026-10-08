@@ -67,7 +67,8 @@ public interface ICallableShaderList
 
 /// Lists the hit-group implementations available to a trace program schema.
 ///
-/// Declaration order determines the dense function index within each payload partition. It does
+/// The planned target layout assigns dense function indices in declaration order across the
+/// schema's entire hit section, including groups with different payload types. These indices do
 /// not determine where a host places records in the runtime SBT.
 /// @tparam Group The type pack of hit-group implementations in declaration order.
 ///
@@ -85,7 +86,9 @@ public struct HitGroupList<each Group> : IHitGroupList
 
 /// Lists the miss-stage implementations available to a trace program schema.
 ///
-/// Declaration order determines the dense function index within each payload partition.
+/// The planned target layout assigns dense function indices in declaration order across the
+/// schema's entire miss section, including shaders with different payload types. Runtime miss
+/// record indices remain host-selected positions in one shared miss section.
 /// @tparam Shader The type pack of miss-stage implementations in declaration order.
 ///
 /// @par Constraints

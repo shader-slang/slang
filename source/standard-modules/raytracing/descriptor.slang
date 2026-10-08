@@ -16,24 +16,56 @@ namespace rt
 /// - Metal: a generated ParameterBlock-like argument buffer containing function tables and a
 ///   record-data buffer. These are lowering artifacts, not fields available to Slang source.
 ///
-/// For Metal, let `P` be the number of payload partitions in the finalized schema, and `i` a
-/// reflected payload-partition index. The intended block-relative argument-buffer IDs are:
+/// Metal uses one table for each dispatch role, shared by all payload types in the schema.
+/// The intended block-relative argument-buffer IDs are:
 ///
-///     Resource                                  Metal [[id]]
-///     intersection function table for payload i  3 * i
-///     miss visible-function table for payload i  3 * i + 1
-///     closest-hit table for payload i            3 * i + 2
-///     program-wide callable table                3 * P
-///     program-wide record-data buffer            3 * P + 1
+/// @verbatim
+///     Resource                            Metal [[id]]
+///     intersection function table         0
+///     miss visible-function table         1
+///     closest-hit visible-function table  2
+///     callable visible-function table     3
+///     record-data buffer                  4
+/// @endverbatim
 ///
-/// Thus a one-payload program uses IDs 0 through 4. Each table occupies one argument-buffer ID;
-/// its function slots and the host's SBT record indices are separate from these resource bindings.
+/// Adding a payload type does not add resources or split the SBT record sections. Generated
+/// visible-function adapters use a uniform signature per table, with `thread void*` for concrete
+/// payload or callable state. Each adapter recovers its concrete type; source stage inputs remain
+/// strongly typed. The shared intersection table uses schema-wide intersection tags and generated
+/// primitive dispatchers that select candidate logic from the hit record.
+///
+/// Consider two geometries with radiance and shadow ray types. The host can arrange hit records
+/// as one logical two-dimensional table, even when the ray types use different payload types:
+///
+/// @verbatim
+///     Hit records, instanceContribution = 0, sbtStride = 2
+///     +--------------+----------------------+----------------------+
+///     | Geometry row | Radiance, offset = 0 | Shadow, offset = 1   |
+///     +--------------+----------------------+----------------------+
+///     | 0            | hit record 0         | hit record 1         |
+///     | 1            | hit record 2         | hit record 3         |
+///     +--------------+----------------------+----------------------+
+///     Miss records: missIndex 0 -> radiance; missIndex 1 -> shadow.
+///     Callable records: selected independently by the callShader record index.
+/// @endverbatim
+///
+/// Generated Metal dispatch selects `instanceContribution + geometryIndex * sbtStride + sbtOffset`.
+/// `sbtStride` counts records, not bytes. The reflected section stride converts the index to a
+/// byte offset.
+/// The ray-type columns are a host convention, not payload-type indices. A selected record holds
+/// a function index and application record data. Function indices are schema-wide within each
+/// section, so several records can name the same program without duplicating its table entry.
+/// The host must ensure the selected hit or miss program accepts the trace's payload type.
+///
+/// Resource IDs, function indices, and SBT record indices are distinct. In particular, Metal's
+/// native intersection-table slot selects a primitive dispatcher, which computes the full hit
+/// record index above; that slot is not itself the two-dimensional SBT index.
 /// A standalone descriptor's argument buffer is bound at the entry point's reflected
 /// `[[buffer(B)]]` index. `B` follows normal parameter binding allocation and is not a fixed slot
 /// such as zero.
 /// A descriptor inside another ParameterBlock follows that containing parameter's reflected layout.
-/// The host must use reflection for the outer binding, payload partitions, and resource IDs rather
-/// than infer them from source declaration order. TODO: implement this target layout and its
+/// The host must use reflection for the outer binding, resource IDs, function indices, and record
+/// layouts. TODO: implement the shared-table target layout, adapters, and their
 /// reflection in the adapter slice; this frontend slice diagnoses descriptors reaching codegen.
 /// @tparam Schema The trace context and finite shader lists describing the bound program.
 ///

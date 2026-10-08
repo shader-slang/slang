@@ -143,6 +143,7 @@ public struct RayTraversalDesc
     public uint instanceMask;
 
     /// Supplies the ray's offset when selecting a hit-group record from the shader binding table.
+    /// A host can use this as the ray-type column of a logical geometry-by-ray-type table.
     ///
     /// @par Constraints
     /// Uses a runtime `uint`, not a schema-list index. The caller must choose this offset together
@@ -151,6 +152,7 @@ public struct RayTraversalDesc
     public uint sbtOffset;
 
     /// Supplies the stride applied to the geometry contribution when selecting a hit-group record.
+    /// Counts records rather than bytes. For two ray-type columns per geometry row, use 2.
     ///
     /// @par Constraints
     /// Uses a runtime `uint`. Its value must agree with the host-built shader binding table's
