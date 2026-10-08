@@ -303,8 +303,8 @@ bool Test_VectorType()
 
         // CHECK_GLSL-COUNT-8: min(
         // CHECK_GLSL-NOT: min(
-        // CHECK_SPIR-COUNT-4: FMin{{ }}
-        // CHECK_SPIR-NOT: FMin{{ }}
+        // CHECK_SPIR-COUNT-4: NMin{{ }}
+        // CHECK_SPIR-NOT: NMin{{ }}
         // CHECK_SPIR-COUNT-2: SMin{{ }}
         // CHECK_SPIR-NOT: SMin{{ }}
         // CHECK_SPIR-COUNT-2: UMin{{ }}
@@ -320,8 +320,8 @@ bool Test_VectorType()
 
         // CHECK_GLSL-COUNT-8: max(
         // CHECK_GLSL-NOT: max(
-        // CHECK_SPIR-COUNT-4: FMax{{ }}
-        // CHECK_SPIR-NOT: FMax{{ }}
+        // CHECK_SPIR-COUNT-4: NMax{{ }}
+        // CHECK_SPIR-NOT: NMax{{ }}
         // CHECK_SPIR-COUNT-2: SMax{{ }}
         // CHECK_SPIR-NOT: SMax{{ }}
         // CHECK_SPIR-COUNT-2: UMax{{ }}
