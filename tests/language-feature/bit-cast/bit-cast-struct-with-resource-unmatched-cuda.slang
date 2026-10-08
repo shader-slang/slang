@@ -26,6 +26,6 @@ void computeMain()
     FloatView a = bit_cast<FloatView, UintView>(gView);
 //CHECK:                                       ^ E41205
 //CHECK:                                       ^ cannot bit_cast 'UintView' to 'FloatView'
-//CHECK:                                       ^ has no bit representation here
+//CHECK:                                       ^ is supported when each handle maps
     outputBuffer[0] = a.data[a.offset];
 }

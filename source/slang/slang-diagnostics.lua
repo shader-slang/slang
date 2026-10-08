@@ -5618,9 +5618,9 @@ err(
 err(
     "bit-cast-of-opaque-type",
     41205,
-    "bit_cast of a type containing an opaque handle requires matching fields",
+    "unsupported bit_cast involving an opaque handle",
     span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst'" },
-    note { message = "an opaque handle (resource, sampler, buffer) has no bit representation here and cannot be built from bytes; it can only be copied to a field of the same handle type at the same position, and the remaining fields must match in size, alignment and offset", span { loc = "location" } }
+    note { message = "a bit_cast involving opaque handles (resources, samplers, buffers) is supported when each handle maps to a handle of the same type at the same position and the remaining fields match in size, alignment and offset", span { loc = "location" } }
 )
 
 err(

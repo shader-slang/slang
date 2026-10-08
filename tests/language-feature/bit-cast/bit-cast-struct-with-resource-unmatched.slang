@@ -33,18 +33,18 @@ void computeMain()
     FloatView a = bit_cast<FloatView, UintView>(gView);
 //CHECK:                                       ^ E41205
 //CHECK:                                       ^ cannot bit_cast 'UintView' to 'FloatView'
-//CHECK:                                       ^ has no bit representation here
+//CHECK:                                       ^ is supported when each handle maps
     outputBuffer[0] = a.data[a.offset];
 
     ShortView b = bit_cast<ShortView, UintView>(gView);
 //CHECK:                                       ^ E41205
 //CHECK:                                       ^ cannot bit_cast 'UintView' to 'ShortView'
-//CHECK:                                       ^ has no bit representation here
+//CHECK:                                       ^ is supported when each handle maps
     outputBuffer[1] = float(b.data[0]);
 
     UintView c[3] = bit_cast<UintView[3], UintView[2]>(gViews);
 //CHECK:                                              ^ E41205
 //CHECK:                                              ^ cannot bit_cast
-//CHECK:                                              ^ has no bit representation here
+//CHECK:                                              ^ is supported when each handle maps
     outputBuffer[2] = float(c[2].data[c[2].offset]);
 }
