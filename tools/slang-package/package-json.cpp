@@ -13,6 +13,8 @@
 #include "core/slang-string-util.h"
 #include "core/slang-string.h"
 
+#include <stdio.h>
+
 namespace Slang
 {
 namespace PackageTool
@@ -1445,6 +1447,18 @@ static SlangResult _findCurlExecutable(String& outPath, String& outError)
     return SLANG_FAIL;
 }
 
+/// Warn that an `http` or `https` package index cannot be downloaded because `curl` is not on PATH.
+///
+/// The command still fails. `dependency add` reports that the package name cannot be resolved, and
+/// a remap reports that the index cannot be accessed.
+static void _warnCurlNotInstalled(const String& location)
+{
+    fprintf(
+        stderr,
+        "slang-package: warning: curl is not installed, so '%s' cannot be downloaded.\n",
+        location.getBuffer());
+}
+
 static SlangResult _readPackageIndexText(
     const String& sourceName,
     const String& text,
@@ -1477,9 +1491,12 @@ static SlangResult _readPackageIndexText(
 SlangResult readPackageIndex(
     const String& location,
     List<RepositoryLocation>& outPackages,
-    String& outError)
+    String& outError,
+    bool* outCurlMissing)
 {
     outPackages.clear();
+    if (outCurlMissing)
+        *outCurlMissing = false;
     if (!location.getLength() || location.getBuffer()[0] == '-')
     {
         outError = "Package index location is missing.";
@@ -1495,7 +1512,14 @@ SlangResult readPackageIndex(
             return SLANG_FAIL;
         }
         String curl;
-        SLANG_RETURN_ON_FAIL(_findCurlExecutable(curl, outError));
+        if (SLANG_FAILED(_findCurlExecutable(curl, outError)))
+        {
+            if (outCurlMissing)
+                *outCurlMissing = true;
+            _warnCurlNotInstalled(location);
+            outError = String("Cannot access package index: ") + location;
+            return SLANG_FAIL;
+        }
         CommandLine commandLine;
         commandLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Path, curl));
         commandLine.addArg("-fsSL");

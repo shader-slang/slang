@@ -383,7 +383,9 @@ When `--git` is omitted and `SLANG_PACKAGE_INDEX` names a
 package index, the Git URL is copied from that index into the manifest. The variable is a local
 path, resolved from the current directory when it is relative, or an `http`/`https` URL. The
 index is a JSON object with `"schema_version": 1` and a `packages` map from package name to Git
-URL. `--version` is still required, and an explicit `--git` is not replaced.
+URL. Downloading an `http` or `https` index requires `curl` on `PATH`. If `curl` is missing,
+`dependency add` warns and fails to resolve the name, and `--remap-urls` warns and fails to
+access the index. `--version` is still required, and an explicit `--git` is not replaced.
 `fetch` and `update` do not read that variable. `update --remap-urls URL` records an `http` or
 `https` package index in the lock and resolves listed packages from it, leaving manifest URLs
 unchanged. A later `update` reuses the index stored in the lock. `update --no-remap` clears it

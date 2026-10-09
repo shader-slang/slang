@@ -3368,8 +3368,22 @@ SlangResult executeInDirectory(
                     if (indexLocation.getLength())
                     {
                         List<RepositoryLocation> indexPackages;
-                        SLANG_RETURN_ON_FAIL(
-                            readPackageIndex(indexLocation, indexPackages, outError));
+                        bool curlMissing = false;
+                        if (SLANG_FAILED(readPackageIndex(
+                                indexLocation,
+                                indexPackages,
+                                outError,
+                                &curlMissing)))
+                        {
+                            // The index reader already warned that curl is absent. The command
+                            // error is that this name cannot be resolved without a Git URL.
+                            if (curlMissing)
+                            {
+                                outError = String("Cannot resolve '") + dependency.name +
+                                           "' without --git or an accessible package index.";
+                            }
+                            return SLANG_FAIL;
+                        }
                         bool found = false;
                         for (const auto& repository : indexPackages)
                         {

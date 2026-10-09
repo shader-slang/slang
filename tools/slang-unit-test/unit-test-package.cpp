@@ -16,6 +16,22 @@
 #include "scoped-env-var.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdio.h>
+
+#if defined(_WIN32)
+#include <io.h>
+#define SLANG_PACKAGE_DUP _dup
+#define SLANG_PACKAGE_DUP2 _dup2
+#define SLANG_PACKAGE_FILENO _fileno
+#define SLANG_PACKAGE_CLOSE _close
+#else
+#include <unistd.h>
+#define SLANG_PACKAGE_DUP dup
+#define SLANG_PACKAGE_DUP2 dup2
+#define SLANG_PACKAGE_FILENO fileno
+#define SLANG_PACKAGE_CLOSE close
+#endif
+
 using namespace Slang;
 using namespace Slang::PackageTool;
 
@@ -30,6 +46,60 @@ struct TemporaryDirectory
     {
         if (path.getLength())
             Path::removeNonEmpty(path);
+    }
+};
+
+/// Capture stderr for one in-process package-tool call.
+///
+/// `executeInDirectory` returns only the command error. Warnings such as a missing `curl` are
+/// printed to stderr and have to be read back from this capture.
+struct StderrCapture
+{
+    String path;
+    int savedFd = -1;
+    FILE* file = nullptr;
+
+    ~StderrCapture() { restore(); }
+
+    SlangResult start()
+    {
+        SLANG_RETURN_ON_FAIL(
+            File::generateTemporary(UnownedStringSlice("slang-package-stderr"), path));
+        SLANG_RETURN_ON_FAIL(File::remove(path));
+        file = fopen(path.getBuffer(), "w+");
+        if (!file)
+            return SLANG_FAIL;
+        fflush(stderr);
+        savedFd = SLANG_PACKAGE_DUP(SLANG_PACKAGE_FILENO(stderr));
+        if (savedFd < 0)
+            return SLANG_FAIL;
+        if (SLANG_PACKAGE_DUP2(SLANG_PACKAGE_FILENO(file), SLANG_PACKAGE_FILENO(stderr)) < 0)
+            return SLANG_FAIL;
+        return SLANG_OK;
+    }
+
+    SlangResult finish(String& outText)
+    {
+        fflush(stderr);
+        SLANG_RETURN_ON_FAIL(restore());
+        return File::readAllText(path, outText);
+    }
+
+    SlangResult restore()
+    {
+        if (savedFd >= 0)
+        {
+            fflush(stderr);
+            SLANG_PACKAGE_DUP2(savedFd, SLANG_PACKAGE_FILENO(stderr));
+            SLANG_PACKAGE_CLOSE(savedFd);
+            savedFd = -1;
+        }
+        if (file)
+        {
+            fclose(file);
+            file = nullptr;
+        }
+        return SLANG_OK;
     }
 };
 
@@ -828,6 +898,98 @@ SLANG_UNIT_TEST(PackageToolDependencyAddUsesPackageIndex)
         fetchMissingArguments,
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("http or https")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolHttpIndexRequiresCurl)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    String indexPath = Path::combine(temp.path, "index.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        indexPath,
+        "{\"schema_version\":1,\"packages\":{\"noise\":\"https://example.com/noise.git\"}}\n")));
+    String pathWithoutCurl = Path::combine(temp.path, "no-curl");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(pathWithoutCurl));
+
+    {
+        SlangUnitTest::ScopedEnvVar pathEnvironment("PATH", pathWithoutCurl.getBuffer());
+        SlangUnitTest::ScopedEnvVar indexEnvironment("SLANG_PACKAGE_INDEX", indexPath.getBuffer());
+        StderrCapture capture;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.start()));
+        const char* addArguments[] = {
+            "slang-package",
+            "dependency",
+            "add",
+            "noise",
+            "--version",
+            "1.0.0",
+        };
+        const SlangResult added =
+            executeInDirectory(temp.path, SLANG_COUNT_OF(addArguments), addArguments, error);
+        String warning;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.finish(warning)));
+        SLANG_CHECK(SLANG_SUCCEEDED(added));
+        SLANG_CHECK(
+            warning.getUnownedSlice().indexOf(UnownedStringSlice("curl is not installed")) < 0);
+    }
+
+    {
+        SlangUnitTest::ScopedEnvVar pathEnvironment("PATH", pathWithoutCurl.getBuffer());
+        SlangUnitTest::ScopedEnvVar indexEnvironment(
+            "SLANG_PACKAGE_INDEX",
+            "https://example.com/index.json");
+        StderrCapture capture;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.start()));
+        const char* addArguments[] = {
+            "slang-package",
+            "dependency",
+            "add",
+            "noise",
+            "--version",
+            "1.0.0",
+        };
+        const SlangResult added =
+            executeInDirectory(temp.path, SLANG_COUNT_OF(addArguments), addArguments, error);
+        String warning;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.finish(warning)));
+        SLANG_CHECK(SLANG_FAILED(added));
+        SLANG_CHECK(
+            error.getUnownedSlice().indexOf(UnownedStringSlice("Cannot resolve 'noise'")) >= 0);
+        SLANG_CHECK(
+            error.getUnownedSlice().indexOf(
+                UnownedStringSlice("without --git or an accessible package index")) >= 0);
+        SLANG_CHECK(
+            warning.getUnownedSlice().indexOf(UnownedStringSlice("curl is not installed")) >= 0);
+        SLANG_CHECK(
+            warning.getUnownedSlice().indexOf(
+                UnownedStringSlice("https://example.com/index.json")) >= 0);
+    }
+
+    {
+        SlangUnitTest::ScopedEnvVar pathEnvironment("PATH", pathWithoutCurl.getBuffer());
+        StderrCapture capture;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.start()));
+        const char* remapArguments[] = {
+            "slang-package",
+            "update",
+            "--remap-urls",
+            "https://example.com/index.json",
+        };
+        const SlangResult remapped =
+            executeInDirectory(temp.path, SLANG_COUNT_OF(remapArguments), remapArguments, error);
+        String warning;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(capture.finish(warning)));
+        SLANG_CHECK(SLANG_FAILED(remapped));
+        SLANG_CHECK(
+            error.getUnownedSlice().indexOf(UnownedStringSlice(
+                "Cannot access package index: https://example.com/index.json")) >= 0);
+        SLANG_CHECK(
+            warning.getUnownedSlice().indexOf(UnownedStringSlice("curl is not installed")) >= 0);
+    }
 }
 
 SLANG_UNIT_TEST(PackageLockRejectsUnknownFields)

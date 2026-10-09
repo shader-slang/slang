@@ -150,9 +150,12 @@ directory. The index is JSON:
 `schema_version` must be the integer `1`. `packages` maps a package name to one Git URL. The
 command writes that URL into `slang-package.json` as if `--git` had been passed. `--version` is
 still required. An explicit `--git` is used as given and the variable is not read. If
-the variable is unset or empty, omitting `--git` fails. A variable that is set but names an index
-that cannot be read fails, and so does a name the index does not list. `fetch` and `update` do
-not read `SLANG_PACKAGE_INDEX`. Remapping an existing graph uses [`--remap-urls`](#update).
+the variable is unset or empty, omitting `--git` fails. An `http` or `https` index is downloaded
+with `curl`. When `curl` is not on `PATH`, the command warns that `curl` is not installed and
+fails because the name cannot be resolved without `--git` or an accessible index. A variable that
+is set but names an index that cannot be read fails, and so does a name the index does not list.
+`fetch` and `update` do not read `SLANG_PACKAGE_INDEX`. Remapping an existing graph uses
+[`--remap-urls`](#update).
 
 `<name>` identifies the package in the graph and must match the selected package manifest.
 
@@ -439,7 +442,9 @@ so branches, tags, and commits there are kept without that list.
 
 When the lock records a remap index, `update` reads that index and resolves every listed package
 name from its Git URL. Names the index does not list keep the manifest URL. The manifest itself is
-left unchanged. If the index cannot be read, the command fails and the lock stays.
+left unchanged. If the index cannot be read, the command fails and the lock stays. When `curl` is
+not on `PATH`, that failure is preceded by a warning that `curl` is not installed, and the error
+reports that the index cannot be accessed.
 
 `--remap-urls <url>` sets or replaces that index. `<url>` must be `http` or `https`. It is not
 taken from `SLANG_PACKAGE_INDEX`. The command lists each package whose Git URL would change, then
