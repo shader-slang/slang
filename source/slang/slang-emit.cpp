@@ -2514,6 +2514,12 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Shader-record globals are lowered after `moveGlobalVarInitializationToEntryPoints` above,
+    // and before `lowerImmutableBufferLoadForCUDA`, which keeps loads through the resulting SBT
+    // handles off `__ldg`.
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+        SLANG_PASS(lowerShaderRecordGlobalParamsForOptiX, sink);
+
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.

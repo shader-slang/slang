@@ -2,16 +2,38 @@
 
 // Note: A significant portion of this code is taken and modified from
 // slang-ir-entry-point-uniforms.cpp
+//
+// On OptiX, a ray tracing program's shader binding table (SBT) data, returned by
+// `optixGetSbtDataPointer()`, can be declared two ways: as entry-point `uniform` parameters
+// (`collectOptiXEntryPointUniformParams`) or as a module-scope shader-record constant buffer
+// (`lowerShaderRecordGlobalParamsForOptiX`). Both lower to `GetOptiXSbtDataPtr`.
 
 #include "slang-ir-optix-entry-point-uniforms.h"
 
+#include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-profile.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
+
+/// Emit a new read of the running program's OptiX SBT record pointer, typed as
+/// `sbtRecordPtrType`, before the first ordinary instruction of `code`'s entry block, so that it
+/// dominates every instruction in `code`. `code` must have a body.
+static IRInst* emitOptiXSbtDataPtrAtBodyStart(
+    IRBuilder& builder,
+    IRGlobalValueWithCode* code,
+    IRType* sbtRecordPtrType)
+{
+    SLANG_ASSERT(code->getFirstBlock());
+    builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
+    return builder.emitIntrinsicInst(sbtRecordPtrType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+}
 
 struct CollectOptixEntryPointUniformParams : PerEntryPointPass
 {
@@ -224,10 +246,8 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
         }
 
         // Now, replace the collected parameter with OptiX SBT accesses.
-        auto paramType = collectedParam->getFullType();
-        builder->setInsertBefore(entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
         IRInst* getAttr =
-            builder->emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+            emitOptiXSbtDataPtrAtBodyStart(*builder, entryPointFunc, collectedParam->getFullType());
         collectedParam->replaceUsesWith(getAttr);
         collectedParam->removeAndDeallocate();
         fixUpFuncType(entryPointFunc);
@@ -272,6 +292,116 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
             UnownedTerminatedStringSlice("shaderRecordParams"));
     }
 };
+
+/// Report an error for each entry point that reaches `param`, a shader-record parameter, through
+/// calls or global initializers, but is not a ray tracing stage. Only OptiX ray tracing programs
+/// have an SBT record, so anywhere else `optixGetSbtDataPointer()` has nothing to return.
+static void diagnoseShaderRecordUseOutsideRayTracingStages(
+    DiagnosticSink* sink,
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    IRGlobalParam* param)
+{
+    auto entryPoints = getReferencingEntryPoints(referencingEntryPoints, param);
+    if (!entryPoints)
+        return;
+    for (auto entryPoint : *entryPoints)
+    {
+        // Only ray tracing stages are OptiX programs with an SBT record. The reference graph is
+        // also rooted at `[CudaKernel]` functions, which are ordinary CUDA kernels without a
+        // record, so they are always an error; we name them by their name hint.
+        auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
+        if (entryPointDecoration &&
+            isRaytracingStage(entryPointDecoration->getProfile().getStage()))
+            continue;
+
+        String entryPointName;
+        if (entryPointDecoration)
+        {
+            entryPointName = entryPointDecoration->getName()->getStringSlice();
+        }
+        else
+        {
+            SLANG_ASSERT(entryPoint->findDecoration<IRCudaKernelDecoration>());
+            auto nameHint = entryPoint->findDecoration<IRNameHintDecoration>();
+            SLANG_ASSERT(nameHint);
+            if (nameHint)
+                entryPointName = nameHint->getName();
+        }
+        sink->diagnose(Diagnostics::ShaderRecordOutsideRayTracingStage{
+            .entryPoint = entryPointName,
+            .location = getDiagnosticPos(param)});
+    }
+}
+
+/// Return the function, or global-variable initializer, whose body contains `inst`.
+static IRGlobalValueWithCode* findEnclosingCode(IRInst* inst)
+{
+    for (auto parent = inst->getParent(); parent; parent = parent->getParent())
+    {
+        if (auto code = as<IRGlobalValueWithCode>(parent))
+            return code;
+    }
+    return nullptr;
+}
+
+/// Consider:
+///
+///     layout(shaderRecordEXT) ConstantBuffer<SbtData> gSbtRecordData;
+///
+/// The CUDA shader-record layout rules give `gSbtRecordData` a `ShaderRecord` slot and no
+/// `Uniform` bytes, so `collectGlobalUniformParameters` leaves it at module scope rather than
+/// folding it into `GlobalParams`. On OptiX the record is whatever `optixGetSbtDataPointer()`
+/// returns for the running program, so we fetch that pointer in each function that uses the
+/// parameter, and a helper shared by several entry points reads the record of whichever one is
+/// running.
+///
+/// A ray tracing entry point's `uniform` parameters also start at offset zero of this record
+/// (`CollectOptixEntryPointUniformParams`), so using both spellings aliases the same storage.
+void lowerShaderRecordGlobalParamsForOptiX(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRGlobalParam*> shaderRecordParams;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto varLayout = findVarLayout(param);
+        if (varLayout && varLayout->usesResourceKind(LayoutResourceKind::ShaderRecord))
+            shaderRecordParams.add(param);
+    }
+    if (shaderRecordParams.getCount() == 0)
+        return;
+
+    Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
+    buildEntryPointReferenceGraph(referencingEntryPoints, module);
+
+    IRBuilder builder(module);
+    for (auto param : shaderRecordParams)
+    {
+        diagnoseShaderRecordUseOutsideRayTracingStages(sink, referencingEntryPoints, param);
+
+        // We rewrite the uses even after reporting an error, so the module stays well formed
+        // until the compile fails. Every use is an instruction inside a function, or inside the
+        // initializer of a `__global` variable, which keeps its initializer. The latter runs
+        // outside any OptiX program and is unsupported; NVRTC rejects every dynamic `__global`
+        // initializer.
+        Dictionary<IRGlobalValueWithCode*, IRInst*> sbtRecordPtrPerBody;
+        while (auto use = param->firstUse)
+        {
+            auto body = findEnclosingCode(use->getUser());
+            SLANG_RELEASE_ASSERT(body);
+
+            IRInst* sbtRecordPtr = nullptr;
+            if (!sbtRecordPtrPerBody.tryGetValue(body, sbtRecordPtr))
+            {
+                sbtRecordPtr = emitOptiXSbtDataPtrAtBodyStart(builder, body, param->getFullType());
+                sbtRecordPtrPerBody.add(body, sbtRecordPtr);
+            }
+            builder.replaceOperand(use, sbtRecordPtr);
+        }
+        param->removeAndDeallocate();
+    }
+}
 
 void collectOptiXEntryPointUniformParams(IRModule* module)
 {
