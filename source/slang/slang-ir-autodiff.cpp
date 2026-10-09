@@ -154,6 +154,8 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
 // propagate function `IBwdCallable.operator()`. These mirror the op families that
 // `isBackwardDerivativeValue` recognizes (primal, remat, legacy combined and propagate); the
 // context types and the `BwdCallable : IBwdCallable` witness are not functions and are excluded.
+// No user syntax is known to reach the `remat` or propagate keys; we keep them for parity with the
+// op switch.
 static bool isBackwardDerivativeRequirementKey(IRInst* key)
 {
     auto decor = key->findDecoration<IRBuiltinRequirementDecoration>();
@@ -186,7 +188,8 @@ bool isBackwardDerivativeValue(IRInst* inst)
     // `SynthesizedBackwardDerivativeWitnessTable` that only the translation pass materializes. Both
     // `checkAutoDiffUsages` and the translation backstop therefore see `bwd_diff(fwd_diff(f))` and
     // `__apply(fwd_diff(f))` as a `LookupWitnessMethod`, which we recognize by the requirement's
-    // role.
+    // role. We match any witness table, not only a synthesized one, because a lookup of one of
+    // these keys yields a backward derivative whichever conformance provides it.
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
         return isBackwardDerivativeRequirementKey(lookup->getRequirementKey());
 

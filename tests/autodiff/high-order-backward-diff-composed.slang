@@ -8,6 +8,7 @@
 // the concrete type, and the `out`/`inout` functions cover the other parameter directions.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -156,3 +157,5 @@ void computeMain()
     outputBuffer[24] = ky.d.p;
     outputBuffer[25] = ky.d.d;
 }
+
+// SPIRV: OpEntryPoint GLCompute

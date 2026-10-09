@@ -3731,6 +3731,12 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
     // The IBackwardDifferentiable requirements are addressed by built-in requirement *role*
     // rather than by operand position, so this is robust to the order in which the requirements
     // (and the relocated `BwdCallable : IBwdCallable` conformance) appear in the interface.
+    //
+    // The table we build is a complete conformance: every requirement gets a real value, because
+    // a call through any of them looks it up. The interface has six requirements (`BwdCallable`,
+    // its `IBwdCallable` conformance, `MinimalContext`, `apply_bwd`, `remat` and the legacy
+    // `bwd_diff`), so a new one must be filled here too.
+    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 6);
     IRInst* typeOperand = baseFunc->getFullType();
 
     auto contextType = builder.emitIntrinsicInst(
