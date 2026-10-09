@@ -1,23 +1,24 @@
 // Memory orders are validated on the final IR, so these programs compile on every target: an
-// order held in a `static` global folds to its constant, and an atomic in a branch that is removed
-// as dead code is never checked. An atomic intrinsic declared without an order has nothing to
-// check, and a Metal texture atomic takes no order, so its order may be dynamic.
+// order held in a `static const` global folds to its constant, and an atomic in a branch that is
+// removed as dead code is never checked. An atomic intrinsic declared without an order has
+// nothing to check, and a Metal texture atomic takes no order, so its order may be dynamic.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -g2
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute -g2
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL_TEXTURE):-target metal -entry computeMain -stage compute -DTEXTURE_ATOMIC
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute -DORDERLESS_ATOMIC
-//TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute -DORDERLESS_ATOMIC
 
 RWStructuredBuffer<Atomic<uint>> flag;
 RWStructuredBuffer<uint> outb;
 uniform int dynamicOrder;
 
-static MemoryOrder globalOrder = MemoryOrder.Acquire;
+static const MemoryOrder globalOrder = MemoryOrder.Acquire;
 static const bool useDynamicOrder = false;
 
 #ifdef ORDERLESS_ATOMIC

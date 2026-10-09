@@ -662,9 +662,9 @@ static Index getFirstMemoryOrderOperandIndex(IRInst* inst)
 }
 
 // Return whether the code generated for the atomic operation `inst` encodes its memory order, and
-// so needs the order to be a valid compile-time constant. SPIR-V encodes the order of every atomic.
-// Metal encodes it except on texture atomics, whose Metal functions take no order. The other
-// targets drop the order.
+// so needs the order to be a valid compile-time constant. SPIR-V emits the order as the memory
+// semantics of its atomic instructions. Metal emits it except on texture atomics (the emitter's
+// `isTextureAccess`), whose Metal functions take no order. The other targets drop the order.
 static bool doesAtomicEncodeMemoryOrder(IRInst* inst, CodeGenTarget target)
 {
     if (isSPIRV(target))
@@ -763,20 +763,30 @@ static void validateCompareExchangeMemoryOrders(
     DiagnosticSink* sink)
 {
     IRMemoryOrder successOrder;
-    bool hasSuccessOrder = tryGetAtomicMemoryOrder(inst, orderIndex, target, sink, successOrder);
+    if (!tryGetAtomicMemoryOrder(inst, orderIndex, target, sink, successOrder))
+    {
+        if (auto failOrderLit = as<IRIntLit>(inst->getOperand(orderIndex + 1)))
+        {
+            auto failOrder = IRMemoryOrder(failOrderLit->getValue());
+            if (!isMemoryOrderValidForRead(failOrder))
+                diagnoseInvalidMemoryOrderForAtomicOperation(
+                    inst,
+                    failOrder,
+                    "a compareExchange failure",
+                    sink);
+        }
+        return;
+    }
     IRMemoryOrder failOrder;
     if (!tryGetAtomicMemoryOrder(inst, orderIndex + 1, target, sink, failOrder))
         return;
     if (!isMemoryOrderValidForRead(failOrder))
-    {
         diagnoseInvalidMemoryOrderForAtomicOperation(
             inst,
             failOrder,
             "a compareExchange failure",
             sink);
-        return;
-    }
-    if (hasSuccessOrder && isCompareExchangeFailOrderStronger(successOrder, failOrder))
+    else if (isCompareExchangeFailOrderStronger(successOrder, failOrder))
         sink->diagnose(Diagnostics::AtomicCompareExchangeFailOrderStrongerThanSuccessOrder{
             .failOrder = getMemoryOrderName(failOrder),
             .successOrder = getMemoryOrderName(successOrder),
@@ -798,10 +808,10 @@ static void validateAtomicMemoryOrders(IRInst* inst, CodeGenTarget target, Diagn
     if (inst->getOperandCount() <= UInt(orderIndex))
         return;
 
-    if (inst->getOp() == kIROp_AtomicCompareExchange)
+    if (inst->getOp() == kIROp_AtomicCompareExchange &&
+        inst->getOperandCount() > UInt(orderIndex) + 1)
     {
-        if (inst->getOperandCount() > UInt(orderIndex) + 1)
-            validateCompareExchangeMemoryOrders(inst, orderIndex, target, sink);
+        validateCompareExchangeMemoryOrders(inst, orderIndex, target, sink);
         return;
     }
 
