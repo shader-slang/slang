@@ -920,7 +920,26 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
+            // An `inout` argument is read as well as written, so it is checked separately
+            // in `ResolveInvoke`. A GLSL `writeonly` parameter receives the restriction
+            // instead of reading the argument.
+            bool bindsLocation = paramType.isLeftValue || context.isCoercionConversionCall;
+            if (candidate.flavor == OverloadCandidate::Flavor::Func &&
+                paramIndex < paramDecls.getCount())
+            {
+                if (auto memoryQualifiers = paramDecls[paramIndex]
+                                                .getDecl()
+                                                ->findModifier<MemoryQualifierSetModifier>())
+                {
+                    if (memoryQualifiers->getMemoryQualifierBit() &
+                        MemoryQualifierSetModifier::Flags::kWriteOnly)
+                        bindsLocation = true;
+                }
+            }
+            Expr* coercedExpr =
+                bindsLocation
+                    ? coerceBoundLocation(CoercionSite::Argument, paramType, arg.argExpr, getSink())
+                    : coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
@@ -1088,6 +1107,20 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     //
     if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
+        // A receiver passed by value or `inout` is read, while an `out` or `[__ref]` receiver is
+        // bound as a location. A resource handle's methods are exempt: the restriction is on the
+        // resource's contents, and a method's signature does not say whether it reads them.
+        const auto thisMode = thisParamInfo->mode;
+        const bool readsThis = thisMode == ParamPassingMode::In ||
+                               thisMode == ParamPassingMode::BorrowIn ||
+                               thisMode == ParamPassingMode::BorrowInOut;
+        if (context.mode == OverloadResolveContext::Mode::ForReal && readsThis &&
+            context.baseExpr && context.baseExpr->type.isWriteOnly &&
+            !isOpaqueHandleType(context.baseExpr->type))
+        {
+            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = context.baseExpr});
+        }
+
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
@@ -1675,6 +1708,12 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 // sure
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
+                    // Whether a subscript reads its base depends on the accessor chosen later, so
+                    // the element inherits the base's write-only restriction and `coerce` reports
+                    // a value use.
+                    if (context.baseExpr && context.baseExpr->type.isWriteOnly)
+                        callExpr->type.isWriteOnly = true;
+
                     const auto& decl = subscriptDeclRef.getDecl();
                     for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {

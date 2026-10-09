@@ -2658,6 +2658,7 @@ bool SemanticsVisitor::_coerce(
 
     OverloadResolveContext overloadContext;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
+    overloadContext.isCoercionConversionCall = true;
     overloadContext.argCount = 1;
     List<Expr*> args;
     args.add(fromExpr);
@@ -3394,6 +3395,17 @@ Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* f
 
 
 Expr* SemanticsVisitor::coerce(
+    CoercionSite site,
+    Type* toType,
+    Expr* fromExpr,
+    DiagnosticSink* sink)
+{
+    if (fromExpr->type.isWriteOnly && sink)
+        sink->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = fromExpr});
+    return coerceBoundLocation(site, toType, fromExpr, sink);
+}
+
+Expr* SemanticsVisitor::coerceBoundLocation(
     CoercionSite site,
     Type* toType,
     Expr* fromExpr,

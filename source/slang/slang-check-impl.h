@@ -2444,8 +2444,18 @@ public:
     ///
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
+    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible.
+    /// The result is read as a value, so a write-only `fromExpr` is reported.
     Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
+
+    /// Coerce `fromExpr` to `toType` as `coerce` does, for a result that is bound as a location
+    /// (an argument for an `out` or reference parameter) rather than read, so a write-only
+    /// `fromExpr` is allowed.
+    Expr* coerceBoundLocation(
+        CoercionSite site,
+        Type* toType,
+        Expr* fromExpr,
+        DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -3740,6 +3750,11 @@ public:
             ShortList<MatchedArg>& outMatchedArgs);
 
         bool disallowNestedConversions = false;
+
+        /// Is this the call to a conversion initializer that `coerce` forms? Its argument
+        /// is the expression being coerced, which `coerce` has already checked for a
+        /// write-only read.
+        bool isCoercionConversionCall = false;
 
         Expr* baseExpr = nullptr;
 

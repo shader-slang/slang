@@ -2667,6 +2667,10 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     initExpr = subVisitor.CheckExpr(initExpr);
     initExpr = maybeOpenRef(initExpr);
 
+    // An inferred-type initializer is not coerced, so `coerce` cannot report the read.
+    if (initExpr->type.isWriteOnly)
+        getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
+
     // TODO: We might need some additional steps here to ensure
     // that the type of the expression is one we are okay with
     // inferring. E.g., if we ever decide that integer and floating-point
@@ -3597,9 +3601,6 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
         auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
-
-        if (initExpr->type.isWriteOnly)
-            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;

@@ -3486,6 +3486,8 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
+    // Reading an element of a write-only array or vector would also read the base.
+    subscriptExpr->type.isWriteOnly = baseExpr->type.isWriteOnly;
 
     return subscriptExpr;
 }
@@ -3814,9 +3816,6 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
-    if (expr->right->type.isWriteOnly)
-        getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
-
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
     if (auto atomicType = as<AtomicType>(type))
@@ -4339,6 +4338,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
+                // An `inout` parameter (including the left operand of `+=` and the operand
+                // of `++`) reads its argument before writing it back.
+                if (argExpr && argExpr->type.isWriteOnly && as<BorrowInOutParamType>(paramType))
+                    getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = argExpr});
+
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
@@ -4819,7 +4823,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
 
         auto arg = expr->arguments[0];
-        if (!arg->type.type)
+        if (!arg->type.type || arg->type.isWriteOnly)
             return nullptr;
         Type* uOperandType = arg->type.type;
         // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
@@ -4907,6 +4911,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 
     auto leftArg = expr->arguments[0];
     auto rightArg = expr->arguments[1];
+    // A write-only operand goes through ordinary overload resolution, whose argument
+    // coercion reports the read.
+    if (leftArg->type.isWriteOnly || rightArg->type.isWriteOnly)
+        return nullptr;
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
 
@@ -8435,6 +8443,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     // A swizzle can be used as an l-value as long as there
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates;
+    swizExpr->type.isWriteOnly = memberRefExpr->baseExpression->type.isWriteOnly;
 
     return swizExpr;
 }
@@ -8549,6 +8558,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     // A swizzle can be used as an l-value as long as there
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates;
+    swizExpr->type.isWriteOnly = memberExpr->baseExpression->type.isWriteOnly;
     return swizExpr;
 }
 
@@ -8658,6 +8668,7 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
                                  swizExpr->base->type.isLeftValue;
+    swizExpr->type.isWriteOnly = swizExpr->base && swizExpr->base->type.isWriteOnly;
 
     return swizExpr;
 }
