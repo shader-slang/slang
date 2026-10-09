@@ -207,6 +207,22 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+// Controls whether `checkAutodiffPatterns` warns when a `[PreferRecompute]`
+// function has side effects; neither value says anything about purity. The
+// user-visible `SideEffectBehavior` enum in core.meta.slang takes its values
+// from this one, and they are stored as the integer operand of
+// `IRPreferRecomputeDecoration`, so renumbering them changes the meaning of
+// already-compiled modules.
+enum class SideEffectBehavior
+{
+    // Warn if the decorated function is detected to have side effects.
+    Warn = 0,
+
+    // Suppress that warning: the author accepts that the side effects may run
+    // more than once.
+    Allow = 1,
+};
+
 // NOTE: The IR linker assumes every `AnnotationKind` is differentiability-
 // related: `cloneAnnotations` in slang-ir-link.cpp skips cloning *all*
 // module-scope annotations into the final codegen link of a program that does
