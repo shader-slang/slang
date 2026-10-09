@@ -22968,13 +22968,14 @@ static bool _isTypeKnownToHoldOrdinaryDataImpl(
     auto decl = declRefType->getDeclRef().getDecl();
 
     // Every other builtin type, such as a scalar, vector, matrix, pointer or `Optional<T>`,
-    // is stored as ordinary data. So is an enum.
-    if (as<EnumDecl>(decl) || decl->hasModifier<BuiltinTypeModifier>() ||
+    // is stored as ordinary data. So is an enum, and so is an interface type, whose values
+    // are existentials that carry type and witness identifiers alongside their payload.
+    if (as<EnumDecl>(decl) || as<InterfaceDecl>(decl) || decl->hasModifier<BuiltinTypeModifier>() ||
         decl->hasModifier<MagicTypeModifier>())
         return true;
 
-    // A generic parameter, associated type or interface type is only resolved by
-    // specialization, so we cannot prove that it holds ordinary data.
+    // A generic parameter or associated type is only resolved by specialization, so we
+    // cannot prove that it holds ordinary data.
     auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
     if (!structDeclRef)
         return false;

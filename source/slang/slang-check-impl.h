@@ -4639,7 +4639,7 @@ bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type)
 // aggregate into its own binding: `struct R { Texture2D t; SamplerState s; }` holds no
 // ordinary data, while `struct M { Texture2D t; float4 v; }` holds `v`. A pointer is an
 // address stored in uniform memory, so it is ordinary data. We return false when the answer
-// depends on specialization, as for a generic parameter `T` or an interface type.
+// depends on specialization, as for a generic parameter `T`.
 bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type);
 
 // Diagnose `varDecl`, a shader parameter that the compiler packs into an implicit
