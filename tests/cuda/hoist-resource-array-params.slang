@@ -1,0 +1,180 @@
+// Verifies hoistCUDAResourceArrayParamsToParameterGroup: a CUDA compute entry point whose uniform
+// parameters transitively contain a fixed-size array of resources is hoisted into a module-scope
+// `ConstantBuffer<GlobalParams>` (emitted as `extern "C" __constant__ ... SLANG_globalParams`),
+// while entry points without such an array keep the default entry-point parameter path. On CUDA,
+// ordinary entry-point uniforms are left on the kernel signature, so `SLANG_globalParams` appears
+// here only when the hoist fires.
+
+//TEST:SIMPLE(filecheck=POS): -target cuda -line-directive-mode none -stage compute -entry positiveMain
+//TEST:SIMPLE(filecheck=TRANS): -target cuda -line-directive-mode none -stage compute -entry transitiveMain
+//TEST:SIMPLE(filecheck=TENSOR): -target cuda -line-directive-mode none -stage compute -entry tensorWrapperMain
+//TEST:SIMPLE(filecheck=MIXED): -target cuda -line-directive-mode none -stage compute -entry mixedOrderMain
+//TEST:SIMPLE(filecheck=KINDS): -target cuda -line-directive-mode none -stage compute -entry textureSamplerMain
+//TEST:SIMPLE(filecheck=PTR): -target cuda -line-directive-mode none -stage compute -entry ptrMain
+//TEST:SIMPLE(filecheck=NEGNOARR): -target cuda -line-directive-mode none -stage compute -entry noResourceArrayMain
+//TEST:SIMPLE(filecheck=NEGNONRES): -target cuda -line-directive-mode none -stage compute -entry nonResourceArrayMain
+// Compiling every entry point together makes more than one compute kernel qualify, so the driver
+// must bail and hoist nothing (a single module cannot hold two `SLANG_globalParams` symbols).
+//TEST:SIMPLE(filecheck=MULTI): -target cuda -line-directive-mode none
+// The pass is CUDA-only (gated on isCUDATarget). The same kernel on a non-CUDA target must not be
+// hoisted — no `SLANG_globalParams` — guarding against a regression that drops/broadens the gate.
+//TEST:SIMPLE(filecheck=NEGHLSL): -target hlsl -line-directive-mode none -stage compute -entry positiveMain
+//TEST:SIMPLE(filecheck=NEGSPIRV): -target spirv -line-directive-mode none -stage compute -entry positiveMain
+
+// Positive: a runtime-indexed fixed-size resource array uniform must be hoisted into __constant__.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void positiveMain(
+    uint tid: SV_DispatchThreadID,
+    RWStructuredBuffer<float> tensors[8],
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]][tid] = 1.0f;
+}
+// The hoisted struct holds the uniform params in declaration order (tensors before indices), the
+// varying SV_DispatchThreadID is computed locally (not hoisted), and the kernel signature is empty.
+// POS: struct GlobalParams
+// POS: tensors
+// POS: indices
+// POS: __constant__{{.*}}SLANG_globalParams
+// The kernel signature is emptied — all uniform params were hoisted (literal `()`, no parameters).
+// POS: void positiveMain()
+// A partial regression that left a uniform on the signature would still match a bare
+// `positiveMain(` substring, so explicitly forbid a resource-typed kernel argument.
+// POS-NOT: positiveMain({{.*}}RWStructuredBuffer
+// POS: blockIdx
+
+// Positive (transitive): a fixed-size resource array nested inside a struct uniform must also be
+// hoisted, exercising the recursive walk through struct fields.
+struct Tensors
+{
+    RWStructuredBuffer<float> bufs[8];
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void transitiveMain(uint tid: SV_DispatchThreadID, Tensors t, StructuredBuffer<uint> indices)
+{
+    t.bufs[indices[tid]][tid] = 1.0f;
+}
+// The struct is synthesized and the uniforms actually land in it (not just an empty GlobalParams).
+// TRANS: struct GlobalParams
+// TRANS: indices
+// TRANS: __constant__{{.*}}SLANG_globalParams
+
+// Positive (struct-wrapped element): a fixed-size array whose element is a struct wrapping a
+// resource (the SlangPy tensor shape) must be hoisted, exercising the recursive walk into the
+// array element type.
+struct Tensor
+{
+    RWStructuredBuffer<float> data;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void tensorWrapperMain(
+    uint tid: SV_DispatchThreadID,
+    Tensor tensors[8],
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]].data[tid] = 1.0f;
+}
+// TENSOR: struct GlobalParams
+// TENSOR: tensors
+// TENSOR: indices
+// TENSOR: __constant__{{.*}}SLANG_globalParams
+
+// Positive (mixed ordering): a uniform resource array declared *before* the varying
+// SV_DispatchThreadID must still hoist with correct field indexing — the per-parameter counter has
+// to account for the varying parameter's position, not assume the varying one comes first.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mixedOrderMain(
+    RWStructuredBuffer<float> tensors[8],
+    uint tid: SV_DispatchThreadID,
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]][tid] = 1.0f;
+}
+// MIXED: struct GlobalParams
+// MIXED: tensors
+// MIXED: indices
+// MIXED: __constant__{{.*}}SLANG_globalParams
+// MIXED: mixedOrderMain()
+// MIXED: blockIdx
+
+// Positive (resource-kind matrix): the classifier admits the whole CUDA resource family via
+// `isResourceType`, not just structured buffers — fixed-size arrays of textures and of samplers must
+// hoist too. This guards against an `isResourceType` change that silently drops a resource kind and
+// lets the affected kernel fall back to the `.param` slowdown.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void textureSamplerMain(
+    uint tid: SV_DispatchThreadID,
+    Texture2D<float4> textures[4],
+    SamplerState samplers[4],
+    RWStructuredBuffer<float4> output,
+    StructuredBuffer<uint> indices)
+{
+    uint i = indices[tid];
+    output[tid] = textures[i].SampleLevel(samplers[i], float2(0.5f, 0.5f), 0.0f);
+}
+// KINDS: struct GlobalParams
+// KINDS: textures
+// KINDS: samplers
+// KINDS: __constant__{{.*}}SLANG_globalParams
+
+// Positive (pointer-backed element): the `_typeIsOrContainsResource` carve-out admits a first-class
+// data pointer (`IRPtrType`), not just the resource family `isResourceType` covers. This is the
+// SlangPy shape — tensor storage specialized to a plain `float*` on CUDA — and a fixed-size array of
+// such pointer-backed structs must hoist too. Pins the documented `IRPtrType` (not `IRPtrTypeBase`)
+// distinction so a regression that drops the carve-out (regressing SlangPy) fails here.
+struct PtrTensor
+{
+    float* data;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void ptrMain(
+    uint tid: SV_DispatchThreadID,
+    PtrTensor tensors[8],
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]].data[tid] = 1.0f;
+}
+// PTR: struct GlobalParams
+// PTR: tensors
+// PTR: __constant__{{.*}}SLANG_globalParams
+
+// Negative: a single resource (not a fixed-size array) must not trigger the hoist.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void noResourceArrayMain(uint tid: SV_DispatchThreadID, RWStructuredBuffer<float> output)
+{
+    output[tid] = 1.0f;
+}
+// NEGNOARR-NOT: SLANG_globalParams
+
+// Negative: a fixed-size array of non-resource elements must not trigger the hoist.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void nonResourceArrayMain(
+    uint tid: SV_DispatchThreadID,
+    RWStructuredBuffer<float> output,
+    uniform float scales[8])
+{
+    output[tid] = scales[tid % 8];
+}
+// NEGNONRES-NOT: SLANG_globalParams
+
+// Multi-kernel module (all entry points compiled together): more than one compute kernel qualifies,
+// so the driver bails and nothing is hoisted.
+// MULTI-NOT: SLANG_globalParams
+
+// Non-CUDA targets never run the pass, so the synthesized `GlobalParams` struct must not appear.
+// (We check `GlobalParams`, not `SLANG_globalParams`: the latter is a CUDA-emit-only symbol that is
+// absent on these targets regardless of the gate, so it would be a vacuous check — but the
+// `GlobalParams` struct this pass synthesizes would show up on any target if the gate broke.)
+// NEGHLSL-NOT: GlobalParams
+// NEGSPIRV-NOT: GlobalParams
