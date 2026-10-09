@@ -2849,6 +2849,17 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         JSONValue::makeInt(1));
     List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
     bool diagnosticsReceived = false;
+    // Set by `SET_WORKSPACE_FLAVOR:`; the next response wait then skips the server's refresh
+    // requests and log messages. Other tests keep treating an unexpected server call as the
+    // response.
+    //
+    // This deliberately differs from `sendConfig` above, which blocks until exactly two refresh
+    // requests arrive: a server that ignores the setting sends none, so `sendConfig` would hang
+    // instead of failing the test. The flag is one-shot (cleared when the next response wait
+    // returns), so every `SET_WORKSPACE_FLAVOR:` directive must be followed by a
+    // response-producing directive (e.g. `HOVER:`); otherwise a later, unrelated wait would
+    // still skip these calls.
+    bool skipRefreshRequests = false;
     auto waitForNonDiagnosticResponse = [&]() -> SlangResult
     {
         repeat:
@@ -2867,7 +2878,16 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     diagnostics.add(arg);
                     goto repeat;
                 }
+                if (skipRefreshRequests && (call.method == "workspace/semanticTokens/refresh" ||
+                                            call.method == "workspace/inlayHint/refresh" ||
+                                            call.method == "window/logMessage"))
+                {
+                    // Sent by the server after a configuration change (or, for an unknown
+                    // value, a warning about it); not a response.
+                    goto repeat;
+                }
             }
+            skipRefreshRequests = false;
             return SLANG_OK;
     };
 
@@ -2939,6 +2959,27 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     JSONValue::makeBool(false))))
                 return TestResult::Fail;
             actualOutputSB << "--------\nsearchInAllWorkspaceDirectories: false\n";
+        }
+        else if (line.startsWith("SET_WORKSPACE_FLAVOR:"))
+        {
+            // The `slang.workspaceFlavor` configuration change is sent without waiting for the
+            // server's refresh requests (the next response wait skips them), so that a server
+            // that ignores the change fails the test instead of hanging it.
+            skipRefreshRequests = true;
+            auto flavor = line.tail(UnownedStringSlice("SET_WORKSPACE_FLAVOR:").getLength()).trim();
+            auto container = connection->getContainer();
+            JSONValue settingsValue = container->createObject(nullptr, 0);
+            container->setKeyValue(
+                settingsValue,
+                container->getKey(UnownedStringSlice("slang.workspaceFlavor")),
+                container->createString(flavor));
+            LanguageServerProtocol::DidChangeConfigurationParams configParams;
+            configParams.settings = settingsValue;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+                    &configParams)))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nworkspaceFlavor: " << flavor << "\n";
         }
         else if (line.startsWith("SIGNATURE:"))
         {

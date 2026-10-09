@@ -194,6 +194,7 @@ public:
     bool updateSearchPaths(List<String> searchPaths);
     bool updateSearchInWorkspace(bool value);
     bool updatePredefinedLanguageVersion(SlangLanguageVersion version);
+    bool updateWorkspaceFlavor(WorkspaceFlavor flavor);
 
     void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
     void invalidate();
