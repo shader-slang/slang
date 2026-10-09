@@ -448,9 +448,14 @@ jobs:
   # A skipped job here does NOT by itself let the build below proceed --
   # see the `if` on build-windows-release-cl-x86_64-gpu-falcor, which
   # explicitly opts back in to running after a skip.
+  # Do not request approval for a bot run that yielded before doing any work.
+  # Otherwise it remains waiting and cannot be picked up by the retry workflow.
   falcor-build-approval-gate:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
+    needs: [filter, wait-for-human-priority]
+    if: |
+      needs.filter.outputs.should-run == 'true' &&
+      needs.wait-for-human-priority.result == 'success' &&
+      github.event_name != 'merge_group'
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -491,15 +496,17 @@ jobs:
   # conditional expression that causes the job to continue" (GitHub Actions
   # docs). So this job's `if` must explicitly opt back in with `always()`
   # and then re-check the gate's own result: proceed when the gate
-  # succeeded (the ordinary pull_request path) or was itself skipped
-  # (the merge_group path added above), but still stop if the gate ran
-  # and failed or was cancelled.
+  # succeeded (the ordinary pull_request path) or was skipped for merge_group.
+  # The priority decision must also succeed: a bot yield skips the approval
+  # gate too, but must not release the Falcor build or its downstream tests.
   build-windows-release-cl-x86_64-gpu-falcor:
-    needs: [filter, falcor-build-approval-gate]
+    needs: [filter, wait-for-human-priority, falcor-build-approval-gate]
     if: >-
       always() && needs.filter.outputs.should-run == 'true' &&
+      needs.wait-for-human-priority.result == 'success' &&
       (needs.falcor-build-approval-gate.result == 'success' ||
-      needs.falcor-build-approval-gate.result == 'skipped')
+      (github.event_name == 'merge_group' &&
+      needs.falcor-build-approval-gate.result == 'skipped'))
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
