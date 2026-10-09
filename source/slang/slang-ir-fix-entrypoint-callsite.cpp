@@ -35,6 +35,7 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
             case kIROp_UserExternDecoration:
             case kIROp_HLSLExportDecoration:
             case kIROp_EntryPointDecoration:
+            case kIROp_CudaKernelDecoration:
             case kIROp_LayoutDecoration:
             case kIROp_NumThreadsDecoration:
             case kIROp_ImportDecoration:
@@ -98,7 +99,12 @@ void fixEntryPointCallsites(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (globalInst->findDecoration<IREntryPointDecoration>())
+        // Consider a SlangPy compute wrapper that directly calls a [CUDAKernel] function.
+        // The attribute gives the original function a launch ABI, even without an entry-point
+        // decoration. Its direct callers need the same ordinary-function clone as callers of
+        // a shader entry point; retaining the attribute would make that clone another kernel.
+        if (globalInst->findDecoration<IREntryPointDecoration>() ||
+            globalInst->findDecoration<IRCudaKernelDecoration>())
             fixEntryPointCallsites((IRFunc*)globalInst);
     }
 }
