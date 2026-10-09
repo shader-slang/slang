@@ -5492,6 +5492,13 @@ err(
     span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
+warning(
+    "conflicting-exported-definitions",
+    45002,
+    "'~symbol' is exported by more than one module; using the definition from module '~selectedModule'",
+    span { loc = "location", message = "selected definition of '~symbol'" }
+)
+
 -- 451xx - Coverage instrumentation (-trace-coverage)
 
 err(
@@ -6529,6 +6536,20 @@ standalone_note(
     -1,
     "see declaration of '~inst:IRInst'",
     span { loc = "inst:IRInst" }
+)
+
+standalone_note(
+    "conflicting-exported-definition-candidate",
+    -1,
+    "another definition of '~symbol' is exported by module '~candidateModule'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "conflicting-exported-type-members",
+    -1,
+    "the methods of '~symbol' are linked separately and may come from a different one of these modules",
+    span { loc = "location" }
 )
 
 standalone_note(
