@@ -2980,8 +2980,9 @@ static void beginConditional(PreprocessorDirectiveContext* context, bool enable)
 // Preprocessor Conditional Expressions
 //
 
-// Conditional expressions are always of type `int`
-typedef int PreprocessorExpressionValue;
+// Conditional expressions are evaluated as 64-bit signed integers, so that integer
+// literals keep the same values they have in code.
+typedef IntegerLiteralValue PreprocessorExpressionValue;
 
 // Forward-declaretion
 static PreprocessorExpressionValue _parseAndEvaluateExpression(
@@ -3026,7 +3027,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
         }
 
     case TokenType::IntegerLiteral:
-        return stringToInt(token.getContent());
+        return getIntegerLiteralValue(token, GetSink(context));
 
     case TokenType::Identifier:
         {
