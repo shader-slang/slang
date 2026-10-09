@@ -1,6 +1,6 @@
 // An explicit constant buffer whose element type has no instance fields of its own ends where
 // its base struct ends, so a trailing unsized array of ordinary data in the base is diagnosed
-// (E31215) instead of crashing while looking for the trailing field.
+// (E31215).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main
 

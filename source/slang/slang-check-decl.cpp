@@ -23104,16 +23104,25 @@ void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
     VarDeclBase* varDecl,
     GlobalGenericArgs const* globalGenericArgs)
 {
+    if (!isGlobalShaderParameter(varDecl))
+        return;
+
+    // A parameter declared with a global `type_param`, as in `uniform TT values`, has the type
+    // bound to it, as in `_createTypeLayout`.
+    auto type = varDecl->getType();
+    Val* boundType = nullptr;
+    if (auto globalGenericParamDeclRef = isDeclRefTypeOf<GlobalGenericParamDecl>(type);
+        globalGenericParamDeclRef && globalGenericArgs &&
+        globalGenericArgs->tryGetValue(globalGenericParamDeclRef.getDecl(), boundType))
+        type = as<Type>(boundType);
+    if (!type)
+        return;
+
     // An explicit `ConstantBuffer` or `ParameterBlock` is checked against its element type
     // instead; the ordinary data of any other global shader parameter goes into `GlobalParams`.
-    if (!isGlobalShaderParameter(varDecl) ||
-        visitor->getConstantBufferElementType(varDecl->getType()))
+    if (visitor->getConstantBufferElementType(type))
         return;
-    diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
-        visitor,
-        varDecl->getType(),
-        varDecl,
-        globalGenericArgs);
+    diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(visitor, type, varDecl, globalGenericArgs);
 }
 
 bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)

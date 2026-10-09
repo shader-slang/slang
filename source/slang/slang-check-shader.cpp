@@ -1744,6 +1744,7 @@ static void collectGenericStructTypeUses(
 
 /// Diagnose each `uniform` parameter of `funcDeclRef` whose type, after substituting any
 /// generic arguments in `funcDeclRef`, ends in an unsized array of ordinary data.
+/// `globalGenericArgs` is as for `isTypeKnownToHoldOrdinaryData`.
 ///
 /// Requires the `uniform` modifiers of `funcDeclRef`'s parameters to be final, as they are
 /// after `validateEntryPoint` classifies its parameters. We skip a parameter that is not
@@ -1752,7 +1753,8 @@ static void collectGenericStructTypeUses(
 /// `main<A : IArray<float4>>(uniform A values)`, can still become unsized by specialization.
 static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
     SemanticsVisitor* visitor,
-    DeclRef<FuncDecl> funcDeclRef)
+    DeclRef<FuncDecl> funcDeclRef,
+    GlobalGenericArgs const* globalGenericArgs)
 {
     auto astBuilder = visitor->getASTBuilder();
     for (auto paramDeclRef : getParameters(astBuilder, funcDeclRef))
@@ -1768,7 +1770,7 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
             visitor,
             getType(astBuilder, paramDeclRef),
             param,
-            nullptr);
+            globalGenericArgs);
     }
 }
 
@@ -2374,7 +2376,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             linkage->m_optionSet.getLanguageVersion(),
             sink);
         SemanticsVisitor visitor(shared);
-        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, entryPoint->getFuncDeclRef());
+        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
+            &visitor,
+            entryPoint->getFuncDeclRef(),
+            nullptr);
     }
 
     // Validate that varying parameter/return types are legal. Runs after the
@@ -3579,10 +3584,11 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
         }
     }
 
-    // Semantic checking cannot decide whether a global parameter such as `uniform TT values[]`
-    // holds an unsized array of ordinary data before a type is bound to the `type_param TT`, so
-    // we check the global shader parameters again with the bound types. A module with errors is
-    // not specialized, so a parameter already diagnosed is not reported twice.
+    // Semantic checking cannot decide whether a parameter such as `uniform TT values[]` holds an
+    // unsized array of ordinary data before a type is bound to the `type_param TT`, so we check
+    // the global shader parameters and the module's entry-point uniforms again with the bound
+    // types. A module with errors is not specialized, so a parameter already diagnosed is not
+    // reported twice.
     GlobalGenericArgs globalGenericArgs;
     for (auto& genericArg : specializationInfo->genericArgs)
     {
@@ -3596,6 +3602,13 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
             diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
                 &visitor,
                 shaderParam.paramDeclRef.getDecl(),
+                &globalGenericArgs);
+        }
+        for (auto entryPoint : m_entryPoints)
+        {
+            diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
+                &visitor,
+                entryPoint->getFuncDeclRef(),
                 &globalGenericArgs);
         }
     }
@@ -3805,7 +3818,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     // parameters again. An error that `validateEntryPoint` reported for the unspecialized
     // parameters stops compilation before specialization, so it is not reported twice.
     if (genericSpecializationParamCount)
-        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, specializedFuncDeclRef);
+        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, specializedFuncDeclRef, nullptr);
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface
