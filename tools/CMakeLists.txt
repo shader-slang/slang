@@ -486,6 +486,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/source
             ${slang_SOURCE_DIR}/examples
+        INCLUDE_FROM_PRIVATE prelude
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools

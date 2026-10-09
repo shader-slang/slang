@@ -20680,26 +20680,33 @@ static const RAY_FLAG RAY_FLAG_FORCE_OMM_2_STATE = 0x400;
 /// @category raytracing
 __target_intrinsic(hlsl, RayDesc)
 __target_intrinsic(cuda, RayDesc)
+__target_intrinsic(cpp, RayDesc)
 struct RayDesc
 {
     /// Starting point of the ray in world space.
     __target_intrinsic(hlsl, Origin)
     __target_intrinsic(cuda, Origin)
+    __target_intrinsic(cpp, Origin)
     float3 Origin;
 
     /// Minimum distance along the ray to consider intersections.
     __target_intrinsic(hlsl, TMin)
     __target_intrinsic(cuda, TMin)
+    __target_intrinsic(cpp, TMin)
     float  TMin;
 
-    /// Normalized direction vector of the ray in world space.
+    /// Direction vector of the ray in world space. It does not need to be normalized.
+    /// See the DXR functional specification for the definition of a ray:
+    /// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#rays
     __target_intrinsic(hlsl, Direction)
     __target_intrinsic(cuda, Direction)
+    __target_intrinsic(cpp, Direction)
     float3 Direction;
 
     /// Maximum distance along the ray to consider intersections.
     __target_intrinsic(hlsl, TMax)
     __target_intrinsic(cuda, TMax)
+    __target_intrinsic(cpp, TMax)
     float  TMax;
 };
 
@@ -22487,7 +22494,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @param ray Description of ray parameters (origin, direction, tMin, tMax)
     [__unsafeForceInlineEarly]
     [mutating]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -22496,6 +22503,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->TraceRayInline($1, $2, $3, $4)";
         case hlsl: __intrinsic_asm ".TraceRayInline";
         case glsl:
         case spirv:
@@ -22530,11 +22538,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks When true is returned, use Candidate* methods to evaluate the hit
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     bool Proceed()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->Proceed()";
         case hlsl: __intrinsic_asm ".Proceed";
         case glsl: __intrinsic_asm "rayQueryProceedEXT";
         case metal: __intrinsic_asm "$0->next()";
@@ -22549,11 +22558,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks Causes subsequent Proceed() calls to return false
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     void Abort()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->Abort()";
         case hlsl: __intrinsic_asm ".Abort";
         case glsl: __intrinsic_asm "rayQueryTerminateEXT";
         case metal: __intrinsic_asm "$0->abort()";
@@ -22565,11 +22575,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     void CommitNonOpaqueTriangleHit()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CommitNonOpaqueTriangleHit()";
         case hlsl: __intrinsic_asm ".CommitNonOpaqueTriangleHit";
         case glsl: __intrinsic_asm "rayQueryConfirmIntersectionEXT";
         case metal: __intrinsic_asm "$0->commit_triangle_intersection()";
@@ -22582,11 +22593,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     void CommitProceduralPrimitiveHit(float t)
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CommitProceduralPrimitiveHit($1)";
         case hlsl: __intrinsic_asm ".CommitProceduralPrimitiveHit";
         case glsl: __intrinsic_asm "rayQueryGenerateIntersectionEXT";
         case metal: __intrinsic_asm "$0->commit_bounding_box_intersection($1)";
@@ -22606,11 +22618,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CandidateType()";
         case hlsl: __intrinsic_asm ".CandidateType";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, false)";
         case spirv:
@@ -22643,11 +22656,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CommittedStatus()";
         case hlsl: __intrinsic_asm ".CommittedStatus";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTypeEXT($0, true)";
         case spirv:
@@ -22680,11 +22694,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_spirv, rayquery)]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CandidateProceduralPrimitiveNonOpaque()";
         case hlsl: __intrinsic_asm ".CandidateProceduralPrimitiveNonOpaque";
         case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0))";
         case spirv:
@@ -22702,11 +22717,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float CandidateTriangleRayT()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CandidateTriangleRayT()";
         case hlsl: __intrinsic_asm ".CandidateTriangleRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, false)";
         case metal: __intrinsic_asm "$0->get_candidate_triangle_distance()";
@@ -22724,11 +22740,12 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float CommittedRayT()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->CommittedRayT()";
         case hlsl: __intrinsic_asm ".CommittedRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
         case metal: __intrinsic_asm "$0->get_committed_distance()";
@@ -23268,11 +23285,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_spirv, rayquery)]
     uint $(ccName)InstanceContributionToHitGroupIndex()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->$(ccName)InstanceContributionToHitGroupIndex()";
         case hlsl: __intrinsic_asm ".$(ccName)InstanceContributionToHitGroupIndex";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, $(ccTF))";
         case spirv:
@@ -23341,11 +23359,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float3x4 $(ccName)$(method.name)3x4()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->$(ccName)$(method.name)3x4()";
         case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
         case metal: __intrinsic_asm "transpose($0->get_$(ccNameMetal)$(method.metalName)())";
@@ -23365,11 +23384,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__readNone]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float4x3 $(ccName)$(method.name)4x3()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->$(ccName)$(method.name)4x3()";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
         case metal: __intrinsic_asm "$0->get_$(ccNameMetal)$(method.metalName)()";
@@ -23411,11 +23431,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     $(method.type) $(ccName)$(method.hlslName)()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->$(ccName)$(method.hlslName)()";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
         case metal: __intrinsic_asm "$0->$(metalPrefix)$(ccNameMetal)$(method.metalName)()";
@@ -23437,11 +23458,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     uint RayFlags()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->RayFlags()";
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
         case metal:
@@ -23490,11 +23512,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayOrigin()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->WorldRayOrigin()";
         case hlsl: __intrinsic_asm ".WorldRayOrigin";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayOriginEXT";
         case metal: __intrinsic_asm "$0->get_world_space_ray_origin()";
@@ -23507,15 +23530,16 @@ $}
     }
 
     /// Gets the world-space direction of the ray.
-    /// @return Normalized direction vector in world space
+    /// @return Direction vector supplied to `TraceRayInline`; it is not necessarily normalized.
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayDirection()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->WorldRayDirection()";
         case hlsl: __intrinsic_asm ".WorldRayDirection";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayDirectionEXT";
         case metal: __intrinsic_asm "$0->get_world_space_ray_direction()";
@@ -23533,11 +23557,12 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(cpp_glsl_hlsl_metal_spirv, rayquery)]
     float RayTMin()
     {
         __target_switch
         {
+        case cpp: __intrinsic_asm "$0->RayTMin()";
         case hlsl: __intrinsic_asm ".RayTMin";
         case glsl: __intrinsic_asm "rayQueryGetRayTMinEXT";
         case metal: __intrinsic_asm "$0->get_ray_min_distance()";
