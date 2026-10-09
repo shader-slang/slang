@@ -1352,6 +1352,9 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     case AccessQualifier::Immutable:
         out << toSlice(", Access.Immutable");
         break;
+    case AccessQualifier::WriteOnly:
+        out << toSlice(", Access.WriteOnly");
+        break;
     default:
         break;
     }
@@ -1426,9 +1429,10 @@ void RefParamType::_toTextOverride(StringBuilder& out)
 
 ParamPassingMode RefParamType::getParamPassingMode()
 {
-    // Only a constant `Read` or `Immutable` access makes the reference read-only.
-    // Any other access is symbolic (as in `RefParam<int, A>`) or out of range;
-    // neither promises read-only access, so we treat it as read-write.
+    // Only a constant `Read` or `Immutable` access makes the reference read-only,
+    // and only a constant `WriteOnly` makes it write-only. Any other access is
+    // symbolic (as in `RefParam<int, A>`) or out of range; neither restricts
+    // access, so we treat it as read-write.
     auto accessQualifier = tryGetAccessQualifierValue();
     if (!accessQualifier)
         return ParamPassingMode::RefReadWrite;
@@ -1437,6 +1441,8 @@ ParamPassingMode RefParamType::getParamPassingMode()
     case AccessQualifier::Read:
     case AccessQualifier::Immutable:
         return ParamPassingMode::RefReadOnly;
+    case AccessQualifier::WriteOnly:
+        return ParamPassingMode::RefWriteOnly;
     default:
         return ParamPassingMode::RefReadWrite;
     }

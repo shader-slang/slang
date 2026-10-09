@@ -2855,6 +2855,7 @@ Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& param
         return astBuilder->getBorrowInOutParamType(paramInfo.type);
     case ParamPassingMode::RefReadWrite:
     case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         return astBuilder->getRefParamType(
             paramInfo.type,
             getRefParamPassingModeAccess(paramInfo.mode));

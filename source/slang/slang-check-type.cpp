@@ -456,7 +456,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         auto accessQualifier = refParamType->tryGetAccessQualifierValue();
         if (accessQualifier && *accessQualifier != AccessQualifier::ReadWrite &&
             *accessQualifier != AccessQualifier::Read &&
-            *accessQualifier != AccessQualifier::Immutable)
+            *accessQualifier != AccessQualifier::Immutable &&
+            *accessQualifier != AccessQualifier::WriteOnly)
         {
             if (diagSink)
             {
@@ -464,6 +465,23 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     .access = (int64_t)*accessQualifier,
                     .type = result,
                     .typeExp = typeExp.exp});
+            }
+            *outProperType = getASTBuilder()->getErrorType();
+            return false;
+        }
+    }
+
+    // `Access.WriteOnly` describes a `__ref_writeonly` parameter only; a `Ptr` or `Ref`
+    // value cannot promise that it is never read through.
+    if (as<PtrType>(result) || as<ExplicitRefType>(result))
+    {
+        auto accessQualifier = as<PtrTypeBase>(result)->tryGetAccessQualifierValue();
+        if (accessQualifier && *accessQualifier == AccessQualifier::WriteOnly)
+        {
+            if (diagSink)
+            {
+                diagSink->diagnose(
+                    Diagnostics::WriteOnlyAccessNotAllowed{.type = result, .typeExp = typeExp.exp});
             }
             *outProperType = getASTBuilder()->getErrorType();
             return false;

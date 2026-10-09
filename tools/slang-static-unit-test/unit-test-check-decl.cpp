@@ -480,6 +480,7 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
         ParamPassingMode::BorrowIn,
         ParamPassingMode::RefReadWrite,
         ParamPassingMode::RefReadOnly,
+        ParamPassingMode::RefWriteOnly,
     };
     for (auto mode : modes)
     {

@@ -4179,6 +4179,7 @@ void _lowerInfoFromFuncParameters(
             break;
         case ParamPassingMode::RefReadWrite:
         case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             irParamType = builder->getRefParamType(
                 irParamType,
                 getRefParamPassingModeAccess(paramInfo.actualParamPassingModeToUse),

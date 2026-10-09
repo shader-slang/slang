@@ -1486,6 +1486,11 @@ enum Access : uint64_t
     /// qualifier than `Read`, and may allow the backend to perform more aggressive
     /// optimizations.
     Immutable = $((uint64_t)AccessQualifier::Immutable),
+
+    /// The data being referred to can only be written through the reference.
+    /// This is only valid as the access of a `RefParam`, which represents a
+    /// `__ref_writeonly` parameter; `Ptr` and `Ref` reject it.
+    WriteOnly = $((uint64_t)AccessQualifier::WriteOnly),
 }
 
 //@public:

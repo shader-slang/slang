@@ -28,6 +28,13 @@ QualType::QualType(Type* type)
                 isLeftValue = false;
                 break;
 
+            // Checking rejects a write-only `Ref`, but a write-only location is
+            // still a location that may be assigned and must not be read.
+            case AccessQualifier::WriteOnly:
+                isLeftValue = true;
+                isWriteOnly = true;
+                break;
+
             default:
                 SLANG_UNEXPECTED("unhandled access qualifier");
                 break;
@@ -98,6 +105,8 @@ AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
         return AccessQualifier::ReadWrite;
     case ParamPassingMode::RefReadOnly:
         return AccessQualifier::Read;
+    case ParamPassingMode::RefWriteOnly:
+        return AccessQualifier::WriteOnly;
     default:
         SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
         UNREACHABLE_RETURN(AccessQualifier::ReadWrite);

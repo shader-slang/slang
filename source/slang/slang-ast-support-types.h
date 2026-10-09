@@ -1923,9 +1923,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a memory location that the callee may only write.
         ///
-        /// Indicated by the `__ref_writeonly` modifier on a parameter. There
-        /// is no corresponding `AccessQualifier`, so this mode has no
-        /// parameter type representation yet.
+        /// Indicated by the `__ref_writeonly` modifier on a parameter, and
+        /// represented as `RefParam<T, Access.WriteOnly>`.
         ///
         RefWriteOnly,
     };
@@ -1947,9 +1946,6 @@ FIDDLE() namespace Slang
 
     /// Get the access qualifier that a parameter type wrapper (`RefParamType`
     /// in the AST, `IRRefParamType` in the IR) records for a `Ref*` mode.
-    ///
-    /// `RefWriteOnly` is rejected because no `AccessQualifier` value
-    /// represents write-only access.
     ///
     AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
 
