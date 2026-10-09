@@ -477,14 +477,14 @@ SLANG_UNIT_TEST(irBlob)
     }
 }
 
-// Check current module loading and rejection of version-33 modules.
+// Check current module loading and rejection of version-34 modules.
 //
-// Adding `UniformParameterShadowVarDecl` changes the numeric AST node IDs in version 34.
-// This test verifies that a current module loads, then changes only its module version to 33
+// Adding `ReadOnlyModifier` and `WriteOnlyModifier` changes the numeric AST node IDs in version 35.
+// This test verifies that a current module loads, then changes only its module version to 34
 // and requires rejection with the specific unsupported-version diagnostic.
-SLANG_UNIT_TEST(irBlobRejectsVersion33)
+SLANG_UNIT_TEST(irBlobRejectsVersion34)
 {
-    // The fixture includes a function parameter, whose AST node ID changed in version 34.
+    // The fixture includes a function parameter, whose AST node ID changed in version 35.
     const char* moduleText = R"(
         module version_guard;
         public uint readValue(uint input) { return input + 1; }
@@ -567,7 +567,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion33)
     auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
     SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
     auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
-    const UInt64 olderVersion = 33;
+    const UInt64 olderVersion = 34;
     memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
 
     // Another fresh session must reject the older version with its specific diagnostic.
@@ -589,7 +589,7 @@ SLANG_UNIT_TEST(irBlobRejectsVersion33)
     diagnosticText.append(
         static_cast<char const*>(diagnostics->getBufferPointer()),
         diagnostics->getBufferSize());
-    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 33"));
+    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 34"));
 }
 
 // Regression test for #6557 that mirrors the reporter's exact deployment shape:

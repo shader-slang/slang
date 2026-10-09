@@ -1574,6 +1574,11 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::InOutModifier:
         return ASTNodeType::OutModifier;
 
+        // A reference is either read-only or write-only, not both.
+    case ASTNodeType::ReadOnlyModifier:
+    case ASTNodeType::WriteOnlyModifier:
+        return ASTNodeType::ReadOnlyModifier;
+
         // Modifiers that are their own exclusive group.
     case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
     case ASTNodeType::GLSLOffsetLayoutAttribute:
@@ -1701,6 +1706,11 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
+
+        // Reference-access modifiers restrict a `__ref` parameter's passing mode.
+    case ASTNodeType::ReadOnlyModifier:
+    case ASTNodeType::WriteOnlyModifier:
+        return as<ParamDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
@@ -2450,14 +2460,6 @@ void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
     }
 }
 
-Modifier* SemanticsVisitor::createGLSLReadOnlyModifier(ReadOnlyModifier* readOnly)
-{
-    auto glslReadOnly = m_astBuilder->create<GLSLReadOnlyModifier>();
-    glslReadOnly->loc = readOnly->loc;
-    glslReadOnly->keywordName = readOnly->keywordName;
-    return glslReadOnly;
-}
-
 void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 {
     // TODO(tfoley): need to make sure this only
@@ -2491,22 +2493,10 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
-    // `readonly` on a `__ref` parameter stays a `ReadOnlyModifier` until the parameter's type is
-    // checked; on every other declaration it is the GLSL memory qualifier. We replace it in the
-    // list itself, because `checkModifier` finds the `MemoryQualifierSetModifier` made for an
-    // earlier memory qualifier through `syntaxNode->modifiers`.
-    if (!(as<ParamDecl>(syntaxNode) && syntaxNode->hasModifier<RefModifier>()))
-    {
-        for (auto link = &syntaxNode->modifiers.first; *link; link = &(*link)->next)
-        {
-            if (auto readOnly = as<ReadOnlyModifier>(*link))
-            {
-                auto glslReadOnly = createGLSLReadOnlyModifier(readOnly);
-                glslReadOnly->next = readOnly->next;
-                *link = glslReadOnly;
-            }
-        }
-    }
+    // On a `__ref` parameter, `const` is the legacy spelling of `__ref_readonly`, so we represent
+    // it the same way, as a `ReadOnlyModifier`. We decide this before the loop below, which unlinks
+    // each modifier as it goes. A by-value `const` stays a `ConstModifier`.
+    const bool isRefParam = as<ParamDecl>(syntaxNode) && syntaxNode->hasModifier<RefModifier>();
 
     Modifier* modifier = syntaxNode->modifiers.first;
     bool ignoreUnallowedModifier = false;
@@ -2531,6 +2521,15 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 
         // may return a list of modifiers
         auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
+
+        if (isRefParam && as<ConstModifier>(checkedModifier))
+        {
+            SLANG_ASSERT(!checkedModifier->next);
+            auto readOnly = m_astBuilder->create<ReadOnlyModifier>();
+            readOnly->loc = checkedModifier->loc;
+            readOnly->keywordName = checkedModifier->keywordName;
+            checkedModifier = readOnly;
+        }
 
         if (checkedModifier)
         {

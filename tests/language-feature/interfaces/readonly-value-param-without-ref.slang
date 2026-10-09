@@ -1,5 +1,5 @@
-// `readonly` on a parameter without `__ref` stays the GLSL memory qualifier, so on a
-// non-image parameter it is still rejected, exactly as before `readonly __ref` existed.
+// `readonly` on a parameter without `__ref` is the GLSL memory qualifier, so on a
+// non-image parameter it is rejected.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 

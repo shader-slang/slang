@@ -1,11 +1,11 @@
-// A `readonly __ref` parameter has the `RefReadOnly` passing mode, so it does not match a
+// A `__ref_readonly` parameter has the `RefReadOnly` passing mode, so it does not match a
 // plain `__ref` (`RefReadWrite`) requirement parameter, in either direction.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
 interface IReadOnly
 {
-    void f(readonly __ref uint a[8]);
+    void f(__ref_readonly uint a[8]);
 //CHECK: ^ see interface requirement declaration of 'f'
 }
 
@@ -24,7 +24,7 @@ interface IReadWrite
 
 struct ReadsThroughReadOnlyRef : IReadWrite
 {
-    void g(readonly __ref uint a[8]) {}
+    void g(__ref_readonly uint a[8]) {}
 //CHECK:                       ^ E38108
 //CHECK:                       ^ parameter 'a' direction 'readonly ref' does not match interface requirement 'ref'.
 }

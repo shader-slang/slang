@@ -672,3 +672,45 @@ SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
         }
     }
 }
+
+// Checking represents `const` on a `__ref` parameter as a reference-access modifier, so
+// reflection reports `const` for a read-only reference and for a by-value `const` parameter,
+// and not for a read-write reference.
+SLANG_UNIT_TEST(functionReflectionConstRefParam)
+{
+    const char* source = R"(
+        int f(const __ref int a, __ref const int b, __ref_readonly int c, __ref int d, const int e)
+        {
+            return a + b + c + d + e;
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module =
+        session->loadModuleFromSourceString("m", "m.slang", source, diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto func = module->getLayout()->findFunctionByName("f");
+    SLANG_CHECK_ABORT(func != nullptr);
+    SLANG_CHECK_ABORT(func->getParameterCount() == 5);
+
+    auto isConst = [&](unsigned index)
+    { return func->getParameterByIndex(index)->findModifier(slang::Modifier::Const) != nullptr; };
+    SLANG_CHECK(isConst(0));
+    SLANG_CHECK(isConst(1));
+    SLANG_CHECK(isConst(2));
+    SLANG_CHECK(!isConst(3));
+    SLANG_CHECK(isConst(4));
+}

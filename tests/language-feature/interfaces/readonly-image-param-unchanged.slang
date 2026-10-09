@@ -1,5 +1,5 @@
-// `readonly` on an image parameter stays the GLSL memory qualifier: only a `__ref`
-// parameter of ordinary data gets the `readonly` reference-access modifier.
+// `readonly` on an image parameter is the GLSL memory qualifier, which marks the image
+// non-writable.
 
 //TEST:SIMPLE(filecheck=CHECK): -lang glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
 

@@ -1912,9 +1912,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a memory location that the callee may only read.
         ///
-        /// Indicated by using the `ref` modifier on a parameter together
-        /// with the `readonly` modifier. The `const` keyword is accepted here
-        /// as a legacy alias for `readonly`.
+        /// Indicated by the `__ref_readonly` modifier on a parameter, or by
+        /// its legacy spelling `const __ref` (or `__ref const`).
         ///
         /// The same rules as `RefReadWrite` apply to the argument and to
         /// aliasing access paths; only the callee's access through the
@@ -1924,10 +1923,9 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a memory location that the callee may only write.
         ///
-        /// Indicated by using the `ref` modifier on a parameter together
-        /// with the `writeonly` modifier. The checker does not derive this
-        /// mode yet, and there is no corresponding `AccessQualifier`, so it
-        /// has no parameter type representation.
+        /// Indicated by the `__ref_writeonly` modifier on a parameter. There
+        /// is no corresponding `AccessQualifier`, so this mode has no
+        /// parameter type representation yet.
         ///
         RefWriteOnly,
     };

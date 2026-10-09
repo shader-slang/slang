@@ -2246,11 +2246,11 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `UniformParameterShadowVarDecl` shifts the sequential `ASTNodeType` values.
-    // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
-    // Version 34 is the earliest module version with the updated AST node numbering.
-    const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 34;
+    // Adding `ReadOnlyModifier` and `WriteOnlyModifier` shifts the sequential `ASTNodeType`
+    // values, so a version-34 module's later AST nodes would be decoded as different classes.
+    // Version 35 is the earliest module version with the updated AST node numbering.
+    const static UInt k_minSupportedModuleVersion = 35;
+    const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

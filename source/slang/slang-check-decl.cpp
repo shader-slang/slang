@@ -683,11 +683,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
-
-    /// Replace each `ReadOnlyModifier` on a `__ref` parameter whose type is an image or buffer
-    /// with the GLSL `readonly` memory qualifier. The parameter's type must already be checked.
-    void maybeTreatReadOnlyAsMemoryQualifier(ParamDecl* paramDecl);
-
     void deriveVarTypeFromInitExpr(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
@@ -1755,6 +1750,8 @@ QualType getTypeForDeclRef(
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kWriteOnly)
                 isWriteOnly = true;
         }
+        if (varDeclRef.getDecl()->hasModifier<WriteOnlyModifier>())
+            isWriteOnly = true;
 
         qualType.isLeftValue = isLValue;
         qualType.isWriteOnly = isWriteOnly;
@@ -2563,20 +2560,6 @@ ImageFormat inferImageFormatFromTextureType(
         }
     }
     return format;
-}
-
-void SemanticsDeclHeaderVisitor::maybeTreatReadOnlyAsMemoryQualifier(ParamDecl* paramDecl)
-{
-    if (!paramDecl->type.type || !isOpaqueHandleType(paramDecl->type.type))
-        return;
-
-    while (auto readOnly = paramDecl->findModifier<ReadOnlyModifier>())
-    {
-        removeModifier(paramDecl, readOnly);
-        if (auto memoryQualifiers =
-                checkModifier(createGLSLReadOnlyModifier(readOnly), paramDecl, false))
-            addModifier(paramDecl, memoryQualifiers);
-    }
 }
 
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
@@ -7447,9 +7430,9 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
 }
 
 /// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
-/// function type has only its effective mode, and several spellings (`const __ref`,
-/// a legacy alias, an inferred mode) produce the same mode, so we spell each mode
-/// one canonical way.
+/// function type has only its effective mode, and several spellings (`const __ref`
+/// and `__ref_readonly`, a legacy alias, an inferred mode) produce the same mode, so
+/// we spell each mode one canonical way.
 static void addModifiersForParamPassingMode(
     ASTBuilder* astBuilder,
     ParamDecl* paramDecl,
@@ -7476,7 +7459,8 @@ static void addModifiersForParamPassingMode(
         addModifier(paramDecl, astBuilder->create<ReadOnlyModifier>());
         break;
     case ParamPassingMode::RefWriteOnly:
-        SLANG_UNEXPECTED("no parameter modifier spells a write-only reference");
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        addModifier(paramDecl, astBuilder->create<WriteOnlyModifier>());
         break;
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
@@ -14859,8 +14843,6 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     }
 
     maybeApplyLayoutModifier(paramDecl);
-
-    maybeTreatReadOnlyAsMemoryQualifier(paramDecl);
 
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)

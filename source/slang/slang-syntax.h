@@ -571,6 +571,9 @@ Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 /// alone, without consideration of the type of the parameter, or
 /// any other context.
 ///
+/// The parameter's modifiers must already be checked, because checking is what
+/// represents `const` on a `__ref` parameter as a `ReadOnlyModifier`.
+///
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 
 /// Get the parameter-passing mode to use for a parameter.

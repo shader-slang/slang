@@ -3297,7 +3297,10 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(
         modifier = var->findModifier<HLSLEffectSharedModifier>();
         break;
     case SLANG_MODIFIER_CONST:
+        // Checking represents `const` on a `__ref` parameter as `ReadOnlyModifier`.
         modifier = var->findModifier<ConstModifier>();
+        if (!modifier)
+            modifier = var->findModifier<ReadOnlyModifier>();
         break;
     case SLANG_MODIFIER_NO_DIFF:
         modifier = var->findModifier<NoDiffModifier>();
