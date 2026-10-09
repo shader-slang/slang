@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry psmain -profile vs_6_0 -ignore-capabilities
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry vsmain -profile ps_6_0 -ignore-capabilities -skip-spirv-validation
 
-// CHECK_ERROR: warning[E36112]
+// CHECK_ERROR: error[E36112]
 // CHECK-NOT: E36112
 
 struct CameraProperties {
