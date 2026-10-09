@@ -6482,7 +6482,11 @@ static bool _isSizeOfType(Type* type)
     return false;
 }
 
-static bool _isTypeOrValValidForCountOf(Type* type)
+// Decide whether `type` is a valid operand for `countof`. `isTypeExpr` is true when the
+// operand was written as a type (e.g. `countof(SomeEnum)`) rather than a value expression.
+// Packs, tuples, and arrays are valid whether spelled as a type or produced by a value; an
+// enum is accepted only as a type operand (see #12549), so `countof(enumValue)` stays invalid.
+static bool _isTypeOrValValidForCountOf(Type* type, bool isTypeExpr)
 {
     if (!type)
     {
@@ -6509,6 +6513,11 @@ static bool _isTypeOrValValidForCountOf(Type* type)
     }
 
     if (as<ValuePackType>(type))
+    {
+        return true;
+    }
+
+    if (isTypeExpr && isDeclRefTypeOf<EnumDecl>(type))
     {
         return true;
     }
@@ -6755,9 +6764,11 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     sizeOfLikeExpr->type = m_astBuilder->getIntType();
 
     Type* type = nullptr;
+    bool isTypeExpr = false;
 
     if (as<TypeType>(valueExpr->type))
     {
+        isTypeExpr = true;
         TypeExp typeExp;
         typeExp.exp = valueExpr;
 
@@ -6776,7 +6787,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 
     if (as<CountOfExpr>(sizeOfLikeExpr))
     {
-        if (!_isTypeOrValValidForCountOf(type))
+        if (!_isTypeOrValValidForCountOf(type, isTypeExpr))
         {
             getSink()->diagnose(Diagnostics::CountOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
 
