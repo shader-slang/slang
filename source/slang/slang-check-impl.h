@@ -1305,6 +1305,10 @@ private:
         InheritanceInfo const& info,
         List<DeclExtensionEpochStamp>& outDependencyEpochs) const;
 
+    /// Return the generation of `type`'s inheritance cache entry, computing the
+    /// inheritance of `type` first if needed. Zero means there is no complete
+    /// entry yet: `type` is still being linearized, or its result was partial
+    /// and was not cached.
     UInt _getInheritanceInfoCacheGeneration(
         Type* type,
         InheritanceCircularityInfo* circularityInfo = nullptr);
