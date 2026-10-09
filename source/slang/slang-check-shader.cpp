@@ -1778,23 +1778,32 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
 /// `type_param`s, and the specialized declaration of each generic entry point. A composite such
 /// as `{library, mainModule, entryPoint}` can bind a `type_param` declared in `library` that
 /// only `mainModule` uses, so the arguments are only complete for the whole component type.
-/// A composite may list a module or an entry point more than once, so each is collected once.
+/// A composite may list a module, or an entry point with the same arguments, more than once, so
+/// each is collected once; the same generic entry point with different arguments is collected
+/// once per specialization.
 struct UnsizedOrdinaryDataSpecializationCollector : ComponentTypeVisitor
 {
     GlobalGenericArgs globalGenericArgs;
     HashSet<Module*> moduleSet;
     List<Module*> modules;
     HashSet<FuncDecl*> entryPointFuncDecls;
+    HashSet<DeclRefBase*> entryPointFuncDeclRefSet;
     List<DeclRef<FuncDecl>> entryPointFuncDeclRefs;
+
+    void addEntryPoint(DeclRef<FuncDecl> funcDeclRef)
+    {
+        entryPointFuncDecls.add(funcDeclRef.getDecl());
+        if (entryPointFuncDeclRefSet.add(funcDeclRef.declRefBase))
+            entryPointFuncDeclRefs.add(funcDeclRef);
+    }
 
     void visitEntryPoint(
         EntryPoint* entryPoint,
         EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        auto funcDeclRef = specializationInfo ? specializationInfo->specializedFuncDeclRef
-                                              : entryPoint->getFuncDeclRef();
-        if (entryPointFuncDecls.add(funcDeclRef.getDecl()))
-            entryPointFuncDeclRefs.add(funcDeclRef);
+        addEntryPoint(
+            specializationInfo ? specializationInfo->specializedFuncDeclRef
+                               : entryPoint->getFuncDeclRef());
     }
 
     void visitRenamedEntryPoint(
@@ -1864,9 +1873,8 @@ void diagnoseUnsizedOrdinaryDataAfterSpecialization(
             // specialized module is composed with them.
             for (auto entryPoint : module->getEntryPoints())
             {
-                auto funcDeclRef = entryPoint->getFuncDeclRef();
-                if (collector.entryPointFuncDecls.add(funcDeclRef.getDecl()))
-                    collector.entryPointFuncDeclRefs.add(funcDeclRef);
+                if (!collector.entryPointFuncDecls.contains(entryPoint->getFuncDecl()))
+                    collector.addEntryPoint(entryPoint->getFuncDeclRef());
             }
         }
     }

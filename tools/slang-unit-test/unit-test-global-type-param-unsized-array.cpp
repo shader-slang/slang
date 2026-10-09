@@ -160,6 +160,56 @@ static ComPtr<slang::IComponentType> specializeImportedTypeParam(
     return specialized;
 }
 
+// One generic entry point composed twice, as `{module, entryPoint, entryPoint}`, is specialized
+// once per instance.
+static const char* kGenericEntryPointSource = R"(
+    struct Data
+    {
+        float4 v;
+    }
+
+    RWStructuredBuffer<float4> output;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain<T>(uniform T genericValues[])
+    {
+        output[0] = 1;
+    }
+    )";
+
+static ComPtr<slang::IComponentType> specializeGenericEntryPointTwice(
+    slang::ISession* session,
+    const char* firstTypeArg,
+    const char* secondTypeArg,
+    ComPtr<slang::IBlob>& outDiagnostics)
+{
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "gep",
+        "gep.slang",
+        kGenericEntryPointSource,
+        diagnosticBlob.writeRef());
+    if (!module)
+        return nullptr;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
+        return nullptr;
+
+    slang::IComponentType* components[] = {module, entryPoint, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    if (SLANG_FAILED(session->createCompositeComponentType(components, 3, program.writeRef())))
+        return nullptr;
+
+    slang::SpecializationArg specArgs[] = {
+        slang::SpecializationArg::fromExpr(firstTypeArg),
+        slang::SpecializationArg::fromExpr(secondTypeArg)};
+    ComPtr<slang::IComponentType> specialized;
+    program->specialize(specArgs, 2, specialized.writeRef(), outDiagnostics.writeRef());
+    return specialized;
+}
+
 static int countOccurrences(const char* text, const char* pattern)
 {
     int count = 0;
@@ -245,5 +295,19 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
         ComPtr<slang::IBlob> diagnostics;
         auto specialized = specializeImportedTypeParam(session, "Texture2D<float4>", diagnostics);
         SLANG_CHECK(specialized != nullptr);
+    }
+
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto specialized =
+            specializeGenericEntryPointTwice(session, "Texture2D<float4>", "Data", diagnostics);
+        SLANG_CHECK(specialized == nullptr);
+        SLANG_CHECK_ABORT(diagnostics != nullptr);
+        auto text = (const char*)diagnostics->getBufferPointer();
+        SLANG_CHECK(countOccurrences(text, "error[E31215]") == 1);
+        SLANG_CHECK(strstr(text, "genericValues") != nullptr);
     }
 }
