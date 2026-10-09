@@ -134,12 +134,13 @@ void emitParamPassingMode(ManglingContext* context, ParamPassingMode mode)
     switch (mode)
     {
     case ParamPassingMode::RefReadWrite:
-    case ParamPassingMode::RefReadOnly:
-    case ParamPassingMode::RefWriteOnly:
-        // `doFunctionSignaturesMatch` treats the `ref` modes as one
-        // signature, so a declaration and definition that differ only
-        // in `const` (`readonly`) must share a name.
         emitRaw(context, "r_");
+        break;
+    case ParamPassingMode::RefReadOnly:
+        emitRaw(context, "ro_");
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        emitRaw(context, "wo_");
         break;
     case ParamPassingMode::BorrowIn:
         emitRaw(context, "c_");

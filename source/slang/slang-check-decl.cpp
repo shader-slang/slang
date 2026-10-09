@@ -14117,13 +14117,7 @@ static bool _doParamPassingModesMatchForOverload(ParamPassingMode first, ParamPa
     // modes remain distinct from that category and from ordinary `in`.
     auto isOutOrInOut = [](ParamPassingMode mode)
     { return mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut; };
-    if (isOutOrInOut(first) && isOutOrInOut(second))
-        return true;
-
-    // A declaration and a definition that differ only in `readonly` on a `ref` parameter declare
-    // the same function, and mangling gives every `Ref*` mode the same name, so the `Ref*` modes
-    // also share one overload-signature category.
-    return isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second);
+    return isOutOrInOut(first) && isOutOrInOut(second);
 }
 
 bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
