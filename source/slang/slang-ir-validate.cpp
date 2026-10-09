@@ -635,7 +635,7 @@ static const char* getMemoryOrderName(IRMemoryOrder order)
 
 // Return the operand index of the memory order of the atomic operation `inst`, or -1 if `inst` is
 // not an atomic operation. A compare-exchange carries two orders, the success order at this index
-// followed by the failure order; every other atomic operation carries exactly one.
+// followed by the failure order; every other atomic operation carries at most one.
 static Index getFirstMemoryOrderOperandIndex(IRInst* inst)
 {
     switch (inst->getOp())
