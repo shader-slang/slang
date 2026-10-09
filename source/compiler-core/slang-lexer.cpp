@@ -1312,7 +1312,6 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool isOutOfRange{};
     bool precisionLost{};
 
-    // Cursor is updated to be at the end of the decoded part of `numberToDecode`
     if (isInfinity)
     {
         cursor = numberToDecode.end();
