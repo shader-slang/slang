@@ -671,7 +671,8 @@ bool DiagnosticSink::diagnoseRichImpl(
             getSourceLocationLexer(),
             sourceManager,
             {.enableTerminalColors = shouldEnableTerminalColors(),
-             .enableUnicode = shouldEnableUnicode()},
+             .enableUnicode = shouldEnableUnicode(),
+             .format = getDiagnosticFormat()},
             effectiveDiagnostic);
     }
 
@@ -963,29 +964,33 @@ void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Internal severity to prevent exception leak from loadModule
     }
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Fatal severity to prevent exception leak from loadModule
     }
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 

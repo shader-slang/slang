@@ -40,6 +40,31 @@ def _may_be_bundle_path(path: str) -> bool:
     return path.startswith(f"{BUNDLE_ROOT}/") or f"/{BUNDLE_ROOT}/" in path
 
 
+def _register_seen_path(
+    seen_paths: dict[str, bool], normalized_name: str, is_directory: bool
+) -> None:
+    """Record one archive entry by path, rejecting a genuinely duplicated path.
+
+    A directory marker that repeats another directory marker is tolerated: CPack's
+    all-in-one component archives (CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE) emit one marker
+    per component, so a prefix shared across components -- such as `share/`, owned by both
+    the docs and the user-skills components -- legitimately recurs once per component and
+    extracts identically each time. A repeated file entry, or a directory that collides
+    with a file at the same path, stays fatal because it makes the payload there ambiguous.
+    """
+
+    # seen_paths encodes three states per path: absent (never seen), False (seen as a
+    # file), and True (seen as a directory). We test `is not None` rather than truthiness
+    # because a previously-seen file stores False, and treating that as "unseen" would
+    # silently drop the file/file and file/directory duplicate rejections below.
+    previous_is_directory = seen_paths.get(normalized_name)
+    if previous_is_directory is not None:
+        if is_directory and previous_is_directory:
+            return
+        raise VerificationError(f"duplicate archive path: {normalized_name}")
+    seen_paths[normalized_name] = is_directory
+
+
 def _expected_files(source_dir: Path) -> dict[str, bytes]:
     """Return the exact source file set, rejecting symlinks or an empty skills tree."""
 
@@ -149,12 +174,10 @@ def _verify_zip(
 
     with zipfile.ZipFile(archive_path) as archive:
         entries: dict[str, zipfile.ZipInfo] = {}
-        seen_paths: set[str] = set()
+        seen_paths: dict[str, bool] = {}
         for entry in archive.infolist():
             normalized_name = _normalize_archive_path(entry.filename)
-            if normalized_name in seen_paths:
-                raise VerificationError(f"duplicate archive path: {normalized_name}")
-            seen_paths.add(normalized_name)
+            _register_seen_path(seen_paths, normalized_name, entry.is_dir())
             if entry.is_dir():
                 continue
             # Unix-origin ZIP entries encode a file type in external_attr; zero means that no
@@ -187,12 +210,10 @@ def _verify_tar(
 
     with tarfile.open(archive_path, "r:*") as archive:
         entries: dict[str, tarfile.TarInfo] = {}
-        seen_paths: set[str] = set()
+        seen_paths: dict[str, bool] = {}
         for entry in archive.getmembers():
             normalized_name = _normalize_archive_path(entry.name)
-            if normalized_name in seen_paths:
-                raise VerificationError(f"duplicate archive path: {normalized_name}")
-            seen_paths.add(normalized_name)
+            _register_seen_path(seen_paths, normalized_name, entry.isdir())
             if (
                 not entry.isfile()
                 and not entry.isdir()

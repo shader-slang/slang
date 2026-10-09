@@ -16,6 +16,17 @@ constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
 constexpr SlangInt kRTTIHandleSize = 8;
 
+/// Return whether a struct contains only void fields or recursively empty structs. Other types,
+/// including arrays of empty elements, return false. This preserves DCE's existing structural
+/// query: type decorations do not affect its result.
+bool isStructEmpty(IRType* type);
+
+/// Return whether a type contains only empty data: void, structs of empty fields, or arrays of
+/// empty elements. Pointers, resources, opaque records, and target-intrinsic types are not empty.
+/// This structural query does not infer emptiness from byte size or predict all target-dependent
+/// type legalization decisions.
+bool isEmptyType(IRType* type);
+
 // A helper class to clone children insts to a different generic parent that has equivalent set of
 // generic parameters. The clone will take care of substitution of equivalent generic parameters and
 // intermediate values between the two generic parents.
@@ -204,7 +215,23 @@ IRType* getMatrixElementType(IRType* type);
 
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
+
+/// Test for opaque values or invalid recursion in the by-value storage of `type`.
+///
+/// Examines struct fields, array elements, and tuple elements. On a match, assigns the
+/// matching type to `outLeafOpaqueHandleType` if supplied. Native pointers remain leaves;
+/// parameter-group types are themselves opaque.
+/// Conservatively returns true for invalid by-value recursion, assigning the recursive
+/// aggregate type to `outLeafOpaqueHandleType` even if that aggregate contains no resource.
+/// Leaves `outLeafOpaqueHandleType` unchanged when no match occurs.
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
+
+/// Test whether by-value storage for `type` contains an unsized array.
+///
+/// Examines struct fields, array elements, and tuple elements for `IRUnsizedArrayType`.
+/// Native pointers and parameter-group types remain leaves. Specialization can determine an
+/// `IRArrayType` element count; an `IRUnsizedArrayType` has no count.
+bool isUnsizedType(IRType* type);
 
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is

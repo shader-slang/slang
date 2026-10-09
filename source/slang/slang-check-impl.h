@@ -50,6 +50,12 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
+/// Apply one declaration's source-level policy for its effective `this` parameter mode.
+///
+/// This operation only interprets declaration kind and modifiers. It does not apply the declared
+/// receiver type's copyability adjustment or any specialization.
+ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode);
+
 bool isGlobalDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -988,6 +994,20 @@ struct SharedSemanticsContext : public RefObject
     List<ModuleDecl*> importedModulesList;
     HashSet<ModuleDecl*> importedModulesSet;
 
+    /// Declaration roots synthesized and published during this semantic-checking session.
+    ///
+    /// Some synthesized declarations deliberately stay out of their parent's member list so that
+    /// ordinary lookup cannot find them. Others can be added after the module walk has already
+    /// visited their parent. The ordinary declaration-tree traversal cannot reliably discover
+    /// either shape, so successful synthesis registers its outermost root here.
+    ///
+    /// This registry is append-only for the lifetime of the context. Every whole-module phase
+    /// revisits the same list, which lets a declaration created in an early phase continue through
+    /// all later phases. The set makes publication idempotent; the list preserves stable work-list
+    /// order and permits index-based iteration while checking appends more roots.
+    List<Decl*> m_synthesizedDeclRoots;
+    HashSet<Decl*> m_synthesizedDeclRootSet;
+
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
@@ -1104,6 +1124,21 @@ public:
     SlangLanguageVersion getLanguageVersion() const { return m_languageVersion; }
 
     TranslationUnitRequest* getTranslationUnitRequest() { return m_translationUnitRequest; }
+
+    /// Register an accepted synthesized declaration for eventual whole-module completion.
+    ///
+    /// `decl` must belong to this context's primary module and be the outermost root of the
+    /// synthesized declaration graph, after its parent, scope, signature inputs, and body have
+    /// reached their final published form. Registration does not satisfy immediate semantic
+    /// dependencies; callers that are about to read checked data must still use the accessor that
+    /// establishes the required declaration state.
+    void registerSynthesizedDeclRoot(Decl* decl);
+
+    /// Return the number of roots in the persistent synthesized-declaration work list.
+    Index getSynthesizedDeclRootCount() const { return m_synthesizedDeclRoots.getCount(); }
+
+    /// Return one root from the persistent synthesized-declaration work list.
+    Decl* getSynthesizedDeclRoot(Index index) const { return m_synthesizedDeclRoots[index]; }
 
     bool isInLanguageServer()
     {
@@ -1900,6 +1935,12 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
+    /// Diagnose use of a deprecated or removed declaration at `loc`.
+    ///
+    /// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language
+    /// version to decide whether removal applies; reports nothing when no module is available.
+    /// Inspects `originalExpr`, when non-null, to suppress repeats and uses at the declaration's
+    /// name location.
     void diagnoseDeprecatedAndRemovedDeclRefUsage(
         DeclRef<Decl> declRef,
         SourceLoc loc,
@@ -1926,6 +1967,12 @@ public:
             getDefaultDeclRef(declToSpecialize));
     }
 
+    /// Construct a checked variable or member expression for `declRef`.
+    ///
+    /// Requires a resolved declaration reference and a checked `baseExpr` when one is provided.
+    /// Selects the expression kind from the base and whether the declaration is static. The result
+    /// includes the declaration's type and the read/write restrictions of any instance-member
+    /// access.
     DeclRefExpr* ConstructDeclRefExpr(
         DeclRef<Decl> declRef,
         Expr* baseExpr,
@@ -2094,6 +2141,12 @@ public:
 
     void ensureAllDeclsRec(Decl* decl, DeclCheckState state);
 
+    /// Advance every published synthesized declaration root to `state`.
+    ///
+    /// The live list is iterated by index so checking one root can publish another root for the
+    /// same phase. The registry remains intact after this operation for all later phases.
+    void ensureRegisteredSynthesizedDecls(DeclCheckState state);
+
     /// Helper routine allowing `ensureDecl` to be used on a `DeclBase`
     ///
     /// `DeclBase` is the base clas of `Decl` and `DeclGroup`. When
@@ -2193,8 +2246,10 @@ public:
     Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
-    Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
+    Type* getForwardDiffFuncType(FuncType* originalType, std::optional<ParamInfo> thisParamInfo);
+    Type* getBackwardDiffFuncType(
+        FuncType* originalType,
+        std::optional<ParamInfo> thisParamInfo = std::nullopt);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -2637,8 +2692,9 @@ public:
         ConformanceCheckingContext* context,
         DeclRef<ContainerDecl> requiredMemberDeclRef,
         Type* resultType,
-        Expr* synBoundStorageExpr,
-        ContainerDecl* synAccesorContainer,
+        LookupResult const& lookupResult,
+        List<Expr*> const& synthesizedContainerArgs,
+        ContainerDecl* synthesizedAccessorContainer,
         RefPtr<WitnessTable> witnessTable);
 
     void _addMethodWitness(
@@ -3156,6 +3212,27 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
+    /// Compute the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// This operation is only used while advancing a declaration to
+    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code should use the queries
+    /// below so that it reads the information attached to the declaration. A `this` expression in
+    /// the declaration's own signature is the exception: it needs this computation before the
+    /// transition can finish, but leaves diagnostics to the final call that publishes the result.
+    std::optional<ParamInfo> checkEffectiveThisParamInfo(
+        Decl* decl,
+        bool shouldDiagnoseModeAttributes);
+
+    /// Compute and attach the effective `this` parameter information owned by `decl`.
+    void checkAndAttachEffectiveThisParamInfo(Decl* decl);
+
+    /// Return the effective `this` parameter information for `decl`, if it has one.
+    ///
+    /// These wrappers first ensure that the declaration has completed signature checking. The
+    /// underlying passive queries assert that precondition themselves.
+    std::optional<ParamInfo> findEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
+    ParamInfo getEffectiveThisParamInfo(DeclRef<Decl> const& declRef);
+
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
     /// Calculate the builtin differentiable function interface type for a callable-as-type.
@@ -3497,8 +3574,23 @@ public:
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
+    /// Determine whether `type` has the storage property identified by `tag`.
+    ///
+    /// Returns whether `getTypeTags` establishes the property. A false result does not prove
+    /// that a later specialization or linked replacement will lack it.
     bool doesTypeHaveTag(Type* type, TypeTag tag);
 
+    /// Compute the storage properties of `type`, including its specialized instance fields.
+    ///
+    /// Checks aggregate and field declarations only far enough to use their types. Field
+    /// initializers are checked only when needed to infer a type or array bound. For example,
+    /// `struct Box<T> { T value; };` has an opaque field when instantiated as `Box<Texture2D>`,
+    /// but not as `Box<float>`.
+    /// Returns established flags, rather than proof that absent properties cannot occur.
+    /// Unsubstituted generic parameters have no established flags. Includes `TypeTag::Incomplete`
+    /// for externally replaceable definitions and link-time aliases, and when recursive
+    /// inspection stops at a cycle or the nesting limit. Ordinary type validation diagnoses
+    /// invalid recursion; linked-type validation checks restrictions after replacement.
     TypeTag getTypeTags(Type* type);
 
     Type* getConstantBufferElementType(Type* type);
@@ -3559,8 +3651,18 @@ public:
         Type* type,
         Type* interfaceType);
 
-    // Try to compute the "join" between two types
-    Type* TryJoinTypes(GenericInferenceContext* constraints, QualType left, QualType right);
+    // Try to compute the "join" between two types.
+    //
+    // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
+    // join with a scalar; it is enabled only for common-type/convertibility
+    // inference of ordinary call arguments (e.g. the arms of `?:`/`select`), and
+    // left off for the witness/subtype/equality constraint solver, where a
+    // fabricated enum->tag join would wrongly constrain a type parameter.
+    Type* TryJoinTypes(
+        GenericInferenceContext* constraints,
+        QualType left,
+        QualType right,
+        bool allowEnumScalarJoin = false);
 
     // Try to solve the ordinary and witness arguments for one generic
     // application. The inference context must be moved into the solver because
@@ -3667,7 +3769,7 @@ public:
     };
 
     // count the number of parameters required/allowed for a callable
-    ParamCounts CountParameters(FilteredMemberRefList<ParamDecl> params);
+    ParamCounts CountParameters(List<DeclRef<ParamDecl>> const& params);
 
     // count the number of parameters required/allowed for a generic
     ParamCounts CountParameters(DeclRef<GenericDecl> genericRef);
@@ -4010,7 +4112,7 @@ public:
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
-        FunctionDeclBase* funcDeclBase);
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
@@ -4082,6 +4184,26 @@ public:
         DeclRefExpr* expr,
         QualType const& baseType,
         bool supressDiagnostic = false);
+
+    /// Called after member lookup on `expr` has failed with `baseType` as the base. If the base is
+    /// a user-declared generic type parameter (directly, or as `T.m` / `v::m`), emit a note for
+    /// each interface that: is visible from the failed access and not from the core module;
+    /// directly declares a visible requirement of the failed name, static when the access is
+    /// static; and, by its unqualified name, resolves to itself at the generic declaration that
+    /// owns the parameter. A non-generic interface gets `where T : IFoo`; a generic one gets
+    /// "consider constraining 'T' to interface 'IFoo'", since its type arguments cannot be
+    /// inferred.
+    void maybeSuggestMissingGenericConstraintForMemberLookup(
+        DeclRefExpr* expr,
+        QualType const& baseType);
+
+    /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
+    /// visible from `scope`) finds exactly one distinct declaration and it is `decl`. A diagnostic
+    /// that prints an unqualified name for the user to write at `scope` uses this to check the name
+    /// will mean `decl` there; for a generic declaration, `decl` is the `GenericDecl`, which is
+    /// what lookup returns for its name. The default mask also finds non-type declarations, so a
+    /// same-named function makes this conservatively return false.
+    bool doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl);
 
     SharedSemanticsContext& operator=(const SharedSemanticsContext&) = delete;
 
@@ -4394,6 +4516,11 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
+    /// Check `decl`, a local declaration whose statement has been reached, make it
+    /// visible to the code that follows its declarator, and register the lambda
+    /// captures in its initializer.
+    void checkDeclAtDeclarationPoint(Decl* decl);
+
     void visitBlockStmt(BlockStmt* stmt);
 
     void visitSeqStmt(SeqStmt* stmt);
@@ -4478,10 +4605,6 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
-
-QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 

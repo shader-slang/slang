@@ -378,6 +378,21 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
 err(
     "unknown-source-language",
     19,
@@ -534,6 +549,12 @@ err(
     "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
+)
+
+standalone_note(
+    "module-format-not-finalized",
+    88,
+    "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"
 )
 
 err("expecting-slang-riff-container", 89, "expecting a slang riff container")
@@ -1449,6 +1470,20 @@ err(
     span { loc = "expr:Expr", message = "'~name:Name' is not a member of '~type:Type'." }
 )
 
+standalone_note(
+    "suggest-constraint-for-missing-member",
+    30032,
+    "consider adding a constraint such as 'where ~genericParam:Name : ~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "suggest-generic-interface-constraint-for-missing-member",
+    30033,
+    "consider constraining '~genericParam:Name' to interface '~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
 err(
     "argument-expected-lvalue",
     30047,
@@ -1555,6 +1590,20 @@ err(
 )
 
 err(
+    "this-param-mode-attribute-without-effective-this-param",
+    30428,
+    "attribute requires an effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+)
+
+err(
+    "this-param-mode-attribute-on-class-member",
+    30429,
+    "attribute cannot change a source-declared class member's effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
@@ -1650,6 +1699,27 @@ err(
     30076,
     "global variable cannot have opaque type",
     span { loc = "decl:Decl", message = "global variable cannot have opaque type." }
+)
+
+err(
+    "mutable-global-requires-addressable-type",
+    30088,
+    "mutable global variable requires an addressable type",
+    span { loc = "decl:Decl", message = "a mutable static global variable requires an addressable type." }
+)
+
+err(
+    "opaque-type-in-mutable-global",
+    30089,
+    "mutable global variable has an opaque type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot contain an opaque value of type '~type:IRInst'." }
+)
+
+err(
+    "unsized-type-in-mutable-global",
+    30074,
+    "mutable global variable has an unsized type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot have unsized type '~type:IRInst'." }
 )
 
 err(
@@ -3120,7 +3190,7 @@ warning(
     "deprecated-usage",
     31200,
     "use of deprecated declaration",
-    span { loc = "location", message = "~declName:Name has been deprecated: ~message" }
+    span { loc = "location", message = "~decl:Decl has been deprecated: ~message" }
 )
 
 err(
@@ -3169,7 +3239,7 @@ err(
     "removed-usage",
     31207,
     "use of removed declaration",
-    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+    span { loc = "location", message = "~decl:Decl has been removed since language version '~sinceVersion:Int': ~message" }
 )
 
 err(
@@ -4083,6 +4153,27 @@ err(
 )
 
 err(
+    "set-accessor-param-cannot-have-default-value",
+    31163,
+    "a 'set' parameter cannot have a default value",
+    span { loc = "initExpr:Expr", message = "the value passed to a 'set' accessor is always supplied by an assignment" }
+)
+
+err(
+    "set-accessor-param-must-be-input-only",
+    31164,
+    "a 'set' parameter must be input-only",
+    span { loc = "param:Decl", message = "'set' parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
+    "subscript-param-must-be-input-only",
+    31165,
+    "a subscript parameter must be input-only",
+    span { loc = "param:Decl", message = "subscript parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
     "accessor-does-not-satisfy-type-constraint-requirements",
     31110,
     "accessor does not satisfy type constraint requirements",
@@ -4104,6 +4195,13 @@ err(
     31301,
     "bit-field type must be integral",
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
+)
+
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
 )
 
 --
@@ -4484,6 +4582,12 @@ err(
     38014,
     "generic entry point used without specialization arguments",
     span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
+)
+
+err(
+    "entry-point-index-out-of-range",
+    38015,
+    "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
 )
 
 
@@ -5098,6 +5202,13 @@ err(
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
 )
 
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
+)
+
 fatal(
     "function-never-returns-fatal",
     40030,
@@ -5140,6 +5251,13 @@ err(
     41009,
     "non-void function must return",
     span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
+)
+
+err(
+    "missing-return-not-allowed-in-slang-202c",
+    40025,
+    "non-void function must return in Slang 202c and later",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c and later" }
 )
 
 warning(

@@ -83,10 +83,12 @@ function(add_supported_cxx_linker_flags target)
 endfunction()
 
 #
-# Add sanitizer compile and link options to a target: AddressSanitizer (plus
-# UndefinedBehaviorSanitizer) when SLANG_ENABLE_ASAN is on, or ThreadSanitizer
-# when SLANG_ENABLE_TSAN is on, and nothing otherwise. The two are mutually
-# exclusive (enforced in the top-level CMakeLists).
+# Add the settings a target needs in order to be sanitized: AddressSanitizer
+# (plus UndefinedBehaviorSanitizer) when SLANG_ENABLE_ASAN is on, or
+# ThreadSanitizer when SLANG_ENABLE_TSAN is on, and nothing otherwise. The two
+# are mutually exclusive (enforced in the top-level CMakeLists). Mostly these
+# are compile and link options, but MSVC also needs a debug information format
+# that ASan can symbolize with, so we set that here too.
 #
 # Slang targets normally get these through set_default_compile_options, which
 # calls this function. It is exposed separately so that targets which must not
@@ -141,6 +143,19 @@ function(add_sanitizer_options target)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)
             target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
+            # MSVC's ASan needs debug info to turn the addresses in a report
+            # into source locations, and warns (C5072, "ASAN enabled without
+            # debug information emission") when a translation unit is
+            # instrumented without it. An ASan build exists to be debugged, so
+            # we emit debug info for every sanitized target regardless of
+            # config, which also means SLANG_ENABLE_RELEASE_DEBUG_INFO does not
+            # get to switch it off underneath ASan. Setting it here rather than
+            # in slang_add_target is what covers a target that is sanitized
+            # without being a Slang target at all, such as the vendored spvdb.
+            set_target_properties(
+                ${target}
+                PROPERTIES MSVC_DEBUG_INFORMATION_FORMAT "Embedded"
+            )
         else()
             message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
         endif()

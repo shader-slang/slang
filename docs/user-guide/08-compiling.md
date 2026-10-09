@@ -1096,6 +1096,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
+| EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1103,6 +1104,7 @@ meanings of their `CompilerOptionValue` encodings.
 | Target             | Specifies the target format. Has same effect as setting TargetDesc::format. |
 | WarningsAsErrors   | Specifies a list of warnings to be treated as errors. `stringValue0` encodes a comma separated list of warning codes or names, or can be "all" to indicate all warnings. |
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
+| DisableNotes       | Specifies a list of notes to disable. `stringValue0` encodes comma separated list of note codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
 | WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected. |
@@ -1147,7 +1149,48 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+
+### Backwards Compatibility Option for Legacy HLSL
+
+For HLSL inputs, `-Gec` enables additional backwards-compatibility features for legacy HLSL.
+The equivalent API option is `CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility`.
+The option currently enables uniform parameter temporaries; additional legacy HLSL behaviors may be added in the future.
+It has no effect on Slang or GLSL inputs.
+
+#### Uniform Parameter Temporaries
+
+With `-Gec`, file and namespace uniform parameters can be used as mutable temporaries within each shader invocation, subject to the same type restrictions as mutable `static` globals.
+For example:
+
+```hlsl
+uint x;
+cbuffer Settings { uint y; };
+
+void setValues(uint value)
+{
+    x = value;
+    y = value + 1;
+}
+```
+
+Each copy starts with the corresponding shader input's value for every entry-point invocation.
+Assignments and `out`/`inout` arguments update that private copy; they do not modify the constant buffer.
+Reflection continues to describe the original shader inputs and their bindings.
+Semantic checking enforces explicit `readonly` and `writeonly` qualifiers on the temporary or alias.
+
+The temporary has the parameter's type.
+For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
+This type selection also applies when the struct contains a resource.
+
+Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
+Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
+Reading these parameters with `-Gec` does not allocate mutable resource storage.
+A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
+If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
+Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
 

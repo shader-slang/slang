@@ -1686,7 +1686,16 @@ IRInst* IRModule::_allocateInst(IROp op, Int operandCount, size_t minSizeInBytes
     // We handle the combination of the two cases by just taking the maximum of the two
     // different sizes.
     //
-    size_t defaultSize = sizeof(IRInst) + (operandCount) * sizeof(IRUse);
+    // The operand count is in-contract only when it is non-negative and small enough that the
+    // trailing operand array can be sized without wrapping `size_t`. That is trivially true for
+    // counts the compiler itself computes, but deserialization derives the count from a file, so
+    // we assert rather than silently allocating a buffer smaller than the operands written into
+    // it (`size_t` is 32 bits on WebAssembly and other 32-bit targets).
+    //
+    SLANG_RELEASE_ASSERT(operandCount >= 0);
+    SLANG_RELEASE_ASSERT(size_t(operandCount) <= (~size_t(0) - sizeof(IRInst)) / sizeof(IRUse));
+
+    size_t defaultSize = sizeof(IRInst) + size_t(operandCount) * sizeof(IRUse);
     size_t totalSize = minSizeInBytes > defaultSize ? minSizeInBytes : defaultSize;
 
     IRInst* inst = (IRInst*)m_memoryArena.allocateAndZero(totalSize);
@@ -3607,18 +3616,31 @@ IRInst* IRBuilder::emitDebugVar(
     IRInst* source,
     IRInst* line,
     IRInst* col,
+    IRInst* scope,
     IRInst* argIndex)
 {
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope));
     if (argIndex)
     {
-        IRInst* args[] = {source, line, col, argIndex};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
+        IRInst* args[] = {source, line, col, scope, argIndex};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 5, args);
     }
     else
     {
-        IRInst* args[] = {source, line, col};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
+        IRInst* args[] = {source, line, col, scope};
+        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
     }
+}
+
+IRInst* IRBuilder::emitDebugLexicalBlock(
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    IRInst* parentScope)
+{
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+    IRInst* args[] = {source, line, col, parentScope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 4, args);
 }
 
 IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
@@ -3681,7 +3703,8 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    SLANG_RELEASE_ASSERT(scope);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, inlinedAt ? 2 : 1, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
@@ -9524,6 +9547,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_RTTIType:
     case kIROp_Func:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_Generic:
     case kIROp_Var:
     case kIROp_Param:
@@ -9794,6 +9818,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_IsSignedInt:
     case kIROp_IsUnsignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsBindlessTextureNVEncodable:
     case kIROp_IsType:
         return false;
     }
