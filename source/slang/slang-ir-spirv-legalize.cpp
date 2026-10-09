@@ -3453,11 +3453,12 @@ SlangResult legalizeIRForSPIRV(
     eliminateDeadCode(module);
 
     // The IR is now in the shape the SPIR-V emitter reads its memory orders from: every order that
-    // folds to a constant has been folded, and atomics in removed code are gone. An atomic whose
-    // order is still invalid cannot be emitted, so we stop here.
+    // folds to a constant has been folded, and atomics in removed code are gone. This is the
+    // SPIR-V counterpart of the check at the end of `linkAndOptimizeIR`. We do not emit an atomic
+    // whose order failed the check, so we stop here.
     if (!validateAtomicMemoryOrders(
             module,
-            context->m_targetRequest->getTarget(),
+            codeGenContext->getTargetFormat(),
             codeGenContext->getSink()))
         return SLANG_FAIL;
 

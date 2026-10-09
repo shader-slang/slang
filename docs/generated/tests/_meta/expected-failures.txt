@@ -43,9 +43,11 @@ docs/generated/tests/conformance/expressions-operators/conditional-does-not-shor
 
 # https://github.com/shader-slang/slang/issues/13518 — the test pins the
 # invalid `Atomic<T>.load(MemoryOrder.AcquireRelease)` emission, which the
-# compiler now rejects with E41405 on every target. The test is awaiting
-# regeneration: its bundle's source_doc moved to shader-slang/spec (#13439),
-# so `regenerate.py` cannot regenerate the bundle until it is re-anchored.
+# compiler rejects with E41405 on every target. These entries can be removed
+# once the bundle is regenerated with a diagnostic test for invalid orders,
+# as its _prompt.md asks. That needs the bundle's source_doc re-anchored:
+# shader-slang/slang#13439 moved it to shader-slang/spec, so `regenerate.py`
+# cannot regenerate the bundle until then.
 docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang
 docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang.1
 docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang.2

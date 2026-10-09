@@ -4169,8 +4169,12 @@ extension half : IArithmeticAtomicable {}
 /// All operations take a `MemoryOrder` parameter which influenced the
 /// semantics of the performed operation
 ///
-/// When targeting SPIR-V or Metal, the `MemoryOrder` arguments must be
-/// compile-time constants.
+/// When emitting SPIR-V directly, or Metal for an atomic that is not on a
+/// texture, each `MemoryOrder` argument must be known at compile time: a
+/// `MemoryOrder` value, a generic value parameter, a `static const`
+/// variable, or a parameter of a `[ForceInline]` function that is passed one
+/// of these. A parameter of a function that is not inlined is not known at
+/// compile time, even when every caller passes a constant.
 ///
 /// All operations take place at the device scope.
 ///

@@ -61,8 +61,8 @@ multi-threaded (GPU) programs. Claims fall into five normative sections:
   semantics operands on `OpAtomicStore`/`OpAtomicLoad` — different orders
   produce different `MemorySemantics` operand values. Pin only orders that are
   valid for the operation: a load cannot release, a store cannot acquire, and a
-  `compareExchange` failure order can neither release nor be stronger than the
-  success order. The compiler rejects the others (E41405/E41406, issue #13518),
+  `compareExchange` failure order cannot release and needs a success order at
+  least as strong. The compiler rejects the others (E41405/E41406, issue #13518),
   so write a `DIAGNOSTIC_TEST` for them instead of an emission test.
 - **Atomic total-order and release-acquire** claims are runtime-value claims
   only observable on a GPU. Write `COMPARE_COMPUTE -vk/-dx12` tests for CI;

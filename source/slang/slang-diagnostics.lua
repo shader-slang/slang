@@ -5700,10 +5700,10 @@ err(
 )
 
 err(
-    "atomic-compare-exchange-fail-order-stronger-than-success-order",
+    "atomic-compare-exchange-success-order-too-weak",
     41406,
-    "compareExchange failure order is stronger than its success order",
-    span { loc = "location", message = "failure memory order '~failOrder:String' must not be stronger than success memory order '~successOrder:String'" }
+    "compareExchange success order is weaker than its failure order",
+    span { loc = "location", message = "success memory order '~successOrder:String' must be at least as strong as failure memory order '~failOrder:String'" }
 )
 
 err(
@@ -5714,9 +5714,9 @@ err(
 )
 
 err(
-    "invalid-atomic-memory-order-value",
+    "atomic-memory-order-out-of-range",
     41408,
-    "invalid atomic memory order value",
+    "atomic memory order is out of range",
     span { loc = "location", message = "~value:Int is not a valid MemoryOrder value" }
 )
 

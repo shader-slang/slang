@@ -2895,8 +2895,9 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
     // Memory orders are validated on the final IR, after every pass that can fold an order to a
-    // constant or remove the atomic that uses it. For SPIR-V that point is in `legalizeIRForSPIRV`.
-    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
+    // constant or remove the atomic that uses it. For SPIR-V, `legalizeIRForSPIRV` runs further
+    // passes, so the check runs at its end instead.
+    if (!isSPIRV(target))
         SLANG_PASS(validateAtomicMemoryOrders, target, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;

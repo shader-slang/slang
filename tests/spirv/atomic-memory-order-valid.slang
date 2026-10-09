@@ -1,7 +1,7 @@
 // Memory orders that are valid for their atomic operation still reach the SPIR-V memory semantics
 // operand, including orders forwarded through a generic value parameter or a [ForceInline] helper.
 // The semantics are the order bit OR'd with UniformMemory (64): Acquire = 66, Release = 68,
-// AcquireRelease = 72, Relaxed = 0.
+// AcquireRelease = 72. Relaxed is None (0), with no storage-class bit.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

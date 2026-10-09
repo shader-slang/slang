@@ -1,12 +1,15 @@
-// A memory order that is invalid for its atomic operation is diagnosed on every target: a load
-// cannot release, a store cannot acquire, and a compareExchange failure order can neither release
-// nor be stronger than the success order. The check runs after specialization and inlining, so it
-// also sees orders forwarded through a generic value parameter or a [ForceInline] helper.
+// A memory order that is invalid for its atomic operation is diagnosed on every target, including
+// those that drop the order: a load cannot release, a store cannot acquire, and a compareExchange
+// failure order cannot release and needs a success order at least as strong. The check runs after
+// specialization and inlining, so it also sees orders forwarded through a generic value parameter
+// or a [ForceInline] helper.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda
 
 RWStructuredBuffer<Atomic<uint>> flag;
 RWStructuredBuffer<uint> outb;
@@ -48,13 +51,13 @@ void computeMain()
 //CHECK:                             ^ 'MemoryOrder.AcquireRelease' cannot be used as the memory order of a compareExchange failure
     outb[4] = flag[0].compareExchange(0, 1, MemoryOrder.Relaxed, MemoryOrder.Acquire);
 //CHECK:                             ^ E41406
-//CHECK:                             ^ failure memory order 'MemoryOrder.Acquire' must not be stronger than success memory order 'MemoryOrder.Relaxed'
+//CHECK:                             ^ success memory order 'MemoryOrder.Relaxed' must be at least as strong as failure memory order 'MemoryOrder.Acquire'
     outb[5] = flag[0].compareExchange(0, 1, MemoryOrder.Release, MemoryOrder.Acquire);
 //CHECK:                             ^ E41406
-//CHECK:                             ^ failure memory order 'MemoryOrder.Acquire' must not be stronger than success memory order 'MemoryOrder.Release'
+//CHECK:                             ^ success memory order 'MemoryOrder.Release' must be at least as strong as failure memory order 'MemoryOrder.Acquire'
     outb[6] = flag[0].compareExchange(0, 1, MemoryOrder.AcquireRelease, MemoryOrder.SeqCst);
 //CHECK:                             ^ E41406
-//CHECK:                             ^ failure memory order 'MemoryOrder.SeqCst' must not be stronger than success memory order 'MemoryOrder.AcquireRelease'
+//CHECK:                             ^ success memory order 'MemoryOrder.AcquireRelease' must be at least as strong as failure memory order 'MemoryOrder.SeqCst'
 
     outb[7] = loadWithGenericOrder<MemoryOrder.Release>();
     storeWithOrder(MemoryOrder.Acquire);

@@ -86,10 +86,15 @@ void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, Di
 
 // Validate the memory order operands of every atomic operation against the operation, e.g. that a
 // load does not release. On targets that encode the order (SPIR-V, and Metal outside texture
-// atomics), the order must also be a constant `MemoryOrder` value. Requires the IR in its final
-// shape before emission, after specialization, inlining and constant folding, so that an order
-// forwarded through a generic, a helper or a `static` global is seen as the constant it folds to.
-// Returns false if any atomic operation was diagnosed as an error.
+// atomics), each order operand must also be a constant `MemoryOrder` value. Returns false if any
+// atomic operation was diagnosed as an error.
+//
+// Requires the IR in its final shape before emission, after specialization, inlining, constant
+// folding and dead-code elimination. An order forwarded through a generic value parameter, a
+// `[ForceInline]` function or a `static const` global is then the constant it folds to, and an
+// atomic in removed code is gone. An order passed to a function that is not inlined stays a
+// parameter. Each target runs this pass exactly once, at the end of `legalizeIRForSPIRV` for direct
+// SPIR-V emission and at the end of `linkAndOptimizeIR` for every other target.
 bool validateAtomicMemoryOrders(IRModule* module, CodeGenTarget target, DiagnosticSink* sink);
 
 void validateVectorsAndMatrices(
