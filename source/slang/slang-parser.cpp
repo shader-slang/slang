@@ -10446,21 +10446,21 @@ static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* 
 
 static IROp parseIROp(Parser* parser, Token& outToken)
 {
-    IROp op;
     if (AdvanceIf(parser, TokenType::OpSub))
     {
         outToken = parser->ReadToken();
-        op = IROp(-stringToInt(outToken.getContent()));
+        return IROp(-stringToInt(outToken.getContent()));
     }
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         outToken = parser->ReadToken();
-        op = IROp(stringToInt(outToken.getContent()));
+        return IROp(stringToInt(outToken.getContent()));
     }
     else
     {
         outToken = parser->ReadToken(TokenType::Identifier);
-        op = findIROp(outToken.getContent());
+        ;
+        auto op = findIROp(outToken.getContent());
 
         if (op == kIROp_Invalid)
         {
@@ -10468,16 +10468,8 @@ static IROp parseIROp(Parser* parser, Token& outToken)
                 .feature = "unknown intrinsic op",
                 .location = outToken.loc});
         }
+        return op;
     }
-
-    if (diagnoseInvalidStructuralRayTracingIntrinsicOp(
-            op,
-            parser->options.isCoreModule,
-            outToken.getContent(),
-            outToken.loc,
-            parser->sink))
-        return kIROp_Invalid;
-    return op;
 }
 
 static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)

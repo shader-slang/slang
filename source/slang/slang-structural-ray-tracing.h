@@ -2,7 +2,6 @@
 
 #include "slang-ast-support-types.h"
 #include "slang-compiler-fwd.h"
-#include "slang-ir-insts-enum.h"
 
 namespace Slang
 {
@@ -233,14 +232,6 @@ RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
 
 /// Returns whether a type represents the opaque trace-program resource handle.
 bool isStructuralRayTracingOpaqueHandleType(Type* type);
-
-/// Diagnoses source use of compiler-owned structural IR identities and metadata.
-bool diagnoseInvalidStructuralRayTracingIntrinsicOp(
-    IROp op,
-    bool isCoreModule,
-    UnownedStringSlice operationName,
-    SourceLoc loc,
-    DiagnosticSink* sink);
 
 /// Rejects structural source representations that remain before native ABI legalization.
 SlangResult diagnoseUnloweredStructuralRayTracing(

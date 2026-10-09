@@ -1816,33 +1816,6 @@ bool isStructuralRayTracingOpaqueHandleType(Type* type)
     return isIntrinsicTypeWithOp(type, kIROp_TraceProgramDescriptorType);
 }
 
-// Rejects source attempts to manufacture compiler-owned structural stage and operation metadata.
-//
-// Consider `__intrinsic_op(miss_stage_interface)` on an ordinary user declaration. That opcode does
-// not implement a callable intrinsic; it records a stage contract already validated by the
-// compiler. Accepting it directly would bypass those checks. Apply the same rule to named and
-// numeric opcodes, while retaining the core module's existing permission to define intrinsics.
-bool diagnoseInvalidStructuralRayTracingIntrinsicOp(
-    IROp op,
-    bool isCoreModule,
-    UnownedStringSlice operationName,
-    SourceLoc loc,
-    DiagnosticSink* sink)
-{
-    if (isCoreModule)
-        return false;
-
-    const bool isStageInterface =
-        op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface;
-    if (!isStageInterface && op != kIROp_StructuralRayTracingEntryPointInfoDecoration &&
-        op != kIROp_StructuralRayTracingSourceOperationDecoration)
-        return false;
-
-    sink->diagnose(
-        Diagnostics::CompilerOwnedIntrinsicOp{.operation = operationName, .location = loc});
-    return true;
-}
-
 // Prevents a logical structural stage signature from reaching native entry-point ABI passes.
 //
 // Consider `-entry MyMiss` selecting a struct whose `invoke` takes `rt::MissInput<C>`.

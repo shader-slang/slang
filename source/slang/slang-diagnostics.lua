@@ -1095,13 +1095,6 @@ err(
 )
 
 err(
-    "compiler-owned-intrinsic-op",
-    20023,
-    "compiler-owned intrinsic operation",
-    span { loc = "location", message = "intrinsic operation '~operation' is reserved for compiler use" }
-)
-
-err(
     "direct-structural-ray-tracing-stage-invoke",
     20024,
     "direct invocation of a structural ray-tracing stage",

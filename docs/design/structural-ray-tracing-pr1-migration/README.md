@@ -204,7 +204,7 @@ can enforce the same-module mixing restriction, including after serialization.
 
 All additional semantic rules and declaration-identity queries live in
 `source/slang/slang-check-structural-ray-tracing.cpp`, with examples beside the rule implementations.
-Conformance, expression, entry-point, parser, and code-generation boundaries call into that file.
+Conformance, expression, entry-point, and code-generation boundaries call into that file.
 The ordinary library constraints remain the source of truth for type relationships; there is no
 ray-tracing module build mode, import hook, or global declaration registry.
 
