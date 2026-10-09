@@ -29,7 +29,6 @@ in. Every prefix currently in use:
 | `container-`     | The CI container images.                                            |
 | `scaler-`        | The GCP runner scaler binary and auto-deployment artifact.          |
 | `sccache-`       | The shared compiler cache.                                          |
-| `llvm-`          | LLVM prebuilt population.                                           |
 | `issue-`         | Issue-triggered automation.                                         |
 | `reuse-`         | REUSE/SPDX license compliance.                                      |
 | `slash-command-` | The PR-comment command dispatcher.                                  |
@@ -232,21 +231,21 @@ Work too slow, too noisy, or too repetitive to gate a PR. Cadences are in each
 file's `schedule:` block; the nightly hours are staggered so the heavy suites do
 not compete for the same runners.
 
-| Workflow                           | Cadence    | Purpose                                                      |
-| ---------------------------------- | ---------- | ------------------------------------------------------------ |
-| `ci-health.yml`                    | sub-hourly | Samples runner-cap saturation and publishes a health signal. |
-| `sccache-populate.yml`             | sub-hourly | Builds master to keep the shared sccache warm for PRs.       |
-| `ci-retry-yielded-bot.yml`         | hourly     | Reruns bot CI runs that yielded their runner slot.           |
-| `nightly-slang-coverage-test.yml`  | nightly    | Full coverage run; publishes the report.                     |
-| `nightly-slang-sanitizer-test.yml` | nightly    | Sanitizer run over the full test suite.                      |
-| `nightly-remix-test.yml`           | nightly    | Compiles all RTX Remix shaders.                              |
-| `nightly-slang-test.yml`           | nightly    | Runs the generated, doc-anchored suite under `docs/`.        |
-| `nightly-slang-sascha-test.yml`    | nightly    | Compiles the Sascha Willems Vulkan sample shaders.           |
-| `nightly-slang-vkglcts-test.yml`   | nightly    | Runs the Vulkan CTS with Slang as the shader compiler.       |
-| `nightly-mdl-perf-test.yml`        | nightly    | Compile-performance suite for the MDL workloads.             |
-| `ci-analytics.yml`                 | daily      | Collects CI run statistics and publishes them.               |
-| `pr-sweep-nightly.yml`             | nightly    | Board-sync backstop over every open PR.                      |
-| `cmake-options.yml`                | weekly     | Builds the matrix of non-default CMake option combinations.  |
+| Workflow                           | Cadence                            | Purpose                                                              |
+| ---------------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `ci-health.yml`                    | sub-hourly                         | Samples runner-cap saturation and publishes a health signal.         |
+| `sccache-populate.yml`             | sub-hourly, recipe changes, manual | Populates missing LLVM prebuilts, then warms Slang's shared sccache. |
+| `ci-retry-yielded-bot.yml`         | hourly                             | Reruns bot CI runs that yielded their runner slot.                   |
+| `nightly-slang-coverage-test.yml`  | nightly                            | Full coverage run; publishes the report.                             |
+| `nightly-slang-sanitizer-test.yml` | nightly                            | Sanitizer run over the full test suite.                              |
+| `nightly-remix-test.yml`           | nightly                            | Compiles all RTX Remix shaders.                                      |
+| `nightly-slang-test.yml`           | nightly                            | Runs the generated, doc-anchored suite under `docs/`.                |
+| `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
+| `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
+| `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
+| `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
+| `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
 
 ## 4. PR board sync and bots
 
@@ -286,14 +285,13 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 6. Release, tag, and publishing
 
-| Workflow                                                       | Trigger                               | Purpose                                                                                                                                                                |
-| -------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `release.yml`                                                  | version tag                           | Builds and publishes the release binaries.                                                                                                                             |
-| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly                  | Extra Linux builds against older glibc.                                                                                                                                |
-| `container-publish-images.yml`                                 | push/PR on `docker/**`                | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
-| `scaler-release.yml`                                           | push/PR on scaler code                | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
-| `perf-push-benchmark-results.yml`                              | push to master                        | Publishes MDL benchmark numbers.                                                                                                                                       |
-| `llvm-populate.yml`                                            | LLVM recipe changes on master, manual | Builds missing LLVM prebuilts and publishes them to GCS.                                                                                                               |
+| Workflow                                                       | Trigger                | Purpose                                                                                                                                                                |
+| -------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release.yml`                                                  | version tag            | Builds and publishes the release binaries.                                                                                                                             |
+| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly   | Extra Linux builds against older glibc.                                                                                                                                |
+| `container-publish-images.yml`                                 | push/PR on `docker/**` | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `scaler-release.yml`                                           | push/PR on scaler code | Validates scaler PRs, then uploads the merged scaler binary as a GitHub artifact for host-side auto-deployment from `gpu-scaler-host`.                                 |
+| `perf-push-benchmark-results.yml`                              | push to master         | Publishes MDL benchmark numbers.                                                                                                                                       |
 
 ## 7. Manual only
 
