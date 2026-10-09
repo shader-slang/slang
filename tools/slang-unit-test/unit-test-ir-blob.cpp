@@ -3,6 +3,8 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "slang/slang-fossil.h"
+#include "slang/slang-serialize-types.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
@@ -473,6 +475,121 @@ SLANG_UNIT_TEST(irBlob)
         // make loadModuleFromIRBlob return nullptr (the original #6557 symptom).
         SLANG_CHECK(loadedImporter != nullptr);
     }
+}
+
+// Check current module loading and rejection of version-33 modules.
+//
+// Adding `UniformParameterShadowVarDecl` changes the numeric AST node IDs in version 34.
+// This test verifies that a current module loads, then changes only its module version to 33
+// and requires rejection with the specific unsupported-version diagnostic.
+SLANG_UNIT_TEST(irBlobRejectsVersion33)
+{
+    // The fixture includes a function parameter, whose AST node ID changed in version 34.
+    const char* moduleText = R"(
+        module version_guard;
+        public uint readValue(uint input) { return input + 1; }
+    )";
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Module serialization creates valid AST and IR chunks with the current compiler's schema.
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<slang::ISession> buildSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, buildSession.writeRef()) == SLANG_OK);
+    ComPtr<slang::IModule> module;
+    module = buildSession->loadModuleFromSourceString(
+        "version_guard",
+        "version_guard.slang",
+        moduleText,
+        nullptr);
+    SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<ISlangBlob> moduleBlob;
+    SLANG_CHECK_ABORT(module->serialize(moduleBlob.writeRef()) == SLANG_OK);
+
+    // A fresh session must load the current version. Reusing `buildSession` could satisfy
+    // lookup from its existing module instead of reading the serialized bytes.
+    ComPtr<slang::ISession> currentSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, currentSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(currentSession->loadModuleFromIRBlob(
+        "version_guard",
+        "version_guard.slang-module",
+        moduleBlob,
+        nullptr));
+
+    // We copy the entire blob so its chunks and relative pointers remain intact when we change
+    // the module version.
+    List<uint8_t> olderModuleBytes;
+    olderModuleBytes.setCount(moduleBlob->getBufferSize());
+    memcpy(
+        olderModuleBytes.getBuffer(),
+        moduleBlob->getBufferPointer(),
+        moduleBlob->getBufferSize());
+
+    // We use RIFF navigation to select the IR metadata without inspecting the AST chunk.
+    auto rootChunk =
+        RIFF::RootChunk::getFromBlob(olderModuleBytes.getBuffer(), olderModuleBytes.getCount());
+    SLANG_CHECK_ABORT(rootChunk != nullptr);
+    auto moduleChunk = rootChunk->findListChunkRec(SerialBinary::kModuleFourCC);
+    SLANG_CHECK_ABORT(moduleChunk != nullptr);
+    auto irList = moduleChunk->findListChunk(PropertyKeys<IRModule>::IRModule);
+    SLANG_CHECK_ABORT(irList != nullptr);
+
+    // `writeSerializedModuleIR` writes one data chunk containing the serialized `IRModuleInfo`
+    // into this IR list, so its first child contains the metadata we need to change.
+    auto irChunk = as<RIFF::DataChunk>(irList->getFirstChild().get());
+    SLANG_CHECK_ABORT(irChunk != nullptr);
+
+    // In `slang-serialize-ir.cpp`, `IRModuleInfo` contains `serializationVersion`,
+    // `fullVersion`, then `module`. The serializer records that third field's offset in the layout.
+    auto fossilHeader = static_cast<Fossil::Header const*>(irChunk->getPayload());
+    auto moduleInfo = fossilHeader->rootValue.get();
+    auto infoLayout = reinterpret_cast<FossilizedRecordLayout*>(moduleInfo->getContentLayout());
+    SLANG_CHECK_ABORT(infoLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(infoLayout->fieldCount == 3);
+    auto infoFields = reinterpret_cast<FossilizedRecordElementLayout*>(infoLayout + 1);
+    SLANG_CHECK_ABORT(infoFields[2].layout.get()->kind == FossilizedValKind::Ptr);
+
+    // We obtain the serialized `IRModule` through the recorded pointer and its element layout.
+    auto modulePointer = reinterpret_cast<FossilizedPtr<void>*>(
+        static_cast<Byte*>(moduleInfo->getContentDataPtr()) + infoFields[2].offset);
+    SLANG_CHECK_ABORT(modulePointer->get() != nullptr);
+    auto pointerLayout = reinterpret_cast<FossilizedPtrLikeLayout*>(infoFields[2].layout.get());
+    auto moduleLayout =
+        reinterpret_cast<FossilizedRecordLayout*>(pointerLayout->elementLayout.get());
+    SLANG_CHECK_ABORT(moduleLayout->kind == FossilizedValKind::Struct);
+    SLANG_CHECK_ABORT(moduleLayout->fieldCount == 3);
+
+    // `IRSerialWriteContext::handleIRModule` writes `m_name`, `m_version`, then `m_moduleInst`.
+    // We use the checked field layout to locate `m_version`, leaving the AST and format intact.
+    auto moduleFields = reinterpret_cast<FossilizedRecordElementLayout*>(moduleLayout + 1);
+    SLANG_CHECK_ABORT(moduleFields[1].layout.get()->kind == FossilizedValKind::UInt64);
+    auto versionAddress = static_cast<Byte*>(modulePointer->get()) + moduleFields[1].offset;
+    const UInt64 olderVersion = 33;
+    memcpy(versionAddress, &olderVersion, sizeof(olderVersion));
+
+    // Another fresh session must reject the older version with its specific diagnostic.
+    // A general load failure would not identify the module version as the reason for rejection.
+    ComPtr<slang::ISession> olderSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, olderSession.writeRef()) == SLANG_OK);
+    ComPtr<ISlangBlob> diagnostics;
+    auto loadedModule = slang_loadModuleFromIRBlob(
+        olderSession,
+        "version_guard",
+        "version_guard.slang-module",
+        olderModuleBytes.getBuffer(),
+        olderModuleBytes.getCount(),
+        diagnostics.writeRef());
+    SLANG_CHECK(loadedModule == nullptr);
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    String diagnosticText;
+    diagnosticText.append(
+        static_cast<char const*>(diagnostics->getBufferPointer()),
+        diagnostics->getBufferSize());
+    SLANG_CHECK(diagnosticText.contains("cannot load IR module version 33"));
 }
 
 // Regression test for #6557 that mirrors the reporter's exact deployment shape:
