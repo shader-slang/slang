@@ -605,6 +605,15 @@ public:
         unregisterProxyImpl(proxyIdentity);
     }
 
+    /// A replayed user release() of `proxy`; see unnotePlaybackOrphanedProxyImpl.
+    inline void unnotePlaybackOrphanedProxy(ISlangUnknown* proxy)
+    {
+        unnotePlaybackOrphanedProxyImpl(proxy);
+    }
+
+    /// A replayed user addRef() of `proxy`; see playbackUserAddRefImpl.
+    inline void playbackUserAddRef(ISlangUnknown* proxy) { playbackUserAddRefImpl(proxy); }
+
     /// Registers `obj` in the handle registry and returns its handle, for tests.
     ///
     /// A production proxy is registered by wrapObject() as part of being
@@ -780,6 +789,20 @@ private:
     /// later releases the reference unless the replayed release stream already
     /// destroyed the proxy first (issue #11936).
     SLANG_API void notePlaybackOrphanedProxy(ISlangUnknown* proxy);
+
+    /// A replayed user release() of `proxy` gives up one reference the user owned. If
+    /// `proxy` has outstanding orphaned references, that reference is one of them, because
+    /// on playback the creation reference stands in for the one the recorded user owned.
+    /// One note is therefore dropped, so releaseOrphanedPlaybackProxies() does not release
+    /// that reference a second time. A replayed user addRef() adds a reference of the same
+    /// kind and adds a note (see playbackUserAddRef), so only a release that is not matched
+    /// by an earlier user addRef consumes the creation reference.
+    SLANG_API void unnotePlaybackOrphanedProxyImpl(ISlangUnknown* proxy);
+
+    /// A replayed user addRef() of `proxy`. If `proxy` has outstanding orphaned references,
+    /// the new user reference counts as one more, so that a later replayed release balances
+    /// it instead of the creation reference.
+    SLANG_API void playbackUserAddRefImpl(ISlangUnknown* proxy);
 
     /// Release the still-live orphaned playback proxies recorded by
     /// notePlaybackOrphanedProxy. Proxies whose recorded release stream already

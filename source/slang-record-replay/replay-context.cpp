@@ -847,6 +847,24 @@ void ReplayContext::notePlaybackOrphanedProxy(ISlangUnknown* proxy)
         m_playbackOrphanedProxies[proxy] = 1;
 }
 
+void ReplayContext::unnotePlaybackOrphanedProxyImpl(ISlangUnknown* proxy)
+{
+    uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
+    if (!existing)
+        return;
+    if (*existing > 1)
+        --(*existing);
+    else
+        m_playbackOrphanedProxies.remove(proxy);
+}
+
+void ReplayContext::playbackUserAddRefImpl(ISlangUnknown* proxy)
+{
+    uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
+    if (existing)
+        ++(*existing);
+}
+
 uint32_t ReplayContext::testOnlyGetOrphanedRefCountImpl(ISlangUnknown* proxy) const
 {
     const uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
