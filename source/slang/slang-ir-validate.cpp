@@ -650,6 +650,294 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
     }
 }
 
+// Memory-order validation
+//
+// An atomic operation carries its `MemoryOrder` arguments as trailing operands, and each order must
+// suit the operation, as the `Atomic<T>` documentation in core.meta.slang states:
+//
+// * a load cannot release, and a store cannot acquire;
+// * a compareExchange failure order cannot release, and the success order must be at least as
+//   strong as the failure order.
+//
+// For these four rules, `spirv-val` enforces the same constraints on SPIR-V atomics
+// (VUID-StandaloneSpirv-MemorySemantics-10867, -10868, -10875 and -10876), except that it accepts
+// a `Release` success order with an `Acquire` failure order, which the "at least as strong" rule
+// rejects. Other SPIR-V and Vulkan constraints on memory semantics, such as Vulkan's ban on
+// `SequentiallyConsistent`, are outside this check. We report a violation (E41405, E41406) on
+// every target, including those whose emitters drop or widen the order.
+//
+// The SPIR-V and Metal emitters also read each order as a constant (`emitMemorySemanticMask`,
+// `emitMemoryOrderOperand`), so on those targets, except for Metal texture atomics, which take no
+// order, we also report an order that is not a constant (E41407) or not a `MemoryOrder` value
+// (E41408). The other emitters, including GLSL when SPIR-V is produced through it, drop the
+// order.
+
+static const char* getMemoryOrderName(IRMemoryOrder order)
+{
+    switch (order)
+    {
+    case kIRMemoryOrder_Relaxed:
+        return "MemoryOrder.Relaxed";
+    case kIRMemoryOrder_Acquire:
+        return "MemoryOrder.Acquire";
+    case kIRMemoryOrder_Release:
+        return "MemoryOrder.Release";
+    case kIRMemoryOrder_AcquireRelease:
+        return "MemoryOrder.AcquireRelease";
+    case kIRMemoryOrder_SeqCst:
+        return "MemoryOrder.SeqCst";
+    }
+    SLANG_UNEXPECTED("unknown memory order");
+    UNREACHABLE_RETURN(nullptr);
+}
+
+// Return the operand index of the memory order of the atomic operation `inst`, or -1 if `inst` is
+// not an atomic operation. A compare-exchange carries two orders, the success order at this index
+// followed by the failure order; every other atomic operation carries at most one. The operands
+// named in slang-ir-insts.lua come first, and the orders follow them in the order the atomic
+// intrinsics in core.meta.slang and hlsl.meta.slang declare them; the SPIR-V and Metal emitters
+// read the orders at these same positions.
+static Index getFirstMemoryOrderOperandIndex(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        return 1;
+    case kIROp_AtomicStore:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        return 2;
+    case kIROp_AtomicCompareExchange:
+        return 3;
+    default:
+        return -1;
+    }
+}
+
+// Return whether the code generated for the atomic operation `inst` encodes its memory order, and
+// so needs the order to be a constant `MemoryOrder` value. SPIR-V emits the order as the memory
+// semantics of its atomic instructions. Metal emits it except on texture atomics, whose Metal
+// functions take no order; the test for those mirrors `isTextureAccess` in slang-emit-metal.cpp.
+// The other targets drop the order.
+static bool doesAtomicEncodeMemoryOrder(IRInst* inst, CodeGenTarget target)
+{
+    if (isSPIRV(target))
+        return true;
+    if (isMetalTarget(target))
+        return !as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
+    return false;
+}
+
+// Read `operand` into `outOrder` and return true if it is a literal naming a `MemoryOrder`
+// enumerator; return false for any other operand, including an out-of-range literal.
+static bool tryGetConstantMemoryOrder(IRInst* operand, IRMemoryOrder& outOrder)
+{
+    auto orderLit = as<IRIntLit>(operand);
+    if (!orderLit)
+        return false;
+    switch (orderLit->getValue())
+    {
+    case kIRMemoryOrder_Relaxed:
+    case kIRMemoryOrder_Acquire:
+    case kIRMemoryOrder_Release:
+    case kIRMemoryOrder_AcquireRelease:
+    case kIRMemoryOrder_SeqCst:
+        outOrder = IRMemoryOrder(orderLit->getValue());
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Read the memory order operand `operandIndex` of the atomic operation `inst` into `outOrder` and
+// return true if it is a constant `MemoryOrder` value. Otherwise return false, after reporting
+// E41407 or E41408 if the code generated for `target` encodes the order; on other targets nothing
+// reads the order, so there is nothing to report.
+static bool checkConstantMemoryOrder(
+    IRInst* inst,
+    UInt operandIndex,
+    CodeGenTarget target,
+    DiagnosticSink* sink,
+    IRMemoryOrder& outOrder)
+{
+    auto operand = inst->getOperand(operandIndex);
+    if (tryGetConstantMemoryOrder(operand, outOrder))
+        return true;
+    if (!doesAtomicEncodeMemoryOrder(inst, target))
+        return false;
+    if (auto orderLit = as<IRIntLit>(operand))
+        sink->diagnose(Diagnostics::AtomicMemoryOrderOutOfRange{
+            .value = orderLit->getValue(),
+            .location = inst->sourceLoc,
+        });
+    else
+        sink->diagnose(Diagnostics::AtomicMemoryOrderNotConstant{
+            .target = target,
+            .location = inst->sourceLoc,
+        });
+    return false;
+}
+
+// Return whether `order` is valid for an operation that only reads: an atomic load, or the
+// failure case of a compare-exchange. A read writes nothing, so it cannot release.
+static bool isMemoryOrderValidForRead(IRMemoryOrder order)
+{
+    return order != kIRMemoryOrder_Release && order != kIRMemoryOrder_AcquireRelease;
+}
+
+// Return whether `order` is valid for an atomic store. A store reads nothing, so it cannot acquire.
+static bool isMemoryOrderValidForStore(IRMemoryOrder order)
+{
+    return order != kIRMemoryOrder_Acquire && order != kIRMemoryOrder_AcquireRelease;
+}
+
+// Return whether the success order of a compare-exchange is at least as strong as its failure
+// order. `Relaxed` is the weakest order, `Acquire` and `Release` are each stronger than `Relaxed`
+// but unordered with each other, `AcquireRelease` is stronger than both, and `SeqCst` is the
+// strongest. `failOrder` must already be valid for a read, so it is `Relaxed`, `Acquire` or
+// `SeqCst`.
+static bool isSuccessOrderAtLeastAsStrongAsFailOrder(
+    IRMemoryOrder successOrder,
+    IRMemoryOrder failOrder)
+{
+    switch (failOrder)
+    {
+    case kIRMemoryOrder_Relaxed:
+        return true;
+    case kIRMemoryOrder_Acquire:
+        return successOrder != kIRMemoryOrder_Relaxed && successOrder != kIRMemoryOrder_Release;
+    case kIRMemoryOrder_SeqCst:
+        return successOrder == kIRMemoryOrder_SeqCst;
+    default:
+        SLANG_UNEXPECTED("compare-exchange failure order that releases");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
+static void diagnoseInvalidMemoryOrderForAtomicOperation(
+    IRInst* inst,
+    IRMemoryOrder order,
+    const char* operation,
+    DiagnosticSink* sink)
+{
+    sink->diagnose(Diagnostics::InvalidMemoryOrderForAtomicOperation{
+        .order = getMemoryOrderName(order),
+        .operation = operation,
+        .location = inst->sourceLoc,
+    });
+}
+
+// Diagnose the memory orders of the compare-exchange `inst`, whose success order is operand
+// `successOrderIndex` and failure order the one after it.
+static void validateCompareExchangeMemoryOrders(
+    IRInst* inst,
+    UInt successOrderIndex,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
+{
+    UInt failOrderIndex = successOrderIndex + 1;
+    IRMemoryOrder successOrder;
+    bool hasSuccessOrder =
+        checkConstantMemoryOrder(inst, successOrderIndex, target, sink, successOrder);
+
+    // Both orders are reported at the location of the call, so when neither is a valid order
+    // and both fail the same way, the success order's diagnostic is the only one we report.
+    auto successLit = as<IRIntLit>(inst->getOperand(successOrderIndex));
+    auto failLit = as<IRIntLit>(inst->getOperand(failOrderIndex));
+    if (!hasSuccessOrder && !successLit && !failLit)
+        return;
+    if (!hasSuccessOrder && successLit && failLit && successLit->getValue() == failLit->getValue())
+        return;
+
+    IRMemoryOrder failOrder;
+    if (!checkConstantMemoryOrder(inst, failOrderIndex, target, sink, failOrder))
+        return;
+
+    // A failure order that releases is invalid whatever the success order is, so we report it
+    // even when the success order is unusable.
+    if (!isMemoryOrderValidForRead(failOrder))
+        diagnoseInvalidMemoryOrderForAtomicOperation(
+            inst,
+            failOrder,
+            "a compareExchange failure",
+            sink);
+    else if (hasSuccessOrder && !isSuccessOrderAtLeastAsStrongAsFailOrder(successOrder, failOrder))
+        sink->diagnose(Diagnostics::AtomicCompareExchangeSuccessOrderTooWeak{
+            .successOrder = getMemoryOrderName(successOrder),
+            .failOrder = getMemoryOrderName(failOrder),
+            .location = inst->sourceLoc,
+        });
+}
+
+// Diagnose the memory orders of `inst` if it is an atomic operation.
+static void validateMemoryOrdersOfAtomicOperation(
+    IRInst* inst,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
+{
+    Index firstOrderIndex = getFirstMemoryOrderOperandIndex(inst);
+    if (firstOrderIndex < 0)
+        return;
+
+    // An atomic intrinsic may be declared with fewer order parameters than its operation takes,
+    // e.g. `__intrinsic_op(atomicAdd) uint add(__ref uint dst, uint v);`, which the IR definition
+    // allows. We validate only the orders that are present; the SPIR-V and Metal emitters assume
+    // every order is present, which is a limitation of those emitters rather than of this check.
+    UInt orderIndex = UInt(firstOrderIndex);
+    if (inst->getOperandCount() <= orderIndex)
+        return;
+    if (inst->getOp() == kIROp_AtomicCompareExchange && inst->getOperandCount() > orderIndex + 1)
+    {
+        validateCompareExchangeMemoryOrders(inst, orderIndex, target, sink);
+        return;
+    }
+
+    IRMemoryOrder order;
+    if (!checkConstantMemoryOrder(inst, orderIndex, target, sink, order))
+        return;
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+        if (!isMemoryOrderValidForRead(order))
+            diagnoseInvalidMemoryOrderForAtomicOperation(inst, order, "an atomic load", sink);
+        break;
+    case kIROp_AtomicStore:
+        if (!isMemoryOrderValidForStore(order))
+            diagnoseInvalidMemoryOrderForAtomicOperation(inst, order, "an atomic store", sink);
+        break;
+    default:
+        // Exchange and read-modify-write operations both read and write, so every order is valid
+        // for them. So is any success order of a compare-exchange declared without a failure
+        // order.
+        break;
+    }
+}
+
+static void validateAtomicMemoryOrdersRecursive(
+    IRInst* inst,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
+{
+    validateMemoryOrdersOfAtomicOperation(inst, target, sink);
+    for (auto child : inst->getChildren())
+        validateAtomicMemoryOrdersRecursive(child, target, sink);
+}
+
+bool validateAtomicMemoryOrders(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
+{
+    auto errorCountBefore = sink->getErrorCount();
+    validateAtomicMemoryOrdersRecursive(module->getModuleInst(), target, sink);
+    return sink->getErrorCount() == errorCountBefore;
+}
+
 static void validateVectorOrMatrixElementType(
     DiagnosticSink* sink,
     SourceLoc sourceLoc,

@@ -3427,7 +3427,7 @@ static void widenNarrowAccessChainIndices(IRModule* module, TargetRequest* targe
     }
 }
 
-void legalizeIRForSPIRV(
+SlangResult legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
     const List<IRFunc*>& entryPoints,
@@ -3452,8 +3452,19 @@ void legalizeIRForSPIRV(
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
 
+    // The IR is now in the shape the SPIR-V emitter reads its memory orders from: every order that
+    // folds to a constant has been folded, and atomics in removed code are gone. This is the
+    // SPIR-V counterpart of the check at the end of `linkAndOptimizeIR`. We do not emit an atomic
+    // whose order failed the check, so we stop here.
+    if (!validateAtomicMemoryOrders(
+            module,
+            codeGenContext->getTargetFormat(),
+            codeGenContext->getSink()))
+        return SLANG_FAIL;
+
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);
+    return SLANG_OK;
 }
 
 } // namespace Slang

@@ -5692,6 +5692,34 @@ err(
     span { loc = "location", message = "cannot perform atomic operation because destination is neither groupshared nor from a device buffer." }
 )
 
+err(
+    "invalid-memory-order-for-atomic-operation",
+    41405,
+    "invalid memory order for atomic operation",
+    span { loc = "location", message = "'~order:String' cannot be used as the memory order of ~operation:String" }
+)
+
+err(
+    "atomic-compare-exchange-success-order-too-weak",
+    41406,
+    "compareExchange success order is weaker than its failure order",
+    span { loc = "location", message = "success memory order '~successOrder:String' must be at least as strong as failure memory order '~failOrder:String'" }
+)
+
+err(
+    "atomic-memory-order-not-constant",
+    41407,
+    "atomic memory order is not a compile-time constant",
+    span { loc = "location", message = "the memory order of an atomic operation must be a compile-time constant when targeting '~target:CodeGenTarget'" }
+)
+
+err(
+    "atomic-memory-order-out-of-range",
+    41408,
+    "atomic memory order is out of range",
+    span { loc = "location", message = "~value:Int is not a valid MemoryOrder value" }
+)
+
 
 -- Load semantic checking diagnostics (part 14) - Target code generation
 -- (inlined from slang-diagnostics-semantic-checking-14.lua)

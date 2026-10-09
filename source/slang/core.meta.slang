@@ -4169,6 +4169,13 @@ extension half : IArithmeticAtomicable {}
 /// All operations take a `MemoryOrder` parameter which influenced the
 /// semantics of the performed operation
 ///
+/// When emitting SPIR-V directly, or Metal for an atomic that is not on a
+/// texture, each `MemoryOrder` argument must be known at compile time: a
+/// `MemoryOrder` value, a generic value parameter, a `static const`
+/// variable, or a parameter of a `[ForceInline]` function that is passed one
+/// of these. A parameter of a function that is not inlined is not known at
+/// compile time, even when every caller passes a constant.
+///
 /// All operations take place at the device scope.
 ///
 /// Operators `+=`, `-=`, `&=`, `|=`, `^=`, `++`, `--` are overloaded to
@@ -4179,10 +4186,14 @@ __intrinsic_type($(kIROp_AtomicType))
 struct Atomic<T : IAtomicable>
 {
     /// Atomically load the stored `T` value
+    ///
+    /// `order` must not be `MemoryOrder.Release` or `MemoryOrder.AcquireRelease`
     __intrinsic_op($(kIROp_AtomicLoad))
     [constref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically store a new `T` value
+    ///
+    /// `order` must not be `MemoryOrder.Acquire` or `MemoryOrder.AcquireRelease`
     __intrinsic_op($(kIROp_AtomicStore))
     [__ref] void store(T newValue, MemoryOrder order = MemoryOrder.Relaxed);
 
