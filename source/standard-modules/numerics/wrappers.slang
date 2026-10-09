@@ -771,7 +771,7 @@ public T rsqrt<T : IRootFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T min<T : IRealOrderingFunctions>(T left, T right)
+public T min<T : INumericExtrema>(T left, T right)
 {
     return left.minimum(right);
 }
@@ -779,7 +779,7 @@ public T min<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-9)]
-public T max<T : IRealOrderingFunctions>(T left, T right)
+public T max<T : INumericExtrema>(T left, T right)
 {
     return left.maximum(right);
 }
@@ -787,7 +787,7 @@ public T max<T : IRealOrderingFunctions>(T left, T right)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T clamp<T : IRealOrderingFunctions>(T value, T minimumValue, T maximumValue)
+public T clamp<T : INumericExtrema>(T value, T minimumValue, T maximumValue)
 {
     return value.maximum(minimumValue).minimum(maximumValue);
 }
@@ -795,7 +795,7 @@ public T clamp<T : IRealOrderingFunctions>(T value, T minimumValue, T maximumVal
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
+public T saturate<T : IFractional & INumericExtrema>(T value)
 {
     return clamp<T>(
         value,
@@ -807,7 +807,7 @@ public T saturate<T : IFractional & IRealOrderingFunctions>(T value)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fdim<T : IFractional & IRealOrderingFunctions>(T x, T y)
+public T fdim<T : IFractional & INumericExtrema>(T x, T y)
 {
     T zero = T.zero();
     return x.minus(y).maximum(zero);
@@ -834,7 +834,7 @@ public T lerp<T : IFractional>(T x, T y, T factor)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T max3<T : INumericExtrema>(T x, T y, T z)
 {
     return x.maximum(y.maximum(z));
 }
@@ -842,7 +842,7 @@ public T max3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T min3<T : INumericExtrema>(T x, T y, T z)
 {
     return x.minimum(y.minimum(z));
 }
@@ -850,7 +850,7 @@ public T min3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T median3<T : IRealOrderingFunctions>(T x, T y, T z)
+public T median3<T : INumericExtrema>(T x, T y, T z)
 {
     T lower = y.minimum(z);
     T upper = y.maximum(z);
@@ -860,7 +860,7 @@ public T median3<T : IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmax<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
+public T fmax<T : IFloatingPoint & INumericExtrema>(T x, T y)
 {
     return x.maximum(y);
 }
@@ -868,7 +868,7 @@ public T fmax<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmax3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmax3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return x.maximum(y.maximum(z));
 }
@@ -876,7 +876,7 @@ public T fmax3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmin<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
+public T fmin<T : IFloatingPoint & INumericExtrema>(T x, T y)
 {
     return x.minimum(y);
 }
@@ -884,7 +884,7 @@ public T fmin<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmin3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmin3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return x.minimum(y.minimum(z));
 }
@@ -892,7 +892,7 @@ public T fmin3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
-public T fmedian3<T : IFloatingPoint & IRealOrderingFunctions>(T x, T y, T z)
+public T fmedian3<T : IFloatingPoint & INumericExtrema>(T x, T y, T z)
 {
     return median3(x, y, z);
 }

@@ -38,7 +38,7 @@ void computeMain()
 }
 
 // Each specialized function returns the target's `min`/`max` applied to its vector parameters.
-// A loop over scalars would instead index the parameters and return a separate result variable.
+// A scalar loop would index the parameters instead.
 
 // HLSL: int3 maxInteger_{{[0-9]+}}(int3 a_{{[0-9]+}}, int3 b_{{[0-9]+}})
 // HLSL-NOT: }
@@ -93,7 +93,7 @@ void computeMain()
 // WGSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
 
 // In SPIR-V the extended instruction's result type is the vector type.
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMin
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMax
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMin
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMax
 // SPIRV-DAG: OpExtInst %v3int %{{[0-9a-zA-Z_]+}} SMin
 // SPIRV-DAG: OpExtInst %v3int %{{[0-9a-zA-Z_]+}} SMax
