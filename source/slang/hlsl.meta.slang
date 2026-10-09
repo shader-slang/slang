@@ -11385,7 +11385,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__half2float";
+    case cuda: return vector<float, N>(value);
     case hlsl: __intrinsic_asm "f16tof32";
     case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
@@ -11424,7 +11424,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__float2half";
+    case cuda: return vector<float16_t, N>(value);
     case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
