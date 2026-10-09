@@ -149,6 +149,28 @@ SLANG_UNIT_TEST(json)
     }
 
     {
+        const char text[] =
+            "{\n // line comment\n \"a\" : /* block comment */ 1,\n // another comment\n \"b\" : "
+            "2 }";
+        const Element eles[] = {
+            {JSONTokenType::LBrace, "{"},
+            {JSONTokenType::StringLiteral, "\"a\""},
+            {JSONTokenType::Colon, ":"},
+            {JSONTokenType::IntegerLiteral, "1"},
+            {JSONTokenType::Comma, ","},
+            {JSONTokenType::StringLiteral, "\"b\""},
+            {JSONTokenType::Colon, ":"},
+            {JSONTokenType::IntegerLiteral, "2"},
+            {JSONTokenType::RBrace, "}"},
+            {JSONTokenType::EndOfFile, ""},
+        };
+
+        List<JSONToken> toks;
+        SLANG_CHECK(SLANG_SUCCEEDED(_lex(text, &sink, toks)));
+        SLANG_CHECK(_areEqual(&sourceManager, toks, eles, SLANG_COUNT_OF(eles)));
+    }
+
+    {
         StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
 
 

@@ -199,7 +199,7 @@ letter, a digitless or unterminated `\x{...}` / `\u{...}` form, or an
 overflowing value; `invalidUnicodeStringEscape` when `\u` does not have
 exactly 4 hex digits or `\U` does not have exactly 8) before returning
 `-1`. Its grammar follows
-[docs/language-reference/expressions-literal.md](../../../../docs/language-reference/expressions-literal.md):
+[specification/expressions-literal.md](https://github.com/shader-slang/spec/blob/main/specification/expressions-literal.md):
 octal (`\NNN`), hex (`\xNN`, any number of digits), and the Unicode
 escapes `\uNNNN` (4 hex digits), `\UNNNNNNNN` (8 hex digits), and
 `\u{...}` (braced, up to 32 bits). In string literals, `\xNN` maps to a
