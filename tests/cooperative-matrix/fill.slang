@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -entry computeMain -Xslang -DBAB
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -entry computeMain -render-feature cooperative-matrix
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -entry computeMain -Xslang -DBAB -render-feature cooperative-matrix
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -entry computeMain
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -entry computeMain -Xslang -DBAB
 
