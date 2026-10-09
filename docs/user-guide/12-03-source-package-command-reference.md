@@ -42,7 +42,7 @@ The commands are:
 
 - [`help`](#help) — show a command summary.
 - [`init`](#init) — create a package skeleton.
-- [`dependency`](#dependency) — add, remove, or list direct dependencies. `dep` is a short form.
+- [`dependency`](#dependency) — add, remove, or list direct dependencies. `dep` is an alias.
 - [`pin`](#pin) — hold a solved release, or hold the current edit without moving it.
 - [`unpin`](#unpin) — clear a pin. An edit stays on its branch.
 - [`edit`](#edit) — check out a branch of a solved dependency.
@@ -111,7 +111,7 @@ contents before running bare `validate`.
 
 Manage direct dependency declarations in the workspace `slang-package.json`. These subcommands do
 not resolve the graph, rewrite the lock, or materialize checkouts. Run `status` to inspect the
-result and `update` to resolve it. `dep` is a short form of `dependency` and accepts the same
+result and `update` to resolve it. `dep` is an alias for `dependency` and accepts the same
 subcommands.
 
 Direct dependencies are kept in package-name order.

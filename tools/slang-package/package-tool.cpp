@@ -38,7 +38,7 @@ static void _printHelp(bool experimental = false)
         "  dependency add <name> [--git <url>] (--version <range> | --ref <ref> [--as <ver>])\n"
         "                    Without --git, SLANG_PACKAGE_INDEX supplies the Git URL.\n"
         "  dependency remove <name> | list\n"
-        "                    dep is a short form of dependency.\n"
+        "  dep               Alias for dependency.\n"
         "\n"
         "Lock (slang-package-lock.json):\n"
         "  pin <name> [<version>]\n"
@@ -192,7 +192,7 @@ static bool _isInitCommand(int argc, const char* const* argv)
 
 /// Return whether `command` selects the manifest dependency subcommands.
 ///
-/// `dep` is the short form of `dependency`. Both names accept `add`, `remove`, and `list`.
+/// `dep` is an alias for `dependency`. Both names accept `add`, `remove`, and `list`.
 static bool _isDependencyCommand(const String& command)
 {
     return command == "dependency" || command == "dep";
