@@ -21,7 +21,8 @@ bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* modu
 
 bool specializeResourceOutputs(CodeGenContext* codeGenContext, IRModule* module);
 
-/// Iteratively specialize resource selections, function parameters, and function outputs.
+/// This pass iteratively specializes resource selections, function parameters, and function
+/// outputs.
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext);
 
 /// Convert parameter-passing modes for non-copyable types to ones that are valid for GLSL.

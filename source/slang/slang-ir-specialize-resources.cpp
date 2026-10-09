@@ -1291,10 +1291,115 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
-// Move resource selection onto indices when all incoming values access the same heap or array.
+// This function emits integer replacements for resource selects after leaf accesses and
+// block parameters have entries in mapResourceToIndex. In select(c, a, b), where b is another
+// select that also uses a, both users need a's integer replacement first. Discovery order alone
+// does not establish that order, so the worklist finishes missing dependencies first.
+// Cycles pass through block parameters, whose replacements already exist.
+static void emitResourceIndexSelects(
+    List<IRSelect*>& workList,
+    IRType* indexType,
+    Dictionary<IRInst*, IRInst*>& mapResourceToIndex)
+{
+    // Only selects currently being expanded belong to this set. Other worklist entries
+    // may be independent roots or shared dependencies that have not been visited yet.
+    HashSet<IRSelect*> activeSelects;
+    while (workList.getCount())
+    {
+        auto select = workList.getLast();
+        if (mapResourceToIndex.containsKey(select))
+        {
+            workList.removeLast();
+            continue;
+        }
+        activeSelects.add(select);
+        auto trueValue = select->getOperand(1);
+        auto falseValue = select->getOperand(2);
+        IRInst* missingValue = nullptr;
+        if (!mapResourceToIndex.containsKey(trueValue))
+            missingValue = trueValue;
+        else if (!mapResourceToIndex.containsKey(falseValue))
+            missingValue = falseValue;
+        if (missingValue)
+        {
+            // Leaves and parameters already have indices, so only another select can
+            // be missing. A dependency on an active select would be a cycle without a
+            // block parameter, which is invalid SSA. Returning to this select after
+            // finishing one operand is valid even when its other operand is still missing.
+            auto dependency = as<IRSelect>(missingValue);
+            SLANG_RELEASE_ASSERT(dependency);
+            SLANG_RELEASE_ASSERT(!activeSelects.contains(dependency));
+            workList.add(dependency);
+            continue;
+        }
+        IRBuilder builder(select);
+        builder.setInsertBefore(select);
+        IRInst* operands[] = {
+            select->getCondition(),
+            mapResourceToIndex[trueValue],
+            mapResourceToIndex[falseValue]};
+        auto index = builder.emitIntrinsicInst(indexType, kIROp_Select, 3, operands);
+        index->sourceLoc = select->sourceLoc;
+        mapResourceToIndex.add(select, index);
+        activeSelects.remove(select);
+        workList.removeLast();
+    }
+}
+
+// This function replaces each incoming argument for a rewritten block parameter with
+// that argument's integer index. We call it before replacing uses of the old resource
+// values, while each argument still names the resource whose index it carries.
+// originalParams lists each block's parameters as they were before the integer
+// parameters were inserted, so entry i is argument i on every incoming branch.
+//
+// Consider a loop header with parameters (a, b, k), where a and b select samplers from
+// different arrays and we are specializing a's graph. The back edge
+//
+//     unconditionalBranch(%header, %nextA, %nextB, %nextK)
+//
+// becomes
+//
+//     unconditionalBranch(%header, %nextAIndex, %nextB, %nextK)
+//
+// The slot for b keeps its resource because b belongs to another graph, and k is not
+// part of any selection.
+static void rewriteResourceSelectionBranchArgs(
+    Dictionary<IRBlock*, List<IRParam*>>& originalParams,
+    Dictionary<IRInst*, IRInst*>& mapResourceToIndex)
+{
+    for (auto& [block, params] : originalParams)
+    {
+        // We overwrite argument operands in place. The branch's target, a loop's break and
+        // continue blocks, and its decorations are unchanged. The block's own uses are also
+        // unchanged, so iterating its predecessors while we edit them is safe.
+        for (auto predecessor : block->getPredecessors())
+        {
+            auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
+            SLANG_RELEASE_ASSERT(branch && branch->getTargetBlock() == block);
+            SLANG_RELEASE_ASSERT(branch->getArgCount() == (UInt)params.getCount());
+            IRBuilder builder(branch);
+            for (Index i = 0; i < params.getCount(); i++)
+            {
+                // A parameter outside this graph keeps its argument even when that argument
+                // is part of the graph. In `a = shared; b = shared;`, specializing a's graph
+                // must leave b's slot holding a resource. The caller's replaceUsesWith points
+                // that slot at the reconstructed resource, and a later call specializes b.
+                if (!mapResourceToIndex.containsKey(params[i]))
+                    continue;
+                auto index = mapResourceToIndex.tryGetValue(branch->getArg((UInt)i));
+                SLANG_RELEASE_ASSERT(index && *index);
+                builder.replaceOperand(branch->getArgs() + i, *index);
+            }
+        }
+    }
+}
+
+// This function replaces resource selections with index selections when all incoming values
+// access the same heap or array.
 // For example, `c ? samplers[i] : samplers[j]` becomes `samplers[c ? i : j]`.
 // Array subscripts can have different integer types, so the selected indices need a common
-// type. Consider `select(c, samplers[i], samplers[j])`, where `i` is int and `j` is uint:
+// type. For `select(c, samplers[i], samplers[j])`, where `i` is int and `j` is uint,
+// the transformation is:
 //
 //     // Before:
 //     let %a : SamplerState = getElement(%samplers, %i : Int)
@@ -1313,7 +1418,7 @@ bool specializeResourceOutputs(
 // resource, which are handled separately.
 //
 // A loop can make this more complicated than matching the two operands of a select.
-// Consider this example:
+// The following loop illustrates why:
 //
 //     SamplerState samplers[2];
 //     Texture2D<float4> texture;
@@ -1367,76 +1472,93 @@ bool specializeResourceOutputs(
 //
 // The sample operation now uses %sampler. The branches, including the loop back edge,
 // still pass arguments in the same positions, but carry indices instead of resources.
-// An IRSelect changes similarly: its two value operands become indices, its result type
-// becomes the index type, and a resource access after it supplies the original uses.
+// Each select and block parameter is replaced by a new integer instruction. We create
+// all integer parameters first, so the loop dependencies have values to refer to, then
+// create integer selects in dependency order. Reconstructed resource accesses supply
+// the original resource uses, while the branches pass the corresponding indices.
 // We check all incoming values before changing any instruction, so a rejected case leaves
 // the IR intact.
-static bool specializeResourceSelection(TargetRequest* targetReq, IRInst* selection)
+static bool specializeResourceSelection(
+    TargetRequest* targetReq,
+    IRInst* selection,
+    OrderedHashSet<IRInst*>& remainingSelections)
 {
-    struct SelectionNode
-    {
-        IRInst* inst;
-        // These are the incoming branch arguments for a block parameter, or the two
-        // value operands of a select. Keep their original values because redirecting
-        // uses during the rewrite will also change these operands.
-        List<IRUse*> edges;
-        List<IRInst*> values;
-    };
-
     auto resourceType = selection->getDataType();
     if (!isResourceType(resourceType) || as<IRArrayTypeBase>(resourceType))
         return false;
 
+    // The worklist contains resource values that contribute to the original selection.
+    // Selects contribute their two values, and parameters contribute incoming branch
+    // arguments. Resource accesses end the traversal. Any unsupported producer rejects
+    // the entire graph before we change IR.
     List<IRInst*> workList;
     HashSet<IRInst*> visited;
-    List<SelectionNode> nodes;
-    // A resource access maps to its index operand, then to the converted index during
-    // rewriting. A select or block parameter maps to itself, since we will change that
-    // instruction to produce an index.
-    Dictionary<IRInst*, IRInst*> indices;
-    IRInst* representative = nullptr;
-    IRInst* resourceSource = nullptr;
+    List<IRInst*> selections;
+    Dictionary<IRBlock*, List<IRParam*>> originalParams;
+    // Initially this maps only resource accesses to their index operands. After analysis,
+    // we convert those indices and add the new integer parameters and selects.
+    Dictionary<IRInst*, IRInst*> mapResourceToIndex;
+    IRInst* representativeAccess = nullptr;
+    IRInst* representativeSource = nullptr;
     IRType* commonIndexType = nullptr;
     workList.add(selection);
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto inst = workList[i];
+        // We have already checked a repeated value. In particular, a loop back edge
+        // must not cause us to visit the same parameter indefinitely.
         if (!visited.add(inst))
             continue;
         if (inst->getDataType() != resourceType)
             return false;
 
-        SelectionNode node;
-        node.inst = inst;
         if (auto param = as<IRParam>(inst))
         {
             // Function parameters have no incoming branch arguments to inspect. For other
-            // block parameters, collect the argument in the same position on each branch.
+            // block parameters, the argument at the parameter's position on each branch
+            // supplies one incoming resource value.
             auto block = as<IRBlock>(param->getParent());
-            if (!block || block == cast<IRGlobalValueWithCode>(block->getParent())->getFirstBlock())
+            SLANG_RELEASE_ASSERT(block);
+            auto func = as<IRFunc>(block->getParent());
+            SLANG_RELEASE_ASSERT(func);
+            // An entry parameter receives its resource from a caller, so this graph
+            // does not tell us which heap or array supplies it.
+            if (block == func->getFirstBlock())
                 return false;
             auto paramIndex = getParamIndexInBlock(param);
+            SLANG_RELEASE_ASSERT(paramIndex >= 0);
+            Index incomingCount = 0;
             for (auto predecessor : block->getPredecessors())
             {
                 auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator());
-                if (!branch || branch->getTargetBlock() != block)
-                    return false;
-                node.edges.add(branch->getArgs() + paramIndex);
+                SLANG_RELEASE_ASSERT(branch && branch->getTargetBlock() == block);
+                SLANG_RELEASE_ASSERT((UInt)paramIndex < branch->getArgCount());
+                workList.add(branch->getArg((UInt)paramIndex));
+                incomingCount++;
             }
-            if (node.edges.getCount() == 0)
+            // A non-entry block with no predecessors is unreachable. There is no incoming
+            // resource from which to determine an index.
+            if (incomingCount == 0)
                 return false;
+            if (!originalParams.containsKey(block))
+            {
+                List<IRParam*> params;
+                for (auto originalParam : block->getParams())
+                    params.add(originalParam);
+                originalParams.add(block, params);
+            }
         }
         else if (auto select = as<IRSelect>(inst))
         {
             if (!as<IRBoolType>(select->getCondition()->getDataType()))
                 return false;
-            node.edges.add(select->getOperandUse(1));
-            node.edges.add(select->getOperandUse(2));
+            workList.add(select->getOperand(1));
+            workList.add(select->getOperand(2));
         }
         else
         {
-            // Global resource arrays and the built-in heaps are immutable descriptor sources.
-            // Local arrays or arbitrary loads might change between the original and new access.
+            // The supported leaves are built-in heap loads and direct global-array
+            // accesses. Each exposes the source and index needed to recreate a resource.
             IRInst* source = nullptr;
             IRInst* index = nullptr;
             switch (inst->getOp())
@@ -1456,27 +1578,44 @@ static bool specializeResourceSelection(TargetRequest* targetReq, IRInst* select
                     source = getElement->getBase();
                     index = getElement->getIndex();
                     // Storage-buffer arrays already support selection through variable pointers.
-                    // Rewriting them would unnecessarily require nonuniform descriptor-indexing
-                    // capabilities.
+                    // Rewriting them would add nonuniform descriptor-indexing requirements.
+                    // This restriction is specific to arrays: heap buffers above still need
+                    // the index rewrite.
                     if (!as<IRResourceTypeBase>(resourceType) &&
                         !as<IRSamplerStateTypeBase>(resourceType))
                         return false;
-                    if (!as<IRGlobalParam>(source) || !as<IRArrayTypeBase>(source->getDataType()))
+                    // Resource-type legalization runs before this pass and splits resource
+                    // fields of global shader parameters into separate global parameters.
+                    // A global array is therefore available at every reconstructed access.
+                    // Loaded or computed array values are outside this pass's supported
+                    // producers; their computations are not rematerialized here.
+                    if (!as<IRGlobalParam>(source))
+                        return false;
+                    // This operation indexes an array value. Pointer and field-address
+                    // accesses remain the responsibility of access-chain lowering.
+                    if (!as<IRArrayTypeBase>(source->getDataType()))
                         return false;
                     break;
                 }
             default:
                 return false;
             }
-            if (representative &&
-                (inst->getOp() != representative->getOp() || source != resourceSource))
-                return false;
-            representative = inst;
-            resourceSource = source;
+            if (representativeAccess)
+            {
+                // One access operation must reconstruct every selected resource, so we
+                // cannot combine heap loads and array indexing in the same graph.
+                if (inst->getOp() != representativeAccess->getOp())
+                    return false;
+                // a[i] and a[j] can share a selected index, but a[i] and b[j] cannot.
+                if (source != representativeSource)
+                    return false;
+            }
+            representativeAccess = inst;
+            representativeSource = source;
             // Valid array indices are nonnegative. The widest incoming type can hold all
             // of them if we prefer unsigned when widths match. For example, Int and UInt
-            // use UInt, while UInt and Int64 use Int64. Preserve existing 64-bit indices
-            // without introducing 64-bit values when all incoming indices are narrower.
+            // use UInt, while UInt and Int64 use Int64. This preserves existing 64-bit
+            // indices without introducing 64-bit values when all incoming indices are narrower.
             auto incomingIndexType = index->getDataType();
             SLANG_RELEASE_ASSERT(isIntegralType(incomingIndexType));
             if (!commonIndexType)
@@ -1489,75 +1628,98 @@ static bool specializeResourceSelection(TargetRequest* targetReq, IRInst* select
                     (incomingInfo.width == commonInfo.width && !incomingInfo.isSigned))
                     commonIndexType = incomingIndexType;
             }
-            indices.add(inst, index);
+            mapResourceToIndex.add(inst, index);
             continue;
         }
-        for (auto edge : node.edges)
-        {
-            node.values.add(edge->get());
-            workList.add(edge->get());
-        }
-        indices.add(inst, inst);
-        nodes.add(node);
+        selections.add(inst);
     }
 
     // A cycle without any descriptor access does not establish a source to rematerialize.
-    if (!representative)
+    if (!representativeAccess)
         return false;
 
-    // Only insert casts after the whole graph has been accepted. Put each conversion before
-    // its original access: the index is available there, and the conversion will dominate
-    // every selection edge that previously used that resource, including loop back edges.
-    for (auto& [resource, index] : indices)
+    // Casts are inserted only after the whole graph has been accepted, so rejection leaves
+    // the IR unchanged. Each conversion precedes its original access, where the index is
+    // available, and dominates every selection edge that used that resource, including
+    // loop back edges.
+    for (auto& [resource, index] : mapResourceToIndex)
     {
-        if (resource == index)
-            continue;
         IRBuilder builder(resource);
         builder.setInsertBefore(resource);
         index = builder.emitCast(commonIndexType, index);
     }
 
-    // Keep the existing selects, block parameters, and branch argument positions. Only
-    // their types and incoming values change; the original index computations stay where
-    // they were. Recreate the resource after each selection for uses that need a resource.
-    for (auto& node : nodes)
+    // New parameters give cyclic dependencies their integer values before we build any
+    // selects. We insert each integer parameter immediately before its resource parameter,
+    // so the integer parameters take the original positions once the resource parameters
+    // are removed. Until then, originalParams records those positions for the branch rewrite.
+    List<IRSelect*> pendingSelects;
+    for (auto inst : selections)
     {
-        auto inst = node.inst;
-        inst->setFullType(commonIndexType);
-        IRBuilder builder(inst);
-        setInsertAfterOrdinaryInst(&builder, inst);
-        IRInst* index = inst;
-        if (as<IRGetElement>(representative))
+        if (as<IRParam>(inst))
         {
-            // Array selections can be nonuniform even when the incoming indices are constant.
+            IRBuilder builder(inst);
+            auto index = builder.createParam(commonIndexType);
+            index->insertBefore(inst);
+            index->sourceLoc = inst->sourceLoc;
+            mapResourceToIndex.add(inst, index);
+        }
+        else
+            pendingSelects.add(cast<IRSelect>(inst));
+    }
+
+    emitResourceIndexSelects(pendingSelects, commonIndexType, mapResourceToIndex);
+
+    // We rewrite branch arguments before replaceUsesWith below, because afterwards they
+    // no longer name the original resources.
+    rewriteResourceSelectionBranchArgs(originalParams, mapResourceToIndex);
+
+    // The new integer graph never uses the old resource selections, so replacing their
+    // uses cannot introduce a self-reference. Ordinary accesses go after all parameters.
+    for (auto inst : selections)
+    {
+        IRBuilder builder(inst);
+        setInsertBeforeOrdinaryInst(&builder, inst);
+        IRInst* index = mapResourceToIndex[inst];
+        // The name follows the selected state, which is now an integer. Moving the hint
+        // avoids giving the reconstructed access the same source name. Other decorations
+        // stay on the reconstructed value, which still has the resource type.
+        if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+        {
+            nameHint->removeFromParent();
+            nameHint->insertAtStart(index);
+        }
+        if (as<IRGetElement>(representativeAccess))
+        {
+            // The index used for array indexing can be nonuniform even when all incoming
+            // indices are constant: the condition or control flow chooses between them.
             // SPIRVLoadDescriptorFromHeap needs no marker: DescriptorHeapEXT permits
             // nonuniform resource access by default.
             index = builder.emitNonUniformResourceIndexInst(index);
         }
-        IRInst* operands[] = {resourceSource, index};
+        IRInst* operands[] = {representativeSource, index};
         auto resource =
-            builder.emitIntrinsicInst(resourceType, representative->getOp(), 2, operands);
-        traverseUses(
-            inst,
-            [&](IRUse* use)
-            {
-                if (use->getUser() != index && use->getUser() != resource)
-                    use->set(resource);
-            });
+            builder.emitIntrinsicInst(resourceType, representativeAccess->getOp(), 2, operands);
+        resource->sourceLoc = inst->sourceLoc;
+        inst->transferDecorationsTo(resource);
+        inst->replaceUsesWith(resource);
     }
-    // Redirecting uses above also made selections refer to the recreated resources.
-    // Replace those operands with the indices recorded before the rewrite. In particular,
-    // a loop back edge must carry the index from the previous iteration, not its sampler.
-    for (auto& node : nodes)
-        for (Index i = 0; i < node.edges.getCount(); i++)
-            node.edges[i]->set(indices[node.values[i]]);
+
+    for (auto inst : selections)
+    {
+        // A single graph can consume several candidates saved by the outer traversal.
+        // Removing them before deletion prevents that traversal from using stale pointers.
+        remainingSelections.remove(inst);
+        inst->removeAndDeallocate();
+    }
     // Original resource accesses, and recreated resources used only by other selections,
-    // may now be unused. Leave them for simplifyIR in specializeResourceUsage to remove.
+    // may now be unused. The simplifyIR call in specializeResourceUsage removes them.
     return true;
 }
 
-// Find resource-valued selects and block parameters in function bodies and try to replace
-// them with index selections. Function parameters are handled by specializeResourceParameters.
+// This pass finds resource-valued selects and block parameters in function bodies and
+// replaces supported graphs with index selections. Function parameters are handled by
+// specializeResourceParameters.
 static bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module)
 {
     // This is needed for both SPIR-V and GLSL: eliminating a sampler-valued phi would
@@ -1575,13 +1737,29 @@ static bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModul
         auto func = as<IRFunc>(global);
         if (!func)
             continue;
-        List<IRInst*> selections;
+        OrderedHashSet<IRInst*> selections;
         for (auto block : func->getBlocks())
             for (auto inst : block->getChildren())
-                if ((as<IRParam>(inst) && block != func->getFirstBlock()) || as<IRSelect>(inst))
+            {
+                if (as<IRSelect>(inst))
+                {
                     selections.add(inst);
-        for (auto selection : selections)
-            changed |= specializeResourceSelection(codeGenContext->getTargetReq(), selection);
+                    continue;
+                }
+                if (!as<IRParam>(inst))
+                    continue;
+                // Function parameters receive resources from callers, not branch arguments.
+                if (block == func->getFirstBlock())
+                    continue;
+                selections.add(inst);
+            }
+        while (selections.getCount())
+        {
+            auto selection = *selections.begin();
+            selections.remove(selection);
+            changed |=
+                specializeResourceSelection(codeGenContext->getTargetReq(), selection, selections);
+        }
     }
     return changed;
 }
@@ -1591,14 +1769,11 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
     bool result = false;
     // We apply three kinds of specialization to clean up resource value usage:
     //
-    // * Replace selections of resources from the same heap or array with selections
-    //   of their indices.
+    // * Resource selections from the same heap or array become selections of their indices.
     //
-    // * Specalize call sites based on the actual resources
-    //   that a called function will return/output.
+    // * Call sites are specialized based on the resources the called function returns or outputs.
     //
-    // * Specialize called functions based on the actual resources
-    //   passed as input at specific call sites.
+    // * Called functions are specialized based on the resources passed in at specific call sites.
     //
     // We need to run these passes in an iterative fashion (combined with IR
     // simplification passes), because each optimization may open up opportunties

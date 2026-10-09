@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -validate-ir
 //TEST:SIMPLE(filecheck=ARRAY): -target spirv-asm -stage fragment -entry main -validate-ir
 
-// Check that selecting a heap sampler stored in a struct field compiles with native
+// This test checks that selecting a heap sampler stored in a struct field compiles with native
 // descriptor heaps and with the descriptor-array fallback.
 
 // CHECK: OpTypeSampler

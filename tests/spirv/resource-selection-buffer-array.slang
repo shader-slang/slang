@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -O0 -validate-ir
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -validate-ir
 
-// Check that storage-buffer array selections keep their variable-pointer representation
+// This test checks that storage-buffer array selections keep their variable-pointer representation
 // without acquiring a nonuniform descriptor-indexing requirement.
 
 // CHECK-NOT: NonUniform
