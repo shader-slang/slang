@@ -11,6 +11,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -342,6 +343,80 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    // Returns true when a wide structured-buffer reinterpret of `type` must be scalarized into
+    // tight scalar accesses because the reinterpret buffer's element stride would not equal the
+    // natural stride used to compute the element index.
+    //
+    // `emitSimpleLoad`/`emitSimpleStore` turn a byte offset into a structured-buffer element index
+    // by dividing by the natural stride of `type`, so the wide access is only correct when the
+    // reinterpret buffer's element stride equals that natural stride. For a 3-component vector the
+    // std430 buffer layout rounds the element stride up (a 32-bit `float3`/`int3` from a tight 12
+    // to 16, a `double3` from 24 to 32), so e.g. a `float3` element `k` lands at byte `k*16` while
+    // the tight field walk and store intend `k*12`; every natural-stride-aligned nonzero offset
+    // then reads or writes the wrong bytes, which is why such a leaf must be scalarized.
+    //
+    // We compare the natural stride against the layout the reinterpret buffer is actually emitted
+    // with: direct SPIR-V honors `-fvk-use-scalar-layout`/`-fvk-use-dx-layout`/`-fvk-use-c-layout`
+    // (which make the element tight or C-packed), while textual GLSL emits the raw-buffer SSBO as
+    // `layout(scalar)` under `-fvk-use-scalar-layout` and `layout(std430)` otherwise. The GL-style
+    // Vulkan layout (`-fvk-use-gl-layout`) requires coordinated std430-aware indexing and sequence
+    // stepping to be correct, which this predicate does not attempt, so it returns false there.
+    bool structuredBufferReinterpretNeedsScalarization(IRType* type, IRInst* buffer)
+    {
+        if (!m_options.translateToStructuredBufferOps)
+            return false;
+
+        if (auto vkLayoutOptions = m_targetProgram->getHLSLToVulkanLayoutOptions())
+            if (vkLayoutOptions->shouldUseGLLayout())
+                return false;
+
+        IRTypeLayoutRuleName bufferRuleName;
+        if (m_targetProgram->shouldEmitSPIRVDirectly())
+        {
+            auto structuredBufferType =
+                getEquivalentStructuredBufferParamType(type, buffer->getDataType());
+            // A null result means the buffer's data type is not one this pass reinterprets through
+            // a typed structured buffer, so the wide access cannot mis-index and no scalarization
+            // is needed here.
+            if (!structuredBufferType)
+                return false;
+            bufferRuleName = getTypeLayoutRuleNameForBuffer(m_targetProgram, structuredBufferType);
+        }
+        else
+        {
+            // Textual GLSL emits the raw-buffer SSBO with `layout(scalar)` under
+            // `-fvk-use-scalar-layout` and `layout(std430)` otherwise; it does not honor
+            // `-fvk-use-dx-layout`/`-fvk-use-c-layout` for this buffer. We reproduce the
+            // `shouldUseScalarLayout() ? "scalar" : "std430"` choice that
+            // `_emitGLSLStructuredBuffer`/`emitSSBOHeader` (slang-emit-glsl.cpp) make inline. That
+            // mirror is valid only because `getEquivalentStructuredBufferParamType` always tags the
+            // reinterpret buffer `kIROp_DefaultBufferLayoutType`, the layout those emitters
+            // special-case; there is no shared helper returning the rule, so the two must be kept
+            // in sync by hand.
+            bufferRuleName = m_targetProgram->getOptionSet().shouldUseScalarLayout()
+                                 ? IRTypeLayoutRuleName::Natural
+                                 : IRTypeLayoutRuleName::Std430;
+        }
+
+        // The vector/array cases that call this established a natural layout for `type`'s *element*
+        // (`vecType`/`arrayType`'s element type); a well-formed fixed-size vector or array whose
+        // element has a layout also has both a natural and a buffer-rule layout for `type` itself,
+        // so a failure here would be an out-of-contract type that never reaches the reinterpret
+        // path. The `Slang::` qualifier selects the free `getSizeAndAlignment` overload that takes
+        // an explicit rule, not this class's member overload, which re-derives natural/std430 from
+        // GL layout and would ignore `bufferRuleName`.
+        IRSizeAndAlignment naturalLayout;
+        SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(m_target, type, &naturalLayout));
+        IRSizeAndAlignment bufferLayout;
+        SLANG_RELEASE_ASSERT(!Slang::getSizeAndAlignment(
+            m_target,
+            IRTypeLayoutRules::get(bufferRuleName),
+            type,
+            &bufferLayout));
+
+        return naturalLayout.getStride() != bufferLayout.getStride();
+    }
+
     // The storage type / cast opcode a `DescriptorHandle` field packs into must match the handle's
     // SPIR-V representation, which is per-kind under `spvBindlessTextureNV` (uint64 for
     // texture/sampler kinds, uint2 for buffers and acceleration structures), so each of these takes
@@ -509,7 +584,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal) ||
+                    structuredBufferReinterpretNeedsScalarization(type, buffer))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -621,7 +697,8 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal) ||
+                    structuredBufferReinterpretNeedsScalarization(vecType, buffer))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -1470,7 +1547,8 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal) ||
+                    structuredBufferReinterpretNeedsScalarization(type, buffer))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1580,7 +1658,8 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal) ||
+                    structuredBufferReinterpretNeedsScalarization(vecType, buffer))
                 {
                     return emitLegalSequenceStore(
                         buffer,
