@@ -5,6 +5,7 @@
 #include "compiler-core/slang-spirv-core-grammar.h"
 #include "core/slang-token-reader.h"
 #include "slang-lookup-spirv.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -91,7 +92,9 @@ SpvWord readWordOrWordLiteral(Misc::TokenReader& reader)
 
 RefPtr<SpvSnippet> SpvSnippet::parse(
     const SPIRVCoreGrammarInfo& spirvGrammar,
-    UnownedStringSlice definition)
+    UnownedStringSlice definition,
+    SourceLoc sourceLoc,
+    DiagnosticSink* sink)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
     try
@@ -189,7 +192,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
-                            SLANG_ASSERT(!"Invalid SPV ASM: referenced inst is not defined.");
+                            sink->diagnose(Diagnostics::SpirvSnippetUndefinedId{
+                                .id = refName,
+                                .snippet = definition,
+                                .location = sourceLoc});
+                            return nullptr;
                         }
                         inst.operands.add(operand);
                     }
@@ -270,7 +277,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                             tokenReader.Read("(");
                             constant.type = parseASMType(tokenReader);
                             int i = 0;
-                            while (tokenReader.AdvanceIf(","))
+                            while (i < SpvSnippet::kMaxASMConstantValues &&
+                                   tokenReader.AdvanceIf(","))
                             {
                                 switch (constant.type)
                                 {
@@ -302,8 +310,11 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            SLANG_UNEXPECTED(
-                                ("Invalid SPV ASM operand: \"" + identifier + "\"").getBuffer());
+                            sink->diagnose(Diagnostics::SpirvSnippetUnknownOperand{
+                                .operand = identifier,
+                                .snippet = definition,
+                                .location = sourceLoc});
+                            return nullptr;
                         }
                     }
                     break;
@@ -317,6 +328,8 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
     }
     catch (const Slang::Misc::TextFormatException&)
     {
+        sink->diagnose(
+            Diagnostics::SnippetParsingFailed{.snippet = definition, .location = sourceLoc});
         return nullptr;
     }
     return snippet;
