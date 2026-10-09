@@ -358,7 +358,7 @@ The `...` at the end indicates all the following parameters should be sent to `d
 It is also worth noting that `-X...` options can be nested. This would allow a GCC downstream compilation to control linking, for example with
 
 ```
--Xgcc -Xlinker --split -X.
+-Xgcc... -Xlinker --split -X.
 ```
 
 In this example gcc would see
@@ -374,6 +374,16 @@ And the linker would see (as passed through by GCC):
 ```
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+`slangc` finds the boundaries of each forwarded argument before it parses any other option:
+
+* `-X<tool> <arg>` forwards exactly one argument, `<arg>`. A missing `<arg>` is error 100001.
+* `-X<tool>... <args> -X.` forwards every argument up to the matching `-X.`. If there is no `-X.`, it forwards everything up to the end of the command line. Everything inside is forwarded to `<tool>` unchanged, including any nested `-X<other>... -X.`. Nesting is used only to find the matching `-X.`, so a nested `-X<other>...` needs its own `-X.`, and an unclosed nested scope is error 100002.
+* `-X.` outside an open `-X<tool>...` scope is error 100003. A bare `-X` with no tool name is error 100004, and an unknown tool name is error 100000.
+
+For example, in `-Xnvrtc --fmad=true --fmad=false -X` only `--fmad=true` belongs to `-Xnvrtc`. `--fmad=false` is left as an ordinary `slangc` argument and is not forwarded. The trailing `-X` then fails with error 100004 while `slangc` is still separating out the downstream arguments, before ordinary options are parsed. Without the trailing `-X`, `slangc` instead rejects `--fmad=false` as an unknown option. To forward both arguments, write `-Xnvrtc --fmad=true -Xnvrtc --fmad=false` or `-Xnvrtc... --fmad=true --fmad=false -X.`.
+
+`slangc` forwards all `-X` arguments at the session level, in command-line order. The compilation API rules in [Downstream Arguments in the Compilation API](#downstream-arguments-in-the-compilation-api) apply to them, including the way the downstream tool handles repeated or conflicting arguments.
 
 Arguments passed via `-Xspirv-opt` are forwarded to the SPIRV-Tools optimizer as additional passes, registered on top of the passes selected by the `-O<level>` preset (they add to that level, they do not replace it). For example, to strip debug information in addition to the `-O1` passes:
 
@@ -1133,7 +1143,7 @@ meanings of their `CompilerOptionValue` encodings.
 | EmitSpirvDirectly | When set will use Slang's direct-to-SPIR-V backend to generate SPIR-V directly from Slang IR. `intValue0` specifies a bool value for the setting. |
 | SPIRVCoreGrammarJSON | When set will use the provided SPIR-V grammar file to parse SPIR-V assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |
 | IncompleteLibrary | When set will not issue an error when the linked program has unresolved extern function symbols. `intValue0` specifies a bool value for the setting. |
-| DownstreamArgs | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line. |
+| DownstreamArgs | Provide additional arguments to a downstream compiler. `stringValue0` names the downstream compiler and `stringValue1` holds its argument list, one argument per line. See [Downstream Arguments in the Compilation API](#downstream-arguments-in-the-compilation-api) for how entries from different levels combine. |
 | DumpIntermediates | When set will dump the intermediate source output. `intValue0` specifies a bool value for the setting. |
 | DumpIntermediatePrefix | The file name prefix for the intermediate source output. `stringValue0` specifies a string value for the setting. |
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
@@ -1151,6 +1161,26 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+
+### Downstream Arguments in the Compilation API
+
+A `DownstreamArgs` entry is the API form of the `slangc` `-X` option. Each entry names its own downstream tool in `stringValue0`, such as `nvrtc`, `dxc` or `spirv-opt`, and holds that tool's arguments in `stringValue1`, one argument per line.
+
+`DownstreamArgs` entries can be given at three levels: the session (`SessionDesc`), a target (`TargetDesc`), and a linked program (`IComponentType::linkWithOptions`). Slang combines a tool's arguments from all three levels into one list, in session, target, then linked-program order. Within each level the arguments keep the order they were given in. Slang appends the entries for one tool. It does not override, merge or deduplicate individual flags.
+
+For example, a session entry for `nvrtc` with `stringValue1` set to `"--gpu-architecture=compute_86\n--fmad=true"`, combined with a `linkWithOptions` entry for `nvrtc` holding `--fmad=false`, forwards all three arguments, combined in this order:
+
+```
+--gpu-architecture=compute_86 --fmad=true --fmad=false
+```
+
+Slang does not remove `--fmad=true`.
+
+The final tool invocation can still order some arguments differently, because existing argument processing runs after the lists are combined. Slang treats an argument written as `-I<dir>` as an include path rather than passing it through as-is, and for NVRTC it emits include paths before the remaining arguments. So a target-level `-ITARGET` is searched before a session-level `--include-path=SESSION`, while `--include-path=` at both levels keeps the combined order.
+
+The downstream compiler decides how repeated or conflicting arguments are handled, and that behavior can differ between tools and between versions of the same tool. Slang does not guarantee either "last one wins" or a rejection. For example, NVRTC 12.6 rejects `--fmad=true --fmad=false` with "defined more than once". NVRTC 13.0.88 has been reported to accept the same pair with a warning and use `false`, and to accept two identical `--fmad=false` arguments silently. To control a flag precisely, pass it at one level only.
+
+Earlier versions of Slang could discard the session's entire argument list for a tool when a target description or `linkWithOptions` also supplied arguments for that tool, so the session's `--gpu-architecture` was lost in the example above. Slang now passes both lists.
 
 ### Backwards Compatibility Option for Legacy HLSL
 

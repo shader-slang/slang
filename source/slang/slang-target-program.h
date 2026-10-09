@@ -118,6 +118,13 @@ public:
 private:
     RefPtr<IRModule> createIRModuleForLayout(DiagnosticSink* sink);
 
+    /// Seed this program's options with the session's and then the target's `DownstreamArgs`.
+    /// The constructor's `overrideWith` of the program's own options then appends the program's
+    /// entries, so Slang combines session, target and program arguments in that order, without
+    /// any of them merged. `DownstreamArgs` is level-local (see
+    /// `CompilerOptionSet::isLevelLocal`), so the levels are combined only here.
+    void composeDownstreamArgs();
+
     // The program being compiled or laid out
     ComponentType* m_program;
 

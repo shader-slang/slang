@@ -463,7 +463,6 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
-    case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
@@ -474,6 +473,43 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     }
     return false;
 }
+bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
+{
+    return name == CompilerOptionName::DownstreamArgs;
+}
+
+CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
+{
+    CompilerOptionSet result = *this;
+    for (auto& kv : options)
+    {
+        if (isLevelLocal(kv.key))
+            result.options.remove(kv.key);
+    }
+    return result;
+}
+
+void CompilerOptionSet::appendLevelLocal(
+    CompilerOptionName name,
+    const List<CompilerOptionValue>& values)
+{
+    SLANG_ASSERT(isLevelLocal(name));
+    auto existing = options.tryGetValue(name);
+    if (!existing)
+    {
+        options[name] = values;
+        return;
+    }
+    if (existing == &values)
+    {
+        // Growing the list would free the buffer we are copying from.
+        List<CompilerOptionValue> copy = values;
+        existing->addRange(copy);
+        return;
+    }
+    existing->addRange(values);
+}
+
 CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name)
 {
     switch (name)

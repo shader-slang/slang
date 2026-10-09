@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=SM75): -target ptx -entry computeMain -capability cuda_sm_8_0 -Xnvrtc --gpu-architecture=compute_75
 //TEST:SIMPLE(filecheck=SM75): -target ptx -entry computeMain -capability cuda_sm_8_0 -Xnvrtc -arch -Xnvrtc compute_75
 //TEST:SIMPLE(filecheck=SM75): -target ptx -entry computeMain -capability cuda_sm_8_0 -Xnvrtc --gpu-architecture -Xnvrtc compute_75
+//TEST:SIMPLE(filecheck=SM75): -target ptx -entry computeMain -capability cuda_sm_8_0 -Xnvrtc -arch=compute_75 -Xnvrtc --fmad=false
 //TEST:SIMPLE(filecheck=SM80): -target ptx -entry computeMain -capability cuda_sm_7_0 -Xnvrtc -arch=compute_80
 //TEST:SIMPLE(filecheck=SM80): -target ptx -entry computeMain -capability cuda_sm_8_0
 //TEST:SIMPLE(filecheck=SM80): -target ptx -entry computeMain -capability cuda_sm_8_0 -Xnvrtc -DTEST_ARCH=compute_75
@@ -11,6 +12,8 @@
 // Require empty diagnostics: newer NVRTC accepts duplicate architecture options with a warning,
 // while older NVRTC rejects them. Checking only the PTX target would miss the newer behavior.
 // The final two cases check that capability-derived selection still works without an override.
+// The case with `--fmad=false` also checks that the session-level `-Xnvrtc` entry reaches NVRTC
+// once although the target re-inherits the session options: NVRTC 12.6 rejects a repeated `--fmad`.
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
