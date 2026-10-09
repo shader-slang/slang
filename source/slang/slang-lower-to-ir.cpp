@@ -16191,7 +16191,12 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             }
             else if (fieldDecl.getDecl())
             {
-                irFieldKey = getSimpleVal(context, ensureDecl(context, fieldDecl.getDecl()));
+                // A field key identifies the field's declaration: the struct key of a struct
+                // field, or the variable itself (not a load of it) for a global variable in the
+                // global scope's offset-element layout. That key must be the same instruction
+                // `createIRModuleForLayout` uses for the element layout, because passes such as
+                // `collectGlobalUniformParameters` find both entries through it.
+                irFieldKey = materialize(context, ensureDecl(context, fieldDecl.getDecl())).val;
             }
             else
             {
