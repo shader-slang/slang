@@ -2553,6 +2553,10 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     // Check for mutually exclusive modifier conflicts
+    //
+    // A keyword that spells two modifiers (`__ref_readonly`) can conflict through both of them,
+    // so we report each keyword once.
+    SourceLoc lastConflictLoc;
     for (modifier = resultModifiers; modifier; modifier = modifier->next)
     {
         // Check if a modifier belonging to the same conflict group is already
@@ -2563,9 +2567,13 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
             {
-                getSink()->diagnose(Diagnostics::DuplicateModifier{
-                    .existingModifier = existingModifier,
-                    .modifier = modifier});
+                if (!modifier->loc.isValid() || modifier->loc != lastConflictLoc)
+                {
+                    getSink()->diagnose(Diagnostics::DuplicateModifier{
+                        .existingModifier = existingModifier,
+                        .modifier = modifier});
+                }
+                lastConflictLoc = modifier->loc;
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
         }
