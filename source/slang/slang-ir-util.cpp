@@ -1415,6 +1415,14 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+bool isGroupSharedAddr(IRInst* addr)
+{
+    if (as<IRGroupSharedRate>(addr->getRate()))
+        return true;
+    auto ptrType = as<IRPtrTypeBase>(addr->getDataType());
+    return ptrType && ptrType->getAddressSpace() == AddressSpace::GroupShared;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1437,15 +1445,26 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
+            // On Metal and the CPU targets, `introduceExplicitGlobalContext` turns groupshared
+            // memory into a local variable of the entry point, and other functions reach it by
+            // loading its address from the kernel context. Either root is local to `func`, yet
+            // callees can read and write the memory and a barrier orders it against other
+            // threads, so we treat any call, including one without side effects, as reading
+            // and writing it. A groupshared global takes the non-local path below.
+            auto rootAddr = getRootAddr(addr);
+            if (isGroupSharedAddr(rootAddr) && isChildInstOf(rootAddr, func))
+                return true;
+
             // If addr is a global variable, calling a function may change its value.
             // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            if (!isChildInstOf(rootAddr, func))
             {
                 auto callee = call->getCallee();
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                 {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
+                    // An exception is if the callee is side-effect free: it may read the
+                    // global but cannot write it, and reads of a non-local root do not
+                    // matter here because `tryRemoveRedundantStore` never asks about one.
                 }
                 else
                 {

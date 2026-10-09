@@ -3515,15 +3515,26 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     }
 }
 
+// Return true if `store` is emitted as the initializer of the `var` declared immediately
+// before it, in which case `emitVar` folds it and `emitStore` skips it.
+//
+// Metal and the CPU targets declare groupshared memory as a local `var` of the entry
+// point, so a groupshared `var` directly followed by a store to it is valid IR. Metal
+// declares `threadgroup` variables without an initializer, so for groupshared variables
+// we always emit the store as a separate assignment, which is equally valid C++ on the
+// CPU targets.
+static bool isStoreFoldedIntoVarDecl(IRStore* store)
+{
+    auto var = as<IRVar>(store->getPtr());
+    if (!var || store->getPrevInst() != var)
+        return false;
+    return !isGroupSharedAddr(var);
+}
+
 void CLikeSourceEmitter::emitStore(IRStore* store)
 {
-    if (store->getPrevInst() == store->getOperand(0) && store->getOperand(0)->getOp() == kIROp_Var)
-    {
-        // If we are storing into a `var` that is defined right before the store, we have
-        // already folded the store in the initialization of the `var`, so we can skip here.
-        //
+    if (isStoreFoldedIntoVarDecl(store))
         return;
-    }
     _emitStoreImpl(store);
 }
 
@@ -4882,7 +4893,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     //
     if (auto store = as<IRStore>(varDecl->getNextInst()))
     {
-        if (store->getPtr() == varDecl)
+        if (isStoreFoldedIntoVarDecl(store))
         {
             const bool isCoopVectorType = varType->getOp() == kIROp_CoopVectorType;
             if (isCoopVectorType && store->getVal()->getOp() == kIROp_Load)
