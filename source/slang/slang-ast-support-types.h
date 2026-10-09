@@ -43,6 +43,7 @@ FIDDLE() namespace Slang
 
     class DeclRefBase;
     struct SubstitutionCache;
+    struct LinkTimeSubstitution;
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
@@ -787,6 +788,9 @@ FIDDLE() namespace Slang
 
         // An operation-local cache shared by recursive copies of this substitution set.
         SubstitutionCache* substitutionCache = nullptr;
+
+        // Optional bindings supplied by a composed program, never stored in shared Vals.
+        LinkTimeSubstitution* linkTimeSubstitution = nullptr;
 
         // The element index if the substitution is happening inside a pack expansion.
         // For example, if we are substituting the pattern type of `expand each T`, where
