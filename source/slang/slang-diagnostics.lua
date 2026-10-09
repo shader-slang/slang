@@ -6091,6 +6091,27 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "texture-partial-write-is-read-modify-write",
+    56006,
+    "write to part of a texel reads the texel first, which is undefined after an earlier write in the same CUDA kernel launch",
+    span { loc = "location", message = "this write to part of a texel is lowered to a read of the whole texel followed by a write of the whole texel. On CUDA that read returns undefined data if the texel was already written earlier in the same kernel launch, so an earlier write to another component can be lost even within one thread. A concurrent write by another thread to another component of the texel can also be lost." }
+)
+
+err(
+    "cuda-surface-format-conversion-unavailable",
+    56007,
+    "CUDA surface access cannot convert this texture's format",
+    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not do correctly. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and converts neither reads nor writes for array textures." }
+)
+
+err(
+    "cuda-surface-shape-unsupported",
+    56008,
+    "writes through a subscript of this texture shape are not supported on CUDA",
+    span { loc = "location", message = "this write to a texel is lowered to CUDA surface calls, which Slang spells only for 1D, 2D and 3D textures and 1D and 2D array textures." }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 

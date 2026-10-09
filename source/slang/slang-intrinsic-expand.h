@@ -7,6 +7,52 @@
 namespace Slang
 {
 
+/// The facts that decide how a CUDA surface read or write (`surf*read`/`surf*write`) of a given
+/// resource is spelled, and whether the CUDA prelude performs it correctly.
+///
+/// A CUDA surface access is spelled in two places: the `__intrinsic_asm` strings of the `RWTexture`
+/// `Load`/`Store` accessors in hlsl.meta.slang (through `$C` and `$E`), and
+/// `CUDASourceEmitter::_emitSurfaceAccess`, which spells the `kIROp_ImageLoad`/`kIROp_ImageStore`
+/// produced by `legalizeImageSubscript`. Both take the `_convert` suffix and the x scale from here.
+/// The function names, the coordinate order (an array texture's layer last, as CUDA's `Layered`
+/// variants take it) and the boundary mode are written out at both sites
+/// (shader-slang/slang#13364).
+///
+/// We keep this next to the `$C`/`$E` expansion so that both spellings share its private format
+/// helpers. The image-op path rejects an access whose conversion is not available; the accessor
+/// strings do not check `isConversionAvailable`.
+struct CUDASurfaceAccessInfo
+{
+    /// The access calls the `_convert` variant, because the resource's `[format(...)]` differs
+    /// from its element type.
+    bool isFormatConversion = false;
+
+    /// The `_convert` call performs the conversion correctly. The prelude's converting read
+    /// reinterprets the texel as `half`, so it is correct only for `r16f`, `rg16f` and `rgba16f`;
+    /// it has no converting read for array textures, and its converting writes for array textures
+    /// do nothing. Always true when `isFormatConversion` is false.
+    bool isConversionAvailable = true;
+
+    /// The emitted call uses the CUDA `half` type, so the caller must enable it. Only converting
+    /// reads from half-based formats need it.
+    bool requiresHalf = false;
+
+    /// The factor applied to the x coordinate. Surface reads and ordinary writes address x in
+    /// bytes, so this is the size of the backing element; a converting write (`sust.p`) addresses
+    /// x in elements, so it is 1.
+    size_t xScale = 1;
+};
+
+/// Return the `CUDASurfaceAccessInfo` of a read (`isWrite == false`) or write of the CUDA surface
+/// `resourceInst`.
+CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrite);
+
+/// Return the number of dimensions of the CUDA surface functions that access a texture of
+/// `shape`: 1, 2 or 3 for `surf1D*`, `surf2D*` and `surf3D*`. Return 0 for a shape we do not
+/// spell on CUDA, such as a cube texture. The `RWTexture` accessors in hlsl.meta.slang spell the
+/// same three shapes.
+Index getCUDASurfaceDimensionCount(SlangResourceShape shape);
+
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the
 expansion of the 'special cases' prefixed with '$' */
 struct IntrinsicExpandContext

@@ -307,10 +307,54 @@ static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
     return 4;
 }
 
-static bool _isResourceRead(IRCall* call)
+CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrite)
 {
-    IRType* returnType = call->getDataType();
-    return returnType && (as<IRVoidType>(returnType) == nullptr);
+    CUDASurfaceAccessInfo info;
+    info.xScale = _calcBackingElementSizeInBytes(resourceInst);
+
+    IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst);
+    if (!formatDecoration || !_isConvertRequired(formatDecoration->getFormat(), resourceInst))
+        return info;
+
+    info.isFormatConversion = true;
+    auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
+    SLANG_ASSERT(textureType);
+    const bool isLayered = textureType->isArray();
+    if (isWrite)
+    {
+        info.isConversionAvailable = !isLayered;
+        info.xScale = 1;
+        return info;
+    }
+
+    switch (formatDecoration->getFormat())
+    {
+    case ImageFormat::r16f:
+    case ImageFormat::rg16f:
+    case ImageFormat::rgba16f:
+        info.requiresHalf = true;
+        info.isConversionAvailable = !isLayered;
+        break;
+    default:
+        info.isConversionAvailable = false;
+        break;
+    }
+    return info;
+}
+
+Index getCUDASurfaceDimensionCount(SlangResourceShape shape)
+{
+    switch (shape)
+    {
+    case SLANG_TEXTURE_1D:
+        return 1;
+    case SLANG_TEXTURE_2D:
+        return 2;
+    case SLANG_TEXTURE_3D:
+        return 3;
+    default:
+        return 0;
+    }
 }
 
 static bool _isResourceWrite(IRCall* call)
@@ -560,68 +604,33 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // specialized versions of the RWTexture writes that will do a format conversion.
             if (isCUDATarget(m_emitter->getTargetReq()))
             {
-                IRInst* resourceInst = m_callInst->getArg(0);
-
-                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+                const CUDASurfaceAccessInfo access =
+                    getCUDASurfaceAccessInfo(m_callInst->getArg(0), _isResourceWrite(m_callInst));
+                if (access.requiresHalf)
                 {
-                    const ImageFormat imageFormat = formatDecoration->getFormat();
-                    if (_isConvertRequired(imageFormat, resourceInst))
+                    CUDAExtensionTracker* extensionTracker =
+                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
+                    if (extensionTracker)
                     {
-                        // If the function returns something it's a reader so we may need to convert
-                        // and in doing so require half
-                        if (_isResourceRead(m_callInst))
-                        {
-                            // If the source format if half derived, then we need to enable half
-                            switch (imageFormat)
-                            {
-                            case ImageFormat::r16f:
-                            case ImageFormat::rg16f:
-                            case ImageFormat::rgba16f:
-                                {
-                                    CUDAExtensionTracker* extensionTracker =
-                                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
-                                    if (extensionTracker)
-                                    {
-                                        extensionTracker->requireBaseType(BaseType::Half);
-                                    }
-                                    break;
-                                }
-                            default:
-                                break;
-                            }
-                        }
-
-                        // Append _convert on the name to signify we need to use a code path, that
-                        // will automatically do the format conversion.
-                        m_writer->emit("_convert");
+                        extensionTracker->requireBaseType(BaseType::Half);
                     }
                 }
+
+                if (access.isFormatConversion)
+                    m_writer->emit("_convert");
             }
             break;
         }
 
     case 'E':
         {
-            /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for
-            /// surface access is byte addressed. $E will return the byte size of the *backing
-            /// element*.
-
-            IRInst* resourceInst = m_callInst->getArg(0);
-            size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
-
-            // If we have a format converstion and its a *write* we don't need to scale
-            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
-            {
-                const ImageFormat imageFormat = formatDecoration->getFormat();
-                if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
-                {
-                    // If there is a conversion *and* it's a write we don't need to scale.
-                    elemSizeInBytes = 1;
-                }
-            }
-
-            SLANG_ASSERT(elemSizeInBytes > 0);
-            m_writer->emitUInt64(UInt64(elemSizeInBytes));
+            // `$E` appears only in CUDA surface accessor strings, where it is the scale applied to
+            // the x coordinate (the backing element size, or 1 for a converting write).
+            size_t xScale =
+                getCUDASurfaceAccessInfo(m_callInst->getArg(0), _isResourceWrite(m_callInst))
+                    .xScale;
+            SLANG_ASSERT(xScale > 0);
+            m_writer->emitUInt64(UInt64(xScale));
             break;
         }
 
