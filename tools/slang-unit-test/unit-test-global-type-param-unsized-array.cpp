@@ -60,8 +60,8 @@ static ComPtr<slang::IComponentType> specializeGlobalTypeParams(
     if (SLANG_FAILED(session->createCompositeComponentType(components, 2, program.writeRef())))
         return nullptr;
 
-    // We pass the types as expressions rather than reflecting them, because laying out the
-    // unspecialized program would need a layout for the unsized `TT globalValues[]`.
+    // We pass the types as expressions: reflection would lay out the unspecialized program,
+    // and `TT globalValues[]` has no layout until `TT` is bound.
     slang::SpecializationArg specArgs[] = {
         slang::SpecializationArg::fromExpr(elementTypeArg),
         slang::SpecializationArg::fromExpr(arrayTypeArg)};
