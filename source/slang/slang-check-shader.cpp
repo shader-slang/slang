@@ -1786,13 +1786,11 @@ struct UnsizedOrdinaryDataSpecializationCollector : ComponentTypeVisitor
     GlobalGenericArgs globalGenericArgs;
     HashSet<Module*> moduleSet;
     List<Module*> modules;
-    HashSet<FuncDecl*> entryPointFuncDecls;
     HashSet<DeclRefBase*> entryPointFuncDeclRefSet;
     List<DeclRef<FuncDecl>> entryPointFuncDeclRefs;
 
     void addEntryPoint(DeclRef<FuncDecl> funcDeclRef)
     {
-        entryPointFuncDecls.add(funcDeclRef.getDecl());
         if (entryPointFuncDeclRefSet.add(funcDeclRef.declRefBase))
             entryPointFuncDeclRefs.add(funcDeclRef);
     }
@@ -1868,14 +1866,17 @@ void diagnoseUnsizedOrdinaryDataAfterSpecialization(
                     module->getShaderParam(i).paramDeclRef.getDecl(),
                     &collector.globalGenericArgs);
             }
-            // A module specialized on its own, as in `module->specialize(...)`, is not a
-            // component of its entry points, but they are compiled with its bindings once the
-            // specialized module is composed with them.
+        }
+    }
+    // A module specialized on its own, as in `module->specialize(...)`, contains no entry
+    // point, but its entry points are compiled with its bindings once the specialized module is
+    // composed with them. A component type that contains entry points compiles only those.
+    if (collector.globalGenericArgs.getCount() && !collector.entryPointFuncDeclRefs.getCount())
+    {
+        for (auto module : collector.modules)
+        {
             for (auto entryPoint : module->getEntryPoints())
-            {
-                if (!collector.entryPointFuncDecls.contains(entryPoint->getFuncDecl()))
-                    collector.addEntryPoint(entryPoint->getFuncDeclRef());
-            }
+                collector.addEntryPoint(entryPoint->getFuncDeclRef());
         }
     }
     for (auto funcDeclRef : collector.entryPointFuncDeclRefs)

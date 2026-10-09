@@ -4670,7 +4670,9 @@ void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     GlobalGenericArgs const* globalGenericArgs);
 
 // Diagnose `varDecl` as `diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer` does when it is a
-// global shader parameter whose ordinary data goes into the implicit constant buffer.
+// global shader parameter whose ordinary data goes into the implicit constant buffer. A global
+// `type_param` bound to an unsized array is resolved only when it is the parameter's whole type,
+// as in `uniform TA a`, not when it is a field type, as in `uniform Box<TA> b`.
 void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
     SemanticsVisitor* visitor,
     VarDeclBase* varDecl,

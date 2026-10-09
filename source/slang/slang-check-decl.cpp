@@ -22784,8 +22784,11 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+    // A generic struct whose last field instantiates it with new arguments, such as
+    // `struct S<each T> { float4 x[]; S<T, int> next; }`, never repeats a type, so the walk is
+    // also capped in depth.
     HashSet<Type*> seenTypes;
-    for (;;)
+    for (UInt depth = 0; depth < kMaxTypeNestingDepth; depth++)
     {
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
@@ -22838,6 +22841,7 @@ VarDeclBase* getTrailingUnsizedArrayElement(
         // to descend into.
         return nullptr;
     }
+    return nullptr;
 }
 
 bool isImmutableBufferType(Type* type)

@@ -1,12 +1,15 @@
 // shader-slang/slang#13530: unsized arrays whose elements are resource handles hold no
 // ordinary data, so they stay valid as global uniform parameters. Resource legalization
-// turns each of them into a descriptor array.
+// turns each of them into a descriptor array. A `static const` or `groupshared` array is not a
+// shader parameter, so it is not checked.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry main
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main
 
-// CHECK-NOT: E31215
-// CHECK: main
+// SPIRV-NOT: E31215
+// SPIRV: OpTypeRuntimeArray
+// HLSL-NOT: E31215
+// HLSL: textures_0[]
 
 struct ResourceOnly
 {
@@ -51,6 +54,8 @@ uniform Tuple<Texture2D, SamplerState> resourceTuples[];
 uniform Box<Box<Texture2D>> boxedTextures[];
 uniform DerivedResources derivedResources[];
 uniform TrailingResources trailingResources;
+static const float4 lookupTable[] = { float4(1), float4(2), float4(3) };
+groupshared float4 sharedValues[4];
 
 RWStructuredBuffer<float4> output;
 
@@ -67,6 +72,9 @@ void main()
     result += boxedTextures[1].value.value.Load(int3(0));
     result += derivedResources[2].t.SampleLevel(derivedResources[1].s, float2(0), 0);
     result += trailingResources.addend + trailingResources.t[5].Load(int3(0));
+    sharedValues[0] = lookupTable[2];
+    GroupMemoryBarrierWithGroupSync();
+    result += sharedValues[0];
 
     RayQuery<RAY_FLAG_NONE> query;
     RayDesc ray = {};

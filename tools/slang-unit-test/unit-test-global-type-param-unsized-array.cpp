@@ -210,6 +210,61 @@ static ComPtr<slang::IComponentType> specializeGenericEntryPointTwice(
     return specialized;
 }
 
+// A program composed from a module and only one of its entry points, `{module, other}`,
+// does not compile `computeMain`, so `computeMain`'s `uniform TT values[]` is not checked.
+static const char* kUnusedEntryPointSource = R"(
+    struct Data
+    {
+        float4 v;
+    }
+
+    type_param TT;
+
+    RWStructuredBuffer<float4> output;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain(uniform TT unusedValues[])
+    {
+        output[0] = 1;
+    }
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void other()
+    {
+        output[0] = 2;
+    }
+    )";
+
+static ComPtr<slang::IComponentType> specializeWithoutEntryPoint(
+    slang::ISession* session,
+    ComPtr<slang::IBlob>& outDiagnostics)
+{
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "uep",
+        "uep.slang",
+        kUnusedEntryPointSource,
+        diagnosticBlob.writeRef());
+    if (!module)
+        return nullptr;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    if (SLANG_FAILED(module->findEntryPointByName("other", entryPoint.writeRef())))
+        return nullptr;
+
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    if (SLANG_FAILED(session->createCompositeComponentType(components, 2, program.writeRef())))
+        return nullptr;
+
+    slang::SpecializationArg specArgs[] = {slang::SpecializationArg::fromExpr("Data")};
+    ComPtr<slang::IComponentType> specialized;
+    program->specialize(specArgs, 1, specialized.writeRef(), outDiagnostics.writeRef());
+    return specialized;
+}
+
 static int countOccurrences(const char* text, const char* pattern)
 {
     int count = 0;
@@ -309,5 +364,20 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
         auto text = (const char*)diagnostics->getBufferPointer();
         SLANG_CHECK(countOccurrences(text, "error[E31215]") == 1);
         SLANG_CHECK(strstr(text, "genericValues") != nullptr);
+    }
+
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto specialized = specializeWithoutEntryPoint(session, diagnostics);
+        SLANG_CHECK_ABORT(specialized != nullptr);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(specialized->link(linkedProgram.writeRef())));
+        ComPtr<slang::IBlob> code;
+        linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+        SLANG_CHECK(code != nullptr && code->getBufferSize() != 0);
     }
 }
