@@ -1974,7 +1974,9 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
                     ModuleBlobType::IR,
                     /*isSpeculativeLoad*/ true);
                 if (module)
+                {
                     return module;
+                }
             }
         }
     }
