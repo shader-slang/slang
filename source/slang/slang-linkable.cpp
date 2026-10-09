@@ -177,6 +177,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
 
     auto linkage = getLinkage();
 
+    // The code below adds associations to the entry point result artifact, which is cached and
+    // shared between callers, so serialize it with other component-type operations (and with
+    // getEntryPointMetadata(), which reads the associations).
+    std::unique_lock<std::recursive_mutex> lock(linkage->getComponentTypeOperationMutex());
+
     auto target = linkage->targets[targetIndex];
 
     auto targetProgram = getTargetProgram(target);
@@ -231,6 +236,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getResultAsFileSystem(
     // Filter the containerArtifact into things that can be written
     ComPtr<IArtifact> writeArtifact;
     SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::filter(artifact, writeArtifact));
+
+    // filter() builds new artifacts that only share the (immutable) blobs with the cached one, so
+    // writing the copy does not need the lock.
+    lock.unlock();
+
     SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, "", fileSystem));
 
     *outFileSystem = fileSystem.detach();
@@ -399,6 +409,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
 
     if (artifact == nullptr)
         return SLANG_E_NOT_AVAILABLE;
+
+    // The result artifact is cached and shared, and getResultAsFileSystem() can add associations
+    // to it concurrently; read them under the same lock.
+    std::lock_guard<std::recursive_mutex> lock(linkage->getComponentTypeOperationMutex());
 
     auto metadata = findAssociatedRepresentation<IArtifactPostEmitMetadata>(artifact);
     if (!metadata)
