@@ -625,25 +625,22 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         return 0;
 
     IntVal* elementCount;
-    bool isUnsized;
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
+        // `T[]` reports `SLANG_UNBOUNDED_SIZE`, distinct from 0 for `T[0]`. We check this before
+        // folding because `tryFoldIntVal` would return its `kUnsizedArrayMagicLength` as a count.
+        if (arrayType->isUnsized())
+            return SLANG_UNBOUNDED_SIZE;
         elementCount = arrayType->getElementCount();
-        isUnsized = arrayType->isUnsized();
     }
     else if (auto vectorType = as<VectorExpressionType>(type))
     {
         elementCount = vectorType->getElementCount();
-        isUnsized = false;
     }
     else
     {
         return 0;
     }
-
-    // An unsized array's element count is a placeholder constant, so it must not be folded.
-    if (isUnsized)
-        return SLANG_UNBOUNDED_SIZE;
 
     if (const auto program = convert(reflection))
     {

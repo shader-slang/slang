@@ -6,7 +6,10 @@
 
 using namespace Slang;
 
-// We pass the program layout to permit link-time folding without changing these counts.
+// Check that every public element-count query on the one-dimensional array `param` reports
+// `expected`: `getElementCount()` on both the type and the type layout, with and without the
+// program layout, and `getTotalArrayElementCount()`. The program-layout overloads can fold a sized
+// count through `tryFoldIntVal`, a separate path from the plain overloads, so we check both.
 static void checkArrayElementCounts(
     slang::ProgramLayout* programLayout,
     slang::VariableLayoutReflection* param,
@@ -65,21 +68,19 @@ SLANG_UNIT_TEST(unsizedArrayReflection)
     SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findEntryPointByName("main", entryPoint.writeRef());
-    SLANG_CHECK_ABORT(entryPoint != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findEntryPointByName("main", entryPoint.writeRef())));
 
     slang::IComponentType* components[] = {module, entryPoint};
     ComPtr<slang::IComponentType> compositeProgram;
-    session->createCompositeComponentType(
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
         components,
         2,
         compositeProgram.writeRef(),
-        diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+        diagnosticBlob.writeRef())));
 
     ComPtr<slang::IComponentType> linkedProgram;
-    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef())));
 
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK_ABORT(programLayout != nullptr);
