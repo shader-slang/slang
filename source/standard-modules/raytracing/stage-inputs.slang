@@ -606,7 +606,7 @@ public extension<Input : ICommonHitInput> Input
 /// The view requires `Context : IHitContext` and its declared structural stage capability. It may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_closesthit)]
-__magic_type(ClosestHitInputType)
+[KnownBuiltin(__RayTracingBuiltin.ClosestHitInput)]
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -616,9 +616,7 @@ public struct ClosestHitInput<Context> : ICommonHitInput
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
-    /// payload: omit the payload argument to `trace` and do not access this property for that type.
-    [__RayTracingPayload]
+    /// itself being an `in` view. Empty structs are valid payload types.
     public property Context.Payload payload
     {
         ref;
@@ -825,7 +823,7 @@ public extension<Context> ClosestHitInput<Context>
 /// The view requires `Context : IHitContext` and its declared structural stage capability. It may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_anyhit)]
-__magic_type(AnyHitInputType)
+[KnownBuiltin(__RayTracingBuiltin.AnyHitInput)]
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -835,9 +833,7 @@ public struct AnyHitInput<Context> : ICommonHitInput
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
-    /// payload: omit the payload argument to `trace` and do not access this property for that type.
-    [__RayTracingPayload]
+    /// itself being an `in` view. Empty structs are valid payload types.
     public property Context.Payload payload
     {
         ref;
@@ -1092,7 +1088,7 @@ public extension<Context> AnyHitInput<Context>
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
 [require(structural_raytracing_intersection)]
-__magic_type(IntersectionInputType)
+[KnownBuiltin(__RayTracingBuiltin.IntersectionInput)]
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -1102,10 +1098,7 @@ public struct IntersectionInput<Context> : ICommonHitInput
     /// @par Constraints
     /// Requires `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX).
     /// The `ref` accessor exposes exactly `Context.Payload` for mutation through this `in` view.
-    /// An ordinary user struct with no instance fields is an implicit payload and cannot be
-    /// accessed through this property.
     [require(structural_raytracing_intersection_payload)]
-    [__RayTracingPayload]
     public property Context.Payload payload
     {
         ref;
@@ -1338,7 +1331,7 @@ public extension<Context> IntersectionInput<Context>
 /// may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_miss)]
-__magic_type(MissInputType)
+[KnownBuiltin(__RayTracingBuiltin.MissInput)]
 public struct MissInput<Context>
     where Context : IPayloadContext
 {
@@ -1348,9 +1341,7 @@ public struct MissInput<Context>
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
-    /// payload: omit the payload argument to `trace` and do not access this property for that type.
-    [__RayTracingPayload]
+    /// itself being an `in` view. Empty structs are valid payload types.
     public property Context.Payload payload
     {
         ref;
@@ -1469,7 +1460,7 @@ public extension<Context> MissInput<Context>
 /// may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_callable)]
-__magic_type(CallableInputType)
+[KnownBuiltin(__RayTracingBuiltin.CallableInput)]
 public struct CallableInput<Context>
     where Context : ICallableContext
 {

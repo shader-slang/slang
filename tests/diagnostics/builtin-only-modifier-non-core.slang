@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
 
 // Core-only builtin annotations must be rejected with error E31229 on a user declaration.
-// Ordinary modules can use __magic_type only for concrete ModuleBuiltinType subclasses of the
-// correct declaration kind. Each struct below is referenced from main to force type realization,
+// Ordinary modules can use __magic_type only for the executable shader-stage interfaces.
+// Each struct below is referenced from main to force type realization,
 // where an unrejected annotation would build an invalid internal type node.
 
 // Unregistered AST syntax-class name.
@@ -55,7 +55,7 @@ struct WrongStageKind
 {
 }
 
-// A stage-input AST type likewise requires a struct declaration.
+// Stage inputs remain ordinary structs; their old magic AST spelling is not available.
 __magic_type(MissInputType)
 /*CHECK:
 ^^^^^^^^^^^^ error E31229
@@ -65,7 +65,7 @@ interface WrongInputKind
 {
 }
 
-// Abstract AST classes have no factory and must never reach DeclRefType::create.
+// Abstract AST classes must never reach DeclRefType::create.
 __magic_type(RayTracingStageInterfaceType)
 /*CHECK:
 ^^^^^^^^^^^^ error E31229
@@ -75,7 +75,7 @@ interface AbstractStageKind
 {
 }
 
-__magic_type(ModuleBuiltinStructType)
+__magic_type(RayTracingStageInterfaceType)
 /*CHECK:
 ^^^^^^^^^^^^ error E31229
 ^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module

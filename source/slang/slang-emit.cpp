@@ -29,7 +29,6 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
-#include "slang-ir-call-graph.h"
 #include "slang-ir-check-optional-none-usage.h"
 #include "slang-ir-check-recursion.h"
 #include "slang-ir-check-shader-parameter-type.h"
@@ -124,7 +123,6 @@
 #include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-thread-switch-on-constant-phi.h"
 #include "slang-ir-transform-params-to-constref.h"
@@ -145,6 +143,7 @@
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -1054,86 +1053,7 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    // Structural entry points initially link as their logical `invoke` methods. Their parameters
-    // are compiler-owned source views, so ordinary entry-point ABI passes must never process that
-    // signature. Structural adapter synthesis belongs immediately before this check and consumes
-    // the metadata when it replaces the logical entry point with a native adapter. Keeping the
-    // check after synthesis makes an unconsumed marker a permanent compiler invariant instead of a
-    // temporary frontend feature gate.
-    bool foundUnloweredStructuralEntryPoint = false;
-    for (auto irEntryPoint : irEntryPoints)
-    {
-        if (!irEntryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
-            continue;
-
-        sink->diagnose(
-            Diagnostics::UnloweredStructuralRayTracingEntryPoint{.entryPoint = irEntryPoint});
-        foundUnloweredStructuralEntryPoint = true;
-    }
-    // Calls to annotated structural trace and callShader methods are represented by calls to
-    // marked IR functions until structural lowering replaces them. Build the ordinary entry-point
-    // reference graph so an unused overload in the imported module does not block unrelated code,
-    // while a marker reached through a helper or generic specialization still cannot enter ABI
-    // legalization as an empty source-level body.
-    bool foundUnloweredStructuralOperation = false;
-    Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
-    buildEntryPointReferenceGraph(referencingEntryPoints, irModule);
-    for (const auto& [inst, entryPoints] : referencingEntryPoints)
-    {
-        auto func = as<IRFunc>(inst);
-        if (!func || entryPoints.getCount() == 0)
-            continue;
-        auto marker = func->findDecoration<IRStructuralRayTracingSourceOperationDecoration>();
-        if (!marker)
-            continue;
-
-        auto operationKindInst = as<IRIntLit>(marker->getOperationKind());
-        SLANG_RELEASE_ASSERT(operationKindInst);
-        auto operationKind = StructuralRayTracingSourceOperationKind(operationKindInst->getValue());
-        const char* operationName = nullptr;
-        switch (operationKind)
-        {
-        case StructuralRayTracingSourceOperationKind::TraceExplicitPayload:
-            operationName = "trace with explicit payload";
-            break;
-        case StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload:
-            operationName = "trace with implicit empty payload";
-            break;
-        case StructuralRayTracingSourceOperationKind::CallShader:
-            operationName = "callShader";
-            break;
-        default:
-            SLANG_UNEXPECTED("invalid structural ray-tracing source operation marker");
-        }
-
-        // The marker belongs to a function in the installed standard module, but that location is
-        // not actionable to the shader author. Diagnose every user entry point that reaches the
-        // operation instead. This also explains why code generation fails when the call is hidden
-        // behind a helper rather than written directly in the entry-point body.
-        for (auto entryPoint : entryPoints)
-        {
-            sink->diagnose(Diagnostics::UnloweredStructuralRayTracingSourceOperation{
-                .operationName = String(operationName),
-                .entryPoint = entryPoint});
-        }
-        foundUnloweredStructuralOperation = true;
-    }
-    // The descriptor is an opaque source type. A later adapter pass must replace it with the
-    // target's resources before ordinary parameter layout can interpret its representation.
-    // Concrete descriptor types are hoisted to module scope, including shader parameters that
-    // remain in the interface even when their values are not read by an entry point.
-    bool foundUnloweredDescriptor = false;
-    for (auto inst : irModule->getGlobalInsts())
-    {
-        if (!as<IRTraceProgramDescriptorType>(inst))
-            continue;
-        sink->diagnose(
-            Diagnostics::UnloweredTraceProgramDescriptor{.location = findFirstUseLoc(inst)});
-        foundUnloweredDescriptor = true;
-    }
-    if (foundUnloweredStructuralEntryPoint || foundUnloweredStructuralOperation ||
-        foundUnloweredDescriptor)
-        return SLANG_FAIL;
+    SLANG_RETURN_ON_FAIL(diagnoseUnloweredStructuralRayTracing(irModule, irEntryPoints, sink));
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s

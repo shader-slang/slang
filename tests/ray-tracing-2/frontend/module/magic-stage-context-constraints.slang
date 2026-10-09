@@ -12,6 +12,7 @@ interface IRefinedPayloadContext : first::IPayloadContext {}
 __magic_type(MissShaderType)
 interface IExtraFirstStage
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IExtra;
     __constraint Context : first::IPayloadContext;
     void invoke(in first::BackgroundInput<Context> input);
@@ -21,6 +22,7 @@ interface IExtraFirstStage
 __magic_type(MissShaderType)
 interface IPayloadFirstStage
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : first::IPayloadContext;
     __constraint Context : IExtra;
     void invoke(in first::BackgroundInput<Context> input);
@@ -31,6 +33,7 @@ interface IPayloadFirstStage
 __magic_type(MissShaderType)
 interface IRefinedStage
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IExtra;
     __constraint Context : IRefinedPayloadContext;
     void invoke(in first::BackgroundInput<Context> input);

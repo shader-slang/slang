@@ -28,14 +28,6 @@ IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind)
     }
 }
 
-bool isCompilerOwnedStructuralRayTracingIROp(IROp op)
-{
-    if (op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface)
-        return true;
-    return op == kIROp_StructuralRayTracingEntryPointInfoDecoration ||
-           op == kIROp_StructuralRayTracingSourceOperationDecoration;
-}
-
 void addStructuralRayTracingEntryPointInfo(
     IRBuilder& builder,
     IRInst* entryPointValue,

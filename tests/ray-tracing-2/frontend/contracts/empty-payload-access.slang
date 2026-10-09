@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry Miss -stage miss -target hlsl -profile sm_6_5 -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Miss -stage miss -target hlsl -profile sm_6_5 -no-codegen
 
+// Empty payloads are ordinary source values; target legalization owns their physical storage.
 import slang.raytracing;
 
 struct EmptyPayload
@@ -24,7 +25,6 @@ struct Miss : rt::IMissShader
     void invoke(rt::MissInput<Context> input)
     {
         EmptyPayload payload = input.payload;
-//CHECK:                             ^^^^^^^ an empty structural ray-tracing payload has no explicit value
-//CHECK:                             ^^^^^^^ empty payload type 'EmptyPayload' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'
+        input.payload = payload;
     }
 }

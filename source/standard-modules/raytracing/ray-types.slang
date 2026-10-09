@@ -328,7 +328,6 @@ public struct CurveData
 /// The interface is sealed because primitive selection controls native signatures and Metal
 /// intersection tags. Applications select one of the standard primitive types below.
 [sealed]
-__magic_type(RayTracingIntersectionPrimitiveType)
 public interface IIntersectionPrimitive
 {
     /// Names the attributes read by the primitive's any-hit and closest-hit stages.
@@ -337,6 +336,7 @@ public interface IIntersectionPrimitive
     /// This associated type has no conformance constraint. Built-in primitives select their
     /// zero-storage `TriangleData` or `CurveData` view; procedural primitives select the value
     /// type reported by their intersection shader.
+    [KnownBuiltin(__RayTracingBuiltin.PrimitiveAttributes)]
     associatedtype Attributes;
 }
 
@@ -370,7 +370,7 @@ public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 ///
 /// @par Constraints
 /// Conforms to `IBuiltinIntersectionPrimitive`, so a matching hit group uses `NoIntersection`.
-__magic_type(TrianglePrimitiveType)
+[KnownBuiltin(__RayTracingBuiltin.TrianglePrimitive)]
 public struct TrianglePrimitive : IBuiltinIntersectionPrimitive
 {
     /// Selects the built-in triangle attribute view for matching hit-stage inputs.
@@ -387,7 +387,7 @@ public struct TrianglePrimitive : IBuiltinIntersectionPrimitive
 /// Conforms to `IBuiltinIntersectionPrimitive`, so a matching hit group uses `NoIntersection`.
 /// Requires Metal library version 3.1 or later.
 [require(metallib_3_1)]
-__magic_type(CurvePrimitiveType)
+[KnownBuiltin(__RayTracingBuiltin.CurvePrimitive)]
 public struct CurvePrimitive : IBuiltinIntersectionPrimitive
 {
     /// Selects the built-in curve attribute view for matching hit-stage inputs.

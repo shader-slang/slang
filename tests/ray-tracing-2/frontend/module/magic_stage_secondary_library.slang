@@ -6,34 +6,34 @@ module magic_stage_secondary_library;
 // not replace the first module's declarations or associated-type requirements in a global map.
 namespace second
 {
-__magic_type(RayTracingTraceContextType)
 public interface ITraversal
 {
     associatedtype AccelerationStructure;
     associatedtype Motion;
 }
 
-__magic_type(RayTracingStageContextType)
 public interface IRecordContext
 {
     associatedtype TraceContext : ITraversal;
+    [KnownBuiltin(__RayTracingBuiltin.StageRecord)]
     associatedtype Record;
 }
 
-__magic_type(RayTracingPayloadContextType)
 public interface IPayloadContext : IRecordContext
 {
+    [KnownBuiltin(__RayTracingBuiltin.PayloadContextPayload)]
     associatedtype Payload;
 }
 
 [require(structural_raytracing_miss)]
-__magic_type(MissInputType)
+[KnownBuiltin(__RayTracingBuiltin.MissInput)]
 public struct BackgroundInput<C : IPayloadContext> {}
 
 [require(structural_raytracing_miss)]
 __magic_type(MissShaderType)
 public interface IBackgroundStage
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
     void invoke(in BackgroundInput<Context> input);
 }

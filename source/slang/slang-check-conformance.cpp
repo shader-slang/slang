@@ -530,10 +530,7 @@ struct TypeTagContext
             return TypeTag((int(tags) & ~int(TypeTag::Unsized)) | int(TypeTag::Opaque));
         }
 
-        // The descriptor has no fields, but its intrinsic type represents a host-bound handle.
-        // Read its intrinsic modifier so opacity checks and IR lowering agree on the representation,
-        // including when the declaration comes from an ordinary source or serialized module.
-        if (isIntrinsicTypeWithOp(type, kIROp_TraceProgramDescriptorType))
+        if (isStructuralRayTracingOpaqueHandleType(type))
             return TypeTag::Opaque;
 
         // The compiler's resource type classes describe opaque values directly. Their builtin

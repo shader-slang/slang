@@ -2,6 +2,7 @@
 
 #include "slang-ast-support-types.h"
 #include "slang-compiler-fwd.h"
+#include "slang-ir-insts-enum.h"
 
 namespace Slang
 {
@@ -20,6 +21,10 @@ class SubtypeWitness;
 class ConcreteTypePack;
 class TypePackSubtypeWitness;
 class GenericTypeParamDecl;
+class MagicTypeModifier;
+
+/// Allows only the executable-stage magic type family on ordinary interface declarations.
+bool isRayTracingStageInterfaceModifier(MagicTypeModifier* modifier, Decl* decl);
 
 /// Returns whether `functionDecl` is one of the top-level legacy pipeline intrinsics in `core`.
 ///
@@ -40,46 +45,22 @@ enum class StructuralRayTracingStageKind
     Count,
 };
 
-/// Identifies a compile-time metadata interface whose conformers have no runtime representation.
-///
-/// Dedicated AST types identify these roles independently of module or declaration names.
-enum class StructuralRayTracingMetadataKind
-{
-    HitGroup,
-    HitGroupList,
-    MissShaderList,
-    CallableShaderList,
-    TraceProgramSchema,
-    Count,
-};
-
 /// Gives each associated-type requirement in the structural API a stable semantic role.
 ///
-/// Each role belongs to a named member of a compiler-recognized interface. Consumers find that
-/// requirement through the supplied conformance witness, preserving its inheritance path.
+/// A KnownBuiltin annotation identifies each requirement on an ordinary interface. For example,
+/// the Record requirement is found through the selected context conformance even when another
+/// interface also declares a member named Record. Neither interface needs a special AST type.
 enum class StructuralRayTracingAssociatedTypeKind
 {
-    TraceAccelerationStructure,
-    TraceMotion,
-    StageTraceContext,
+    StageContext,
     StageRecord,
     PayloadContextPayload,
     HitPrimitive,
     PrimitiveAttributes,
     CallableData,
-    ProgramTraceContext,
     ProgramHitGroups,
     ProgramMissShaders,
     ProgramCallableShaders,
-    HitGroupContext,
-    HitGroupClosestHit,
-    HitGroupAnyHit,
-    HitGroupIntersection,
-    ClosestHitShaderContext,
-    AnyHitShaderContext,
-    IntersectionStageContext,
-    MissShaderContext,
-    CallableShaderContext,
     Count,
 };
 
@@ -115,17 +96,6 @@ enum class StructuralRayTracingSourceOperationKind
     TraceImplicitEmptyPayload,
     CallShader,
     Count,
-};
-
-/// Describes the annotated payload contract of one `RayTracer.trace` overload.
-///
-/// The method kind distinguishes the explicit and implicit empty-payload contracts. Only the
-/// explicit form has a payload parameter; its source-parameter index lets semantic checking reject
-/// an explicitly passed empty payload without depending on a parameter name or position.
-struct StructuralRayTracingTraceMethodInfo
-{
-    StructuralRayTracingTraceMethodKind kind = StructuralRayTracingTraceMethodKind::None;
-    Index payloadParameterIndex = -1;
 };
 
 /// Classifies how a selected hit stage obtains its intersection attributes.
@@ -181,35 +151,17 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
 
-/// Returns whether a declaration belongs to an explicitly annotated structural API type or
-/// operation.
-///
-/// Generic declarations and extensions retain the identity of their inner declaration or target.
-/// Module membership alone does not grant compiler-recognized behavior.
-bool isStructuralRayTracingDeclaration(Decl* declaration);
-
-/// Returns the stage represented by the interface's AST type, including the intersection
-/// marker.
+/// Returns the executable stage represented by the interface's AST type.
 StructuralRayTracingStageKind getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl);
 
 /// Returns whether the interface represents an executable stage with an `invoke` requirement.
 bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl);
 
-/// Returns the stage represented by the input's AST type, or `Count` for an ordinary type.
+/// Returns the stage named by the input struct's KnownBuiltin annotation, or Count otherwise.
 StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
-
-/// Returns the metadata role represented by the interface's AST type, or `Count` otherwise.
-StructuralRayTracingMetadataKind getStructuralRayTracingMetadataKind(InterfaceDecl* interfaceDecl);
-
-/// Returns whether the accessor belongs to a property annotated as a stage payload view.
-bool isStructuralRayTracingPayloadStageInputAccessor(FunctionDeclBase* functionDecl);
 
 /// Returns the source contract of an annotated trace overload, or `None` for other functions.
 StructuralRayTracingTraceMethodKind getStructuralRayTracingTraceMethodKind(
-    FunctionDeclBase* functionDecl);
-
-/// Reads an annotated trace overload and the index of its annotated payload parameter.
-StructuralRayTracingTraceMethodInfo getStructuralRayTracingTraceMethodInfo(
     FunctionDeclBase* functionDecl);
 
 /// Returns whether the function is an annotated structural trace operation.
@@ -218,7 +170,7 @@ bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl);
 /// Returns whether the function is an annotated structural callable operation.
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);
 
-/// Returns the requirement's role from its name and its declaring interface's AST type.
+/// Returns the semantic role attached to an ordinary associated-type requirement.
 StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
     AssocTypeDecl* requirement);
 
@@ -231,13 +183,17 @@ Type* resolveStructuralRayTracingAssociatedType(
     SubtypeWitness* witness,
     StructuralRayTracingAssociatedTypeKind kind);
 
-/// Resolves the constraint on an associated type through the supplied conformance path.
+/// Resolves the constraint on an associated type that supplies the required next member.
+/// For example, Context may have several bounds; resolving its Payload selects the bound
+/// whose checked interface facets declare the annotated Payload requirement.
 SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind);
+    StructuralRayTracingAssociatedTypeKind kind,
+    StructuralRayTracingAssociatedTypeKind requiredMember);
 
-/// Classifies the attribute model from the primitive's AST type.
+/// Classifies built-in primitive attribute ABIs from the ordinary struct's semantic annotation.
+/// For example, TrianglePrimitive selects triangle attributes; BoundingBoxPrimitive<A> selects A.
 StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(Type* primitiveType);
 
 /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
@@ -250,18 +206,46 @@ FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* i
 /// cannot silently claim the same structural entry-point name.
 String getStructuralRayTracingSourceTypeName(ASTBuilder* astBuilder, Type* type);
 
-/// Returns whether `type` is a resolved user struct with no instance storage.
-///
-/// Empty payloads use an implicit representation in the structural ray-tracing API. This query is
-/// shared by the semantic checks that reject both explicit trace arguments and explicit access to
-/// the corresponding stage-input property.
-bool isSemanticallyEmptyStructuralRayTracingPayload(ASTBuilder* astBuilder, Type* type);
-
 /// Returns the deterministic target symbol used for a portable structural ray-tracing stage type.
 ///
 /// Ordinary source identifiers other than target-reserved names are preserved. Qualified,
 /// reserved, or otherwise target-unsafe names are encoded injectively so reflection and
 /// synthesized entry points agree on one physical name.
 String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName);
+
+struct FrontEndEntryPointRequest;
+struct CapabilitySet;
+class EntryPoint;
+struct IRModule;
+struct IRFunc;
+
+/// Returns the source-stage capabilities, including synthesized structural stages.
+CapabilitySet getEntryPointStageCapabilities(EntryPoint* entryPoint);
+
+/// Returns the public entry-point declaration used by capability diagnostics.
+Decl* getEntryPointCapabilityDiagnosticDecl(EntryPoint* entryPoint);
+
+/// Creates a structural entry point if the request selects a stage struct.
+RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
+    FrontEndEntryPointRequest* entryPointReq,
+    bool* outFoundStructuralStage,
+    CapabilitySet* outCapabilities);
+
+/// Returns whether a type represents the opaque trace-program resource handle.
+bool isStructuralRayTracingOpaqueHandleType(Type* type);
+
+/// Diagnoses source use of compiler-owned structural IR identities and metadata.
+bool diagnoseInvalidStructuralRayTracingIntrinsicOp(
+    IROp op,
+    bool isCoreModule,
+    UnownedStringSlice operationName,
+    SourceLoc loc,
+    DiagnosticSink* sink);
+
+/// Rejects structural source representations that remain before native ABI legalization.
+SlangResult diagnoseUnloweredStructuralRayTracing(
+    IRModule* module,
+    const List<IRFunc*>& entryPoints,
+    DiagnosticSink* sink);
 
 } // namespace Slang

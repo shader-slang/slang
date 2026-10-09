@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5 -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5 -no-codegen
 
+// Empty payloads are ordinary source values; target legalization owns their physical storage.
 import slang.raytracing;
 
 struct EmptyPayload
@@ -41,6 +42,4 @@ void main()
     rt::RayTracer<Schema> tracer;
     EmptyPayload payload = {};
     tracer.trace<EmptyPayload>({}, scene, program, payload);
-//CHECK:                                           ^^^^^^^ an empty structural ray-tracing payload has no explicit value
-//CHECK:                                           ^^^^^^^ empty payload type 'EmptyPayload' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'
 }

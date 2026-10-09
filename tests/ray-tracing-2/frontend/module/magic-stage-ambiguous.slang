@@ -7,20 +7,21 @@
 import magic_stage_library;
 import magic_stage_secondary_library;
 
-__magic_type(RayTracingCallableContextType)
 interface ICallableContext : first::IRecordContext
 {
+    [KnownBuiltin(__RayTracingBuiltin.CallableData)]
     associatedtype CallableData;
 }
 
 [require(structural_raytracing_callable)]
-__magic_type(CallableInputType)
+[KnownBuiltin(__RayTracingBuiltin.CallableInput)]
 struct CallableInput<C : ICallableContext> {}
 
 [require(structural_raytracing_callable)]
 __magic_type(CallableShaderType)
 interface ICallableStage
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : ICallableContext;
     void invoke(in CallableInput<Context> input);
 }
@@ -60,6 +61,7 @@ struct DualStage : first::IBackgroundStage, second::IBackgroundStage, ICallableS
 __magic_type(MissShaderType)
 interface ISharedMiss
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : first::IPayloadContext;
     void invoke(in first::BackgroundInput<Context> input);
 }

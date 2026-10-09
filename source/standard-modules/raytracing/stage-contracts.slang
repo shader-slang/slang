@@ -20,6 +20,7 @@ public interface IClosestHitShader
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
     /// the group's `Context`.
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IHitContext;
 
     /// Implements the closest-hit stage selected for the committed hit.
@@ -44,6 +45,7 @@ public interface IAnyHitShader
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
     /// the group's `Context`.
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IHitContext;
 
     /// Implements the any-hit stage for an intersection candidate.
@@ -66,7 +68,6 @@ public interface IAnyHitShader
 /// intersection shader for a builtin primitive. Sealing this interface prevents user-defined
 /// placeholders from bypassing the procedural shader contract.
 [sealed]
-__magic_type(IntersectionStageType)
 public interface IIntersectionStage
 {
     /// Defines the shared context for procedural or hardware intersection.
@@ -74,6 +75,7 @@ public interface IIntersectionStage
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this stage requires this type to equal
     /// the group's `Context`.
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IHitContext;
 }
 
@@ -116,6 +118,7 @@ public interface IMissShader
     ///
     /// @par Constraints
     /// Must conform to `IPayloadContext`.
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
 
     /// Implements the miss stage for a trace that finds no accepted hit.
@@ -138,6 +141,7 @@ public interface ICallableShader
     ///
     /// @par Constraints
     /// Must conform to `ICallableContext`.
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : ICallableContext;
 
     /// Implements the callable stage selected by `RayTracer.callShader`.

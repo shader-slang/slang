@@ -1939,21 +1939,6 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     return attr;
 }
 
-// Returns whether the annotation selects a concrete type whose representation is valid for an
-// ordinary module declaration. For example, `__magic_type(MissShaderType)` on an interface uses
-// that interface's declaration reference; `__magic_type(ConstantBufferType)` also expects a
-// particular core generic declaration and therefore cannot use this path.
-static bool isModuleBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
-{
-    if (!modifier || !modifier->magicNodeType || !modifier->magicNodeType.getInfo()->createFunc)
-        return false;
-
-    return (as<InterfaceDecl>(decl) &&
-            modifier->magicNodeType.isSubClassOf<ModuleBuiltinInterfaceType>()) ||
-           (as<StructDecl>(decl) &&
-            modifier->magicNodeType.isSubClassOf<ModuleBuiltinStructType>());
-}
-
 Modifier* SemanticsVisitor::checkModifier(
     Modifier* m,
     ModifiableSyntaxNode* syntaxNode,
@@ -1975,13 +1960,14 @@ Modifier* SemanticsVisitor::checkModifier(
     if (auto decl = as<Decl>(syntaxNode))
     {
         // Core builtin annotations require compiler-owned declaration shapes. Ordinary modules
-        // may instead select a ModuleBuiltinType, whose shape is just the checked declaration
+        // may instead select a ray-tracing stage interface, whose shape is the checked declaration
         // reference. Reject other builtin annotations before forming a Type, so downstream
         // consumers never see unsupported shapes. `__intrinsic_type` only records an IR opcode
         // and remains valid user syntax.
         if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
              as<BuiltinRequirementModifier>(m)) &&
-            !isFromCoreModule(decl) && !isModuleBuiltinTypeModifier(as<MagicTypeModifier>(m), decl))
+            !isFromCoreModule(decl) &&
+            !isRayTracingStageInterfaceModifier(as<MagicTypeModifier>(m), decl))
         {
             if (!ignoreUnallowedModifier)
                 getSink()->diagnose(Diagnostics::BuiltinOnlyModifierOnNonCoreDecl{.modifier = m});

@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-08. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-09. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -157,6 +157,7 @@ Stage interfaces now declare their compiler identity with `__magic_type`, for ex
 __magic_type(MissShaderType)
 public interface IMissShader
 {
+    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
     void invoke(in MissInput<Context> input);
 }
@@ -164,8 +165,11 @@ public interface IMissShader
 
 The checked type is a `MissShaderType`; the declaration remains an ordinary interface with normal
 conformance witnesses. Ordinary interface lowering emits its stage-specific IR interface opcode.
-Context, stage-input, and schema annotations likewise identify the contracts that need compiler
-checks. Preserve these annotations when integrating the updated library.
+Only the five executable stage interfaces have special AST classes. Context, primitive, input,
+list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations mark
+only compiler-consumed associated requirements, the five stage-input structs, the shader-list
+containers, and the two built-in primitive attribute models. Preserve these declaration annotations through ordinary serialization;
+do not introduce a special AST class for each supporting library type.
 
 Remove the old import-time declaration registration and IR opcode replacement. Loading a module
 must not depend on the `slang.raytracing` name or its installation location. The same declarations
@@ -186,6 +190,27 @@ Representation diagnostics use the semantic checker's existing duplicate suppres
 structural and legacy API uses are retained on the module declaration so later entry-point selection
 can enforce the same-module mixing restriction, including after serialization.
 
+## 8. Centralize special rules and allow ordinary metadata/payload values
+
+All additional semantic rules and declaration-identity queries live in
+`source/slang/slang-check-structural-ray-tracing.cpp`, with examples beside the rule implementations.
+Conformance, expression, entry-point, parser, and code-generation boundaries call into that file.
+The ordinary library constraints remain the source of truth for type relationships; there is no
+ray-tracing module build mode, import hook, or global declaration registry.
+
+Schemas, hit groups, and shader lists can be constructed, stored, and used by ordinary generics.
+A value such as `MySchema schema = {};` neither constructs shader instances nor allocates an SBT.
+Stage/input construction, storage, writable parameters, returned values, and arbitrary generic
+arguments retain their checks. The generic restriction prevents a deferred generic body such as
+`make<T>() { T local = T(); }` from manufacturing an input after frontend checking. Supporting
+broader type-only uses would require validating the eventual specialized body.
+
+An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
+`input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
+annotations from the full implementation. Backend adapters must preserve the native payload
+representation needed by the existing target legalization passes. The no-payload convenience
+overload remains a separate operation; this change does not infer its payload at runtime.
+
 ## Additional API and integration updates
 
 These are additive declarations or behavior corrections rather than the main source migrations:
@@ -197,7 +222,7 @@ These are additive declarations or behavior corrections rather than the main sou
 - **Intersection payload:** `IntersectionInput<Context>.payload` now gives mutable access to
   `Context.Payload` on Metal and CUDA/OptiX, guarded by
   `structural_raytracing_intersection_payload`. D3D/Vulkan reject use of the property; intersection
-  shaders that do not access it remain portable. Empty payloads still cannot be accessed explicitly.
+  shaders that do not access it remain portable. Empty payloads may be accessed explicitly.
   The full implementation must lower this accessor to Metal's `ray_data` payload and OptiX payload
   state; adapter implementation remains outside PR1.
 - **Transforms:** `objectToWorld` and `worldToObject` are common properties on closest-hit,

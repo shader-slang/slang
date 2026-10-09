@@ -5452,12 +5452,7 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
 
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
-    // Consider `TextureWrapper<vector<T, 1>>` while an extension's generic signature is being
-    // checked. Asking whether T has a structural stage conformance can re-enter that unfinished
-    // signature through inheritance and generic solving. Record checked type uses now and inspect
-    // their inheritance only after the ordinary module phases have completed all declarations.
-    SLANG_RELEASE_ASSERT(!getShared()->m_deferStructuralRayTracingTypeUses);
-    getShared()->m_deferStructuralRayTracingTypeUses = true;
+    beginStructuralRayTracingModule();
 
     // When we are dealing with code from the core modules,
     // there is a potential problem where we might need to look
@@ -23260,7 +23255,7 @@ bool isOpaqueHandleType(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
-    if (isIntrinsicTypeWithOp(type, kIROp_TraceProgramDescriptorType))
+    if (isStructuralRayTracingOpaqueHandleType(type))
         return true;
     if (as<ResourceType>(type))
         return true;

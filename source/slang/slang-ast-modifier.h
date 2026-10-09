@@ -2406,8 +2406,8 @@ class RayTracingCallShaderAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// Identifies the payload parameter of a trace or the payload property of a stage input.
-/// Semantic checking uses this role to reject values of an implicit empty payload type.
+/// Identifies the payload parameter of a trace overload for its source-operation IR marker.
+/// An explicitly passed empty struct is a valid payload and uses the same marker.
 FIDDLE()
 class RayTracingPayloadAttribute : public Attribute
 {

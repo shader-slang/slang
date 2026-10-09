@@ -9,7 +9,6 @@ namespace rt
 /// topology and motion model. Later lowering will map that contract to a target ABI.
 ///
 /// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
-__magic_type(RayTracerType)
 public struct RayTracer<Schema>
     where Schema : ITraceProgramSchema
 {}
@@ -51,7 +50,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with caller-owned payload storage shared by the reachable hit and miss stages.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
     /// `desc.time` is unused because this overload requires `NoMotion`.
     /// @param[in] accelerationStructure Native two-level handle matching the schema's
@@ -120,7 +119,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload and Metal primitive-motion traversal.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
     /// `desc.time` selects the time used for motion during traversal.
     /// @param[in] accelerationStructure Native two-level handle matching the schema's
@@ -176,7 +175,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload and native instance-motion traversal.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
     /// `desc.time` selects the time used for motion during traversal.
     /// @param[in] accelerationStructure Native two-level handle matching the schema's
@@ -254,7 +253,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload and combined Metal motion traversal.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
     /// `desc.time` selects the time used for motion during traversal.
     /// @param[in] accelerationStructure Native two-level handle matching the schema's
@@ -317,7 +316,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload and a depth inferred from the scene handle.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @tparam maxLevelCount Compile-time integer maximum acceleration-structure depth, including
     /// the final primitive acceleration structure. Inferred from `accelerationStructure`.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
@@ -385,7 +384,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload, explicit depth, and primitive motion.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @tparam maxLevelCount Compile-time integer maximum acceleration-structure depth, including
     /// the final primitive acceleration structure. Inferred from `accelerationStructure`.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
@@ -452,7 +451,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload, explicit depth, and instance motion.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @tparam maxLevelCount Compile-time integer maximum acceleration-structure depth, including
     /// the final primitive acceleration structure. Inferred from `accelerationStructure`.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
@@ -520,7 +519,7 @@ public extension<Schema> RayTracer<Schema>
 
     /// Traces with a mutable payload, explicit depth, and combined motion.
     ///
-    /// @tparam Payload Non-empty payload type shared with reachable hit and miss stages.
+    /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @tparam maxLevelCount Compile-time integer maximum acceleration-structure depth, including
     /// the final primitive acceleration structure. Inferred from `accelerationStructure`.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.

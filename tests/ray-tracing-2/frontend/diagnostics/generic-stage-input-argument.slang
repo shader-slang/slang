@@ -94,18 +94,14 @@ ConstantBuffer<HitInputAlias> invalidStageInputBuffer;
 //CHECK:       ^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
 
-// Structural metadata may only be consumed by compiler-provided schema containers. An arbitrary
-// user generic could materialize its argument after specialization, even if its declaration has no
-// fields today.
-typealias InvalidMetadataArgument = Phantom<rt::ITraceProgramSchema>;
-//CHECK:                                        ^^^^^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
-//CHECK:                                        ^^^^^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramSchema' has no runtime representation
+// Metadata types remain ordinary generic arguments; only shader stages and inputs retain
+// the restriction needed to prevent a generic body from constructing or storing those values.
+typealias LegalMetadataArgument = Phantom<rt::ITraceProgramSchema>;
 
 typealias LegalTracer = rt::RayTracer<TestSchema>;
 typealias LegalDescriptor = rt::TraceProgramDescriptor<TestSchema>;
 
-// Listed stage implementations are generic arguments, but the resulting type is compiler-recognized
-// structural metadata rather than an ordinary user container.
+// Shader lists accept stages as type arguments without constructing their values.
 struct Miss : rt::IMissShader
 {
     typealias Context = HitContext;
@@ -155,9 +151,5 @@ void main()
     ^^^^^^^^ structural ray-tracing stage type 'ClosestHit' has no runtime representation
 */
 
-    materialize<rt::ITraceProgramSchema>();
-/*CHECK:
-    ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
-    ^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramSchema' has no runtime representation
-*/
+    materialize<TestSchema>();
 }

@@ -33,9 +33,6 @@ struct StructuralRayTracingEntryPointIRInfo
 /// or serialized and their AST pointers are no longer available.
 IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind);
 
-/// Returns whether `op` is a structural ray-tracing identity reserved for compiler use.
-bool isCompilerOwnedStructuralRayTracingIROp(IROp op);
-
 /// Attaches `info` to the selected logical `invoke` value.
 ///
 /// A closed generic stage is represented by an `IRSpecialize` until entry-point linking eagerly

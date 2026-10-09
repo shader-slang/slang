@@ -1129,12 +1129,6 @@ err(
     span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
 )
 
-err(
-    "structural-ray-tracing-metadata-runtime-value",
-    20028,
-    "runtime use of structural ray-tracing metadata",
-    span { loc = "location", message = "structural ray-tracing metadata type '~type:type' has no runtime representation" }
-)
 
 err(
     "structural-ray-tracing-input-stage-mismatch",
@@ -4669,12 +4663,6 @@ err(
     span { loc = "location", message = "~section entry '~entry:Type' is listed more than once in schema '~schema:Type'" }
 )
 
-err(
-    "structural-ray-tracing-empty-payload-value",
-    38075,
-    "an empty structural ray-tracing payload has no explicit value",
-    span { loc = "location", message = "empty payload type '~payloadType:Type' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'" }
-)
 
 err(
     "unlowered-structural-ray-tracing-entry-point",

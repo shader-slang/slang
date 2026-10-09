@@ -1,6 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry Intersection -stage intersection -target cuda -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry Intersection -stage intersection -target metal -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Intersection -stage intersection -target cuda -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry Intersection -stage intersection -target metal -no-codegen
 
+// Empty payloads are ordinary source values; target legalization owns their physical storage.
 import slang.raytracing;
 
 struct EmptyPayload
@@ -27,7 +28,6 @@ struct Intersection : rt::IIntersectionShader
     void invoke(in rt::IntersectionInput<Context> input)
     {
         EmptyPayload payload = input.payload;
-//CHECK:                             ^^^^^^^ an empty structural ray-tracing payload has no explicit value
-//CHECK:                             ^^^^^^^ empty payload type 'EmptyPayload' is represented implicitly; omit the payload argument to 'trace' and do not access 'input.payload'
+        input.payload = payload;
     }
 }

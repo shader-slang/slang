@@ -5,7 +5,6 @@
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -10471,17 +10470,13 @@ static IROp parseIROp(Parser* parser, Token& outToken)
         }
     }
 
-    // Structural stage-interface identities, selected-entry metadata, and source-operation
-    // markers come only from the compiler after it validates the packaged `slang.raytracing`
-    // declarations. User source must not forge those identities with `__intrinsic_op`, even if it
-    // knows their numeric opcode.
-    if (!parser->options.isCoreModule && isCompilerOwnedStructuralRayTracingIROp(op))
-    {
-        parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
-            .operation = outToken.getContent(),
-            .location = outToken.loc});
+    if (diagnoseInvalidStructuralRayTracingIntrinsicOp(
+            op,
+            parser->options.isCoreModule,
+            outToken.getContent(),
+            outToken.loc,
+            parser->sink))
         return kIROp_Invalid;
-    }
     return op;
 }
 
