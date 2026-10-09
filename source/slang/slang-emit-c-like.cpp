@@ -1764,14 +1764,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     auto user = use->getUser();
 
-    // NonUniformResourceIndex is always emitted at its use sites so the target sees
-    // the nonuniform qualifier. Its input still needs to be evaluated at its original
-    // location. Folding a load into the marker could delay the read until after a store
-    // has changed the value, for example when emitting the assignments for a swap.
-    // Keep the input in a temporary instead.
-    if (user->getOp() == kIROp_NonUniformResourceIndex)
-        return false;
-
     // Check if the use is a call using a target intrinsic that uses the parameter more than once
     // in the intrinsic definition.
     if (auto callInst = as<IRCall>(user))
