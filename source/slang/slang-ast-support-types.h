@@ -243,7 +243,8 @@ FIDDLE() namespace Slang
         CallShader,
         ReportHit = 16,
         /// An atomic entry point that can take a floating-point value, such as the global
-        /// `Interlocked*` functions. The differentiability checker uses it to recognize a call
+        /// `Interlocked*` functions. Integer specializations of generic entry points retain this
+        /// marker too. The differentiability checker uses it to recognize a call
         /// that writes a derivative-carrying value into non-differentiable memory.
         AtomicOperation,
         COUNT
