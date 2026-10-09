@@ -1609,11 +1609,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         type = arrayType->getElementType();
     }
 
-    // Don't allow temporaries of pointer types to be created,
-    // if target language doesn't support pointers.
+    // A target without pointer types cannot declare a temporary of pointer type, unless it
+    // represents that particular pointer type as an ordinary value.
     if (as<IRPtrTypeBase>(type))
     {
-        if (!doesTargetSupportPtrTypes())
+        if (!doesTargetSupportPtrTypes() && !canHoldPtrTypeInTemporary(type))
             return true;
     }
 

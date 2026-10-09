@@ -50,20 +50,20 @@ VSOutput vertexMain(int vertexIndex: SV_VulkanVertexID)
     // Test field access chains.
     //
 
-    // CHECK_GLSL: (((((pushConstants_0.verts_0 + gl_VertexIndex)._data.inner_1) + 1)._data.inner_0) + 5)._data.position_0
+    // CHECK_GLSL: (((pushConstants_0.verts_0 + gl_VertexIndex)._data.inner_1 + 1)._data.inner_0 + 5)._data.position_0
     let position1 = pushConstants.verts[vertexIndex].inner[1].inner[5].position;
 
-    // CHECK_GLSL: (((((constantBuffer_0.verts_0 + 7)._data.inner_1) + 3)._data.inner_0) + 4)._data.position_0
+    // CHECK_GLSL: (((constantBuffer_0.verts_0 + 7)._data.inner_1 + 3)._data.inner_0 + 4)._data.position_0
     let position2 = constantBuffer.verts[7].inner[3].inner[4].position;
 
-    // CHECK_GLSL: (((constantBuffer_0.verts_0 + gl_VertexIndex)._data.inner_1) + 12)._data.position_1
+    // CHECK_GLSL: ((constantBuffer_0.verts_0 + gl_VertexIndex)._data.inner_1 + 12)._data.position_1
     let position3 = constantBuffer.verts[vertexIndex].inner[12].position;
 
     //
     // Test accesing from a variable.
     //
 
-    // CHECK_GLSL: ((((pushConstants_0.verts_0 + 8)._data.inner_1 + 6)._data.inner_0))._data.position_0
+    // CHECK_GLSL: ((pushConstants_0.verts_0 + 8)._data.inner_1 + 6)._data.inner_0._data.position_0
     let vertex = pushConstants.verts[8];
     let position4 = vertex.inner[6].inner.position;
 

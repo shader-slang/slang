@@ -2177,6 +2177,73 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     m_writer->emit("};\n");
 }
 
+/// Return true when `inst` is an access path into the pointee of a `buffer_reference` handle,
+/// i.e. a `FieldAddress` or `GetElementPtr` whose base is a `UserPointer`. GLSL spells such an
+/// address as an l-value inside the pointee (`p._data.f`), not as a handle of its own.
+static bool isBufferReferenceAccessPath(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_FieldAddress:
+    case kIROp_GetElementPtr:
+        return isUserPointerType(inst->getOperand(0)->getDataType());
+    default:
+        return false;
+    }
+}
+
+void GLSLSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
+{
+    // A `T*` is emitted as a `buffer_reference` block whose only member is `T _data`
+    // (see `emitBufferPointerTypeDefinition`). `_data` has no counterpart in the IR, so we
+    // spell "the value a `UserPointer` address designates" here.
+    //
+    // An access path is itself `UserPointer`-typed, so we test for it before the general
+    // `UserPointer` case: that case emits the value with `emitOperand`, whose `FieldAddress` and
+    // `GetElementPtr` arms call back into this function.
+    if (isBufferReferenceAccessPath(inst))
+    {
+        auto base = inst->getOperand(0);
+        auto prec = getInfo(EmitOp::Postfix);
+        EmitOpInfo newOuterPrec = outerPrec;
+        bool needClose = maybeEmitParens(newOuterPrec, prec);
+        emitDereferenceOperand(base, leftSide(newOuterPrec, prec));
+        if (auto fieldAddress = as<IRFieldAddress>(inst))
+        {
+            m_writer->emit(".");
+            m_writer->emit(getName(fieldAddress->getField()));
+        }
+        else
+        {
+            m_writer->emit("[");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("]");
+        }
+        maybeCloseParens(needClose);
+        return;
+    }
+
+    if (isUserPointerType(inst->getDataType()))
+    {
+        auto prec = getInfo(EmitOp::Postfix);
+        EmitOpInfo newOuterPrec = outerPrec;
+        bool needClose = maybeEmitParens(newOuterPrec, prec);
+        emitOperand(inst, leftSide(newOuterPrec, prec));
+        m_writer->emit("._data");
+        maybeCloseParens(needClose);
+        return;
+    }
+
+    Super::emitDereferenceOperand(inst, outerPrec);
+}
+
+bool GLSLSourceEmitter::canHoldPtrTypeInTemporary(IRType* ptrType)
+{
+    // A `UserPointer` value that is not an access path into a pointee is a `buffer_reference`
+    // block handle, which is an ordinary GLSL value.
+    return isUserPointerType(ptrType);
+}
+
 // Is this type only used by SSBO declarations, if so then we don't need to
 // emit it and it'll be emitted inline there.
 static bool isSSBOInternalStructType(IRInst* inst)
@@ -2223,50 +2290,17 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("barrier();\n");
             return true;
         }
-    case kIROp_Load:
-        {
-            auto addr = inst->getOperand(0);
-            auto ptrType = as<IRPtrType>(addr->getDataType());
-            if (!ptrType)
-                return false;
-            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
-            {
-                auto prec = getInfo(EmitOp::Postfix);
-                EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = maybeEmitParens(outerPrec, prec);
-                emitOperand(inst->getOperand(0), prec);
-
-                // `_data` member extraction is not required for `FieldAddress` instructions because
-                // it is already emitted alongside the user requested field during `FieldAddress`
-                // emit. See `kIROp_FieldAddress` case below.
-                if (!as<IRFieldAddress>(addr))
-                {
-                    m_writer->emit("._data");
-                }
-
-                maybeCloseParens(needClose);
-                return true;
-            }
-            return false;
-        }
     case kIROp_FieldAddress:
+    case kIROp_GetElementPtr:
         {
-            auto addr = inst->getOperand(0);
-            auto ptrType = as<IRPtrType>(addr->getDataType());
-            if (!ptrType)
+            // GLSL has no handle for a sub-object of a pointee, so an access path into one can
+            // only be emitted as the l-value it designates. Dereferencing consumers reach that
+            // through `emitDereferenceOperand` directly; this arm serves callers that emit the
+            // address with `emitOperand`, such as a built-in's `out` argument (`modf(x, p->y)`).
+            if (!isBufferReferenceAccessPath(inst))
                 return false;
-            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
-            {
-                auto prec = getInfo(EmitOp::Postfix);
-                EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = maybeEmitParens(outerPrec, prec);
-                emitOperand(inst->getOperand(0), prec);
-                m_writer->emit("._data.");
-                m_writer->emit(getName(as<IRFieldAddress>(inst)->getField()));
-                maybeCloseParens(needClose);
-                return true;
-            }
-            return false;
+            emitDereferenceOperand(inst, inOuterPrec);
+            return true;
         }
     case kIROp_MakeVectorFromScalar:
     case kIROp_MatrixReshape:
@@ -3098,7 +3132,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicExchange(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3118,7 +3152,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicCompSwap(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3140,7 +3174,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicAdd(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3160,7 +3194,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicAdd(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", -(");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3180,7 +3214,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicAnd(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3200,7 +3234,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicOr(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3220,7 +3254,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicXor(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3240,7 +3274,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicMin(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3260,7 +3294,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicMax(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -3280,7 +3314,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicAdd(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitType(inst->getDataType());
@@ -3301,7 +3335,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             else
             {
                 m_writer->emit("atomicAdd(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             }
             m_writer->emit(", ");
             emitType(inst->getDataType());
