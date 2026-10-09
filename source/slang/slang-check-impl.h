@@ -1514,6 +1514,8 @@ public:
         return result;
     }
 
+    LambdaExpr* getParentLambdaExpr() const { return m_parentLambdaExpr; }
+
     SemanticsContext withParentLambdaExpr(
         LambdaExpr* expr,
         LambdaDecl* decl,
@@ -3811,6 +3813,12 @@ public:
     /// null.
     ///
     ParamDecl* isReferenceIntoFunctionInputParameter(Expr* expr);
+
+    bool checkMutatingReceiver(
+        DeclRef<Decl> funcDeclRef,
+        Expr* baseExpr,
+        SourceLoc loc,
+        bool diagnose);
 
     // Create a witness that attests to the fact that `type`
     // is equal to itself.

@@ -1180,7 +1180,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitAggTypeCtorExpr(AggTypeCtorExpr*) { return; }
     void visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr) { dispatchIfNotNull(expr->valueArg); }
     void visitModifierCastExpr(ModifierCastExpr* expr) { dispatchIfNotNull(expr->valueArg); }
-    void visitLetExpr(LetExpr* expr) { dispatchIfNotNull(expr->body); }
+    void visitLetExpr(LetExpr* expr)
+    {
+        // A mutable temporary's initializer is reached only through its declaration.
+        if (expr->decl && expr->decl->findModifier<MutableLocalTempVarModifier>())
+            dispatchIfNotNull(expr->decl->initExpr);
+        dispatchIfNotNull(expr->body);
+    }
     void visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
         dispatchIfNotNull(expr->declRef.declRefBase);

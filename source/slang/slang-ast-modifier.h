@@ -226,6 +226,14 @@ class LocalTempVarModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a local temporary that is bound to a fresh mutable variable even when its initial value
+// is an r-value, so that it can be passed to an `inout` parameter.
+FIDDLE()
+class MutableLocalTempVarModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // Marks a `VarDecl` whose existential type has been opened directly
 // (i.e. `maybeMoveTemp` reused the variable instead of creating a temporary).
 // If the variable is later reassigned, the opened existential type identity

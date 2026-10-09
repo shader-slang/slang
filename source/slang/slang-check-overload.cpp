@@ -1066,6 +1066,60 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
     }
 }
 
+/// Checks the receiver of a call to the `[mutating]` method `funcDeclRef`, diagnosing when
+/// `diagnose` is set. Returns false when the receiver is not an l-value.
+bool SemanticsVisitor::checkMutatingReceiver(
+    DeclRef<Decl> funcDeclRef,
+    Expr* baseExpr,
+    SourceLoc loc,
+    bool diagnose)
+{
+    if (baseExpr && !baseExpr->type.isLeftValue)
+    {
+        if (diagnose)
+        {
+            getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
+                .methodName = funcDeclRef.getName(),
+                .location = loc});
+            maybeDiagnoseConstVariableAssignment(baseExpr);
+        }
+        return false;
+    }
+
+    // The parameters of functions declared using traditional/legacy
+    // syntax are currently exposed as mutable locals within the body
+    // of the relevant function. As such, it is legal to call `[mutating]`
+    // methods on such a function parameter. However, doing so is typically
+    // indicative of an error on the programmer's part.
+    //
+    // We will detect such cases here and issue a diagnostic that explains
+    // the situation.
+    //
+    if (baseExpr && diagnose)
+    {
+        if (auto paramDecl = isReferenceIntoFunctionInputParameter(baseExpr))
+        {
+            const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
+
+            if (isNonCopyable)
+            {
+                getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterError{
+                    .method = funcDeclRef.getName(),
+                    .param = paramDecl->getName(),
+                    .location = loc});
+            }
+            else
+            {
+                getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                    .method = funcDeclRef.getName(),
+                    .param = paramDecl->getName(),
+                    .location = loc});
+            }
+        }
+    }
+    return true;
+}
+
 bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     OverloadResolveContext& context,
     OverloadCandidate const& candidate)
@@ -1088,51 +1142,12 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     {
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
-            if (context.baseExpr && !context.baseExpr->type.isLeftValue)
-            {
-                if (context.mode == OverloadResolveContext::Mode::ForReal)
-                {
-                    getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
-                        .methodName = funcDeclRef.getName(),
-                        .location = context.loc});
-                    maybeDiagnoseConstVariableAssignment(context.baseExpr);
-                }
+            if (!checkMutatingReceiver(
+                    funcDeclRef,
+                    context.baseExpr,
+                    context.loc,
+                    context.mode == OverloadResolveContext::Mode::ForReal))
                 return false;
-            }
-
-            // The parameters of functions declared using traditional/legacy
-            // syntax are currently exposed as mutable locals within the body
-            // of the relevant function. As such, it is legal to call `[mutating]`
-            // methods on such a function parameter. However, doing so is typically
-            // indicative of an error on the programmer's part.
-            //
-            // We will detect such cases here and issue a diagnostic that explains
-            // the situation.
-            //
-            if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
-            {
-                if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
-                {
-                    const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
-
-                    if (isNonCopyable)
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                    else
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                }
-            }
         }
     }
 

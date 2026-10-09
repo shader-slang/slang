@@ -4775,7 +4775,7 @@ err(
     "encountered-non-differentiable-function-during-higher-order-diff",
     38035,
     "cannot propagate through non-differentiable function",
-    span { loc = "location", message = "encountered non-differentiable function '~func' during higher-order differentiation" }
+    span { loc = "location", message = "encountered non-differentiable function '~func:IRInst' during higher-order differentiation" }
 )
 
 err(
@@ -4783,6 +4783,27 @@ err(
     38037,
     "cannot differentiate the result of a backward-derivative call",
     span { loc = "location", message = "the code produced by 'bwd_diff' is not itself differentiable, so a function that calls 'bwd_diff' cannot be differentiated; for higher-order derivatives, nest 'fwd_diff' calls or apply a single 'bwd_diff' to a function that uses 'fwd_diff'." }
+)
+
+err(
+    "cannot-differentiate-mutating-member-with-differentiable-this",
+    38038,
+    "cannot differentiate a mutating method with a differentiable 'this' through an instance",
+    span { loc = "expr:Expr", message = "'~method:Decl' is [mutating] and its 'this' is differentiable, so its derivative takes 'this' as an 'inout ~thisType:Type', which differentiating it through an instance does not support" }
+)
+
+err(
+    "cannot-differentiate-member-of-differentiable-ptr-type-through-instance",
+    38039,
+    "cannot differentiate a method of a differentiable pointer type through an instance",
+    span { loc = "expr:Expr", message = "the derivative of '~method:Decl' takes 'this' as a '~thisType:Type', which differentiating it through an instance does not support" }
+)
+
+err(
+    "cannot-backward-differentiate-derivative-directly",
+    38049,
+    "cannot apply 'bwd_diff' directly to a generated derivative",
+    span { loc = "expr:Expr", message = "'bwd_diff' of a generated derivative is not supported; apply 'bwd_diff' to a function that uses 'fwd_diff' instead." }
 )
 
 --

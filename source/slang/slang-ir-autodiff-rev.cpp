@@ -209,13 +209,15 @@ struct BackwardDiffTranslationContext
         if (SLANG_FAILED(prepareFuncForBackwardDiff(diffTypeContext, sink, primalFunc)))
             return diffPropagateFunc;
 
-        auto fwdDiffFunc = cast<IRFunc>(maybeTranslateRawForwardDerivativeWithAnnotations(
+        auto fwdDiffFunc = as<IRFunc>(maybeTranslateRawForwardDerivativeWithAnnotations(
             autoDiffSharedContext,
             sink,
             primalFunc));
 
         // Remove the clone of original func.
         primalFunc->removeAndDeallocate();
+        if (!fwdDiffFunc)
+            return nullptr;
 
         // Remove redundant loads since they interfere with transposition logic.
         eliminateRedundantLoadStore(fwdDiffFunc);
@@ -242,7 +244,8 @@ struct BackwardDiffTranslationContext
             trivialFwdDiffInst));
     }
 
-    void translateFunc(
+    // Returns false, with the outputs unset, when the forward derivative could not be made.
+    bool translateFunc(
         IRBuilder* builder,
         IRFunc* targetFunc,
         IRInst*& applyFuncInst,
@@ -269,7 +272,7 @@ struct BackwardDiffTranslationContext
                 ? generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc)
                 : generateTrivialForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
         if (!fwdDiffFunc)
-            return;
+            return false;
 
         // Split first block into a paramter block.
         makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
@@ -421,6 +424,7 @@ struct BackwardDiffTranslationContext
         propagateFuncInst = propagateFunc;
         applyFuncInst = applyFunc;
         rematFuncInst = rematFuncResult;
+        return true;
     }
 };
 
@@ -827,16 +831,22 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         }
         else if (as<IRBorrowInOutParamType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
         {
+            // A non-differentiable `inout` parameter is passed by value, except a `[mutating]`
+            // method's `this`, which stays `inout`.
+            IRInst* paramVal = bwdDiffFuncParams[bwdDiffParamIdx];
+            if (as<IRPtrTypeBase>(paramVal->getDataType()))
+                paramVal = builder.emitLoad(paramVal);
+
             {
                 auto var = builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
                 applyBwdFuncArgs.add(var);
-                builder.emitStore(var, bwdDiffFuncParams[bwdDiffParamIdx]);
+                builder.emitStore(var, paramVal);
             }
 
             {
                 auto var = builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
                 rematFuncArgs.add(var);
-                builder.emitStore(var, bwdDiffFuncParams[bwdDiffParamIdx]);
+                builder.emitStore(var, paramVal);
             }
 
             bwdDiffParamIdx++;
@@ -1023,15 +1033,20 @@ IRInst* maybeTranslateBackwardDerivative(
     IRInst* bwdPropagateFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
-    translater.translateFunc(
-        &builder,
-        targetFunc,
-        bwdPrimalFunc,
-        bwdRematFunc,
-        bwdPropagateFunc,
-        bwdContextType,
-        bwdMinimalContextType,
-        false);
+    if (!translater.translateFunc(
+            &builder,
+            targetFunc,
+            bwdPrimalFunc,
+            bwdRematFunc,
+            bwdPropagateFunc,
+            bwdContextType,
+            bwdMinimalContextType,
+            false))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     builder.setInsertAfter(translateInst);
     return builder.emitMakeTuple(
@@ -1082,15 +1097,20 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
     IRInst* bwdPropagateFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
-    translater.translateFunc(
-        &builder,
-        targetFunc,
-        bwdPrimalFunc,
-        bwdRematFunc,
-        bwdPropagateFunc,
-        bwdContextType,
-        bwdMinimalContextType,
-        true);
+    if (!translater.translateFunc(
+            &builder,
+            targetFunc,
+            bwdPrimalFunc,
+            bwdRematFunc,
+            bwdPropagateFunc,
+            bwdContextType,
+            bwdMinimalContextType,
+            true))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     builder.setInsertAfter(translateInst);
     return builder.emitMakeTuple(

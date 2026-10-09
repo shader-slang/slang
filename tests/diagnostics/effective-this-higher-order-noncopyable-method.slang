@@ -44,13 +44,9 @@ struct NoDiffBorrowReceiver
 
 void exerciseHigherOrderAdjustedBorrowIn()
 {
-    DifferentialPair<NonCopyableReceiver> firstOrderReceiver;
     DifferentialPair<DifferentialPair<NonCopyableReceiver>> nestedReceiver;
     DifferentialPair<DifferentialPair<float>> argument;
-    let result = __fwd_diff(__fwd_diff(NonCopyableReceiver::evaluate))(
-        firstOrderReceiver,
-        nestedReceiver,
-        argument);
+    let result = __fwd_diff(__fwd_diff(NonCopyableReceiver::evaluate))(nestedReceiver, argument);
 
     deliberateHigherOrderStop;
 /*CHECK:
@@ -60,16 +56,14 @@ void exerciseHigherOrderAdjustedBorrowIn()
 }
 
 // A NoDiff receiver has no differential witness, but its mode still needs translation when the
-// first forward derivative is differentiated again. Reverse-mode synthesis consumes that
-// translated receiver in its rematerialization signature.
+// first forward derivative is differentiated again. Applying `bwd_diff` directly to that generated
+// derivative is rejected.
 void exerciseHigherOrderNoDiffBorrowIn()
 {
     NoDiffBorrowReceiver receiver;
     DifferentialPair<DifferentialPair<float>> argument;
     DifferentialPair<float> dOut;
-    __bwd_diff(__fwd_diff(NoDiffBorrowReceiver::evaluate))(
-        receiver,
-        receiver,
-        argument,
-        dOut);
+    __bwd_diff(__fwd_diff(NoDiffBorrowReceiver::evaluate))(receiver, argument, dOut);
+//CHECK:       ^^^^^^^^^^ cannot apply 'bwd_diff' directly to a generated derivative
+//CHECK:       ^^^^^^^^^^ 'bwd_diff' of a generated derivative is not supported; apply 'bwd_diff' to a function that uses 'fwd_diff' instead.
 }
