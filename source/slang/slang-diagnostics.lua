@@ -5637,6 +5637,14 @@ err(
 )
 
 err(
+    "bit-cast-of-opaque-type",
+    41205,
+    "unsupported bit_cast involving an opaque handle",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst'" },
+    note { message = "a bit_cast involving opaque handles (resources, samplers, buffers) is supported when each handle maps to a handle of the same type at the same position and the remaining fields match in size, alignment and offset", span { loc = "location" } }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
