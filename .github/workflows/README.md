@@ -163,9 +163,9 @@ a SlangPy PR and it will be cherry-picked for SlangPy workflow just in Slang rep
 There are two workflow YML related to this process. Slang uses `ci-slangpy-trigger-test.yml`
 and it simply triggers the existing workflow on SlangPy repo, `ci-latest-slang.yml`.
 Note that their names are similar:
+
 - `ci-slangpy-trigger-test.yml` is in Slang repo
 - `ci-latest-slang.yml` is in SlangPy repo; not Slang repo.
-
 
 You can specify which PR to cherry-pick by setting the following in `ci-slangpy-trigger-test.yml`:
 
@@ -180,9 +180,11 @@ will ignore this setting.
 
 In order to workaround the limitation, you need to manually trigger the workflow
 with `branch` name and the PR number from "Action" page:
+
 - https://github.com/shader-slang/slang/actions/workflows/ci-slangpy-trigger-test.yml
 
 Click "Run workflow" button on the right side of the page. It will ask two info:
+
 - "Use workflow from" that takes a branch name
 - "Slang PR number to test against SlangPy"
 
@@ -191,6 +193,7 @@ a branch in the https://github.com/shader-slang/slang/; not a forked repo.
 
 Once the SlangPy workflow is triggered, you need to track the result from the SlangPy
 side:
+
 - https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml
 
 The manual run reports its result back to the PR, onto the same `SlangPy Tests`
@@ -200,7 +203,6 @@ failure, and the PR page will end up green.
 It is worth noting that if you needed this feature of cherry-pick with the backward
 compatibility breaking change, you probably need to announce the breaking change to
 the community before merging the change.
-
 
 ## 2. Reusable building blocks (`workflow_call`)
 
@@ -229,21 +231,21 @@ Work too slow, too noisy, or too repetitive to gate a PR. Cadences are in each
 file's `schedule:` block; the nightly hours are staggered so the heavy suites do
 not compete for the same runners.
 
-| Workflow                           | Cadence    | Purpose                                                      |
-| ---------------------------------- | ---------- | ------------------------------------------------------------ |
-| `ci-health.yml`                    | sub-hourly | Samples runner-cap saturation and publishes a health signal. |
-| `sccache-populate.yml`             | sub-hourly | Builds master to keep the shared sccache warm for PRs.       |
-| `ci-retry-yielded-bot.yml`         | hourly     | Reruns bot CI runs that yielded their runner slot.           |
-| `nightly-slang-coverage-test.yml`  | nightly    | Full coverage run; publishes the report.                     |
-| `nightly-slang-sanitizer-test.yml` | nightly    | Sanitizer run over the full test suite.                      |
-| `nightly-remix-test.yml`           | nightly    | Compiles all RTX Remix shaders.                              |
-| `nightly-slang-test.yml`           | nightly    | Runs the generated, doc-anchored suite under `docs/`.        |
-| `nightly-slang-sascha-test.yml`    | nightly    | Compiles the Sascha Willems Vulkan sample shaders.           |
-| `nightly-slang-vkglcts-test.yml`   | nightly    | Runs the Vulkan CTS with Slang as the shader compiler.       |
-| `nightly-mdl-perf-test.yml`        | nightly    | Compile-performance suite for the MDL workloads.             |
-| `ci-analytics.yml`                 | daily      | Collects CI run statistics and publishes them.               |
-| `pr-sweep-nightly.yml`             | nightly    | Board-sync backstop over every open PR.                      |
-| `cmake-options.yml`                | weekly     | Builds the matrix of non-default CMake option combinations.  |
+| Workflow                           | Cadence                            | Purpose                                                              |
+| ---------------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `ci-health.yml`                    | sub-hourly                         | Samples runner-cap saturation and publishes a health signal.         |
+| `sccache-populate.yml`             | sub-hourly, recipe changes, manual | Populates missing LLVM prebuilts, then warms Slang's shared sccache. |
+| `ci-retry-yielded-bot.yml`         | hourly                             | Reruns bot CI runs that yielded their runner slot.                   |
+| `nightly-slang-coverage-test.yml`  | nightly                            | Full coverage run; publishes the report.                             |
+| `nightly-slang-sanitizer-test.yml` | nightly                            | Sanitizer run over the full test suite.                              |
+| `nightly-remix-test.yml`           | nightly                            | Compiles all RTX Remix shaders.                                      |
+| `nightly-slang-test.yml`           | nightly                            | Runs the generated, doc-anchored suite under `docs/`.                |
+| `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
+| `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
+| `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
+| `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
+| `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |
 
 ## 4. PR board sync and bots
 

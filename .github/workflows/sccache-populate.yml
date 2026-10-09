@@ -1,6 +1,13 @@
 name: Populate sccache
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - external/build-llvm.sh
+      - external/llvm-*.patch
+      - .github/workflows/sccache-populate.yml
+      - .github/actions/setup-llvm-from-gcs/action.yml
   schedule:
     - cron: "*/30 * * * *" # Every 30 minutes
   workflow_dispatch: # Allow manual trigger
@@ -15,22 +22,67 @@ permissions:
 
 jobs:
   check-changes:
+    if: github.repository == 'shader-slang/slang' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     outputs:
       should-build: ${{ steps.check.outputs.should-build }}
       last-commit: ${{ steps.check.outputs.last-commit }}
+      llvm-hash: ${{ steps.llvm.outputs.hash }}
+      llvm-matrix: ${{ steps.llvm.outputs.matrix }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          # Use the same event commit as the reusable Slang build workflows.
+          ref: ${{ github.sha }}
           fetch-depth: 10
+
+      # LLVM prebuilts have a recipe-based GCS key, independent of Slang's
+      # commit-based object caches. Check them even when every sccache entry exists.
+      - name: Find missing LLVM prebuilts
+        id: llvm
+        shell: python
+        env:
+          LLVM_HASH: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+        run: |
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          configurations = [
+              {"os": "linux", "compiler": "gcc", "platform": "x86_64", "runner": "ubuntu-22.04"},
+              {"os": "linux", "compiler": "gcc", "platform": "aarch64", "runner": "ubuntu-24.04-arm"},
+              # The WASM Slang build requests host LLVM under its own cache key.
+              {"os": "linux", "compiler": "gcc", "platform": "wasm", "runner": "ubuntu-22.04"},
+              {"os": "macos", "compiler": "clang", "platform": "aarch64", "runner": "macos-latest"},
+              {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": "windows-2022"},
+              {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm"},
+          ]
+          recipe_hash = os.environ["LLVM_HASH"]
+          missing = []
+          for config in configurations:
+              key = f"llvm-{config['os']}-{config['compiler']}-{config['platform']}-{recipe_hash}"
+              url = f"https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/{key}.tar.gz"
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30):
+                      print(f"Cached: {key}")
+              except urllib.error.HTTPError as error:
+                  if error.code != 404:
+                      raise
+                  print(f"Missing: {key}")
+                  missing.append(config)
+
+          matrix = {"include": missing} if missing else []
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"hash={recipe_hash}\n")
+              output.write(f"matrix={json.dumps(matrix, separators=(',', ':'))}\n")
 
       - name: Check if all sccache caches exist
         id: check
         run: |
           # Get current master HEAD
           CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "last-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "last-commit=$CURRENT_COMMIT" >> "$GITHUB_OUTPUT"
 
           # Check that all sccache config caches exist for this commit
           CONFIGS=(
@@ -60,17 +112,201 @@ jobs:
 
           if [ "$MISSING" -eq 0 ]; then
             echo "✅ All sccache caches exist for commit ${CURRENT_COMMIT}"
-            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "should-build=false" >> "$GITHUB_OUTPUT"
           else
             echo "🔨 ${MISSING} cache(s) missing for commit ${CURRENT_COMMIT}, rebuilding all"
-            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "should-build=true" >> "$GITHUB_OUTPUT"
           fi
         env:
           GH_TOKEN: ${{ github.token }}
 
-  build-linux-release:
+  populate-llvm:
     needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    if: needs.check-changes.outputs.llvm-matrix != '[]'
+    name: LLVM ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    # A native Windows ARM64 LLVM build can take nearly two hours by itself.
+    # Allow roughly twice that time for runner variance, compression, and staging.
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-changes.outputs.llvm-matrix) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ needs.check-changes.outputs.last-commit }}
+
+      - name: Set up native build tools
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          config: release
+          build-llvm: false
+
+      - name: Restore or build LLVM
+        id: llvm
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          llvm-hash: ${{ needs.check-changes.outputs.llvm-hash }}
+          upload-if-missing: "false"
+
+      - name: Validate installed LLVM and Clang packages
+        shell: bash
+        run: |
+          mkdir -p build/llvm-prebuilt-smoke
+          cat > build/llvm-prebuilt-smoke/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(LLVMPrebuiltSmoke LANGUAGES C CXX)
+          find_package(LLVM REQUIRED CONFIG)
+          find_package(Clang REQUIRED CONFIG)
+          add_executable(llvm-prebuilt-smoke main.cpp)
+          # Match the pinned LLVM release's minimum language standard.
+          target_compile_features(llvm-prebuilt-smoke PRIVATE cxx_std_17)
+          target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
+          target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
+          EOF
+          cat > build/llvm-prebuilt-smoke/main.cpp <<'EOF'
+          #include <llvm/Support/raw_ostream.h>
+          int main() { llvm::outs() << "LLVM prebuilt works\n"; }
+          EOF
+          cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/native \
+            -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' \
+            "-DCMAKE_PREFIX_PATH=$(pwd)/build/llvm-project-install"
+          cmake --build build/llvm-prebuilt-smoke/native
+          build/llvm-prebuilt-smoke/native/llvm-prebuilt-smoke
+
+      - name: Validate Linux prebuilt in the Slang CI container
+        if: matrix.os == 'linux' && (matrix.platform == 'x86_64' || matrix.platform == 'wasm')
+        shell: bash
+        run: |
+          # Use the consumer image from ci-slang-build-container.yml rather
+          # than trusting optional packages installed on the native builder.
+          docker run --rm --volume "$(pwd):/workspace" --workdir /workspace \
+            ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0 bash -c '
+              cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/container \
+                -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH=/workspace/build/llvm-project-install &&
+              cmake --build build/llvm-prebuilt-smoke/container &&
+              build/llvm-prebuilt-smoke/container/llvm-prebuilt-smoke
+            '
+
+      - name: Archive new prebuilt
+        if: steps.llvm.outputs.cache-hit != 'true'
+        id: archive
+        shell: bash
+        env:
+          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ needs.check-changes.outputs.llvm-hash }}
+        run: |
+          # Match setup-llvm-from-gcs's key and restore layout: archive the
+          # install contents directly, without an enclosing directory.
+          # Slang's CMake configuration requires both installed packages.
+          test -f build/llvm-project-install/lib/cmake/llvm/LLVMConfig.cmake
+          test -f build/llvm-project-install/lib/cmake/clang/ClangConfig.cmake
+          archive_path="${RUNNER_TEMP}/${LLVM_KEY}.tar.gz"
+          tar_path="$archive_path"
+          # Git Bash's GNU tar interprets a Windows drive-letter colon as a
+          # remote archive. Keep the native path for upload-artifact below.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            tar_path=$(cygpath -u "$archive_path")
+          fi
+          tar -czf "$tar_path" -C build/llvm-project-install .
+          tar -tzf "$tar_path" > /dev/null
+          echo "path=$archive_path" >> "$GITHUB_OUTPUT"
+
+      - name: Stage new prebuilt for publication
+        if: steps.llvm.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish-llvm:
+    needs: [check-changes, populate-llvm]
+    # Publish successful platforms even if another platform's cold build fails.
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.llvm-matrix != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Download new prebuilts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: llvm-*
+          path: llvm-prebuilts
+          merge-multiple: true
+
+      - name: Check for new prebuilts
+        id: archives
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(llvm-prebuilts/*.tar.gz)
+          if [ "${#archives[@]}" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No completed LLVM archives are available to publish."
+          fi
+
+      # Upload from Ubuntu so native builders, including Windows ARM64, do not
+      # need the Cloud SDK. Authenticate after the hours-long builds finish.
+      - name: Authenticate to Google Cloud
+        if: steps.archives.outputs.found == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Set up Google Cloud SDK
+        if: steps.archives.outputs.found == 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Publish and verify new prebuilts
+        if: steps.archives.outputs.found == 'true'
+        shell: bash
+        run: |
+          gcloud config set storage/parallel_composite_upload_enabled False
+          for archive in llvm-prebuilts/*.tar.gz; do
+            filename=$(basename "$archive")
+            gcloud storage cp "$archive" "gs://slang-ci-cache/llvm-prebuilts/${filename}"
+            published_archive="${RUNNER_TEMP}/published-${filename}"
+            curl --fail --location --retry 3 --retry-delay 5 --output "$published_archive" \
+              "https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${filename}"
+            cmp "$archive" "$published_archive"
+            rm "$published_archive"
+          done
+
+      - name: Require all missing platforms to finish
+        if: needs.populate-llvm.result != 'success'
+        shell: bash
+        run: |
+          echo "Some LLVM builds failed; completed archives were published, but LLVM population is incomplete."
+          exit 1
+
+  # When every recipe-keyed LLVM prebuilt already exists, publish-llvm is
+  # skipped because there is nothing to upload. Slang's commit-keyed object
+  # caches can still be missing, so warming accepts that skipped publisher
+  # and separately requires should-build=true. A failed publisher blocks warming.
+  build-linux-release:
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     permissions:
       id-token: write
@@ -81,8 +317,11 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     permissions:
       id-token: write
@@ -93,8 +332,11 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
 
   build-macos-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -110,8 +352,11 @@ jobs:
       save-sccache: true
 
   build-macos-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -127,8 +372,11 @@ jobs:
       save-sccache: true
 
   build-linux-aarch64-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -144,8 +392,11 @@ jobs:
       save-sccache: true
 
   build-linux-aarch64-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -161,8 +412,11 @@ jobs:
       save-sccache: true
 
   build-windows-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -178,8 +432,11 @@ jobs:
       save-sccache: true
 
   build-windows-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
+    needs: [check-changes, publish-llvm]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
