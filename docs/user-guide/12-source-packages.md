@@ -381,7 +381,7 @@ the existing cache.
 It does not inspect `out/`, modify package state, or contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to change direct manifest edges, and
-`dependency list` to inspect them. Add accepts `--git URL --version RANGE` or
+`dependency list` to inspect them. `dep` is a short form of `dependency`. Add accepts `--git URL --version RANGE` or
 `--git URL --ref REF [--as VERSION]`. When `--git` is omitted and `SLANG_PACKAGE_INDEX` names a
 package index, the Git URL is copied from that index into the manifest. The variable is a local
 path, resolved from the current directory when it is relative, or an `http`/`https` URL. The

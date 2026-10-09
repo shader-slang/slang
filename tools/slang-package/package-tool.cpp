@@ -38,6 +38,7 @@ static void _printHelp(bool experimental = false)
         "  dependency add <name> [--git <url>] (--version <range> | --ref <ref> [--as <ver>])\n"
         "                    Without --git, SLANG_PACKAGE_INDEX supplies the Git URL.\n"
         "  dependency remove <name> | list\n"
+        "                    dep is a short form of dependency.\n"
         "\n"
         "Lock (slang-package-lock.json):\n"
         "  pin <name> [<version>]\n"
@@ -189,6 +190,14 @@ static bool _isInitCommand(int argc, const char* const* argv)
     return index < argc && String(argv[index]) == "init";
 }
 
+/// Return whether `command` selects the manifest dependency subcommands.
+///
+/// `dep` is the short form of `dependency`. Both names accept `add`, `remove`, and `list`.
+static bool _isDependencyCommand(const String& command)
+{
+    return command == "dependency" || command == "dep";
+}
+
 static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
 {
     if (_isHelpCommand(argc, argv) || _isInitCommand(argc, argv))
@@ -200,7 +209,7 @@ static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
     return command == "fetch" || command == "update" || command == "validate" ||
            command == "bundle" || command == "build" || command == "run" || command == "test" ||
            command == "docs" || command == "status" || command == "tree" || command == "why" ||
-           command == "dependency" || command == "edit" || command == "unedit" ||
+           _isDependencyCommand(command) || command == "edit" || command == "unedit" ||
            command == "pin" || command == "unpin";
 }
 
@@ -3421,7 +3430,7 @@ SlangResult executeInDirectory(
         return _tree(projectRoot, outError);
     if (command == "why" && argc == 3)
         return _why(projectRoot, argv[2], outError);
-    if (command == "dependency")
+    if (_isDependencyCommand(command))
     {
         if (argc == 3 && String(argv[2]) == "list")
             return _dependencyList(projectRoot, outError);

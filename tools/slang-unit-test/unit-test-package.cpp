@@ -2033,6 +2033,31 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
         executeInDirectory(temp.path, SLANG_COUNT_OF(addGitArguments), addGitArguments, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
     SLANG_CHECK(root.dependencies.getCount() == 1);
+    const char* depAddArguments[] = {
+        "slang-package",
+        "dep",
+        "add",
+        "other",
+        "--git",
+        "https://example.com/other.git",
+        "--version",
+        "1",
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(depAddArguments), depAddArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    SLANG_CHECK(root.dependencies.getCount() == 2);
+    const char* depListArguments[] = {"slang-package", "dep", "list"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(depListArguments), depListArguments, error)));
+    const char* depRemoveArguments[] = {"slang-package", "dep", "remove", "other"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(depRemoveArguments),
+        depRemoveArguments,
+        error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    SLANG_CHECK(root.dependencies.getCount() == 1);
     const char* removeGitArguments[] = {"slang-package", "dependency", "remove", "remote"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
