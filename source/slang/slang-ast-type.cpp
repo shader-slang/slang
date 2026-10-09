@@ -2490,12 +2490,12 @@ void ResourceType::_toTextOverride(StringBuilder& out)
 
 Val* TextureTypeBase::getSampleCount()
 {
-    return as<Type>(_getGenericTypeArg(this, 4));
+    return _getGenericTypeArg(this, 4);
 }
 
 Val* TextureTypeBase::getFormat()
 {
-    return as<Type>(_getGenericTypeArg(this, 8));
+    return _getGenericTypeArg(this, 8);
 }
 
 bool isCopyableType(Type* type)
