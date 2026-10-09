@@ -3597,8 +3597,11 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
+    // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its operands.
+    SemanticsVisitor operandVisitor(withOperandTryCoverage(nullptr));
+
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
+    auto baseExpr = operandVisitor.checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
         CheckBaseContext::Subscript,
         needDeref);
@@ -3609,8 +3612,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
     auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(disableShortCircuitLogicalExpr())
-                          : *this;
+                          ? SemanticsVisitor(operandVisitor.disableShortCircuitLogicalExpr())
+                          : operandVisitor;
 
     for (auto& arg : subscriptExpr->indexExprs)
     {
@@ -4283,6 +4286,41 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     }
 }
 
+void SemanticsVisitor::checkThrowingCallIsCovered(InvokeExpr* invoke)
+{
+    if (m_enclosingTryClauseType != TryClauseType::None)
+        return;
+    if (m_pendingTryCoverage)
+    {
+        m_pendingTryCoverage->add(invoke);
+        return;
+    }
+    getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
+}
+
+bool SemanticsVisitor::shouldDeferArgumentTryCoverage(InvokeExpr* expr)
+{
+    if (expr->arguments.getCount() != 1 || as<OperatorExpr>(expr))
+        return false;
+    return m_enclosingTryClauseType != TryClauseType::None || m_pendingTryCoverage;
+}
+
+void SemanticsVisitor::settlePendingTryCoverage(
+    Expr* checkedExpr,
+    List<InvokeExpr*> const& pendingCalls)
+{
+    // A call that the conversion resolved to takes the conversion's place, as `f()` does in
+    // `int(f())`, so the same `try` covers it. A call nested deeper, as in `int(f().x)`, is not
+    // covered.
+    for (auto invoke : pendingCalls)
+    {
+        if (invoke == checkedExpr)
+            checkThrowingCallIsCovered(invoke);
+        else
+            getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
+    }
+}
+
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
@@ -4304,14 +4342,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
-            {
-                // If the callee throws, make sure we are inside a try clause.
-                if (m_enclosingTryClauseType == TryClauseType::None)
-                {
-                    getSink()->diagnose(
-                        Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
-                }
-            }
+                checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
             List<DeclRef<ParamDecl>> paramDeclRefs;
@@ -5208,23 +5239,35 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
+    // An enclosing `try` covers this call but not the calls in its operands, so we check the
+    // arguments and the callee outside it. A throwing call in the argument of a possible identity
+    // conversion waits for this call to resolve, as in `try int(f())`.
+    List<InvokeExpr*> pendingTryCoverage;
+    SemanticsVisitor operandVisitor(withOperandTryCoverage(
+        shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr));
     // Next check the argument expressions
     for (auto& arg : expr->arguments)
     {
-        arg = CheckExpr(arg);
+        arg = operandVisitor.CheckExpr(arg);
     }
 
     // if the expression is '&&' or '||', we will convert it
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
+    {
+        settlePendingTryCoverage(newExpr, pendingTryCoverage);
         return newExpr;
+    }
 
     // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
     // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
     // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
     // overload resolution.
     if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
+    {
+        settlePendingTryCoverage(builtinOp, pendingTryCoverage);
         return builtinOp;
+    }
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
     // Skip warning in Slang 2026+ mode where parentheses create tuples
@@ -5260,7 +5303,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
-    expr->functionExpr = CheckTerm(expr->functionExpr);
+    expr->functionExpr =
+        SemanticsVisitor(withOperandTryCoverage(nullptr)).CheckTerm(expr->functionExpr);
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
@@ -5291,7 +5335,9 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             if (!diagnosed)
                 getSink()->diagnose(
                     Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
-            return CreateErrorExpr(expr);
+            auto errorExpr = CreateErrorExpr(expr);
+            settlePendingTryCoverage(errorExpr, pendingTryCoverage);
+            return errorExpr;
         }
         auto callFuncExpr = createLookupResultExpr(
             operatorName,
@@ -5315,6 +5361,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     }
 
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     // Perform additional validation for known built-in functions.
     maybeCheckKnownBuiltinInvocation(checkedExpr);
@@ -7636,14 +7683,21 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     if (expr->type)
         return expr;
 
+    // As in `visitInvokeExpr`, an enclosing `try` covers the cast but not its operand, and a
+    // throwing call in the operand waits for the cast to resolve, as in `try (int)f()`.
+    List<InvokeExpr*> pendingTryCoverage;
+    SemanticsVisitor operandVisitor(withOperandTryCoverage(nullptr));
+    SemanticsVisitor argumentVisitor(withOperandTryCoverage(
+        shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr));
+
     // Check the term we are applying first
     auto funcExpr = expr->functionExpr;
-    funcExpr = CheckTerm(funcExpr);
+    funcExpr = operandVisitor.CheckTerm(funcExpr);
 
     // Now ensure that the term represents a (proper) type.
     TypeExp typeExp;
     typeExp.exp = funcExpr;
-    typeExp = CheckProperType(typeExp);
+    typeExp = operandVisitor.CheckProperType(typeExp);
 
     expr->functionExpr = typeExp.exp;
     expr->type.type = typeExp.type;
@@ -7651,7 +7705,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     // Next check the argument expression (there should be only one)
     for (auto& arg : expr->arguments)
     {
-        arg = CheckTerm(arg);
+        arg = argumentVisitor.CheckTerm(arg);
     }
 
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
@@ -7729,6 +7783,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
+                        settlePendingTryCoverage(nullptr, pendingTryCoverage);
                         return coerce(
                             CoercionSite::General,
                             typeExp.type,
@@ -7745,6 +7800,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     // and constructor calls are semantically equivalent).
     //
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     if (m_parentDifferentiableAttr)
     {
