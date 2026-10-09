@@ -40,8 +40,8 @@ def main():
     }
     body = (
         "int inputs[] = {-1,0,1,2}; for(int x : inputs) "
-        'printf("%d ", sequential(x)+sameLine(x)+choose(x)+logical(x)'
-        "+mixed(x)+loop(x)+cases(x));"
+        'printf("%d ", sequential(x)+sameLine(x)+disjoint(x)+parenthesized(x)+choose(x)+logical(x)'
+        "+mixed(x)+loop(x)+cases(x)+whileLoop(x));"
     )
     (out / "reference.cpp").write_text(
         "#include <cstdio>\n#define CPU_REFERENCE\n#include "
@@ -170,7 +170,7 @@ def main():
                             f"{name}: {tag}: expected {want} arm executions"
                         )
                 for tag in (
-                    ["sequential", "same_line", "loop_line"]
+                    ["sequential", "same_line", "disjoint", "loop_line", "while_header"]
                     if kinds in ("all", "line")
                     else []
                 ):
@@ -186,7 +186,7 @@ def main():
                     rhs = branches.get(tags["skipped_rhs"], [])
                     if sorted(-1 if x is None else x for x in rhs) != [-1, -1, 0, 1]:
                         failures.append(f"{name}: skipped RHS decisions: {rhs}")
-                    for tag in ["same_line", "mixed", "switch", "loop_line"]:
+                    for tag in ["same_line", "mixed", "switch", "loop_line", "while_header"]:
                         ref = ref_lines[tags[tag]]["branches"]
                         want = sorted(
                             int(b["count"] != 0) if mode == "boolean" else b["count"]

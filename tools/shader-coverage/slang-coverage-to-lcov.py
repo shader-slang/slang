@@ -14,9 +14,11 @@ Pipeline:
        Line coverage coalesces entries that execute together onto a
        shared counter, so several entries may name the same slot and
        there are fewer counters than entries. Read each entry through
-       its own counter, and take the maximum over the line entries of
-       one source line: its first marker runs on every visit, so the
-       maximum counts the visits to the line, not the statements on it.
+       its own counter. Sum each distinct slot once per source line, or
+       take their logical union in boolean mode. Current producers give
+       every entry of a source line its shared line-visit counter. Older
+       manifests can contain independent statement counters; deduplicating
+       aliases preserves their counts without guessing at control flow.
        Function and branch modes use one direct counter
        per marker op, but consumers must treat the manifest as
        authoritative.
@@ -188,6 +190,7 @@ def iter_manifest_entries(manifest):
                 counter = entry.get("counter")
                 yield {
                     "kind": kind,
+                    "mode": entry.get("mode", "count"),
                     "counter": None
                     if counter is None
                     else parse_manifest_int(counter, "v2 entry counter"),
@@ -249,7 +252,7 @@ def main():
     # Aggregate by (file, line). Multiple counter slots may map to the
     # same line, and one slot may also serve several lines once the
     # compiler coalesces markers that execute together;
-    # LCOV wants line-oriented reporting, so sum them here.
+    # Sum distinct slots once per line; entries sharing a slot are aliases.
     #
     # GCOV/LCOV-style output only admits real source files and positive
     # line numbers. Keep unattributable slots in the manifest/metadata,
@@ -257,6 +260,8 @@ def main():
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     functions_by_source = collections.defaultdict(dict)
     branches_by_source = collections.defaultdict(dict)
+    seen_line_counters = set()
+    boolean_sources = set()
     skipped_entries = 0
     skipped_by_kind = {}
     for entry in iter_manifest_entries(manifest):
@@ -276,8 +281,18 @@ def main():
             continue
         count = counters[idx]
 
+        boolean_mode = entry.get("mode") == "boolean"
+        if boolean_mode:
+            boolean_sources.add(source)
         if kind == "line":
-            hits_by_line[source][line] = max(hits_by_line[source][line], count)
+            key = (source, line, idx)
+            if key in seen_line_counters:
+                continue
+            seen_line_counters.add(key)
+            if boolean_mode:
+                hits_by_line[source][line] = int(hits_by_line[source][line] != 0 or count != 0)
+            else:
+                hits_by_line[source][line] += count
         elif kind == "function":
             function_name = entry.get("function") or entry.get("function_mangled")
             if not function_name:
@@ -316,7 +331,9 @@ def main():
         for line, count in functions.values():
             function_lines[line] += count
         for line, count in function_lines.items():
-            hits_by_line[source].setdefault(line, count)
+            hits_by_line[source].setdefault(
+                line, int(count != 0) if source in boolean_sources else count
+            )
 
     # A decision is evaluated if any outcome executed; BRDA reports "-" for the
     # outcomes of an unevaluated decision rather than an untaken zero.

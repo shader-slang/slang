@@ -3,6 +3,7 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir.h"
@@ -1311,30 +1312,31 @@ struct CoverageInstrumenter
         }
     }
 
-    // Lower a single coverage marker op, recording its source-entry
-    // metadata against `slot` and then removing the marker op.
-    //
-    // `emitRuntimeProbe` selects whether this marker also emits the
-    // counter update. Coalesced line markers share one slot and one
-    // probe, so only the last marker of a group emits it while the
-    // others contribute metadata alone — that is what removes probe
-    // sequences from the emitted shader. Every marker still produces
-    // its own entry, so per-line reporting is unchanged.
-    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe)
+    // Emit a probe before a marker without removing it. A conditional probe must
+    // skip the atomic entirely: an atomic addition of zero would still contend.
+    // Splitting here preserves the marker as the insertion point for subsequent probes.
+    void emitCounterProbe(IRInst* markerOp, UInt slot, IRInst* shouldRecord = nullptr)
     {
-        CoverageTracingEntry entry;
-        populateEntryForMarker(markerOp, slot, entry);
-        outMetadata.m_coverageEntries.add(entry);
-
-        if (!emitRuntimeProbe)
-        {
-            SLANG_ASSERT(!markerOp->hasUses());
-            markerOp->removeAndDeallocate();
-            return;
-        }
-
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
+        IRBlock* afterProbe = nullptr;
+        if (shouldRecord)
+        {
+            auto block = cast<IRBlock>(markerOp->getParent());
+            afterProbe = builder.createBlock();
+            afterProbe->insertAfter(block);
+            for (auto inst = markerOp; inst;)
+            {
+                auto next = inst->getNextInst();
+                inst->insertAtEnd(afterProbe);
+                inst = next;
+            }
+            auto probeBlock = builder.createBlock();
+            probeBlock->insertBefore(afterProbe);
+            builder.setInsertInto(block);
+            builder.emitIf(shouldRecord, probeBlock, afterProbe);
+            builder.setInsertInto(probeBlock);
+        }
 
         // Bindless form: select this shader's buffer out of the descriptor
         // array first, then index within it. The array index is uniform by
@@ -1401,20 +1403,313 @@ struct CoverageInstrumenter
             builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
         }
 
-        // The marker op has void return type and, by construction, no uses.
-        // Catch a future IR transform that takes a use of it before we reach
-        // this removal — the op would otherwise be silently dropped here.
-        SLANG_ASSERT(!markerOp->hasUses());
-        markerOp->removeAndDeallocate();
+        if (afterProbe)
+            builder.emitBranch(afterProbe);
     }
 
+    struct Line
+    {
+        List<UInt> runs;
+        UInt slot = 0;
+        bool assigned = false;
+    };
+    struct Probe
+    {
+        UInt slot;
+        List<UInt> previousRunsContainingLine;
+    };
+    struct Run
+    {
+        IRInst* lastMarker = nullptr;
+        IRFunc* func = nullptr;
+        List<Index> lines;
+        List<Probe> probes;
+    };
+
+    // Find the last marked run on every incoming path. A back edge starts a
+    // fresh visit even when the loop body and condition share a physical line.
+    void findPrecedingRuns(
+        const Run& run,
+        const Dictionary<IRBlock*, UInt>& lastRunInBlock,
+        IRDominatorTree* dom,
+        HashSet<UInt>& predecessors)
+    {
+        auto block = cast<IRBlock>(run.lastMarker->getParent());
+        UInt previous;
+        List<IRBlock*> pending;
+        HashSet<IRBlock*> visited;
+        pending.add(block);
+        visited.add(block);
+        for (Index i = 0; i < pending.getCount(); ++i)
+        {
+            auto next = pending[i];
+            if (next == run.func->getFirstBlock())
+                predecessors.add(0);
+            for (auto pred : next->getPredecessors())
+            {
+                if (dom->dominates(next, pred))
+                    predecessors.add(0);
+                else if (lastRunInBlock.tryGetValue(pred, previous))
+                    predecessors.add(previous);
+                else if (visited.add(pred))
+                    pending.add(pred);
+            }
+        }
+    }
+
+    // Reset the visit state on loop re-entry. Preserve block arguments and the
+    // dominance-compatible block order required by subsequent IR builders.
+    void resetPreviousRunOnBackEdges(IRBuilder& builder, IRFunc* func, IRInst* previousRun)
+    {
+        auto dom = computeDominatorTree(func);
+        List<IREdge> backEdges;
+        for (auto block : func->getBlocks())
+            for (auto it = block->getSuccessors().begin(); it != block->getSuccessors().end(); ++it)
+                if (dom->dominates(*it, block))
+                    backEdges.add(it.getEdge());
+        for (auto edge : backEdges)
+        {
+            auto head = edge.getSuccessor();
+            auto resetBlock = builder.createBlock();
+            // IR builders require dominators to precede their uses in
+            // block order. The loop header dominates this back-edge
+            // block, so keep it after the predecessor, inside the loop.
+            resetBlock->insertAfter(edge.getPredecessor());
+            builder.setInsertInto(resetBlock);
+            List<IRInst*> args;
+            for (auto param : head->getParams())
+                args.add(builder.emitParam(param->getDataType()));
+            builder.emitStore(previousRun, builder.getIntValue(intType, 0));
+            builder.emitBranch(head, args.getCount(), args.getBuffer());
+            edge.getUse()->set(resetBlock);
+        }
+    }
+
+    // Count entry into a line's runs, including a new visit on a loop back edge.
+    // Consider `if (p) { a(); } else { b(); }`. If everything is on one line,
+    // its condition and selected arm are one visit. If the arms share a line
+    // below the condition, either arm starts a visit of that second line. Taking
+    // the maximum of the arm counts loses half the visits when both arms run.
+    //
+    // The existing coalescer gives us runs of markers that execute together,
+    // stopping at block boundaries and calls that may abandon the invocation.
+    // A line's counter increments when the previous run did not contain it.
+    // Static predecessor analysis resolves ordinary paths. When incoming paths
+    // disagree, one local run ID carries that information across the join.
+    // Back edges clear the ID so loops entirely on one line also count iterations.
+    // Every entry for a physical source line reads the same counter, including
+    // entries from different functions. Single-run lines still share a probe
+    // when they execute together.
     void run(List<IRInst*> const& markerOps)
     {
+        List<UInt> runsForMarker;
+        List<bool> coalescedProbes;
+        UInt runCount = 0;
+        assignCoverageCounterSlots(markerOps, runsForMarker, coalescedProbes, runCount);
+        List<Run> runs;
+        runs.setCount(runCount);
+        List<Line> lines;
+        Dictionary<String, Dictionary<uint32_t, Index>> lineIndices;
+        List<Index> linesForMarker;
+        linesForMarker.setCount(markerOps.getCount());
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            auto marker = markerOps[i];
+            linesForMarker[i] = -1;
+            if (marker->getOp() != kIROp_IncrementCoverageCounter)
+                continue;
+            String file;
+            uint32_t line = 0, column = 0;
+            bool hasLocation = resolveHumaneLoc(sourceManager, marker, file, line, column);
+            auto& fileLines = lineIndices.getOrAddValue(file, Dictionary<uint32_t, Index>());
+            Index index;
+            if (!hasLocation || !fileLines.tryGetValue(line, index))
+            {
+                index = lines.getCount();
+                lines.add(Line());
+                if (hasLocation)
+                    fileLines.add(line, index);
+            }
+            linesForMarker[i] = index;
+            UInt runID = runsForMarker[i];
+            auto& run = runs[runID];
+            if (coalescedProbes[i])
+                run.lastMarker = marker;
+            run.func = getParentFunc(marker);
+            if (run.lines.indexOf(index) < 0)
+            {
+                run.lines.add(index);
+                lines[index].runs.add(runID);
+            }
+        }
+
         List<UInt> slots;
-        List<bool> emitsProbe;
-        UInt coalescedCounterCount = 0;
-        assignCoverageCounterSlots(markerOps, slots, emitsProbe, coalescedCounterCount);
-        const auto counterCount = (Index)coalescedCounterCount;
+        slots.setCount(markerOps.getCount());
+        Dictionary<UInt, UInt> singleRunSlots;
+        UInt nextSlot = 0;
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            if (linesForMarker[i] < 0)
+            {
+                slots[i] = nextSlot++;
+                continue;
+            }
+            auto& line = lines[linesForMarker[i]];
+            if (!line.assigned)
+            {
+                UInt sharedSlot;
+                if (line.runs.getCount() == 1 &&
+                    singleRunSlots.tryGetValue(line.runs[0], sharedSlot))
+                    line.slot = sharedSlot;
+                else
+                {
+                    line.slot = nextSlot++;
+                    if (line.runs.getCount() == 1)
+                        singleRunSlots.add(line.runs[0], line.slot);
+                }
+                line.assigned = true;
+            }
+            slots[i] = line.slot;
+        }
+
+        // Resolve the preceding run statically wherever possible. Ordinary if/else
+        // arms already have a known preceding condition run, so they need neither
+        // a guard nor a local state update just to avoid counting the line twice.
+        Dictionary<IRBlock*, UInt> lastRunInBlock;
+        Dictionary<IRFunc*, RefPtr<IRDominatorTree>> dominators;
+        for (UInt runID = 0; runID < runCount; ++runID)
+        {
+            auto& run = runs[runID];
+            if (run.lastMarker)
+                lastRunInBlock[cast<IRBlock>(run.lastMarker->getParent())] = runID + 1;
+        }
+        Dictionary<IRBlock*, UInt> precedingRunInBlock;
+        HashSet<IRFunc*> needsPreviousRun;
+        for (UInt runID = 0; runID < runCount; ++runID)
+        {
+            auto& run = runs[runID];
+            if (!run.lastMarker)
+                continue;
+            HashSet<UInt> predecessors;
+            auto block = cast<IRBlock>(run.lastMarker->getParent());
+            UInt previous;
+            if (precedingRunInBlock.tryGetValue(block, previous))
+                predecessors.add(previous);
+            else if (!booleanMode)
+            {
+                auto& dom = dominators.getOrAddValue(run.func, RefPtr<IRDominatorTree>());
+                if (!dom)
+                    dom = computeDominatorTree(run.func);
+                findPrecedingRuns(run, lastRunInBlock, dom, predecessors);
+            }
+            precedingRunInBlock[block] = runID + 1;
+            List<UInt> orderedPredecessors;
+            for (auto predecessor : predecessors)
+                orderedPredecessors.add(predecessor);
+            orderedPredecessors.sort();
+            HashSet<UInt> emittedSlots;
+            for (auto lineIndex : run.lines)
+            {
+                auto& line = lines[lineIndex];
+                if (!emittedSlots.add(line.slot))
+                    continue;
+                Probe probe;
+                probe.slot = line.slot;
+                bool canEnter = booleanMode || predecessors.getCount() == 0;
+                if (!booleanMode)
+                {
+                    // Keep comparison operands in deterministic run order.
+                    for (auto predecessor : orderedPredecessors)
+                        if (predecessor && runs[predecessor - 1].lines.contains(lineIndex))
+                            probe.previousRunsContainingLine.add(predecessor);
+                    canEnter |= probe.previousRunsContainingLine.getCount() !=
+                                orderedPredecessors.getCount();
+                }
+                if (!canEnter)
+                    continue;
+                if (probe.previousRunsContainingLine.getCount())
+                    needsPreviousRun.add(run.func);
+                run.probes.add(probe);
+            }
+        }
+
+        IRBuilder builder(module);
+        Dictionary<IRFunc*, IRInst*> previousRuns;
+        if (!booleanMode)
+        {
+            // Visit functions in marker order rather than hash-table order so
+            // probe planning and the resulting IR remain reproducible.
+            for (auto& run : runs)
+            {
+                if (run.func && needsPreviousRun.contains(run.func) &&
+                    !previousRuns.containsKey(run.func))
+                {
+                    builder.setInsertBefore(run.func->getFirstBlock()->getFirstOrdinaryInst());
+                    auto previous = builder.emitVar(intType);
+                    builder.emitStore(previous, builder.getIntValue(intType, 0));
+                    previousRuns.add(run.func, previous);
+                }
+            }
+            for (auto& item : previousRuns)
+            {
+                resetPreviousRunOnBackEdges(builder, item.first, item.second);
+            }
+        }
+
+        // Record metadata before splitting blocks for conditional probes. Branch-site
+        // remapping and all source entries retain the original marker identities.
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            CoverageTracingEntry entry;
+            populateEntryForMarker(markerOps[i], slots[i], entry);
+            outMetadata.m_coverageEntries.add(entry);
+        }
+        for (UInt runID = 0; runID < runCount; ++runID)
+        {
+            auto& run = runs[runID];
+            if (!run.lastMarker)
+                continue;
+            IRInst* previous = nullptr;
+            IRInst* previousVar = nullptr;
+            if (previousRuns.tryGetValue(run.func, previousVar))
+            {
+                builder.setInsertBefore(run.lastMarker);
+                previous = builder.emitLoad(previousVar);
+            }
+            for (auto& probe : run.probes)
+            {
+                builder.setInsertBefore(run.lastMarker);
+                IRInst* shouldRecord = nullptr;
+                for (auto otherRun : probe.previousRunsContainingLine)
+                {
+                    SLANG_RELEASE_ASSERT(previous);
+                    auto different =
+                        builder.emitNeq(previous, builder.getIntValue(intType, otherRun));
+                    shouldRecord =
+                        shouldRecord
+                            ? builder.emitAnd(builder.getBoolType(), shouldRecord, different)
+                            : different;
+                }
+                emitCounterProbe(run.lastMarker, probe.slot, shouldRecord);
+            }
+            if (previousVar)
+            {
+                builder.setInsertBefore(run.lastMarker);
+                builder.emitStore(previousVar, builder.getIntValue(intType, runID + 1));
+            }
+        }
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+        {
+            auto marker = markerOps[i];
+            if (linesForMarker[i] < 0)
+                emitCounterProbe(marker, slots[i]);
+            SLANG_ASSERT(!marker->hasUses());
+            marker->removeAndDeallocate();
+        }
+        // Conditional probes and back-edge resets change dominance. Later passes
+        // must not use analyses cached before those blocks were introduced.
+        module->invalidateAllAnalysis();
+        const auto counterCount = (Index)nextSlot;
         // This concerns the counter *index* type, which is independent of
         // the per-slot storage width recorded just below: the public
         // metadata stores counter indices as uint32_t because the
@@ -1449,14 +1744,6 @@ struct CoverageInstrumenter
         default:
             SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
         }
-        outMetadata.m_coverageEntries.reserve(markerOps.getCount());
-        // Every marker produces one source entry, but line markers that
-        // provably execute together share a counter slot, so entry count
-        // and counter count now genuinely differ. The public metadata API
-        // has always kept the two separate; hosts size the readback buffer
-        // from the counter count and attribute results per entry.
-        for (Index i = 0; i < markerOps.getCount(); ++i)
-            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i]);
     }
 };
 

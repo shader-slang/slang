@@ -79,7 +79,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stdout,
             "TN:shader_coverage\n"
             "SF:shader.slang\n"
-            "DA:12,7\n"
+            "DA:12,12\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -158,7 +158,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRDA:13,1,2,11\n"
             "BRF:1\n"
             "BRH:1\n"
-            "DA:12,7\n"
+            "DA:12,12\n"
             "end_of_record\n",
         )
         # Counterless source entries stay in the manifest/metadata, but
@@ -846,8 +846,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         # Coalesced line coverage points several source entries at one
         # counter. The converter reads each entry through its own counter,
         # so a slot shared by two lines reports that slot's value on each
-        # line, and two entries on the same line report their maximum: the
-        # visits to the line, not the sum of its statements.
+        # line, and aliases of one slot on the same line are counted once.
         manifest = {
             "version": 2,
             "counter_count": 1,
@@ -868,6 +867,35 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         # Two entries on line 12 describe one execution of the line.
         self.assertIn("DA:12,5\n", result.stdout)
         self.assertEqual(result.stderr, "")
+
+    def test_sums_independent_line_counters_without_counting_aliases_twice(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "entries": [
+                {"kind": "line", "counter": counter, "file": "shader.slang", "line": 7}
+                for counter in (0, 0, 1)
+            ],
+        }
+        result = self.run_converter(manifest, "2 2\n")
+        self.assertIn("DA:7,4\n", result.stdout)
+        for entry in manifest["entries"]:
+            entry["mode"] = "boolean"
+        result = self.run_converter(manifest, "1 1\n")
+        self.assertIn("DA:7,1\n", result.stdout)
+
+    def test_function_only_boolean_line_remains_a_hit(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "entries": [
+                {"kind": "function", "counter": counter, "file": "shader.slang",
+                 "line": 7, "function": name, "mode": "boolean"}
+                for counter, name in enumerate(("first", "second"))
+            ],
+        }
+        result = self.run_converter(manifest, "1 1\n")
+        self.assertIn("DA:7,1\n", result.stdout)
 
     def test_binary_counters_unsupported_stride_errors(self):
         # The converter only handles 4-byte and 8-byte counters today.

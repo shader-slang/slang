@@ -42,9 +42,8 @@ It also marks the evaluated scalar conditions of `if`, loops, `?:`,
 
 This is statement coverage, not basic-block coverage. Multiple
 statements on the same source line can get multiple counters, and the
-LCOV conversion step aggregates those counters back to the source line
-by taking their maximum, so a line reports its visits rather than the
-number of statements on it; see
+instrumentation pass gives their entries one shared line-visit counter.
+The LCOV exporter counts each distinct counter once per line; see
 [Lines with several markers](#lines-with-several-markers).
 
 Conceptually, this source:
@@ -98,7 +97,9 @@ Per-arm loop condition counts come from branch coverage.
 Emitted shader size scales with the number of probe sequences, not with
 counter width: every probe expands to index arithmetic, an address
 computation, and an atomic. Line coverage therefore coalesces markers
-that provably execute together onto one counter and one probe.
+that provably execute together into runs. Lines confined to the same run
+can share one counter and one probe; a line spanning several runs needs
+its shared line-visit counter.
 
 The rule is simple because the IR is already in basic-block form when
 the coverage pass runs: markers in the same basic block, with nothing
@@ -107,19 +108,18 @@ same number of times. A basic block has one entry and one exit, so
 reaching any instruction in it means reaching all of them.
 
 The `someFunction` example above therefore emits three counters for its
-markers: one for the entry block (`uint i = 0` and the `while` statement),
-one for the loop header (the evaluated loop condition), and one for the
-loop body, where the four body statements are one straight-line region:
+markers: one for `uint i = 0`, one for visits of the `while` line, and one
+shared by the four straight-line body statements. The following shows their
+counts conceptually; the pass can place a line's first probe before its
+initial test and suppress the overlapping first test event:
 
 ```slang
 void someFunction(uint N)
 {
-    // `uint i = 0` and the `while` statement are in the same block: one
-    // probe covers both, and it sits at the last of the two.
     uint i = 0;
-    coverageAtomic("region: i = 0, while");
-    // The probe of the loop header block runs before each evaluation of
-    // the condition, N + 1 times; a comma expression stands in for it.
+    coverageAtomic("line: i = 0");
+    // The line counter records N + 1 condition evaluations; a comma
+    // expression stands in for those line visits.
     while (coverageAtomic("region: while condition"), i < N)
     {
         // The four body statements are one straight-line region.
@@ -191,17 +191,47 @@ int sequential(int x) { int y = x; y += 2; return y; }
 int conditional(int x) { if (x > 0) return 1; else return 2; }
 ```
 
-Each marker keeps its own entry, and the LCOV exporter takes the maximum
-over the entries of a line. A visit to a line passes its first marker,
-and a loop test on the line runs once per iteration, so the largest
-count is the number of times the line was visited:
+Each marker keeps its own entry, but all entries for the same `(file, line)`
+read one shared counter. The compiler counts visits before exporting, while
+control flow is still available. An exporter cannot reconstruct visits by
+summing arbitrary marker counts or taking their maximum. For example:
 
-- In `conditional`, the condition runs on every call and a return runs
-  on only some, so the line reports the condition's count.
-- A `for` header has an initializer, a test, and an increment in
-  different blocks, and reports the test's count: its condition
-  evaluations, `N + 1` per loop of `N` iterations.
-- A loop written on one source line reports its test the same way.
+```slang
+if (x > 0)
+    { a(); } else { b(); }
+```
+
+If each arm executes twice, the second line has four visits. Taking the
+maximum of its two counters would incorrectly report two. In contrast,
+summing the condition and arm counters of an entirely one-line `if` would
+count every visit twice.
+
+The pass first uses the existing coalescer to find runs of line markers that
+execute together, ending at a block boundary or a call that might abandon
+the invocation. A line starts a visit when execution reaches a run containing
+that line from a run that does not contain it. Static predecessor analysis
+resolves ordinary paths without adding runtime state. Where incoming paths
+disagree, one local previous-run ID carries this information through joins.
+Compiler blocks without line markers
+are transparent. A loop back edge clears this ID so a loop wholly on one line
+starts a new visit on each iteration. A `for` increment on its condition's
+line needs no separate line event: the condition already records that header.
+An increment on a different line keeps its own event.
+
+- A one-line `if` reports the condition plus its selected arm as one visit.
+- Disjoint arms on a shared second line both increment that line's counter.
+- A loop header reports its condition evaluations, including the final false
+  test (`N + 1` for a loop completing `N` iterations).
+- Functions sharing a source line contribute to that line's shared counter.
+- Lines confined to the same straight-line run can still share one probe.
+- Boolean mode stores a hit in the shared counter without previous-run state.
+
+Consumers read every entry through `counterIndex`, deduplicate each
+`(file, line, counterIndex)`, and sum distinct counts (or union boolean hits).
+This also accepts older manifests with independent statement counters without
+losing disjoint-arm counts. Those older manifests lack the control-flow
+information needed to remove every overlap between different counters; exact
+line-visit counts require recompiling with the current producer.
 
 Lowering also records a marker at each evaluated condition and at the
 selected value of a conditional expression, so these are visits of their
@@ -243,7 +273,10 @@ Apple's `/usr/bin/gcov` is an LLVM compatibility implementation.
 The normal `coverageCpuRuntimeLineRegions` and
 `coverageCpuRuntimeExpressionBranches` unit tests also exercise these semantics
 without requiring GCC, gcov, or genhtml. They cover both counter widths and modes,
-one-line loops, nested loops, early exits, skipped operands, and nested expressions.
+one-line loops, nested loops, early exits, skipped operands, nested expressions,
+disjoint arms, and functions sharing a source line.
+`coverageCpuRuntimeParenthesizedConditions` checks that every statement branch
+has a corresponding line event even when extra parentheses span lines.
 
 ## Function Coverage: `-trace-function-coverage`
 

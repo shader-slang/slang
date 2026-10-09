@@ -662,6 +662,7 @@ SLANG_UNIT_TEST(coverageCpuRuntimeLineRegions)
     const char* source = R"(
 RWStructuredBuffer<uint> outputBuffer;
 uint choose(uint t) { if (t == 0) return 5; return 7; } // early
+uint zeroA(uint t) { return t - t; } uint zeroB(uint t) { return t - t; } // sharedFunctions
 [shader("compute")]
 [numthreads(4, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
@@ -677,6 +678,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             value += 10; // innerBody
         }
     }
+    if (t < 2)
+        { value += zeroA(t); } else { value += zeroA(t); } // disjointArms
+    value += (t < 2)
+        ? zeroB(t) : zeroB(t); // sharedTernaryArms
     bool skipped = t > 100 && t < 200; // skipped
     value += t == 0 ? (t < 2 ? 3 : 4) : ((t == 1 || t == 3) ? 5 : 6); // nested
     uint arm = (t > 1u)
@@ -705,6 +710,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     };
     const ExpectedLine expectedLines[] = {
         {"// early", 4},
+        {"// sharedFunctions", 8},
+        {"// disjointArms", 4},
+        {"// sharedTernaryArms", 4},
         {"// sameLine", 4},
         {"// oneLineLoop", 10},
         {"// outer", 12},
@@ -740,7 +748,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
             for (auto expected : expectedLines)
             {
                 auto line = findLineContaining(source, expected.tag);
-                // The count of a source line is the maximum over its line entries.
+                // All markers on one line read its shared visit counter.
+                HashSet<uint32_t> lineCounters;
                 uint32_t entries = 0;
                 uint64_t lineCount = 0;
                 for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
@@ -750,9 +759,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                     if (entry.kind != slang::CoverageEntryKind::Line || entry.line != line)
                         continue;
                     ++entries;
+                    lineCounters.add(entry.counterIndex);
                     lineCount = std::max(lineCount, dispatch.getCount(entry));
                 }
                 SLANG_CHECK(entries >= 1);
+                SLANG_CHECK(lineCounters.getCount() == 1);
+                if (lineCount != (booleanMode ? 1 : expected.count))
+                    fprintf(
+                        stderr,
+                        "%s: expected %llu, got %llu (width %d, boolean %d)\n",
+                        expected.tag,
+                        (unsigned long long)(booleanMode ? 1 : expected.count),
+                        (unsigned long long)lineCount,
+                        width,
+                        int(booleanMode));
                 SLANG_CHECK(lineCount == (booleanMode ? 1 : expected.count));
             }
             // Every dispatch arm of a switch, including its default, is attributed to
@@ -800,6 +820,83 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                 }
             }
             SLANG_CHECK(rhsEntries == 2);
+        }
+    }
+}
+
+
+// Extra parentheses can place the expression on a different line than its
+// opening token. Branch-only coverage must still provide a line event at every
+// branch location so its LCOV output can be consumed without suppressing errors.
+SLANG_UNIT_TEST(coverageCpuRuntimeParenthesizedConditions)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    if (!createCppHostCallableGlobalSession(globalSession))
+    {
+        SLANG_IGNORE_TEST;
+    }
+    const char* source = R"(
+RWStructuredBuffer<uint> outputBuffer;
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    uint value = 0;
+    if ((
+        tid.x < 2))
+        value = 10;
+    else
+        value = 20;
+    uint i = 0;
+    while ((
+        i < 1))
+        ++i;
+    for (uint j = 0; (
+        j < 1); ++j)
+        value += j;
+    do { ++i; } while ((
+        i < 2));
+    switch ((
+        tid.x))
+    {
+    case 0: break;
+    default: break;
+    }
+    outputBuffer[tid.x] = value;
+}
+)";
+    for (int width : {4, 8})
+    {
+        for (bool booleanMode : {false, true})
+        {
+            List<slang::CompilerOptionName> modes;
+            modes.add(slang::CompilerOptionName::TraceBranchCoverage);
+            if (booleanMode)
+                modes.add(slang::CompilerOptionName::TraceCoverageBoolean);
+            CoverageCpuDispatch dispatch;
+            dispatchCoverageShader(
+                globalSession,
+                "coverageCpuParenthesized",
+                source,
+                modes.getArrayView(),
+                width,
+                dispatch);
+            for (uint32_t t = 0; t < kThreadCount; ++t)
+                SLANG_CHECK(dispatch.outputValues[t] == (t < 2 ? 10u : 20u));
+            HashSet<uint32_t> lineLocations;
+            HashSet<uint32_t> branchLocations;
+            for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
+            {
+                slang::CoverageEntryInfo entry;
+                SLANG_CHECK_ABORT(dispatch.coverage->getEntryInfo(i, &entry) == SLANG_OK);
+                if (entry.kind == slang::CoverageEntryKind::Line)
+                    lineLocations.add(entry.line);
+                else if (entry.kind == slang::CoverageEntryKind::Branch)
+                    branchLocations.add(entry.line);
+            }
+            SLANG_CHECK(branchLocations.getCount() == 5);
+            for (auto line : branchLocations)
+                SLANG_CHECK(lineLocations.contains(line));
         }
     }
 }

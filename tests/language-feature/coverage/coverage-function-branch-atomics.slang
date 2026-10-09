@@ -65,7 +65,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // `-trace-coverage` is not enabled. Branch decisions carry line events.
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Function + branch coverage emits 24 counters: eight decision line
+// Function + branch coverage emits 23 counters: seven decision line
 // events, two function-entry markers, two for-loop condition arms,
 // two if/else arms, two if-without-else arms, two while-loop condition
 // arms, two do-while condition arms, two switch case arms, one explicit
@@ -93,8 +93,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(20\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(21\)}}
 //CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(22\)}}
-//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(23\)}}
-//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(24\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(23\)}}
 
 // The three coverage modes must be accepted together and share one
 // synthesized coverage buffer. The exact combined slot map is covered

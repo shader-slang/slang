@@ -194,9 +194,10 @@ counters are inserted, with examples, see
      as a standalone `IRGlobalParam`.
    - **Assigns a counter slot to each coverage marker op** (per-inst
      UID, consecutive index in traversal order). Multiple line markers
-     on the same source line get distinct slots, or share one when they
-     provably execute together, and the LCOV exporter aggregates them by
-     taking the maximum per line. Function and branch markers produce their
+     on the same source line share its line-visit counter. The pass counts
+     entry into that line's runs and resets visits on loop back edges.
+     Exporters count each distinct slot once per line; they do not reconstruct
+     control flow from counter values. Function and branch markers produce their
      own `CoverageEntryInfo::kind` values and use the same counter buffer.
    - **Rewrites each op** as `AtomicAdd(__slang_coverage[slot], 1,
 Relaxed)` in the default counting mode, or as a plain non-atomic

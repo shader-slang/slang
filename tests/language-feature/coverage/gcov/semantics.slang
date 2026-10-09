@@ -7,6 +7,20 @@ int sequential(int x)
 
 int sameLine(int x) { if (x > 0) return 10; else return 20; } // CASE: same_line
 
+int disjoint(int x)
+{
+    if (x > 0)
+        { return 10; } else { return 20; } // CASE: disjoint
+}
+
+int parenthesized(int x)
+{
+    if ((
+        x > 0))
+        return 1;
+    return 2;
+}
+
 int positiveArm(int x) { return x + 3; }
 int negativeArm(int x) { return x - 3; }
 
@@ -58,6 +72,16 @@ int cases(int x)
     return result;
 }
 
+int whileLoop(int x)
+{
+    int result = 0;
+    while (result < x) // CASE: while_header
+    {
+        ++result;
+    }
+    return result;
+}
+
 #ifndef CPU_REFERENCE
 StructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;
@@ -66,7 +90,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     int x = inputBuffer[tid.x];
-    outputBuffer[tid.x] = sequential(x) + sameLine(x) + choose(x) + logical(x)
-        + mixed(x) + loop(x) + cases(x);
+    outputBuffer[tid.x] = sequential(x) + sameLine(x) + disjoint(x) + parenthesized(x) + choose(x) + logical(x)
+        + mixed(x) + loop(x) + cases(x) + whileLoop(x);
 }
 #endif

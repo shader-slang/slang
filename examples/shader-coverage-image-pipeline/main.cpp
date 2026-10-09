@@ -23,6 +23,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <set>
 #include <slang-com-ptr.h>
 #include <slang-rhi/shader-cursor.h>
 #include <slang.h>
@@ -428,6 +429,8 @@ void writeLcov(
     struct FileRecords
     {
         std::map<uint32_t, uint64_t> lines; // line → accumulated count
+        std::set<std::pair<uint32_t, uint32_t>> lineCounters;
+        bool booleanMode = false;
         std::vector<FuncRecord> funcs;
         std::vector<BranchRecord> branches;
     };
@@ -451,10 +454,17 @@ void writeLcov(
                                    ? hits[entry.counterIndex]
                                    : 0;
         auto& rec = byFile[entry.file];
+        rec.booleanMode = entry.counterMode == slang::CoverageCounterMode::Boolean;
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:
-            rec.lines[entry.line] = std::max(rec.lines[entry.line], count);
+            if (rec.lineCounters.emplace(entry.line, entry.counterIndex).second)
+            {
+                if (rec.booleanMode)
+                    rec.lines[entry.line] = rec.lines[entry.line] != 0 || count != 0;
+                else
+                    rec.lines[entry.line] += count;
+            }
             break;
         case slang::CoverageEntryKind::Function:
             rec.funcs.push_back({entry.line, entry.functionName ? entry.functionName : "", count});
@@ -475,7 +485,9 @@ void writeLcov(
         for (const auto& fn : fp.second.funcs)
             functionLines[fn.line] += fn.count;
         for (const auto& line : functionLines)
-            fp.second.lines.emplace(line.first, line.second);
+            fp.second.lines.emplace(
+                line.first,
+                fp.second.booleanMode ? uint64_t(line.second != 0) : line.second);
     }
 
     std::ofstream f(path, std::ios::binary);

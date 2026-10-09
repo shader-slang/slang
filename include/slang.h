@@ -4944,11 +4944,12 @@ inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = ~uint32_t(0);
 /// branch-arm identity, or coverage-mode-specific metadata at the end
 /// without changing the COM interface. Entries are source-location
 /// based: the current producers emit one source entry per marker op.
-/// If multiple line entries resolve to the same `(file, line)`, consumers
-/// aggregate them by taking the maximum count, which counts the visits to
-/// the line rather than the number of statements on it. Several entries
-/// may also read one counter, so read results per entry through
-/// `counterIndex`, never per counter.
+/// Current producers give all line entries for the same `(file, line)` one
+/// shared line-visit counter. Consumers count each distinct
+/// `(file, line, counterIndex)` once, summing counts or unioning boolean hits.
+/// This also accepts older producers with independent statement counters,
+/// whose overlaps cannot in general be recovered without control flow.
+/// Always read results through `counterIndex`, never the entry index.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);

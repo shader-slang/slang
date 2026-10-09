@@ -4160,7 +4160,7 @@ static SourceLoc getConditionLoc(Expr* expr)
 // When both start on one source line, `expr` adds no second probe. The check is local and does not
 // verify dominance, so passing an expression that does not dominate `expr` would drop a real line
 // event. It also does not deduplicate markers in general: several markers of one line from
-// different constructs are expected, and the exporters take the maximum over a line's entries.
+// different constructs are expected. The instrumentation pass shares their line-visit counter.
 static void emitExpressionLineCoverage(
     IRGenContext* context,
     Expr* expr,
@@ -8592,7 +8592,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                getConditionLoc(condExpr),
                 coverageBranchSiteID,
                 1,
                 slang::CoverageBranchArmKind::TrueArm);
@@ -8601,7 +8601,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                getConditionLoc(condExpr),
                 coverageBranchSiteID,
                 2,
                 slang::CoverageBranchArmKind::FalseArm);
@@ -8623,7 +8623,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                getConditionLoc(condExpr),
                 coverageBranchSiteID,
                 1,
                 slang::CoverageBranchArmKind::TrueArm);
@@ -8634,7 +8634,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                getConditionLoc(condExpr),
                 coverageBranchSiteID,
                 2,
                 slang::CoverageBranchArmKind::FalseArm);
@@ -8742,7 +8742,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto irCondition =
                 getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
 
-            coverageBranchLoc = condExpr->loc;
+            coverageBranchLoc = getConditionLoc(condExpr);
             coverageBranchSiteID = allocateConditionBranchSiteID(context, condExpr);
 
             // Now we want to `break` if the loop condition is false.
@@ -8823,7 +8823,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (auto incrExpr = stmt->sideEffectExpression)
         {
             maybeEmitDebugLine(context, this, stmt, incrExpr->loc);
-            emitExpressionLineCoverage(context, incrExpr);
+            // The test already counts this header line once per iteration. An
+            // increment on that same line does not start another source visit.
+            emitExpressionLineCoverage(context, incrExpr, stmt->predicateExpression);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -8879,7 +8881,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             emitExpressionLineCoverage(context, condExpr);
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
-            coverageBranchLoc = condExpr->loc;
+            coverageBranchLoc = getConditionLoc(condExpr);
             coverageBranchSiteID = allocateConditionBranchSiteID(context, condExpr);
 
             // Now we want to `break` if the loop condition is false.
@@ -9006,7 +9008,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 insertBlock(loopExitBlock);
                 emitBranchCoverageMarker(
                     context,
-                    condExpr->loc,
+                    getConditionLoc(condExpr),
                     coverageBranchSiteID,
                     2,
                     slang::CoverageBranchArmKind::FalseArm);
@@ -9015,7 +9017,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 insertBlock(mergeBlock);
                 emitBranchCoverageMarker(
                     context,
-                    condExpr->loc,
+                    getConditionLoc(condExpr),
                     coverageBranchSiteID,
                     1,
                     slang::CoverageBranchArmKind::TrueArm);
@@ -9914,7 +9916,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info.defaultLabel = nullptr;
         info.coverageBranchSiteID =
             context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
-        info.coverageBranchLoc = stmt->condition->loc;
+        info.coverageBranchLoc = getConditionLoc(stmt->condition);
 
         lowerSwitchCases(stmt->body, &info);
 
