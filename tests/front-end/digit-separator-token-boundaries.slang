@@ -1,7 +1,6 @@
-// Integer literals with digit separators keep the values they had before separators were
-// accepted in floating-point literals: a `.x` swizzle still ends the integer, `0_` starts a
-// decimal (not octal) literal, and separators may follow the radix prefix, end the literal,
-// or repeat. `0x1e_5` stays a hexadecimal integer: `e` is a hex digit there, not an exponent.
+// Separators preserve integer-literal token boundaries: a `.x` swizzle still ends the
+// integer, `0_` selects decimal (not octal), and separators may follow the radix prefix,
+// end the literal, or repeat. `0x1e_5` stays a hexadecimal integer: `e` is a hex digit there, not an exponent.
 
 //TEST:INTERPRET(filecheck=CHECK):  -warnings-as-errors all
 void main()

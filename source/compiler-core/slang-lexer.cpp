@@ -708,7 +708,6 @@ static int _maybeReadDigit(char const** ioCursor, int base)
         default:
             return -1;
 
-        // A digit separator (see `_lexDigits`).
         case '_':
             cursor++;
             continue;
