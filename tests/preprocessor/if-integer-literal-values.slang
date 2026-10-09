@@ -1,5 +1,5 @@
-// Integer literals in `#if` expressions evaluate the same way as in code: base prefixes,
-// octal, digit separators and values that do not fit in 32 bits (#13545).
+// Integer literals in `#if` expressions are decoded like literals in code: base prefixes,
+// octal, digit separators, and values in the signed 64-bit range that do not fit in 32 bits (#13545).
 
 //TEST:INTERPRET(filecheck=CHECK):
 void main()

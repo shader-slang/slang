@@ -2980,8 +2980,8 @@ static void beginConditional(PreprocessorDirectiveContext* context, bool enable)
 // Preprocessor Conditional Expressions
 //
 
-// Conditional expressions are evaluated as 64-bit signed integers, so that integer
-// literals keep the same values they have in code.
+// Conditional expressions are evaluated as 64-bit signed integers, so that literals up to
+// INT64_MAX are not truncated to 32 bits.
 typedef IntegerLiteralValue PreprocessorExpressionValue;
 
 // Forward-declaretion
