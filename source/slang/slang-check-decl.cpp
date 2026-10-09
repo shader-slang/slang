@@ -3822,12 +3822,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
-    else if (isGlobalShaderParameter(varDecl))
-    {
-        // The ordinary data of any other global shader parameter goes into the implicit
-        // constant buffer `GlobalParams`.
-        diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(this, varDecl->getType(), varDecl);
-    }
+    diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(this, varDecl, nullptr);
     maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());
 }
 
@@ -22952,6 +22947,7 @@ static bool _isHandleWithoutOrdinaryData(Type* type)
 struct OrdinaryDataQuery
 {
     SemanticsVisitor* visitor;
+    GlobalGenericArgs const* globalGenericArgs;
     HashSet<Type*> activeTypes;
     Dictionary<Type*, bool> computedResults;
     UInt nestingDepth = 0;
@@ -23023,6 +23019,16 @@ struct OrdinaryDataQuery
             return false;
         auto decl = declRefType->getDeclRef().getDecl();
 
+        // Like `_createTypeLayout`, we use the type bound to a global `type_param`, if any.
+        if (auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl))
+        {
+            Val* arg = nullptr;
+            if (!globalGenericArgs || !globalGenericArgs->tryGetValue(globalGenericParamDecl, arg))
+                return false;
+            auto argType = as<Type>(arg);
+            return argType && holdsOrdinaryData(argType);
+        }
+
         // Every other builtin or magic type is stored by value: a scalar, vector, matrix,
         // pointer, `Atomic<T>`, `TensorView<T>`, untyped descriptor handle, `DescriptorHandle<T>`,
         // or `Optional<T>`, which adds a presence flag to its value. So is an enum, and so is
@@ -23055,17 +23061,22 @@ struct OrdinaryDataQuery
     }
 };
 
-bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type)
+bool isTypeKnownToHoldOrdinaryData(
+    SemanticsVisitor* visitor,
+    Type* type,
+    GlobalGenericArgs const* globalGenericArgs)
 {
     OrdinaryDataQuery query;
     query.visitor = visitor;
+    query.globalGenericArgs = globalGenericArgs;
     return query.holdsOrdinaryData(type);
 }
 
 void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     SemanticsVisitor* visitor,
     Type* type,
-    VarDeclBase* varDecl)
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs)
 {
     if (!visitor->doesTypeHaveTag(type, TypeTag::Unsized))
         return;
@@ -23076,14 +23087,33 @@ void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     ArrayExpressionType* trailingArrayType = nullptr;
     VarDeclBase* trailingArrayField =
         getTrailingUnsizedArrayElement(type, varDecl, trailingArrayType);
-    if (!trailingArrayField ||
-        !isTypeKnownToHoldOrdinaryData(visitor, trailingArrayType->getElementType()))
+    if (!trailingArrayField || !isTypeKnownToHoldOrdinaryData(
+                                   visitor,
+                                   trailingArrayType->getElementType(),
+                                   globalGenericArgs))
         return;
     visitor->getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{
         .type = trailingArrayType,
         .field = trailingArrayField});
     if (trailingArrayField != varDecl)
         visitor->getSink()->diagnose(Diagnostics::SeeDeclarationOf{.decl = varDecl});
+}
+
+void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
+    SemanticsVisitor* visitor,
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs)
+{
+    // An explicit `ConstantBuffer` or `ParameterBlock` is checked against its element type
+    // instead; the ordinary data of any other global shader parameter goes into `GlobalParams`.
+    if (!isGlobalShaderParameter(varDecl) ||
+        visitor->getConstantBufferElementType(varDecl->getType()))
+        return;
+    diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
+        visitor,
+        varDecl->getType(),
+        varDecl,
+        globalGenericArgs);
 }
 
 bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)

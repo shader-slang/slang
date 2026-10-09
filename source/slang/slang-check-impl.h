@@ -4648,18 +4648,33 @@ bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type)
 // The answer does not depend on the target. On targets with bindless resources (CPU, CUDA,
 // Metal) a handle is itself stored as ordinary data, so the answer is false for some types
 // that do occupy uniform bytes there.
-bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type);
+//
+// `globalGenericArgs` holds the types bound to global `type_param`s by specialization, or is
+// null before specialization, when a global `type_param` is not known to hold ordinary data.
+using GlobalGenericArgs = Dictionary<GlobalGenericParamDecl*, Val*>;
+bool isTypeKnownToHoldOrdinaryData(
+    SemanticsVisitor* visitor,
+    Type* type,
+    GlobalGenericArgs const* globalGenericArgs);
 
 // Diagnose an unsized array of ordinary data that ends `type`, the declared or specialized
 // type of `varDecl`. The caller guarantees that the compiler packs the ordinary data of
 // `varDecl` into an implicit constant buffer (`GlobalParams` or `EntryPointParams`), which,
 // like an explicit `cbuffer`, has no layout for an unsized array of ordinary data.
 // We report E31215 at the trailing array field, with a note at `varDecl` when the field is a
-// member of its type.
+// member of its type. `globalGenericArgs` is as for `isTypeKnownToHoldOrdinaryData`.
 void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     SemanticsVisitor* visitor,
     Type* type,
-    VarDeclBase* varDecl);
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs);
+
+// Diagnose `varDecl` as `diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer` does when it is a
+// global shader parameter whose ordinary data goes into the implicit constant buffer.
+void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
+    SemanticsVisitor* visitor,
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs);
 
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,

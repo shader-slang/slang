@@ -1767,7 +1767,8 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
         diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
             visitor,
             getType(astBuilder, paramDeclRef),
-            param);
+            param,
+            nullptr);
     }
 }
 
@@ -3575,6 +3576,27 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
 
         default:
             SLANG_UNEXPECTED("unhandled specialization parameter flavor");
+        }
+    }
+
+    // Semantic checking cannot decide whether a global parameter such as `uniform TT values[]`
+    // holds an unsized array of ordinary data before a type is bound to the `type_param TT`, so
+    // we check the global shader parameters again with the bound types. A module with errors is
+    // not specialized, so a parameter already diagnosed is not reported twice.
+    GlobalGenericArgs globalGenericArgs;
+    for (auto& genericArg : specializationInfo->genericArgs)
+    {
+        if (auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericArg.paramDecl))
+            globalGenericArgs.add(globalGenericParamDecl, genericArg.argVal);
+    }
+    if (globalGenericArgs.getCount())
+    {
+        for (auto& shaderParam : m_shaderParams)
+        {
+            diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
+                &visitor,
+                shaderParam.paramDeclRef.getDecl(),
+                &globalGenericArgs);
         }
     }
 
