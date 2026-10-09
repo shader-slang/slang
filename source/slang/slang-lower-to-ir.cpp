@@ -5298,12 +5298,19 @@ struct ExprLoweringContext
         }
     }
 
-    /// Default values for omitted arguments come from `defaultArgsDeclRef`,
-    /// the declaration that the call was checked against.
+    /// Lower the arguments of the call `expr` to `funcDeclRef`, appending
+    /// them to `ioArgs` and any post-call fixups to `ioFixups`.
+    ///
+    /// Each argument in `expr` is lowered against the matching parameter of
+    /// `funcDeclRef`. Any parameter without an argument at the call site is
+    /// given its default value, taken from the parameter at the same position
+    /// of `funcDeclRefForDefaultArgs`, the declaration the call was checked
+    /// against. For an ordinary call that is `funcDeclRef` itself.
+    ///
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<CallableDecl> funcDeclRef,
-        DeclRef<CallableDecl> defaultArgsDeclRef,
+        DeclRef<CallableDecl> funcDeclRefForDefaultArgs,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -5317,9 +5324,9 @@ struct ExprLoweringContext
             Index argIndex = argCounter++;
             if (argIndex >= argCount)
             {
-                auto defaultArgsParams = getParameters(getASTBuilder(), defaultArgsDeclRef);
-                SLANG_RELEASE_ASSERT(argIndex < defaultArgsParams.getCount());
-                paramDeclRef = defaultArgsParams[argIndex];
+                auto defaultArgParams = getParameters(getASTBuilder(), funcDeclRefForDefaultArgs);
+                SLANG_RELEASE_ASSERT(argIndex < defaultArgParams.getCount());
+                paramDeclRef = defaultArgParams[argIndex];
             }
             addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
         }
@@ -5330,7 +5337,7 @@ struct ExprLoweringContext
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<Decl> funcDeclRef,
-        DeclRef<Decl> defaultArgsDeclRef,
+        DeclRef<Decl> funcDeclRefForDefaultArgs,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -5339,7 +5346,7 @@ struct ExprLoweringContext
             addDirectCallArgs(
                 expr,
                 callableDeclRef,
-                defaultArgsDeclRef.as<CallableDecl>(),
+                funcDeclRefForDefaultArgs.as<CallableDecl>(),
                 ioArgs,
                 ioFixups);
         }
@@ -5639,9 +5646,9 @@ struct ExprLoweringContext
             // TODO: A default that refers to another member of `This`
             // is not yet resolved against the implementation (#12700).
             //
-            DeclRef<Decl> defaultArgsDeclRef = funcDeclRef;
+            DeclRef<Decl> funcDeclRefForDefaultArgs = funcDeclRef;
             if (resolvedInfo.funcDeclRef.getDecl() != funcDeclRef.getDecl())
-                defaultArgsDeclRef = resolvedInfo.funcDeclRef;
+                funcDeclRefForDefaultArgs = resolvedInfo.funcDeclRef;
 
             auto baseExpr = resolvedInfo.baseExpr;
             if (baseExpr)
@@ -5667,7 +5674,12 @@ struct ExprLoweringContext
                 // we must call one of its accessors.
                 //
                 auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, defaultArgsDeclRef, &irArgs, &argFixups);
+                addDirectCallArgs(
+                    expr,
+                    funcDeclRef,
+                    funcDeclRefForDefaultArgs,
+                    &irArgs,
+                    &argFixups);
                 auto result = lowerStorageReference(
                     context,
                     type,
@@ -5785,7 +5797,12 @@ struct ExprLoweringContext
                     funcDeclRef.template as<FunctionDeclBase>(),
                     funcTypeInfo);
                 // Calculate args by inspecting the decl-ref.
-                addDirectCallArgs(expr, funcDeclRef, defaultArgsDeclRef, &irArgs, &argFixups);
+                addDirectCallArgs(
+                    expr,
+                    funcDeclRef,
+                    funcDeclRefForDefaultArgs,
+                    &irArgs,
+                    &argFixups);
             }
 
             validateInvokeExprArgsWithFunctionModifiers(
