@@ -297,6 +297,10 @@ jobs:
           echo "Some LLVM builds failed; completed archives were published, but LLVM population is incomplete."
           exit 1
 
+  # When every recipe-keyed LLVM prebuilt already exists, publish-llvm is
+  # skipped because there is nothing to upload. Slang's commit-keyed object
+  # caches can still be missing, so warming accepts that skipped publisher
+  # and separately requires should-build=true. A failed publisher blocks warming.
   build-linux-release:
     needs: [check-changes, publish-llvm]
     if: >-
