@@ -315,6 +315,11 @@ enum class MatchedTokenType
 static void parseDecls(Parser* parser, ContainerDecl* parent, MatchedTokenType matchType);
 
 /// Parse a body consisting of declarations enclosed in `{}`, as the children of `parent`.
+///
+/// We parse every declaration body without the semantic visitor, as at module scope.
+/// Name lookup still runs, but it no longer calls `ensureDecl` on an enclosing local
+/// type, such as the `struct` being parsed, which is incomplete until `CompleteDecl`
+/// adds it to its container.
 static void parseDeclBody(Parser* parser, ContainerDecl* parent);
 
 static Decl* parseEnumDecl(Parser* parser);
@@ -6573,6 +6578,10 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
 
 static void parseDeclBody(Parser* parser, ContainerDecl* parent)
 {
+    SemanticsVisitor* outerSemanticsVisitor = parser->semanticsVisitor;
+    parser->semanticsVisitor = nullptr;
+    SLANG_DEFER(parser->semanticsVisitor = outerSemanticsVisitor);
+
     parser->PushScope(parent);
 
     parser->ReadToken(TokenType::LBrace);
