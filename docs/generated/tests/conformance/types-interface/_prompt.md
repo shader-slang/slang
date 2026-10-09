@@ -6,7 +6,7 @@ See [`_common.md`](../../../../generated/tests/_meta/prompts/_common.md).
 
 Bundle at `docs/generated/tests/conformance/types-interface/`,
 anchored to
-[`docs/language-reference/types-interface.md`](../../../../language-reference/types-interface.md).
+[`docs/language-reference/types-interface.md`](https://github.com/shader-slang/spec/blob/main/specification/types-interface.md).
 
 ## Source doc structure
 

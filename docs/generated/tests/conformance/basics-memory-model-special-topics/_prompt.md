@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/basics-memory-model-special-topics/`,
 anchored to
-[`docs/language-reference/basics-memory-model-special-topics.md`](../../../../language-reference/basics-memory-model-special-topics.md).
+[`docs/language-reference/basics-memory-model-special-topics.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-special-topics.md).
 
 ## Doc summary
 

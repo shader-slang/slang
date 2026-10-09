@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/types-array/`,
 anchored to
-[`docs/language-reference/types-array.md`](../../../../language-reference/types-array.md).
+[`docs/language-reference/types-array.md`](https://github.com/shader-slang/spec/blob/main/specification/types-array.md).
 
 ## High-value claims
 

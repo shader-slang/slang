@@ -4,7 +4,7 @@ See [`_common.md`](_common.md).
 
 ## Target
 
-[`docs/language-reference/types-enum.md`](../../../../language-reference/types-enum.md).
+[`docs/language-reference/types-enum.md`](https://github.com/shader-slang/spec/blob/main/specification/types-enum.md).
 
 ## High-value claims
 

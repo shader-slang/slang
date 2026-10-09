@@ -12,7 +12,7 @@ language reference itself, not the design docs.
 Produce the test bundle at
 `docs/generated/tests/conformance/expressions-literal/`,
 anchored to
-[`docs/language-reference/expressions-literal.md`](../../../../language-reference/expressions-literal.md).
+[`docs/language-reference/expressions-literal.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-literal.md).
 
 The doc specifies the **grammar** and **semantics** of literal
 expressions: boolean, integer (decimal / hexadecimal / binary /

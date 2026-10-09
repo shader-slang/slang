@@ -4,7 +4,7 @@ See [`_common.md`](_common.md).
 
 ## Target
 
-[`docs/language-reference/expressions-identifier.md`](../../../../language-reference/expressions-identifier.md).
+[`docs/language-reference/expressions-identifier.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-identifier.md).
 
 ## Claim-extraction strategy
 

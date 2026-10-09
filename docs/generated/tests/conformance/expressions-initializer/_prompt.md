@@ -8,7 +8,7 @@ See [`_common.md`](../_common.md) for universal rules. Read
 Bundle at
 `docs/generated/tests/conformance/expressions-initializer/`,
 anchored to
-[`docs/language-reference/expressions-initializer.md`](../../../../language-reference/expressions-initializer.md).
+[`docs/language-reference/expressions-initializer.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-initializer.md).
 
 The doc is marked `> TODO` at the top, but the body below that marker is
 normative prose describing two distinct language features with testable

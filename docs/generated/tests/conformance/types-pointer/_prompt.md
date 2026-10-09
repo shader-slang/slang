@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/types-pointer/`,
 anchored to
-[`docs/language-reference/types-pointer.md`](../../../../language-reference/types-pointer.md).
+[`docs/language-reference/types-pointer.md`](https://github.com/shader-slang/spec/blob/main/specification/types-pointer.md).
 
 ## High-value claims
 

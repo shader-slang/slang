@@ -5,7 +5,7 @@ See [`_common.md`](../../../_meta/prompts/_common.md).
 ## Target
 
 Bundle at `docs/generated/tests/conformance/generics/`, anchored to
-[`docs/language-reference/generics.md`](../../../../language-reference/generics.md).
+[`docs/language-reference/generics.md`](https://github.com/shader-slang/spec/blob/main/specification/generics.md).
 
 ## Claim-extraction strategy
 

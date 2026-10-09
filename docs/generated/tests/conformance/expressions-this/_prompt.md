@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/expressions-this/`,
 anchored to
-[`docs/language-reference/expressions-this.md`](../../../../language-reference/expressions-this.md).
+[`docs/language-reference/expressions-this.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-this.md).
 
 ## Triage result
 

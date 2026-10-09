@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/types-struct/`,
 anchored to
-[`docs/language-reference/types-struct.md`](../../../../language-reference/types-struct.md).
+[`docs/language-reference/types-struct.md`](https://github.com/shader-slang/spec/blob/main/specification/types-struct.md).
 
 ## Sub-areas and claim extraction strategy
 

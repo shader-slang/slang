@@ -4,7 +4,7 @@ See [`_common.md`](_common.md).
 
 ## Target
 
-[`docs/language-reference/expressions-member-access.md`](../../../../language-reference/expressions-member-access.md).
+[`docs/language-reference/expressions-member-access.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-member-access.md).
 
 ## High-value claims
 

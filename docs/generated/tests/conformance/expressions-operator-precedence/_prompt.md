@@ -8,7 +8,7 @@ See [`_common.md`](../../../_meta/prompts/_common.md) for universal rules. Read
 Bundle at
 `docs/generated/tests/conformance/expressions-operator-precedence/`,
 anchored to
-[`docs/language-reference/expressions-operator-precedence.md`](../../../../language-reference/expressions-operator-precedence.md).
+[`docs/language-reference/expressions-operator-precedence.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-operator-precedence.md).
 
 The doc is a single precedence table (16 levels × 3 columns: Level,
 Operators, Associativity) followed by worked examples. Every row of
