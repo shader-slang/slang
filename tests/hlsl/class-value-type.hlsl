@@ -10,6 +10,16 @@
 class Value
 {
     int x;
+
+    void increment()
+    {
+        x++;
+    }
+
+    int read() const
+    {
+        return x;
+    }
 };
 
 Value changeCopy(Value value)
@@ -35,13 +45,13 @@ void computeMain()
 {
     Value original = { 1 };
     Value copy = original;
-    copy.x = 2;
+    copy.increment();
     Value returned = changeCopy(original);
 
     // CHECK: 1
     outputBuffer[0] = original.x;
     // CHECK: 2
-    outputBuffer[1] = copy.x;
+    outputBuffer[1] = copy.read();
     // CHECK: 3
     outputBuffer[2] = returned.x;
 

@@ -2394,6 +2394,23 @@ static void parseOptionalGenericConstraints(
     }
 }
 
+/// Parses an optional `const` after a `FuncDecl` parameter list.
+///
+/// The dedicated modifier lets semantic checking distinguish C++-style trailing `const` from a
+/// prefix `const` modifier. Its callers parse only `FuncDecl` syntax; constructor, accessor, and
+/// subscript parameter lists do not accept trailing `const`.
+static void parseOptionalCppStyleTrailingThisParamConstModifier(Parser* parser, FuncDecl* decl)
+{
+    Token constToken;
+    if (!AdvanceIf(parser, "const", &constToken))
+        return;
+
+    auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
+    modifier->keywordName = constToken.getName();
+    modifier->loc = constToken.getLoc();
+    addModifier(decl, modifier);
+}
+
 static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
 {
     if (AdvanceIf(parser, TokenType::Colon))
@@ -2448,6 +2465,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
 
             if (AdvanceIf(parser, "throws"))
             {
@@ -5321,6 +5339,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             if (AdvanceIf(parser, "throws"))
@@ -7216,7 +7235,26 @@ Stmt* parseCompileTimeStmt(Parser* parser)
 
 Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowCaseDefault)
 {
+    const bool beginsWithNoDiff = LookAheadToken("no_diff");
+    const auto statementStart = tokenReader.getCursor();
     auto modifiers = ParseModifiers(this);
+
+    auto parseExpressionStatement = [&]()
+    {
+        // `no_diff` is both a declaration modifier and a prefix expression. We must parse the
+        // modifiers before we can distinguish `no_diff T value;` from `no_diff call();`. If the
+        // declaration probe loses, resetting the token cursor lets expression parsing construct a
+        // `TreatAsDifferentiableExpr` instead of leaving `no_diff` on the statement.
+        if (beginsWithNoDiff)
+        {
+            auto noDiffModifier = as<NoDiffModifier>(modifiers.first);
+            SLANG_RELEASE_ASSERT(noDiffModifier);
+            modifiers.first = noDiffModifier->next;
+            noDiffModifier->next = nullptr;
+            tokenReader.setCursor(statementStart);
+        }
+        return ParseExpressionStatement();
+    };
 
     Stmt* statement = nullptr;
     if (LookAheadToken(TokenType::LBrace))
@@ -7285,7 +7323,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
     }
     else if (LookAheadToken("try"))
     {
-        statement = ParseExpressionStatement();
+        statement = parseExpressionStatement();
     }
     else if (LookAheadToken("throw"))
     {
@@ -7384,7 +7422,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
         // Fallback: reset and parse an expression
         hasSeenCompletionToken = prevHasSeenCompletionToken;
         tokenReader.setCursor(startPos);
-        statement = ParseExpressionStatement();
+        statement = parseExpressionStatement();
     }
     else if (LookAheadToken(TokenType::Semicolon))
     {
@@ -7404,7 +7442,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
     {
         // Default case should always fall back to parsing an expression,
         // and then let that detect any errors
-        statement = ParseExpressionStatement();
+        statement = parseExpressionStatement();
     }
 
     if (statement && !as<DeclStmt>(statement))

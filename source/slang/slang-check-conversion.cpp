@@ -457,7 +457,8 @@ bool SemanticsVisitor::_readValueFromInitializerList(
     if (shouldUseInitializerDirectly(toType, firstInitExpr))
     {
         ioInitArgIndex++;
-        return _coerce(
+        CoercionSourceAccess sourceAccess;
+        const bool succeeded = _coerce(
             CoercionSite::Initializer,
             toType,
             outToExpr,
@@ -465,7 +466,22 @@ bool SemanticsVisitor::_readValueFromInitializerList(
             firstInitExpr,
             getSink(),
             nullptr,
-            nullptr);
+            nullptr,
+            outToExpr ? &sourceAccess : nullptr);
+        if (succeeded && outToExpr)
+        {
+            if (sourceAccess.needsFallbackCheck())
+                sourceAccess =
+                    CoercionSourceAccess::makeAccess(firstInitExpr, ParamPassingMode::In);
+            if (sourceAccess.hasAccess())
+            {
+                checkStorageExpressionAccess(
+                    sourceAccess.getExpression(),
+                    sourceAccess.getMode(),
+                    sourceAccess.getExpression()->loc);
+            }
+        }
+        return succeeded;
     }
 
     // If there is somehow an error in one of the initialization
@@ -850,15 +866,16 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     return false;
 }
 
-bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
-    Type* toType,
-    InitializerListExpr* fromInitializerListExpr,
-    Expr** outExpr)
+SemanticsVisitor::SynthesizedConstructorCoercionResult SemanticsVisitor::
+    createInvokeExprForSynthesizedCtor(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr)
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
     if (!structDecl)
-        return false;
+        return SynthesizedConstructorCoercionResult::NotApplicable;
 
     if (!structDecl->checkState.isBeingChecked())
         ensureDecl(structDecl, DeclCheckState::AttributesChecked);
@@ -879,44 +896,53 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
-                .type = toType,
-                .initList = fromInitializerListExpr});
+            // This type owns the initializer-list conversion even though it has no synthesized
+            // constructor to accept the list. A speculative overload probe must remain silent and
+            // reject the conversion; a materialized conversion reports why the type cannot be
+            // initialized and produces an error expression for recovery.
+            if (outExpr)
+            {
+                diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
+                    .type = toType,
+                    .initList = fromInitializerListExpr});
 
-            // Emit a note naming the first member whose visibility mismatches the
-            // struct's. Guard against emitting it when a different isCStyleType
-            // condition is the real cause — those conditions are checked first:
-            //   - Non-interface inheritance (rule 2): guard 1.
-            //   - Explicit constructor (rule 3): guard 2.
-            bool hasNonInterfaceBase = false;
-            for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
-            {
-                if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                // Emit a note naming the first member whose visibility mismatches the struct's.
+                // Guard against emitting it when a different `isCStyleType` condition is the real
+                // cause: non-interface inheritance or an explicit constructor.
+                bool hasNonInterfaceBase = false;
+                for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
                 {
-                    hasNonInterfaceBase = true;
-                    break;
-                }
-            }
-            if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
-            {
-                DeclVisibility structVis = getDeclVisibility(structDecl);
-                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
-                {
-                    DeclVisibility memberVis = getDeclVisibility(varDecl);
-                    if (memberVis != structVis)
+                    if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
                     {
-                        diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
-                            .memberVis = memberVis,
-                            .type = toType,
-                            .structVis = structVis,
-                            .member = varDecl});
+                        hasNonInterfaceBase = true;
                         break;
                     }
                 }
+                if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
+                {
+                    DeclVisibility structVis = getDeclVisibility(structDecl);
+                    for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                    {
+                        DeclVisibility memberVis = getDeclVisibility(varDecl);
+                        if (memberVis != structVis)
+                        {
+                            diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                                .memberVis = memberVis,
+                                .type = toType,
+                                .structVis = structVis,
+                                .member = varDecl});
+                            break;
+                        }
+                    }
+                }
+
+                *outExpr = CreateErrorExpr(fromInitializerListExpr);
             }
+
+            return SynthesizedConstructorCoercionResult::Rejected;
         }
 
-        return false;
+        return SynthesizedConstructorCoercionResult::NotApplicable;
     }
 
     isCStyle = isCStyleType(toType, isVisit);
@@ -927,7 +953,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     if (!fromInitializerListExpr->useCStyleInitialization)
     {
         if (isCStyle)
-            return false;
+            return SynthesizedConstructorCoercionResult::NotApplicable;
     }
 
     DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
@@ -950,46 +976,48 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             if (outExpr)
                 *outExpr = ctorInvokeExpr;
 
-            return true;
+            return SynthesizedConstructorCoercionResult::Succeeded;
         }
         else if (!isCStyle)
         {
-            Slang::ComPtr<ISlangBlob> blob;
-            tempSink.getBlobIfNeeded(blob.writeRef());
-            getSink()->diagnoseRaw(
-                Severity::Error,
-                static_cast<char const*>(blob->getBufferPointer()));
-
-            // When the synthesized constructor has fewer parameters than
-            // members because some members are less visible than the struct
-            // itself, the user gets "too many arguments" without
-            // understanding why certain members were excluded from the
-            // constructor. Emit a note naming each non-public member so
-            // they know what to fix (issue #11005).
-            //
-            // Use the same criteria as `collectInitializableMembers`:
-            // instance members whose visibility is strictly less than the
-            // struct's are excluded from the synthesized ctor.
-            DeclVisibility structVis = getDeclVisibility(structDecl);
-            for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+            // A speculative probe has no diagnostic to preserve and must report that the
+            // conversion is not viable. A materialized attempt instead owns the constructor
+            // diagnostic and must prevent the legacy aggregate path from retrying the same list.
+            if (outExpr)
             {
-                if (varDecl->hasModifier<HLSLStaticModifier>())
-                    continue;
-                DeclVisibility memberVis = getDeclVisibility(varDecl);
-                if (memberVis < structVis)
-                {
-                    diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
-                        .memberVis = memberVis,
-                        .type = toType,
-                        .structVis = structVis,
-                        .member = varDecl});
-                }
-            }
+                Slang::ComPtr<ISlangBlob> blob;
+                tempSink.getBlobIfNeeded(blob.writeRef());
+                getSink()->diagnoseRaw(
+                    Severity::Error,
+                    static_cast<char const*>(blob->getBufferPointer()));
 
-            return false;
+                // When the synthesized constructor has fewer parameters than members because some
+                // members are less visible than the struct itself, the user gets "too many
+                // arguments" without understanding why certain members were excluded from the
+                // constructor. A note names each excluded member (issue #11005), using the same
+                // visibility criteria as `collectInitializableMembers`.
+                DeclVisibility structVis = getDeclVisibility(structDecl);
+                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                {
+                    if (varDecl->hasModifier<HLSLStaticModifier>())
+                        continue;
+                    DeclVisibility memberVis = getDeclVisibility(varDecl);
+                    if (memberVis < structVis)
+                    {
+                        diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                            .memberVis = memberVis,
+                            .type = toType,
+                            .structVis = structVis,
+                            .member = varDecl});
+                    }
+                }
+
+                *outExpr = CreateErrorExpr(ctorInvokeExpr);
+            }
+            return SynthesizedConstructorCoercionResult::Rejected;
         }
     }
-    return false;
+    return SynthesizedConstructorCoercionResult::NotApplicable;
 }
 
 bool SemanticsVisitor::_readAggregateValueFromInitializerList(
@@ -1015,7 +1043,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         if (ioArgIndex < argCount)
         {
             auto arg = fromInitializerListExpr->args[ioArgIndex++];
-            return _coerce(
+            CoercionSourceAccess sourceAccess;
+            const bool succeeded = _coerce(
                 CoercionSite::Initializer,
                 toType,
                 outToExpr,
@@ -1023,7 +1052,21 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 arg,
                 getSink(),
                 nullptr,
-                nullptr);
+                nullptr,
+                outToExpr ? &sourceAccess : nullptr);
+            if (succeeded && outToExpr)
+            {
+                if (sourceAccess.needsFallbackCheck())
+                    sourceAccess = CoercionSourceAccess::makeAccess(arg, ParamPassingMode::In);
+                if (sourceAccess.hasAccess())
+                {
+                    checkStorageExpressionAccess(
+                        sourceAccess.getExpression(),
+                        sourceAccess.getMode(),
+                        sourceAccess.getExpression()->loc);
+                }
+            }
+            return succeeded;
         }
         else
         {
@@ -1054,11 +1097,13 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 as<PolynomialIntVal>(toElementCount) || as<BuiltinOperationIntVal>(toElementCount);
             if (isLinkTimeVal)
             {
-                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
-                defaultConstructExpr->loc = fromInitializerListExpr->loc;
-                defaultConstructExpr->type = QualType(toType);
-
-                *outToExpr = defaultConstructExpr;
+                if (outToExpr)
+                {
+                    auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                    defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                    defaultConstructExpr->type = QualType(toType);
+                    *outToExpr = defaultConstructExpr;
+                }
                 return true;
             }
 
@@ -1439,18 +1484,26 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr, getSink());
 
-    // Try to invoke the user-defined constructor if it exists. This call will
-    // report error diagnostics if the used-defined constructor exists but does not
-    // match the initialize list.
+    // An explicit user-defined constructor, when available, owns the initializer list. A
+    // materialized attempt diagnoses a constructor that does not accept the initializer list.
     if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }
 
-    // Try to invoke the synthesized constructor if it exists
-    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    // Synthesized-constructor handling gets the next opportunity to own the initializer list. A
+    // non-C-style struct that cannot accept the list makes a speculative candidate non-viable; a
+    // materialized attempt instead preserves the diagnostic and error expression.
+    switch (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
+    case SynthesizedConstructorCoercionResult::Succeeded:
         return true;
+    case SynthesizedConstructorCoercionResult::Rejected:
+        return outToExpr != nullptr;
+    case SynthesizedConstructorCoercionResult::NotApplicable:
+        break;
+    default:
+        SLANG_UNEXPECTED("unexpected synthesized-constructor coercion result");
     }
 
     // Finally, allow selected abstract wrapper types to surface a common
@@ -1460,11 +1513,12 @@ bool SemanticsVisitor::_coerceInitializerList(
         return true;
     }
 
-    // We will fall back to the legacy logic of initialize list.
-    Expr* outInitListExpr = nullptr;
+    // The legacy initializer-list logic handles the remaining cases while preserving the caller's
+    // distinction between a speculative viability check and materializing the converted
+    // expression. Element access is validated only while materializing the expression.
     if (!_readAggregateValueFromInitializerList(
             toType,
-            &outInitListExpr,
+            outToExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
@@ -1478,9 +1532,6 @@ bool SemanticsVisitor::_coerceInitializerList(
                 .initList = fromInitializerListExpr});
         }
     }
-    if (outToExpr)
-        *outToExpr = outInitListExpr;
-
     return true;
 }
 
@@ -1724,6 +1775,17 @@ bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl
     return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
 }
 
+void SemanticsVisitor::_recordCoercionSourceValueAccess(
+    Expr* sourceExpr,
+    CoercionSourceAccess* ioSourceAccess)
+{
+    if (!ioSourceAccess || !ioSourceAccess->needsFallbackCheck())
+        return;
+
+    SLANG_RELEASE_ASSERT(sourceExpr);
+    *ioSourceAccess = CoercionSourceAccess::makeAccess(sourceExpr, ParamPassingMode::In);
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1732,7 +1794,8 @@ bool SemanticsVisitor::_coerce(
     Expr* fromExpr,
     DiagnosticSink* sink,
     ConversionCost* outCost,
-    TypeCoercionWitness** outWitnessOfConversion)
+    TypeCoercionWitness** outWitnessOfConversion,
+    CoercionSourceAccess* ioSourceAccess)
 {
     auto setWitnessOfConversionToBuiltinConversion = [&]()
     {
@@ -1780,7 +1843,8 @@ bool SemanticsVisitor::_coerce(
                 coercibleCandidates[0],
                 sink,
                 outCost,
-                outWitnessOfConversion);
+                outWitnessOfConversion,
+                ioSourceAccess);
         }
         if (sink)
         {
@@ -2008,7 +2072,8 @@ bool SemanticsVisitor::_coerce(
                     fromExpr,
                     sink,
                     &baseCost,
-                    outWitnessOfConversion))
+                    outWitnessOfConversion,
+                    ioSourceAccess))
             {
                 return false;
             }
@@ -2024,7 +2089,13 @@ bool SemanticsVisitor::_coerce(
                 // in a modifier cast to apply them.
                 if (toModified)
                 {
-                    *outToExpr = createModifierCast(toType, coercedBaseExpr->type, coercedBaseExpr);
+                    auto modifierCast =
+                        createModifierCast(toType, coercedBaseExpr->type, coercedBaseExpr);
+                    *outToExpr = modifierCast;
+                    if (auto detachExpr = as<DetachExpr>(modifierCast))
+                    {
+                        _recordCoercionSourceValueAccess(detachExpr->inner, ioSourceAccess);
+                    }
                 }
                 else
                 {
@@ -2059,6 +2130,8 @@ bool SemanticsVisitor::_coerce(
             {
                 *outCost = kConversionCost_None;
             }
+            if (ioSourceAccess)
+                *ioSourceAccess = CoercionSourceAccess::makeNoAccess();
             setWitnessOfConversionToBuiltinConversion();
 
             return true;
@@ -2078,6 +2151,8 @@ bool SemanticsVisitor::_coerce(
             defaultExpr->type = QualType(toType);
             *outToExpr = defaultExpr;
         }
+        if (ioSourceAccess)
+            *ioSourceAccess = CoercionSourceAccess::makeNoAccess();
         return true;
     }
     // none_t can be cast into any Optional<T> type.
@@ -2110,6 +2185,8 @@ bool SemanticsVisitor::_coerce(
             resultExpr->checked = true;
             *outToExpr = resultExpr;
         }
+        if (ioSourceAccess)
+            *ioSourceAccess = CoercionSourceAccess::makeNoAccess();
         return true;
     }
 
@@ -2191,6 +2268,7 @@ bool SemanticsVisitor::_coerce(
                         castExpr->innerVarDecl = innerVarDecl;
                         castExpr->innerCoercedExpr = innerCoercedExpr;
                         *outToExpr = castExpr;
+                        _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
                     }
                     return true;
                 }
@@ -2215,6 +2293,7 @@ bool SemanticsVisitor::_coerce(
                 rsExpr->loc = fromExpr->loc;
                 rsExpr->base = fromExpr;
                 *outToExpr = rsExpr;
+                _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
             }
             return true;
         }
@@ -2266,6 +2345,8 @@ bool SemanticsVisitor::_coerce(
                     *outCost = kConversionCost_RankPromotion + innerCost;
                 if (outToExpr)
                     *outToExpr = convertedExpr;
+                if (outToExpr)
+                    _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
                 setWitnessOfConversionToBuiltinConversion();
                 return true;
             }
@@ -2293,7 +2374,8 @@ bool SemanticsVisitor::_coerce(
                     fromExpr,
                     sink,
                     &tagCost,
-                    nullptr))
+                    nullptr,
+                    ioSourceAccess))
             {
                 if (outCost)
                     *outCost = tagCost + kConversionCost_Explicit;
@@ -2305,6 +2387,7 @@ bool SemanticsVisitor::_coerce(
                         enumExpr->loc = fromExpr->loc;
                     enumExpr->base = tagExpr;
                     *outToExpr = enumExpr;
+                    _recordCoercionSourceValueAccess(tagExpr, ioSourceAccess);
                 }
                 setWitnessOfConversionToBuiltinConversion();
                 return true;
@@ -2332,6 +2415,7 @@ bool SemanticsVisitor::_coerce(
                     castExpr->loc = fromExpr->loc;
                     castExpr->base = fromExpr;
                     *outToExpr = castExpr;
+                    _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
                 }
                 return true;
             }
@@ -2356,6 +2440,8 @@ bool SemanticsVisitor::_coerce(
                 {
                     *outCost = kConversionCost_LambdaToFunc;
                 }
+                if (ioSourceAccess)
+                    *ioSourceAccess = CoercionSourceAccess::makeNoAccess();
                 return true;
             }
         }
@@ -2379,20 +2465,17 @@ bool SemanticsVisitor::_coerce(
         {
             *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
 
-            // If the original expression was an l-value, then the result
-            // of the cast may be an l-value itself. We want to be able
-            // to invoke `[mutating]` methods on a value that is cast to
-            // an interface it conforms to, and we also expect to be able
-            // to pass a value of a derived `struct` type into methods that
-            // expect a value of its base type.
-            //
+            // A concrete struct base is an embedded subobject, so its cast can preserve an l-value.
+            // An interface conversion instead materializes an existential value. Other non-struct
+            // supertypes also materialize a source value, as recorded below for storage analysis.
             if (fromExpr && fromExpr->type.isLeftValue)
             {
-                // If toType is an interface type, we need to wrap the original
-                // expression into a MakeExistential, and the result of
-                // MakeExistential is not an l-value.
                 (*outToExpr)->type.isLeftValue = !isInterfaceType(toType);
             }
+            const bool materializesSourceValue =
+                !isTypeEqualityWitness(witness) && !isDeclRefTypeOf<StructDecl>(toType);
+            if (materializesSourceValue)
+                _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
         }
         if (outCost)
             *outCost = kConversionCost_CastToInterface;
@@ -2489,10 +2572,16 @@ bool SemanticsVisitor::_coerce(
                 derefExpr,
                 sink,
                 &subCost,
-                outWitnessOfConversion))
+                outWitnessOfConversion,
+                ioSourceAccess))
         {
             return false;
         }
+
+        // When a later coercion consumes the dereferenced value, the implicit dereference reads the
+        // parameter group first. Record that boundary without replacing a more precise downstream
+        // result, including a conversion that does not consume the value.
+        _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
 
         if (outCost)
             *outCost = subCost + kConversionCost_ImplicitDereference;
@@ -2528,12 +2617,27 @@ bool SemanticsVisitor::_coerce(
         // it pushes back on various parts of the compiler.
         //
         auto qualRefType = QualType(refType);
-        if (qualRefType.isLeftValue && !fromExpr->type.isLeftValue)
-        {
-            // The result type would be an l-value, but the source isn't,
-            // so there is no way to support the conversion.
-            //
+        // A viability probe has only the source value category and must not select accessors for a
+        // conversion candidate. Materializing the selected conversion below establishes the
+        // stronger invariant that a writable reference has a direct source address.
+        if (qualRefType.isLeftValue && !fromType.isLeftValue)
             return false;
+
+        if (qualRefType.isLeftValue && outToExpr)
+        {
+            // A writable explicit reference exposes the source address directly. Abstract storage
+            // with only `get` and `set` accessors supports value-based writeback, but it cannot
+            // provide the address required by this conversion.
+            SLANG_RELEASE_ASSERT(fromExpr);
+            auto storageAccess = analyzeStorageExpressionAccess(fromExpr, ParamPassingMode::Ref);
+            if (!storageAccess.canEvaluate())
+            {
+                if (sink)
+                    checkStorageExpressionAccess(fromExpr, ParamPassingMode::Ref, fromExpr->loc);
+                return false;
+            }
+            if (!storageAccess.canProvideRequestedStorage)
+                return _failedCoercion(toType, outToExpr, fromExpr, sink);
         }
 
         ConversionCost subCost = kConversionCost_GetRef;
@@ -2547,6 +2651,9 @@ bool SemanticsVisitor::_coerce(
             refExpr->type = qualRefType;
             refExpr->checked = true;
             *outToExpr = refExpr;
+
+            if (qualRefType.isLeftValue && ioSourceAccess)
+                *ioSourceAccess = CoercionSourceAccess::makeAccess(fromExpr, ParamPassingMode::Ref);
         }
 
         return true;
@@ -2583,10 +2690,15 @@ bool SemanticsVisitor::_coerce(
                 openRefExpr,
                 sink,
                 &subCost,
-                outWitnessOfConversion))
+                outWitnessOfConversion,
+                ioSourceAccess))
         {
             return false;
         }
+
+        // When a later coercion consumes the opened value, producing it first reads the explicit
+        // reference. Record that boundary without replacing a more precise downstream result.
+        _recordCoercionSourceValueAccess(fromExpr, ioSourceAccess);
 
         //
         // TODO(tfoley): This logic treats the implicit dereferencing
@@ -2657,6 +2769,11 @@ bool SemanticsVisitor::_coerce(
     // call to one of the initializers in the target type.
 
     OverloadResolveContext overloadContext;
+    // A materialized conversion is a call to the selected initializer, so its argument access
+    // follows that initializer parameter's effective mode. Record that access for the enclosing
+    // coercion; cost probes and callers that request no result do not account for it.
+    overloadContext.mayAccountForArgumentStorageAccess = outToExpr && ioSourceAccess;
+    overloadContext.outSourceAccess = ioSourceAccess;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
     overloadContext.argCount = 1;
     List<Expr*> args;
@@ -3397,10 +3514,27 @@ Expr* SemanticsVisitor::coerce(
     CoercionSite site,
     Type* toType,
     Expr* fromExpr,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    CoercionSourceAccessCheck sourceAccessCheck,
+    CoercionSourceAccess* outSourceAccess)
 {
+    if (outSourceAccess)
+        *outSourceAccess = CoercionSourceAccess();
+
+    CoercionSourceAccess sourceAccess;
+    const bool shouldTrackConversionSource =
+        outSourceAccess || (sink && sourceAccessCheck == CoercionSourceAccessCheck::CheckAsValue);
     Expr* expr = nullptr;
-    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, sink, nullptr, nullptr))
+    if (!_coerce(
+            site,
+            toType,
+            &expr,
+            fromExpr->type,
+            fromExpr,
+            sink,
+            nullptr,
+            nullptr,
+            shouldTrackConversionSource ? &sourceAccess : nullptr))
     {
         // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
         // clobber the type on `fromExpr`, and an invariant here is that coercion
@@ -3416,6 +3550,22 @@ Expr* SemanticsVisitor::coerce(
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
 
+    if (sourceAccessCheck == CoercionSourceAccessCheck::CheckAsValue &&
+        sourceAccess.needsFallbackCheck() && !as<ErrorType>(fromExpr->type))
+    {
+        sourceAccess = CoercionSourceAccess::makeAccess(fromExpr, ParamPassingMode::In);
+    }
+    if (sourceAccessCheck == CoercionSourceAccessCheck::CheckAsValue && sink &&
+        sourceAccess.hasAccess())
+    {
+        SemanticsVisitor(withSink(sink))
+            .checkStorageExpressionAccess(
+                sourceAccess.getExpression(),
+                sourceAccess.getMode(),
+                sourceAccess.getExpression()->loc);
+    }
+    if (outSourceAccess)
+        *outSourceAccess = sourceAccess;
     return expr;
 }
 

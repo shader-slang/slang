@@ -2832,6 +2832,17 @@ ParamInfo getParamInfo(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
     return result;
 }
 
+ParamInfo getSetterNewValueParamInfo(ASTBuilder* astBuilder, DeclRef<SetterDecl> setterDeclRef)
+{
+    auto parameters = getParameters(astBuilder, setterDeclRef);
+    SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+
+    auto result = getParamInfo(astBuilder, parameters[0]);
+    SLANG_RELEASE_ASSERT(
+        result.mode == ParamPassingMode::In || result.mode == ParamPassingMode::BorrowIn);
+    return result;
+}
+
 Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     return getParamTypeWithModeWrapper(astBuilder, getParamInfo(astBuilder, paramDeclRef));

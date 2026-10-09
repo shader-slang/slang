@@ -24,7 +24,8 @@ struct MutatingFunctor : IMutatingFunc<int, int, bool>
 
 int apply(IMutatingFunc<int, int, bool> f, int p)
 {
-    return f(p, true);
+    var localF = f;
+    return localF(p, true);
 }
 
 //TEST_INPUT:ubuffer(data=[0 3 2 2], stride=4):out,name=outputBuffer

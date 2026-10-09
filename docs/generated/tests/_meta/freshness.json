@@ -259,18 +259,18 @@
       "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/name-resolution/lookup": {
-      "generated_at": "2026-09-11T14:31:17+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "2e7c61642aa963c1eab83e3b5f078378672249e689a4505d7f9ae670dde8982a",
-      "watched_paths_digest": "fd7f3e4358dd53ce98e2c638a15ac2260c44e0636c6b24e6e6acf97a02b1aa44"
+      "generated_at": "2026-10-08T14:15:57+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "efdf7f4eb66432683c1cf2cb5329ad664773feb1",
+      "source_doc_digest": "cffd7e589792c4cdba4a0ae6875b826a811ba00aa790089e0ac76f5fcc872ecf",
+      "watched_paths_digest": "b8c008dc30fa2f397e11484c69393a4f2ad10f7c32d7e19d91e3ea5a120c6885"
     },
     "design/name-resolution/overload-resolution": {
-      "generated_at": "2026-09-11T14:31:17+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "ad0a750862e3c4522d0aa08b167f46265a6e0cf241fc5bc8bc85eedea0e7b56c",
-      "watched_paths_digest": "a91f3be6da31fc87c70ca6a66c1d67dcbbb2aaf74e3f4a40026000841c682498"
+      "generated_at": "2026-10-08T14:21:18+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "efdf7f4eb66432683c1cf2cb5329ad664773feb1",
+      "source_doc_digest": "01cb37084c8777585fcf374259bce9c027c038c58bb161014a90804e1d812693",
+      "watched_paths_digest": "725e7cbc29627d0fe6027e3fbbd43b86db29b5bce414e1af89b8f3140ed7d76c"
     },
     "design/name-resolution/scopes": {
       "generated_at": "2026-09-11T14:31:18+00:00",

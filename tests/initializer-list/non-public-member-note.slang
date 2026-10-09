@@ -12,10 +12,10 @@ public struct HasInternalMember
     int data; // implicitly internal
 }
 
-// Test 3: non-interface inheritance blocks initializer list for MyDerived.
-// The visibility note for MyDerived is suppressed because inheritance is the root cause.
-// However, as a cascade, the compiler also tries to initialize the base class MyBase from
-// the initializer list; that fails too and emits a note for MyBase's internal member.
+// Test 3: non-interface inheritance blocks initializer list for MyDerived. The visibility note for
+// MyDerived is suppressed because inheritance is the root cause. The rejected conversion owns the
+// initializer list, so the compiler does not retry legacy aggregate initialization and produce a
+// cascading diagnostic for MyBase.
 public struct MyBase { int x; }
 
 public struct MyDerived : MyBase
@@ -61,12 +61,10 @@ void computeMain()
 void computeMain2()
 {
     // Should error: inheritance (not visibility mismatch) is the root cause for MyDerived;
-    // note is suppressed for MyDerived. Cascade also errors on MyBase.
+    // the visibility note is suppressed for MyDerived.
     MyDerived d = MyDerived({ 1 });
 //CHECK: cannot use initializer list for type 'MyDerived'
 //CHECK-NOT: member 'data' is private, but 'MyDerived' is public
-//CHECK: cannot use initializer list for type 'MyBase'
-//CHECK: member 'x' is internal, but 'MyBase' is public; all members must be public to use an initializer list
 }
 
 [numthreads(1, 1, 1)]

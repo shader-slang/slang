@@ -39,7 +39,7 @@ struct Empty<TT : IEmptyS> : IInterface
     }
 }
 
-void test<Obj : IInterface>(Obj obj)
+void test<Obj : IInterface>(inout Obj obj)
 {
     Obj.T v = obj.getT();
     obj.setT(v);

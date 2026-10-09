@@ -66,17 +66,19 @@ check, so a single directive per claim is sufficient (the
    - `#transparent-members` — `cbuffer C { float4 f; }` lowering;
      `f` resolves through `anon1.f` via a `Deref` + `Member`
      breadcrumb chain.
-   - `#breadcrumbs` — the breadcrumb-walk produces canonical
-     navigation, observable through a `this.g` resolution inside a
-     method.
+   - `#breadcrumbs` — breadcrumbs record structural navigation,
+     including whether reconstruction starts from a `ThisValue` or
+     `ThisType`. A reconstructed `ThisExpr` obtains receiver mutability
+     from the checked callable declaration rather than from lookup.
    - `#block-local-shadowing` — `hiddenFromLookup`; a forward
      reference is rejected.
    - `#container-level-overload-accumulation` — same-name decls
      accumulate; overload set fires.
-   - `#deduplication-there-isnt-any-at-the-lookupresult-level` — the
-     doc explicitly states no dedup; the observable consequence is
-     that an ambiguity diagnostic fires when both paths reach the
-     same type (covered by an ambiguity claim).
+   - `#deduplication` — cover facet-origin deduplication during member
+     lookup and/or narrowing between a concrete member and an interface
+     requirement. Treat duplicate identical `DeclRef` paths inside a
+     `LookupResult` as an implementation detail that caller-side narrowing
+     consumes, not as a required user-visible ambiguity.
    - `#module-and-namespace` — re-opened namespace lookups merge;
      `using namespace` makes unqualified names reachable. (Scopes
      covers the _boundary_; this bundle covers the _merge_.)

@@ -52,8 +52,8 @@ interface IFieldBackedProperty
 }
 
 // The synthesized accessors that adapt a field to this property requirement likewise preserve the
-// accessors' declaration-derived modes without pretending that source-level mode attributes are
-// valid on class members.
+// receiver modes chosen for the requirement without treating source-level receiver-mode specifiers
+// as valid on class members.
 class FieldBackedPropertyClass : IFieldBackedProperty
 {
     int value;

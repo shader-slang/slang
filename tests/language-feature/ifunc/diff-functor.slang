@@ -14,7 +14,8 @@ struct DiffFunctor : IDifferentiableFunc<float, float>
 
 float apply(IMutatingFunc<float, float> f, float p)
 {
-    return f(p);
+    var localF = f;
+    return localF(p);
 }
 
 [Differentiable]

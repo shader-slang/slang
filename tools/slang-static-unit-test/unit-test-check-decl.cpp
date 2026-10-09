@@ -319,10 +319,47 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
     SLANG_CHECK(sink.getErrorCount() == 0);
 }
 
-// Moving mangling to the checked effective `this` parameter information must not change the
-// established names. In particular, only explicitly `[mutating]` and `[__ref]` ordinary methods
-// had mode suffixes; a borrowed method, a setter's writable default, and a direct function-type
-// declaration did not.
+// `SynthesizedParamPassingModeModifier` is a complete source of receiver-mode policy. An ad hoc
+// semantics context used by specialization has no translation unit from which to infer a
+// source-language default, so receiver checking must consume that fixed mode without asking for a
+// fallback first.
+SLANG_UNIT_TEST(synthesizedEffectiveThisUsesFixedModeWithoutTranslationUnit)
+{
+    StaticUnitTestEnv env(unitTestContext);
+
+    Module* module = env.checkModuleFromSource(
+        "synthesizedEffectiveThisUsesFixedModeWithoutTranslationUnit",
+        "struct Receiver {}\n");
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto receiverDecl = findMemberDecl<StructDecl>(module->getModuleDecl(), "Receiver");
+    SLANG_CHECK_ABORT(receiverDecl != nullptr);
+
+    auto astBuilder = env.getASTBuilder();
+    auto synthesizedMethod = astBuilder->create<FuncDecl>();
+    synthesizedMethod->parentDecl = receiverDecl;
+    auto synthesizedMode = astBuilder->create<SynthesizedParamPassingModeModifier>();
+    synthesizedMode->mode = ParamPassingMode::BorrowInOut;
+    addModifier(synthesizedMethod, synthesizedMode);
+
+    DiagnosticSink sink(module->getLinkage()->getSourceManager(), nullptr);
+    SharedSemanticsContext shared(
+        module->getLinkage(),
+        module->getModuleDecl()->languageVersion,
+        &sink);
+    SemanticsVisitor visitor(&shared);
+    visitor.checkAndAttachEffectiveThisParamInfo(synthesizedMethod);
+
+    auto thisParamInfo = synthesizedMethod->findModifier<ThisParamInfoAttribute>();
+    SLANG_CHECK_ABORT(thisParamInfo != nullptr);
+    SLANG_CHECK(thisParamInfo->info.mode == ParamPassingMode::BorrowInOut);
+    SLANG_CHECK(sink.getErrorCount() == 0);
+}
+
+// Source mangling preserves the legacy receiver-mode suffixes: only methods explicitly marked
+// `[mutating]` or `[__ref]` had suffixes. Borrowed methods, writable setters, and direct
+// function-type declarations remain unsuffixed. Neither HLSL's writable default nor trailing
+// `const` adds a suffix because receiver mode is not source overload identity.
 SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -335,7 +372,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
         "    [constref] int ordinaryBorrow(int value) { return value; }\n"
         "    [mutating] int ordinaryMutating(int value) { return value; }\n"
         "    [__ref] int ordinaryRef(int value) { return value; }\n"
-        "    [mutating] [__ref] int overlappingModes(int value) { return value; }\n"
         "    [NoDiffThis] static int staticNoDiffThis(int value) { return value; }\n"
         "    property int item { get { return 0; } set {} }\n"
         "}\n"
@@ -367,7 +403,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     auto ordinaryBorrow = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryBorrow");
     auto ordinaryMutating = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryMutating");
     auto ordinaryRef = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryRef");
-    auto overlappingModes = findMemberDecl<FuncDecl>(receiverDecl, "overlappingModes");
     auto staticNoDiffThis = findMemberDecl<FuncDecl>(receiverDecl, "staticNoDiffThis");
     auto propertyDecl = findMemberDecl<PropertyDecl>(receiverDecl, "item");
     auto defaultBorrow = findMemberDecl<FuncDecl>(nonCopyableReceiverDecl, "defaultBorrow");
@@ -377,7 +412,6 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     SLANG_CHECK_ABORT(ordinaryBorrow != nullptr);
     SLANG_CHECK_ABORT(ordinaryMutating != nullptr);
     SLANG_CHECK_ABORT(ordinaryRef != nullptr);
-    SLANG_CHECK_ABORT(overlappingModes != nullptr);
     SLANG_CHECK_ABORT(staticNoDiffThis != nullptr);
     SLANG_CHECK_ABORT(propertyDecl != nullptr);
     SLANG_CHECK_ABORT(defaultBorrow != nullptr);
@@ -401,13 +435,63 @@ SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
     SLANG_CHECK(getMangledName(astBuilder, ordinaryBorrow).endsWith("ii"));
     SLANG_CHECK(getMangledName(astBuilder, ordinaryMutating).endsWith("m"));
     SLANG_CHECK(getMangledName(astBuilder, ordinaryRef).endsWith("r"));
-    SLANG_CHECK(getMangledName(astBuilder, overlappingModes).endsWith("mr"));
     SLANG_CHECK(getMangledName(astBuilder, staticNoDiffThis).endsWith("n"));
     SLANG_CHECK(!getMangledName(astBuilder, setterDecl).endsWith("m"));
     SLANG_CHECK(!getMangledName(astBuilder, defaultBorrow).endsWith("c"));
     SLANG_CHECK(getMangledName(astBuilder, directBorrow).endsWith("B"));
     SLANG_CHECK(getMangledName(astBuilder, directMutating).endsWith("B"));
     SLANG_CHECK(getMangledName(astBuilder, directRef).endsWith("B"));
+
+    // `loadModuleFromSourceString` uses the session language option for in-memory source whose
+    // path still ends in `.slang`. The `Language` session option selects the HLSL dialect, so the
+    // first member function exercises its writable default and the second exercises trailing
+    // `const`.
+    slang::CompilerOptionEntry sourceLanguageOption = {};
+    sourceLanguageOption.name = slang::CompilerOptionName::Language;
+    sourceLanguageOption.value.kind = slang::CompilerOptionValueKind::Int;
+    sourceLanguageOption.value.intValue0 = SLANG_SOURCE_LANGUAGE_HLSL;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &sourceLanguageOption;
+
+    ComPtr<slang::ISession> hlslSession;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        unitTestContext->slangGlobalSession->createSession(sessionDesc, hlslSession.writeRef())));
+
+    ComPtr<slang::IBlob> hlslDiagnostics;
+    ComPtr<slang::IModule> hlslModuleInterface(hlslSession->loadModuleFromSourceString(
+        "checkedHlslEffectiveThisManglingPreservesLegacySuffixes",
+        "checked-hlsl-effective-this-mangling.slang",
+        "struct HlslReceiver\n"
+        "{\n"
+        "    int defaultWritable(int value) { return value; }\n"
+        "    int trailingConst(int value) const { return value; }\n"
+        "};\n",
+        hlslDiagnostics.writeRef()));
+    SLANG_CHECK_ABORT(hlslModuleInterface != nullptr);
+
+    auto hlslModule = static_cast<Module*>(hlslModuleInterface.get());
+    auto hlslReceiverDecl = findMemberDecl<StructDecl>(hlslModule->getModuleDecl(), "HlslReceiver");
+    SLANG_CHECK_ABORT(hlslReceiverDecl != nullptr);
+
+    auto defaultWritable = findMemberDecl<FuncDecl>(hlslReceiverDecl, "defaultWritable");
+    auto trailingConst = findMemberDecl<FuncDecl>(hlslReceiverDecl, "trailingConst");
+    SLANG_CHECK_ABORT(defaultWritable != nullptr);
+    SLANG_CHECK_ABORT(trailingConst != nullptr);
+
+    auto defaultWritableInfo = defaultWritable->findModifier<ThisParamInfoAttribute>();
+    auto trailingConstInfo = trailingConst->findModifier<ThisParamInfoAttribute>();
+    SLANG_CHECK_ABORT(defaultWritableInfo != nullptr);
+    SLANG_CHECK_ABORT(trailingConstInfo != nullptr);
+    SLANG_CHECK(defaultWritableInfo->info.mode == ParamPassingMode::BorrowInOut);
+    SLANG_CHECK(trailingConstInfo->info.mode == ParamPassingMode::In);
+
+    // The final `ii` encodes the ordinary `int` parameter and result. Any receiver-mode suffix
+    // appended for either HLSL case would make these checks fail.
+    auto hlslAstBuilder = hlslModule->getASTBuilder();
+    SLANG_CHECK(getMangledName(hlslAstBuilder, defaultWritable).endsWith("ii"));
+    SLANG_CHECK(getMangledName(hlslAstBuilder, trailingConst).endsWith("ii"));
 }
 
 // Synthesized witness wrappers use the checked effective `this` parameter mode as part of their
@@ -493,36 +577,6 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
         SLANG_CHECK(decoded.type->equals(original.type));
         SLANG_CHECK(doesTypeHaveNoDiffModifier(decoded.type));
     }
-}
-
-// Unchecked callable headers cannot query their checked effective `this` parameter information
-// without creating a semantic-checking cycle. The syntax-only policy used to bootstrap lookup must
-// nevertheless use the same modifier precedence as the checked producer.
-SLANG_UNIT_TEST(effectiveThisParamModePolicyPrecedence)
-{
-    StaticUnitTestEnv env(unitTestContext);
-    auto astBuilder = env.getASTBuilder();
-    auto setterDecl = astBuilder->create<SetterDecl>();
-
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
-        ParamPassingMode::BorrowInOut);
-
-    addModifier(setterDecl, astBuilder->create<NonmutatingAttribute>());
-    SLANG_CHECK(applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::In);
-
-    addModifier(setterDecl, astBuilder->create<RefAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::Ref);
-
-    addModifier(setterDecl, astBuilder->create<ConstRefAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::BorrowIn);
-
-    addModifier(setterDecl, astBuilder->create<MutatingAttribute>());
-    SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
-        ParamPassingMode::BorrowInOut);
 }
 
 // Source that fails to check reports a diagnostic rather than returning a

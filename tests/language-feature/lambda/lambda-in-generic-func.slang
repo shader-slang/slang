@@ -1,11 +1,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir -O0
 
-// Test: lambda capture of outer-scope variables when the lambda body contains
-// a generic method call. The two-phase parsing's generic disambiguation
-// (tryParseGenericApp) can pre-check expressions before the lambda capture
-// context is established, causing outer-scope variable references to not be
-// captured. This test ensures the capture is applied retroactively.
+// This test checks lambda capture when the body contains a generic method call.
+// Generic-call disambiguation may check the receiver expression before the capture context exists,
+// so later capture analysis must still find both outer variables.
 
 interface IPackedVal
 {
@@ -32,13 +30,13 @@ void computeMain<TBias: IPackedVal>(
     ConstantBuffer<Params<TBias>> params)
 {
     Params<TBias> pLocal = params;
+    uint capturedIndex = 0;
     let lambda = (uint x, float value) =>
     {
-        // pLocal.bias[0].unpack<float>() involves a generic method call that
-        // triggers tryParseGenericApp during parsing. This pre-checks the
-        // expression chain containing pLocal before the lambda capture context
-        // exists. The LambdaCaptureVisitor must retroactively fix the capture.
-        pLocal.output[x] = pLocal.bias[0].unpack<float>();
+        // `pLocal.bias[capturedIndex].unpack<float>()` is parsed before lambda-capture analysis
+        // runs. Capture analysis must still record both `pLocal` and `capturedIndex`, including the
+        // variable used only as an index operand.
+        pLocal.output[x] = pLocal.bias[capturedIndex].unpack<float>();
         return value;
     };
     invoke(lambda, 0, 1.0f);
@@ -50,9 +48,10 @@ void invoke(IFunc<float, uint, float> f, uint x, float value)
     f(x, value);
 }
 
-// Verify the lambda struct captures pLocal as a member.
+// The lambda struct captures both `pLocal` and the variable used as an index.
 // CHECK: OpName %[[LAMBDA_STRUCT:[A-Za-z0-9_]+]] "computeMain._slang_Lambda_computeMain_1"
 // CHECK: OpMemberName %[[LAMBDA_STRUCT]] 0 "pLocal"
+// CHECK: OpMemberName %[[LAMBDA_STRUCT]] 1 "capturedIndex"
 
 // Verify the lambda's operator() takes the lambda struct as its first parameter (`this`).
 // CHECK: OpName %[[LAMBDA_FUNC:[A-Za-z0-9_]+]] "computeMain._slang_Lambda_computeMain_1.()"

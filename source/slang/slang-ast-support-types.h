@@ -1365,41 +1365,33 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            // The lookup process crossed an enclosing type while a current instance was
+            // available, so the reconstructed reference needs a `this` value as its base.
+            ThisValue,
+
+            // The lookup process considered a member of an enclosing type in a context without an
+            // instance, so the reconstructed reference needs the `This` type as its base.
+            ThisType,
         };
 
         // The kind of lookup step that was performed
         Kind kind;
 
-        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
-        // and is that value mutable?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
-
-        // As needed, a reference to the declaration that faciliated
-        // the lookup step.
+        // The declaration involved in the lookup step, when the kind requires one.
         //
         // For a `Member` lookup step, this is the declaration whose
         // members were implicitly pulled into scope.
         //
-        // For a `Constraint` lookup step, this is the `ConstraintDecl`
-        // that serves to witness the subtype relationship.
+        // For a `SuperType` lookup step, this is the declaration through which the subtype
+        // relationship was found.
         //
         DeclRef<Decl> declRef;
 
         Val* val = nullptr;
+
+        // The lexical scope used to check the reconstructed `this` expression for a
+        // `Kind::ThisValue` step. Other breadcrumb kinds leave this null.
+        Scope* thisValueScope = nullptr;
 
         // The next implicit step that the lookup process took to
         // arrive at a final value.
@@ -1409,14 +1401,11 @@ FIDDLE() namespace Slang
             Kind kind,
             DeclRef<Decl> declRef,
             Val* val,
-            RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
-            : kind(kind)
-            , thisParameterMode(thisParameterMode)
-            , declRef(declRef)
-            , val(val)
-            , next(next)
+            Scope* thisValueScope,
+            RefPtr<LookupResultItem_Breadcrumb> next)
+            : kind(kind), declRef(declRef), val(val), thisValueScope(thisValueScope), next(next)
         {
+            SLANG_ASSERT((kind == Kind::ThisValue) == (thisValueScope != nullptr));
         }
 
     protected:

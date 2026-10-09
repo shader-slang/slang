@@ -893,14 +893,15 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         // writable default, and modes inherited from an enclosing declaration emitted no suffix.
         // Direct function-type declarations emitted none of these suffixes. The checked
         // information cannot reproduce those spelling distinctions by itself because several
-        // spellings intentionally produce the same ParamInfo, and overlapping attributes can
-        // produce more than one suffix even though they resolve to one effective mode.
+        // spellings intentionally produce the same ParamInfo. The HLSL default and C++-style
+        // trailing `const` are new behaviors and therefore do not add a legacy suffix.
         //
         // Source declarations therefore continue to use their spelling to reproduce the legacy
         // suffix bits, even when they do not have an effective `this` parameter. Synthesized
-        // witness wrappers are different: their declaration-owned mode is an internal ABI fact,
-        // and wrappers with distinct modes must not receive the same symbol and be coalesced by
-        // linking. Those wrappers use the checked information below to encode that distinction.
+        // witness wrappers are different: their fixed `SynthesizedParamPassingModeModifier` mode
+        // is an internal ABI fact, and wrappers with distinct modes must not receive the same
+        // symbol and be coalesced by linking. Those wrappers use the checked information below to
+        // encode that distinction.
         bool isMutating = false;
         bool isRefThis = false;
         bool isNoDiffThis =

@@ -305,25 +305,64 @@ struct BoundStorageInfo : ExtendedValueInfo
 };
 
 
-// Represents some declaration bound to a particular
-// object. For example, if we had `obj.f` where `f`
-// is a member function, we'd use a `BoundMemberInfo`
-// to represnet this.
-//
-// Note: This case is largely avoided by special-casing
-// in the handling of calls (like `obj.f(arg)`), but
-// it is being left here as an example of what we might
-// need/want to do in the long term.
+// Represents a member declaration whose base must remain available. A bound member is either a
+// field or concrete-base projection from deferred storage, or a callable bound to an object.
 struct BoundMemberInfo : ExtendedValueInfo
 {
+    enum class Kind
+    {
+        StorageProjection,
+        Callable,
+    };
+
+    static BoundMemberInfo* createStorageProjection(
+        LoweredValInfo base,
+        DeclRef<Decl> declRef,
+        IRType* type)
+    {
+        SLANG_RELEASE_ASSERT(declRef.as<VarDecl>() || declRef.as<InheritanceDecl>());
+        return new BoundMemberInfo(Kind::StorageProjection, base, declRef, type);
+    }
+
+    static BoundMemberInfo* createCallable(
+        LoweredValInfo base,
+        DeclRef<CallableDecl> declRef,
+        IRType* type)
+    {
+        SLANG_RELEASE_ASSERT(declRef);
+        return new BoundMemberInfo(Kind::Callable, base, declRef, type);
+    }
+
+    Kind getKind() const { return m_kind; }
+
+    DeclRef<Decl> getStorageProjectionDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::StorageProjection);
+        return m_declRef;
+    }
+
+    DeclRef<CallableDecl> getCallableDeclRef() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::Callable);
+        auto callableDeclRef = m_declRef.as<CallableDecl>();
+        SLANG_RELEASE_ASSERT(callableDeclRef);
+        return callableDeclRef;
+    }
+
     // The base object
     LoweredValInfo base;
 
-    // The (AST-level) declaration reference.
-    DeclRef<Decl> declRef;
-
     // The type of this value
     IRType* type;
+
+private:
+    BoundMemberInfo(Kind kind, LoweredValInfo base, DeclRef<Decl> declRef, IRType* type)
+        : base(base), type(type), m_kind(kind), m_declRef(declRef)
+    {
+    }
+
+    Kind m_kind;
+    DeclRef<Decl> m_declRef;
 };
 
 // Represents the result of a swizzle operation in
@@ -1178,10 +1217,8 @@ LoweredValInfo extractField(
             // The base value is one that is trying to defer a get-vs-set
             // decision, so we will need to do the same.
 
-            RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type = fieldType;
-            boundMemberInfo->base = base;
-            boundMemberInfo->declRef = field;
+            RefPtr<BoundMemberInfo> boundMemberInfo =
+                BoundMemberInfo::createStorageProjection(base, field, fieldType);
 
             context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
@@ -1219,22 +1256,20 @@ top:
         {
             auto boundStorageInfo = lowered.getBoundStorageInfo();
 
-            // We are being asked to extract a value from a subscript call
-            // (e.g., `base[index]`). We will first check if the subscript
-            // declared a getter and use that if possible, and then fall
-            // back to a `ref` accessor if one is defined.
-            //
-            // (Picking the `get` over the `ref` accessor simplifies things
-            // in case the `get` operation has a natural translation for
-            // a target, while the general `ref` case does not...)
+            // A `BoundStorage` value defers accessor selection for a property or subscript.
+            // Materialization prefers `get` because a target may translate the getter directly,
+            // while the general `ref` path requires an address and load. When no getter exists,
+            // materialization falls back to `ref`.
 
-            auto getters = getMembersOfType<GetterDecl>(
+            auto accessorSelection = getStorageAccessorSelection(
                 context->astBuilder,
                 boundStorageInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (getters.getCount())
+                StorageAccessorOperation::ReadValue);
+            if (accessorSelection.getStrategy() ==
+                StorageAccessorSelectionStrategy::ValueAccessorCall)
             {
-                auto getter = *getters.begin();
+                auto getter = accessorSelection.getAccessor().as<GetterDecl>();
+                SLANG_RELEASE_ASSERT(getter);
                 lowered = _emitCallToAccessor(
                     context,
                     boundStorageInfo->type,
@@ -1244,13 +1279,10 @@ top:
                 goto top;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
-                context->astBuilder,
-                boundStorageInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.getCount())
+            if (accessorSelection.getStrategy() == StorageAccessorSelectionStrategy::DirectRef)
             {
-                auto refAccessor = *refAccessors.begin();
+                auto refAccessor = accessorSelection.getAccessor().as<RefAccessorDecl>();
+                SLANG_RELEASE_ASSERT(refAccessor);
 
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -1270,8 +1302,7 @@ top:
                 goto top;
             }
 
-            // TODO: Ellie, Is this really unreachable? User code input can get here
-            SLANG_UNEXPECTED("subscript had no getter");
+            SLANG_UNEXPECTED("abstract storage cannot be read");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
         break;
@@ -1281,23 +1312,29 @@ top:
             auto boundMemberInfo = lowered.getBoundMemberInfo();
             auto base = materialize(context, boundMemberInfo->base);
 
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            switch (boundMemberInfo->getKind())
             {
-                lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
-                goto top;
-            }
-            else if (auto methodDeclRef = declRef.as<CallableDecl>())
-            {
-                auto funcVal = emitDeclRef(context, declRef, boundMemberInfo->type);
-                SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
-                lowered = funcVal;
-                goto top;
-            }
-            else
-            {
-
-                SLANG_UNEXPECTED("unexpected member flavor");
+            case BoundMemberInfo::Kind::StorageProjection:
+                {
+                    lowered = extractField(
+                        context,
+                        boundMemberInfo->type,
+                        base,
+                        boundMemberInfo->getStorageProjectionDeclRef());
+                    goto top;
+                }
+            case BoundMemberInfo::Kind::Callable:
+                {
+                    auto funcVal = emitDeclRef(
+                        context,
+                        boundMemberInfo->getCallableDeclRef(),
+                        boundMemberInfo->type);
+                    SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+                    lowered = funcVal;
+                    goto top;
+                }
+            default:
+                SLANG_UNEXPECTED("unexpected bound member kind");
                 UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
@@ -3407,7 +3444,13 @@ enum class TryGetAddressMode
     Aggressive,
 };
 
-/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
+/// Tries to refine `inVal` toward a directly addressable representation.
+///
+/// A `Ptr` result addresses the complete value. A non-pointer result can still preserve progress:
+/// nested l-values may have been replaced with addresses, including pointers returned by emitted
+/// `ref` accessor calls. Callers must continue with the returned representation even when it is
+/// not a `Ptr`; using `inVal` again would discard the selected access path and can evaluate the
+/// storage again through a different accessor.
 LoweredValInfo tryGetAddress(
     IRGenContext* context,
     LoweredValInfo const& inVal,
@@ -3535,12 +3578,20 @@ void addArg(
             // it might actually fail to yield an address in some of the
             // cases where it would have been able to for a `ref` parameter.
             //
-            LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
-            if (argPtr.flavor == LoweredValInfo::Flavor::Ptr)
+            LoweredValInfo addressedArg =
+                tryGetAddress(context, argVal, TryGetAddressMode::Default);
+            if (addressedArg.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
+                addSimpleArg(context, ioArgs, LoweredValInfo::simple(addressedArg.val));
                 return;
             }
+
+            // Address formation can simplify part of an abstract l-value without reducing the
+            // complete expression to a pointer. Preserve that result so the temporary's initial
+            // value and write-back use the accessor selected by the address attempt. For example,
+            // a multi-component swizzle can retain a pointer returned by a `ref` accessor even
+            // though the swizzle itself still needs a temporary.
+            argVal = addressedArg;
 
             // At this point we know that the `argVal` is not a simple
             // l-value that names a memory location. There are a few
@@ -4028,9 +4079,14 @@ void collectParameterLists(
         }
     }
 
-    maybeAddReturnDestinationParam(
-        ioParameterLists,
-        getResultType(context->astBuilder, callableDeclRef));
+    // A `ref` accessor returns an address to its storage rather than returning the stored value.
+    // The stored value's copyability therefore does not require a hidden return destination.
+    if (!callableDeclRef.as<RefAccessorDecl>())
+    {
+        maybeAddReturnDestinationParam(
+            ioParameterLists,
+            getResultType(context->astBuilder, callableDeclRef));
+    }
 }
 
 bool isConstExprVar(Decl* decl)
@@ -4525,38 +4581,6 @@ struct ExprLoweringContext
         }
     }
 
-    /// Return `expr` with any outer casts to interface types stripped away
-    Expr* maybeIgnoreCastToInterface(Expr* expr)
-    {
-        auto e = expr;
-        while (auto castExpr = as<CastToSuperTypeExpr>(e))
-        {
-            if (auto declRefType = as<DeclRefType>(e->type))
-            {
-                if (declRefType->getDeclRef().as<InterfaceDecl>())
-                {
-                    e = castExpr->valueArg;
-                    continue;
-                }
-            }
-            else if (auto andType = as<AndType>(e->type); andType)
-            {
-                // TODO: We might eventually need to tell the difference
-                // between conjunctions of interfaces and conjunctions
-                // that might include non-interface types.
-                //
-                // For now we assume that any case to a conjunction
-                // is effectively a cast to an interface type.
-                //
-                e = castExpr->valueArg;
-                continue;
-            }
-            break;
-        }
-        return e;
-    }
-
-
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
@@ -4978,14 +5002,6 @@ struct ExprLoweringContext
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
             auto baseExpr = resolvedInfo.baseExpr;
-            if (baseExpr)
-            {
-                // The base expression might be an "upcast" to a base interface, in
-                // which case we don't want to emit the result of the cast, but instead
-                // the source.
-                //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
-            }
 
             // If the thing being invoked is a subscript operation,
             // then we need to handle multiple extra details
@@ -5796,9 +5812,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto loweredType = lowerType(context, expr->type);
 
-        auto baseExpr = expr->baseExpression;
-        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
-        auto loweredBase = lowerSubExpr(baseExpr);
+        auto loweredBase = lowerSubExpr(expr->baseExpression);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -5808,11 +5822,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
-            RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type =
-                lowerType(context, getResultType(context->astBuilder, callableDeclRef));
-            boundMemberInfo->base = loweredBase;
-            boundMemberInfo->declRef = callableDeclRef;
+            RefPtr<BoundMemberInfo> boundMemberInfo = BoundMemberInfo::createCallable(
+                loweredBase,
+                callableDeclRef,
+                lowerType(context, getResultType(context->astBuilder, callableDeclRef)));
 
             context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
@@ -5874,59 +5887,37 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitMakeRefExpr(MakeRefExpr* expr)
     {
+        // A writable explicit reference preserves the identity of the operand's storage, so
+        // lowering must refine abstract storage through its `ref` accessor. A read-only explicit
+        // reference instead borrows a materialized value. Leaving that operand unaddressed lets
+        // materialization prefer a property's `get` accessor over its `ref` accessor.
+        SLANG_RELEASE_ASSERT(as<ExplicitRefType>(expr->type));
+
         auto loweredBase = lowerLValueExpr(context, expr->base);
+        if (expr->type.isLeftValue && loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
+            loweredBase = tryGetAddress(context, loweredBase, TryGetAddressMode::Aggressive);
 
         if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
         {
-            // If the base expression is not one that (trivially)
-            // lower to a pointer, then we have a bit of a problem,
-            // because the semantics of forming a reference are
-            // that we should refer to the memory location of
-            // the operand itself.
-            //
-            // For now, we are hacking this case by supporting
-            // formation of a *read-only* reference when the base
-            // expression is an r-value, by first copying the base
-            // expression into a temporary.
-            //
-            // Note that this approach is semantically incorrect,
-            // and a fix should be made further up the stack to
-            // rule out whatever is happening here.
-            //
-            // TODO(tfoley): Investigate why this case is arising
-            // at all, and/or eliminate the explicit `Ref` type
-            // entirely, so we don't have to deal with it.
+            // The `ExplicitRef` conversion permits a read-only reference to a non-addressable
+            // operand. Lowering implements that case by materializing the operand's value into a
+            // temporary. The temporary does not preserve the operand's storage identity, so a
+            // writable reference must never reach this path.
+            SLANG_ASSERT(!expr->type.isLeftValue);
 
-
-            // We start by asserting that the reference type we
-            // are being asked to form is read-only.
+            // TODO(tfoley): A defined lifetime model for read-only explicit references could make
+            // this temporary unnecessary. Eliminating `ExplicitRef` would remove the case instead.
             //
-            SLANG_ASSERT(as<ExplicitRefType>(expr->type) && !QualType(expr->type).isLeftValue);
-
-            // Now we perpetrate our hackery, by forming a simple value
-            // for the operand in an SSA register and copying it into
-            // a temporary.
-            //
-            // TODO(tfoley): This logic might be better expressed by
-            // forming a `LoweredValInfo` for the temporary and then
-            // using the `assign()` operation to write the base into it,
-            // since that operation might produce simpler code than
-            // we get by using `getSimpleVal` here.
-            //
+            // TODO(tfoley): Initializing the temporary through `assign()` may generate simpler IR
+            // than `getSimpleVal()` if it can preserve the same materialized value.
             auto baseVal = getSimpleVal(context, loweredBase);
             auto tempVar = context->irBuilder->emitVar(baseVal->getFullType());
             context->irBuilder->emitStore(tempVar, baseVal);
             loweredBase.val = tempVar;
         }
 
-        // Note that the `flavor` of the lowered value that we return
-        // is always `Simple`, because at the level of the IR a value
-        // of type `Ref` is just a pointer.
-        //
-        // In the case where the hack above was used to introduce a
-        // temporary, the pointer value is the address of the temporary
-        // variable itself.
-        //
+        // Slang IR represents an explicit reference as a pointer value. When lowering introduced
+        // a temporary above, `loweredBase.val` now contains the address of that temporary.
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
     }
@@ -7024,10 +7015,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto builder = getBuilder();
 
-        // The `tryGetAddress` operation will take a complex value representation
-        // and try to turn it into a single pointer, if possible.
-        //
-        baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+        // For an l-value subscript, lowering aggressively requests the base address so an available
+        // `ref` accessor can provide address-based access. If no address is available, the deferred
+        // representation remains available for read-modify-write. An r-value subscript needs only
+        // the stored value and therefore uses getter-first materialization.
+        if (isLValueContext())
+            baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+        else
+            baseVal = materialize(context, baseVal);
 
         if (auto indexLit = as<IRIntLit>(indexVal))
         {
@@ -9751,54 +9746,40 @@ LoweredValInfo tryGetAddress(
 
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            // If we are are trying to turn a subscript operation like `buffer[index]`
-            // into a pointer, then we need to find a `ref` accessor declared
-            // as part of the subscript operation being referenced.
-            //
-            auto subscriptInfo = val.getBoundStorageInfo();
+            // A `BoundStorage` value can produce an address only by calling its `ref` accessor.
+            // The requested address mode determines whether an available setter defers that call.
+            auto storageInfo = val.getBoundStorageInfo();
 
-            // We don't want to immediately bind to a `ref` accessor if there is
-            // a `set` accessor available, unless we are in an "aggressive" mode
-            // where we really want/need a pointer to be able to make progress.
-            //
-            if (mode != TryGetAddressMode::Aggressive && getMembersOfType<SetterDecl>(
-                                                             context->astBuilder,
-                                                             subscriptInfo->declRef,
-                                                             MemberFilterStyle::Instance)
-                                                             .isNonEmpty())
-            {
-                // There is a setter that we should consider using,
-                // so don't go and aggressively collapse things just yet.
+            auto operation = mode == TryGetAddressMode::Default
+                                 ? StorageAccessorOperation::TryAddressDefault
+                                 : StorageAccessorOperation::TryAddressAggressive;
+            auto accessorSelection =
+                getStorageAccessorSelection(context->astBuilder, storageInfo->declRef, operation);
+
+            // The default operation defers when a setter can preserve value-based writeback.
+            // Aggressive address formation defers only when no `ref` accessor exists.
+            if (accessorSelection.getStrategy() == StorageAccessorSelectionStrategy::Deferred)
                 return val;
-            }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
-                context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.isNonEmpty())
-            {
-                auto refAccessor = *refAccessors.begin();
+            SLANG_RELEASE_ASSERT(
+                accessorSelection.getStrategy() == StorageAccessorSelectionStrategy::DirectRef);
+            auto refAccessor = accessorSelection.getAccessor().as<RefAccessorDecl>();
+            SLANG_RELEASE_ASSERT(refAccessor);
 
-                // The `ref` accessor will return a pointer to the value, so
-                // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
+            // The `ref` accessor will return a pointer to the value, so
+            // we need to reflect that in the type of our `call` instruction.
+            IRType* ptrType = context->irBuilder->getPtrType(storageInfo->type);
 
-                LoweredValInfo refVal = _emitCallToAccessor(
-                    context,
-                    ptrType,
-                    refAccessor,
-                    subscriptInfo->base,
-                    subscriptInfo->additionalArgs);
+            LoweredValInfo refVal = _emitCallToAccessor(
+                context,
+                ptrType,
+                refAccessor,
+                storageInfo->base,
+                storageInfo->additionalArgs);
 
-                // The result from the call should be a pointer, and it
-                // is the address that we wanted in the first place.
-                return LoweredValInfo::ptr(getSimpleVal(context, refVal));
-            }
-
-            // Otherwise, there was no `ref` accessor, and so it is not possible
-            // to materialize this location into a pointer for whatever purpose
-            // we have in mind (e.g., passing it to an atomic operation).
+            // The result from the call should be a pointer, and it
+            // is the address that we wanted in the first place.
+            return LoweredValInfo::ptr(getSimpleVal(context, refVal));
         }
         break;
 
@@ -9806,22 +9787,28 @@ LoweredValInfo tryGetAddress(
         {
             auto boundMemberInfo = val.getBoundMemberInfo();
 
-            // If we hit this case, then it means that we have a reference
-            // to a single field in something, but for whatever reason the
-            // higher-level logic was not able to turn it into a pointer
-            // already (maybe the base value for the field reference is
-            // a `BoundStorage`, etc.).
-            //
-            // We need to read the entire base value out, modify the field
-            // we care about, and then write it back.
+            // A storage-projection `BoundMember` defers a field or concrete-base projection until
+            // lowering chooses how to access the abstract storage at its base. Address formation
+            // applies the same IR field key after aggressively asking that base for an address.
 
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            switch (boundMemberInfo->getKind())
             {
-                auto baseVal = boundMemberInfo->base;
-                auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+            case BoundMemberInfo::Kind::StorageProjection:
+                {
+                    auto baseVal = boundMemberInfo->base;
+                    auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
 
-                return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
+                    return extractField(
+                        context,
+                        boundMemberInfo->type,
+                        basePtr,
+                        boundMemberInfo->getStorageProjectionDeclRef());
+                }
+            case BoundMemberInfo::Kind::Callable:
+                (void)boundMemberInfo->getCallableDeclRef();
+                break;
+            default:
+                SLANG_UNEXPECTED("unexpected bound member kind");
             }
         }
         break;
@@ -9905,8 +9892,17 @@ LoweredValInfo tryGetAddress(
                         baseAddr.val);
                 return LoweredValInfo::ptr(result);
             }
+
+            // The base can still be partially simplified. Keep that representation inside the
+            // casted l-value so a caller that falls back to a temporary does not repeat accessor
+            // selection from the original abstract storage expression.
+            RefPtr<ImplicitCastLValueInfo> addressedInfo = new ImplicitCastLValueInfo();
+            addressedInfo->type = info->type;
+            addressedInfo->base = baseAddr;
+            addressedInfo->lValueType = info->lValueType;
+            context->shared->extValues.add(addressedInfo);
+            return LoweredValInfo::implicitCastedLValue(addressedInfo);
         }
-        break;
         // TODO: are there other cases we need to handled here?
 
     default:
@@ -9932,6 +9928,23 @@ IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc
     return nullptr;
 }
 
+/// Emits a selected setter call after its new-value argument has been lowered.
+static void emitBoundStorageSetterCall(
+    IRGenContext* context,
+    BoundStorageInfo* storageInfo,
+    DeclRef<SetterDecl> setterDeclRef,
+    List<IRInst*> const& args,
+    List<OutArgumentFixup> const& fixups)
+{
+    _emitCallToAccessor(
+        context,
+        context->irBuilder->getVoidType(),
+        setterDeclRef,
+        storageInfo->base,
+        args);
+    applyOutArgumentFixups(context, fixups);
+}
+
 void assignExpr(
     IRGenContext* context,
     const LoweredValInfo& inLeft,
@@ -9940,6 +9953,37 @@ void assignExpr(
 {
     auto left = tryGetAddress(context, inLeft, TryGetAddressMode::Default);
     IRBuilderSourceLocRAII locRAII(context->irBuilder, assignmentLoc);
+
+    // The source expression remains available until a setter has selected its new-value parameter
+    // mode. In particular, a non-copyable value gives that parameter the `BorrowIn` mode, which
+    // must lower the source as an l-value so that abstract storage can provide its `ref` accessor.
+    if (left.flavor == LoweredValInfo::Flavor::BoundStorage)
+    {
+        auto storageInfo = left.getBoundStorageInfo();
+        auto accessorSelection = getStorageAccessorSelection(
+            context->astBuilder,
+            storageInfo->declRef,
+            StorageAccessorOperation::WriteValue);
+        if (accessorSelection.getStrategy() == StorageAccessorSelectionStrategy::ValueAccessorCall)
+        {
+            auto setter = accessorSelection.getAccessor().as<SetterDecl>();
+            SLANG_RELEASE_ASSERT(setter);
+
+            auto newValueParamInfo = getSetterNewValueParamInfo(context->astBuilder, setter);
+            auto allArgs = storageInfo->additionalArgs;
+            List<OutArgumentFixup> newValueFixups;
+            addCallArgsForParam(
+                context,
+                newValueParamInfo.mode,
+                rightExpr,
+                &allArgs,
+                &newValueFixups);
+
+            emitBoundStorageSetterCall(context, storageInfo, setter, allArgs, newValueFixups);
+            return;
+        }
+    }
+
     switch (left.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
@@ -9950,7 +9994,7 @@ void assignExpr(
     default:
         {
             auto right = lowerRValueExpr(context, rightExpr);
-            assign(context, inLeft, right);
+            assign(context, left, right);
         }
         break;
     }
@@ -10160,37 +10204,27 @@ top:
 
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            // The `left` value refers to a subscript operation on
-            // a resource type, bound to particular arguments, e.g.:
-            // `someStructuredBuffer[index]`.
-            //
-            // When storing to such a value, we need to emit a call
-            // to the appropriate builtin "setter" accessor, if there
-            // is one, and then fall back to a `ref` accessor if
-            // there is no setter.
-            //
-            auto subscriptInfo = left.getBoundStorageInfo();
+            // A `BoundStorage` destination defers accessor selection for a property or subscript.
+            // Assignment prefers `set` and falls back to storing through `ref` when no setter
+            // exists.
+            auto storageInfo = left.getBoundStorageInfo();
 
-            // Search for an appropriate "setter" declaration
-            auto setters = getMembersOfType<SetterDecl>(
+            auto accessorSelection = getStorageAccessorSelection(
                 context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (setters.isNonEmpty())
+                storageInfo->declRef,
+                StorageAccessorOperation::WriteValue);
+            if (accessorSelection.getStrategy() ==
+                StorageAccessorSelectionStrategy::ValueAccessorCall)
             {
-                auto setter = *setters.begin();
+                auto setter = accessorSelection.getAccessor().as<SetterDecl>();
+                SLANG_RELEASE_ASSERT(setter);
 
-                auto allArgs = subscriptInfo->additionalArgs;
+                auto allArgs = storageInfo->additionalArgs;
 
                 // A setter owns exactly one new-value parameter. Lower that value through the
                 // same mode-aware path as an ordinary call argument so that an effective
                 // `BorrowIn` parameter receives an address rather than a copied value.
-                auto setterParams = getParameters(context->astBuilder, setter);
-                SLANG_RELEASE_ASSERT(setterParams.getCount() == 1);
-                auto newValueParamInfo = getParamInfo(context->astBuilder, setterParams[0]);
-                SLANG_RELEASE_ASSERT(
-                    newValueParamInfo.mode == ParamPassingMode::In ||
-                    newValueParamInfo.mode == ParamPassingMode::BorrowIn);
+                auto newValueParamInfo = getSetterNewValueParamInfo(context->astBuilder, setter);
 
                 List<OutArgumentFixup> newValueFixups;
                 addArg(
@@ -10202,34 +10236,25 @@ top:
                     newValueParamInfo.type,
                     setter.getDecl()->loc);
 
-                _emitCallToAccessor(
-                    context,
-                    builder->getVoidType(),
-                    setter,
-                    subscriptInfo->base,
-                    allArgs);
-                applyOutArgumentFixups(context, newValueFixups);
+                emitBoundStorageSetterCall(context, storageInfo, setter, allArgs, newValueFixups);
                 return;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
-                context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.isNonEmpty())
+            if (accessorSelection.getStrategy() == StorageAccessorSelectionStrategy::DirectRef)
             {
-                auto refAccessor = *refAccessors.begin();
+                auto refAccessor = accessorSelection.getAccessor().as<RefAccessorDecl>();
+                SLANG_RELEASE_ASSERT(refAccessor);
 
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
+                IRType* ptrType = context->irBuilder->getPtrType(storageInfo->type);
 
                 LoweredValInfo refVal = _emitCallToAccessor(
                     context,
                     ptrType,
                     refAccessor,
-                    subscriptInfo->base,
-                    subscriptInfo->additionalArgs);
+                    storageInfo->base,
+                    storageInfo->additionalArgs);
 
                 // The result from the call needs to be implicitly dereferenced,
                 // so that it can work as an l-value of the desired result type.
@@ -10239,8 +10264,7 @@ top:
                 goto top;
             }
 
-            // No setter found? Then we have an error!
-            SLANG_UNEXPECTED("no setter found");
+            SLANG_UNEXPECTED("abstract storage cannot be written");
             break;
         }
         break;
@@ -10249,37 +10273,40 @@ top:
         {
             auto boundMemberInfo = left.getBoundMemberInfo();
 
-            // If we hit this case, then it means that we are trying to set
-            // a single field in someting that is not atomically set-able.
-            // (e.g., an element of a value where the `subscript` operation
-            // has `get` and `set` but not a `ref` accessor).
-            //
-            // We need to read the entire base value out, modify the field
-            // we care about, and then write it back.
+            // A storage-projection `BoundMember` represents a field or concrete-base projection
+            // from abstract storage. When no direct address is available, assignment copies the
+            // complete base value, updates the selected subobject, and writes the complete value
+            // back.
 
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            switch (boundMemberInfo->getKind())
             {
-                // materialize the base value and move it into
-                // a mutable temporary if needed
-                auto baseVal = boundMemberInfo->base;
-                auto tempVal = moveIntoMutableTemp(context, baseVal);
+            case BoundMemberInfo::Kind::StorageProjection:
+                {
+                    // materialize the base value and move it into
+                    // a mutable temporary if needed
+                    auto baseVal = boundMemberInfo->base;
+                    auto tempVal = moveIntoMutableTemp(context, baseVal);
 
-                // extract the field l-value out of the temporary
-                auto tempFieldVal =
-                    extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
+                    // extract the field l-value out of the temporary
+                    auto tempFieldVal = extractField(
+                        context,
+                        boundMemberInfo->type,
+                        tempVal,
+                        boundMemberInfo->getStorageProjectionDeclRef());
 
-                // assign to the field of the temporary l-value
-                assign(context, tempFieldVal, right);
+                    // assign to the field of the temporary l-value
+                    assign(context, tempFieldVal, right);
 
-                // write back the modified temporary to the base l-value
-                assign(context, baseVal, tempVal);
+                    // write back the modified temporary to the base l-value
+                    assign(context, baseVal, tempVal);
 
-                return;
-            }
-            else
-            {
-                SLANG_UNEXPECTED("handled member flavor");
+                    return;
+                }
+            case BoundMemberInfo::Kind::Callable:
+                (void)boundMemberInfo->getCallableDeclRef();
+                SLANG_UNEXPECTED("cannot assign to a bound callable");
+            default:
+                SLANG_UNEXPECTED("unexpected bound member kind");
             }
         }
         break;

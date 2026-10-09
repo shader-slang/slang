@@ -63,6 +63,14 @@ and a 1-3 sentence explanation:
 For each step, name the diagnostic family the step can produce (or
 note "no diagnostic; silent rejection").
 
+After the probe pipeline, explain that `CompleteOverloadCandidate`
+materializes the selected expression and calls
+`checkSelectedCallableReceiver`. Receiver writability is validated only
+for the selected call; it does not affect candidate applicability,
+ranking, or overload identity. Distinguish this post-selection check
+from ordinary explicit-parameter passing modes, which remain part of
+`TryCheckOverloadCandidateTypes`.
+
 Include a mermaid flowchart showing the candidate filter pipeline.
 
 The page must also contain a level-2 section `## Conversion costs`
