@@ -19,6 +19,19 @@ User-specific instructions for Slang (optional, may not exist):
 
 - @~/.claude/slang-instructions.md
 
+## Authoring and Self-Review
+
+When authoring or revising Slang code, tests, comments, or documentation, follow the [authoring and self-review procedure](.claude/skills/slang-review-clarity-workflow/SKILL.md#authoring-and-self-review).
+Apply both clarity review perspectives from the outset and examine every in-scope declaration, name, expression, condition, and sentence in comments and documentation.
+Review the complete cumulative change, including earlier commits and review fixes, and keep a compact record of coverage tied to the reviewed revision.
+These are acceptance requirements for authored work; passing tests or filtering review candidates does not establish that they are satisfied.
+
+Review feedback about clarity, quality, or style reopens the application of the relevant expectation throughout the assigned change before the concern is accepted or dismissed.
+A demonstrated violation of an already applicable requirement means the previous self-review was insufficient and requires correcting all applicable violations, followed by fresh high-level and fine-grained reviews of the cumulative change.
+Apply a genuinely new requirement throughout the current assignment without treating it as evidence of prior noncompliance.
+Complete that reassessment before reporting the feedback addressed or the work ready.
+Preserve the original responsibility boundary; exhaustive review does not authorize cleanup of unrelated existing code.
+
 ## Build System and Common Commands
 
 ### Building the Project
@@ -110,10 +123,9 @@ representation that is robust by construction, even when that means a larger rew
 - **Fix root causes, not symptoms.** When a bug appears in emit/codegen, the cause is usually
   upstream (an IR pass, type legalization, specialization, lowering, or the AST/IR representation
   itself). Trace it there and fix it there.
-- **Question every change.** Before keeping a change, answer: _Why is this change necessary? What
-  test fails without it? Is this the right fix, or is the problem telling me the
-  direction/representation is flawed?_ If you cannot name a test that fails without a change, the
-  change probably should not exist.
+- **Question every change.** Before keeping a change, explain why it is necessary and whether the problem calls for a different direction or representation.
+  For a behavioral implementation change, identify a test that fails without it; otherwise, the change probably should not exist.
+  A naming, contract, decomposition, or explanation correction can be necessary without changing runtime behavior; justify it by the clarity requirement the current code fails to satisfy.
 - **Do not mask.** A guard, null-check, or special case that papers over a malformed
   AST/IR/witness-table is a band-aid that hides a representation bug. A guard that is never hit
   under correct input is dead code. Prefer making the representation correct so consumers stay

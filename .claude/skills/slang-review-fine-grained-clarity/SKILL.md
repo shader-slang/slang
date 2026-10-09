@@ -1,6 +1,6 @@
 ---
 name: slang-review-fine-grained-clarity
-description: Review Slang changes for fine-grained clarity. Use whenever reviewing PRs or diffs for code quality or correctness. Produces candidate review comments in a markdown file.
+description: Review Slang changes for fine-grained clarity and supply declaration, naming, comment, and control-flow acceptance criteria for authored changes. Use for authoring self-review or reviewing PRs and diffs for code quality. Produces candidate findings in a markdown file.
 argument-hint: "<pr-number-or-diff-path>"
 allowed-tools:
   - Bash
@@ -17,11 +17,15 @@ Perform a detailed name/comment/definition consistency pass over a Slang PR.
 This is a "nit-pick" review pass, but the nits are not cosmetic: unclear names, muddy
 comments, and mismatched contracts are evidence that the code is not clear enough to be trusted.
 
-The expected standard is exhaustive scrutiny of touched code. Consider every changed or newly
-relevant file, type, function, declaration, comment, branch, expression, and line. Generate a
-candidate unless you can confidently state that a careful reader would find the code/comments
-obviously necessary, correct, and internally consistent. One candidate may cover a cluster of
-related lines, but do not skip a concern merely because it is fine-grained or pedantic.
+The expected standard is exhaustive scrutiny of the complete cumulative change.
+Examine every in-scope file, type, function, declaration, name, expression, condition, line, and sentence in comments and documentation.
+Include earlier assigned commits and review fixes; do not sample or exempt apparently trivial changes.
+Generate a candidate unless you can confidently state that a careful reader would find the code and comments obviously necessary, correct, and internally consistent.
+One candidate may cover a cluster of related lines, but do not skip examination or a concern because it is fine-grained or pedantic.
+
+When authoring or revising code, apply these criteria through the [authoring and self-review procedure](../slang-review-clarity-workflow/SKILL.md#authoring-and-self-review).
+That procedure defines the cumulative comparison, responsibility boundary, response to feedback, and acceptance requirements.
+Candidate discovery or filtering does not itself establish that authored work satisfies these criteria.
 
 Do not directly post comments to PRs; write candidate comments to a markdown file under
 `tmp/review-candidates/`.
@@ -43,6 +47,9 @@ mkdir -p tmp/review-candidates
 gh.exe pr diff <number> -R shader-slang/slang > tmp/pr-diff.patch
 gh.exe pr view <number> -R shader-slang/slang --json files -q '.files[].path' > tmp/pr-files.txt
 ```
+
+These conventional input paths are shared within a checkout.
+Use an isolated checkout if concurrent sessions could overwrite them, and preserve a task-specific copy of the reviewed snapshot with the review record.
 
 Read `CLAUDE.md`, `AGENTS.md`, `tmp/pr-files.txt`, `tmp/pr-diff.patch`, and the PR-version
 source files. For large files, use grep first and then read focused ranges.
@@ -77,15 +84,18 @@ which candidates are fair to post.
 
 ## Coverage Standard
 
-This pass should leave an audit trail of scrutiny, not just the most interesting few comments.
-For each changed source file, the final raw candidate set should make it plausible that every
-touched declaration and non-trivial changed line was inspected. The outcome for each touched
-region should be one of:
+Keep an inspectable coverage record alongside the raw candidates, tied to the comparison base, reviewed revision, and cumulative diff snapshot.
+Identify the declarations and regions examined and the applicable criteria.
+For each in-scope region, record one of:
 
 - a candidate records the missing clarity, uncertainty, or inconsistency;
 - a nearby candidate covers the same conceptual issue;
-- the code and comments are obviously sufficient, with no lingering question about necessity,
-  correctness, naming, or contract.
+- concrete reasons the code and comments satisfy the applicable requirements for necessity, correctness, naming, and contract.
+
+Grouping related items in the record is allowed; omitting examination of individual items is not.
+For a condition, establish which semantic cases it distinguishes and why that distinction is valid.
+For a comment or documentation sentence, identify the proposition and referents and check that the implementation supports its claim.
+A blanket "reviewed" or "obvious" disposition is insufficient.
 
 When in doubt, write the candidate with lower confidence. Do not rely on later memory or final
 summaries to recover skipped fine-grained concerns.
@@ -348,12 +358,11 @@ When possible, request that names, comments, etc. be revised to focus more on de
 1. Build an inventory of changed or newly relevant types, functions, terms, etc.
 2. Work file by file, in source order.
 3. For each touched type, function, or free-standing comment, apply the appropriate checklist mechanically.
-4. For touched statement-level logic, inspect each non-trivial branch, loop, early return,
-   assertion, mutation, or other cluster of related statements.
+4. For in-scope statement-level logic, inspect each declaration, expression, condition, branch, loop, early return, assertion, and mutation, including apparently trivial statements.
+   Examine every in-scope sentence in comments and documentation with the terminology and prose checklist.
 5. Record candidates immediately in the output file with source context.
-6. Perform a second coverage pass over the changed file list and diff hunks. For each changed
-   file, ask which touched line/function/type has no candidate and is not obviously clear
-   enough to review quickly and confidently. Add missing candidates before deduplicating.
+6. Perform a second coverage pass over the cumulative file list and diff snapshot.
+   Revisit regions without a candidate or concrete acceptance reasons and add missing findings before deduplicating.
 7. Deduplicate only when two candidates ask for the same clarification at the same location.
 
 Do not collapse a high volume of legitimate clarity candidates just because they are numerous.
