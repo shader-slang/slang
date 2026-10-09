@@ -569,7 +569,7 @@ static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* from
     // Get the branch argument supplied for that parameter along the edge from
     // `fromPred`.
     auto branch = as<IRUnconditionalBranch>(fromPred->getTerminator());
-    if (!branch || paramIndex >= branch->getArgCount())
+    if (!branch || UInt(paramIndex) >= branch->getArgCount())
         return nullptr;
 
     auto argVal = as<IRBoolLit>(branch->getArg(paramIndex));
