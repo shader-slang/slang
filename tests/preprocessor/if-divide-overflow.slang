@@ -1,6 +1,6 @@
 // Overflowing arithmetic in an `#if` expression wraps instead of trapping or invoking undefined
-// behavior. The int32 rows used to trap when `#if` evaluated in 32 bits; the int64 rows reach the
-// `/ -1` and `% -1` special cases, where the quotient wraps (as in GCC and Clang) and the
+// behavior. The int32-minimum rows stay within the signed 64-bit range; the INT64_MIN rows reach
+// the `/ -1` and `% -1` special cases, where the quotient wraps (as in GCC and Clang) and the
 // remainder is 0.
 
 //TEST:INTERPRET(filecheck=CHECK):

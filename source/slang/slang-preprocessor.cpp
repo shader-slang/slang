@@ -3193,8 +3193,6 @@ static int GetInfixOpPrecedence(Token const& opToken)
     }
 };
 
-// Evaluate one infix operation in a preprocessor
-// conditional expression
 // Returns `count` reduced modulo the width of `PreprocessorExpressionValue`. Shifting by a
 // negative count, or by the width or more, is undefined in C++, so we mask every count; constant
 // folding in code masks non-negative counts the same way (`_tryFoldConstantShift`).
@@ -3205,6 +3203,8 @@ static int _getPreprocessorShiftCount(PreprocessorExpressionValue count)
         std::numeric_limits<UnsignedPreprocessorExpressionValue>::digits);
 }
 
+// Evaluate one infix operation in a preprocessor
+// conditional expression
 static PreprocessorExpressionValue EvaluateInfixOp(
     PreprocessorDirectiveContext* context,
     Token const& opToken,
