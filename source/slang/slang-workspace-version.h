@@ -164,6 +164,7 @@ class Workspace : public ComObject, public ISlangFileSystem
 private:
     RefPtr<WorkspaceVersion> currentVersion;
     RefPtr<WorkspaceVersion> currentCompletionVersion;
+    uint64_t completionVersionSerial = 0;
     RefPtr<WorkspaceVersion> createWorkspaceVersion();
 
 public:
@@ -199,6 +200,10 @@ public:
     void invalidate();
     WorkspaceVersion* getCurrentVersion();
     WorkspaceVersion* getCurrentCompletionVersion() { return currentCompletionVersion.Ptr(); }
+    // Identifies the completion version returned by `getCurrentCompletionVersion`. It changes every
+    // time `createVersionForCompletion` is called, so a completion item can record which version
+    // its candidate index refers to.
+    uint64_t getCompletionVersionSerial() const { return completionVersionSerial; }
     WorkspaceVersion* createVersionForCompletion();
 
 public:
