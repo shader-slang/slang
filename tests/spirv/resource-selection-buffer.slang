@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -capability spvDescriptorHeapEXT -O0 -validate-ir
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -capability spvDescriptorHeapEXT -validate-ir
 
-// Check that a function returning a selected heap buffer is legalized to select an index,
+// This test checks that a function returning a selected heap buffer is legalized to select an index,
 // and that the caller can write through the resulting buffer pointer.
 
 // CHECK: %[[VAR:[^ ]+]] = OpVariable %_ptr_Function_uint Function

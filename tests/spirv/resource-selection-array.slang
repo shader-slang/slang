@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -validate-ir
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage fragment -entry main -validate-ir
 
-// Check that sampler and texture array selections use nonuniform indices in SPIR-V and GLSL.
+// This test checks that sampler and texture array selections use nonuniform indices in SPIR-V and GLSL.
 
 // CHECK: OpCapability SampledImageArrayNonUniformIndexing
 // CHECK: OpDecorate %t NonUniform

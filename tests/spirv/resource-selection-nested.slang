@@ -3,8 +3,9 @@
 //TEST:SIMPLE(filecheck=LOOP): -target spirv-asm -stage fragment -entry swap -O0 -validate-ir
 //TEST:SIMPLE(filecheck=LOOP): -target spirv-asm -stage fragment -entry swap -validate-ir
 
-// Check that nested sampler selects become integer selects with correctly typed nonuniform indices.
-// Check that swapping samplers in a loop uses integer state instead of local sampler variables.
+// The nested-select case checks that sampler selects become integer selects with correctly typed
+// nonuniform indices. The loop case checks that swapping samplers uses integer state instead of
+// local sampler variables.
 
 // SELECT: %a = OpSelect %int
 // SELECT: %b = OpSelect %int

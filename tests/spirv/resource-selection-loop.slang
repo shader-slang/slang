@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -O0 -validate-ir
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -validate-ir
 
-// Check that a conditionally updated sampler is carried through a loop as a heap index,
+// This test checks that a conditionally updated sampler is carried through a loop as a heap index,
 // and that a texture select also selects a heap index.
 
 // CHECK: %[[S:[^ ]+]] = OpVariable %_ptr_Function_uint Function
