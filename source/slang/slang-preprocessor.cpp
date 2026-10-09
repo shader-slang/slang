@@ -3218,6 +3218,10 @@ static PreprocessorExpressionValue EvaluateInfixOp(
                 }
                 return 0;
             }
+            // The most negative value divided by -1 overflows and traps on common hardware, so
+            // we define division by -1 as wrapping negation, which is what GCC and Clang produce.
+            if (right == -1)
+                return PreprocessorExpressionValue(0 - uint64_t(left));
             return left / right;
         }
     case TokenType::OpMod:
@@ -3231,6 +3235,9 @@ static PreprocessorExpressionValue EvaluateInfixOp(
                 }
                 return 0;
             }
+            // Any value modulo -1 is 0, but computing the most negative value % -1 traps.
+            if (right == -1)
+                return 0;
             return left % right;
         }
     case TokenType::OpAdd:
