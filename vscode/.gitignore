@@ -1,0 +1,7 @@
+*.vsix
+bin/
+dist/
+out/
+node_modules/
+client/server
+.vscode-test-web

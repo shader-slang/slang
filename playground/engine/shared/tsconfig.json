@@ -1,0 +1,17 @@
+{
+	"extends": "../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": [
+			"es2020",
+			"WebWorker",
+			"DOM"
+		],
+		"rootDir": "src",
+		"composite": true,
+		"outDir": "dist"
+	},
+	"include": [
+		"src"
+	],
+	"exclude": []
+}
