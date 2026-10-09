@@ -23,6 +23,7 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsFloat:
     case kIROp_IsCoopFloat:
     case kIROp_IsVector:
+    case kIROp_IsBindlessTextureNVEncodable:
     case kIROp_GetNaturalStride:
     case kIROp_GetNaturalAlignment:
     case kIROp_TypeEquals:
@@ -429,6 +430,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     case kIROp_DebugVar:
     case kIROp_DebugLine:
     case kIROp_DebugScope:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugInlinedAt:
         return None;
 

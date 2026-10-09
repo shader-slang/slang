@@ -89,15 +89,6 @@ docs/generated/tests/conformance/types-extension/enum-extension-static-members.s
 #    generates that test, so the entry no longer resolved to a file.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
 
-# Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
-# `countof(a)` on a static array folds to the element type's byte size
-# instead of the array's element count (int[9] -> 4, double[6] -> 8),
-# while `countof` on a generic type pack folds correctly. The design doc
-# documents the array operand. (Will become a tracking issue after human
-# triage.)
-docs/generated/tests/design/ast-reference/expressions/countof-static-array.slang
-docs/generated/tests/design/ir-reference/misc/countof-fixed-size-array.slang (cpu)
-
 # Pending: docs/generated/tests/_meta/findings/new-expr-with-constructor-args-internal-error.yaml
 # The `E99997 ... could not resolve target declaration for call` abort this
 # block was opened for is fixed by

@@ -1887,6 +1887,10 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- AST-to-IR lowering applies this decoration to mutable file- or namespace-scope
+			-- `static` variables and uniform-parameter shadows with the same storage semantics.
+			-- Lowering does not apply it to static data members, which also use `IRGlobalVar`.
+			{ fileOrNamespaceScopeStaticVar = { struct_name = "FileOrNamespaceScopeStaticVarDecoration" } },
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
@@ -2068,10 +2072,10 @@ local insts = {
 				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
 			},
 			{
+				-- Added to an entry point's input parameter, and copied onto the entry-point function
 				GeometryInputPrimitiveTypeDecoration = {
 					{
 						pointPrimitiveType = {
-							-- Added to IRParam parameters to an entry point
 							struct_name = "PointInputPrimitiveTypeDecoration",
 						},
 					},
@@ -2526,6 +2530,11 @@ local insts = {
 			{ loopCounterUpdateDecoration = {} },
 			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
+				AutodiffParameterContextTypeDecoration = {
+					-- Marks a context whose fields are captured primal parameters.
+				},
+			},
+			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
 					{
@@ -2660,9 +2669,9 @@ local insts = {
 			},
 			{
 				DebugLocation = {
-					-- Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+					-- Source, line, column, and an optional declaration scope for variables/parameters.
 					struct_name = "DebugLocationDecoration",
-					operands = { { "source" }, { "line" }, { "col" } },
+					operands = { { "source" }, { "line" }, { "col" }, { "scope", optional = true } },
 				},
 			},
 			{
@@ -2704,7 +2713,11 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks a module as an experimental module
+					-- Marks a module as experimental in serialized IR.
+					--
+					-- Retained as derived metadata because the AST-gate refactor left
+					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
+					-- pre-refactor readers still inspect this marker to emit E00104.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
@@ -2824,6 +2837,7 @@ local insts = {
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
+	{ IsBindlessTextureNVEncodable = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ TranslateBase = {
 		hoistable = true,
@@ -2989,7 +3003,11 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{
+		DebugVar = {
+			min_operands = 5,
+		},
+	},
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -3001,13 +3019,18 @@ local insts = {
 			min_operands = 5,
 		},
 	},
+	{
+		DebugLexicalBlock = {
+			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
+		},
+	},
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {
-			min_operands = 2,
+			min_operands = 1,
 		},
 	},
-	{ DebugNoScope = { min_operands = 1 } },
+	{ DebugNoScope = { min_operands = 0 } },
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,

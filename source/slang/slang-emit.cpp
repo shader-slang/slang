@@ -50,6 +50,7 @@
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
+#include "slang-ir-expand-autodiff-parameter-contexts.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
@@ -99,6 +100,7 @@
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-resolve-varying-input-ref.h"
@@ -446,6 +448,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
@@ -1554,6 +1557,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // The linker can resolve an external type to a definition containing resources or an unsized
+    // array. We need to validate mutable storage after those fields become available.
+    // We check the linked IR at the specialization checkpoint, before resource legalization
+    // assumes that each mutable global has a supported type.
+    if (!validateMutableGlobalVariableTypes(irModule, sink))
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
@@ -1680,7 +1690,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            SLANG_PASS(checkForMissingReturns, sink, target, false);
+            SLANG_PASS(
+                checkForMissingReturns,
+                sink,
+                SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN,
+                target,
+                false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
@@ -1792,6 +1807,14 @@ Result linkAndOptimizeIR(
     SLANG_PASS(lowerTuples, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    // Expand captured parameters for CUDA (including PTX and OptiX) and Metal after tuple
+    // lowering, before aggregate parameters are converted to references. Keep the other target
+    // pipelines unchanged until this optimization is validated for them.
+    if (target == CodeGenTarget::CUDASource || isMetalTarget(target))
+    {
+        SLANG_PASS(expandAutodiffParameterContexts);
+    }
 
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
     if (sink->getErrorCount() != 0)
@@ -1951,6 +1974,13 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        // Give empty ray/callable payloads physical storage at native interfaces before type
+        // legalization erases their logical values, and wrap non-struct D3D payloads and hit
+        // attributes in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
+        SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
+
         if (isMetalTarget(targetRequest))
         {
             // Metal is a special target in that we want to legalize constant buffer
@@ -1994,52 +2024,6 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
-        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
-        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
-        {
-            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
-        }
-
-        // Vulkan (SPIR-V + GLSL): an empty `CallShader` payload is backed by a
-        // `[__vulkanCallablePayload]` global; if it legalizes to `none`, type legalization aborts
-        // with "non-simple operand(s)!" — via `OpExecuteCallableKHR` on SPIR-V, or
-        // `__callablePayloadLocation` on GLSL. Pad it so a real Callable Data variable survives.
-        // Must run before legalizeResourceTypes erases the empty payload struct.
-        if (isKhronosTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForVulkan);
-        }
-
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
-        if (isD3DTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
-
-            // A callable entry point must keep exactly one argument parameter for DXC, and a
-            // `CallShader(index, payload)` must keep its payload argument, but an empty
-            // callable-data struct would be erased by the empty-struct legalization below. Pad it
-            // with a dummy field first (must run before legalizeExistentialTypeLayout /
-            // legalizeResourceTypes remove the empty struct). `targetCaps` lets the pass recognize
-            // the `CallShader` intrinsic call via `findTargetIntrinsicDefinition`.
-            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL, targetRequest->getTargetCaps());
-
-            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
-            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
-            // only covers payload structs reached through a `TraceRay`-style call, so a
-            // user-authored struct with one-sided PAQ that only reaches a hit shader
-            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
-            // missing per-side PAQs structurally on every `[raypayload]` struct.
-            auto profile = getEffectiveTargetProfile(
-                targetProgram->getTargetReq(),
-                targetProgram->getOptionSet());
-            if (profile.getFamily() == ProfileFamily::DX &&
-                profile.getVersion() >= ProfileVersion::DX_6_7)
-            {
-                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
-            }
-        }
-
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -3321,6 +3305,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         NonSemanticShaderDebugInfo100DebugTypeComposite,
         NonSemanticShaderDebugInfo100DebugTypeMember,
         NonSemanticShaderDebugInfo100DebugFunction,
+        NonSemanticShaderDebugInfo100DebugLexicalBlock,
         NonSemanticShaderDebugInfo100DebugScope,
         NonSemanticShaderDebugInfo100DebugNoScope,
         NonSemanticShaderDebugInfo100DebugInlinedAt,

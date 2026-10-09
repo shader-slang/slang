@@ -111,6 +111,42 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+//@hidden:
+// A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
+// that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
+// matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
+// `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
+// implement these by calling `min`/`max` on their own operands. That call is resolved when each
+// builtin conformance is checked, where the operand shape is known, so it binds the concrete
+// overload for that shape, which ranks above the generic ones that would call back into
+// `__min`/`__max` without end. Each target then gets its native vector operation where it has one,
+// and the same per-element code as a direct call on cpp/cuda.
+//
+// `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
+// defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a
+// type ordered as a whole. The builtin types override them: vectors and matrices are
+// component-wise, and scalars keep each target's own `min`/`max`, including its NaN handling, which
+// a `lessThan` comparison does not match. A user `IFloat`/`IInteger` type therefore needs no new
+// members. The requirements live here rather than in `IComparable` so that a type conforming only
+// to `IComparable` gains no new requirements and `IComparable` stays a pure ordering interface.
+interface __IMinMax : IComparable
+{
+    This __min(This other)
+    {
+        if (this.lessThan(other))
+            return this;
+        return other;
+    }
+
+    This __max(This other)
+    {
+        if (this.lessThan(other))
+            return other;
+        return this;
+    }
+}
+//@public:
+
 /// Represents types that has a defined range of values.
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
@@ -248,7 +284,7 @@ interface ILogical : IComparable
 /// }
 /// ```
 ///
-interface IInteger : IArithmetic, ILogical
+interface IInteger : IArithmetic, ILogical, __IMinMax
 {
     /// Converts the value of the current instance to an `int`.
     /// @return The converted `int` value.
@@ -301,7 +337,7 @@ interface IInteger : IArithmetic, ILogical
 /// }
 /// ```
 ///
-interface IFloat : IArithmetic, IDifferentiable
+interface IFloat : IArithmetic, IDifferentiable, __IMinMax
 {
     /// Initializes a value of the conforming type form a `float`.
     [Differentiable]
@@ -370,12 +406,23 @@ interface __BuiltinType
 {
 }
 
+/// A compiler-supported, non-void scalar representation.
+///
+/// Implemented by `bool`, the builtin signed and unsigned integer scalar types, and the `half`,
+/// `float`, and `double` types. This sealed marker supports representation-level dispatch such as
+/// compiler-defined casts; it does not imply any particular mathematical capabilities.
+[sealed]
+[builtin]
+interface __BuiltinScalarType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -383,7 +430,7 @@ interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 /// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType, ILogical
+interface __BuiltinLogicalType : __BuiltinScalarType, ILogical
 {
 }
 
@@ -947,10 +994,13 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Represents types that provide a subscript operator so that they can be used like an immutable array.
+/// Represents types that provide a subscript operator so that they can be used like an immutable
+/// array.
 /// @param T The element type returned by the subscript operator.
-/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.
-/// @example The follow example shows how to define a generic function that computes the sum of all elements in an array-like type.
+/// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `Buffer`,
+/// `StructuredBuffer`, and `RWStructuredBuffer` types.
+/// @example The following example shows how to define a generic function that computes the sum of
+/// all elements in an array-like type.
 /// ```csharp
 /// T sum<T:IFloat, U:IArray<T>>(U array)
 /// {
@@ -1292,6 +1342,8 @@ $}
         __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
         __intrinsic_op($(kIROp_IntCast)) uint toUInt();
         __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
+        [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+        [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 ${
         break;
 
@@ -1327,6 +1379,8 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
@@ -2371,6 +2425,8 @@ extension vector<T,N> : IInteger
     [__unsafeForceInlineEarly] int64_t toInt64() { return __intCast<int64_t>(this[0]); }
     [__unsafeForceInlineEarly] uint toUInt() { return __intCast<uint>(this[0]); }
     [__unsafeForceInlineEarly] uint64_t toUInt64() { return __intCast<uint64_t>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
@@ -2411,6 +2467,8 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 
     [Differentiable]
     __intrinsic_op(0)
@@ -2479,6 +2537,21 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    // The concrete floating-point matrix overloads accept layout `L` directly. Overload resolution
+    // therefore selects the shaped overload without a layout conversion or a recursive call to
+    // the whole-type `IFloat` forwarder.
+    [__unsafeForceInlineEarly]
+    override This __min(This other)
+    {
+        return min(this, other);
+    }
+
+    [__unsafeForceInlineEarly]
+    override This __max(This other)
+    {
+        return max(this, other);
+    }
 
     [Differentiable]
     __intrinsic_op(0)

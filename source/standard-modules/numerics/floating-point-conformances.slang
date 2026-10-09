@@ -1623,31 +1623,13 @@ public extension<
     [__unsafeForceInlineEarly]
     This minimum(This other)
     {
-        This result;
-        [ForceUnroll]
-        for (int row = 0; row < R; ++row)
-        {
-            [ForceUnroll]
-            for (int column = 0; column < C; ++column)
-                result[row][column] =
-                    __numericsBuiltinMinimum(this[row][column], other[row][column]);
-        }
-        return result;
+        return __numericsBuiltinMinimum(this, other);
     }
 
     [__unsafeForceInlineEarly]
     This maximum(This other)
     {
-        This result;
-        [ForceUnroll]
-        for (int row = 0; row < R; ++row)
-        {
-            [ForceUnroll]
-            for (int column = 0; column < C; ++column)
-                result[row][column] =
-                    __numericsBuiltinMaximum(this[row][column], other[row][column]);
-        }
-        return result;
+        return __numericsBuiltinMaximum(this, other);
     }
 
     [__unsafeForceInlineEarly]

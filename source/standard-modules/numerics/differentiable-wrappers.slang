@@ -12,17 +12,18 @@ implementing differentiable;
 // requirements. Importing `slang.numerics.differentiable` makes these overloads available, and
 // declarations in this module are found before the corresponding declarations brought in by its
 // exported import of `slang.numerics`. Most free functions intentionally use the base module's -10
-// fallback rank, while the operators use its -4 fallback rank. The dot-product overload needs no
-// explicit rank because its refined constraint makes it more specific than the base wrapper, while
-// concrete core overloads remain more specific than either wrapper. The negative ranks elsewhere
-// keep concrete and legacy core overloads preferred; raising only selected differentiable wrappers
-// would make the overload policy depend on incidental operation-by-operation exceptions. The
-// bodies dispatch to differentiable requirements so that builtin and user-defined conformances can
-// use spellings such as `sin(value)` instead of `value.sin()` without making differentiability part
-// of the base contracts.
+// fallback rank, while the operators use its -4 fallback rank. The dot-product overload is the one
+// functional exception: it uses -9 so differentiable dispatch selects this derivative-bearing
+// overload over the base `IDotProduct` wrapper at -10, while concrete core overloads remain
+// preferred over both. Raising other selected wrappers without such a dispatch requirement would
+// make the overload policy depend on incidental operation-by-operation exceptions. The bodies
+// dispatch to differentiable requirements so that builtin and user-defined conformances can use
+// spellings such as `sin(value)` instead of `value.sin()` without making differentiability part of
+// the base contracts.
 
 [__readNone]
 [ForceInline]
+[OverloadRank(-9)]
 [ForwardDerivative(__numericsForwardDifferentiateDot)]
 [BackwardDerivative(__numericsBackwardDifferentiateDot)]
 public T.Scalar dot<T : IDifferentiableDotProduct>(T left, T right)

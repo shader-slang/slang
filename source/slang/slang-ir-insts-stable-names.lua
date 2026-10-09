@@ -575,6 +575,7 @@ return {
 	["IsUnsignedInt"] = 587,
 	["IsSignedInt"] = 588,
 	["IsVector"] = 589,
+	["IsBindlessTextureNVEncodable"] = 904,
 	["GetDynamicResourceHeap"] = 590,
 	["DispatchKernel"] = 596,
 	["CudaKernelLaunch"] = 597,
@@ -876,5 +877,8 @@ return {
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
 	["Attr.TypeAlignment"] = 901,
 	["reportOptiXIntersection"] = 902,
-	["Decoration.postDepthCoverage"] = 903
+	["Decoration.postDepthCoverage"] = 903,
+	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
+	["DebugLexicalBlock"] = 906,
+	["Decoration.fileOrNamespaceScopeStaticVar"] = 907
 }

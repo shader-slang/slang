@@ -140,6 +140,7 @@ enum class ValueCategory
     VulkanShift,
     SourceEmbedStyle,
     LanguageVersion,
+    BitfieldPackingRules,
 
     CountOf,
 };
@@ -168,6 +169,7 @@ SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
 SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
 SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
 SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
+SLANG_GET_VALUE_CATEGORY(BitfieldPackingRules, slang::BitfieldPackingRules)
 
 } // namespace
 
@@ -301,6 +303,13 @@ void initCommandOptions(CommandOptions& options)
             "File System Type",
             UserValue(ValueCategory::FileSystemType));
         options.addValues(TypeTextUtil::getFileSystemTypeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "bitfield-packing-rules",
+            "Bitfield Packing Rules",
+            UserValue(ValueCategory::BitfieldPackingRules));
+        options.addValues(TypeTextUtil::getBitfieldPackingRulesInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -589,6 +598,10 @@ void initCommandOptions(CommandOptions& options)
          "version does not recognize is silently ignored, so one option value can be shared across "
          "compiler versions that do not all define the warning; an unrecognized warning name is "
          "still reported as an error."},
+        {OptionKind::DisableNotes,
+         "-notes-disable",
+         "-notes-disable <id>[,<id>...]",
+         "Disable specific notes, given by numeric id or name."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -644,8 +657,8 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-branch-arm coverage counters for "
          "if/else, loop-condition, switch case/default arms, and switch no-match "
-         "default paths. Expression-level short-circuit and ternary branches are "
-         "not instrumented by this mode yet. "
+         "default paths, and for the true/false arms of scalar `?:` conditions and "
+         "short-circuiting `&&` / `||` left operands. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
         {OptionKind::TraceCoverageBoolean,
          "-trace-coverage-boolean",
@@ -769,11 +782,19 @@ void initCommandOptions(CommandOptions& options)
          "-reflection-json",
          "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."},
+        {OptionKind::BitfieldPackingRules,
+         "-bitfield-packing-rules",
+         "-bitfield-packing-rules <bitfield-packing-rules>",
+         "Select the rules to use for packing bitfields. The value must be one of the "
+         "<bitfield-packing-rules> documented below. Cannot be combined with "
+         "-msvc-style-bitfield-packing."},
         {OptionKind::UseMSVCStyleBitfieldPacking,
          "-msvc-style-bitfield-packing",
          nullptr,
-         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
-         "changes) rather than gcc-style (lsb first)"}};
+         "Deprecated. Uses the same packing rules as -bitfield-packing-rules "
+         "legacy-msb-first-msvc. Use -bitfield-packing-rules msvc for MSVC's bit order and "
+         "type-size grouping on little-endian platforms. Cannot be combined with "
+         "-bitfield-packing-rules."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -1244,6 +1265,11 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EnableExtendedHLSLBackwardsCompatibility,
+         "-Gec",
+         nullptr,
+         "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
+         "user guide's HLSL backwards compatibility section for the supported behavior."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -1264,6 +1290,12 @@ void initCommandOptions(CommandOptions& options)
          "-enable-machine-readable-diagnostics",
          nullptr,
          "Enable machine-readable diagnostic output in tab-separated format"},
+        {OptionKind::DiagnosticFormat,
+         "-diagnostic-format",
+         "-diagnostic-format <default|vs>",
+         "Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio "
+         "headers and uncolored, indented source details. Machine-readable diagnostics take "
+         "precedence."},
         {OptionKind::DiagnosticColor,
          "-diagnostic-color",
          "-diagnostic-color <always|never|auto>",
@@ -2826,6 +2858,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     m_reader.init(&args, m_sink);
 
+    // A compile request can inherit packing options from its session. A named rule in the option
+    // set makes the deprecated CLI flag ineffective, so we reject that flag. An inherited
+    // deprecated bool can be overridden by a named CLI rule. We track whether the deprecated flag
+    // appears in this argument list so that the two CLI spellings also conflict in either order.
+    bool hasLegacyBitfieldPackingOptionInArgs = false;
+
     while (m_reader.hasArg())
     {
         auto arg = m_reader.getArgAndAdvance();
@@ -2864,9 +2902,33 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // silently changing the language of source modules loaded by an `import`.
             m_requestImpl->setLegacyAllowGLSLInput(true);
             break;
+        case OptionKind::UseMSVCStyleBitfieldPacking:
+            if (!hasLegacyBitfieldPackingOptionInArgs)
+                m_sink->diagnose(Diagnostics::DeprecatedMsvcStyleBitfieldPacking{});
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
+            {
+                m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                return SLANG_FAIL;
+            }
+            hasLegacyBitfieldPackingOptionInArgs = true;
+            linkage->m_optionSet.set(optionKind, true);
+            break;
+        case OptionKind::BitfieldPackingRules:
+            {
+                if (hasLegacyBitfieldPackingOptionInArgs)
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                    return SLANG_FAIL;
+                }
+                slang::BitfieldPackingRules rules = slang::BitfieldPackingRules::Default;
+                SLANG_RETURN_ON_FAIL(_expectValue(rules));
+                linkage->m_optionSet.set(optionKind, rules);
+                break;
+            }
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
         case OptionKind::EnableExperimentalPasses:
+        case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
@@ -2911,7 +2973,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
-        case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
             linkage->m_optionSet.set(optionKind, true);
             break;
@@ -2939,6 +3000,26 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
             }
             break;
+        case OptionKind::DiagnosticFormat:
+            {
+                CommandLineArg formatArg;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(formatArg));
+                SlangDiagnosticFormat format = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
+                if (formatArg.value == "vs")
+                    format = SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO;
+                else if (formatArg.value != "default")
+                {
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = "default, vs"});
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(optionKind, (int)format);
+                // Apply immediately so errors in subsequent options use the requested format.
+                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                    sink->setDiagnosticFormat(format);
+                break;
+            }
         case OptionKind::DiagnosticColor:
             {
                 CommandLineArg colorArg;
@@ -3153,6 +3234,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(
                     OptionKind::DisableWarnings,
                     operand.value.getUnownedSlice());
+                break;
+            }
+        case OptionKind::DisableNotes:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                linkage->m_optionSet.add(OptionKind::DisableNotes, operand.value.getUnownedSlice());
                 break;
             }
         case OptionKind::DisableWarning:
@@ -5089,7 +5177,8 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
-        // Copy color and unicode settings from the request sink
+        // Copy diagnostic presentation settings from the request sink.
+        m_parseSink.setDiagnosticFormat(requestSink->getDiagnosticFormat());
         m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
         m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }

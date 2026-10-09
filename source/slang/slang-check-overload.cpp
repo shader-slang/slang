@@ -24,7 +24,7 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
 }
 
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
-    FilteredMemberRefList<ParamDecl> params)
+    List<DeclRef<ParamDecl>> const& params)
 {
     ParamCounts counts = {0, 0};
     for (auto param : params)
@@ -151,8 +151,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        paramCounts =
-            CountParameters(getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()));
+        paramCounts = CountParameters(getParametersForCallableSignature(
+            m_astBuilder,
+            candidate.item.declRef.as<CallableDecl>()));
         break;
 
     case OverloadCandidate::Flavor::Generic:
@@ -811,11 +812,15 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     Index argCount = context.getArgCount();
 
     List<QualType> paramTypes;
+    List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        for (auto param : getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()))
+        for (auto param : getParametersForCallableSignature(
+                 m_astBuilder,
+                 candidate.item.declRef.as<CallableDecl>()))
         {
+            paramDecls.add(param);
             paramTypes.add(getParamQualType(m_astBuilder, param));
         }
         break;
@@ -924,9 +929,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     String name;
                     if (candidate.flavor == OverloadCandidate::Flavor::Func)
                     {
-                        auto decl = getParameters(
-                            m_astBuilder,
-                            candidate.item.declRef.as<CallableDecl>())[paramIndex];
+                        auto decl = paramDecls[paramIndex];
                         name = getText(decl.getName());
                     }
                     else
@@ -1013,21 +1016,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     return true;
 }
 
-bool isEffectivelyMutating(CallableDecl* decl)
-{
-    if (decl->hasModifier<MutatingAttribute>())
-        return true;
-    if (decl->hasModifier<RefAttribute>())
-        return true;
-    if (decl->hasModifier<NonmutatingAttribute>())
-        return false;
-
-    if (as<SetterDecl>(decl))
-        return true;
-
-    return false;
-}
-
 ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 {
     auto expr = inExpr;
@@ -1047,13 +1035,11 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
                     return nullptr;
                 }
 
-                if (paramDeclRef.getDecl()->findModifier<OutModifier>() ||
-                    paramDeclRef.getDecl()->findModifier<RefModifier>())
+                if (doesParamPassingModeIndicateWritableStorage(
+                        getParamPassingMode(paramDeclRef.getDecl())))
                 {
-                    // Function parameters marked with `out`, `inout`,
-                    // `in out` or `ref` are all mutable in a way where
-                    // the result of mutations will be visible to the
-                    // caller.
+                    // Writable-storage modes are mutable in a way where the result of mutations
+                    // will be visible to the caller.
                     //
                     return nullptr;
                 }
@@ -1096,11 +1082,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     // done in other places.
     //
     // For now we will only use this step to check the
-    // mutability of the `this` parameter where necessary.
+    // mutability of the effective `this` parameter where necessary.
     //
-    if (!isEffectivelyStatic(funcDeclRef.getDecl()))
+    if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        if (isEffectivelyMutating(funcDeclRef.getDecl()))
+        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
@@ -1719,10 +1705,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                     break;
                                 }
                             }
-                            // Otherwise, if the accessor is [nonmutating], we can
-                            // also consider the result of the subscript call as l-value
-                            // regardless of the base.
-                            if (accessorDecl->findModifier<NonmutatingAttribute>())
+                            // Otherwise, an accessor that does not require writable receiver
+                            // storage can produce an l-value regardless of the base.
+                            auto accessorDeclRef =
+                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                            if (thisParamInfo &&
+                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;
@@ -2943,7 +2932,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             // Most callers let this routine compute parameter types from the
             // generic's inner callable. A caller that already computed them can
             // pass the list to avoid repeating that work.
-            auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
+            auto params = getParametersForCallableSignature(m_astBuilder, funcDeclRef);
             for (auto param : params)
             {
                 paramTypes.add(getParamQualType(m_astBuilder, param));
@@ -3079,6 +3068,66 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     AddOverloadCandidates(initializers, context);
 }
 
+// Return true if `candidate` is a generic candidate whose recorded inference failure is a
+// constraint failure — an unsatisfied interface conformance or `where`-clause. These are the
+// reasons worth surfacing on the "no overload applicable" diagnostic (issue #12965); the other
+// inference-failure kinds (arity mismatch, an un-inferrable parameter, a unification conflict)
+// are structural mismatches that would only add noise if listed.
+static bool isConstraintFailedGenericCandidate(const OverloadCandidate& candidate)
+{
+    if (candidate.status != OverloadCandidate::Status::GenericArgumentInferenceFailed)
+        return false;
+    switch (candidate.genericInferenceFailure.kind)
+    {
+    case GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied:
+    case GenericArgumentInferenceFailure::Kind::GenericConstraintNotSatisfied:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Emit a note explaining why the retained generic candidate `candidate` did not apply. This
+// reports the same reason `CompleteOverloadCandidate` gives on the selected-candidate path, but
+// at note severity so it attaches to the "no overload applicable" error instead of raising a
+// second top-level error. Only the constraint-failure kinds accepted by
+// `isConstraintFailedGenericCandidate` are handled.
+static void diagnoseGenericConstraintFailureNote(
+    DiagnosticSink* sink,
+    ASTBuilder* astBuilder,
+    const OverloadCandidate& candidate)
+{
+    const auto& failure = candidate.genericInferenceFailure;
+    switch (failure.kind)
+    {
+    case GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied:
+        {
+            const auto& reason = failure.interfaceConformanceNotSatisfied;
+            sink->diagnose(Diagnostics::OverloadCandidateTypeArgumentDoesNotConform{
+                .typeArg = reason.subType,
+                .interface = reason.supType,
+                .location = reason.location});
+        }
+        break;
+    case GenericArgumentInferenceFailure::Kind::GenericConstraintNotSatisfied:
+        {
+            const auto& reason = failure.genericConstraintNotSatisfied;
+            sink->diagnose(Diagnostics::OverloadCandidateGenericConstraintNotSatisfied{
+                .constraint =
+                    ASTPrinter::getGenericConstraintString(reason.constraintDecl, astBuilder),
+                .location = reason.location});
+            sink->diagnose(
+                Diagnostics::SeeGenericConstraintDeclaration{.location = reason.constraintLoc});
+        }
+        break;
+    default:
+        // Callers only pass candidates accepted by `isConstraintFailedGenericCandidate`, which
+        // is limited to the two kinds above; any other kind means the two have drifted apart.
+        SLANG_UNEXPECTED("generic constraint-failure note requested for an unsupported kind");
+        break;
+    }
+}
+
 void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
     LookupResultItem genericItem,
     OverloadResolveContext& context,
@@ -3119,6 +3168,11 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
         candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
         candidate.genericInferenceFailure = genericInferenceFailure;
+
+        // Retain constraint-failed generics for the "no overload applicable" diagnostic before
+        // pruning can discard them (issue #12965). Capturing at the producer is order-independent.
+        if (isConstraintFailedGenericCandidate(candidate))
+            context.constraintFailedGenericCandidates.add(candidate);
 
         AddOverloadCandidateInner(context, candidate);
     }
@@ -3600,6 +3654,57 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 HashSet<String> seenCandidates;
                 Index printedCount = 0;
                 Index remainingCount = 0;
+
+                // List these constraint-failed generics before the existing `bestCandidates`: they
+                // carry the most actionable reason and are usually dropped from `bestCandidates` by
+                // status-based pruning, so listing them first keeps their reason inside the display
+                // budget rather than truncated as "N more" (issue #12965). `stableSort` orders by
+                // declaration location for deterministic output while preserving lookup order among
+                // candidates that share a location.
+                //
+                // This loop and the `bestCandidates` loop below dedup on *different* keys, and both
+                // are correct: these retained generics failed inference and so are unspecialized,
+                // meaning their signature strings collapse (all of `f<T:I0>`..`f<T:I9>` render as
+                // `func f<T> -> T`), so only a full `DeclRef` keeps distinct requirements apart
+                // here; the `bestCandidates` entries carry inferred substitutions that the
+                // signature string already reflects, so a signature dedup suffices there. The two
+                // loops also share the `maxCandidatesToPrint` budget, `printedCount`,
+                // `remainingCount`, and `seenCandidates`: the single ten-candidate cap and single
+                // "N more" tail span both, and registering each printed signature in
+                // `seenCandidates` here (its return value is unused — below, the identical call is
+                // the load-bearing dedup gate) is what stops a generic that *also* survived into
+                // `bestCandidates` from being printed twice.
+                context.constraintFailedGenericCandidates.stableSort(
+                    [](const OverloadCandidate& c1, const OverloadCandidate& c2) {
+                        return c1.item.declRef.getLoc().getRaw() <
+                               c2.item.declRef.getLoc().getRaw();
+                    });
+                HashSet<DeclRef<Decl>> seenGenericCandidateDeclRefs;
+                for (const auto& candidate : context.constraintFailedGenericCandidates)
+                {
+                    if (!candidate.item.declRef.getDecl())
+                        continue;
+                    if (!seenGenericCandidateDeclRefs.add(candidate.item.declRef))
+                        continue;
+
+                    String declString =
+                        ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                    seenCandidates.add(declString);
+
+                    if (printedCount >= maxCandidatesToPrint)
+                    {
+                        remainingCount++;
+                        continue;
+                    }
+
+                    getSink()->diagnose(Diagnostics::OverloadCandidate{
+                        .candidate = declString,
+                        .location = candidate.item.declRef.getLoc()});
+                    diagnoseGenericConstraintFailureNote(getSink(), m_astBuilder, candidate);
+
+                    printedCount++;
+                }
+
                 for (const auto& candidate : context.bestCandidates)
                 {
                     if (!candidate.item.declRef.getDecl())
@@ -3765,9 +3870,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
         else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
         {
-            for (auto param : callableDeclRef.getDecl()->getParameters())
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(m_astBuilder, callableDeclRef))
             {
-                paramDirections.add(getParamPassingMode(param));
+                paramDirections.add(getParamPassingMode(paramDeclRef.getDecl()));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)

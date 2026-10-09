@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-uninitialized-output.cpp
 // Regression tests for issue #11865: the record layer must not read uninitialized caller memory for
 // output parameters when the wrapped API fails without writing them.
@@ -134,3 +135,4 @@ SLANG_UNIT_TEST(replayGetTypeConformanceWitnessSequentialIDFailureNoUninitialize
     // Return to Idle before the session/global-session ComPtrs release during teardown.
     ctx().reset();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

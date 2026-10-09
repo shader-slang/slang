@@ -290,6 +290,15 @@ class BuiltinOperatorExpr : public ExprWithArgsBase
 {
     FIDDLE(...)
     FIDDLE() BuiltinOperationKind op;
+
+    // Whether the operand element type belongs to the floating-point family, resolved once by
+    // `SemanticsExprVisitor::convertToBuiltinArithmeticOp` (from a concrete `BasicExpressionType`
+    // or from a generic parameter's `__BuiltinFloatingPointType` constraint) and read back by
+    // `lowerBuiltinOperatorExpr` to choose `FRem` over `IRem` for `Mod`. IR lowering cannot
+    // re-derive this the way checking did: the element type may still be an abstract, unspecialized
+    // generic parameter at that point, which carries no concrete `BaseType` to inspect. Meaningless
+    // for every other operator kind.
+    FIDDLE() bool elementTypeIsFloatingPoint = false;
 };
 
 FIDDLE()
