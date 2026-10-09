@@ -34746,6 +34746,10 @@ $}
 ///    }
 /// }
 /// ```
+///
+/// When targeting HLSL with shader model 6.10, this lowers to the thread-scope
+/// `dx::linalg::Matrix::InterlockedAccumulate`, which uses its default alignment of 128 bytes, so
+/// the buffer base address plus `matrixOffset` is expected to be 128-byte aligned.
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
@@ -34848,6 +34852,9 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// for (int i = 0; i < N; i++)
 ///     atomicAdd(dest[i], v[i]);
 /// ```
+/// When targeting HLSL with shader model 6.10, this lowers to `dx::linalg::InterlockedAccumulate`
+/// with its default alignment of 64 bytes, so the buffer base address plus `offset` is expected to
+/// be 64-byte aligned.
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
