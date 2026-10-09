@@ -208,6 +208,9 @@ public:
 
     FileStream();
 
+    /// Opens `fileName` in `fileMode`. An existing directory is never opened. In `Open` mode an
+    /// existing path must be a regular file. In `Create` and `Append` modes an existing FIFO or
+    /// device (e.g. `/dev/null`) is opened by the platform, which blocks for a FIFO with no reader.
     SlangResult init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
     SlangResult init(const String& fileName, FileMode fileMode = FileMode::Open);
 

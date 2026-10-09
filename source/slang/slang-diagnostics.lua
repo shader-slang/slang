@@ -5801,7 +5801,7 @@ err(
 err(
     "unable-to-write-file",
     52004,
-    "unable to write file",
+    "unable to write file '~path'",
     span { loc = "location", message = "unable to write file '~path'" }
 )
 
