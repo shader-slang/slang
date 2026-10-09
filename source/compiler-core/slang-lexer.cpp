@@ -500,7 +500,9 @@ static void _lexDigits(Lexer* lexer, int base)
         int digitVal = 0;
         switch (c)
         {
-        // A digit separator, which the literal value decoders skip.
+        // A `_` digit separator may appear anywhere in a run of digits. It does not end the
+        // token; `getIntegerLiteralValue` skips it and `getFloatingPointLiteralValue` strips it
+        // before decoding.
         case '_':
             _advance(lexer);
             continue;
@@ -660,7 +662,8 @@ static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base)
 
 static TokenType _lexNumber(Lexer* lexer, int base)
 {
-    // TODO(tfoley): Need to consider whether to allow any kind of digit separator character.
+    // TODO: Decide whether to also accept `'` digit separators (#13544); `_` is handled
+    // by `_lexDigits`.
 
     TokenType tokenType = TokenType::IntegerLiteral;
 
@@ -705,7 +708,7 @@ static int _maybeReadDigit(char const** ioCursor, int base)
         default:
             return -1;
 
-        // TODO: need to decide on digit separator characters
+        // A digit separator (see `_lexDigits`).
         case '_':
             cursor++;
             continue;
@@ -782,6 +785,7 @@ static int _readOptionalBase(char const** ioCursor)
         case '9':
             return 8;
 
+        // `0_…` is decimal; the leading-`0` dispatch in `_lexTokenImpl` makes the same choice.
         default:
             return 10;
         }
@@ -1221,8 +1225,8 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
     else
     {
-        // regular float: the number chars (incl. exponent) are distinct from
-        // suffix chars
+        // regular float: the number runs up to the first suffix letter, so a `_` before
+        // the suffix belongs to the number (`1.0_f` is the number `1.0_` with suffix `f`)
         while (cursor != end)
         {
             bool numberChar{};
@@ -1263,14 +1267,16 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
 
     UnownedStringSlice number{numberStart, cursor};
 
-    // The decoders below do not understand digit separators, so we decode a copy of the
-    // number with them removed.
+    // fast_float and `_hexFloatLiteralToDouble` do not understand digit separators, so we
+    // decode a copy of the number with them removed. `numberToDecode`, and `cursor` once
+    // decoding has advanced it, may point into that local copy: they are only compared
+    // against each other, and every out-parameter slices `content` instead.
     String numberWithoutSeparators;
-    UnownedStringSlice digits = number;
+    UnownedStringSlice numberToDecode = number;
     if (number.indexOf('_') >= 0)
     {
         numberWithoutSeparators = StringUtil::replaceAll(number, toSlice("_"), toSlice(""));
-        digits = numberWithoutSeparators.getUnownedSlice();
+        numberToDecode = numberWithoutSeparators.getUnownedSlice();
     }
     FloatingPointLiteralValue value{};
     bool isInfinity{};
@@ -1307,16 +1313,16 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool isOutOfRange{};
     bool precisionLost{};
 
-    // Cursor is updated to be at the end of parsed number
+    // Cursor is updated to be at the end of the decoded part of `numberToDecode`
     if (isInfinity)
     {
-        cursor = digits.end();
+        cursor = numberToDecode.end();
     }
     else if (hexFloat)
     {
         value = _hexFloatLiteralToDouble(
-            digits.begin(),
-            digits.end(),
+            numberToDecode.begin(),
+            numberToDecode.end(),
             cursor,
             isOutOfRange,
             precisionLost);
@@ -1346,7 +1352,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         if (literalType == FloatingPointLiteralType::Float)
         {
             float f{};
-            result = fast_float::from_chars(digits.begin(), digits.end(), f);
+            result = fast_float::from_chars(numberToDecode.begin(), numberToDecode.end(), f);
             value = f;
         }
         else if (literalType == FloatingPointLiteralType::Half)
@@ -1356,7 +1362,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
             // half. This effectively performs double rounding (decimal ->
             // double -> half), and therefore in rare cases, the result may
             // differ from a single correctly-rounded decimal -> half.
-            result = fast_float::from_chars(digits.begin(), digits.end(), value);
+            result = fast_float::from_chars(numberToDecode.begin(), numberToDecode.end(), value);
 
             if (result.ec == std::errc{})
             {
@@ -1372,7 +1378,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         else
         {
             // in all other cases, parse as double
-            result = fast_float::from_chars(digits.begin(), digits.end(), value);
+            result = fast_float::from_chars(numberToDecode.begin(), numberToDecode.end(), value);
         }
 
         cursor = result.ptr;
@@ -1392,7 +1398,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
 
     // check for special exponent for infinity
-    if (cursor != digits.end())
+    if (cursor != numberToDecode.end())
     {
         literalType = FloatingPointLiteralType::BadSignificand;
         errorContent = UnownedStringSlice(content.begin(), number.end());
@@ -2089,8 +2095,10 @@ static TokenType _lexTokenImpl(Lexer* lexer)
                     return _lexNumberAfterDecimalPoint(lexer, 10);
                 }
 
-            // A digit separator after a leading `0` does not make the literal octal, so `0_7`
-            // is decimal and `0_0.5` is a floating-point literal.
+            // A leading `0` followed by a separator is a decimal number, not octal: `0_7` is 7
+            // and `0_0.5` is 0.5. Lexing it with `_lexNumber` is what lets the token continue
+            // past the integer part; the decoder `_readOptionalBase` independently picks base
+            // 10 for `0_`, and the two must stay in agreement.
             case '_':
                 return _lexNumber(lexer, 10);
 

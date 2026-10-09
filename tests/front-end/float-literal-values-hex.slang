@@ -111,7 +111,7 @@ void main()
     // Note: 0111'1111'0111'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7f7fffff
 
-    // digit separators are ignored in the significand, fraction and exponent
+    // digit separators are ignored in the integer part, fraction and exponent
     f = 0x1_0p3f;
     printf("0x%08x\n", bit_cast<uint32_t>(f));
     //CHECK-NEXT: 0x43000000
@@ -127,6 +127,10 @@ void main()
     f = 0xFF_FF.8p0f;
     printf("0x%08x\n", bit_cast<uint32_t>(f));
     //CHECK-NEXT: 0x477fff80
+
+    f = 0x1p_4f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x41800000
 
 
     ////// doubles //////

@@ -45,6 +45,8 @@ the list [`int`, `int64_t`] which can represent the specified literal value. If 
 a `uint64_t` and a warning is given. The type of a hexadecimal non-suffixed integer literal is the first type from the list
 [`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64-bit integer literals, see the documentation on [64-bit type support](../64bit-type-support.md).
 
+Integer and floating-point literals may contain `_` digit separators, which do not change the value: `1_000_000`, `0xFF_FF`, `1_000.5f` and `1.5e1_0`. A separator may appear anywhere after the first digit or radix prefix, including next to `.`, `e`/`p` or a suffix. A literal that starts with `0_` is decimal, not octal: `0_10` is 10.
+
 See also [Literal Expressions](../language-reference/expressions-literal.md) in the language reference manual for details.
 
 #### Floating-Point Types
@@ -62,8 +64,6 @@ All targets support the 32-bit `float`, but support for the other types depends 
 Floating-point literals can be decimal or hexadecimal. The default literal type is `float`, with an
 optional `f` suffix. The `h`/`hf`/`fh` suffixes denote `half` literals, and the `l`/`lf`/`fl` suffixes
 denote `double` literals.
-
-Integer and floating-point literals may contain `_` digit separators, which are ignored: `1_000_000`, `0xFF_FF`, `1_000.5f` and `1.5e1_0`.
 
 Use hexadecimal literals when precise values are desired. If a hexadecimal literal cannot be precisely
 represented, a warning is given. Decimal literals do not trigger rounding warnings.
