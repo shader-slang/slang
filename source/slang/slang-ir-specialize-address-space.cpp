@@ -663,9 +663,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         if (sink)
             reconcilePointerSlots();
 
-        HashSet<IRFunc*> newWorkList;
         while (workList.getCount())
         {
+            // Each round starts with a fresh set, so it revisits only the callers queued by the
+            // preceding round. A function's result address space only refines from `Generic`
+            // toward a concrete value, so it changes finitely often; once a round changes no
+            // result, this set stays empty and the loop ends. A set kept across rounds would
+            // leave already-converged callers permanently queued after any callee's result
+            // changed, and the loop would never terminate.
+            HashSet<IRFunc*> newWorkList;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];
