@@ -4620,7 +4620,11 @@ EnumDecl* isEnumType(Type* type);
 
 DeclVisibility getDeclVisibility(Decl* decl);
 
-// If `type` is unsized, return the trailing unsized array field that makes it so.
+// If `type` is unsized because its last instance field, followed through nested structs and
+// base structs, is an unsized array, return that field (or `rootObject` when `type` is itself
+// an unsized array) and set `outArrayType` to the array type. Return null for any other
+// type, including an unsized struct whose last field is not the array, such as a struct that
+// adds fields after a base struct ending in one.
 VarDeclBase* getTrailingUnsizedArrayElement(
     Type* type,
     VarDeclBase* rootObject,
@@ -4633,6 +4637,57 @@ bool isOpaqueHandleType(Type* type);
 // Returns true if `type` itself is an opaque handle type, or if it is a struct
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
+
+// Returns true if `type` is known to occupy ordinary (uniform) bytes in a constant buffer on
+// targets that bind resources through descriptors, where resource legalization moves each
+// handle out of its aggregate into its own binding: `struct R { Texture2D t; SamplerState s; }`
+// holds no ordinary data, while `struct M { Texture2D t; float4 v; }` holds `v`. A pointer is
+// an address stored in uniform memory, so it is ordinary data. We return false when the answer
+// depends on specialization, as for a generic parameter `T`, or on linking.
+//
+// The answer does not depend on the target. On targets with bindless resources (CPU, CUDA,
+// Metal) a handle is itself stored as ordinary data, so the answer is false for some types
+// that do occupy uniform bytes there.
+//
+// `globalGenericArgs` holds the types bound to global `type_param`s by specialization, or is
+// null before specialization, when a global `type_param` is not known to hold ordinary data.
+using GlobalGenericArgs = Dictionary<GlobalGenericParamDecl*, Val*>;
+bool isTypeKnownToHoldOrdinaryData(
+    SemanticsVisitor* visitor,
+    Type* type,
+    GlobalGenericArgs const* globalGenericArgs);
+
+// Diagnose an unsized array of ordinary data that ends `type`, the declared or specialized
+// type of `varDecl`. The caller guarantees that the compiler packs the ordinary data of
+// `varDecl` into an implicit constant buffer (`GlobalParams` or `EntryPointParams`), which,
+// like an explicit `cbuffer`, has no layout for an unsized array of ordinary data.
+// We report E31215 at the trailing array field, with a note at `varDecl` when the field is a
+// member of its type. `globalGenericArgs` is as for `isTypeKnownToHoldOrdinaryData`.
+void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
+    SemanticsVisitor* visitor,
+    Type* type,
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs);
+
+// Diagnose `varDecl` as `diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer` does when it is a
+// global shader parameter whose ordinary data goes into the implicit constant buffer. A global
+// `type_param` bound to an unsized array is resolved only when it is the parameter's whole type,
+// as in `uniform TA a`, not when it is a field type, as in `uniform Box<TA> b`.
+void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
+    SemanticsVisitor* visitor,
+    VarDeclBase* varDecl,
+    GlobalGenericArgs const* globalGenericArgs);
+
+// Diagnose the uniform parameters of `componentType`, specialized by `specializationInfo`,
+// that end in an unsized array of ordinary data. Semantic checking cannot decide this for a
+// parameter such as `uniform T values[]` before `T`, a generic entry-point parameter or a
+// global `type_param`, is bound, so `ComponentType::specialize` checks again with the bound
+// types. Requires the unspecialized component type to have no errors, so a parameter that
+// semantic checking already diagnosed is not reported twice.
+void diagnoseUnsizedOrdinaryDataAfterSpecialization(
+    ComponentType* componentType,
+    ComponentType::SpecializationInfo* specializationInfo,
+    DiagnosticSink* sink);
 
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,

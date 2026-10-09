@@ -5,14 +5,20 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
+// The unsized array lives in a storage buffer, because a global uniform `int a[]` is itself
+// an error (E31215).
+struct Data
+{
+    int values[];
+}
 RWStructuredBuffer<int> outBuf;
-int gArr[];
+GLSLShaderStorageBuffer<Data> buffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outBuf[0] = countof(gArr);
+    outBuf[0] = countof(buffer.values);
     //CHECK: invalid countof argument
     //CHECK: argument to countof must be a type pack, tuple, value pack, or fixed-size array
 }

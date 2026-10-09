@@ -52,6 +52,7 @@ void writeBlock()
 static uint mutableArray[];
 // UNSIZED: error[E30071]
 uniform uint arrayParameter[];
+// UNSIZED: error[E31215]
 
 void writeArray()
 {
