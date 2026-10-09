@@ -157,6 +157,45 @@ jobs:
           llvm-hash: ${{ needs.check-changes.outputs.llvm-hash }}
           upload-if-missing: "false"
 
+      - name: Validate installed LLVM and Clang packages
+        shell: bash
+        run: |
+          mkdir -p build/llvm-prebuilt-smoke
+          cat > build/llvm-prebuilt-smoke/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(LLVMPrebuiltSmoke LANGUAGES C CXX)
+          find_package(LLVM REQUIRED CONFIG)
+          find_package(Clang REQUIRED CONFIG)
+          add_executable(llvm-prebuilt-smoke main.cpp)
+          target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
+          target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
+          EOF
+          cat > build/llvm-prebuilt-smoke/main.cpp <<'EOF'
+          #include <llvm/Support/raw_ostream.h>
+          int main() { llvm::outs() << "LLVM prebuilt works\n"; }
+          EOF
+          cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/native \
+            -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' \
+            "-DCMAKE_PREFIX_PATH=$(pwd)/build/llvm-project-install"
+          cmake --build build/llvm-prebuilt-smoke/native
+          build/llvm-prebuilt-smoke/native/llvm-prebuilt-smoke
+
+      - name: Validate Linux prebuilt in the Slang CI container
+        if: matrix.os == 'linux' && (matrix.platform == 'x86_64' || matrix.platform == 'wasm')
+        shell: bash
+        run: |
+          # Use the consumer image from ci-slang-build-container.yml rather
+          # than trusting optional packages installed on the native builder.
+          docker run --rm --volume "$(pwd):/workspace" --workdir /workspace \
+            ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0 bash -c '
+              cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/container \
+                -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH=/workspace/build/llvm-project-install &&
+              cmake --build build/llvm-prebuilt-smoke/container &&
+              build/llvm-prebuilt-smoke/container/llvm-prebuilt-smoke
+            '
+
       - name: Archive new prebuilt
         if: steps.llvm.outputs.cache-hit != 'true'
         id: archive

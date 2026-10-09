@@ -50,6 +50,11 @@ be published; fix the failed build or upload and dispatch the workflow again.
 Rerunning a PR cannot publish a missing prebuilt, because its ref is not `master`.
 Recipe changes on a PR can still require a cold build before they reach `master`.
 
+Population verifies the installed LLVM and Clang packages by compiling, linking,
+and running a small LLVM consumer before staging an archive. Linux x86_64 also
+runs that check inside the Slang CI build container. The recipe explicitly disables
+optional zstd support so dependencies do not vary with packages on the build host.
+
 LLVM itself is built in Release mode, including for Windows Debug Slang builds
 because of the differences in Debug/Release standard libraries. We cache the
 installed build product rather than using sccache for LLVM compilation. See the
