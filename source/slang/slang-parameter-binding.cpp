@@ -4853,8 +4853,6 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != errorCountBefore)
             m_layoutHasErrors = true;
-        if (sink->getErrorCount() != 0)
-            return nullptr;
     }
 
     // Layout generation reported errors on an earlier call (to a different sink, or this one).
