@@ -2,6 +2,7 @@
 
 set(raytracing_shader_sources
     raytracing.slang
+    compiler-intrinsics.slang
     ray-types.slang
     contexts.slang
     stage-inputs.slang
@@ -29,6 +30,21 @@ foreach(shader_file ${raytracing_shader_sources})
     )
     list(APPEND raytracing_copied_files ${dest_file})
 endforeach()
+
+# Keep the generated enum with the ordinary module sources so source imports and installations
+# use the same builtin IDs as serialized imports. generator() supplies a host executable when
+# SLANG_GENERATORS_PATH is set for cross compilation.
+set(raytracing_builtin_source
+    "${raytracing_output_dir}/raytracing-builtins.slang"
+)
+add_custom_command(
+    OUTPUT ${raytracing_builtin_source}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${raytracing_output_dir}
+    COMMAND slang-standard-module-generator ${raytracing_builtin_source}
+    DEPENDS slang-standard-module-generator
+    VERBATIM
+)
+list(APPEND raytracing_copied_files ${raytracing_builtin_source})
 
 set(raytracing_module_file "${raytracing_output_dir}/raytracing.slang-module")
 

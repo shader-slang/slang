@@ -4,24 +4,25 @@
 //TEST:SIMPLE: -experimental-feature -entry DualStage -stage callable -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry SharedInvoke -no-codegen
 
+import slang.raytracing;
 import magic_stage_library;
 import magic_stage_secondary_library;
 
 interface ICallableContext : first::IRecordContext
 {
-    [KnownBuiltin(__RayTracingBuiltin.CallableData)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.CallableData)]
     associatedtype CallableData;
 }
 
 [require(structural_raytracing_callable)]
-[KnownBuiltin(__RayTracingBuiltin.CallableInput)]
+[KnownBuiltin(rt::__RayTracingBuiltin.CallableInput)]
 struct CallableInput<C : ICallableContext> {}
 
 [require(structural_raytracing_callable)]
 __magic_type(CallableShaderType)
 interface ICallableStage
 {
-    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
     associatedtype Context : ICallableContext;
     void invoke(in CallableInput<Context> input);
 }
@@ -61,7 +62,7 @@ struct DualStage : first::IBackgroundStage, second::IBackgroundStage, ICallableS
 __magic_type(MissShaderType)
 interface ISharedMiss
 {
-    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
     associatedtype Context : first::IPayloadContext;
     void invoke(in first::BackgroundInput<Context> input);
 }

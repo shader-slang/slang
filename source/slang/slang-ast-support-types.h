@@ -6,6 +6,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
+#include "slang-known-builtin-decl-name.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
@@ -221,46 +222,6 @@ FIDDLE() namespace Slang
     bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat);
 
     char const* getGLSLNameForImageFormat(ImageFormat format);
-
-    /// Identifies declarations with compiler-defined meaning independently of their source names.
-    enum class KnownBuiltinDeclName : uint32_t
-    {
-        GeometryStreamAppend,
-        GeometryStreamRestart,
-        GetAttributeAtVertex,
-        DispatchMesh,
-        saturated_cooperation,
-        saturated_cooperation_using,
-        IDifferentiable,
-        IDifferentiablePtr,
-        IForwardDifferentiable,
-        IBackwardDifferentiable,
-        IBwdCallable,
-        NullDifferential,
-        OperatorAddressOf,
-        WaveIsFirstLane,
-        WaveReadLaneFirst,
-        CallShader,
-        ReportHit = 16,
-        RayTracingShaderList,
-        RayTracingClosestHitInput,
-        RayTracingAnyHitInput,
-        RayTracingIntersectionInput,
-        RayTracingMissInput,
-        RayTracingCallableInput,
-        RayTracingTrianglePrimitive,
-        RayTracingCurvePrimitive,
-        RayTracingStageContext,
-        RayTracingStageRecord,
-        RayTracingPayloadContextPayload,
-        RayTracingHitPrimitive,
-        RayTracingPrimitiveAttributes,
-        RayTracingCallableData,
-        RayTracingProgramHitGroups,
-        RayTracingProgramMissShaders,
-        RayTracingProgramCallableShaders,
-        COUNT
-    };
 
     /// Convert string name to KnownBuiltinDeclName enum
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);

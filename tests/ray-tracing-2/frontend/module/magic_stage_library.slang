@@ -2,8 +2,10 @@
 
 module magic_stage_library;
 
-// This ordinary module deliberately does not import slang.raytracing. The annotations identify
-// its contracts; neither the module name nor the declarations' names grant compiler behavior.
+// The import supplies compiler marker constants, while this module declares its own contracts.
+// Their annotations establish separate identities; their names do not grant compiler behavior.
+import slang.raytracing;
+
 namespace first
 {
 public interface ITraversal
@@ -15,25 +17,25 @@ public interface ITraversal
 public interface IRecordContext
 {
     associatedtype TraceContext : ITraversal;
-    [KnownBuiltin(__RayTracingBuiltin.StageRecord)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.StageRecord)]
     associatedtype Record;
 }
 
 public interface IPayloadContext : IRecordContext
 {
-    [KnownBuiltin(__RayTracingBuiltin.PayloadContextPayload)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.PayloadContextPayload)]
     associatedtype Payload;
 }
 
 [require(structural_raytracing_miss)]
-[KnownBuiltin(__RayTracingBuiltin.MissInput)]
+[KnownBuiltin(rt::__RayTracingBuiltin.MissInput)]
 public struct BackgroundInput<C : IPayloadContext> {}
 
 [require(structural_raytracing_miss)]
 __magic_type(MissShaderType)
 public interface IBackgroundStage
 {
-    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
     void invoke(in BackgroundInput<Context> input);
 }

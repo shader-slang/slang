@@ -157,7 +157,7 @@ Stage interfaces now declare their compiler identity with `__magic_type`, for ex
 __magic_type(MissShaderType)
 public interface IMissShader
 {
-    [KnownBuiltin(__RayTracingBuiltin.StageContext)]
+    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
     void invoke(in MissInput<Context> input);
 }
@@ -170,6 +170,16 @@ list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin
 only compiler-consumed associated requirements, the five stage-input structs, the shader-list
 containers, and the two built-in primitive attribute models. Preserve these declaration annotations through ordinary serialization;
 do not introduce a special AST class for each supporting library type.
+
+The annotation constants now belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
+The module's `compiler-intrinsics.slang` also declares its three internal operation attributes:
+`__RayTracingTrace`, `__RayTracingCallShader`, and `__RayTracingPayload`. Core no longer declares
+these RT-only names. The C++ attribute classes and checker stay in the compiler.
+
+Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
+`slang-standard-module-generator`. Its values come directly from `KnownBuiltinDeclName` in the
+shared C++ header; do not copy numeric IDs into the module. Ship this generated include with the
+other RT source files so source compilation and serialized imports use the same declarations.
 
 Remove the old import-time declaration registration and IR opcode replacement. Loading a module
 must not depend on the `slang.raytracing` name or its installation location. The same declarations
