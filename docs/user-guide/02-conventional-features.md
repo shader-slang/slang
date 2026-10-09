@@ -63,6 +63,8 @@ Floating-point literals can be decimal or hexadecimal. The default literal type 
 optional `f` suffix. The `h`/`hf`/`fh` suffixes denote `half` literals, and the `l`/`lf`/`fl` suffixes
 denote `double` literals.
 
+Integer and floating-point literals may contain `_` digit separators, which are ignored: `1_000_000`, `0xFF_FF`, `1_000.5f` and `1.5e1_0`.
+
 Use hexadecimal literals when precise values are desired. If a hexadecimal literal cannot be precisely
 represented, a warning is given. Decimal literals do not trigger rounding warnings.
 

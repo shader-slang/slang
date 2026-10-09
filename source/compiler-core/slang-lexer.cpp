@@ -500,6 +500,11 @@ static void _lexDigits(Lexer* lexer, int base)
         int digitVal = 0;
         switch (c)
         {
+        // A digit separator, which the literal value decoders skip.
+        case '_':
+            _advance(lexer);
+            continue;
+
         case '0':
         case '1':
         case '2':
@@ -1197,6 +1202,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
             case '9':
             case '+':
             case '-':
+            case '_':
                 expChar = true;
                 break;
 
@@ -1237,6 +1243,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
             case '+':
             case '-':
             case '.':
+            case '_':
                 numberChar = true;
                 break;
 
@@ -1255,6 +1262,16 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
 
     UnownedStringSlice number{numberStart, cursor};
+
+    // The decoders below do not understand digit separators, so we decode a copy of the
+    // number with them removed.
+    String numberWithoutSeparators;
+    UnownedStringSlice digits = number;
+    if (number.indexOf('_') >= 0)
+    {
+        numberWithoutSeparators = StringUtil::replaceAll(number, toSlice("_"), toSlice(""));
+        digits = numberWithoutSeparators.getUnownedSlice();
+    }
     FloatingPointLiteralValue value{};
     bool isInfinity{};
 
@@ -1293,13 +1310,13 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     // Cursor is updated to be at the end of parsed number
     if (isInfinity)
     {
-        cursor = number.end();
+        cursor = digits.end();
     }
     else if (hexFloat)
     {
         value = _hexFloatLiteralToDouble(
-            number.begin(),
-            number.end(),
+            digits.begin(),
+            digits.end(),
             cursor,
             isOutOfRange,
             precisionLost);
@@ -1329,7 +1346,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         if (literalType == FloatingPointLiteralType::Float)
         {
             float f{};
-            result = fast_float::from_chars(number.begin(), number.end(), f);
+            result = fast_float::from_chars(digits.begin(), digits.end(), f);
             value = f;
         }
         else if (literalType == FloatingPointLiteralType::Half)
@@ -1339,7 +1356,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
             // half. This effectively performs double rounding (decimal ->
             // double -> half), and therefore in rare cases, the result may
             // differ from a single correctly-rounded decimal -> half.
-            result = fast_float::from_chars(number.begin(), number.end(), value);
+            result = fast_float::from_chars(digits.begin(), digits.end(), value);
 
             if (result.ec == std::errc{})
             {
@@ -1355,7 +1372,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         else
         {
             // in all other cases, parse as double
-            result = fast_float::from_chars(number.begin(), number.end(), value);
+            result = fast_float::from_chars(digits.begin(), digits.end(), value);
         }
 
         cursor = result.ptr;
@@ -1375,7 +1392,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
 
     // check for special exponent for infinity
-    if (cursor != number.end())
+    if (cursor != digits.end())
     {
         literalType = FloatingPointLiteralType::BadSignificand;
         errorContent = UnownedStringSlice(content.begin(), number.end());
@@ -2071,6 +2088,11 @@ static TokenType _lexTokenImpl(Lexer* lexer)
                     _advance(lexer);
                     return _lexNumberAfterDecimalPoint(lexer, 10);
                 }
+
+            // A digit separator after a leading `0` does not make the literal octal, so `0_7`
+            // is decimal and `0_0.5` is a floating-point literal.
+            case '_':
+                return _lexNumber(lexer, 10);
 
             case 'x':
             case 'X':
