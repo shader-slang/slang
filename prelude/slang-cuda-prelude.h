@@ -2444,11 +2444,31 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U8_countbits(uint8_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint8_t U8_min(uint8_t a, uint8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint8_t U8_max(uint8_t a, uint8_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I8 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I8_countbits(int8_t v)
 {
     return U8_countbits(uint8_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int8_t I8_min(int8_t a, int8_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int8_t I8_max(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U16 -----------------------------------------
@@ -2459,11 +2479,31 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U16_countbits(uint16_t v)
     return __popc(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t U16_min(uint16_t a, uint16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t U16_max(uint16_t a, uint16_t b)
+{
+    return a > b ? a : b;
+}
+
 // ----------------------------- I16 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I16_countbits(int16_t v)
 {
     return U16_countbits(uint16_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t I16_min(int16_t a, int16_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t I16_max(int16_t a, int16_t b)
+{
+    return a > b ? a : b;
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -2516,9 +2556,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
 {
-    // maps to hlsl firstbithigh
-    if ((int32_t)v < 0)
-        v = ~v;
+    // Find the highest set bit without interpreting the unsigned input's sign bit.
     if (v == 0)
         return ~0u;
     return 31 - __clz(v);
@@ -2576,6 +2614,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbitlow(int32_t v)
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
 {
+    // Negative signed inputs search for the highest zero bit, so complement before counting.
+    if (v < 0)
+        v = ~v;
     return U32_firstbithigh(uint32_t(v));
 }
 
