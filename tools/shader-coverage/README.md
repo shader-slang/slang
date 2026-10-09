@@ -108,9 +108,23 @@ The raw metadata retains the individual statement counts and column positions.
 In boolean mode (`-trace-coverage-boolean`), `DA` is `0` or `1`, indicating
 whether any represented event executed. It carries no execution frequency.
 
-Function-only and branch-only compilations can legitimately have no statement
-entries. To support strict `genhtml`, the exporters fill missing `DA` records
-at `FN`/`BRDA` locations using existing function-entry or branch-outcome counts.
+Function-only and branch-only compilations intentionally record function entries
+or branch outcomes without requiring statement entries. Even with statement
+coverage enabled, the locations can differ. Consider this example:
+
+```slang
+int helper(int x) // Function-entry location (FN).
+{
+    return x + 1; // Executable statement location (DA).
+}
+```
+
+The declaration line has a function entry but no statement entry. To support
+strict `genhtml`, the exporters synthesize compatibility `DA` records at
+`FN`/`BRDA` locations that lack statement entries, using existing function-entry
+or branch-outcome counts. This does not add compiler instrumentation or indicate
+that statement instrumentation is missing.
+
 Actual statement aggregates take precedence, including zero. If both other
 kinds occupy a missing line, the sum of function entries takes precedence over
 the sum of branch outcomes. Boolean mode reduces these fallback records to

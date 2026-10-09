@@ -409,9 +409,13 @@ physical-line visit frequency. Boolean-mode line export instead reports whether
 any entry executed. The compiler's IR coalescing and branch-site definitions
 are independent of this export policy.
 
-The exporters also provide missing `DA` records for function and branch locations
-so that function-only and branch-only metadata can be rendered by strict LCOV
-consumers. Existing statement counts remain authoritative. See
+The exporters also synthesize compatibility `DA` records where the metadata has
+function or branch events but no statement entry. This is expected in function-only
+and branch-only coverage; even with statement coverage enabled, a function's
+declaration line can differ from its executable statement locations. These records
+use existing function-entry or branch-outcome counts so that strict `genhtml` can
+render the data. They do not add compiler instrumentation or imply that statement
+instrumentation is missing. Existing statement counts remain authoritative. See
 [How to interpret LCOV counts](../../tools/shader-coverage/README.md#how-to-interpret-lcov-counts)
 for the fallback precedence, unevaluated-branch representation, and examples.
 
