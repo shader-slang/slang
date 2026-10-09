@@ -5,10 +5,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type -render-feature hardware-device
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj -output-using-type
 
-// Doesn't work on CUDA, not clear why yet
-//DISABLE_TEST_INPUT: Texture1D(format=R_Float32, size=4, content = one, mipMaps=1):name tLoad1D
-//Texture1D<float> tLoad1D;
-
 // Not supported in WGSL: 1D array texture not supported in WGSL
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
@@ -54,7 +50,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0);
     val += tCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0);
  
-    //val += tLoad1D.Load(int2(idx, 0));
+    val += t1D.Load(int2(idx, 0));
  
     outputBuffer[idx] = val;
 }

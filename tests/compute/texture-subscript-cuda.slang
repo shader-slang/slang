@@ -64,10 +64,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     {
     case 1:
         {
-            int var = 0;
             float result = cudaT1D[0];
-            // This is not supported in PTX.
-            //cudaOutputBuffer[idx] = result;
+            cudaOutputBuffer[idx] = result;
         }    
     break;
     
