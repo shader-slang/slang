@@ -167,6 +167,7 @@ jobs:
           find_package(LLVM REQUIRED CONFIG)
           find_package(Clang REQUIRED CONFIG)
           add_executable(llvm-prebuilt-smoke main.cpp)
+          target_compile_features(llvm-prebuilt-smoke PRIVATE cxx_std_20)
           target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
           target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
           EOF
