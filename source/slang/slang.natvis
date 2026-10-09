@@ -136,8 +136,16 @@
                 <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
                 <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
                 <Variable Name="pOperandInst" InitialValue="(IRInst*)nullptr"/>
+                <!-- Operands are tail-allocated immediately after the instruction, so
+                     they start at "this + 1". That is the same address that
+                     IRInst::getOperands() computes, and the same form used for
+                     "child + 1" and "nameDecoration + 1" elsewhere in this file.
+                     Deriving them from the address of typeUse instead would also
+                     require typeUse to be the last member of IRInst, which the
+                     standard does not guarantee now that IRInst has members with
+                     differing access control. -->
                 <Loop Condition="index &lt; operandCount">
-                    <Exec>pOperandInst = ((IRUse*)(&amp;(typeUse) + 1 + index))->usedValue </Exec>
+                    <Exec>pOperandInst = (((Slang::IRUse*)(this + 1)) + index)->usedValue </Exec>
                     <Item Condition="pOperandInst == 0" Name="[operand{index}]">pOperandInst</Item>
                     <If Condition="pOperandInst != 0">
                         <Exec>child = pOperandInst->m_decorationsAndChildren.first</Exec>
