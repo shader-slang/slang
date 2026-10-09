@@ -206,7 +206,7 @@
 30071	UNCOVERED	err	var-cannot-be-unsized	slang-diagnostics.lua	cannot instantiate unsized type
 30072	UNCOVERED	err	param-cannot-be-unsized	slang-diagnostics.lua	function parameter cannot be unsized
 30075	UNCOVERED	err	cannot-specialize-generic	slang-diagnostics.lua	cannot specialize generic
-30076	covered	err	global-var-cannot-have-opaque-type	slang-diagnostics.lua	global variable cannot have opaque type
+30076	covered	err	opaque-type-not-supported-for-mutable-static	slang-diagnostics.lua	opaque type is not supported for mutable static storage
 30077	UNCOVERED	err	concrete-argument-to-output-interface	slang-diagnostics.lua	concrete type passed to interface-typed output parameter
 30078	UNCOVERED	err	coherent-keyword-on-a-pointer	slang-diagnostics.lua	cannot have coherent qualifier on pointer
 30079	UNCOVERED	err	cannot-take-constant-pointers	slang-diagnostics.lua	cannot take address of immutable object

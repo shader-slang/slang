@@ -1,8 +1,11 @@
-// An entry point can also be called as an ordinary function. The ray-tracing boundary pass
-// changes its physical signature before fixEntryPointCallsites later clones that function for
-// ordinary callers, so those calls must already supply the matching physical argument.
-// Other helper parameters remain logical: recordEvent's Empty parameter disappears normally.
-// The replacement argument needs storage, but its dummy field does not need an initial value.
+// An entry point can also be called as an ordinary function. `legalizeRayTracingPayloads` first
+// gives the empty native payload physical storage. The pipeline then resolves varying references
+// before `fixEntryPointCallsites` clones the already-resolved function for ordinary callers. Later
+// entry-point legalization can therefore adapt the entry-point and callable roles independently
+// without making the clone refer to the entry point's obsolete payload representation.
+// Other helper parameters remain logical: the `Empty` parameter of `recordEvent` disappears
+// normally. The replacement argument needs storage, but its dummy field does not need an initial
+// value.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile sm_6_6 -whole-program -O0 -validate-ir-detailed
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile sm_6_6 -whole-program -O3 -validate-ir-detailed

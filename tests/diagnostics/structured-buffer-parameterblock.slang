@@ -35,8 +35,6 @@ struct StructWithParameterBlockArray
     ParameterBlock<Texture2D> blocks[2];
 //CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
 //CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
-//CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
-//CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
     int value;
 }
 

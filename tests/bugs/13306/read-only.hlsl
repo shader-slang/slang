@@ -1,7 +1,7 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/read-only.hlsl -Gec -target hlsl -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -Gec -no-codegen
 
-// We check that semantic checking rejects writes to resource parameters and buffer contents
-// when their types cannot be stored in mutable globals. Reading these aliases is still allowed.
+// Compatibility permits rebinding a direct resource through its mutable shadow. Explicit parameter
+// groups and legacy-buffer contents remain read-only aliases, so their writes must be rejected.
 Texture2D<float4> gTex;
 Texture2D<float4> other;
 struct Data { uint value; };
@@ -17,9 +17,10 @@ cbuffer Mixed
 void main()
 {
     gTex = other;
-    // CHECK: error[E30011]
     explicitBuffer.value = 1;
-    // CHECK: error[E30011]
+//CHECK:                 ^ left of '=' is not an l-value
+//CHECK:                 ^ left of '=' is not an l-value.
     value = 1;
-    // CHECK: error[E30011]
+//CHECK:  ^ left of '=' is not an l-value
+//CHECK:  ^ left of '=' is not an l-value.
 }

@@ -1184,12 +1184,17 @@ The temporary has the parameter's type.
 For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
 This type selection also applies when the struct contains a resource.
 
-Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
-Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
-The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
-Reading these parameters with `-Gec` does not allocate mutable resource storage.
+The compiler can provide a mutable temporary for the resource types and fixed-size resource arrays described under [resource-valued static variables](02-conventional-features.md#resource-valued-static-variables).
+For a resource temporary, assignment changes which bound resource the temporary denotes during the current shader invocation; it does not rebind the original shader parameter.
+An operation through the temporary still accesses the selected resource's contents normally.
+The same restrictions on storage qualifiers, address identity, function invocation, and target representation apply to the temporary.
+
+A parameter remains an immutable alias when its type or declaration qualifiers require semantics that the mutable temporary cannot preserve.
+This includes each unsupported type form and memory-access qualifier listed for a resource-valued `static` variable.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct because the buffer shadow has that struct type.
+Using any of these parameters with `-Gec` does not allocate mutable storage.
 A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
-If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
+If the linked definition requires unsupported opaque storage or unsized storage, the compiler reports that limitation after linking.
 Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability

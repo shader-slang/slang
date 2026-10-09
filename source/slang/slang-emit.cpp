@@ -71,6 +71,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -1003,6 +1004,41 @@ void removeWeakUseInsts(IRModule* module)
     {
         weakUse->removeAndDeallocate();
     }
+}
+
+/// Resolve varying references and redirect ordinary calls to non-entry-point clones.
+///
+/// Shader entry points and CUDA kernels remain launch targets; ordinary calls use their clones.
+static void resolveVaryingReferencesAndSplitEntryPointCallsites(
+    IRModule* irModule,
+    CodeGenContext* codeGenContext)
+{
+    // A shader entry point or CUDA kernel that is also called as an ordinary function needs a
+    // non-entry-point clone.
+    // We first translate global varying variables and resolve varying-input references so that
+    // the clone contains the references that emission expects. We then redirect ordinary calls
+    // to the clone. Each pass retains its own hooks for IR validation, dumps, and profiling.
+    auto& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
+    if (requiredLoweringPassSet.globalVaryingVar)
+        wrapPass(
+            codeGenContext,
+            "translateGlobalVaryingVar",
+            translateGlobalVaryingVar,
+            irModule,
+            codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        wrapPass(
+            codeGenContext,
+            "resolveVaryingInputRef",
+            [](IRModule* module) { resolveVaryingInputRef(module); },
+            irModule);
+
+    wrapPass(
+        codeGenContext,
+        "fixEntryPointCallsites",
+        [](IRModule* module) { fixEntryPointCallsites(module); },
+        irModule);
 }
 
 Result linkAndOptimizeIR(
@@ -2066,6 +2102,52 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    // Resource-global legalization requires the entry-point call-site split to happen before we
+    // move global initializers. We move that split and its prerequisite passes only for modules
+    // that contain a candidate. Other modules retain the established late ordering below.
+    const bool hasResourceGlobalCandidate = doesModuleContainResourceGlobalCandidate(irModule);
+    if (hasResourceGlobalCandidate)
+    {
+        // We split the launch and ordinary-call roles of shader entry points and CUDA kernels
+        // before moving entry-point initialization. Otherwise the ordinary clone would inherit
+        // initialization that must execute only when the original function is launched. Resource-
+        // global legalization can then add generated resource parameters to the ordinary clone and
+        // append matching arguments at its direct call sites.
+        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
+
+        // Any resource- or empty-type legalization selected for the target has now run.
+        // `isResourceGlobalCandidateForPerInvocationReplacement` accepts only resource values and
+        // homogeneous resource arrays that still have one global IR value. The initializer mover
+        // can therefore transfer each selected initializer without coordinating several legalized
+        // values.
+        //
+        // TODO: Consolidate this resource-initializer selection with
+        // `moveGlobalVarInitializationToEntryPoints` later in the pipeline. A combined policy must
+        // continue to move cooperative-vector and selected resource initializers for HLSL while
+        // leaving every other HLSL global initializer at module scope.
+        SLANG_PASS(
+            moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization,
+            codeGenContext->getTargetProgram(),
+            sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+
+        // Each selected global still has one IR value and now has no initializer body. We can
+        // replace it with function-local storage and pass its value through generated parameters
+        // and call arguments. `specializeResourceUsage` later tries to rewrite or eliminate
+        // generated parameter forms that the target cannot emit. Uninitialized-value diagnostics
+        // are non-essential validation, so we pass the same option that controls the pre-link
+        // module-wide uninitialized-value check. The generated-local analysis must not reintroduce
+        // those diagnostics when the user has disabled them.
+        SLANG_PASS(
+            legalizeResourceGlobalVars,
+            targetRequest->getTargetCaps(),
+            targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
+            sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     if (isCPUTargetViaLLVM(targetRequest))
     {
         // The LLVM targets are special in that we always lower all matrices
@@ -2109,15 +2191,13 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // After type legalization and subsequent SSA cleanup we expect
-    // that any resource types passed to functions are exposed
-    // as their own top-level parameters (which might have
-    // resource or array-of-...-resource types).
-    //
-    // Many of our targets place restrictions on how certain
-    // resource types can be used, so that having them as
-    // function parameters, reults, etc. is invalid.
-    // We clean up the usages of resource values here.
+    // On targets that require resource-type legalization, that pass has separated resources from
+    // the aggregates that contained them. Each remaining resource parameter on those paths
+    // represents one resource value or one resource array. CPU and CUDA paths retain aggregates
+    // because their target representations can contain resource values.
+    // Some targets cannot pass those values through ordinary function parameters or results.
+    // `specializeResourceUsage` specializes calls that it can rewrite into a supported form; later
+    // target validation diagnoses any addressable resource storage that still cannot be emitted.
     SLANG_PASS(specializeResourceUsage, codeGenContext);
 
     // Specialize calls to functions with values loaded from an immutable location,
@@ -2335,17 +2415,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Specialization can expose references to global varying builtins that were
-    // previously hidden behind generic/interface dispatch. Translate all global
-    // varying inputs/outputs now, after specialization, but before target
-    // entry-point legalization.
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
+    if (!hasResourceGlobalCandidate)
+    {
+        // A module with no resource-global candidate does not need the earlier entry-point split.
+        // We leave these passes in their established position so that adding resource-global
+        // legalization does not reorder unrelated modules.
+        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
+    }
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2891,6 +2967,9 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
+    // We check D3D and Metal resource locals after all passes that can create mutable storage.
+    // Minimum-optimization mode must still reject storage that its target cannot represent.
+    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
