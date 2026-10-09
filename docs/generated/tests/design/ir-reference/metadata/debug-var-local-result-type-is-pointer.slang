@@ -27,4 +27,4 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = local;
 }
 
-// CHECK: Ptr(Int){{.*}}= DebugVar(%{{[0-9]+}}, {{[0-9]+}} : UInt, {{[0-9]+}} : UInt)
+// CHECK: Ptr(Int){{.*}}= DebugVar(%{{[0-9]+}}, {{[0-9]+}} : UInt, {{[0-9]+}} : UInt, %{{[A-Za-z0-9_]+}})

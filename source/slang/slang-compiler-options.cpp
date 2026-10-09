@@ -370,6 +370,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLBinding:
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
+        case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
@@ -458,6 +459,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
@@ -655,6 +657,16 @@ void applySettingsToDiagnosticSink(
             Severity::Warning,
             Severity::Disable);
     }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
+            Severity::Disable);
+    }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);
     for (auto& element : enableArray)
     {
@@ -703,6 +715,13 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
     }
 
     // Handle diagnostic color setting.

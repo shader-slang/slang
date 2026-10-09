@@ -265,7 +265,6 @@ issue, comment, and review events rather than to a PR's code.
 | `pr-ci-complete.yml`                                    | Board sync when a gating workflow finishes.                                                                        |
 | `pr-commit-status.yml`                                  | Board sync when an external commit status settles.                                                                 |
 | `pr-review-fork-bridge.yml`, `pr-review-fork-apply.yml` | Two-stage relay for fork-PR reviews.                                                                               |
-| `issue-add-labels.yml`                                  | Labels new issues by the author's team membership.                                                                 |
 | `issue-onboard.yml` / `issue-board-onboard.yml`         | Adds a new issue to Slang-All; sets Source; Internal authors are assigned and moved to In Triage / current Sprint. |
 | `claude.yml`                                            | The `@claude` assistant on issues and PRs.                                                                         |
 | `claude-ci-analysis.yml`                                | On demand: analyzes a CI failure and pushes a fix to the PR.                                                       |

@@ -241,6 +241,7 @@ FIDDLE() namespace Slang
         WaveIsFirstLane,
         WaveReadLaneFirst,
         CallShader,
+        ReportHit = 16,
         /// An atomic entry point that can take a floating-point value, such as the global
         /// `Interlocked*` functions. The differentiability checker uses it to recognize a call
         /// that writes a derivative-carrying value into non-differentiable memory.
@@ -1378,8 +1379,8 @@ FIDDLE() namespace Slang
         // The kind of lookup step that was performed
         Kind kind;
 
-        // For the `Kind::This` case, what does the implicit
-        // `this` or `This` parameter refer to?
+        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
+        // and is that value mutable?
         //
         enum class ThisParameterMode : uint8_t
         {
@@ -1913,6 +1914,50 @@ FIDDLE() namespace Slang
         ///
         Ref,
     };
+
+    /// Combined semantic information about a parameter's type and parameter-passing mode.
+    ///
+    /// The two fields deliberately use the same decomposition as a parameter type with a
+    /// parameter-passing-mode wrapper: `type` is the value type *inside* that wrapper, while
+    /// `mode` identifies the wrapper. Thus `type` never contains an `OutParamType`,
+    /// `BorrowInOutParamType`, `BorrowInParamType`, or `RefParamType`.
+    ///
+    /// Other modifiers that are part of the parameter's semantic value type remain encoded in
+    /// `type`. In particular, a `no_diff` parameter uses a `ModifiedType` carrying
+    /// `NoDiffModifierVal`. Producers and consumers must preserve this decomposition so that a
+    /// `ParamInfo` and its wrapped parameter-type representation encode the same information.
+    FIDDLE()
+    struct ParamInfo
+    {
+        FIDDLE(...)
+
+        /// The effective parameter value type, including semantic type modifiers such as
+        /// `no_diff`, but excluding any parameter-passing-mode wrapper.
+        FIDDLE() Type* type = nullptr;
+
+        /// The effective parameter-passing mode, stored separately from `type`.
+        FIDDLE() ParamPassingMode mode = ParamPassingMode::In;
+    };
+
+    /// Returns whether `mode` passes writable storage to the callee.
+    inline bool doesParamPassingModeIndicateWritableStorage(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::Ref:
+            return true;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return false;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
