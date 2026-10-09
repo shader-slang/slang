@@ -3128,6 +3128,135 @@ static void diagnoseGenericConstraintFailureNote(
     }
 }
 
+// Suggests stronger generic constraints after a call fails. Consider this example:
+//
+//     interface IBase {}
+//     interface IDerived : IBase {}
+//     void f<U : IDerived>(U value) {}
+//     void f(int2 value) {}
+//     void g<T : IBase>(T value) { f(value); }
+//
+// Overload resolution reports a mismatch against f(int2), but the caller needs
+// T : IDerived. addOverloadCandidatesForCallToGeneric retains the failed generic
+// candidate before ranking discards it, so we can suggest that constraint here.
+// IDerived inherits IBase, so it replaces IBase in the suggestion. If T also
+// requires an unrelated interface IOther, suggest T : IOther & IDerived to
+// preserve that requirement.
+void SemanticsVisitor::diagnoseMissingGenericConstraints(OverloadResolveContext& context)
+{
+    struct Suggestion
+    {
+        DeclRef<GenericTypeParamDecl> parameter;
+        Type* requiredType;
+        Type* suggestedConstraintType;
+        bool refinesExistingConstraint;
+    };
+    // Keep candidate order for printing, but defer emission until we know which
+    // parameters have a suggestion that strengthens an existing constraint.
+    List<Suggestion> suggestions;
+    // Different overloads may require the same interface for the same parameter.
+    // Track that pair so it produces only one suggestion.
+    HashSet<KeyValuePair<Type*, Type*>> seenRequirements;
+    // This set lets the printing pass suppress unrelated suggestions for a parameter
+    // when any candidate offers a stronger version of one of its existing constraints.
+    HashSet<DeclRef<GenericTypeParamDecl>> parametersWithRefinements;
+
+    // Collect suggestions from failed interface conformances, retaining any existing
+    // constraints that the required interface does not already imply.
+    for (const auto& candidate : context.constraintFailedGenericCandidates)
+    {
+        const auto& inferenceFailure = candidate.genericInferenceFailure;
+        // Other failure kinds cannot supply an interface constraint to suggest.
+        // Check the kind before reading the corresponding union member.
+        if (inferenceFailure.kind !=
+            GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied)
+            continue;
+        const auto& failure = inferenceFailure.interfaceConformanceNotSatisfied;
+        auto parameter = isDeclRefTypeOf<GenericTypeParamDecl>(failure.subType);
+        auto requiredInterface = isDeclRefTypeOf<InterfaceDecl>(failure.supType);
+        // A concrete argument type has no generic parameter to constrain. Also exclude
+        // non-interface requirements and overloads inaccessible at the call.
+        if (!parameter || !requiredInterface ||
+            !isDeclVisibleFromScope(candidate.item.declRef, context.sourceScope))
+            continue;
+
+        // Don't suggest constraints for the implicit This parameter.
+        if (auto defaultImpl = as<InterfaceDefaultImplDecl>(parameter.getDecl()->parentDecl);
+            defaultImpl && defaultImpl->thisTypeDecl == parameter.getDecl())
+            continue;
+
+        auto generic = getShared()->getDependentGenericParent(parameter);
+        if (!generic)
+            continue;
+        auto parameterScope = getScope(parameter.getDecl());
+        if (!doesNameResolveToDecl(
+                requiredInterface.getName(),
+                parameterScope,
+                requiredInterface.getDecl()))
+            continue;
+
+        // A visible generic interface can still have inaccessible arguments, such
+        // as IBound<Library.PrivateType>. Omit specialized requirements until we
+        // can check that the entire suggested type is nameable at the parameter.
+        if (SubstitutionSet(requiredInterface).findGenericAppDeclRef())
+            continue;
+        if (!seenRequirements.add({failure.subType, failure.supType}))
+            continue;
+
+        Type* retainedConstraintType = nullptr;
+        bool refinesExistingConstraint = false;
+        bool hasInvalidConstraint = false;
+        for (auto constraint : getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, generic))
+        {
+            if (constraint.getDecl()->isEqualityConstraint ||
+                constraint.getDecl()->hasModifier<OptionalConstraintModifier>() ||
+                !getSub(m_astBuilder, constraint)->equals(failure.subType))
+                continue;
+            auto constraintType = getSup(m_astBuilder, constraint);
+            if (as<ErrorType>(constraintType))
+            {
+                hasInvalidConstraint = true;
+                break;
+            }
+            if (tryGetSubtypeWitness(failure.supType, constraintType))
+            {
+                refinesExistingConstraint = true;
+                continue;
+            }
+            retainedConstraintType =
+                retainedConstraintType
+                    ? m_astBuilder->getAndType(retainedConstraintType, constraintType)
+                    : constraintType;
+        }
+        if (hasInvalidConstraint)
+            continue;
+        auto suggestedConstraintType =
+            retainedConstraintType
+                ? m_astBuilder->getAndType(retainedConstraintType, failure.supType)
+                : failure.supType;
+        suggestions.add(
+            {parameter, failure.supType, suggestedConstraintType, refinesExistingConstraint});
+        if (refinesExistingConstraint)
+            parametersWithRefinements.add(parameter);
+    }
+
+    // For abs(value) where value has type T : IFloat, prefer strengthening IFloat
+    // to __BuiltinFloatingPointType over adding the integer overload's constraint.
+    // Apply this preference separately to each parameter. Several suggestions can
+    // remain equally useful, so print each of them.
+    for (const auto& suggestion : suggestions)
+    {
+        if (!suggestion.refinesExistingConstraint &&
+            parametersWithRefinements.contains(suggestion.parameter))
+            continue;
+        getSink()->diagnose(Diagnostics::SuggestGenericParameterConstraint{
+            .param = suggestion.parameter.getName(),
+            .constraintType = suggestion.suggestedConstraintType,
+            .required = suggestion.requiredType,
+            .location = suggestion.parameter.getLoc()});
+    }
+}
+
 void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
     LookupResultItem genericItem,
     OverloadResolveContext& context,
@@ -3744,6 +3873,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                         .location = expr->loc});
                 }
             }
+            diagnoseMissingGenericConstraints(context);
         }
         else
         {
@@ -3895,7 +4025,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
                 arg = extractExistentialExpr->originalExpr;
         }
-        return CompleteOverloadCandidate(context, *context.bestCandidate);
+        bool candidateFailed =
+            context.bestCandidate->status != OverloadCandidate::Status::Applicable;
+        // Complete the candidate first so its error precedes the constraint suggestions.
+        auto result = CompleteOverloadCandidate(context, *context.bestCandidate);
+        if (candidateFailed)
+            diagnoseMissingGenericConstraints(context);
+        return result;
     }
 
     // If absolutely no viable candidates were extracted from the overloaded expression,
