@@ -235,6 +235,51 @@ target_link_libraries(yourLib PUBLIC
 )
 ```
 
+## Submodule
+If you'd like to use Slang as a submodule in your project, you can do so with the following in your CMake project. 
+```cmake
+cmake_minimum_required(VERSION 4.0)
+project(hello-world)
+
+# Set a few options
+# set(SLANG_ENABLE_SLANG_RHI OFF CACHE BOOL "" FORCE)
+# set(SLANG_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+# set(SLANG_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SLANG_LIB_TYPE "STATIC" CACHE STRING "" FORCE)
+
+add_subdirectory(slang)
+add_executable(${CMAKE_PROJECT_NAME} main.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE slang::slang)
+
+# Slang also exposes a target for its compiler
+# We can use it to compile shaders at compile time
+set(SHADER_SOURCE "shader.slang")
+set(OUTPUT_FILE "shader.spv")
+
+set(OUTPUT_DIRECTORY "shaders")
+set(COMPILE_TARGET "spirv")
+set(COMPILE_PROFILE "spirv_1_4")
+
+# Our custom CMake command to compile shaders
+add_custom_command(
+    OUTPUT ${OUTPUT_DIRECTORY}/${OUTPUT_FILE}
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIRECTORY}"
+    COMMAND slang::slang-compiler ${SHADER_SOURCE}
+    -target ${COMPILE_TARGET}
+    -profile ${COMPILE_PROFILE}
+    -emit-spirv-directly
+    -fvk-use-entrypoint-name
+    -o ${OUTPUT_DIRECTORY}/${OUTPUT_FILE}
+
+    COMMENT "Compiling shader: ${SHADER_SOURCE}"
+    VERBATIM
+)
+
+add_custom_target(shaderTarget DEPENDS ${OUTPUT_DIRECTORY}/${OUTPUT_FILE})
+add_dependencies(${CMAKE_PROJECT_NAME} shaderTarget)
+```
+If you'd like more information on all CMake options, see [here](#cmake-options).
+
 ## Testing
 
 ```bash
