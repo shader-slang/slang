@@ -4,7 +4,7 @@ See [`_common.md`](_common.md).
 
 ## Target
 
-[`docs/language-reference/types-extension.md`](https://github.com/shader-slang/spec/blob/main/specification/types-extension.md).
+[`docs/language-reference/types-extension.md`](../../../../language-reference/types-extension.md).
 
 ## High-value claims
 

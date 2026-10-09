@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/statements/`,
 anchored to
-[`docs/language-reference/statements.md`](https://github.com/shader-slang/spec/blob/main/specification/statements.md).
+[`docs/language-reference/statements.md`](../../../../language-reference/statements.md).
 
 ## Sub-areas and claim extraction strategy
 

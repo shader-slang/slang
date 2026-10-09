@@ -8,7 +8,7 @@ truth hierarchy, and the parallel-trees policy.
 Bundle at
 `docs/generated/tests/conformance/types-vector-and-matrix/`,
 anchored to
-[`docs/language-reference/types-vector-and-matrix.md`](https://github.com/shader-slang/spec/blob/main/specification/types-vector-and-matrix.md).
+[`docs/language-reference/types-vector-and-matrix.md`](../../../../language-reference/types-vector-and-matrix.md).
 
 ## High-value claims
 

@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/basics-program-execution/`,
 anchored to
-[`docs/language-reference/basics-program-execution.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-program-execution.md).
+[`docs/language-reference/basics-program-execution.md`](../../../../language-reference/basics-program-execution.md).
 
 ## Claim extraction strategy
 

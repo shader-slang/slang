@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/basics-execution-divergence-reconvergence/`,
 anchored to
-[`docs/language-reference/basics-execution-divergence-reconvergence.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-execution-divergence-reconvergence.md).
+[`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../../../language-reference/basics-execution-divergence-reconvergence.md).
 
 ## Doc summary
 

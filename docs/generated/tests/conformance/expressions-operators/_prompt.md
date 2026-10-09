@@ -8,7 +8,7 @@ See [`_common.md`](_common.md) for universal rules. Read
 Bundle at
 `docs/generated/tests/conformance/expressions-operators/`,
 anchored to
-[`docs/language-reference/expressions-operators.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-operators.md).
+[`docs/language-reference/expressions-operators.md`](../../../../language-reference/expressions-operators.md).
 
 The doc is marked TODO at the top but the operator tables and the
 prefix/postfix/conditional semantics are normative content. Test

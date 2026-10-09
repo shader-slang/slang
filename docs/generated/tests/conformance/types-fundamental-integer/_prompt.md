@@ -8,7 +8,7 @@ See [`_common.md`](_common.md) for universal rules. **Read the
 Produce the test bundle at
 `docs/generated/tests/conformance/types-fundamental-integer/`,
 anchored to
-[`docs/language-reference/types-fundamental.md`](https://github.com/shader-slang/spec/blob/main/specification/types-fundamental.md)
+[`docs/language-reference/types-fundamental.md`](../../../../language-reference/types-fundamental.md)
 (the `#integer-types` section).
 
 The bundle scope is **the integer-type claims only** —

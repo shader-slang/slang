@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/basics-memory-model-address-spaces/`,
 anchored to
-[`docs/language-reference/basics-memory-model-address-spaces.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-address-spaces.md).
+[`docs/language-reference/basics-memory-model-address-spaces.md`](../../../../language-reference/basics-memory-model-address-spaces.md).
 
 ## Doc summary
 

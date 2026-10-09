@@ -27,30 +27,30 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) | 8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-execution-divergence-reconvergence.md) |
-| [`conformance/basics-memory-model-address-spaces`](conformance/basics-memory-model-address-spaces/README.md) | 20 | [`docs/language-reference/basics-memory-model-address-spaces.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-address-spaces.md) |
-| [`conformance/basics-memory-model-consistency`](conformance/basics-memory-model-consistency/README.md) | 20 | [`docs/language-reference/basics-memory-model-consistency.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-consistency.md) |
-| [`conformance/basics-memory-model-special-topics`](conformance/basics-memory-model-special-topics/README.md) | 17 | [`docs/language-reference/basics-memory-model-special-topics.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-special-topics.md) |
-| [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md) | 10 | [`docs/language-reference/basics-program-execution.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-program-execution.md) |
-| [`conformance/declarations`](conformance/declarations/README.md) | 43 | [`docs/language-reference/declarations.md`](https://github.com/shader-slang/spec/blob/main/specification/declarations.md) |
-| [`conformance/expressions-identifier`](conformance/expressions-identifier/README.md) | 10 | [`docs/language-reference/expressions-identifier.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-identifier.md) |
-| [`conformance/expressions-initializer`](conformance/expressions-initializer/README.md) | 10 | [`docs/language-reference/expressions-initializer.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-initializer.md) |
-| [`conformance/expressions-literal`](conformance/expressions-literal/README.md) | 12 | [`docs/language-reference/expressions-literal.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-literal.md) |
-| [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md) | 5 | [`docs/language-reference/expressions-member-access.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-member-access.md) |
-| [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md) | 25 | [`docs/language-reference/expressions-operator-precedence.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-operator-precedence.md) |
-| [`conformance/expressions-operators`](conformance/expressions-operators/README.md) | 10 | [`docs/language-reference/expressions-operators.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-operators.md) |
-| [`conformance/expressions-this`](conformance/expressions-this/README.md) | 6 | [`docs/language-reference/expressions-this.md`](https://github.com/shader-slang/spec/blob/main/specification/expressions-this.md) |
-| [`conformance/generics`](conformance/generics/README.md) | 60 | [`docs/language-reference/generics.md`](https://github.com/shader-slang/spec/blob/main/specification/generics.md) |
-| [`conformance/lexical-structure`](conformance/lexical-structure/README.md) | 8 | [`docs/language-reference/lexical-structure.md`](https://github.com/shader-slang/spec/blob/main/specification/lexical-structure.md) |
-| [`conformance/statements`](conformance/statements/README.md) | 36 | [`docs/language-reference/statements.md`](https://github.com/shader-slang/spec/blob/main/specification/statements.md) |
-| [`conformance/types-array`](conformance/types-array/README.md) | 6 | [`docs/language-reference/types-array.md`](https://github.com/shader-slang/spec/blob/main/specification/types-array.md) |
-| [`conformance/types-enum`](conformance/types-enum/README.md) | 5 | [`docs/language-reference/types-enum.md`](https://github.com/shader-slang/spec/blob/main/specification/types-enum.md) |
-| [`conformance/types-extension`](conformance/types-extension/README.md) | 5 | [`docs/language-reference/types-extension.md`](https://github.com/shader-slang/spec/blob/main/specification/types-extension.md) |
-| [`conformance/types-fundamental-integer`](conformance/types-fundamental-integer/README.md) | 8 | [`docs/language-reference/types-fundamental.md`](https://github.com/shader-slang/spec/blob/main/specification/types-fundamental.md) |
-| [`conformance/types-interface`](conformance/types-interface/README.md) | 33 | [`docs/language-reference/types-interface.md`](https://github.com/shader-slang/spec/blob/main/specification/types-interface.md) |
-| [`conformance/types-pointer`](conformance/types-pointer/README.md) | 19 | [`docs/language-reference/types-pointer.md`](https://github.com/shader-slang/spec/blob/main/specification/types-pointer.md) |
-| [`conformance/types-struct`](conformance/types-struct/README.md) | 31 | [`docs/language-reference/types-struct.md`](https://github.com/shader-slang/spec/blob/main/specification/types-struct.md) |
-| [`conformance/types-vector-and-matrix`](conformance/types-vector-and-matrix/README.md) | 9 | [`docs/language-reference/types-vector-and-matrix.md`](https://github.com/shader-slang/spec/blob/main/specification/types-vector-and-matrix.md) |
+| [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) | 8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
+| [`conformance/basics-memory-model-address-spaces`](conformance/basics-memory-model-address-spaces/README.md) | 20 | [`docs/language-reference/basics-memory-model-address-spaces.md`](../../language-reference/basics-memory-model-address-spaces.md) |
+| [`conformance/basics-memory-model-consistency`](conformance/basics-memory-model-consistency/README.md) | 20 | [`docs/language-reference/basics-memory-model-consistency.md`](../../language-reference/basics-memory-model-consistency.md) |
+| [`conformance/basics-memory-model-special-topics`](conformance/basics-memory-model-special-topics/README.md) | 17 | [`docs/language-reference/basics-memory-model-special-topics.md`](../../language-reference/basics-memory-model-special-topics.md) |
+| [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md) | 10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md) |
+| [`conformance/declarations`](conformance/declarations/README.md) | 43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md) |
+| [`conformance/expressions-identifier`](conformance/expressions-identifier/README.md) | 10 | [`docs/language-reference/expressions-identifier.md`](../../language-reference/expressions-identifier.md) |
+| [`conformance/expressions-initializer`](conformance/expressions-initializer/README.md) | 10 | [`docs/language-reference/expressions-initializer.md`](../../language-reference/expressions-initializer.md) |
+| [`conformance/expressions-literal`](conformance/expressions-literal/README.md) | 12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md) |
+| [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md) | 5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md) |
+| [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md) | 25 | [`docs/language-reference/expressions-operator-precedence.md`](../../language-reference/expressions-operator-precedence.md) |
+| [`conformance/expressions-operators`](conformance/expressions-operators/README.md) | 10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md) |
+| [`conformance/expressions-this`](conformance/expressions-this/README.md) | 6 | [`docs/language-reference/expressions-this.md`](../../language-reference/expressions-this.md) |
+| [`conformance/generics`](conformance/generics/README.md) | 60 | [`docs/language-reference/generics.md`](../../language-reference/generics.md) |
+| [`conformance/lexical-structure`](conformance/lexical-structure/README.md) | 8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md) |
+| [`conformance/statements`](conformance/statements/README.md) | 36 | [`docs/language-reference/statements.md`](../../language-reference/statements.md) |
+| [`conformance/types-array`](conformance/types-array/README.md) | 6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md) |
+| [`conformance/types-enum`](conformance/types-enum/README.md) | 5 | [`docs/language-reference/types-enum.md`](../../language-reference/types-enum.md) |
+| [`conformance/types-extension`](conformance/types-extension/README.md) | 5 | [`docs/language-reference/types-extension.md`](../../language-reference/types-extension.md) |
+| [`conformance/types-fundamental-integer`](conformance/types-fundamental-integer/README.md) | 8 | [`docs/language-reference/types-fundamental.md`](../../language-reference/types-fundamental.md) |
+| [`conformance/types-interface`](conformance/types-interface/README.md) | 33 | [`docs/language-reference/types-interface.md`](../../language-reference/types-interface.md) |
+| [`conformance/types-pointer`](conformance/types-pointer/README.md) | 19 | [`docs/language-reference/types-pointer.md`](../../language-reference/types-pointer.md) |
+| [`conformance/types-struct`](conformance/types-struct/README.md) | 31 | [`docs/language-reference/types-struct.md`](../../language-reference/types-struct.md) |
+| [`conformance/types-vector-and-matrix`](conformance/types-vector-and-matrix/README.md) | 9 | [`docs/language-reference/types-vector-and-matrix.md`](../../language-reference/types-vector-and-matrix.md) |
 
 ### Pipeline
 

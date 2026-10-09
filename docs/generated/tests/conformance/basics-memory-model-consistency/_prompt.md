@@ -6,7 +6,7 @@ See [`_common.md`](_common.md).
 
 Bundle at `docs/generated/tests/conformance/basics-memory-model-consistency/`,
 anchored to
-[`docs/language-reference/basics-memory-model-consistency.md`](https://github.com/shader-slang/spec/blob/main/specification/basics-memory-model-consistency.md).
+[`docs/language-reference/basics-memory-model-consistency.md`](../../../../language-reference/basics-memory-model-consistency.md).
 
 ## Doc summary
 

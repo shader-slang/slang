@@ -8,7 +8,7 @@ source-of-truth hierarchy, and the parallel-trees policy.
 Bundle at
 `docs/generated/tests/conformance/lexical-structure/`,
 anchored to
-[`docs/language-reference/lexical-structure.md`](https://github.com/shader-slang/spec/blob/main/specification/lexical-structure.md).
+[`docs/language-reference/lexical-structure.md`](../../../../language-reference/lexical-structure.md).
 
 The doc covers source units, encoding, whitespace, escaped line
 breaks, comments, the compilation phases, identifiers, and integer
