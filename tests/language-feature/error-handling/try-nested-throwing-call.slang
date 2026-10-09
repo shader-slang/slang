@@ -1,7 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // A `try` covers only the call it wraps. A throwing call inside that call's operands needs its
-// own `try`, as in `try g(try f())` (#13489).
+// own `try`, as in `try g(try f())` (#13489). Apart from `nonThrowingOuterCall`, every `try` here
+// wraps a throwing call, so the only diagnostics are for the uncovered inner calls.
 
 enum MyError
 {
@@ -10,6 +11,9 @@ enum MyError
 
 int f() throws MyError { throw MyError.Failed; }
 int g(int x) throws MyError { return x; }
+int g2(int a, int b) throws MyError { return a + b; }
+float gf(float x) throws MyError { return x; }
+uint gu(uint x) throws MyError { return x; }
 int k(int x) { return x; }
 
 struct T
@@ -77,25 +81,68 @@ int nonThrowingOuterCall() throws MyError
 //CHECK:   ^^^ 'k' called from a 'try' clause does not throw an error, make sure the callee is marked as 'throws'
 }
 
+int siblingAfterExplicitTry() throws MyError
+{
+    return try g2(try f(), f());
+//CHECK:                    ^ callee may throw, use 'try'
+//CHECK:                    ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
 int subscriptIndex() throws MyError
 {
     S s;
     s.x = 1;
-    return try s[f()];
-//CHECK:          ^ callee may throw, use 'try'
-//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
+    return try g(s[f()]);
+//CHECK:            ^ callee may throw, use 'try'
+//CHECK:            ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
 int subscriptBase() throws MyError
 {
-    return try mkS()[0];
-//CHECK:          ^ callee may throw, use 'try'
-//CHECK:          ^ the callee may throw an error, and therefore must be called within a 'try' clause
+    return try g(mkS()[0]);
+//CHECK:            ^ callee may throw, use 'try'
+//CHECK:            ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }
 
-float conversionCast() throws MyError
+float castConversion() throws MyError
 {
-    return try (float)f();
+    return try gf((float)f());
+//CHECK:                  ^ callee may throw, use 'try'
+//CHECK:                  ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
+float constructorConversion() throws MyError
+{
+    return try gf(float(f()));
+//CHECK:                 ^ callee may throw, use 'try'
+//CHECK:                 ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
+uint unsignedConversion() throws MyError
+{
+    return try gu(uint(f()));
+//CHECK:                ^ callee may throw, use 'try'
+//CHECK:                ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
+int identityOverIndex() throws MyError
+{
+    int a[2] = { 3, 4 };
+    return try g(int(a[f() & 1]));
+//CHECK:                ^ callee may throw, use 'try'
+//CHECK:                ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
+int identityOverOperator() throws MyError
+{
+    return try g(int(f() + 1));
+//CHECK:              ^ callee may throw, use 'try'
+//CHECK:              ^ the callee may throw an error, and therefore must be called within a 'try' clause
+}
+
+int identityOverMember() throws MyError
+{
+    return try g(int(mk().v));
 //CHECK:               ^ callee may throw, use 'try'
 //CHECK:               ^ the callee may throw an error, and therefore must be called within a 'try' clause
 }

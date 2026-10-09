@@ -1622,6 +1622,17 @@ public:
         return result;
     }
 
+    /// A context for checking an operand of a call, which a `try` on that call does not cover.
+    /// The throwing calls found in it are diagnosed, or collected in `pendingTryCoverage` when that
+    /// is non-null (see `m_pendingTryCoverage`).
+    SemanticsContext withOperandTryCoverage(List<InvokeExpr*>* pendingTryCoverage)
+    {
+        SemanticsContext result(*this);
+        result.m_enclosingTryClauseType = TryClauseType::None;
+        result.m_pendingTryCoverage = pendingTryCoverage;
+        return result;
+    }
+
     DifferentiableAttribute* getParentDifferentiableAttribute()
     {
         return m_parentDifferentiableAttr;
@@ -1739,8 +1750,15 @@ protected:
     OuterStmtInfo* m_outerStmts = nullptr;
 
     /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
-    /// the call it wraps, so checks of that call's operands run with this reset to `None`.
+    /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
+    /// their operands in a `withOperandTryCoverage` context, where this is `None`.
     TryClauseType m_enclosingTryClauseType = TryClauseType::None;
+
+    /// The throwing calls whose coverage waits for the single-argument call around them to
+    /// resolve. Consider `try int(f())` where `f` returns `int`: `ResolveInvoke` reduces the
+    /// identity conversion `int(...)` to `f()` itself, so the `try` covers `f()`, but that is only
+    /// known after `f()` has been checked. Any other kind of operand is checked with this null.
+    List<InvokeExpr*>* m_pendingTryCoverage = nullptr;
 
     /// Whether an expr referencing to a non-static member in static style (e.g. `Type.member`)
     /// is considered valid in the current context.
@@ -4115,6 +4133,21 @@ public:
         FuncType* funcType,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
+
+    /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its
+    /// coverage is pending, `invoke` is added to `m_pendingTryCoverage` instead.
+    void checkThrowingCallIsCovered(InvokeExpr* invoke);
+
+    /// Return whether the coverage of the throwing calls in the argument of `expr` waits for
+    /// `expr` to resolve: `expr` is a single-argument call that is not an operator, so it may
+    /// resolve to an identity conversion of its argument, and a `try` covers or may cover it.
+    bool shouldDeferArgumentTryCoverage(InvokeExpr* expr);
+
+    /// Settle the coverage of `pendingCalls`, collected while the argument of a call was checked.
+    /// A pending call that the call resolved to (`checkedExpr`) is covered when the call would be;
+    /// no `try` covers any other pending call.
+    void settlePendingTryCoverage(Expr* checkedExpr, List<InvokeExpr*> const& pendingCalls);
+
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 

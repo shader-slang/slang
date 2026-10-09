@@ -1,7 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 
-// Each throwing call inside a `try` operand carries its own `try` (#13489), and the error from
-// either call reaches the enclosing `catch`.
+// Throwing calls inside `try` operands run and propagate their errors (#13489). A throwing call in
+// the operand of another call carries its own `try`. A `try` on an identity conversion, as in
+// `try int(f(n))`, covers the throwing call it converts. Each `run` returns -1 when the error
+// reaches its `catch`.
 
 // CHECK: 6
 // CHECK-NEXT: -1
@@ -11,8 +13,12 @@
 // CHECK-NEXT: -1
 // CHECK-NEXT: 5
 // CHECK-NEXT: 7
+// CHECK-NEXT: 9
+// CHECK-NEXT: -1
+// CHECK-NEXT: 2
+// CHECK-NEXT: -1
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 enum MyError
@@ -61,6 +67,8 @@ int memberCalls(int n) throws MyError
     T t = try T.make(n);
     return try t.get();
 }
+int constructorIdentity(int n) throws MyError { return try int(f(n)); }
+int castIdentity(int n) throws MyError { return try (int)f(n); }
 
 int run(int which, int n)
 {
@@ -72,7 +80,9 @@ int run(int which, int n)
         case 1: return try constructorConversion(n);
         case 2: return try castConversion(n);
         case 3: return try subscriptOperand(n);
-        default: return try memberCalls(n);
+        case 4: return try memberCalls(n);
+        case 5: return try constructorIdentity(n);
+        default: return try castIdentity(n);
         }
     }
     catch (e : MyError)
@@ -84,12 +94,16 @@ int run(int which, int n)
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = run(0, 3);
-    outputBuffer[1] = run(0, -1);
-    outputBuffer[2] = run(1, 3);
-    outputBuffer[3] = run(2, 4);
-    outputBuffer[4] = run(3, 3);
-    outputBuffer[5] = run(3, -1);
-    outputBuffer[6] = run(4, 5);
-    outputBuffer[7] = run(4, 7);
+    outputBuffer[0] = run(0, 3);   // g(f(3)) = 6
+    outputBuffer[1] = run(0, -1);  // f throws
+    outputBuffer[2] = run(1, 3);   // int(f(3)) = 3
+    outputBuffer[3] = run(2, 4);   // (int)f(4) = 4
+    outputBuffer[4] = run(3, 3);   // g(s[f(3)]) = g(4) = 8
+    outputBuffer[5] = run(3, -1);  // f throws
+    outputBuffer[6] = run(4, 5);   // T.make(5).get() = 5
+    outputBuffer[7] = run(4, 7);   // T.make(7).get() = 7
+    outputBuffer[8] = run(5, 9);   // try int(f(9)) = 9
+    outputBuffer[9] = run(5, -1);  // f throws through the identity conversion
+    outputBuffer[10] = run(6, 2);  // try (int)f(2) = 2
+    outputBuffer[11] = run(6, -1); // f throws through the identity cast
 }
