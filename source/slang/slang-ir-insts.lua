@@ -1888,6 +1888,10 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- AST-to-IR lowering applies this decoration to mutable file- or namespace-scope
+			-- `static` variables and uniform-parameter shadows with the same storage semantics.
+			-- Lowering does not apply it to static data members, which also use `IRGlobalVar`.
+			{ fileOrNamespaceScopeStaticVar = { struct_name = "FileOrNamespaceScopeStaticVarDecoration" } },
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
