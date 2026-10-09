@@ -24,7 +24,7 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
 }
 
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
-    FilteredMemberRefList<ParamDecl> params)
+    List<DeclRef<ParamDecl>> const& params)
 {
     ParamCounts counts = {0, 0};
     for (auto param : params)
@@ -151,8 +151,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        paramCounts =
-            CountParameters(getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()));
+        paramCounts = CountParameters(getParametersForCallableSignature(
+            m_astBuilder,
+            candidate.item.declRef.as<CallableDecl>()));
         break;
 
     case OverloadCandidate::Flavor::Generic:
@@ -811,11 +812,15 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     Index argCount = context.getArgCount();
 
     List<QualType> paramTypes;
+    List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        for (auto param : getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()))
+        for (auto param : getParametersForCallableSignature(
+                 m_astBuilder,
+                 candidate.item.declRef.as<CallableDecl>()))
         {
+            paramDecls.add(param);
             paramTypes.add(getParamQualType(m_astBuilder, param));
         }
         break;
@@ -924,9 +929,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     String name;
                     if (candidate.flavor == OverloadCandidate::Flavor::Func)
                     {
-                        auto decl = getParameters(
-                            m_astBuilder,
-                            candidate.item.declRef.as<CallableDecl>())[paramIndex];
+                        auto decl = paramDecls[paramIndex];
                         name = getText(decl.getName());
                     }
                     else
@@ -1013,21 +1016,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     return true;
 }
 
-bool isEffectivelyMutating(CallableDecl* decl)
-{
-    if (decl->hasModifier<MutatingAttribute>())
-        return true;
-    if (decl->hasModifier<RefAttribute>())
-        return true;
-    if (decl->hasModifier<NonmutatingAttribute>())
-        return false;
-
-    if (as<SetterDecl>(decl))
-        return true;
-
-    return false;
-}
-
 ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 {
     auto expr = inExpr;
@@ -1047,13 +1035,11 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
                     return nullptr;
                 }
 
-                if (paramDeclRef.getDecl()->findModifier<OutModifier>() ||
-                    paramDeclRef.getDecl()->findModifier<RefModifier>())
+                if (doesParamPassingModeIndicateWritableStorage(
+                        getParamPassingMode(paramDeclRef.getDecl())))
                 {
-                    // Function parameters marked with `out`, `inout`,
-                    // `in out` or `ref` are all mutable in a way where
-                    // the result of mutations will be visible to the
-                    // caller.
+                    // Writable-storage modes are mutable in a way where the result of mutations
+                    // will be visible to the caller.
                     //
                     return nullptr;
                 }
@@ -1096,11 +1082,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     // done in other places.
     //
     // For now we will only use this step to check the
-    // mutability of the `this` parameter where necessary.
+    // mutability of the effective `this` parameter where necessary.
     //
-    if (!isEffectivelyStatic(funcDeclRef.getDecl()))
+    if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        if (isEffectivelyMutating(funcDeclRef.getDecl()))
+        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
@@ -1726,10 +1712,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                     break;
                                 }
                             }
-                            // Otherwise, if the accessor is [nonmutating], we can
-                            // also consider the result of the subscript call as l-value
-                            // regardless of the base.
-                            if (accessorDecl->findModifier<NonmutatingAttribute>())
+                            // Otherwise, an accessor that does not require writable receiver
+                            // storage can produce an l-value regardless of the base.
+                            auto accessorDeclRef =
+                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                            if (thisParamInfo &&
+                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;
@@ -2950,7 +2939,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             // Most callers let this routine compute parameter types from the
             // generic's inner callable. A caller that already computed them can
             // pass the list to avoid repeating that work.
-            auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
+            auto params = getParametersForCallableSignature(m_astBuilder, funcDeclRef);
             for (auto param : params)
             {
                 paramTypes.add(getParamQualType(m_astBuilder, param));
@@ -3888,9 +3877,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
         else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
         {
-            for (auto param : callableDeclRef.getDecl()->getParameters())
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(m_astBuilder, callableDeclRef))
             {
-                paramDirections.add(getParamPassingMode(param));
+                paramDirections.add(getParamPassingMode(paramDeclRef.getDecl()));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)
