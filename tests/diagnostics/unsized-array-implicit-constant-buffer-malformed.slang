@@ -1,6 +1,6 @@
 // shader-slang/slang#13530: finding the trailing unsized array of a global uniform parameter
-// stops at a field whose type is an error, and at a struct whose only own members are
-// `static`, instead of looping or dereferencing a missing field.
+// stops at a field whose type is an error instead of looping, and follows a struct without
+// instance fields of its own into its base struct instead of dereferencing a missing field.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main
 
@@ -17,16 +17,20 @@ struct WithErrorField
 }
 uniform WithErrorField withErrorField;
 
-struct Base
+struct UnsizedBase
 {
     float4 a;
+    float4 x[];
+//CHECK:   ^ unsized type in constant buffer
+//CHECK:   ^ cannot use unsized type 'vector<float,4>[]' in a constant buffer.
 }
-struct OnlyStatic : Base
-//CHECK:            ^^^^ support for inheritance is unstable
+struct OnlyStatic : UnsizedBase
+//CHECK:            ^^^^^^^^^^^ support for inheritance is unstable
 {
     static int k;
 }
 uniform OnlyStatic onlyStatic;
+//CHECK:           ^^^^^^^^^^ see declaration of 'onlyStatic'
 
 RWStructuredBuffer<float4> output;
 
@@ -34,5 +38,5 @@ RWStructuredBuffer<float4> output;
 [numthreads(1, 1, 1)]
 void main()
 {
-    output[0] = withErrorField.x[1] + onlyStatic.a;
+    output[0] = withErrorField.x[1] + onlyStatic.x[1] + onlyStatic.a;
 }

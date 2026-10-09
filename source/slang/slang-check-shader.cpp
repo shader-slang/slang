@@ -1742,10 +1742,14 @@ static void collectGenericStructTypeUses(
     }
 }
 
-/// Diagnose each `uniform` array parameter of `funcDeclRef` whose type, after substituting
-/// any generic arguments in `funcDeclRef`, ends in an unsized array of ordinary data. We skip
-/// parameters that are not array-typed, because `visitParamDecl` already rejects any other
-/// unsized parameter type (E30072).
+/// Diagnose each `uniform` parameter of `funcDeclRef` whose type, after substituting any
+/// generic arguments in `funcDeclRef`, ends in an unsized array of ordinary data.
+///
+/// Requires the `uniform` modifiers of `funcDeclRef`'s parameters to be final, as they are
+/// after `validateEntryPoint` classifies its parameters. We skip a parameter that is not
+/// array-typed and whose declared type is unsized, because `visitParamDecl` already rejects
+/// it (E30072). A parameter declared with a generic type, as in
+/// `main<A : IArray<float4>>(uniform A values)`, can still become unsized by specialization.
 static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
     SemanticsVisitor* visitor,
     DeclRef<FuncDecl> funcDeclRef)
@@ -1754,8 +1758,11 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
     for (auto paramDeclRef : getParameters(astBuilder, funcDeclRef))
     {
         auto param = paramDeclRef.getDecl();
-        if (!param->hasModifier<HLSLUniformModifier>() ||
-            !as<ArrayExpressionType>(param->getType()))
+        if (!param->hasModifier<HLSLUniformModifier>())
+            continue;
+        auto declaredType = param->getType();
+        if (!as<ArrayExpressionType>(declaredType) &&
+            visitor->doesTypeHaveTag(declaredType, TypeTag::Unsized))
             continue;
         diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
             visitor,
@@ -2357,7 +2364,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // Uniform entry-point parameters share an implicit constant buffer, so they follow the same
-    // rule as global uniform parameters.
+    // rule as global uniform parameters. The check runs after the auto-uniform classification
+    // above, which adds `uniform` to the parameters that go into that buffer.
     {
         auto shared = SharedSemanticsContext::createForOptionalModule(
             linkage,
@@ -3770,8 +3778,10 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
-    // `validateEntryPoint` cannot decide whether an element type such as `T` in
-    // `uniform T values[]` holds ordinary data, so we check the specialized parameters again.
+    // `validateEntryPoint` cannot decide whether a parameter such as `uniform T values[]` holds
+    // an unsized array of ordinary data before `T` is known, so we check the specialized
+    // parameters again. An error that `validateEntryPoint` reported for the unspecialized
+    // parameters stops compilation before specialization, so it is not reported twice.
     if (genericSpecializationParamCount)
         diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, specializedFuncDeclRef);
 

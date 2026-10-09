@@ -3,10 +3,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry computeMain
 // Using non-exhaustive due to multiple duplicate cascading errors
 
-// An unbounded array of ordinary data cannot be a global uniform parameter, because it
-// would be packed into the implicit constant buffer.
-int unboundedArray[];
-//CHECK: unsized type in constant buffer
+// Unbounded array itself is fine
+Texture2D unboundedArray[];
 
 // Array of unbounded arrays - should error (unbounded arrays are NonAddressable)
 int arrayOfUnbounded[3][];

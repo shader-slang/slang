@@ -3802,14 +3802,6 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         checkMutableGlobalVariableType(this, varDecl, varTypeTags);
     }
 
-    // A GLSL `buffer` global is a storage buffer rather than a member of the implicit constant
-    // buffer, and an explicit parameter group is checked against its element type below.
-    if (isGlobalShaderParameter(varDecl) && !varDecl->hasModifier<GLSLBufferModifier>() &&
-        !getConstantBufferElementType(varDecl->getType()))
-    {
-        diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(this, varDecl->getType(), varDecl);
-    }
-
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
         if (doesTypeHaveTag(elementType, TypeTag::Unsized))
@@ -3829,6 +3821,12 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                     Diagnostics::SeeConstantBufferDefinition{.location = varDecl->loc});
             }
         }
+    }
+    else if (isGlobalShaderParameter(varDecl))
+    {
+        // The ordinary data of any other global shader parameter goes into the implicit
+        // constant buffer `GlobalParams`.
+        diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(this, varDecl->getType(), varDecl);
     }
     maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());
 }
@@ -22808,18 +22806,26 @@ VarDeclBase* getTrailingUnsizedArrayElement(
         {
             if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
             {
-                auto varDecls = aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>();
-                if (varDecls.getCount() == 0)
-                    return nullptr;
                 VarDeclBase* lastVarDecl = nullptr;
-                for (auto varDecl : varDecls)
+                for (auto varDecl : aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>())
                 {
                     if (isEffectivelyStatic(varDecl))
                         continue;
                     lastVarDecl = varDecl;
                 }
                 if (!lastVarDecl)
-                    return nullptr;
+                {
+                    // The fields of a base struct come first in the layout, so a struct without
+                    // instance fields of its own ends where its base struct ends.
+                    auto structDeclRef = aggTypeDecl.as<StructDecl>();
+                    auto baseType = structDeclRef
+                                        ? findBaseStructType(getCurrentASTBuilder(), structDeclRef)
+                                        : nullptr;
+                    if (!baseType || !seenTypes.add(type))
+                        return nullptr;
+                    type = baseType;
+                    continue;
+                }
                 auto lastMember =
                     _getMemberDeclRef(getCurrentASTBuilder(), aggTypeDecl, lastVarDecl)
                         .as<VarDeclBase>();
@@ -22928,93 +22934,134 @@ bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type)
     return _typeTransitivelyContainsOpaqueHandleImpl(visitor, type, seen);
 }
 
-/// Returns true if `type` is a resource handle that resource legalization moves out of an
-/// aggregate into its own binding, so that the handle occupies no ordinary (uniform) bytes.
-/// The list mirrors the object types that `_createTypeLayout` lays out as resources.
+/// Returns true if `type` is an opaque handle that occupies no ordinary (uniform) bytes on
+/// targets that bind resources through descriptors. These are the `isOpaqueHandleType` types,
+/// which the explicit-`cbuffer` check also exempts, plus dynamic resources, subpass inputs and
+/// GLSL atomic counters, which `_createTypeLayout` lays out as bindings.
 static bool _isHandleWithoutOrdinaryData(Type* type)
 {
-    return as<ResourceType>(type) || as<SamplerStateType>(type) ||
-           as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type) ||
-           as<UniformParameterGroupType>(type) || as<GLSLShaderStorageBufferType>(type) ||
-           as<DynamicResourceType>(type) || as<SubpassInputType>(type) ||
-           as<GLSLInputAttachmentType>(type) || as<GLSLAtomicUintType>(type);
+    return isOpaqueHandleType(type) || as<DynamicResourceType>(type) ||
+           as<SubpassInputType>(type) || as<GLSLAtomicUintType>(type);
 }
 
-static bool _isTypeKnownToHoldOrdinaryDataImpl(
-    SemanticsVisitor* visitor,
-    Type* type,
-    HashSet<Decl*>& seen)
+/// A context for `isTypeKnownToHoldOrdinaryData`.
+///
+/// Like `TypeTagContext`, it keys the current path and its cache on instantiated types and
+/// bounds the nesting depth. A path keyed on declarations would stop at the second level of
+/// `Box<Box<float4>>`, because both levels instantiate the same `Box`.
+struct OrdinaryDataQuery
 {
-    while (auto modifiedType = as<ModifiedType>(type))
-        type = modifiedType->getBase();
+    SemanticsVisitor* visitor;
+    HashSet<Type*> activeTypes;
+    Dictionary<Type*, bool> computedResults;
+    UInt nestingDepth = 0;
+    UInt interruptedInspections = 0;
 
-    if (_isHandleWithoutOrdinaryData(type))
-        return false;
-    if (auto arrayType = as<ArrayExpressionType>(type))
-        return _isTypeKnownToHoldOrdinaryDataImpl(visitor, arrayType->getElementType(), seen);
-    if (auto tupleType = as<TupleType>(type))
+    /// Returns true if `type` is known to hold ordinary data. Inspection that meets a type
+    /// already on the current path, or the compiler's nesting limit, answers false for that
+    /// step: such a type is invalid, and ordinary type validation diagnoses it where it is
+    /// declared.
+    bool holdsOrdinaryData(Type* type)
     {
-        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        if (nestingDepth >= kMaxTypeNestingDepth)
         {
-            if (_isTypeKnownToHoldOrdinaryDataImpl(visitor, tupleType->getMember(i), seen))
+            interruptedInspections++;
+            return false;
+        }
+        bool cachedResult;
+        if (computedResults.tryGetValue(type, cachedResult))
+            return cachedResult;
+        if (!activeTypes.add(type))
+        {
+            interruptedInspections++;
+            return false;
+        }
+
+        auto interruptedInspectionsBefore = interruptedInspections;
+        nestingDepth++;
+        bool result = holdsOrdinaryDataImpl(type);
+        nestingDepth--;
+        activeTypes.remove(type);
+
+        // As in `TypeTagContext`, a result from interrupted inspection depends on the current
+        // path, so we do not cache it.
+        if (interruptedInspections == interruptedInspectionsBefore)
+            computedResults.add(type, result);
+        return result;
+    }
+
+    bool holdsOrdinaryDataImpl(Type* type)
+    {
+        if (auto modifiedType = as<ModifiedType>(type))
+            return holdsOrdinaryData(modifiedType->getBase());
+        if (_isHandleWithoutOrdinaryData(type))
+            return false;
+        if (auto arrayType = as<ArrayExpressionType>(type))
+            return holdsOrdinaryData(arrayType->getElementType());
+        if (auto tupleType = as<TupleType>(type))
+        {
+            for (Index i = 0; i < tupleType->getMemberCount(); i++)
+            {
+                if (holdsOrdinaryData(tupleType->getMember(i)))
+                    return true;
+            }
+            return false;
+        }
+
+        // `_createTypeLayout` lays out `Conditional<T, hasValue>` as `T` when `hasValue` is a
+        // nonzero constant, and as an empty type otherwise.
+        if (auto conditionalType = as<ConditionalType>(type))
+        {
+            auto hasValue = as<ConstantIntVal>(conditionalType->getHasValue());
+            if (!hasValue || hasValue->getValue() == 0)
+                return false;
+            return holdsOrdinaryData(conditionalType->getValueType());
+        }
+
+        auto declRefType = as<DeclRefType>(type);
+        if (!declRefType)
+            return false;
+        auto decl = declRefType->getDeclRef().getDecl();
+
+        // Every other builtin or magic type is stored by value: a scalar, vector, matrix,
+        // pointer, `Atomic<T>`, `TensorView<T>`, untyped descriptor handle, `DescriptorHandle<T>`,
+        // or `Optional<T>`, which adds a presence flag to its value. So is an enum, and so is
+        // an interface type, whose values are existentials that carry type and witness
+        // identifiers alongside their payload.
+        if (as<EnumDecl>(decl) || as<InterfaceDecl>(decl) ||
+            decl->hasModifier<BuiltinTypeModifier>() || decl->hasModifier<MagicTypeModifier>())
+            return true;
+
+        // A generic type parameter or associated type is only resolved by specialization, and a
+        // class type cannot be laid out at all (E39031). For these and any other declarations
+        // that are not structs, we cannot prove that the type holds ordinary data.
+        auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+        if (!structDeclRef)
+            return false;
+
+        // We inspect the instance fields of the struct and of its base struct. A link-time alias
+        // such as `extern struct Alias : IData = Data;` declares no fields, so it is not known
+        // to hold ordinary data before linking.
+        auto astBuilder = visitor->getASTBuilder();
+        for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+        {
+            visitor->ensureDecl(fieldDeclRef.getDecl(), DeclCheckState::SignatureChecked);
+            if (holdsOrdinaryData(getType(astBuilder, fieldDeclRef)))
                 return true;
         }
-        return false;
-    }
-
-    auto declRefType = as<DeclRefType>(type);
-    if (!declRefType)
-        return false;
-    auto decl = declRefType->getDeclRef().getDecl();
-
-    // Every other builtin type, such as a scalar, vector, matrix, pointer or `Optional<T>`,
-    // is stored as ordinary data. So is an enum, and so is an interface type, whose values
-    // are existentials that carry type and witness identifiers alongside their payload.
-    if (as<EnumDecl>(decl) || as<InterfaceDecl>(decl) || decl->hasModifier<BuiltinTypeModifier>() ||
-        decl->hasModifier<MagicTypeModifier>())
-        return true;
-
-    // A generic parameter or associated type is only resolved by specialization, so we
-    // cannot prove that it holds ordinary data.
-    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
-    if (!structDeclRef)
-        return false;
-
-    // A by-value cycle has unbounded size and is diagnosed elsewhere; we only need to stop.
-    auto structDecl = structDeclRef.getDecl();
-    if (!seen.add(structDecl))
-        return false;
-    auto astBuilder = visitor->getASTBuilder();
-    bool result = false;
-    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
-    {
-        visitor->ensureDecl(fieldDeclRef.getDecl(), DeclCheckState::SignatureChecked);
-        if (_isTypeKnownToHoldOrdinaryDataImpl(visitor, getType(astBuilder, fieldDeclRef), seen))
-        {
-            result = true;
-            break;
-        }
-    }
-    if (!result)
-    {
         if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
-            result = _isTypeKnownToHoldOrdinaryDataImpl(visitor, baseStructType, seen);
+            return holdsOrdinaryData(baseStructType);
+        return false;
     }
-    seen.remove(structDecl);
-    return result;
-}
+};
 
 bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type)
 {
-    HashSet<Decl*> seen;
-    return _isTypeKnownToHoldOrdinaryDataImpl(visitor, type, seen);
+    OrdinaryDataQuery query;
+    query.visitor = visitor;
+    return query.holdsOrdinaryData(type);
 }
 
-// The compiler packs the ordinary data of global and entry-point uniform parameters into an
-// implicit constant buffer (`GlobalParams` / `EntryPointParams`). Like an explicit `cbuffer`,
-// that buffer cannot hold an unsized array of ordinary data: the array has no finite layout,
-// so every later field would land at an unbounded offset. An unsized array whose elements are
-// only resource handles stays valid, because legalization turns it into a descriptor array.
 void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     SemanticsVisitor* visitor,
     Type* type,
@@ -23022,6 +23069,10 @@ void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
 {
     if (!visitor->doesTypeHaveTag(type, TypeTag::Unsized))
         return;
+
+    // `getTrailingUnsizedArrayElement` finds no trailing array in an unsized type whose last
+    // field is not the array, such as a struct that adds fields after a base struct ending in
+    // one. That shape is not diagnosed here.
     ArrayExpressionType* trailingArrayType = nullptr;
     VarDeclBase* trailingArrayField =
         getTrailingUnsizedArrayElement(type, varDecl, trailingArrayType);
@@ -23031,6 +23082,8 @@ void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     visitor->getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{
         .type = trailingArrayType,
         .field = trailingArrayField});
+    if (trailingArrayField != varDecl)
+        visitor->getSink()->diagnose(Diagnostics::SeeDeclarationOf{.decl = varDecl});
 }
 
 bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)

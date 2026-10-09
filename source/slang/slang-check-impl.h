@@ -4620,7 +4620,11 @@ EnumDecl* isEnumType(Type* type);
 
 DeclVisibility getDeclVisibility(Decl* decl);
 
-// If `type` is unsized, return the trailing unsized array field that makes it so.
+// If `type` is unsized because its last instance field, followed through nested structs and
+// base structs, is an unsized array, return that field (or `rootObject` when `type` is itself
+// an unsized array) and set `outArrayType` to the array type. Return null for any other
+// type, including an unsized struct whose last field is not the array, such as a struct that
+// adds fields after a base struct ending in one.
 VarDeclBase* getTrailingUnsizedArrayElement(
     Type* type,
     VarDeclBase* rootObject,
@@ -4634,17 +4638,24 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
-// Returns true if `type` is known to occupy ordinary (uniform) bytes in a constant buffer.
-// Resource handles occupy none, because resource legalization moves each handle out of its
-// aggregate into its own binding: `struct R { Texture2D t; SamplerState s; }` holds no
-// ordinary data, while `struct M { Texture2D t; float4 v; }` holds `v`. A pointer is an
-// address stored in uniform memory, so it is ordinary data. We return false when the answer
-// depends on specialization, as for a generic parameter `T`.
+// Returns true if `type` is known to occupy ordinary (uniform) bytes in a constant buffer on
+// targets that bind resources through descriptors, where resource legalization moves each
+// handle out of its aggregate into its own binding: `struct R { Texture2D t; SamplerState s; }`
+// holds no ordinary data, while `struct M { Texture2D t; float4 v; }` holds `v`. A pointer is
+// an address stored in uniform memory, so it is ordinary data. We return false when the answer
+// depends on specialization, as for a generic parameter `T`, or on linking.
+//
+// The answer does not depend on the target. On targets with bindless resources (CPU, CUDA,
+// Metal) a handle is itself stored as ordinary data, so the answer is false for some types
+// that do occupy uniform bytes there.
 bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type);
 
-// Diagnose `varDecl`, a shader parameter that the compiler packs into an implicit
-// constant buffer, when `type` (its declared or specialized type) ends in an unsized
-// array of ordinary data.
+// Diagnose an unsized array of ordinary data that ends `type`, the declared or specialized
+// type of `varDecl`. The caller guarantees that the compiler packs the ordinary data of
+// `varDecl` into an implicit constant buffer (`GlobalParams` or `EntryPointParams`), which,
+// like an explicit `cbuffer`, has no layout for an unsized array of ordinary data.
+// We report E31215 at the trailing array field, with a note at `varDecl` when the field is a
+// member of its type.
 void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
     SemanticsVisitor* visitor,
     Type* type,

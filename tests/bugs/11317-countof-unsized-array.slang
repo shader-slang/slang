@@ -5,6 +5,8 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
+// The unsized array lives in a storage buffer, because a global uniform `int a[]` is itself
+// an error (E31215).
 struct Data
 {
     int values[];

@@ -168,15 +168,22 @@ int g( int b[] )
 {
     return f(b); // transitive calls are allowed.
 }
-void test(int unsizedParam[])
+struct Data
 {
-    g(unsizedParam); // Not OK, `unsizedParam` doesn't have a known size at compile time.
+    int values[];
+}
+GLSLShaderStorageBuffer<Data> buffer;
+void test()
+{
+    g(buffer.values); // Not OK, `buffer.values` doesn't have a known size at compile time.
     int arr[3];
     g(arr); // OK.
 }
 ```
 
 There are more limits on how runtime-sized arrays can be used than on arrays of statically-known element count.
+For example, a global or entry-point `uniform` parameter cannot be a runtime-sized array of ordinary data, such as `uniform float4 values[]`, because the compiler packs those parameters into an implicit constant buffer, which cannot hold one (error E31215).
+A runtime-sized array of resources, such as `uniform Texture2D textures[]`, is allowed, because each element is bound as a resource instead.
 
 > #### Note ####
 > In Slang, arrays are _value types_, meaning that assignment, parameter passing, etc. semantically copy values of array type.
