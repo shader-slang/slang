@@ -103,6 +103,41 @@ META_DIR = Path(__file__).resolve().parent
 TESTS_ROOT = META_DIR.parent
 # TESTS_ROOT lives at <repo>/docs/generated/tests, so climb three levels.
 REPO_ROOT = TESTS_ROOT.parent.parent.parent
+
+# The language reference manual lives in the shader-slang/spec repository,
+# not in this one. Bundles still name its chapters as
+# `docs/language-reference/<chapter>.md`; those paths resolve against a
+# checkout of that repository, found through $SLANG_SPEC_DIR (default:
+# <repo>/spec-checkout). Its chapters sit in the `specification/` directory.
+LANG_REF_PREFIX = "docs/language-reference/"
+SPEC_CHECKOUT = Path(
+    os.environ.get("SLANG_SPEC_DIR") or REPO_ROOT / "spec-checkout"
+)
+SPEC_CHAPTER_DIR = SPEC_CHECKOUT / "specification"
+
+
+def resolve_doc_path(rel: str) -> Path:
+    """Map a repo-relative doc path to the file that holds it.
+
+    A `docs/language-reference/` path that is not in this repo is looked up
+    in the spec checkout. The returned path may not exist; callers test it.
+    """
+    local = REPO_ROOT / rel
+    if not local.exists() and rel.startswith(LANG_REF_PREFIX):
+        return SPEC_CHAPTER_DIR / rel[len(LANG_REF_PREFIX):]
+    return local
+
+
+def is_unverifiable_doc_path(rel: str) -> bool:
+    """True when `rel` names a language-reference chapter and no spec
+    checkout is available, so a missing file proves nothing."""
+    return (
+        rel.startswith(LANG_REF_PREFIX)
+        and not (REPO_ROOT / rel).exists()
+        and not SPEC_CHAPTER_DIR.is_dir()
+    )
+
+
 MANIFEST_PATH = META_DIR / "manifest.yaml"
 FRESHNESS_PATH = META_DIR / "freshness.json"
 REVIEW_STATE_PATH = META_DIR / "review-state.json"
@@ -785,7 +820,11 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
             # Strip any optional `#anchor` or `:line` suffix before
             # checking the file exists.
             base = citation.split("#", 1)[0].split(":", 1)[0]
-            if base and not (REPO_ROOT / base).exists():
+            if (
+                base
+                and not resolve_doc_path(base).exists()
+                and not is_unverifiable_doc_path(base)
+            ):
                 issues.append(
                     LintIssue(
                         where,
@@ -1246,7 +1285,7 @@ def compute_watched_digest(spec: BundleSpec) -> str:
 def compute_source_doc_digest(spec: BundleSpec) -> str | None:
     if spec.source_doc is None:
         return None
-    p = REPO_ROOT / spec.source_doc
+    p = resolve_doc_path(spec.source_doc)
     if not p.exists():
         return None
     return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -1604,7 +1643,7 @@ def lint_doc_section_digests(specs: list) -> list[LintIssue]:
             if not recorded or "#" not in doc_ref:
                 continue
             target, _, anchor = doc_ref.partition("#")
-            doc = REPO_ROOT / target
+            doc = resolve_doc_path(target)
             if not doc.is_file():
                 continue
             try:
@@ -1863,6 +1902,14 @@ def lint_markdown_links(md_path: Path) -> list[LintIssue]:
         if url in reported:
             continue
         target = (md_path.parent / unquote(path)).resolve()
+        try:
+            target_rel = target.relative_to(REPO_ROOT.resolve()).as_posix()
+        except ValueError:
+            target_rel = ""
+        if target_rel:
+            if is_unverifiable_doc_path(target_rel):
+                continue
+            target = resolve_doc_path(target_rel)
         if not target.exists():
             reported.add(url)
             issues.append(
@@ -2531,8 +2578,10 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
         if not target:
             issues.append(LintIssue(rel, "error", "//META doc_ref has empty path"))
         else:
-            candidate = REPO_ROOT / target
-            if not candidate.exists():
+            candidate = resolve_doc_path(target)
+            if is_unverifiable_doc_path(target):
+                pass
+            elif not candidate.exists():
                 issues.append(
                     LintIssue(
                         rel,
@@ -2739,7 +2788,7 @@ def cmd_show(args: argparse.Namespace) -> int:
         print("source_doc:      (none — gap-selected coverage bundle)")
     else:
         print(f"source_doc:      {spec.source_doc}")
-        doc_path = REPO_ROOT / spec.source_doc
+        doc_path = resolve_doc_path(spec.source_doc)
         print(
             f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
         )
@@ -3294,17 +3343,29 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
 
 def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
-    """Walk docs/language-reference/*.md. For each file, return a list
+    """Walk the language reference chapters. For each file, return a list
     of (lineno, level, anchor_id) tuples — one per heading.
 
-    Returns a dict keyed by workspace-relative path.
+    The chapters live in docs/language-reference/ if they are in this repo
+    and otherwise in the spec checkout. Returns a dict keyed by the logical
+    `docs/language-reference/<chapter>.md` path either way.
     """
     lang_ref_dir = REPO_ROOT / "docs" / "language-reference"
+    # #13439 moved the chapters out but left a README.md stub behind, so
+    # test for chapters other than that stub, not for any markdown at all.
+    if not any(md.name != "README.md" for md in lang_ref_dir.glob("*.md")):
+        lang_ref_dir = SPEC_CHAPTER_DIR
     if not lang_ref_dir.is_dir():
         return {}
     out: dict[str, list[tuple[int, str, str]]] = {}
     for md in sorted(lang_ref_dir.glob("*.md")):
-        rel = _rel_to_repo(md)
+        # Spec-sourced chapters are re-keyed to the logical path so they
+        # match the `doc_ref` strings bundles carry.
+        rel = (
+            LANG_REF_PREFIX + md.name
+            if lang_ref_dir == SPEC_CHAPTER_DIR
+            else _rel_to_repo(md)
+        )
         anchors: list[tuple[int, str, str]] = []
         text = md.read_text()
         # Match both ATX headings (## Foo) and Setext (Foo\n----).
@@ -4783,6 +4844,75 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             g["FINDINGS_DIR"] = real_dir
             g["FINDINGS_FILED_DIR"] = real_filed
             g["FINDINGS_RESOLVED_DIR"] = real_res
+
+    # Language-reference paths resolve against the spec checkout, not this
+    # repo. The branch that matters most is the one lint never reaches in
+    # CI, where a checkout is always present: with none, a missing chapter
+    # must read as unverifiable instead of as 589 dead paths, while with a
+    # checkout a chapter that is absent from it is still a real error.
+    with tempfile.TemporaryDirectory() as td:
+        g = globals()
+        real_root, real_chapters = REPO_ROOT, SPEC_CHAPTER_DIR
+        try:
+            root = Path(td) / "repo"
+            chapters = Path(td) / "spec" / "specification"
+            (root / "docs" / "language-reference").mkdir(parents=True)
+            (root / "docs" / "language-reference" / "README.md").write_text(
+                "# Moved\n", encoding="utf-8"
+            )
+            (root / "docs" / "language-reference" / "local.md").write_text(
+                "# Local\n", encoding="utf-8"
+            )
+            g["REPO_ROOT"] = root
+            g["SPEC_CHAPTER_DIR"] = chapters
+            lr = LANG_REF_PREFIX
+            check(
+                "spec: no checkout, missing chapter is unverifiable",
+                is_unverifiable_doc_path(lr + "types.md"),
+                True,
+            )
+            check(
+                "spec: a chapter in this repo is always verifiable",
+                is_unverifiable_doc_path(lr + "local.md"),
+                False,
+            )
+            check(
+                "spec: a non-language-reference path is never unverifiable",
+                is_unverifiable_doc_path("docs/nope.md"),
+                False,
+            )
+            chapters.mkdir(parents=True)
+            (chapters / "types.md").write_text("# Types\n## Scalars\n", encoding="utf-8")
+            check(
+                "spec: checkout present, absent chapter is a real miss",
+                is_unverifiable_doc_path(lr + "gone.md"),
+                False,
+            )
+            check(
+                "spec: absent chapter does not resolve",
+                resolve_doc_path(lr + "gone.md").exists(),
+                False,
+            )
+            check(
+                "spec: chapter resolves into the checkout",
+                resolve_doc_path(lr + "types.md"),
+                chapters / "types.md",
+            )
+            check(
+                "spec: a local file wins over the checkout",
+                resolve_doc_path(lr + "local.md"),
+                root / "docs" / "language-reference" / "local.md",
+            )
+            (root / "docs" / "language-reference" / "local.md").unlink()
+            keys = sorted(_enumerate_lang_ref_anchors())
+            check(
+                "spec: anchors come from the checkout, not the README stub",
+                keys,
+                [lr + "types.md"],
+            )
+        finally:
+            g["REPO_ROOT"] = real_root
+            g["SPEC_CHAPTER_DIR"] = real_chapters
 
     # An unquoted ISO timestamp is a YAML date, not a string, and the two
     # spellings are indistinguishable in the file. `findings list` used to
