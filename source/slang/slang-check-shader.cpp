@@ -1774,6 +1774,96 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
     }
 }
 
+/// Collects the specialization arguments of a component type: the types bound to global
+/// `type_param`s, and the specialized declaration of each generic entry point. A composite such
+/// as `{library, mainModule, entryPoint}` can bind a `type_param` declared in `library` that
+/// only `mainModule` uses, so the arguments are only complete for the whole component type.
+struct UnsizedOrdinaryDataSpecializationCollector : ComponentTypeVisitor
+{
+    GlobalGenericArgs globalGenericArgs;
+    List<Module*> modules;
+    List<DeclRef<FuncDecl>> entryPointFuncDeclRefs;
+
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPointFuncDeclRefs.add(
+            specializationInfo ? specializationInfo->specializedFuncDeclRef
+                               : entryPoint->getFuncDeclRef());
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
+    {
+        modules.add(module);
+        if (!specializationInfo)
+            return;
+        for (auto& genericArg : specializationInfo->genericArgs)
+        {
+            if (auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericArg.paramDecl))
+                globalGenericArgs.add(globalGenericParamDecl, genericArg.argVal);
+        }
+    }
+
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        visitChildren(composite, specializationInfo);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        visitChildren(specialized);
+    }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
+};
+
+void diagnoseUnsizedOrdinaryDataAfterSpecialization(
+    ComponentType* componentType,
+    ComponentType::SpecializationInfo* specializationInfo,
+    DiagnosticSink* sink)
+{
+    UnsizedOrdinaryDataSpecializationCollector collector;
+    componentType->acceptVisitor(&collector, specializationInfo);
+
+    auto linkage = componentType->getLinkage();
+    SharedSemanticsContext shared(linkage, linkage->m_optionSet.getLanguageVersion(), sink);
+    SemanticsVisitor visitor(&shared);
+    if (collector.globalGenericArgs.getCount())
+    {
+        for (auto module : collector.modules)
+        {
+            for (Index i = 0; i < module->getShaderParamCount(); i++)
+            {
+                diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
+                    &visitor,
+                    module->getShaderParam(i).paramDeclRef.getDecl(),
+                    &collector.globalGenericArgs);
+            }
+        }
+    }
+    for (auto funcDeclRef : collector.entryPointFuncDeclRefs)
+    {
+        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
+            &visitor,
+            funcDeclRef,
+            &collector.globalGenericArgs);
+    }
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -3584,35 +3674,6 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
         }
     }
 
-    // Semantic checking cannot decide whether a parameter such as `uniform TT values[]` holds an
-    // unsized array of ordinary data before a type is bound to the `type_param TT`, so we check
-    // the global shader parameters and the module's entry-point uniforms again with the bound
-    // types. A module with errors is not specialized, so a parameter already diagnosed is not
-    // reported twice.
-    GlobalGenericArgs globalGenericArgs;
-    for (auto& genericArg : specializationInfo->genericArgs)
-    {
-        if (auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericArg.paramDecl))
-            globalGenericArgs.add(globalGenericParamDecl, genericArg.argVal);
-    }
-    if (globalGenericArgs.getCount())
-    {
-        for (auto& shaderParam : m_shaderParams)
-        {
-            diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
-                &visitor,
-                shaderParam.paramDeclRef.getDecl(),
-                &globalGenericArgs);
-        }
-        for (auto entryPoint : m_entryPoints)
-        {
-            diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
-                &visitor,
-                entryPoint->getFuncDeclRef(),
-                &globalGenericArgs);
-        }
-    }
-
     return specializationInfo;
 }
 
@@ -3812,13 +3873,6 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     }
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
-
-    // `validateEntryPoint` cannot decide whether a parameter such as `uniform T values[]` holds
-    // an unsized array of ordinary data before `T` is known, so we check the specialized
-    // parameters again. An error that `validateEntryPoint` reported for the unspecialized
-    // parameters stops compilation before specialization, so it is not reported twice.
-    if (genericSpecializationParamCount)
-        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, specializedFuncDeclRef, nullptr);
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface

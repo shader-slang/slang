@@ -4676,6 +4676,17 @@ void diagnoseUnsizedOrdinaryDataInGlobalShaderParameter(
     VarDeclBase* varDecl,
     GlobalGenericArgs const* globalGenericArgs);
 
+// Diagnose the uniform parameters of `componentType`, specialized by `specializationInfo`,
+// that end in an unsized array of ordinary data. Semantic checking cannot decide this for a
+// parameter such as `uniform T values[]` before `T`, a generic entry-point parameter or a
+// global `type_param`, is bound, so `ComponentType::specialize` checks again with the bound
+// types. Requires the unspecialized component type to have no errors, so a parameter that
+// semantic checking already diagnosed is not reported twice.
+void diagnoseUnsizedOrdinaryDataAfterSpecialization(
+    ComponentType* componentType,
+    ComponentType::SpecializationInfo* specializationInfo,
+    DiagnosticSink* sink);
+
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

@@ -441,6 +441,10 @@ RefPtr<ComponentType> ComponentType::specialize(
     }
     if (sink->getErrorCount() != 0)
         return nullptr;
+
+    diagnoseUnsizedOrdinaryDataAfterSpecialization(this, specializationInfo, sink);
+    if (sink->getErrorCount() != 0)
+        return nullptr;
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 

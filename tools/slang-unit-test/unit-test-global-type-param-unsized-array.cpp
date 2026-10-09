@@ -10,10 +10,10 @@ using namespace Slang;
 
 // shader-slang/slang#13530: the implicit constant buffers `GlobalParams` and `EntryPointParams`
 // cannot hold an unsized array of ordinary data. Semantic checking cannot decide whether
-// `uniform TT values[]` holds one before a type is bound to `type_param TT`, so specialization
-// checks the global and entry-point uniforms again. Binding an ordinary-data type is diagnosed
-// (E31215); binding a texture type stays valid, because resource legalization turns the array
-// into a descriptor array.
+// `uniform TT values[]` holds one before a type is bound to `type_param TT`, so
+// `ComponentType::specialize` checks the global and entry-point uniforms again. Binding an
+// ordinary-data type is diagnosed (E31215); binding a texture type stays valid, because resource
+// legalization turns the array into a descriptor array.
 
 static const char* kGlobalTypeParamUnsizedArraySource = R"(
     struct Data
@@ -67,6 +67,67 @@ static ComPtr<slang::IComponentType> specializeGlobalTypeParams(
         slang::SpecializationArg::fromExpr(arrayTypeArg)};
     ComPtr<slang::IComponentType> specialized;
     program->specialize(specArgs, 2, specialized.writeRef(), outDiagnostics.writeRef());
+    return specialized;
+}
+
+// A `type_param` declared in one module and used in another is bound when the composite
+// `{library, user, entryPoint}` is specialized.
+static const char* kLibrarySource = R"(
+    module gtplibrary;
+
+    public struct Data
+    {
+        public float4 v;
+    }
+
+    public type_param TT;
+    )";
+
+static const char* kUserSource = R"(
+    import gtplibrary;
+
+    uniform TT userValues[];
+    RWStructuredBuffer<float4> output;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void computeMain(uniform TT userEntryPointValues[])
+    {
+        output[0] = 1;
+    }
+    )";
+
+static ComPtr<slang::IComponentType> specializeImportedTypeParam(
+    slang::ISession* session,
+    const char* typeArg,
+    ComPtr<slang::IBlob>& outDiagnostics)
+{
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto library = session->loadModuleFromSourceString(
+        "gtplibrary",
+        "gtplibrary.slang",
+        kLibrarySource,
+        diagnosticBlob.writeRef());
+    auto user = session->loadModuleFromSourceString(
+        "gtpuser",
+        "gtpuser.slang",
+        kUserSource,
+        diagnosticBlob.writeRef());
+    if (!library || !user)
+        return nullptr;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    if (SLANG_FAILED(user->findEntryPointByName("computeMain", entryPoint.writeRef())))
+        return nullptr;
+
+    slang::IComponentType* components[] = {library, user, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    if (SLANG_FAILED(session->createCompositeComponentType(components, 3, program.writeRef())))
+        return nullptr;
+
+    slang::SpecializationArg specArgs[] = {slang::SpecializationArg::fromExpr(typeArg)};
+    ComPtr<slang::IComponentType> specialized;
+    program->specialize(specArgs, 1, specialized.writeRef(), outDiagnostics.writeRef());
     return specialized;
 }
 
@@ -125,5 +186,28 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
         diagnostics = nullptr;
         linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
         SLANG_CHECK(code != nullptr && code->getBufferSize() != 0);
+    }
+
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto specialized = specializeImportedTypeParam(session, "Data", diagnostics);
+        SLANG_CHECK(specialized == nullptr);
+        SLANG_CHECK_ABORT(diagnostics != nullptr);
+        auto text = (const char*)diagnostics->getBufferPointer();
+        SLANG_CHECK(countOccurrences(text, "error[E31215]") == 2);
+        SLANG_CHECK(strstr(text, "userValues") != nullptr);
+        SLANG_CHECK(strstr(text, "userEntryPointValues") != nullptr);
+    }
+
+    {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> diagnostics;
+        auto specialized = specializeImportedTypeParam(session, "Texture2D<float4>", diagnostics);
+        SLANG_CHECK(specialized != nullptr);
     }
 }
