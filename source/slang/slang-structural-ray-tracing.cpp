@@ -163,1346 +163,238 @@ String getStructuralRayTracingEntryPointName(UnownedStringSlice sourceTypeName)
     return _encodeStructuralRayTracingSymbolName(sourceTypeName);
 }
 
-const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind)
+// The annotation already identifies the AST type that DeclRefType::create constructs. Reading
+// its class here avoids constructing a type merely to classify a declaration during checking.
+static ASTNodeType _getMagicTypeClass(Decl* declaration)
 {
-    switch (kind)
+    auto modifier = declaration ? declaration->findModifier<MagicTypeModifier>() : nullptr;
+    return modifier && modifier->magicNodeType ? modifier->magicNodeType.getTag()
+                                               : ASTNodeType::CountOf;
+}
+
+bool isStructuralRayTracingDeclaration(Decl* declaration)
+{
+    if (auto genericDecl = as<GenericDecl>(declaration))
+        declaration = genericDecl->inner;
+    if (!declaration)
+        return false;
+    if (declaration->hasModifier<RayTracingTraceAttribute>() ||
+        declaration->hasModifier<RayTracingCallShaderAttribute>())
+        return true;
+
+    // An extension carries its target's schema parameters, but arbitrary methods declared inside
+    // it do not become structural operations. Their own generic arguments still need checking.
+    if (auto extensionDecl = as<ExtensionDecl>(declaration))
     {
-    case StructuralRayTracingStageKind::ClosestHit:
-        return "IClosestHitShader";
-    case StructuralRayTracingStageKind::AnyHit:
-        return "IAnyHitShader";
-    case StructuralRayTracingStageKind::Intersection:
-        return "IIntersectionShader";
-    case StructuralRayTracingStageKind::Miss:
-        return "IMissShader";
-    case StructuralRayTracingStageKind::Callable:
-        return "ICallableShader";
+        auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
+        declaration = targetType ? targetType->getDeclRef().getDecl() : nullptr;
+    }
+    if (!declaration)
+        return false;
+    auto magicModifier = declaration->findModifier<MagicTypeModifier>();
+    if (magicModifier && magicModifier->magicNodeType &&
+        magicModifier->magicNodeType.isSubClassOf<ModuleBuiltinType>())
+        return true;
+    auto intrinsicModifier = declaration->findModifier<IntrinsicTypeModifier>();
+    return intrinsicModifier && intrinsicModifier->irOp == kIROp_TraceProgramDescriptorType;
+}
+
+StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageKind(
+    InterfaceDecl* interfaceDecl) const
+{
+    switch (_getMagicTypeClass(interfaceDecl))
+    {
+    case ASTNodeType::ClosestHitShaderType:
+        return StructuralRayTracingStageKind::ClosestHit;
+    case ASTNodeType::AnyHitShaderType:
+        return StructuralRayTracingStageKind::AnyHit;
+    case ASTNodeType::IntersectionShaderType:
+    case ASTNodeType::IntersectionStageType:
+        return StructuralRayTracingStageKind::Intersection;
+    case ASTNodeType::MissShaderType:
+        return StructuralRayTracingStageKind::Miss;
+    case ASTNodeType::CallableShaderType:
+        return StructuralRayTracingStageKind::Callable;
     default:
-        return nullptr;
+        return StructuralRayTracingStageKind::Count;
     }
 }
 
-static const char* _getStageInputTypeName(StructuralRayTracingStageKind kind)
+bool StructuralRayTracingCheckingState::isExecutableStageInterface(
+    InterfaceDecl* interfaceDecl) const
 {
-    switch (kind)
+    auto modifier = interfaceDecl ? interfaceDecl->findModifier<MagicTypeModifier>() : nullptr;
+    return modifier && modifier->magicNodeType &&
+           modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>();
+}
+
+StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageInputKind(
+    AggTypeDecl* typeDecl) const
+{
+    switch (_getMagicTypeClass(typeDecl))
     {
-    case StructuralRayTracingStageKind::ClosestHit:
-        return "ClosestHitInput";
-    case StructuralRayTracingStageKind::AnyHit:
-        return "AnyHitInput";
-    case StructuralRayTracingStageKind::Intersection:
-        return "IntersectionInput";
-    case StructuralRayTracingStageKind::Miss:
-        return "MissInput";
-    case StructuralRayTracingStageKind::Callable:
-        return "CallableInput";
+    case ASTNodeType::ClosestHitInputType:
+        return StructuralRayTracingStageKind::ClosestHit;
+    case ASTNodeType::AnyHitInputType:
+        return StructuralRayTracingStageKind::AnyHit;
+    case ASTNodeType::IntersectionInputType:
+        return StructuralRayTracingStageKind::Intersection;
+    case ASTNodeType::MissInputType:
+        return StructuralRayTracingStageKind::Miss;
+    case ASTNodeType::CallableInputType:
+        return StructuralRayTracingStageKind::Callable;
     default:
-        return nullptr;
+        return StructuralRayTracingStageKind::Count;
     }
 }
 
-static const char* _getMetadataInterfaceName(StructuralRayTracingMetadataKind kind)
+StructuralRayTracingMetadataKind StructuralRayTracingCheckingState::getMetadataKind(
+    InterfaceDecl* interfaceDecl) const
 {
-    switch (kind)
+    switch (_getMagicTypeClass(interfaceDecl))
     {
-    case StructuralRayTracingMetadataKind::HitGroup:
-        return "IHitGroup";
-    case StructuralRayTracingMetadataKind::HitGroupList:
-        return "IHitGroupList";
-    case StructuralRayTracingMetadataKind::MissShaderList:
-        return "IMissShaderList";
-    case StructuralRayTracingMetadataKind::CallableShaderList:
-        return "ICallableShaderList";
-    case StructuralRayTracingMetadataKind::TraceProgramSchema:
-        return "ITraceProgramSchema";
+    case ASTNodeType::RayTracingHitGroupType:
+        return StructuralRayTracingMetadataKind::HitGroup;
+    case ASTNodeType::RayTracingHitGroupListType:
+        return StructuralRayTracingMetadataKind::HitGroupList;
+    case ASTNodeType::RayTracingMissShaderListType:
+        return StructuralRayTracingMetadataKind::MissShaderList;
+    case ASTNodeType::RayTracingCallableShaderListType:
+        return StructuralRayTracingMetadataKind::CallableShaderList;
+    case ASTNodeType::RayTracingProgramSchemaType:
+        return StructuralRayTracingMetadataKind::TraceProgramSchema;
     default:
+        return StructuralRayTracingMetadataKind::Count;
+    }
+}
+
+StructuralRayTracingAssociatedTypeKind StructuralRayTracingCheckingState::getAssociatedTypeKind(
+    AssocTypeDecl* requirement) const
+{
+    if (!requirement || !requirement->getName())
+        return StructuralRayTracingAssociatedTypeKind::Count;
+    auto name = requirement->getName()->text.getUnownedSlice();
+    switch (_getMagicTypeClass(requirement->parentDecl))
+    {
+    case ASTNodeType::RayTracingTraceContextType:
+        if (name == "AccelerationStructure")
+            return StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure;
+        if (name == "Motion")
+            return StructuralRayTracingAssociatedTypeKind::TraceMotion;
+        break;
+    case ASTNodeType::RayTracingStageContextType:
+        if (name == "TraceContext")
+            return StructuralRayTracingAssociatedTypeKind::StageTraceContext;
+        if (name == "Record")
+            return StructuralRayTracingAssociatedTypeKind::StageRecord;
+        break;
+    case ASTNodeType::RayTracingPayloadContextType:
+        if (name == "Payload")
+            return StructuralRayTracingAssociatedTypeKind::PayloadContextPayload;
+        break;
+    case ASTNodeType::RayTracingHitContextType:
+        if (name == "Primitive")
+            return StructuralRayTracingAssociatedTypeKind::HitPrimitive;
+        break;
+    case ASTNodeType::RayTracingIntersectionPrimitiveType:
+        if (name == "Attributes")
+            return StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes;
+        break;
+    case ASTNodeType::RayTracingCallableContextType:
+        if (name == "CallableData")
+            return StructuralRayTracingAssociatedTypeKind::CallableData;
+        break;
+    case ASTNodeType::RayTracingProgramSchemaType:
+        if (name == "TraceContext")
+            return StructuralRayTracingAssociatedTypeKind::ProgramTraceContext;
+        if (name == "HitGroups")
+            return StructuralRayTracingAssociatedTypeKind::ProgramHitGroups;
+        if (name == "MissShaders")
+            return StructuralRayTracingAssociatedTypeKind::ProgramMissShaders;
+        if (name == "CallableShaders")
+            return StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders;
+        break;
+    case ASTNodeType::RayTracingHitGroupType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::HitGroupContext;
+        if (name == "ClosestHit")
+            return StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit;
+        if (name == "AnyHit")
+            return StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit;
+        if (name == "Intersection")
+            return StructuralRayTracingAssociatedTypeKind::HitGroupIntersection;
+        break;
+    case ASTNodeType::ClosestHitShaderType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::ClosestHitShaderContext;
+        break;
+    case ASTNodeType::AnyHitShaderType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::AnyHitShaderContext;
+        break;
+    case ASTNodeType::IntersectionStageType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::IntersectionStageContext;
+        break;
+    case ASTNodeType::MissShaderType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::MissShaderContext;
+        break;
+    case ASTNodeType::CallableShaderType:
+        if (name == "Context")
+            return StructuralRayTracingAssociatedTypeKind::CallableShaderContext;
+        break;
+    default:
+        break;
+    }
+    return StructuralRayTracingAssociatedTypeKind::Count;
+}
+
+// Finds a requirement in the interface supplied by the caller's witness and projects that same
+// witness to its owner. Consider `HitContext : IHitContext`, with `IHitContext : IPayloadContext`
+// and `IPayloadContext : IStageContext`. Resolving `Record` needs the inherited IStageContext
+// requirement. The checked interface facets identify that declaration; projecting the original
+// witness preserves this path even when HitContext has another IStageContext conformance.
+static AssocTypeDecl* _findStructuralAssociatedRequirement(
+    const StructuralRayTracingCheckingState& state,
+    SubtypeWitness*& witness,
+    StructuralRayTracingAssociatedTypeKind kind)
+{
+    witness = witness ? as<SubtypeWitness>(witness->resolve()) : nullptr;
+    if (!witness)
         return nullptr;
-    }
-}
-
-static Decl* _findNamedDeclInContainer(
-    ContainerDecl* container,
-    Name* rtName,
-    Name* declName,
-    bool insideRayTracingNamespace)
-{
-    for (auto decl : container->getDirectMemberDecls())
-    {
-        bool insideNamespace = insideRayTracingNamespace;
-        if (auto namespaceDecl = as<NamespaceDecl>(decl))
-            insideNamespace = insideNamespace || namespaceDecl->getName() == rtName;
-
-        auto candidate = decl;
-        if (auto genericDecl = as<GenericDecl>(candidate))
-            candidate = genericDecl->inner;
-        if (insideNamespace && candidate->getName() == declName)
-            return candidate;
-
-        if (auto childContainer = as<ContainerDecl>(decl))
-        {
-            if (auto result =
-                    _findNamedDeclInContainer(childContainer, rtName, declName, insideNamespace))
-            {
-                return result;
-            }
-        }
-    }
-    return nullptr;
-}
-
-static Decl* _findNamedDecl(Module* module, const char* name)
-{
-    auto namePool = module->getASTBuilder()->getNamePool();
-    return _findNamedDeclInContainer(
-        module->getModuleDecl(),
-        namePool->getName("rt"),
-        namePool->getName(name),
-        false);
-}
-
-static InterfaceDecl* _findStageInterface(Module* module, StructuralRayTracingStageKind kind)
-{
-    return as<InterfaceDecl>(
-        _findNamedDecl(module, getStructuralRayTracingStageInterfaceName(kind)));
-}
-
-static AggTypeDecl* _findStageInputType(Module* module, StructuralRayTracingStageKind kind)
-{
-    return as<AggTypeDecl>(_findNamedDecl(module, _getStageInputTypeName(kind)));
-}
-
-static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDecl)
-{
-    for (auto member : interfaceDecl->getDirectMemberDecls())
-    {
-        auto candidate = member;
-        if (auto genericDecl = as<GenericDecl>(candidate))
-            candidate = genericDecl->inner;
-        if (auto functionDecl = as<FunctionDeclBase>(candidate))
-        {
-            if (functionDecl->getName() && functionDecl->getName()->text == "invoke")
-                return functionDecl;
-        }
-    }
-    return nullptr;
-}
-
-static AssocTypeDecl* _findAssociatedTypeRequirement(
-    Module* module,
-    const char* interfaceName,
-    const char* requirementName)
-{
-    auto interfaceDecl = as<InterfaceDecl>(_findNamedDecl(module, interfaceName));
+    auto interfaceType = as<DeclRefType>(witness->getSup()->resolve());
+    auto interfaceDecl =
+        interfaceType ? interfaceType->getDeclRef().as<InterfaceDecl>() : DeclRef<InterfaceDecl>();
     if (!interfaceDecl)
         return nullptr;
-    for (auto member : interfaceDecl->getDirectMemberDeclsOfType<AssocTypeDecl>())
+    auto module = getModule(interfaceDecl.getDecl());
+    SLANG_RELEASE_ASSERT(module);
+    auto sharedSemantics = module->getLinkage()->getSemanticsForReflection();
+    for (auto facet : sharedSemantics->getInheritanceInfo(interfaceType).facets)
     {
-        if (member->getName() && member->getName()->text == requirementName)
-            return member;
+        auto owner = facet->origin.declRef.as<InterfaceDecl>();
+        if (!owner)
+            continue;
+        for (auto requirement : owner.getDecl()->getDirectMemberDeclsOfType<AssocTypeDecl>())
+        {
+            if (state.getAssociatedTypeKind(requirement) != kind)
+                continue;
+            witness = sharedSemantics->tryProjectInterfaceSubtypeWitness(witness, facet->getType());
+            return witness ? requirement : nullptr;
+        }
     }
     return nullptr;
 }
 
-static GenericTypeConstraintDecl* _findAssociatedTypeConstraint(AssocTypeDecl* associatedType)
-{
-    if (!associatedType)
-        return nullptr;
-    auto parentInterface = as<InterfaceDecl>(associatedType->parentDecl);
-    if (!parentInterface)
-        return nullptr;
-    for (auto constraint : parentInterface->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
-    {
-        auto subType = as<DeclRefType>(constraint->sub.type);
-        if (subType && subType->getDeclRef().getDecl() == associatedType)
-            return constraint;
-    }
-    return nullptr;
-}
-
-/// Records the trusted accessors that expose a structural stage's payload.
-///
-/// PR1 consumes no other stage-input operation identity. Keeping this set specific to `payload`
-/// avoids publishing a second, unused inventory of properties that later lowering will discover
-/// from its own operational IR.
-static void _registerPayloadStageInputAccessors(
-    ContainerDecl* container,
-    HashSet<FunctionDeclBase*>& accessors)
-{
-    for (auto member : container->getDirectMemberDecls())
-    {
-        auto propertyDecl = as<PropertyDecl>(member);
-        if (!propertyDecl || !propertyDecl->getName() || propertyDecl->getName()->text != "payload")
-            continue;
-        for (auto accessor : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
-            accessors.add(accessor);
-    }
-}
-
-/// Returns the sole ordinary type parameter, or null if the generic shape is not unary.
-static GenericTypeParamDecl* _getOnlyGenericTypeParameter(GenericDecl* genericDecl)
-{
-    GenericTypeParamDecl* result = nullptr;
-    if (!genericDecl)
-        return result;
-    for (auto member : genericDecl->getDirectMemberDecls())
-    {
-        auto parameter = as<GenericTypeParamDecl>(member);
-        if (!parameter)
-        {
-            if (isGenericParam(member))
-                return nullptr;
-            continue;
-        }
-        if (result)
-            return nullptr;
-        result = parameter;
-    }
-    return result;
-}
-
-/// Finds the unique source constraint that proves `subtype : interfaceDecl`.
-static GenericTypeConstraintDecl* _findConformanceConstraint(
-    GenericDecl* genericDecl,
-    Type* subtype,
-    InterfaceDecl* interfaceDecl)
-{
-    GenericTypeConstraintDecl* result = nullptr;
-    if (!genericDecl || !subtype || !interfaceDecl)
-        return result;
-    for (auto member : genericDecl->getDirectMemberDecls())
-    {
-        auto constraint = as<GenericTypeConstraintDecl>(member);
-        if (!constraint || constraint->isEqualityConstraint || !constraint->sub.type ||
-            !constraint->sub.type->equals(subtype))
-            continue;
-        auto superType = isDeclRefTypeOf<InterfaceDecl>(
-            constraint->sup.type ? constraint->sup.type->resolve() : nullptr);
-        if (!superType || superType.getDecl() != interfaceDecl)
-            continue;
-        if (result)
-            return nullptr;
-        result = constraint;
-    }
-    return result;
-}
-
-/// Returns the source type of one checked associated-type access.
-///
-/// Consider the trusted declaration `CallableContext.TraceContext == Schema.TraceContext`.
-/// Semantic checking represents each endpoint with a `LookupDeclRef`: the declaration identifies
-/// the exact associated-type requirement and `getLookupSource()` identifies either
-/// `CallableContext` or `Schema`. Reading those two semantic roles is more robust than resolving
-/// the type (which may erase the access through the equality) or recognizing its printed name.
-static Type* _getAssociatedTypeLookupSource(Type* type, AssocTypeDecl* requirement)
-{
-    auto associatedType = isDeclRefTypeOf<AssocTypeDecl>(type);
-    if (!associatedType || associatedType.getDecl() != requirement)
-        return nullptr;
-
-    auto lookupDeclRef = as<LookupDeclRef>(associatedType.declRefBase);
-    return lookupDeclRef ? lookupDeclRef->getLookupSource() : nullptr;
-}
-
-/// Returns whether `type` is the exact associated-type access `source.requirement`.
-static bool _isAssociatedTypeAccess(Type* type, AssocTypeDecl* requirement, Type* source)
-{
-    auto lookupSource = _getAssociatedTypeLookupSource(type, requirement);
-    return lookupSource && source && lookupSource->equals(source);
-}
-
-/// Returns whether `type` is `Schema.TraceContext.requirement` for the trusted schema parameter.
-static bool _isSchemaTraceContextAssociatedTypeAccess(
-    Type* type,
-    AssocTypeDecl* requirement,
-    AssocTypeDecl* programTraceContextRequirement,
-    Type* schemaType)
-{
-    auto traceContextType = _getAssociatedTypeLookupSource(type, requirement);
-    return traceContextType &&
-           _isAssociatedTypeAccess(traceContextType, programTraceContextRequirement, schemaType);
-}
-
-/// Extracts the endpoint paired with `Schema.TraceContext.requirement` by an equality.
-///
-/// Equality constraints are symmetric, so the standard module may spell the associated access on
-/// either side without changing this compiler contract.
-static Type* _getSchemaTraceContextEqualityOtherType(
-    GenericTypeConstraintDecl* constraint,
-    AssocTypeDecl* requirement,
-    AssocTypeDecl* programTraceContextRequirement,
-    Type* schemaType)
-{
-    if (!constraint || !constraint->isEqualityConstraint)
-        return nullptr;
-
-    if (_isSchemaTraceContextAssociatedTypeAccess(
-            constraint->sub.type,
-            requirement,
-            programTraceContextRequirement,
-            schemaType))
-    {
-        return constraint->sup.type;
-    }
-    if (_isSchemaTraceContextAssociatedTypeAccess(
-            constraint->sup.type,
-            requirement,
-            programTraceContextRequirement,
-            schemaType))
-    {
-        return constraint->sub.type;
-    }
-    return nullptr;
-}
-
-/// Returns whether an equality connects the callable and schema trace-context roles exactly.
-static bool _isCallableSchemaTraceContextEquality(
-    GenericTypeConstraintDecl* constraint,
-    AssocTypeDecl* stageTraceContextRequirement,
-    Type* callableContextType,
-    AssocTypeDecl* programTraceContextRequirement,
-    Type* schemaType)
-{
-    if (!constraint || !constraint->isEqualityConstraint)
-        return false;
-
-    auto isCallableTraceContext = [&](Type* type)
-    { return _isAssociatedTypeAccess(type, stageTraceContextRequirement, callableContextType); };
-    auto isSchemaTraceContext = [&](Type* type)
-    { return _isAssociatedTypeAccess(type, programTraceContextRequirement, schemaType); };
-    return (isCallableTraceContext(constraint->sub.type) &&
-            isSchemaTraceContext(constraint->sup.type)) ||
-           (isCallableTraceContext(constraint->sup.type) &&
-            isSchemaTraceContext(constraint->sub.type));
-}
-
-/// Returns whether `type` is the compiler's native two-level acceleration-structure handle.
-static bool _isNativeAccelerationStructureType(Type* type)
-{
-    return as<RaytracingAccelerationStructureType>(type ? type->resolve() : nullptr) != nullptr;
-}
-
-/// Returns whether `type` is `genericType<valueParameter>` with no other generic arguments.
-///
-/// Consider the parameter `MultiLevelAccelerationStructure<maxLevelCount>` on
-/// `trace<let maxLevelCount>()`. The checked type carries the multi-level type's own generic
-/// application, whose value operand must be a `DeclRefIntVal` for this method parameter. Checking
-/// that existing semantic operand prevents a different value parameter or constant depth from
-/// being accepted as the trusted signature.
-static bool _isGenericTypeAppliedToValueParameter(
-    ASTBuilder* astBuilder,
-    Type* type,
-    AggTypeDecl* genericType,
-    GenericValueParamDecl* valueParameter)
-{
-    auto declRefType = as<DeclRefType>(type);
-    auto genericDecl = as<GenericDecl>(genericType ? genericType->parentDecl : nullptr);
-    if (!declRefType || declRefType->getDeclRef().getDecl() != genericType || !genericDecl ||
-        genericDecl->inner != genericType || !valueParameter)
-    {
-        return false;
-    }
-
-    GenericValueParamDecl* genericValueParameter = nullptr;
-    for (auto member : genericDecl->getDirectMemberDecls())
-    {
-        if (auto parameter = as<GenericValueParamDecl>(member))
-        {
-            if (genericValueParameter)
-                return false;
-            genericValueParameter = parameter;
-        }
-        else if (isGenericParam(member))
-        {
-            return false;
-        }
-    }
-    auto application =
-        SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef(genericDecl);
-    auto argumentIndex = getGenericArgumentIndex(genericDecl, genericValueParameter);
-    auto expectedValue = astBuilder->getDeclRefVal(makeDeclRef(valueParameter));
-    return application && application->getArgCount() == getGenericArgumentCount(genericDecl) &&
-           argumentIndex >= 0 && argumentIndex < application->getArgCount() && expectedValue &&
-           application->getArg(argumentIndex)->equals(expectedValue);
-}
-
-/// Holds semantic roles decoded from one trusted `RayTracer<Schema>` extension signature.
-struct _StructuralRayTracingRayTracerExtensionInfo
-{
-    GenericTypeParamDecl* schemaTypeParameter = nullptr;
-    GenericTypeConstraintDecl* accelerationStructureConstraint = nullptr;
-    Type* accelerationStructureType = nullptr;
-    GenericTypeConstraintDecl* motionConstraint = nullptr;
-    Type* motionType = nullptr;
-};
-
-/// Decodes the semantic roles in one checked `extension<Schema> RayTracer<Schema>` signature.
-///
-/// The target application identifies the extension's schema parameter semantically. The matching
-/// source constraint then identifies its witness argument even when other extension constraints
-/// are inserted before or after it. The topology and motion equalities are retained separately so
-/// the containing overload family can validate the exact ABI contract it selects.
-static bool _tryGetRayTracerMethodInfo(
-    ExtensionDecl* extensionDecl,
-    AggTypeDecl* rayTracerType,
-    InterfaceDecl* traceProgramSchemaInterface,
-    AssocTypeDecl* programTraceContextRequirement,
-    AssocTypeDecl* accelerationStructureRequirement,
-    AssocTypeDecl* motionRequirement,
-    _StructuralRayTracingRayTracerExtensionInfo& outInfo)
-{
-    auto rayTracerGenericDecl =
-        as<GenericDecl>(rayTracerType ? rayTracerType->parentDecl : nullptr);
-    auto extensionGenericDecl =
-        as<GenericDecl>(extensionDecl ? extensionDecl->parentDecl : nullptr);
-    if (!rayTracerGenericDecl || rayTracerGenericDecl->inner != rayTracerType ||
-        !extensionGenericDecl || extensionGenericDecl->inner != extensionDecl)
-    {
-        return false;
-    }
-
-    auto rayTracerSchemaParameter = _getOnlyGenericTypeParameter(rayTracerGenericDecl);
-    auto targetType = as<DeclRefType>(
-        extensionDecl->targetType.type ? extensionDecl->targetType.type->resolve() : nullptr);
-    if (!rayTracerSchemaParameter || !targetType ||
-        targetType->getDeclRef().getDecl() != rayTracerType)
-    {
-        return false;
-    }
-
-    auto rayTracerApplication =
-        SubstitutionSet(targetType->getDeclRef()).findGenericAppDeclRef(rayTracerGenericDecl);
-    auto targetSchemaArgumentIndex =
-        getGenericArgumentIndex(rayTracerGenericDecl, rayTracerSchemaParameter);
-    if (!rayTracerApplication || targetSchemaArgumentIndex < 0 ||
-        targetSchemaArgumentIndex >= rayTracerApplication->getArgCount() ||
-        rayTracerApplication->getArgCount() != getGenericArgumentCount(rayTracerGenericDecl))
-    {
-        return false;
-    }
-
-    auto schemaType = as<Type>(rayTracerApplication->getArg(targetSchemaArgumentIndex)->resolve());
-    auto schemaDeclRefType = as<DeclRefType>(schemaType);
-    auto schemaParameter = schemaDeclRefType
-                               ? as<GenericTypeParamDecl>(schemaDeclRefType->getDeclRef().getDecl())
-                               : nullptr;
-    if (!schemaParameter || schemaParameter->parentDecl != extensionGenericDecl)
-        return false;
-
-    auto schemaConstraint =
-        _findConformanceConstraint(extensionGenericDecl, schemaType, traceProgramSchemaInterface);
-    auto schemaTypeArgumentIndex = getGenericArgumentIndex(extensionGenericDecl, schemaParameter);
-    auto schemaWitnessArgumentIndex =
-        getGenericArgumentIndex(extensionGenericDecl, schemaConstraint);
-    if (!schemaConstraint || schemaTypeArgumentIndex < 0 || schemaWitnessArgumentIndex < 0)
-        return false;
-
-    for (auto member : extensionGenericDecl->getDirectMemberDecls())
-    {
-        if (isGenericParam(member))
-        {
-            if (member != schemaParameter)
-                return false;
-            continue;
-        }
-
-        if (!isGenericConstraintParameterDecl(member))
-            continue;
-        auto constraint = as<GenericTypeConstraintDecl>(member);
-        if (!constraint)
-            return false;
-        if (constraint == schemaConstraint)
-            continue;
-
-        if (auto accelerationStructureType = _getSchemaTraceContextEqualityOtherType(
-                constraint,
-                accelerationStructureRequirement,
-                programTraceContextRequirement,
-                schemaType))
-        {
-            if (outInfo.accelerationStructureConstraint)
-                return false;
-            outInfo.accelerationStructureConstraint = constraint;
-            outInfo.accelerationStructureType = accelerationStructureType;
-            continue;
-        }
-        if (auto motionType = _getSchemaTraceContextEqualityOtherType(
-                constraint,
-                motionRequirement,
-                programTraceContextRequirement,
-                schemaType))
-        {
-            if (outInfo.motionConstraint)
-                return false;
-            outInfo.motionConstraint = constraint;
-            outInfo.motionType = motionType;
-            continue;
-        }
-        return false;
-    }
-
-    outInfo.schemaTypeParameter = schemaParameter;
-    return true;
-}
-
-/// Returns whether `type` directly names the trusted aggregate declaration.
-static bool _isDirectTypeOf(Type* type, Decl* expectedDecl)
-{
-    auto declRef = isDeclRefTypeOf<Decl>(type ? type->resolve() : nullptr);
-    return declRef && declRef.getDecl() == expectedDecl;
-}
-
-/// Returns the schema argument when `type` is the trusted `TraceProgramDescriptor` specialization.
-static Type* _tryGetTraceProgramDescriptorSchemaType(
-    Type* type,
-    AggTypeDecl* traceProgramDescriptorType)
-{
-    auto descriptorType = as<DeclRefType>(type ? type->resolve() : nullptr);
-    auto descriptorGenericDecl = as<GenericDecl>(
-        traceProgramDescriptorType ? traceProgramDescriptorType->parentDecl : nullptr);
-    auto descriptorSchemaParameter = _getOnlyGenericTypeParameter(descriptorGenericDecl);
-    if (!descriptorType || descriptorType->getDeclRef().getDecl() != traceProgramDescriptorType ||
-        !descriptorGenericDecl || descriptorGenericDecl->inner != traceProgramDescriptorType ||
-        !descriptorSchemaParameter)
-    {
-        return nullptr;
-    }
-
-    auto descriptorApplication =
-        SubstitutionSet(descriptorType->getDeclRef()).findGenericAppDeclRef(descriptorGenericDecl);
-    auto schemaArgumentIndex =
-        getGenericArgumentIndex(descriptorGenericDecl, descriptorSchemaParameter);
-    if (!descriptorApplication || schemaArgumentIndex < 0 ||
-        schemaArgumentIndex >= descriptorApplication->getArgCount() ||
-        descriptorApplication->getArgCount() != getGenericArgumentCount(descriptorGenericDecl))
-    {
-        return nullptr;
-    }
-    return as<Type>(descriptorApplication->getArg(schemaArgumentIndex)->resolve());
-}
-
-/// Returns whether `type` is `TraceProgramDescriptor` specialized with `schemaType`.
-static bool _isTraceProgramDescriptorForSchema(
-    Type* type,
-    AggTypeDecl* traceProgramDescriptorType,
-    Type* schemaType)
-{
-    auto descriptorSchema =
-        _tryGetTraceProgramDescriptorSchemaType(type, traceProgramDescriptorType);
-    return descriptorSchema && descriptorSchema->equals(schemaType);
-}
-
-/// Holds semantic roles while one trusted trace overload is being validated.
-struct _StructuralRayTracingTraceMethodCandidate
-{
-    FunctionDeclBase* method = nullptr;
-    StructuralRayTracingTraceMethodInfo info;
-    GenericDecl* methodGenericDecl = nullptr;
-    GenericTypeParamDecl* payloadGenericParameter = nullptr;
-    GenericValueParamDecl* maxLevelCountParameter = nullptr;
-    GenericTypeConstraintDecl* accelerationStructureConstraint = nullptr;
-    Index traversalDescParameterIndex = -1;
-    Index accelerationStructureParameterIndex = -1;
-    Index descriptorParameterIndex = -1;
-    Index payloadGenericArgumentIndex = -1;
-    bool usesMultiLevelAccelerationStructure = false;
-};
-
-/// Validates the trusted callable-dispatch method's generic and value roles.
-///
-/// `CallableContext : ICallableContext` identifies the witness used to resolve `CallableData`;
-/// parameter types and directions then distinguish the callable index, descriptor, and data
-/// without relying on declaration order.
-static bool _tryGetCallShaderMethodInfo(
-    ASTBuilder* astBuilder,
-    FunctionDeclBase* functionDecl,
-    AggTypeDecl* traceProgramDescriptorType,
-    Type* schemaType,
-    InterfaceDecl* callableContextInterface,
-    AssocTypeDecl* stageTraceContextRequirement,
-    AssocTypeDecl* programTraceContextRequirement,
-    AssocTypeDecl* callableDataRequirement)
-{
-    if (!functionDecl || !functionDecl->returnType.type ||
-        !functionDecl->returnType.type->equals(astBuilder->getVoidType()))
-    {
-        return false;
-    }
-
-    auto methodGenericDecl = as<GenericDecl>(functionDecl->parentDecl);
-    if (!methodGenericDecl || methodGenericDecl->inner != functionDecl)
-        return false;
-    auto callableContextParameter = _getOnlyGenericTypeParameter(methodGenericDecl);
-    if (!callableContextParameter)
-        return false;
-    auto callableContextType =
-        DeclRefType::create(astBuilder, makeDeclRef(callableContextParameter));
-    auto callableContextConstraint = _findConformanceConstraint(
-        methodGenericDecl,
-        callableContextType,
-        callableContextInterface);
-    auto callableContextTypeArgumentIndex =
-        getGenericArgumentIndex(methodGenericDecl, callableContextParameter);
-    auto callableContextWitnessArgumentIndex =
-        getGenericArgumentIndex(methodGenericDecl, callableContextConstraint);
-    if (!callableContextConstraint || callableContextTypeArgumentIndex < 0 ||
-        callableContextWitnessArgumentIndex < 0)
-    {
-        return false;
-    }
-
-    GenericTypeConstraintDecl* traceContextEqualityConstraint = nullptr;
-    for (auto member : methodGenericDecl->getDirectMemberDecls())
-    {
-        if (isGenericConstraintParameterDecl(member))
-        {
-            if (member != callableContextConstraint)
-            {
-                auto constraint = as<GenericTypeConstraintDecl>(member);
-                if (!_isCallableSchemaTraceContextEquality(
-                        constraint,
-                        stageTraceContextRequirement,
-                        callableContextType,
-                        programTraceContextRequirement,
-                        schemaType))
-                {
-                    // Other method constraints stay in the checked generic application. Lowering
-                    // only needs the callable-context conformance and trace-context equality roles.
-                    continue;
-                }
-                if (traceContextEqualityConstraint)
-                {
-                    return false;
-                }
-                traceContextEqualityConstraint = constraint;
-            }
-        }
-        else if (isGenericParam(member) && member != callableContextParameter)
-            return false;
-    }
-    // The equality witness is part of the trusted semantic signature, but its serialized position
-    // is deliberately not part of this registry API.
-    if (!traceContextEqualityConstraint)
-        return false;
-
-    Index callableIndexParameterIndex = -1;
-    Index descriptorParameterIndex = -1;
-    Index dataParameterIndex = -1;
-    auto parameters = functionDecl->getParameters();
-    for (Index parameterIndex = 0; parameterIndex < parameters.getCount(); ++parameterIndex)
-    {
-        auto parameter = parameters[parameterIndex];
-        auto parameterType = parameter->type.type;
-        bool isInOut = parameter->hasModifier<InOutModifier>();
-        bool isOut = parameter->hasModifier<OutModifier>();
-        bool hasReferenceDirection =
-            parameter->hasModifier<RefModifier>() || parameter->hasModifier<BorrowModifier>();
-        bool hasNonInputDirection = isInOut || isOut || hasReferenceDirection;
-
-        if (_isTraceProgramDescriptorForSchema(
-                parameterType,
-                traceProgramDescriptorType,
-                schemaType))
-        {
-            if (descriptorParameterIndex >= 0 || hasNonInputDirection)
-                return false;
-            descriptorParameterIndex = parameterIndex;
-        }
-        else if (isInOut)
-        {
-            if (dataParameterIndex >= 0 || hasReferenceDirection ||
-                !_isAssociatedTypeAccess(
-                    parameterType,
-                    callableDataRequirement,
-                    callableContextType))
-            {
-                return false;
-            }
-            dataParameterIndex = parameterIndex;
-        }
-        else if (parameterType && parameterType->equals(astBuilder->getUIntType()))
-        {
-            if (callableIndexParameterIndex >= 0 || hasNonInputDirection)
-                return false;
-            callableIndexParameterIndex = parameterIndex;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    if (callableIndexParameterIndex < 0 || descriptorParameterIndex < 0 || dataParameterIndex < 0)
-    {
-        return false;
-    }
-    return true;
-}
-
-/// Validates one trace overload and records each source parameter and generic-argument role.
-///
-/// For example, the payload role is the unique `inout` parameter whose type is owned by the
-/// method's generic declaration. A multi-level overload must additionally bind
-/// `Schema.TraceContext.AccelerationStructure` to the exact
-/// `MultiLevelAccelerationStructure<maxLevelCount>` parameter type. Neither role is inferred from
-/// a parameter's name or position.
-static bool _tryGetTraceMethodCandidate(
-    ASTBuilder* astBuilder,
-    FunctionDeclBase* functionDecl,
-    AggTypeDecl* rayTraversalDescType,
-    AggTypeDecl* traceProgramDescriptorType,
-    AssocTypeDecl* accelerationStructureRequirement,
-    AssocTypeDecl* programTraceContextRequirement,
-    AggTypeDecl* multiLevelAccelerationStructureType,
-    Type* schemaType,
-    _StructuralRayTracingTraceMethodCandidate& outCandidate)
-{
-    if (!functionDecl || !functionDecl->returnType.type ||
-        !functionDecl->returnType.type->equals(astBuilder->getVoidType()))
-    {
-        return false;
-    }
-
-    auto methodGenericDecl = as<GenericDecl>(functionDecl->parentDecl);
-    if (methodGenericDecl && methodGenericDecl->inner != functionDecl)
-        return false;
-
-    if (methodGenericDecl)
-    {
-        for (auto member : methodGenericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParameter = as<GenericTypeParamDecl>(member))
-            {
-                if (outCandidate.payloadGenericParameter)
-                    return false;
-                outCandidate.payloadGenericParameter = typeParameter;
-            }
-            else if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
-            {
-                return false;
-            }
-            else if (auto valueParameter = as<GenericValueParamDecl>(member))
-            {
-                if (outCandidate.maxLevelCountParameter || !valueParameter->type.type ||
-                    !valueParameter->type.type->equals(astBuilder->getIntType()))
-                {
-                    return false;
-                }
-                outCandidate.maxLevelCountParameter = valueParameter;
-            }
-            else if (isGenericConstraintParameterDecl(member))
-            {
-                auto constraint = as<GenericTypeConstraintDecl>(member);
-                if (!constraint || outCandidate.accelerationStructureConstraint)
-                    return false;
-                outCandidate.accelerationStructureConstraint = constraint;
-            }
-        }
-    }
-
-    auto payloadType =
-        outCandidate.payloadGenericParameter
-            ? DeclRefType::create(astBuilder, makeDeclRef(outCandidate.payloadGenericParameter))
-            : nullptr;
-
-    auto parameters = functionDecl->getParameters();
-    for (Index parameterIndex = 0; parameterIndex < parameters.getCount(); ++parameterIndex)
-    {
-        auto parameter = parameters[parameterIndex];
-        auto parameterType = parameter->type.type;
-        bool isInOut = parameter->hasModifier<InOutModifier>();
-        bool isOut = parameter->hasModifier<OutModifier>();
-        bool hasReferenceDirection =
-            parameter->hasModifier<RefModifier>() || parameter->hasModifier<BorrowModifier>();
-        bool hasNonInputDirection = isInOut || isOut || hasReferenceDirection;
-
-        if (_isDirectTypeOf(parameterType, rayTraversalDescType))
-        {
-            if (outCandidate.traversalDescParameterIndex >= 0 || hasNonInputDirection)
-            {
-                return false;
-            }
-            outCandidate.traversalDescParameterIndex = parameterIndex;
-        }
-        else if (_isTraceProgramDescriptorForSchema(
-                     parameterType,
-                     traceProgramDescriptorType,
-                     schemaType))
-        {
-            if (outCandidate.descriptorParameterIndex >= 0 || hasNonInputDirection)
-            {
-                return false;
-            }
-            outCandidate.descriptorParameterIndex = parameterIndex;
-        }
-        else if (isInOut)
-        {
-            if (outCandidate.info.payloadParameterIndex >= 0 || hasReferenceDirection ||
-                !payloadType || !parameterType || !parameterType->equals(payloadType))
-            {
-                return false;
-            }
-            outCandidate.info.payloadParameterIndex = parameterIndex;
-        }
-        else if (_isSchemaTraceContextAssociatedTypeAccess(
-                     parameterType,
-                     accelerationStructureRequirement,
-                     programTraceContextRequirement,
-                     schemaType))
-        {
-            if (outCandidate.accelerationStructureParameterIndex >= 0 || hasNonInputDirection)
-            {
-                return false;
-            }
-            outCandidate.accelerationStructureParameterIndex = parameterIndex;
-        }
-        else if (_isGenericTypeAppliedToValueParameter(
-                     astBuilder,
-                     parameterType,
-                     multiLevelAccelerationStructureType,
-                     outCandidate.maxLevelCountParameter))
-        {
-            if (outCandidate.accelerationStructureParameterIndex >= 0 || hasNonInputDirection)
-            {
-                return false;
-            }
-            outCandidate.accelerationStructureParameterIndex = parameterIndex;
-            outCandidate.usesMultiLevelAccelerationStructure = true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    if (outCandidate.traversalDescParameterIndex < 0 ||
-        outCandidate.accelerationStructureParameterIndex < 0 ||
-        outCandidate.descriptorParameterIndex < 0)
-    {
-        return false;
-    }
-
-    if (payloadType)
-    {
-        if (outCandidate.info.payloadParameterIndex < 0)
-            return false;
-        outCandidate.info.kind = StructuralRayTracingTraceMethodKind::ExplicitPayload;
-        outCandidate.payloadGenericArgumentIndex =
-            getGenericArgumentIndex(methodGenericDecl, outCandidate.payloadGenericParameter);
-        if (outCandidate.payloadGenericArgumentIndex < 0)
-            return false;
-    }
-    else
-    {
-        if (outCandidate.info.payloadParameterIndex >= 0)
-            return false;
-        outCandidate.info.kind = StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload;
-    }
-
-    auto accelerationStructureType =
-        parameters[outCandidate.accelerationStructureParameterIndex]->type.type;
-    if (outCandidate.usesMultiLevelAccelerationStructure)
-    {
-        auto equalityOtherType = _getSchemaTraceContextEqualityOtherType(
-            outCandidate.accelerationStructureConstraint,
-            accelerationStructureRequirement,
-            programTraceContextRequirement,
-            schemaType);
-        if (!outCandidate.maxLevelCountParameter || !equalityOtherType ||
-            !accelerationStructureType || !equalityOtherType->equals(accelerationStructureType))
-        {
-            return false;
-        }
-    }
-    else if (outCandidate.maxLevelCountParameter || outCandidate.accelerationStructureConstraint)
-    {
-        return false;
-    }
-
-    outCandidate.method = functionDecl;
-    outCandidate.methodGenericDecl = methodGenericDecl;
-    return true;
-}
-
-/// Returns whether the two trusted trace methods form one implicit/explicit payload overload pair.
-///
-/// Registration retains only each method's own frontend role, but it still verifies that the two
-/// overloads select the same acceleration-structure shape. A compiler/module mismatch is therefore
-/// rejected at the package boundary without preserving a future lowering recipe in the registry.
-static bool _areTraceMethodCandidatesPaired(
-    _StructuralRayTracingTraceMethodCandidate& implicitPayload,
-    _StructuralRayTracingTraceMethodCandidate& explicitPayload)
-{
-    if (!implicitPayload.method || !explicitPayload.method ||
-        implicitPayload.info.kind != StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload ||
-        explicitPayload.info.kind != StructuralRayTracingTraceMethodKind::ExplicitPayload ||
-        implicitPayload.usesMultiLevelAccelerationStructure !=
-            explicitPayload.usesMultiLevelAccelerationStructure ||
-        bool(implicitPayload.maxLevelCountParameter) !=
-            bool(explicitPayload.maxLevelCountParameter) ||
-        bool(implicitPayload.accelerationStructureConstraint) !=
-            bool(explicitPayload.accelerationStructureConstraint))
-    {
-        return false;
-    }
-
-    auto implicitParameters = implicitPayload.method->getParameters();
-    auto explicitParameters = explicitPayload.method->getParameters();
-    auto implicitAccelerationType =
-        implicitParameters[implicitPayload.accelerationStructureParameterIndex]->type.type;
-    auto explicitAccelerationType =
-        explicitParameters[explicitPayload.accelerationStructureParameterIndex]->type.type;
-    if (implicitPayload.maxLevelCountParameter)
-    {
-        if (!implicitPayload.accelerationStructureConstraint ||
-            !explicitPayload.accelerationStructureConstraint ||
-            !implicitPayload.maxLevelCountParameter->type.type ||
-            !explicitPayload.maxLevelCountParameter->type.type ||
-            !implicitPayload.maxLevelCountParameter->type.type->equals(
-                explicitPayload.maxLevelCountParameter->type.type))
-        {
-            return false;
-        }
-    }
-    else if (
-        !implicitAccelerationType || !explicitAccelerationType ||
-        !implicitAccelerationType->equals(explicitAccelerationType))
-    {
-        return false;
-    }
-
-    // The explicit overload adds exactly one generic argument: its payload type. The candidate
-    // decoder rejects every other generic parameter shape, so this count also proves there is no
-    // unclassified argument being retained for later lowering.
-    return explicitPayload.payloadGenericArgumentIndex >= 0 &&
-           getGenericArgumentCount(explicitPayload.methodGenericDecl) ==
-               getGenericArgumentCount(implicitPayload.methodGenericDecl) + 1;
-}
-
-/// Validates and registers all compiler-owned methods on trusted `RayTracer` extensions.
-static bool _registerRayTracerMethods(
-    ASTBuilder* astBuilder,
-    ContainerDecl* container,
-    AggTypeDecl* rayTracerType,
-    InterfaceDecl* traceProgramSchemaInterface,
-    AggTypeDecl* rayTraversalDescType,
-    AggTypeDecl* traceProgramDescriptorType,
-    AssocTypeDecl* accelerationStructureRequirement,
-    AssocTypeDecl* motionRequirement,
-    AssocTypeDecl* stageTraceContextRequirement,
-    AssocTypeDecl* programTraceContextRequirement,
-    AggTypeDecl* multiLevelAccelerationStructureType,
-    AggTypeDecl* const* motionTypes,
-    InterfaceDecl* callableContextInterface,
-    AssocTypeDecl* callableDataRequirement,
-    Dictionary<FunctionDeclBase*, StructuralRayTracingTraceMethodInfo>& traceMethods,
-    HashSet<FunctionDeclBase*>& callShaderMethods)
-{
-    for (auto member : container->getDirectMemberDecls())
-    {
-        auto candidate = member;
-        if (auto genericDecl = as<GenericDecl>(candidate))
-            candidate = genericDecl->inner;
-
-        if (auto extensionDecl = as<ExtensionDecl>(candidate))
-        {
-            auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
-            if (targetType && targetType->getDeclRef().getDecl() == rayTracerType)
-            {
-                _StructuralRayTracingRayTracerExtensionInfo rayTracerExtensionInfo;
-                if (!_tryGetRayTracerMethodInfo(
-                        extensionDecl,
-                        rayTracerType,
-                        traceProgramSchemaInterface,
-                        programTraceContextRequirement,
-                        accelerationStructureRequirement,
-                        motionRequirement,
-                        rayTracerExtensionInfo))
-                {
-                    return false;
-                }
-                auto schemaType = DeclRefType::create(
-                    astBuilder,
-                    makeDeclRef(rayTracerExtensionInfo.schemaTypeParameter));
-
-                _StructuralRayTracingTraceMethodCandidate payloadMethod;
-                _StructuralRayTracingTraceMethodCandidate noPayloadMethod;
-                FunctionDeclBase* callShaderMethod = nullptr;
-                Index traceMethodCount = 0;
-                for (auto extensionMember : extensionDecl->getDirectMemberDecls())
-                {
-                    auto methodCandidate = extensionMember;
-                    if (auto genericDecl = as<GenericDecl>(methodCandidate))
-                        methodCandidate = genericDecl->inner;
-                    auto functionDecl = as<FunctionDeclBase>(methodCandidate);
-                    if (!functionDecl || !functionDecl->getName())
-                        continue;
-
-                    if (functionDecl->getName()->text == "trace")
-                    {
-                        _StructuralRayTracingTraceMethodCandidate traceMethod;
-                        if (!_tryGetTraceMethodCandidate(
-                                astBuilder,
-                                functionDecl,
-                                rayTraversalDescType,
-                                traceProgramDescriptorType,
-                                accelerationStructureRequirement,
-                                programTraceContextRequirement,
-                                multiLevelAccelerationStructureType,
-                                schemaType,
-                                traceMethod))
-                        {
-                            return false;
-                        }
-                        ++traceMethodCount;
-                        if (traceMethod.info.kind ==
-                            StructuralRayTracingTraceMethodKind::ExplicitPayload)
-                        {
-                            if (payloadMethod.method)
-                                return false;
-                            payloadMethod = traceMethod;
-                        }
-                        else
-                        {
-                            if (noPayloadMethod.method)
-                                return false;
-                            noPayloadMethod = traceMethod;
-                        }
-                    }
-                    else if (functionDecl->getName()->text == "callShader")
-                    {
-                        if (callShaderMethod || !_tryGetCallShaderMethodInfo(
-                                                    astBuilder,
-                                                    functionDecl,
-                                                    traceProgramDescriptorType,
-                                                    schemaType,
-                                                    callableContextInterface,
-                                                    stageTraceContextRequirement,
-                                                    programTraceContextRequirement,
-                                                    callableDataRequirement))
-                        {
-                            return false;
-                        }
-                        callShaderMethod = functionDecl;
-                    }
-                }
-
-                if (traceMethodCount)
-                {
-                    if (traceMethodCount != 2 || callShaderMethod ||
-                        !_areTraceMethodCandidatesPaired(noPayloadMethod, payloadMethod) ||
-                        !rayTracerExtensionInfo.motionConstraint)
-                    {
-                        return false;
-                    }
-
-                    bool hasKnownMotionType = false;
-                    for (Index i = 0; i < 4; ++i)
-                    {
-                        if (_isDirectTypeOf(rayTracerExtensionInfo.motionType, motionTypes[i]))
-                        {
-                            hasKnownMotionType = true;
-                            break;
-                        }
-                    }
-                    if (!hasKnownMotionType)
-                        return false;
-
-                    if (payloadMethod.usesMultiLevelAccelerationStructure)
-                    {
-                        if (rayTracerExtensionInfo.accelerationStructureConstraint)
-                            return false;
-                    }
-                    else if (
-                        !rayTracerExtensionInfo.accelerationStructureConstraint ||
-                        !_isNativeAccelerationStructureType(
-                            rayTracerExtensionInfo.accelerationStructureType))
-                    {
-                        return false;
-                    }
-                    traceMethods[payloadMethod.method] = payloadMethod.info;
-                    traceMethods[noPayloadMethod.method] = noPayloadMethod.info;
-                }
-                else
-                {
-                    if (!callShaderMethod ||
-                        rayTracerExtensionInfo.accelerationStructureConstraint ||
-                        rayTracerExtensionInfo.motionConstraint)
-                    {
-                        // The callable-only extension has no topology or motion equality.
-                        // Accepting one here would let an unrelated extension constraint
-                        // masquerade as part of the compiler-owned callable signature.
-                        return false;
-                    }
-                    callShaderMethods.add(callShaderMethod);
-                }
-            }
-        }
-
-        if (auto childContainer = as<ContainerDecl>(candidate))
-        {
-            if (!_registerRayTracerMethods(
-                    astBuilder,
-                    childContainer,
-                    rayTracerType,
-                    traceProgramSchemaInterface,
-                    rayTraversalDescType,
-                    traceProgramDescriptorType,
-                    accelerationStructureRequirement,
-                    motionRequirement,
-                    stageTraceContextRequirement,
-                    programTraceContextRequirement,
-                    multiLevelAccelerationStructureType,
-                    motionTypes,
-                    callableContextInterface,
-                    callableDataRequirement,
-                    traceMethods,
-                    callShaderMethods))
-            {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-bool StructuralRayTracingDeclRegistry::registerTrustedModule(
-    Module* module,
-    StructuralRayTracingStageKind* outMissingStage)
-{
-    m_trustedModuleDecl = module->getModuleDecl();
-    m_intersectionStageInterface = as<InterfaceDecl>(_findNamedDecl(module, "IIntersectionStage"));
-    m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
-    m_trianglePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "TrianglePrimitive"));
-    m_curvePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "CurvePrimitive"));
-    m_motionTypes[0] = as<AggTypeDecl>(_findNamedDecl(module, "NoMotion"));
-    m_motionTypes[1] = as<AggTypeDecl>(_findNamedDecl(module, "PrimitiveMotion"));
-    m_motionTypes[2] = as<AggTypeDecl>(_findNamedDecl(module, "InstanceMotion"));
-    m_motionTypes[3] = as<AggTypeDecl>(_findNamedDecl(module, "PrimitiveAndInstanceMotion"));
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure)] =
-        _findAssociatedTypeRequirement(module, "ITraceContext", "AccelerationStructure");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TraceMotion)] =
-        _findAssociatedTypeRequirement(module, "ITraceContext", "Motion");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::StageTraceContext)] =
-        _findAssociatedTypeRequirement(module, "IStageContext", "TraceContext");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::StageRecord)] =
-        _findAssociatedTypeRequirement(module, "IStageContext", "Record");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::PayloadContextPayload)] =
-        _findAssociatedTypeRequirement(module, "IPayloadContext", "Payload");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitPrimitive)] =
-        _findAssociatedTypeRequirement(module, "IHitContext", "Primitive");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes)] =
-        _findAssociatedTypeRequirement(module, "IIntersectionPrimitive", "Attributes");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableData)] =
-        _findAssociatedTypeRequirement(module, "ICallableContext", "CallableData");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "TraceContext");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramHitGroups)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "HitGroups");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramMissShaders)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "MissShaders");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders)] =
-        _findAssociatedTypeRequirement(module, "ITraceProgramSchema", "CallableShaders");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupContext)] =
-        _findAssociatedTypeRequirement(module, "IHitGroup", "Context");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit)] =
-        _findAssociatedTypeRequirement(module, "IHitGroup", "ClosestHit");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit)] =
-        _findAssociatedTypeRequirement(module, "IHitGroup", "AnyHit");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::HitGroupIntersection)] =
-        _findAssociatedTypeRequirement(module, "IHitGroup", "Intersection");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::ClosestHitShaderContext)] =
-        _findAssociatedTypeRequirement(module, "IClosestHitShader", "Context");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::AnyHitShaderContext)] =
-        _findAssociatedTypeRequirement(module, "IAnyHitShader", "Context");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::IntersectionStageContext)] =
-        _findAssociatedTypeRequirement(module, "IIntersectionStage", "Context");
-    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissShaderContext)] =
-        _findAssociatedTypeRequirement(module, "IMissShader", "Context");
-    m_associatedTypeRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::CallableShaderContext)] =
-        _findAssociatedTypeRequirement(module, "ICallableShader", "Context");
-
-    for (int i = 0; i < int(StructuralRayTracingAssociatedTypeKind::Count); ++i)
-    {
-        m_associatedTypeConstraintRequirements[i] =
-            _findAssociatedTypeConstraint(m_associatedTypeRequirements[i]);
-    }
-
-    InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
-    AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
-    FunctionDeclBase* invokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
-    {
-        auto kind = StructuralRayTracingStageKind(i);
-        interfaces[i] = _findStageInterface(module, kind);
-        inputTypes[i] = _findStageInputType(module, kind);
-        if (interfaces[i])
-            invokeRequirements[i] = _findStageInvokeRequirement(interfaces[i]);
-        if (!interfaces[i] || !inputTypes[i] || !invokeRequirements[i])
-        {
-            if (outMissingStage)
-                *outMissingStage = kind;
-            return false;
-        }
-    }
-
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
-    {
-        m_stageInterfaces[i] = interfaces[i];
-        m_stageInputTypes[i] = inputTypes[i];
-        m_stageInvokeRequirements[i] = invokeRequirements[i];
-        _registerPayloadStageInputAccessors(inputTypes[i], m_payloadStageInputAccessors);
-    }
-    auto traceProgramSchemaInterface =
-        as<InterfaceDecl>(_findNamedDecl(module, "ITraceProgramSchema"));
-    auto rayTraversalDescType = as<AggTypeDecl>(_findNamedDecl(module, "RayTraversalDesc"));
-    auto traceProgramDescriptorType =
-        as<AggTypeDecl>(_findNamedDecl(module, "TraceProgramDescriptor"));
-    // Consider `TraceProgramDescriptor<MySchema>`. The existing intrinsic-type lowering emits
-    // the schema type and its conformance witness directly from the checked substitution. Check
-    // that the packaged declaration supplies exactly those operands before consumers use it.
-    auto descriptorGeneric = as<GenericDecl>(
-        traceProgramDescriptorType ? traceProgramDescriptorType->parentDecl : nullptr);
-    auto descriptorParameter = _getOnlyGenericTypeParameter(descriptorGeneric);
-    auto descriptorIntrinsic =
-        traceProgramDescriptorType
-            ? traceProgramDescriptorType->findModifier<IntrinsicTypeModifier>()
-            : nullptr;
-    SLANG_RELEASE_ASSERT(
-        descriptorParameter && descriptorIntrinsic &&
-        descriptorIntrinsic->irOp == kIROp_TraceProgramDescriptorType &&
-        descriptorIntrinsic->irOperands.getCount() == 0 &&
-        descriptorGeneric->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>().getCount() ==
-            1 &&
-        _findConformanceConstraint(
-            descriptorGeneric,
-            DeclRefType::create(module->getASTBuilder(), makeDeclRef(descriptorParameter)),
-            traceProgramSchemaInterface));
-
-    auto accelerationStructureRequirement = getAssociatedTypeRequirement(
-        StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure);
-    auto motionRequirement =
-        getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind::TraceMotion);
-    auto stageTraceContextRequirement =
-        getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind::StageTraceContext);
-    auto programTraceContextRequirement =
-        getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
-    auto multiLevelAccelerationStructureType =
-        as<AggTypeDecl>(_findNamedDecl(module, "MultiLevelAccelerationStructure"));
-    auto callableContextInterface = as<InterfaceDecl>(_findNamedDecl(module, "ICallableContext"));
-    auto callableDataRequirement =
-        getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind::CallableData);
-    // These declarations form a private compiler/standard-module contract. Validate the complete
-    // contract once here so later checking and lowering can consume semantic roles directly.
-    bool registeredRayTracerMethods = _registerRayTracerMethods(
-        module->getASTBuilder(),
-        module->getModuleDecl(),
-        m_rayTracerType,
-        traceProgramSchemaInterface,
-        rayTraversalDescType,
-        traceProgramDescriptorType,
-        accelerationStructureRequirement,
-        motionRequirement,
-        stageTraceContextRequirement,
-        programTraceContextRequirement,
-        multiLevelAccelerationStructureType,
-        m_motionTypes,
-        callableContextInterface,
-        callableDataRequirement,
-        m_traceMethods,
-        m_callShaderMethods);
-    // A missing stage interface uses the recoverable `outMissingStage` load diagnostic above. A
-    // malformed trace/callable signature has no corresponding user-actionable diagnostic: this
-    // module is compiler-shipped and trusted, so such a mismatch means the compiler and its
-    // standard module were built from incompatible sources.
-    SLANG_RELEASE_ASSERT(
-        registeredRayTracerMethods && m_traceMethods.getCount() != 0 &&
-        m_callShaderMethods.getCount() != 0);
-    for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
-    {
-        auto kind = StructuralRayTracingMetadataKind(i);
-        m_metadataInterfaces[i] =
-            as<InterfaceDecl>(_findNamedDecl(module, _getMetadataInterfaceName(kind)));
-    }
-    return true;
-}
-
-bool StructuralRayTracingDeclRegistry::isTrustedModule(Module* module) const
-{
-    return module && module->getModuleDecl() == m_trustedModuleDecl;
-}
-
-AssocTypeDecl* StructuralRayTracingDeclRegistry::getAssociatedTypeRequirement(
-    StructuralRayTracingAssociatedTypeKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingAssociatedTypeKind::Count))
-        return nullptr;
-    return m_associatedTypeRequirements[index];
-}
-
-static SubtypeWitness* _projectStructuralRayTracingWitnessToInterface(
-    ASTBuilder* astBuilder,
-    SharedSemanticsContext* sharedSemantics,
-    SubtypeWitness* witness,
-    InterfaceDecl* targetInterface)
-{
-    if (!astBuilder || !sharedSemantics || !witness || !targetInterface)
-        return nullptr;
-
-    // Consider a concrete `HitContext : IHitContext`, where `IHitContext` inherits
-    // `IPayloadContext`, which inherits `IStageContext`. The checked `HitContext : IHitContext`
-    // witness cannot directly answer a requirement declared by `IStageContext`. Project that
-    // exact witness through the checked interface-inheritance path. This matters when the context
-    // has another route to `IStageContext`: a fresh subtype query could select that route instead
-    // of the `IHitContext` proof supplied by the caller.
-    auto targetType = DeclRefType::create(astBuilder, makeDeclRef(targetInterface));
-    return sharedSemantics->tryProjectInterfaceSubtypeWitness(witness, targetType);
-}
-
-static SubtypeWitness* _projectStructuralRayTracingWitnessToRequirement(
-    ASTBuilder* astBuilder,
-    SharedSemanticsContext* sharedSemantics,
-    SubtypeWitness* witness,
-    AssocTypeDecl* requirement)
-{
-    auto declaringInterface = requirement ? as<InterfaceDecl>(requirement->parentDecl) : nullptr;
-    SLANG_RELEASE_ASSERT(declaringInterface);
-    return _projectStructuralRayTracingWitnessToInterface(
-        astBuilder,
-        sharedSemantics,
-        witness,
-        declaringInterface);
-}
-
-Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
+Type* StructuralRayTracingCheckingState::resolveAssociatedType(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
     StructuralRayTracingAssociatedTypeKind kind) const
 {
-    if (!witness)
-        return nullptr;
-
-    auto requirement = getAssociatedTypeRequirement(kind);
+    auto requirement = _findStructuralAssociatedRequirement(*this, witness, kind);
     if (!requirement)
         return nullptr;
-
-    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
-    auto sharedSemantics =
-        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
-    witness = _projectStructuralRayTracingWitnessToRequirement(
-        astBuilder,
-        sharedSemantics,
-        witness,
-        requirement);
-    if (!witness)
-        return nullptr;
-
     auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
     if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
         return as<Type>(requirementWitness.getVal()->resolve());
@@ -1514,36 +406,147 @@ Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
     return nullptr;
 }
 
-SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstraint(
+// Names the interface contract needed to continue resolving one associated-type requirement.
+// The role matters when a declaration adds unrelated constraints on the same associated type:
+// `Context : IExtra` must not replace the `Context : IPayloadContext` proof for a miss stage.
+static ASTNodeType _getAssociatedTypeConstraintClass(StructuralRayTracingAssociatedTypeKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingAssociatedTypeKind::StageTraceContext:
+    case StructuralRayTracingAssociatedTypeKind::ProgramTraceContext:
+        return ASTNodeType::RayTracingTraceContextType;
+    case StructuralRayTracingAssociatedTypeKind::HitPrimitive:
+        return ASTNodeType::RayTracingIntersectionPrimitiveType;
+    case StructuralRayTracingAssociatedTypeKind::ProgramHitGroups:
+        return ASTNodeType::RayTracingHitGroupListType;
+    case StructuralRayTracingAssociatedTypeKind::ProgramMissShaders:
+        return ASTNodeType::RayTracingMissShaderListType;
+    case StructuralRayTracingAssociatedTypeKind::ProgramCallableShaders:
+        return ASTNodeType::RayTracingCallableShaderListType;
+    case StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit:
+        return ASTNodeType::ClosestHitShaderType;
+    case StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit:
+        return ASTNodeType::AnyHitShaderType;
+    case StructuralRayTracingAssociatedTypeKind::HitGroupIntersection:
+        return ASTNodeType::IntersectionStageType;
+    case StructuralRayTracingAssociatedTypeKind::HitGroupContext:
+    case StructuralRayTracingAssociatedTypeKind::ClosestHitShaderContext:
+    case StructuralRayTracingAssociatedTypeKind::AnyHitShaderContext:
+    case StructuralRayTracingAssociatedTypeKind::IntersectionStageContext:
+        return ASTNodeType::RayTracingHitContextType;
+    case StructuralRayTracingAssociatedTypeKind::MissShaderContext:
+        return ASTNodeType::RayTracingPayloadContextType;
+    case StructuralRayTracingAssociatedTypeKind::CallableShaderContext:
+        return ASTNodeType::RayTracingCallableContextType;
+    default:
+        return ASTNodeType::CountOf;
+    }
+}
+
+SubtypeWitness* StructuralRayTracingCheckingState::resolveAssociatedTypeConstraint(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
     StructuralRayTracingAssociatedTypeKind kind) const
 {
-    if (!witness)
+    auto expectedInterfaceClass = _getAssociatedTypeConstraintClass(kind);
+    if (expectedInterfaceClass == ASTNodeType::CountOf)
         return nullptr;
+    auto associatedType = _findStructuralAssociatedRequirement(*this, witness, kind);
+    if (!associatedType)
+        return nullptr;
+    auto owner = as<InterfaceDecl>(associatedType->parentDecl);
+    SLANG_RELEASE_ASSERT(owner);
+    auto sharedSemantics = getModule(owner)->getLinkage()->getSemanticsForReflection();
+    for (auto constraint : owner->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    {
+        if (constraint->isEqualityConstraint)
+            continue;
+        auto subType = isDeclRefTypeOf<AssocTypeDecl>(constraint->sub.type);
+        if (!subType || subType.getDecl() != associatedType)
+            continue;
+        auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, constraint);
+        if (requirementWitness.getFlavor() != RequirementWitness::Flavor::val)
+            continue;
+        auto constraintWitness = as<SubtypeWitness>(requirementWitness.getVal()->resolve());
+        if (!constraintWitness)
+            continue;
 
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingAssociatedTypeKind::Count))
-        return nullptr;
-    auto requirement = m_associatedTypeConstraintRequirements[index];
-    if (!requirement)
-        return nullptr;
+        // A bound may refine the required context interface. Follow its checked interface facets
+        // to recognize that contract, but return the original requirement witness so later
+        // associated-type projection keeps the conformance path selected by this declaration.
+        for (auto facet : sharedSemantics->getInheritanceInfo(constraintWitness->getSup()).facets)
+        {
+            auto interfaceDecl = facet->origin.declRef.as<InterfaceDecl>();
+            if (_getMagicTypeClass(interfaceDecl.getDecl()) == expectedInterfaceClass)
+                return constraintWitness;
+        }
+    }
+    return nullptr;
+}
 
-    auto associatedType = getAssociatedTypeRequirement(kind);
-    auto trustedModule = m_trustedModuleDecl ? m_trustedModuleDecl->module : nullptr;
-    auto sharedSemantics =
-        trustedModule ? trustedModule->getLinkage()->getSemanticsForReflection() : nullptr;
-    witness = _projectStructuralRayTracingWitnessToRequirement(
-        astBuilder,
-        sharedSemantics,
-        witness,
-        associatedType);
-    if (!witness)
-        return nullptr;
+StructuralRayTracingHitAttributesKind StructuralRayTracingCheckingState::getHitAttributesKind(
+    Type* primitiveType) const
+{
+    primitiveType = primitiveType ? as<Type>(primitiveType->resolve()) : nullptr;
+    if (as<TrianglePrimitiveType>(primitiveType))
+        return StructuralRayTracingHitAttributesKind::Triangle;
+    if (as<CurvePrimitiveType>(primitiveType))
+        return StructuralRayTracingHitAttributesKind::Curve;
+    return isDeclRefTypeOf<AggTypeDecl>(primitiveType)
+               ? StructuralRayTracingHitAttributesKind::Custom
+               : StructuralRayTracingHitAttributesKind::None;
+}
 
-    auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
-    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
-        return as<SubtypeWitness>(requirementWitness.getVal()->resolve());
+bool StructuralRayTracingCheckingState::isPayloadStageInputAccessor(
+    FunctionDeclBase* functionDecl) const
+{
+    auto propertyDecl = functionDecl ? as<PropertyDecl>(functionDecl->parentDecl) : nullptr;
+    return propertyDecl && propertyDecl->hasModifier<RayTracingPayloadAttribute>();
+}
+
+StructuralRayTracingTraceMethodKind StructuralRayTracingCheckingState::getTraceMethodKind(
+    FunctionDeclBase* functionDecl) const
+{
+    return getTraceMethodInfo(functionDecl).kind;
+}
+
+StructuralRayTracingTraceMethodInfo StructuralRayTracingCheckingState::getTraceMethodInfo(
+    FunctionDeclBase* functionDecl) const
+{
+    StructuralRayTracingTraceMethodInfo result;
+    if (!functionDecl || !functionDecl->hasModifier<RayTracingTraceAttribute>())
+        return result;
+    result.kind = StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload;
+    Index parameterIndex = 0;
+    for (auto parameter : functionDecl->getParameters())
+    {
+        if (parameter->hasModifier<RayTracingPayloadAttribute>())
+        {
+            result.kind = StructuralRayTracingTraceMethodKind::ExplicitPayload;
+            result.payloadParameterIndex = parameterIndex;
+            break;
+        }
+        ++parameterIndex;
+    }
+    return result;
+}
+
+bool StructuralRayTracingCheckingState::isCallShaderMethod(FunctionDeclBase* functionDecl) const
+{
+    return functionDecl && functionDecl->hasModifier<RayTracingCallShaderAttribute>();
+}
+
+FunctionDeclBase* StructuralRayTracingCheckingState::getStageInvokeRequirement(
+    InterfaceDecl* interfaceDecl) const
+{
+    if (!isExecutableStageInterface(interfaceDecl))
+        return nullptr;
+    for (auto member : interfaceDecl->getDirectMemberDeclsOfType<FunctionDeclBase>())
+    {
+        if (member->getName() && member->getName()->text == "invoke")
+            return member;
+    }
     return nullptr;
 }
 
@@ -1578,152 +581,8 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-StructuralRayTracingHitAttributesKind StructuralRayTracingDeclRegistry::getHitAttributesKind(
-    Type* primitiveType) const
-{
-    primitiveType = primitiveType ? as<Type>(primitiveType->resolve()) : nullptr;
-    auto declRefType = as<DeclRefType>(primitiveType);
-    auto primitiveDecl =
-        declRefType ? declRefType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
-    if (primitiveDecl == m_trianglePrimitiveType)
-        return StructuralRayTracingHitAttributesKind::Triangle;
-    if (primitiveDecl == m_curvePrimitiveType)
-        return StructuralRayTracingHitAttributesKind::Curve;
-    return primitiveDecl ? StructuralRayTracingHitAttributesKind::Custom
-                         : StructuralRayTracingHitAttributesKind::None;
-}
 
-InterfaceDecl* StructuralRayTracingDeclRegistry::getStageInterface(
-    StructuralRayTracingStageKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count))
-        return nullptr;
-    return m_stageInterfaces[index];
-}
-
-StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
-    InterfaceDecl* interfaceDecl) const
-{
-    if (!interfaceDecl)
-        return StructuralRayTracingStageKind::Count;
-    if (interfaceDecl == m_intersectionStageInterface)
-        return StructuralRayTracingStageKind::Intersection;
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
-    {
-        if (m_stageInterfaces[i] == interfaceDecl)
-            return StructuralRayTracingStageKind(i);
-    }
-    return StructuralRayTracingStageKind::Count;
-}
-
-AggTypeDecl* StructuralRayTracingDeclRegistry::getStageInputType(
-    StructuralRayTracingStageKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count))
-        return nullptr;
-    return m_stageInputTypes[index];
-}
-
-StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageInputKind(
-    AggTypeDecl* typeDecl) const
-{
-    if (!typeDecl)
-        return StructuralRayTracingStageKind::Count;
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
-    {
-        if (m_stageInputTypes[i] == typeDecl)
-            return StructuralRayTracingStageKind(i);
-    }
-    return StructuralRayTracingStageKind::Count;
-}
-
-StructuralRayTracingMetadataKind StructuralRayTracingDeclRegistry::getMetadataKind(
-    InterfaceDecl* interfaceDecl) const
-{
-    if (!interfaceDecl)
-        return StructuralRayTracingMetadataKind::Count;
-    for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
-    {
-        if (m_metadataInterfaces[i] == interfaceDecl)
-            return StructuralRayTracingMetadataKind(i);
-    }
-    return StructuralRayTracingMetadataKind::Count;
-}
-
-InterfaceDecl* StructuralRayTracingDeclRegistry::getMetadataInterface(
-    StructuralRayTracingMetadataKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingMetadataKind::Count))
-        return nullptr;
-    return m_metadataInterfaces[index];
-}
-
-bool StructuralRayTracingDeclRegistry::isPayloadStageInputAccessor(
-    FunctionDeclBase* functionDecl) const
-{
-    return m_payloadStageInputAccessors.contains(functionDecl);
-}
-
-StructuralRayTracingTraceMethodKind StructuralRayTracingDeclRegistry::getTraceMethodKind(
-    FunctionDeclBase* functionDecl) const
-{
-    if (auto info = getTraceMethodInfo(functionDecl))
-        return info->kind;
-    return StructuralRayTracingTraceMethodKind::None;
-}
-
-const StructuralRayTracingTraceMethodInfo* StructuralRayTracingDeclRegistry::getTraceMethodInfo(
-    FunctionDeclBase* functionDecl) const
-{
-    return m_traceMethods.tryGetValue(functionDecl);
-}
-
-bool StructuralRayTracingDeclRegistry::isCallShaderMethod(FunctionDeclBase* functionDecl) const
-{
-    return m_callShaderMethods.contains(functionDecl);
-}
-
-void StructuralRayTracingDeclRegistry::getSourceOperations(
-    List<StructuralRayTracingSourceOperation>& outOperations) const
-{
-    for (const auto& [functionDecl, traceMethodInfo] : m_traceMethods)
-    {
-        StructuralRayTracingSourceOperationKind operationKind;
-        switch (traceMethodInfo.kind)
-        {
-        case StructuralRayTracingTraceMethodKind::ExplicitPayload:
-            operationKind = StructuralRayTracingSourceOperationKind::TraceExplicitPayload;
-            break;
-        case StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload:
-            operationKind = StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload;
-            break;
-        default:
-            SLANG_UNEXPECTED("invalid trusted structural trace method kind");
-        }
-        outOperations.add(StructuralRayTracingSourceOperation{functionDecl, operationKind});
-    }
-
-    for (auto callShaderMethod : m_callShaderMethods)
-    {
-        outOperations.add(StructuralRayTracingSourceOperation{
-            callShaderMethod,
-            StructuralRayTracingSourceOperationKind::CallShader});
-    }
-}
-
-FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(
-    StructuralRayTracingStageKind kind) const
-{
-    auto index = int(kind);
-    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count))
-        return nullptr;
-    return m_stageInvokeRequirements[index];
-}
-
-void StructuralRayTracingDeclRegistry::registerStageImplementation(
+void StructuralRayTracingCheckingState::registerStageImplementation(
     FunctionDeclBase* implementation,
     StructuralRayTracingStageKind kind)
 {
@@ -1731,33 +590,33 @@ void StructuralRayTracingDeclRegistry::registerStageImplementation(
         m_stageImplementations[implementation] = kind;
 }
 
-StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
+StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageKind(
     FunctionDeclBase* implementation) const
 {
     if (!implementation)
         return StructuralRayTracingStageKind::Count;
-    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    if (auto interfaceDecl = as<InterfaceDecl>(implementation->parentDecl))
     {
-        if (m_stageInvokeRequirements[i] == implementation)
-            return StructuralRayTracingStageKind(i);
+        if (implementation == getStageInvokeRequirement(interfaceDecl))
+            return getStageKind(interfaceDecl);
     }
     if (auto kind = m_stageImplementations.tryGetValue(implementation))
         return *kind;
     return StructuralRayTracingStageKind::Count;
 }
 
-bool StructuralRayTracingDeclRegistry::beginStageRepresentationDeclarationCheck(
+bool StructuralRayTracingCheckingState::beginStageRepresentationDeclarationCheck(
     AggTypeDecl* declaration)
 {
     return declaration && m_stageDeclarationsWithCheckedRepresentation.add(declaration);
 }
 
-bool StructuralRayTracingDeclRegistry::beginStageRepresentationTypeCheck(Type* type)
+bool StructuralRayTracingCheckingState::beginStageRepresentationTypeCheck(Type* type)
 {
     return type && m_stageTypesWithCheckedRepresentation.add(type);
 }
 
-bool StructuralRayTracingDeclRegistry::registerAPIUse(
+bool StructuralRayTracingCheckingState::registerAPIUse(
     Module* module,
     RayTracingAPIFamily family,
     Decl* decl,

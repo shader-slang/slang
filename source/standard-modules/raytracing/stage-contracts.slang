@@ -12,6 +12,7 @@ namespace rt
 /// @par Constraints
 /// Requires the `structural_raytracing_closesthit` capability.
 [require(structural_raytracing_closesthit)]
+__magic_type(ClosestHitShaderType)
 public interface IClosestHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
@@ -35,6 +36,7 @@ public interface IClosestHitShader
 /// @par Constraints
 /// Requires the `structural_raytracing_anyhit` capability.
 [require(structural_raytracing_anyhit)]
+__magic_type(AnyHitShaderType)
 public interface IAnyHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
@@ -64,6 +66,7 @@ public interface IAnyHitShader
 /// intersection shader for a builtin primitive. Sealing this interface prevents user-defined
 /// placeholders from bypassing the procedural shader contract.
 [sealed]
+__magic_type(IntersectionStageType)
 public interface IIntersectionStage
 {
     /// Defines the shared context for procedural or hardware intersection.
@@ -88,6 +91,7 @@ public interface IIntersectionStage
 /// `Context.Primitive : ICustomIntersectionPrimitive`. Requires the
 /// `structural_raytracing_intersection` capability.
 [require(structural_raytracing_intersection)]
+__magic_type(IntersectionShaderType)
 public interface IIntersectionShader : IIntersectionStage
 {
     __constraint Context.Primitive : ICustomIntersectionPrimitive;
@@ -105,6 +109,7 @@ public interface IIntersectionShader : IIntersectionStage
 /// @par Constraints
 /// Requires the `structural_raytracing_miss` capability.
 [require(structural_raytracing_miss)]
+__magic_type(MissShaderType)
 public interface IMissShader
 {
     /// Defines the trace payload and shader-record types available to this stage.
@@ -126,6 +131,7 @@ public interface IMissShader
 /// @par Constraints
 /// Requires the `structural_raytracing_callable` capability.
 [require(structural_raytracing_callable)]
+__magic_type(CallableShaderType)
 public interface ICallableShader
 {
     /// Defines the callable-data and shader-record types available to this stage.

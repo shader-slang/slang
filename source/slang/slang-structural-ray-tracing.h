@@ -30,10 +30,9 @@ class GenericTypeParamDecl;
 /// `HitObject.TraceRay`: those are separate APIs that may coexist with a structural pipeline.
 bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl);
 
-/// Identifies one logical stage contract exported by the trusted ray-tracing module.
+/// Identifies one logical stage contract represented by a dedicated AST type.
 ///
-/// The value keys the matching source interface, stage-input type, `invoke` requirement, and IR
-/// interface opcode. `Count` is the invalid/sentinel value as well as the array bound.
+/// The value selects the stage profile and IR interface opcode. `Count` is the invalid value.
 enum class StructuralRayTracingStageKind
 {
     ClosestHit,
@@ -46,8 +45,7 @@ enum class StructuralRayTracingStageKind
 
 /// Identifies a compile-time metadata interface whose conformers have no runtime representation.
 ///
-/// These roles let semantic checking recognize hit groups, section lists, and schemas by trusted
-/// declaration identity instead of by user-visible names.
+/// Dedicated AST types identify these roles independently of module or declaration names.
 enum class StructuralRayTracingMetadataKind
 {
     HitGroup,
@@ -60,8 +58,8 @@ enum class StructuralRayTracingMetadataKind
 
 /// Gives each associated-type requirement in the structural API a stable semantic role.
 ///
-/// The registry resolves these roles to trusted declarations once. Consumers can then project a
-/// context or schema witness without depending on declaration order or source spelling.
+/// Each role belongs to a named member of a compiler-recognized interface. Consumers find that
+/// requirement through the supplied conformance witness, preserving its inheritance path.
 enum class StructuralRayTracingAssociatedTypeKind
 {
     TraceAccelerationStructure,
@@ -98,7 +96,7 @@ enum class RayTracingAPIFamily
     Legacy,
 };
 
-/// Distinguishes the two trusted `RayTracer.trace` source contracts.
+/// Distinguishes the two annotated `RayTracer.trace` source contracts.
 ///
 /// The explicit form owns an `inout` payload parameter. The implicit form represents the schema's
 /// unique empty payload without exposing a payload value in source.
@@ -109,7 +107,7 @@ enum class StructuralRayTracingTraceMethodKind
     ImplicitEmptyPayload,
 };
 
-/// Identifies a trusted structural operation that still requires target-independent lowering.
+/// Identifies a structural operation that still requires target-independent lowering.
 ///
 /// These values are serialized on the corresponding standard-module IR functions. They describe
 /// source semantics only; they are not target opcodes and must be consumed before entry-point ABI
@@ -122,14 +120,7 @@ enum class StructuralRayTracingSourceOperationKind
     Count,
 };
 
-/// Associates one trusted standard-module method with the source operation it represents.
-struct StructuralRayTracingSourceOperation
-{
-    FunctionDeclBase* functionDecl = nullptr;
-    StructuralRayTracingSourceOperationKind kind = StructuralRayTracingSourceOperationKind::Count;
-};
-
-/// Records the frontend facts consumed for one trusted `RayTracer.trace` overload.
+/// Describes the annotated payload contract of one `RayTracer.trace` overload.
 ///
 /// The method kind distinguishes the explicit and implicit empty-payload contracts. Only the
 /// explicit form has a payload parameter; its source-parameter index lets semantic checking reject
@@ -160,6 +151,8 @@ struct StructuralRayTracingEntryPointInfo
 {
     StructuralRayTracingStageKind stageKind = StructuralRayTracingStageKind::Count;
     Type* stageType = nullptr;
+    /// The exact executable interface selected through the stage implementation's witness.
+    InterfaceDecl* stageInterface = nullptr;
     Type* contextType = nullptr;
     /// The payload is present only for hit and miss stages.
     Type* payloadType = nullptr;
@@ -202,123 +195,94 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     ASTBuilder* astBuilder,
     Type* entryListType);
 
-/// Caches the compiler-owned declaration identities from the packaged ray-tracing module.
+/// Returns whether a declaration belongs to an explicitly annotated structural API type or
+/// operation.
 ///
-/// One registry belongs to a `Linkage`, and every stored AST pointer is owned by that linkage's
-/// imported module graph. Registration authenticates the complete private source contract once;
-/// later semantic and IR code asks for roles through this registry instead of matching names or
-/// generic-argument positions. The registry also keeps per-linkage validation state used to avoid
-/// duplicate diagnostics and to inspect calls reachable from structural stage implementations.
-class StructuralRayTracingDeclRegistry
+/// Generic declarations and extensions retain the identity of their inner declaration or target.
+/// Module membership alone does not grant compiler-recognized behavior.
+bool isStructuralRayTracingDeclaration(Decl* declaration);
+
+/// Retains semantic checking state for structural ray tracing within one linkage.
+///
+/// Compiler-recognized declaration roles come from their AST type or operation annotation. Only
+/// completed implementation selections and diagnostic bookkeeping are cached here; module import
+/// does not populate this state or modify declaration identity.
+class StructuralRayTracingCheckingState
 {
 public:
-    /// Authenticates and records the declarations in the packaged `slang.raytracing` module.
-    ///
-    /// Returns false when a required stage interface, input, or `invoke` requirement is absent.
-    /// `outMissingStage`, when supplied, identifies that incomplete stage contract. Other malformed
-    /// private contracts are compiler/package mismatches and are asserted at registration.
-    bool registerTrustedModule(
-        Module* module,
-        StructuralRayTracingStageKind* outMissingStage = nullptr);
-
-    /// Returns whether the trusted stage declarations have been installed for this linkage.
-    bool isInitialized() const { return m_stageInterfaces[0] != nullptr; }
-
-    /// Returns whether `module` is the exact packaged module authenticated by this registry.
-    bool isTrustedModule(Module* module) const;
-
-    /// Returns the trusted source interface for `kind`, or null for an invalid kind.
-    InterfaceDecl* getStageInterface(StructuralRayTracingStageKind kind) const;
-
-    /// Returns the role of a trusted stage interface, or `Count` for any other interface.
+    /// Returns the stage represented by the interface's AST type, including the intersection
+    /// marker.
     StructuralRayTracingStageKind getStageKind(InterfaceDecl* interfaceDecl) const;
 
-    /// Returns the trusted zero-storage input type for `kind`, or null for an invalid kind.
-    AggTypeDecl* getStageInputType(StructuralRayTracingStageKind kind) const;
+    /// Returns whether the interface represents an executable stage with an `invoke` requirement.
+    bool isExecutableStageInterface(InterfaceDecl* interfaceDecl) const;
 
-    /// Returns the role of a trusted stage-input declaration, or `Count` for any other type.
+    /// Returns the stage represented by the input's AST type, or `Count` for an ordinary type.
     StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
 
-    /// Returns the role of a trusted compile-time metadata interface, or `Count` otherwise.
+    /// Returns the metadata role represented by the interface's AST type, or `Count` otherwise.
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
 
-    /// Returns the trusted metadata interface for `kind`, or null for an invalid kind.
-    InterfaceDecl* getMetadataInterface(StructuralRayTracingMetadataKind kind) const;
-
-    /// Returns whether `functionDecl` is a trusted accessor for a stage input's payload property.
+    /// Returns whether the accessor belongs to a property annotated as a stage payload view.
     bool isPayloadStageInputAccessor(FunctionDeclBase* functionDecl) const;
 
-    /// Returns the source contract implemented by a trusted trace overload.
+    /// Returns the source contract of an annotated trace overload, or `None` for other functions.
     StructuralRayTracingTraceMethodKind getTraceMethodKind(FunctionDeclBase* functionDecl) const;
 
-    /// Returns the checked trace-overload metadata, or null for any untrusted method.
-    const StructuralRayTracingTraceMethodInfo* getTraceMethodInfo(
-        FunctionDeclBase* functionDecl) const;
+    /// Reads an annotated trace overload and the index of its annotated payload parameter.
+    StructuralRayTracingTraceMethodInfo getTraceMethodInfo(FunctionDeclBase* functionDecl) const;
 
-    /// Returns whether `functionDecl` implements either trusted trace source contract.
+    /// Returns whether the function is an annotated structural trace operation.
     bool isTraceMethod(FunctionDeclBase* functionDecl) const
     {
         return getTraceMethodKind(functionDecl) != StructuralRayTracingTraceMethodKind::None;
     }
 
-    /// Returns whether `functionDecl` is a trusted `RayTracer.callShader` overload.
+    /// Returns whether the function is an annotated structural callable operation.
     bool isCallShaderMethod(FunctionDeclBase* functionDecl) const;
 
-    /// Appends every trusted trace and callable operation together with its semantic role.
-    ///
-    /// Consumers use this list to transfer the source contract onto serialized IR without
-    /// rediscovering operations from method names or overload positions.
-    void getSourceOperations(List<StructuralRayTracingSourceOperation>& outOperations) const;
-    /// Returns the trusted associated-type declaration assigned to `kind`.
-    AssocTypeDecl* getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind kind) const;
+    /// Returns the requirement's role from its name and its declaring interface's AST type.
+    StructuralRayTracingAssociatedTypeKind getAssociatedTypeKind(AssocTypeDecl* requirement) const;
 
-    /// Resolves the associated type identified by `kind` through the exact supplied witness path.
+    /// Resolves an associated type through the exact supplied interface-conformance path.
     ///
-    /// Returns null when the witness cannot be projected to the interface that owns the
-    /// requirement or the witness does not provide a type value.
+    /// Returns null if the interface and its inherited interfaces do not declare the requested
+    /// requirement, or the selected witness does not provide a type value.
     Type* resolveAssociatedType(
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
 
-    /// Resolves the subtype witness attached to the associated type identified by `kind`.
-    ///
-    /// This operation preserves the caller's interface-conformance path instead of starting an
-    /// unrelated subtype lookup for the concrete type.
+    /// Resolves the constraint on an associated type through the supplied conformance path.
     SubtypeWitness* resolveAssociatedTypeConstraint(
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
 
-    /// Classifies the attribute model associated with a trusted primitive type.
+    /// Classifies the attribute model from the primitive's AST type.
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
 
-    /// Returns the trusted `invoke` requirement for `kind`, or null for an invalid kind.
-    FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
+    /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
+    FunctionDeclBase* getStageInvokeRequirement(InterfaceDecl* interfaceDecl) const;
 
-    /// Records the concrete method selected to satisfy one trusted stage `invoke` requirement.
+    /// Records the concrete method selected by an executable stage's conformance witness.
     void registerStageImplementation(
         FunctionDeclBase* implementation,
         StructuralRayTracingStageKind kind);
 
-    /// Returns the role of a trusted requirement or registered implementation method.
+    /// Returns the role of a stage requirement or previously selected implementation method.
     StructuralRayTracingStageKind getStageKind(FunctionDeclBase* implementation) const;
 
-    /// Returns true the first time semantic checking validates `declaration`'s stage
-    /// representation.
-    ///
-    /// Interface conformance checking can report the same completed witness more than once, while
-    /// several concrete stage types can share a base struct. Representation diagnostics belong to
-    /// the declaration that introduces the invalid kind or field, so callers emit them once there.
+    /// Returns true the first time checking validates an aggregate declaration's stage storage.
     bool beginStageRepresentationDeclarationCheck(AggTypeDecl* declaration);
 
-    /// Returns true the first time semantic checking validates a non-aggregate stage `type`.
+    /// Returns true the first time checking validates a non-aggregate stage's representation.
     bool beginStageRepresentationTypeCheck(Type* type);
 
-    /// Records one pipeline-API use and reports whether it completes a new mixed-family pair.
+    /// Records one pipeline use and reports whether it completes a new mixed-API pair.
     ///
-    /// A true result means the caller should diagnose once at `decl`; `outOtherDecl` then names the
-    /// first use of the other family. False means the module is not mixed or was already diagnosed.
+    /// A true result requests one diagnostic at `decl`; `outOtherDecl` identifies the earlier
+    /// use of the other API. Later uses in the same module do not repeat the diagnostic.
     bool registerAPIUse(
         Module* module,
         RayTracingAPIFamily family,
@@ -326,37 +290,11 @@ public:
         Decl** outOtherDecl);
 
 private:
-    // These declarations give every compiler-owned source role one authenticated AST identity.
-    InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
-    InterfaceDecl* m_intersectionStageInterface = nullptr;
-    AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
-    FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
-    InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
-    AssocTypeDecl*
-        m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
-    GenericTypeConstraintDecl* m_associatedTypeConstraintRequirements[int(
-        StructuralRayTracingAssociatedTypeKind::Count)] = {};
-
-    // These members classify trusted accessors and dispatch methods without relying on spelling at
-    // each use site.
-    HashSet<FunctionDeclBase*> m_payloadStageInputAccessors;
-    Dictionary<FunctionDeclBase*, StructuralRayTracingTraceMethodInfo> m_traceMethods;
-    HashSet<FunctionDeclBase*> m_callShaderMethods;
-    ModuleDecl* m_trustedModuleDecl = nullptr;
-    AggTypeDecl* m_rayTracerType = nullptr;
-    AggTypeDecl* m_trianglePrimitiveType = nullptr;
-    AggTypeDecl* m_curvePrimitiveType = nullptr;
-    AggTypeDecl* m_motionTypes[4] = {};
-
-    // These sets suppress duplicate stage diagnostics and support same-module API validation.
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     HashSet<AggTypeDecl*> m_stageDeclarationsWithCheckedRepresentation;
     HashSet<Type*> m_stageTypesWithCheckedRepresentation;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
 };
-
-/// Returns the public source name of the trusted stage interface for diagnostics and registration.
-const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);
 
 /// Returns the source declaration path used as the name hint for a structural ray-tracing type.
 ///

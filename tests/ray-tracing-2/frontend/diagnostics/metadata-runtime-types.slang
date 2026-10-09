@@ -65,6 +65,8 @@ void invalidMetadataValues(
     Box<Box<TestHitGroup>> nestedGroup,
 //CHECK:    ^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:    ^^^^^^^^^^^^ structural ray-tracing metadata type 'TestHitGroup' has no runtime representation
+//CHECK:                   ^^^^^^^^^^^ runtime use of structural ray-tracing metadata
+//CHECK:                   ^^^^^^^^^^^ structural ray-tracing metadata type 'Box<Box<TestHitGroup>>' has no runtime representation
     rt::ITraceProgramSchema schemaInterface)
 //CHECK:                    ^^^^^^^^^^^^^^^ runtime use of structural ray-tracing metadata
 //CHECK:                    ^^^^^^^^^^^^^^^ structural ray-tracing metadata type 'rt.ITraceProgramSchema' has no runtime representation

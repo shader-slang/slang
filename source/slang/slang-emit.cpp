@@ -1070,7 +1070,7 @@ Result linkAndOptimizeIR(
             Diagnostics::UnloweredStructuralRayTracingEntryPoint{.entryPoint = irEntryPoint});
         foundUnloweredStructuralEntryPoint = true;
     }
-    // Calls to the trusted standard-module trace and callShader methods are represented by calls to
+    // Calls to annotated structural trace and callShader methods are represented by calls to
     // marked IR functions until structural lowering replaces them. Build the ordinary entry-point
     // reference graph so an unused overload in the imported module does not block unrelated code,
     // while a marker reached through a helper or generic specialization still cannot enter ABI

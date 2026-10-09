@@ -12210,16 +12210,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             operandCount++;
         }
 
-        // Preserve compiler-owned stage identity when lowering the exact declarations registered
-        // from the trusted `slang.raytracing` standard module. The distinct opcode changes only the
-        // nominal identity: requirements and witness-table lowering remain ordinary interface IR.
-        // A user module that shadows these names is absent from the registry and therefore cannot
-        // manufacture a structural stage-interface instruction.
+        // A special AST type identifies an executable stage interface. Emit its corresponding IR
+        // class here so ordinary module serialization preserves that identity. Requirements and
+        // witness tables retain ordinary interface lowering; the non-executable intersection
+        // placeholder contract remains an ordinary interface.
         auto interfaceOp = kIROp_InterfaceType;
-        auto stageKind =
-            context->getLinkage()->getStructuralRayTracingDeclRegistry().getStageKind(decl);
-        if (stageKind != StructuralRayTracingStageKind::Count)
-            interfaceOp = getStructuralRayTracingStageInterfaceOp(stageKind);
+        auto& checkingState = context->getLinkage()->getStructuralRayTracingCheckingState();
+        if (checkingState.isExecutableStageInterface(decl))
+            interfaceOp = getStructuralRayTracingStageInterfaceOp(checkingState.getStageKind(decl));
 
         IRInterfaceType* irInterface =
             subBuilder->createInterfaceType(interfaceOp, operandCount, nullptr);
@@ -13896,6 +13894,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return true;
     }
 
+    // Preserve the checked meaning of annotated trace and callable operations on their function
+    // IR. For example, an implicit-empty-payload trace has an empty source body until structural
+    // lowering implements it; this marker lets codegen reject an unlowered call instead of
+    // silently compiling it away. Normal serialization and specialization retain the decoration.
+    void addStructuralRayTracingSourceOperationDecoration(IRFunc* irFunc, FunctionDeclBase* decl)
+    {
+        auto& checkingState = context->getLinkage()->getStructuralRayTracingCheckingState();
+        auto traceKind = checkingState.getTraceMethodKind(decl);
+        if (traceKind != StructuralRayTracingTraceMethodKind::None)
+        {
+            auto operationKind =
+                traceKind == StructuralRayTracingTraceMethodKind::ExplicitPayload
+                    ? StructuralRayTracingSourceOperationKind::TraceExplicitPayload
+                    : StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload;
+            addStructuralRayTracingSourceOperation(*getBuilder(), irFunc, operationKind);
+        }
+        else if (checkingState.isCallShaderMethod(decl))
+        {
+            addStructuralRayTracingSourceOperation(
+                *getBuilder(),
+                irFunc,
+                StructuralRayTracingSourceOperationKind::CallShader);
+        }
+    }
+
     LoweredValInfo lowerFuncDeclInContext(
         IRGenContext* subContext,
         IRBuilder* subBuilder,
@@ -14482,6 +14505,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
 
         addTargetRequirementDecorations(irFunc, decl);
+
+        addStructuralRayTracingSourceOperationDecoration(as<IRFunc>(irFunc), decl);
 
         bool isInline = false;
 

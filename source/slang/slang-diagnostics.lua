@@ -4634,6 +4634,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-entry-point-ambiguous-implementation",
+    38092,
+    "ambiguous structural ray-tracing stage implementation",
+    span { loc = "stageType:Decl", message = "struct '~stageType' has multiple 'invoke' implementations for the '~stage' stage" }
+)
+
+err(
     "structural-ray-tracing-stage-instance-field",
     38056,
     "stateful structural ray-tracing stage",

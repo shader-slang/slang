@@ -7,6 +7,7 @@ namespace rt
 ///
 /// Payload and shader-record types are stage-specific and therefore belong to stage contexts, not
 /// this common traversal context.
+__magic_type(RayTracingTraceContextType)
 public interface ITraceContext
 {
     /// Selects the acceleration-structure topology used by the trace call and its stages.
@@ -37,6 +38,7 @@ public interface ITraceContext
 ///   for the trace program. It must conform to `ITraceContext`.
 /// - `Record`: the type of application-defined data associated with this stage's shader binding
 ///   table (SBT) entry and read through `input.record`. Use `void` when no record data is needed.
+__magic_type(RayTracingStageContextType)
 public interface IStageContext
 {
     /// Names the trace call's context type, carried into each stage's type-level contract.
@@ -66,6 +68,7 @@ public interface IStageContext
 /// A miss shader needs no primitive-specific state because traversal found no accepted hit, so
 /// `IPayloadContext` is its complete contract and no separate `IMissContext` is needed. It may also
 /// reuse an `IHitContext` when it shares that context's payload and record types.
+__magic_type(RayTracingPayloadContextType)
 public interface IPayloadContext : IStageContext
 {
     /// Describes the mutable ray payload exchanged between a trace call and its hit or miss stage.
@@ -83,6 +86,7 @@ public interface IPayloadContext : IStageContext
 ///
 /// Conformance to `IPayloadContext` supplies the inherited `TraceContext`, `Record`, and `Payload`
 /// requirements. The hit group requires its stage contexts to equal this complete context type.
+__magic_type(RayTracingHitContextType)
 public interface IHitContext : IPayloadContext
 {
     /// Selects the geometry kind and the attributes exposed by the hit-stage inputs.
@@ -100,6 +104,7 @@ public interface IHitContext : IPayloadContext
 ///
 /// Callable data is independent from ray payload data, but the context still names the common
 /// traversal context so the schema can reject entries from a different trace program.
+__magic_type(RayTracingCallableContextType)
 public interface ICallableContext : IStageContext
 {
     /// Describes the mutable data supplied by shader code to `RayTracer.callShader`.

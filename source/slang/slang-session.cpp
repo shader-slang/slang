@@ -5,7 +5,6 @@
 #include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-ir-structural-ray-tracing.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-markdown.h"
@@ -1687,58 +1686,16 @@ RefPtr<Module> Linkage::findOrImportModule(
     DiagnosticSink* sink,
     const LoadedModuleDictionary* loadedModules)
 {
-    bool loadedFromPackagedStandardModule = false;
-    auto module = _findOrImportModuleWithoutPolicy(
-        moduleName,
-        requestingLoc,
-        sink,
-        loadedModules,
-        &loadedFromPackagedStandardModule);
-    module = _getImportableModuleOrDiagnose(module, moduleName, requestingLoc, sink);
-    if (!module)
-        return nullptr;
-
-    if (loadedFromPackagedStandardModule && moduleName->text == "slang/raytracing")
-    {
-        // Only the packaged standard-module fallback is trusted to define the compiler-owned
-        // structural ray-tracing interfaces. A module found through an ordinary user search path
-        // must remain an ordinary source module even if it uses the same import name.
-        StructuralRayTracingStageKind missingStage;
-        bool registered =
-            m_structuralRayTracingDeclRegistry.registerTrustedModule(module, &missingStage);
-        bool identifiedStageInterfaces = registered && identifyStructuralRayTracingStageInterfaces(
-                                                           module,
-                                                           m_structuralRayTracingDeclRegistry,
-                                                           &missingStage);
-        if (!identifiedStageInterfaces)
-        {
-            sink->diagnose(Diagnostics::CannotResolveImportedDecl{
-                .declName = getStructuralRayTracingStageInterfaceName(missingStage),
-                .moduleName = getText(moduleName)});
-        }
-        else
-        {
-            // Trace and callable methods are another private contract between this compiler and
-            // its packaged standard module. Unlike a missing public stage interface, a missing IR
-            // method symbol cannot result from user input and means the package was built by an
-            // incompatible compiler.
-            SLANG_RELEASE_ASSERT(identifyStructuralRayTracingSourceOperations(
-                module,
-                m_structuralRayTracingDeclRegistry));
-        }
-    }
-    return module;
+    auto module = _findOrImportModuleWithoutPolicy(moduleName, requestingLoc, sink, loadedModules);
+    return _getImportableModuleOrDiagnose(module, moduleName, requestingLoc, sink);
 }
 
 RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
     Name* moduleName,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
-    const LoadedModuleDictionary* loadedModules,
-    bool* outLoadedFromPackagedStandardModule)
+    const LoadedModuleDictionary* loadedModules)
 {
-    *outLoadedFromPackagedStandardModule = false;
-
     // Have we already loaded a module matching this name?
     //
     RefPtr<LoadedModule> previouslyLoadedModule;
@@ -2017,10 +1974,7 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
                     ModuleBlobType::IR,
                     /*isSpeculativeLoad*/ true);
                 if (module)
-                {
-                    *outLoadedFromPackagedStandardModule = true;
                     return module;
-                }
             }
         }
     }

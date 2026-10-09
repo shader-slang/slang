@@ -5380,7 +5380,11 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
 
 void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
 {
-    _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
+    // Only core declarations belong to the session-wide builtin lookup. An ordinary module's
+    // `__magic_type` annotation already preserves its special AST class through serialization;
+    // registering it globally would let unrelated modules overwrite each other's declarations.
+    if (isFromCoreModule(moduleDecl))
+        _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
 }
 
 Type* unwrapArrayType(Type* type)
@@ -5448,6 +5452,13 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
 
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
+    // Consider `TextureWrapper<vector<T, 1>>` while an extension's generic signature is being
+    // checked. Asking whether T has a structural stage conformance can re-enter that unfinished
+    // signature through inheritance and generic solving. Record checked type uses now and inspect
+    // their inheritance only after the ordinary module phases have completed all declarations.
+    SLANG_RELEASE_ASSERT(!getShared()->m_deferStructuralRayTracingTypeUses);
+    getShared()->m_deferStructuralRayTracingTypeUses = true;
+
     // When we are dealing with code from the core modules,
     // there is a potential problem where we might need to look
     // up built-in types like `Int` through the session (e.g.,
@@ -5668,6 +5679,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Furthermore, because a fully checked function will have checked
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
+    diagnosePendingStructuralRayTracingTypeUses();
 }
 
 static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)

@@ -606,6 +606,7 @@ public extension<Input : ICommonHitInput> Input
 /// The view requires `Context : IHitContext` and its declared structural stage capability. It may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_closesthit)]
+__magic_type(ClosestHitInputType)
 public struct ClosestHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -617,6 +618,7 @@ public struct ClosestHitInput<Context> : ICommonHitInput
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
     /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
     /// payload: omit the payload argument to `trace` and do not access this property for that type.
+    [__RayTracingPayload]
     public property Context.Payload payload
     {
         ref;
@@ -823,6 +825,7 @@ public extension<Context> ClosestHitInput<Context>
 /// The view requires `Context : IHitContext` and its declared structural stage capability. It may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_anyhit)]
+__magic_type(AnyHitInputType)
 public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -834,6 +837,7 @@ public struct AnyHitInput<Context> : ICommonHitInput
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
     /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
     /// payload: omit the payload argument to `trace` and do not access this property for that type.
+    [__RayTracingPayload]
     public property Context.Payload payload
     {
         ref;
@@ -1088,6 +1092,7 @@ public extension<Context> AnyHitInput<Context>
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
 [require(structural_raytracing_intersection)]
+__magic_type(IntersectionInputType)
 public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
@@ -1100,6 +1105,7 @@ public struct IntersectionInput<Context> : ICommonHitInput
     /// An ordinary user struct with no instance fields is an implicit payload and cannot be
     /// accessed through this property.
     [require(structural_raytracing_intersection_payload)]
+    [__RayTracingPayload]
     public property Context.Payload payload
     {
         ref;
@@ -1332,6 +1338,7 @@ public extension<Context> IntersectionInput<Context>
 /// may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_miss)]
+__magic_type(MissInputType)
 public struct MissInput<Context>
     where Context : IPayloadContext
 {
@@ -1343,6 +1350,7 @@ public struct MissInput<Context>
     /// The `ref` accessor allows mutation of the originating trace payload despite the input
     /// itself being an `in` view. An ordinary user struct with no instance fields is an implicit
     /// payload: omit the payload argument to `trace` and do not access this property for that type.
+    [__RayTracingPayload]
     public property Context.Payload payload
     {
         ref;
@@ -1461,6 +1469,7 @@ public extension<Context> MissInput<Context>
 /// may
 /// only be used as an input value parameter; applications cannot construct or store it.
 [require(structural_raytracing_callable)]
+__magic_type(CallableInputType)
 public struct CallableInput<Context>
     where Context : ICallableContext
 {

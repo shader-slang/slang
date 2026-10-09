@@ -7,6 +7,7 @@ namespace rt
 ///
 /// The group describes executable code and its shared context, not a physical SBT record. A host
 /// may place the same group in any number of records and provide different `Context.Record` values.
+__magic_type(RayTracingHitGroupType)
 public interface IHitGroup
 {
     /// Defines the payload, primitive, and shader-record types shared by the hit stages.
@@ -47,6 +48,7 @@ public interface IHitGroup
 /// It is sealed because the compiler reads the `HitGroupList` type pack directly; the interface
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
+__magic_type(RayTracingHitGroupListType)
 public interface IHitGroupList
 {
     /// Gives the number of hit-group types in the list.
@@ -64,6 +66,7 @@ public interface IHitGroupList
 /// It is sealed because the compiler reads the `MissShaderList` type pack directly; the interface
 /// provides no way for a user-defined list to expose its entries.
 [sealed]
+__magic_type(RayTracingMissShaderListType)
 public interface IMissShaderList
 {
     /// Gives the number of miss-stage types in the list.
@@ -81,6 +84,7 @@ public interface IMissShaderList
 /// empty list. It is sealed because the compiler reads the `CallableShaderList` type pack
 /// directly; the interface provides no way for a user-defined list to expose its entries.
 [sealed]
+__magic_type(RayTracingCallableShaderListType)
 public interface ICallableShaderList
 {
     /// Gives the number of callable-stage types in the list.
@@ -170,6 +174,7 @@ public typealias EmptyCallableShaderList = CallableShaderList<>;
 /// The schema contains no physical SBT positions. Reflection maps these entry types to target
 /// identifiers or link-specific function indices that the host writes into runtime records.
 /// Each section names an explicit list or the corresponding empty-list alias.
+__magic_type(RayTracingProgramSchemaType)
 public interface ITraceProgramSchema
 {
     /// Defines the acceleration structure and motion policy used to trace this program.

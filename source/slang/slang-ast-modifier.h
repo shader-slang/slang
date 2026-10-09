@@ -2392,4 +2392,26 @@ class FunctionInterfaceAttribute : public Attribute
     FIDDLE(...)
 };
 
+/// Identifies a structural trace declaration whose body requires structural operation lowering.
+FIDDLE()
+class RayTracingTraceAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+/// Identifies a structural callable-dispatch declaration for ordinary function lowering.
+FIDDLE()
+class RayTracingCallShaderAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+/// Identifies the payload parameter of a trace or the payload property of a stage input.
+/// Semantic checking uses this role to reject values of an implicit empty payload type.
+FIDDLE()
+class RayTracingPayloadAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 } // namespace Slang

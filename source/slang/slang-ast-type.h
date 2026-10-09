@@ -143,6 +143,190 @@ class BuiltinType : public DeclRefType
     FIDDLE(...)
 };
 
+// Compiler-recognized types that an ordinary module can declare with `__magic_type`.
+// Their complete representation is the inherited declaration reference, including any generic
+// arguments. Unlike core builtin types, their declarations are not registered globally: two
+// modules may independently declare types with the same compiler-recognized behavior.
+FIDDLE(abstract)
+class ModuleBuiltinType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// The modifier checker uses these two families to require the correct declaration kind before
+// constructing a special type. Subclasses must not require operands beyond the declaration ref.
+FIDDLE(abstract)
+class ModuleBuiltinInterfaceType : public ModuleBuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
+class ModuleBuiltinStructType : public ModuleBuiltinType
+{
+    FIDDLE(...)
+};
+
+// Executable stage interfaces share ordinary interface conformance semantics. Their type class
+// identifies the stage to frontend checking and IR lowering without a module-import registry.
+FIDDLE(abstract)
+class RayTracingStageInterfaceType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ClosestHitShaderType : public RayTracingStageInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AnyHitShaderType : public RayTracingStageInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class IntersectionShaderType : public RayTracingStageInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class MissShaderType : public RayTracingStageInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class CallableShaderType : public RayTracingStageInterfaceType
+{
+    FIDDLE(...)
+};
+
+// This contract also accepts the hardware-intersection placeholder, so it does not identify an
+// executable shader stage. IntersectionShaderType identifies the executable refinement.
+FIDDLE()
+class IntersectionStageType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingTraceContextType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingStageContextType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingPayloadContextType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingHitContextType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingCallableContextType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingIntersectionPrimitiveType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingHitGroupType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingHitGroupListType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingMissShaderListType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingCallableShaderListType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracingProgramSchemaType : public ModuleBuiltinInterfaceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ClosestHitInputType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AnyHitInputType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class IntersectionInputType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class MissInputType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class CallableInputType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class TrianglePrimitiveType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class CurvePrimitiveType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class RayTracerType : public ModuleBuiltinStructType
+{
+    FIDDLE(...)
+};
+
 FIDDLE(abstract)
 class DataLayoutType : public BuiltinType
 {

@@ -9,6 +9,7 @@ namespace rt
 /// topology and motion model. Later lowering will map that contract to a target ABI.
 ///
 /// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
+__magic_type(RayTracerType)
 public struct RayTracer<Schema>
     where Schema : ITraceProgramSchema
 {}
@@ -39,6 +40,7 @@ public extension<Schema> RayTracer<Schema>
     /// acceleration-structure type.
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -57,11 +59,12 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
     {
         __target_switch
         {
@@ -106,6 +109,7 @@ public extension<Schema> RayTracer<Schema>
     /// acceleration-structure type.
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -124,11 +128,12 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
     {
         // TODO: Lower this structural operation to Metal intersector dispatch before emission.
     }
@@ -160,6 +165,7 @@ public extension<Schema> RayTracer<Schema>
     /// acceleration-structure type.
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -178,11 +184,12 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
     {
         __target_switch
         {
@@ -236,6 +243,7 @@ public extension<Schema> RayTracer<Schema>
     /// acceleration-structure type.
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -254,11 +262,12 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
     {
         // TODO: Lower this structural operation to Metal intersector dispatch before emission.
     }
@@ -295,6 +304,7 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -320,11 +330,12 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload, let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
         where Schema.TraceContext.AccelerationStructure ==
             MultiLevelAccelerationStructure<maxLevelCount>
     {
@@ -361,6 +372,7 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -386,11 +398,12 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload, let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
         where Schema.TraceContext.AccelerationStructure ==
             MultiLevelAccelerationStructure<maxLevelCount>
     {
@@ -426,6 +439,7 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -451,11 +465,12 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload, let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
         where Schema.TraceContext.AccelerationStructure ==
             MultiLevelAccelerationStructure<maxLevelCount>
     {
@@ -492,6 +507,7 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -517,11 +533,12 @@ public extension<Schema> RayTracer<Schema>
     /// `MultiLevelAccelerationStructure<maxLevelCount>`, so the argument and schema use the same
     /// depth-parameterized handle type.
     [ForceInline]
+    [__RayTracingTrace]
     public void trace<Payload, let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
         TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
+        [__RayTracingPayload] inout Payload payload)
         where Schema.TraceContext.AccelerationStructure ==
             MultiLevelAccelerationStructure<maxLevelCount>
     {
@@ -554,6 +571,7 @@ public extension<Schema> RayTracer<Schema>
     /// `CallableContext.TraceContext == Schema.TraceContext` requires the callable stage and the
     /// descriptor to share the same traversal contract.
     [ForceInline]
+    [__RayTracingCallShader]
     public void callShader<CallableContext>(
         uint callableIndex,
         TraceProgramDescriptor<Schema> descriptor,

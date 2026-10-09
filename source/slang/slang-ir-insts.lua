@@ -765,11 +765,10 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
-			-- The trusted structural ray-tracing stage interfaces retain ordinary interface
-			-- requirements and witness-table behavior, but distinct opcodes preserve each stage's
-			-- compiler-owned identity through serialization and linking. Source lowering emits these
-			-- ops only for declarations registered from the packaged slang.raytracing module; user
-			-- interfaces with the same spelling continue to lower to `interface`.
+			-- Structural ray-tracing stage interfaces retain ordinary interface requirements and
+			-- witness-table behavior. Their magic AST types select these opcodes during normal
+			-- interface lowering, preserving stage identity through serialization and linking.
+			-- An ordinary interface with the same source name still lowers to `interface`.
 			{
 				RaytracingStageInterface = {
 					global = true,
@@ -2189,7 +2188,7 @@ local insts = {
 				},
 			},
 			{
-				-- Marks a trusted standard-module operation whose source semantics must be lowered before
+				-- Marks an annotated structural operation whose source semantics must be lowered before
 				-- ordinary entry-point ABI legalization. This decoration is deliberately non-operational.
 				structuralRayTracingSourceOperation = {
 					struct_name = "StructuralRayTracingSourceOperationDecoration",

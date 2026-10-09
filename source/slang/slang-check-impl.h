@@ -950,6 +950,32 @@ struct ConformanceCheckingContext : public RefObject
     Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
 };
 
+/// A checked source type use whose structural restrictions require completed inheritance.
+/// This retains semantic types and their source locations, not syntax that checking may replace.
+struct StructuralRayTracingTypeUse
+{
+    enum class Kind
+    {
+        Value,
+        ReadOnlyInputParameter,
+        Construction,
+        GenericArguments,
+    };
+
+    struct Argument
+    {
+        Type* type = nullptr;
+        SourceLoc location;
+    };
+
+    Kind kind = Kind::Value;
+    Type* type = nullptr;
+    SourceLoc location;
+    /// A type application's result determines whether it owns structural generic arguments.
+    Type* genericApplicationType = nullptr;
+    ShortList<Argument, 4> genericArguments;
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -1033,6 +1059,11 @@ struct SharedSemanticsContext : public RefObject
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
+
+    /// Whole-module checking records type uses until signatures and conformances are complete.
+    /// Ad hoc checking of already checked declarations evaluates these restrictions immediately.
+    bool m_deferStructuralRayTracingTypeUses = false;
+    List<StructuralRayTracingTypeUse> m_pendingStructuralRayTracingTypeUses;
 
     /// Whether semantic checking has imported the `glsl` module.
     bool m_hasImportedGLSLModule = false;
@@ -3063,6 +3094,7 @@ public:
         Type* schemaType,
         Decl* satisfyingDecl);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
+    void diagnosePendingStructuralRayTracingTypeUses();
     void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
     bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);

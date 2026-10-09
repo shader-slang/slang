@@ -1,10 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
 
-// Builtin-only modifiers (`__magic_type`/`__magic_enum`, `__builtin_type`,
-// `__builtin_requirement`) are valid only on core-module declarations and must be rejected with
-// error E31229 on a user declaration. Each struct is referenced from `main` to force its type to
-// be realized, which is the point at which an unrejected `__magic_type` would build an internal
-// type node around a bare user struct.
+// Core-only builtin annotations must be rejected with error E31229 on a user declaration.
+// Ordinary modules can use __magic_type only for concrete ModuleBuiltinType subclasses of the
+// correct declaration kind. Each struct below is referenced from main to force type realization,
+// where an unrejected annotation would build an invalid internal type node.
 
 // Unregistered AST syntax-class name.
 __magic_type(FloatType)
@@ -43,6 +42,45 @@ __magic_type(BasicExpressionType)
 ^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module
 */
 struct MyBasic
+{
+}
+
+// A stage interface AST type cannot be constructed around a struct declaration.
+__magic_type(MissShaderType)
+/*CHECK:
+^^^^^^^^^^^^ error E31229
+^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module
+*/
+struct WrongStageKind
+{
+}
+
+// A stage-input AST type likewise requires a struct declaration.
+__magic_type(MissInputType)
+/*CHECK:
+^^^^^^^^^^^^ error E31229
+^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module
+*/
+interface WrongInputKind
+{
+}
+
+// Abstract AST classes have no factory and must never reach DeclRefType::create.
+__magic_type(RayTracingStageInterfaceType)
+/*CHECK:
+^^^^^^^^^^^^ error E31229
+^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module
+*/
+interface AbstractStageKind
+{
+}
+
+__magic_type(ModuleBuiltinStructType)
+/*CHECK:
+^^^^^^^^^^^^ error E31229
+^^^^^^^^^^^^ '__magic_type' can only be applied to declarations in the core module
+*/
+struct AbstractStructKind
 {
 }
 
@@ -88,6 +126,8 @@ void main()
     MyUnknown b;
     MyConstantBuffer c;
     MyBasic d;
+    WrongStageKind wrongStage;
+    AbstractStructKind abstractStruct;
     MyEnum e;
     MyBuiltin f;
     MyIntrinsic g;

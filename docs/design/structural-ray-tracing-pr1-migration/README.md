@@ -149,6 +149,35 @@ Carry over the capability-inference fix in `CapabilityDeclReferenceVisitor`: a t
 proof contributes the capabilities of its element proofs. An empty proof contributes none. Visiting
 its constraint interface directly incorrectly imposed miss/callable requirements on empty lists.
 
+## 7. Recognize stage contracts through their AST types
+
+Stage interfaces now declare their compiler identity with `__magic_type`, for example:
+
+```slang
+__magic_type(MissShaderType)
+public interface IMissShader
+{
+    associatedtype Context : IPayloadContext;
+    void invoke(in MissInput<Context> input);
+}
+```
+
+The checked type is a `MissShaderType`; the declaration remains an ordinary interface with normal
+conformance witnesses. Ordinary interface lowering emits its stage-specific IR interface opcode.
+Context, stage-input, and schema annotations likewise identify the contracts that need compiler
+checks. Preserve these annotations when integrating the updated library.
+
+Remove the old import-time declaration registration and IR opcode replacement. Loading a module
+must not depend on the `slang.raytracing` name or its installation location. The same declarations
+work through source imports and serialized modules, and an unannotated interface named
+`IMissShader` remains an ordinary interface. Source trace and callable operations carry annotations
+that normal lowering turns into their existing structural-operation IR metadata.
+
+Module-defined magic types retain their checked declaration references, including generic
+arguments. They are not registered in the core library's global magic-type map. Resolve a stage's
+associated types and `invoke` implementation from its selected conformance witness so generic
+specializations and independently declared contracts retain their own identities.
+
 ## Additional API and integration updates
 
 These are additive declarations or behavior corrections rather than the main source migrations:

@@ -1792,12 +1792,11 @@ static CapabilitySet _getEntryPointStageCapabilities(EntryPoint* entryPoint)
     // Metal has no native miss entry point: later lowering synthesizes dispatch for that role.
     // Consequently, the native profile capability (`miss`, which also requires native ray
     // tracing) is not the right target context for checking the source implementation. The
-    // trusted stage interface already declares the exact logical alternatives accepted by the
+    // selected stage interface already declares the exact logical alternatives accepted by the
     // source contract, including Metal's synthesized path, so keep that declaration as the single
     // source of truth instead of duplicating a stage-to-capability table in C++.
     auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
-    auto& registry = entryPoint->getLinkage()->getStructuralRayTracingDeclRegistry();
-    auto stageInterface = registry.getStageInterface(structuralInfo.stageKind);
+    auto stageInterface = structuralInfo.stageInterface;
     SLANG_RELEASE_ASSERT(stageInterface && stageInterface->inferredCapabilityRequirements);
     return CapabilitySet{stageInterface->inferredCapabilityRequirements};
 }

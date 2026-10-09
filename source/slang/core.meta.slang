@@ -5063,6 +5063,18 @@ attribute_syntax [PreferCheckpoint] : PreferCheckpointAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [KnownBuiltin(name : int)] : KnownBuiltinAttribute;
 
+// Structural operations carry their identity through ordinary AST and IR serialization.
+// These internal attributes do not require a special compilation mode or import hook.
+__attributeTarget(FuncDecl)
+attribute_syntax [__RayTracingTrace] : RayTracingTraceAttribute;
+
+__attributeTarget(FuncDecl)
+attribute_syntax [__RayTracingCallShader] : RayTracingCallShaderAttribute;
+
+__attributeTarget(ParamDecl)
+__attributeTarget(PropertyDecl)
+attribute_syntax [__RayTracingPayload] : RayTracingPayloadAttribute;
+
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
 

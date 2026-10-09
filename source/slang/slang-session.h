@@ -410,13 +410,13 @@ public:
 
     SourceManager* getSourceManager() { return m_sourceManager; }
 
-    StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry()
+    StructuralRayTracingCheckingState& getStructuralRayTracingCheckingState()
     {
-        return m_structuralRayTracingDeclRegistry;
+        return m_structuralRayTracingCheckingState;
     }
-    const StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry() const
+    const StructuralRayTracingCheckingState& getStructuralRayTracingCheckingState() const
     {
-        return m_structuralRayTracingDeclRegistry;
+        return m_structuralRayTracingCheckingState;
     }
 
     /// Override the source manager for the linkage.
@@ -507,14 +507,11 @@ private:
     ///
     /// This is the implementation of `findOrImportModule`; callers must use that public wrapper so
     /// every successful discovery passes through `_getImportableModuleOrDiagnose`.
-    /// `outLoadedFromPackagedStandardModule` reports the trusted provenance needed to authenticate
-    /// compiler-owned standard-module declarations after import policy accepts the module.
     RefPtr<Module> _findOrImportModuleWithoutPolicy(
         Name* moduleName,
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink,
-        const LoadedModuleDictionary* loadedModules,
-        bool* outLoadedFromPackagedStandardModule);
+        const LoadedModuleDictionary* loadedModules);
 
     /// Returns `module` when it may be imported, or `nullptr` when it is absent or rejected.
     ///
@@ -536,6 +533,6 @@ private:
 
     RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
-    StructuralRayTracingDeclRegistry m_structuralRayTracingDeclRegistry;
+    StructuralRayTracingCheckingState m_structuralRayTracingCheckingState;
 };
 } // namespace Slang
