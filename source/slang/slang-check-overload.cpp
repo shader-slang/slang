@@ -1667,6 +1667,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->functionExpr = baseExpr;
+
+                // `ConstructLookupResultExpr` can diagnose an invalid member reference (e.g. a
+                // non-static member named from a static function) after overload selection,
+                // which leaves a valid candidate result type but a callee with `ErrorType`.
+                if (IsErrorExpr(baseExpr))
+                    return CreateErrorExpr(callExpr);
+
                 callExpr->type = QualType(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
