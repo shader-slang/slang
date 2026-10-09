@@ -59,10 +59,15 @@ jobs:
           config: release
           build-llvm: false
 
-      - name: Build LLVM from source
-        shell: bash
-        run: |
-          ./external/build-llvm.sh --install-prefix "$(pwd)/build/llvm-project-install"
+      - name: Restore or build LLVM
+        id: llvm
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+          upload-if-missing: "false"
 
       - name: Validate installed LLVM and Clang packages
         shell: bash
@@ -74,6 +79,7 @@ jobs:
           find_package(LLVM REQUIRED CONFIG)
           find_package(Clang REQUIRED CONFIG)
           add_executable(llvm-prebuilt-smoke main.cpp)
+          target_compile_features(llvm-prebuilt-smoke PRIVATE cxx_std_20)
           target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
           target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
           EOF
@@ -104,6 +110,7 @@ jobs:
             '
 
       - name: Archive new prebuilt
+        if: steps.llvm.outputs.cache-hit != 'true'
         id: archive
         shell: bash
         env:
@@ -126,6 +133,7 @@ jobs:
           echo "path=$archive_path" >> "$GITHUB_OUTPUT"
 
       - name: Stage new prebuilt for publication
+        if: steps.llvm.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
