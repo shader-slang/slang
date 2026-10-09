@@ -400,6 +400,21 @@ dashboards, any non-Slang-linked tool) to embed a Slang process to
 query the metadata, defeating the point of shipping precompiled
 shaders without the toolchain.
 
+## LCOV projection
+
+Line entries retain per-statement counts, including when several entries share
+one counter. Count-mode export sums every line entry at a source line, so three
+statements executed four times yield 12. This aggregate is not a gcov-style
+physical-line visit frequency. Boolean-mode line export instead reports whether
+any entry executed. The compiler's IR coalescing and branch-site definitions
+are independent of this export policy.
+
+The exporters also provide missing `DA` records for function and branch locations
+so that function-only and branch-only metadata can be rendered by strict LCOV
+consumers. Existing statement counts remain authoritative. See
+[How to interpret LCOV counts](../../tools/shader-coverage/README.md#how-to-interpret-lcov-counts)
+for the fallback precedence, unevaluated-branch representation, and examples.
+
 ## Host integration
 
 The practical workflow walkthroughs for both channels — the

@@ -1,6 +1,6 @@
 # Shader Coverage Instrumentation
 
-A gcov-style coverage facility for shaders compiled by Slang. Instruments
+A statement-event coverage facility for shaders compiled by Slang, with LCOV export. Instruments
 a `.slang` shader so that each executed source statement increments a
 counter at runtime; the counter buffer is read back by the host and
 converted to LCOV `.info` for rendering by `genhtml`, Codecov, VS
@@ -82,6 +82,60 @@ render a report:
   `--backend=cpu|cuda|vulkan|metal`, showing that only the
   binding step differs per backend and that all four produce
   identical counters.
+
+## How to interpret LCOV counts
+
+In count mode, a line's `DA` value is the **sum of its statement-entry execution
+counts**, not a count of visits to the physical line. For example:
+
+```slang
+int y = x; y += 2; y *= 3;
+```
+
+Four executions contribute `4 + 4 + 4 = 12`. A one-line `if` includes events
+for its condition statement and its selected body statements. Mutually
+exclusive arms sharing a line contribute their own executions: two hits in
+each arm give four. These aggregates deliberately differ from gcov's line
+frequencies. A nonzero value means at least one represented statement executed;
+it does not prove that every statement or branch on the line executed.
+
+The compiler can share one counter among statements that execute together.
+Each metadata entry still represents a separate event, so read and sum **every
+entry**, even when several entries reference the same `counterIndex`. Neither
+counter-slot deduplication nor taking the maximum preserves this aggregate.
+The raw metadata retains the individual statement counts and column positions.
+
+In boolean mode (`-trace-coverage-boolean`), `DA` is `0` or `1`, indicating
+whether any represented event executed. It carries no execution frequency.
+
+Function-only and branch-only compilations can legitimately have no statement
+entries. To support strict `genhtml`, the exporters fill missing `DA` records
+at `FN`/`BRDA` locations using existing function-entry or branch-outcome counts.
+Actual statement aggregates take precedence, including zero. If both other
+kinds occupy a missing line, the sum of function entries takes precedence over
+the sum of branch outcomes. Boolean mode reduces these fallback records to
+hit/miss too. These compatibility records do not imply that a statement marker
+exists there; line percentages from different coverage configurations therefore
+need not have the same denominator.
+
+For `BRDA`, an evaluated decision's untaken outcome is `0`. If every outcome
+of a site is zero, its outcomes are emitted as `-` (unevaluated). Site evaluation
+uses metadata-wide site IDs, even when source remapping puts switch case labels
+on different lines or files.
+This export rule preserves the compiler's existing branch-site definitions;
+it does not add source-predicate or right-operand coverage.
+
+The exporter regression tests can be run with:
+
+```sh
+python3 tools/shader-coverage/test_slang_coverage_to_lcov.py
+python3 tools/shader-coverage/test_lcov_export.py \
+    --slangc build/Debug/bin/slangc --output-dir build/coverage-lcov-test
+```
+
+The second command requires `clang++` (or `--cxx PATH`) and `genhtml`. It
+executes the shared C++/Slang fixture across coverage kinds, counter widths,
+and recording modes, preserving the raw counts and generated reports.
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -371,7 +425,7 @@ same source location across two compiles or shader variants, and one
 slot may serve several source locations. Aggregate by the source
 attribution in the manifest or metadata, never by slot index.
 
-The counter buffer and the manifest must come from the *same* compile.
+The counter buffer and the manifest must come from the _same_ compile.
 `slang-coverage-to-lcov.py` enforces this by requiring the buffer size
 to match `counter_count` exactly; a mismatch is an error rather than a
 silently truncated read, because a prefix of a stale buffer produces

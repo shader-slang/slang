@@ -159,6 +159,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRF:1\n"
             "BRH:1\n"
             "DA:12,12\n"
+            "DA:13,11\n"
             "end_of_record\n",
         )
         # Counterless source entries stay in the manifest/metadata, but
@@ -225,6 +226,8 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRF:2\n"
             "BRH:1\n"
             "DA:10,5\n"
+            "DA:11,3\n"
+            "DA:12,2\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -255,6 +258,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "FNDA:3,_S6helper\n"
             "FNF:1\n"
             "FNH:1\n"
+            "DA:11,3\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -305,6 +309,8 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "FNDA:0,beta\n"
             "FNF:3\n"
             "FNH:2\n"
+            "DA:10,3\n"
+            "DA:20,5\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -343,6 +349,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "FNDA:8,helper\n"
             "FNF:1\n"
             "FNH:1\n"
+            "DA:12,8\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -395,6 +402,8 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRDA:21,1,1,4\n"
             "BRF:1\n"
             "BRH:1\n"
+            "DA:20,3\n"
+            "DA:21,4\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -414,13 +423,15 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             ],
         }
 
-        result = self.run_converter(manifest, "3\n")
+        for mode in ["count", "boolean"]:
+            manifest["entries"][0]["mode"] = mode
+            result = self.run_converter(manifest, "3\n")
 
-        self.assertEqual(result.stdout, "TN:shader_coverage\n")
-        self.assertIn(
-            "note: skipped 1 function entries without a name not representable in LCOV",
-            result.stderr,
-        )
+            self.assertEqual(result.stdout, "TN:shader_coverage\n")
+            self.assertIn(
+                "note: skipped 1 function entries without a name not representable in LCOV",
+                result.stderr,
+            )
 
     def test_reports_unrepresented_v2_kinds(self):
         manifest = {
@@ -437,12 +448,15 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             ],
         }
 
-        result = self.run_converter(manifest, "5\n")
+        for mode in ["count", "boolean"]:
+            manifest["entries"][0]["mode"] = mode
+            result = self.run_converter(manifest, "5\n")
 
-        self.assertIn(
-            "note: skipped 1 entries of kind 'region' not representable in LCOV",
-            result.stderr,
-        )
+            self.assertIn(
+                "note: skipped 1 entries of kind 'region' not representable in LCOV",
+                result.stderr,
+            )
+            self.assertEqual(result.stdout, "TN:shader_coverage\n")
 
     def test_rejects_non_string_v2_kind(self):
         manifest = {
@@ -492,7 +506,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             result.stderr,
         )
 
-    def test_emits_zero_hit_branch_arm_as_zero(self):
+    def test_emits_unevaluated_branch_site_as_dash(self):
         manifest = {
             "version": 2,
             "counter_count": 1,
@@ -511,7 +525,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         result = self.run_converter(manifest, "0\n")
 
-        self.assertIn("BRDA:13,1,1,0\n", result.stdout)
+        self.assertIn("BRDA:13,1,1,-\n", result.stdout)
         self.assertIn("BRH:0\n", result.stdout)
 
     def test_rejects_out_of_range_v2_counter_index(self):
@@ -576,6 +590,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertIn("BRDA:12,1,1,3\n", result.stdout)
         self.assertIn("BRDA:12,2,1,4\n", result.stdout)
+        self.assertIn("DA:12,7\n", result.stdout)
         self.assertIn("BRF:2\n", result.stdout)
         self.assertIn("BRH:2\n", result.stdout)
 
@@ -614,6 +629,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
             "BRDA:12,1,1,7\n"
             "BRF:1\n"
             "BRH:1\n"
+            "DA:12,7\n"
             "end_of_record\n",
         )
         self.assertEqual(result.stderr, "")
@@ -863,6 +879,155 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         # dedicated slots holding 5 each.
         self.assertIn("DA:12,10\n", result.stdout)
         self.assertEqual(result.stderr, "")
+
+    def test_statement_aggregation_and_boolean_union(self):
+        # Sharing a slot is an optimization: three statement entries still
+        # contribute three counts. Disjoint arms also sum, rather than max.
+        for stride, fmt in [(4, "I"), (8, "Q")]:
+            for mode, values, expected in [
+                ("count", [4, 2, 2], [12, 4]),
+                ("boolean", [1, 1, 1], [1, 1]),
+                ("boolean", [0, 0, 0], [0, 0]),
+            ]:
+                with self.subTest(stride=stride, mode=mode):
+                    manifest = {
+                        "version": 2,
+                        "counter_count": 3,
+                        "buffer": {"element_stride": stride},
+                        "entries": [
+                            {
+                                "kind": "line",
+                                "counter": counter,
+                                "file": "shader.slang",
+                                "line": line,
+                                "mode": mode,
+                            }
+                            for line, counter in [
+                                (10, 0),
+                                (10, 0),
+                                (10, 0),
+                                (11, 1),
+                                (11, 2),
+                            ]
+                        ],
+                    }
+                    result = self.run_converter_binary(
+                        manifest, struct.pack("<3" + fmt, *values)
+                    )
+                    self.assertIn(f"DA:10,{expected[0]}\n", result.stdout)
+                    self.assertIn(f"DA:11,{expected[1]}\n", result.stdout)
+
+    def test_fallback_lines_preserve_actual_statement_counts(self):
+        for mode in ["count", "boolean"]:
+            with self.subTest(mode=mode):
+                manifest = {
+                    "version": 2,
+                    "counter_count": 6,
+                    "entries": [
+                        {
+                            "kind": "function",
+                            "counter": 0,
+                            "file": "shader.slang",
+                            "line": 2,
+                            "function": "first",
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "function",
+                            "counter": 1,
+                            "file": "shader.slang",
+                            "line": 2,
+                            "function": "second",
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "branch",
+                            "counter": 2,
+                            "file": "shader.slang",
+                            "line": 5,
+                            "branch_site": 1,
+                            "branch_arm": 1,
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "branch",
+                            "counter": 3,
+                            "file": "shader.slang",
+                            "line": 5,
+                            "branch_site": 1,
+                            "branch_arm": 2,
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "function",
+                            "counter": 4,
+                            "file": "shader.slang",
+                            "line": 8,
+                            "function": "withStatement",
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "line",
+                            "counter": 5,
+                            "file": "shader.slang",
+                            "line": 8,
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "branch",
+                            "counter": 2,
+                            "file": "shader.slang",
+                            "line": 2,
+                            "branch_site": 2,
+                            "branch_arm": 1,
+                            "mode": mode,
+                        },
+                        {
+                            "kind": "branch",
+                            "counter": 3,
+                            "file": "shader.slang",
+                            "line": 8,
+                            "branch_site": 3,
+                            "branch_arm": 1,
+                            "mode": mode,
+                        },
+                    ],
+                }
+                result = self.run_converter(
+                    manifest, "2 3 1 4 9 0" if mode == "count" else "1 1 1 1 1 0"
+                )
+                self.assertIn(f"DA:2,{5 if mode == 'count' else 1}\n", result.stdout)
+                self.assertIn(f"DA:5,{5 if mode == 'count' else 1}\n", result.stdout)
+                # An actual zero line entry is authoritative, even if another
+                # coverage kind at the same location has a nonzero count.
+                self.assertIn("DA:8,0\n", result.stdout)
+
+    def test_site_evaluation_spans_source_locations(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 4,
+            "entries": [
+                {
+                    "kind": "branch", "counter": counter, "file": file,
+                    "line": line, "branch_site": site, "branch_arm": arm,
+                }
+                for counter, file, line, site, arm in [
+                    (0, "a.slang", 5, 1, 1), (1, "b.slang", 6, 1, 2),
+                    (2, "a.slang", 5, 2, 1), (3, "b.slang", 5, 2, 2),
+                ]
+            ],
+        }
+        result = self.run_converter(manifest, "0 7 0 0")
+        a, b = result.stdout.split("SF:b.slang")
+        # IDs are metadata-wide. Source remapping of a switch's case labels
+        # must not turn an evaluated site's zero arm into an unevaluated site.
+        self.assertIn("BRDA:5,1,1,0\n", a)
+        self.assertIn("BRDA:6,1,2,7\n", b)
+        self.assertIn("BRDA:5,2,1,-\n", a)
+        self.assertIn("BRDA:5,2,2,-\n", b)
+        self.assertIn("DA:5,0\n", a)
+        self.assertIn("DA:5,0\n", b)
+        self.assertIn("DA:6,7\n", b)
 
     def test_binary_counters_unsupported_stride_errors(self):
         # The converter only handles 4-byte and 8-byte counters today.
