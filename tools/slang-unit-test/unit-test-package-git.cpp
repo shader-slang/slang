@@ -393,11 +393,18 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
         error,
         cache)));
 
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, "version 2")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(cache, "move v1")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(cache, "v1")));
-    String movedCommit;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(cache, movedCommit, error)));
+    List<String> branchArguments;
+    branchArguments.add("-C");
+    branchArguments.add(checkout);
+    branchArguments.add("checkout");
+    branchArguments.add("-b");
+    branchArguments.add("local");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(branchArguments)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(checkout, "local.txt"), "local\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAll(checkout, "local branch")));
+    String localCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, localCommit, error)));
 
     SLANG_CHECK(SLANG_FAILED(materializeLockedRevision(
         "unused-origin",
@@ -409,28 +416,25 @@ SLANG_UNIT_TEST(PackageGitMaterializationRejectsUnconfirmedRefMove)
         didMaterialize,
         error,
         cache)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without confirmation")) >= 0);
-    String checkoutTag;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTag, error)));
-    SLANG_CHECK(checkoutTag == lockedCommit);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("without --clean")) >= 0);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
         "unused-origin",
         lockedCommit,
         lockedCommit,
         checkout,
-        false,
         true,
+        false,
         didMaterialize,
         error,
         cache)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTag, error)));
-    SLANG_CHECK(checkoutTag == movedCommit);
     String checkoutHead;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutHead, error)));
     SLANG_CHECK(checkoutHead == lockedCommit);
+    String branchCommit;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(cache, "refs/heads/local", branchCommit, error)));
+    SLANG_CHECK(branchCommit == localCommit);
 }
 
 SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
@@ -478,10 +482,8 @@ SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
         repository)));
     SLANG_CHECK(didMaterialize);
 
-    // Once the checkout is clean at the target commit, materialization needs only its local state,
-    // even when the previous lock still names an older commit. Removing the remote makes this test
-    // fail if the implementation tries to fetch again.
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::removeNonEmpty(repository)));
+    // The checkout is a worktree of the permanent repository, so a later materialization of the
+    // same commit does not fetch or replace it.
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
         repository,
         commit,
@@ -491,7 +493,7 @@ SLANG_UNIT_TEST(PackageGitSkipsAlreadyMaterializedRevision)
         false,
         didMaterialize,
         error,
-        checkout)));
+        repository)));
     SLANG_CHECK(!didMaterialize);
 }
 
@@ -1904,7 +1906,7 @@ SLANG_UNIT_TEST(PackageToolStatusReportsMissingUpstreamCacheWithoutRemoteAccess)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
 
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(Path::removeNonEmpty(Path::combine(temp.path, ".slang/cache/noise"))));
+        SLANG_SUCCEEDED(Path::removeNonEmpty(packageRepositoryPath(temp.path, repository))));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::removeNonEmpty(repository)));
 
     String statusReport;
@@ -2398,8 +2400,8 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedTag)
 
     String checkout = Path::combine(temp.path, "deps/noise");
     String lockedCommit;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", lockedCommit, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(checkout, "refs/slang-cache/tags/v1", lockedCommit, error)));
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         _writeFile(Path::combine(repository, "src/noise.slang"), "module noise;\n// retagged\n")));
@@ -2407,26 +2409,26 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedTag)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     String movedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, movedCommit, error)));
+    List<String> userTagArguments;
+    userTagArguments.add("-C");
+    userTagArguments.add(checkout);
+    userTagArguments.add("tag");
+    userTagArguments.add("kept-tag");
+    userTagArguments.add(lockedCommit);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(userTagArguments)));
 
     const char* fetchArguments[] = {"slang-package", "fetch"};
-    SLANG_CHECK(SLANG_FAILED(
+    SLANG_CHECK(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
 
-    String checkoutTagCommit;
+    String mirrorTag;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(checkout, "refs/slang-cache/tags/v1", mirrorTag, error)));
+    SLANG_CHECK(mirrorTag == movedCommit);
+    String keptTag;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTagCommit, error)));
-    SLANG_CHECK(checkoutTagCommit == lockedCommit);
-
-    const char* confirmedFetchArguments[] = {"slang-package", "fetch", "--yes"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(confirmedFetchArguments),
-        confirmedFetchArguments,
-        error)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/v1", checkoutTagCommit, error)));
-    SLANG_CHECK(checkoutTagCommit == movedCommit);
+        SLANG_SUCCEEDED(resolveLocalRevision(checkout, "refs/tags/kept-tag", keptTag, error)));
+    SLANG_CHECK(keptTag == lockedCommit);
 
     String checkoutHead;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutHead, error)));
@@ -2451,29 +2453,10 @@ SLANG_UNIT_TEST(PackageToolFetchRequiresConfirmationToStageMovedBranch)
     String movedCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(repository, movedCommit, error)));
 
-    StdoutCapture stdoutCapture;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
     const char* fetchArguments[] = {"slang-package", "fetch"};
-    SlangResult fetchResult =
-        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error);
-    String stdoutText;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
-    SLANG_CHECK(SLANG_FAILED(fetchResult));
-    SLANG_CHECK(
-        stdoutText.getUnownedSlice().indexOf(
-            UnownedStringSlice("noise: refs/remotes/origin/main")) >= 0);
-
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     String checkoutBranch;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        resolveLocalRevision(checkout, "refs/remotes/origin/main", checkoutBranch, error)));
-    SLANG_CHECK(checkoutBranch == lockedCommit);
-
-    const char* confirmedFetchArguments[] = {"slang-package", "fetch", "--yes"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(confirmedFetchArguments),
-        confirmedFetchArguments,
-        error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         resolveLocalRevision(checkout, "refs/remotes/origin/main", checkoutBranch, error)));
     SLANG_CHECK(checkoutBranch == movedCommit);
@@ -2490,6 +2473,20 @@ SLANG_UNIT_TEST(PackageToolFetchRejectsDeletedUpstreamTagWithoutDeletingCheckout
     String error;
     String repository = Path::combine(temp.path, "upstream-noise");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initRootWithGitNoise(temp.path, repository, error)));
+
+    String lockedCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveLocalRevision(
+        Path::combine(temp.path, "deps/noise"),
+        "refs/slang-cache/tags/v1",
+        lockedCommit,
+        error)));
+    List<String> keepArguments;
+    keepArguments.add("-C");
+    keepArguments.add(Path::combine(temp.path, "deps/noise"));
+    keepArguments.add("tag");
+    keepArguments.add("v1");
+    keepArguments.add(lockedCommit);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGitChecked(keepArguments)));
 
     List<String> deleteTagArguments;
     deleteTagArguments.add("-C");
@@ -2557,17 +2554,9 @@ SLANG_UNIT_TEST(PackageToolFetchReportsAllRepositoriesWithMovedRefs)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_forceAnnotatedTag(repository, "v1")));
     }
 
-    StdoutCapture stdoutCapture;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
     const char* fetchArguments[] = {"slang-package", "fetch"};
-    SlangResult fetchResult =
-        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error);
-    String stdoutText;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
-    SLANG_CHECK(SLANG_FAILED(fetchResult));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
-    SLANG_CHECK(stdoutText.getUnownedSlice().indexOf(UnownedStringSlice("noise:")) >= 0);
-    SLANG_CHECK(stdoutText.getUnownedSlice().indexOf(UnownedStringSlice("color:")) >= 0);
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
 }
 
 SLANG_UNIT_TEST(PackageToolFetchStagesNewTagWithoutConfirmation)
@@ -2595,7 +2584,7 @@ SLANG_UNIT_TEST(PackageToolFetchStagesNewTagWithoutConfirmation)
     String tagCommit;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveLocalRevision(
         Path::combine(temp.path, "deps/noise"),
-        "refs/tags/v1.0.1",
+        "refs/slang-cache/tags/v1.0.1",
         tagCommit,
         error)));
     String upstreamCommit;

@@ -585,7 +585,7 @@ struct ResolvedPackageLoad
 /// path dependency. Stage 1 must check those identities before it clears search paths or clones
 /// `deps/noise`. A Git pin is therefore read at its locked commit from whichever repository
 /// already has that revision, preferring `deps/NAME` as the workspace repository and falling back
-/// to `.slang/cache` before a newly selected package has been staged there.
+/// to `.slang/repositories` before a newly selected package has been checked out there.
 /// Nested path packages of that Git tree are read out of the same repository with `git show`.
 /// Overrides and ordinary path packages still use the real directory.
 static SlangResult _loadResolvedPackage(
@@ -700,17 +700,15 @@ static SlangResult _loadResolvedPackage(
     // working-tree edits change the graph. A cache is the fallback for a newly selected commit
     // that has not been staged into `deps/NAME` yet.
     String depsRoot = Path::combine(projectRoot, depsDirectory, package.name);
-    String canonicalCache =
-        Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
-    String cachePath = canonicalCache;
+    String cachePath =
+        package.git.getLength() ? packageRepositoryPath(projectRoot, package.git) : String();
     String gitError;
     String manifestText;
     String gitRepositoryPath;
     if (package.git.getLength())
     {
         String located;
-        if (SLANG_SUCCEEDED(
-                locatePreparedPackageCache(canonicalCache, package.git, located, gitError)))
+        if (SLANG_SUCCEEDED(locatePreparedPackageCache(cachePath, package.git, located, gitError)))
             cachePath = located;
     }
     if (SLANG_SUCCEEDED(
@@ -821,17 +819,8 @@ static SlangResult _validateUpstreamResolvedProject(
             isEditedLockedPackage(package))
             continue;
 
-        String canonicalCache =
-            Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
-        String cachePath;
+        String cachePath = packageRepositoryPath(projectRoot, package.git);
         String packageError;
-        if (SLANG_FAILED(
-                locatePreparedPackageCache(canonicalCache, package.git, cachePath, packageError)))
-        {
-            outError = String("Upstream cache for package '") + package.name +
-                       "' does not contain locked commit " + package.commit + ". " + packageError;
-            return SLANG_FAIL;
-        }
         SlangResult cacheResult =
             refreshMode == CacheRefreshMode::FromOrigin
                 ? refreshPackageCache(projectRoot, package.git, cachePath, packageError, assumeYes)

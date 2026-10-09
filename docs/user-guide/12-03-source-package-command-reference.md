@@ -361,9 +361,9 @@ slang package fetch [--clean] [--yes] [--skip-validate] [--remap-urls <url>]
 ### Description
 
 Reproduce the committed lock without selecting newer versions. The command refreshes each Git
-repository under `.slang/cache` from its origin, verifies that every locked ref and commit is
-available there, validates the locked graph, and materializes Git packages at their locked commits
-under the configured dependency directory.
+repository under `.slang/repositories` from its origin, verifies that every locked ref and commit
+is available there, validates the locked graph, and checks out a worktree of that repository at
+the locked commit.
 
 An edited checkout is left on its recorded branch. A clean tool-owned checkout already at
 the correct origin and commit is left untouched. The command regenerates
@@ -420,8 +420,8 @@ Resolve all manifests reachable from the workspace, select compatible package ve
 proposed graph, materialize it, and rewrite `slang-package-lock.json`. This is the command that
 takes newer compatible releases and applies publisher retractions.
 
-Online update refreshes Git repositories only under `.slang/cache`; resolution and workspace
-materialization then use those caches. Before changing `deps/` or the lock, update verifies graph
+Online update refreshes Git repositories only under `.slang/repositories`; resolution then checks
+out a worktree for each selected URL. Before changing `deps/` or the lock, update verifies graph
 identity, dependency constraints, workspace exclusions, toolchain
 requirements, and cache availability.
 
@@ -434,14 +434,17 @@ After materialization, update checks publishability for new or changed Git trees
 module layout and import-path uniqueness across the complete selected graph. The
 new lock is written only after those checks succeed.
 
-When the proposed lock differs, a package Git URL would change, a Git repository would be deleted,
-local checkout state would be discarded, or an existing named Git ref in `deps/` would move,
-update asks for confirmation. Declining interactively changes nothing and succeeds. A
+When the proposed lock differs, a package Git URL would change, a separate Git repository would be
+deleted, local checkout state would be discarded, or an existing named Git ref in a separate
+`deps/` repository would move, update asks for confirmation. Declining interactively changes
+nothing and succeeds. A
 non-interactive invocation that requires confirmation fails unless `--yes` is given.
 
-A Git repository is not deleted while it has commits or tags that are not on one of its remotes.
-The command lists those commits and tags with the confirmation. `--yes` approves that deletion
-after the list is printed. If the remotes cannot be contacted, the repository is left in place.
+A separate Git repository is not deleted while it has commits or tags that are not on one of its
+remotes. The command lists those commits and tags with the confirmation. `--yes` approves that
+deletion after the list is printed. If the remotes cannot be contacted, the repository is left in
+place. Removing a worktree does not delete the permanent repository under `.slang/repositories`,
+so branches, tags, and commits there are kept without that list.
 
 When the lock records a remap index, `update` reads that index and resolves every listed package
 name from its Git URL. Names the index does not list keep the manifest URL. The manifest itself is
@@ -467,12 +470,13 @@ package is not moved onto another URL.
 
 `--clean`
 : Permit replacement of dirty or otherwise mismatched tool-owned checkouts. The affected
-checkouts are listed for confirmation. Commits and tags that are not on a remote are listed
-before that repository is deleted. It cannot be combined with `--dry-run`.
+checkouts are listed for confirmation. Uncommitted files in a worktree are discarded; the permanent
+repository is kept. Commits and tags that are not on a remote are listed before a separate Git
+repository is deleted. It cannot be combined with `--dry-run`.
 
 `--dry-run`
 : Resolve and validate the candidate graph and print the proposed lock changes without writing the
-lock or dependency checkouts. An online dry run may refresh `.slang/cache`. It cannot prove that
+lock or dependency checkouts. An online dry run may refresh `.slang/repositories`. It cannot prove that
 unmaterialized remote source satisfies source-layout checks.
 
 `--minimal`
@@ -480,7 +484,7 @@ unmaterialized remote source satisfies source-layout checks.
 
 `--offline`
 : Do not clone or fetch any package origin. Resolve and materialize exclusively from
-`.slang/cache`. A missing cache, ref, or object is an error. Combine with `--dry-run` for a
+`.slang/repositories`. A missing repository, ref, or object is an error. Combine with `--dry-run` for a
 network-free preview.
 
 `--yes`
@@ -553,7 +557,7 @@ There are four related sets of checks:
    - All `tools.slang-toolchain` constraints in the selected graph accept the installed compiler.
 
 2. **Upstream-cache checks**
-   - Each Git cache is refreshed from its origin.
+   - Each package repository is refreshed from its origin.
    - Every locked Git ref and locked commit exists in the cache. A moved ref may now resolve to a
      different commit without invalidating the commit identity already recorded by the lock.
    - A commit present only in `deps/<name>` does not pass. Push it to the origin so the cache can
@@ -587,7 +591,7 @@ slang package validate
 
 Validate the workspace package as an application sharing gate. It applies source-layout and
 publishability checks to the workspace, validates the materialized locked graph, and refreshes and
-validates all locked Git cache entries.
+validates all locked package repositories.
 
 To pass:
 
@@ -595,7 +599,7 @@ To pass:
 - keep every exported source file in the required `module`/`implementing` layout;
 - have no edited dependency;
 - when dependencies exist, have a current `slang-package-lock.json`; and
-- push every locked Git commit to its origin so it can be fetched into `.slang/cache`.
+- push every locked Git commit to its origin so it can be fetched into `.slang/repositories`.
 
 A package with no dependencies does not need a lock. A pinned release row can be committed. An
 edited lock cannot. A non-empty `slang-package-overlay.json` is an error.
@@ -625,7 +629,7 @@ slang package validate --all
 ```
 
 Apply the named-package sharing check to every package in the lock and report package-tree
-failures together. It refreshes and validates the relevant Git caches but does not materialize
+failures together. It refreshes and validates the relevant package repositories but does not materialize
 trees.
 
 `--all` cannot be combined with a package name. With no lock and no dependencies, it reports that
@@ -749,8 +753,9 @@ Confirmation can cover:
 - a new or changed lock during `update`;
 - a package Git URL changed by a remap index, or restored by `update --no-remap`;
 - checkout state discarded by `--clean`;
-- commits or tags that are not on a remote, before the Git repository that holds them is deleted;
-- existing tags or origin-tracking branches in `deps/` that would move; and
+- commits or tags that are not on a remote, before a separate Git repository that holds them is
+  deleted;
+- existing tags or origin-tracking branches in a separate `deps/` Git repository that would move; and
 - an `unedit` ending that would leave the branch or move `HEAD`. `unedit` has no `--yes`.
 
 ## Files
@@ -775,9 +780,11 @@ rejected.
 : Gitignored generated list of absolute dependency export directories. `fetch` and `update`
 regenerate it.
 
-`.slang/cache/`
-: Workspace-local Git repositories refreshed from package origins. Online resolution updates this
-cache; offline resolution requires it.
+`.slang/repositories/`
+: One permanent bare Git repository for each exact package URL. The directory name is the URL's
+repository name plus an 8-character hash of that URL. Published branches are `refs/remotes/origin/*`
+and published tags are `refs/slang-cache/tags/*`. `deps/` checkouts are worktrees of these
+repositories. Online resolution updates them; offline resolution requires them.
 
 `deps/`
 : Default materialization directory for locked Git checkouts. The path is configured by

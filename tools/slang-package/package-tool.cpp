@@ -56,7 +56,8 @@ static void _printHelp(bool experimental = false)
         "                    --remap-urls records an index and resolves listed packages from it.\n"
         "  update [--clean] [--dry-run] [--minimal] [--offline] [--yes]\n"
         "         [--skip-validate] [--remap-urls <url> | --no-remap]\n"
-        "                    Re-resolve and rewrite the lock. --offline uses .slang/cache only.\n"
+        "                    Re-resolve and rewrite the lock. --offline uses .slang/repositories "
+        "only.\n"
         "                    A lock remap index is reused. --no-remap clears it.\n"
         "  status            Lock and graph readiness (details only when dirty).\n"
         "  validate [name] [--all]\n"
@@ -364,11 +365,7 @@ static SlangResult _materialize(
             }
         }
         bool didMaterialize = false;
-        String canonicalCache =
-            Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
-        String cachePath;
-        SLANG_RETURN_ON_FAIL(
-            locatePreparedPackageCache(canonicalCache, package.git, cachePath, outError));
+        String cachePath = packageRepositoryPath(projectRoot, package.git);
         String disclosedReport;
         for (const auto& disclosed : disclosedDeletions)
         {
@@ -513,7 +510,6 @@ static SlangResult _collectMovingPackageRefs(
     outPackageNames.clear();
     outFacts.clear();
     String depsRoot = Path::combine(projectRoot, getWorkspaceDepsDirectory(manifest));
-    String cacheRoot = Path::combine(projectRoot, ".slang", "cache");
     for (const auto& package : lock.packages)
     {
         if (!isGitBackedLockedPackage(package) || package.path.getLength() ||
@@ -523,10 +519,7 @@ static SlangResult _collectMovingPackageRefs(
             continue;
         }
 
-        String canonicalCache = Path::combine(cacheRoot, package.name);
-        String cachePath;
-        SLANG_RETURN_ON_FAIL(
-            locatePreparedPackageCache(canonicalCache, package.git, cachePath, outError));
+        String cachePath = packageRepositoryPath(projectRoot, package.git);
         String destination = Path::combine(depsRoot, package.name);
         List<String> refs;
         SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(cachePath, destination, refs, outError));
@@ -575,7 +568,12 @@ static SlangResult _collectUnpushedCheckoutReports(
     for (const auto& packageName : packageNames)
     {
         String destination = Path::combine(depsRoot, packageName);
-        if (!File::exists(Path::combine(destination, ".git")))
+        SlangPathType gitType;
+        if (SLANG_FAILED(Path::getPathType(Path::combine(destination, ".git"), &gitType)))
+            continue;
+        // A linked worktree keeps commits in the permanent repository. Removing the worktree
+        // does not delete that history.
+        if (gitType == SLANG_PATH_TYPE_FILE)
             continue;
         DisclosedGitDeletion deletion;
         deletion.path = destination;

@@ -4683,3 +4683,188 @@ SLANG_UNIT_TEST(PackageGitDeletionReportsUnpushedCommitsAndTags)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(deleteDisclosedGitRepository(checkout, report, true, error)));
     SLANG_CHECK(!File::exists(checkout));
 }
+
+SLANG_UNIT_TEST(PackageRepositoriesKeepUrlWorktrees)
+{
+    String noiseName = packageRepositoryDirectoryName("https://example.com/group/noise.git");
+    String otherName = packageRepositoryDirectoryName("https://example.com/other/noise.git");
+    SLANG_CHECK(noiseName.startsWith("noise-"));
+    SLANG_CHECK(noiseName.getLength() == String("noise-").getLength() + 8);
+    SLANG_CHECK(otherName.startsWith("noise-"));
+    SLANG_CHECK(noiseName != otherName);
+    String hash = String(noiseName.getUnownedSlice().tail(String("noise-").getLength()));
+    for (Index i = 0; i < hash.getLength(); ++i)
+    {
+        char c = hash[i];
+        bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+        SLANG_CHECK(hex);
+    }
+
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    String origin = Path::combine(temp.path, "noise.git");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(origin));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(origin)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(origin, "readme.txt"), "one\n")));
+    List<String> arguments;
+    arguments.add("add");
+    arguments.add("readme.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("one");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("v1");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    String publishedCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(origin, publishedCommit, error)));
+
+    String project = Path::combine(temp.path, "project");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(project));
+    String repository = packageRepositoryPath(project, origin);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(refreshPackageCache(project, origin, repository, error)));
+    String mirrored;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(repository, "refs/slang-cache/tags/v1", mirrored, error)));
+    SLANG_CHECK(mirrored == publishedCommit);
+    String localTag;
+    SLANG_CHECK(SLANG_FAILED(resolveLocalRevision(repository, "refs/tags/v1", localTag, error)));
+
+    String checkout = Path::combine(Path::combine(project, "deps"), "noise");
+    bool didMaterialize = false;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        origin,
+        publishedCommit,
+        publishedCommit,
+        checkout,
+        false,
+        false,
+        didMaterialize,
+        error,
+        repository)));
+    SLANG_CHECK(didMaterialize);
+    SlangPathType gitType;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(Path::getPathType(Path::combine(checkout, ".git"), &gitType)));
+    SLANG_CHECK(gitType == SLANG_PATH_TYPE_FILE);
+
+    arguments.clear();
+    arguments.add("checkout");
+    arguments.add("-b");
+    arguments.add("local-only");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(checkout, "local.txt"), "local\n")));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add("local.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("local work");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("local-tag");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("v9.9.9");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(checkout, arguments, error)));
+    String localCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, localCommit, error)));
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(Path::combine(origin, "readme.txt"), "two\n")));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add("readme.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("two");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    arguments.clear();
+    arguments.add("tag");
+    arguments.add("-f");
+    arguments.add("v1");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(origin, arguments, error)));
+    String movedCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(origin, movedCommit, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(refreshPackageCache(project, origin, repository, error)));
+
+    String mirrorAfter;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(repository, "refs/slang-cache/tags/v1", mirrorAfter, error)));
+    SLANG_CHECK(mirrorAfter == movedCommit);
+    String keptTag;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(resolveLocalRevision(repository, "refs/tags/local-tag", keptTag, error)));
+    SLANG_CHECK(keptTag == localCommit);
+    String keptBranch;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(repository, "refs/heads/local-only", keptBranch, error)));
+    SLANG_CHECK(keptBranch == localCommit);
+
+    List<TagCandidate> releases;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(listReleaseTagsFromRepository(repository, releases, error)));
+    bool sawPublished = false;
+    bool sawUserRelease = false;
+    for (const auto& release : releases)
+    {
+        if (release.ref == "v1")
+            sawPublished = true;
+        if (release.ref == "v9.9.9")
+            sawUserRelease = true;
+    }
+    SLANG_CHECK(sawPublished);
+    SLANG_CHECK(!sawUserRelease);
+
+    String otherOrigin = Path::combine(temp.path, "other.git");
+    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(otherOrigin));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeGitRepository(otherOrigin)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(otherOrigin, "readme.txt"), "other\n")));
+    arguments.clear();
+    arguments.add("add");
+    arguments.add("readme.txt");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(otherOrigin, arguments, error)));
+    arguments.clear();
+    arguments.add("commit");
+    arguments.add("-q");
+    arguments.add("-m");
+    arguments.add("other");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runPackageGit(otherOrigin, arguments, error)));
+    String otherCommit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(otherOrigin, otherCommit, error)));
+    String otherRepository = packageRepositoryPath(project, otherOrigin);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(refreshPackageCache(project, otherOrigin, otherRepository, error)));
+    SLANG_CHECK(otherRepository != repository);
+    didMaterialize = false;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(materializeLockedRevision(
+        otherOrigin,
+        String(),
+        otherCommit,
+        checkout,
+        true,
+        false,
+        didMaterialize,
+        error,
+        otherRepository)));
+    SLANG_CHECK(didMaterialize);
+    String checkoutHead;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getRepositoryHeadCommit(checkout, checkoutHead, error)));
+    SLANG_CHECK(checkoutHead == otherCommit);
+    SLANG_CHECK(File::exists(Path::combine(repository, "HEAD")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        resolveLocalRevision(repository, "refs/heads/local-only", keptBranch, error)));
+    SLANG_CHECK(keptBranch == localCommit);
+}

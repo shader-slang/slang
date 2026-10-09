@@ -105,8 +105,8 @@ SlangResult resolveDependenciesWithSource(
 
 /// Resolve dependencies from Git repositories, using a cache under the workspace root.
 ///
-/// When `offline` is true, Git packages are resolved from `.slang/cache` only. Missing cache
-/// entries, refs, or objects fail instead of cloning or fetching the package URL.
+/// When `offline` is true, Git packages are resolved from `.slang/repositories` only. A missing
+/// repository, ref, or object fails instead of cloning or fetching the package URL.
 SlangResult resolveDependencies(
     const String& projectRoot,
     const Manifest& manifest,

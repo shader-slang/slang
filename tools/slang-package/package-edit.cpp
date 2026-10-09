@@ -150,7 +150,7 @@ static SlangResult _readDependentManifest(
         return readManifest(path, outManifest, outError);
     }
     String checkout = _checkoutPath(projectRoot, root, package.name);
-    String cache = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    String cache = packageRepositoryPath(projectRoot, package.git);
     String text;
     String gitError;
     String source;
@@ -240,7 +240,7 @@ static SlangResult _findTagRepository(
         outRepository = checkout;
         return SLANG_OK;
     }
-    String cache = Path::combine(Path::combine(projectRoot, ".slang", "cache"), package.name);
+    String cache = packageRepositoryPath(projectRoot, package.git);
     if (SLANG_SUCCEEDED(requirePackageCache(package.git, cache, outError)))
     {
         outRepository = cache;

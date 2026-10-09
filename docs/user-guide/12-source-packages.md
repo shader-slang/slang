@@ -257,11 +257,17 @@ Commands reload them from an edited checkout's working tree, or from the manifes
 commit. `status` uses that live graph to check whether the current lock still satisfies every
 requirement that cannot change. It does not look for newer Git tags; that is `update`.
 
-Dependency checkouts stay at `deps/NAME`. Fetch and update do not replace an edited checkout, and
-they refuse to replace a tool-owned checkout that has changed files, extra commits, or stashes.
-Pass `--clean` explicitly to permit replacement of a tool-owned checkout. `--clean` does not move
-an edit. Deleting that checkout, or a package cache, still lists any commits or tags that are not
-on a remote and waits for the same confirmation.
+Dependency checkouts stay at `deps/NAME`. Each Git URL has its own permanent repository under
+`.slang/repositories/`. The directory name is the URL's repository name, such as `noise`, plus a
+short hash of the exact URL, so two URLs that both end in `noise.git` do not share a directory.
+`deps/NAME` is a worktree of the repository for the URL the lock resolved. Fetch and update do not
+replace an edited checkout, and they refuse to replace a tool-owned checkout that has changed
+files, extra commits, or stashes. Pass `--clean` explicitly to permit discarding uncommitted files
+in that worktree. `--clean` does not move an edit. Branches, tags, commits, and stashes stay in
+the permanent repository when the worktree is removed, including when a remap switches the package
+to a different URL. A checkout that is a separate Git repository, rather than one of these
+worktrees, is still deleted only after any commits or tags that are not on a remote are listed and
+confirmed.
 
 That refusal happens first, before any other work: both commands inspect every checkout the
 current lock owns up front, and update stops before resolving rather than after printing a plan it
@@ -276,10 +282,9 @@ otherwise change an edited checkout, and it does not move that row's version or 
 tree as it exists and solves the transitive dependencies declared by that manifest. When `HEAD` is
 not on the recorded branch, `update` reports the mismatch and leaves the checkout alone.
 `--minimal` keeps one-line package changes and the summary count. `--offline` resolves and
-materializes from `.slang/cache` only: it does not fetch or clone the package URL. A missing cache,
-ref, or object fails and asks you to re-run without `--offline`. Online update first refreshes
-those cache repositories from their origins, then uses the same cached resolver and staging path
-as offline update. The installed Slang toolchain is omitted unless its constraint fails. A real update
+materializes from `.slang/repositories` only: it does not fetch or clone the package URL. A missing
+repository, ref, or object fails and asks you to re-run without `--offline`. Online update first
+refreshes those repositories from their origins, then checks out a worktree under `deps/`. The installed Slang toolchain is omitted unless its constraint fails. A real update
 prints that report and asks before applying the exact graph it just resolved, unless that graph
 already matches the committed lock. In a terminal, declining that prompt leaves the workspace
 unchanged and still succeeds. Without a terminal the command does not prompt: it fails and tells
@@ -314,8 +319,8 @@ these paths into compiler sessions automatically.
 Package validation has three layers:
 
 - The **workspace graph** checks closed JSON schemas, dependency and lock identities, manifests
-  available in `deps/` or `.slang/cache`, and toolchain constraints. Commands never skip this layer.
-- The **upstream cache** check refreshes `.slang/cache` when network access is allowed and verifies
+  available in `deps/` or `.slang/repositories`, and toolchain constraints. Commands never skip this layer.
+- The **upstream cache** check refreshes `.slang/repositories` when network access is allowed and verifies
   that every locked Git ref and commit is represented there. A commit that exists only in
   `deps/NAME` does not pass until it reaches the origin.
 - A **buildable workspace** additionally requires every export in the materialized closure to
@@ -347,13 +352,13 @@ require `--clean` still fails; run `slang package fetch --clean` yourself.
 
 `fetch` and `update` always verify the workspace graph from selected manifests **before** they
 clear search paths or materialize `deps/`. A release is read at its locked commit from `deps/NAME`
-when that repository contains the commit, otherwise from `.slang/cache`. The committed manifest is
+when that repository contains the commit, otherwise from `.slang/repositories`. The committed manifest is
 read, not the working-tree file, so a dirty release checkout cannot change what the graph check
-sees. An edit is read from the working tree. Online commands refresh origin data only into
-`.slang/cache`;
-all dependency checkouts then receive objects and refs from that cache. New refs are additive.
-Moving an existing tag or origin-tracking branch in `deps/NAME` is destructive, so the command
-lists all affected packages and refs in its single confirmation. After materialization, they apply the publishable-package checks
+sees. An edit is read from the working tree. Online commands fetch origin data only into
+`.slang/repositories`. Published branches are stored as `refs/remotes/origin/*` and published tags
+as `refs/slang-cache/tags/*`. Fetch does not update or delete `refs/heads/*` or `refs/tags/*`, so a
+branch or tag created in the worktree stays put. `deps/NAME` is a worktree of that repository and
+already sees the published refs. After materialization, they apply the publishable-package checks
 to each Git package whose checkout was newly created or changed, then check source layout and
 import uniqueness across the complete selected graph.
 The closure check includes unchanged packages because a new module can
@@ -414,9 +419,12 @@ version can be parsed. It adds `.slang/`, `deps/`, `out/`, `slang-package-overla
 `slang-package-includes.txt` to `.gitignore`. The overlay filename remains ignored so an old file
 is not committed. A file that still contains entries is an error. `slang package help` lists
 commands under the manifest, lock, and bundle.
-`.slang/cache/` contains the Git repositories last refreshed from package origins. Resolution
-reads those caches, and fetch/update stage their objects and refs into the workspace repositories
-under `deps/`. Fetched source remains visible there; generated files go under `out/`.
+`.slang/repositories/` contains one permanent Git repository for each exact package URL that has
+been resolved. The directory name starts with the URL's repository name, for example `noise-`
+followed by eight hexadecimal characters of the URL's SHA-1. Resolution reads those repositories.
+`deps/NAME` is a worktree of the repository for the URL selected for that package, so switching
+the URL detaches that worktree and attaches the other repository without deleting either one.
+Fetched source remains visible there; generated files go under `out/`.
 
 `slang package edit NAME --branch BRANCH` checks out `BRANCH` in the already-resolved
 `deps/NAME` checkout. `--create` creates a missing branch from the commit the dependency is
@@ -528,9 +536,9 @@ use. The command does not copy or regenerate documentation; run `slang package b
 
 ## Possible future enhancements
 
-The initial workspace layout deliberately keeps resolver clones in `.slang/cache/` and compile
-inputs in the workspace. Future versions may add a user-global immutable cache with copy-on-edit,
-let compiler sessions consume workspace metadata without `slang-package-includes.txt`, and share immutable
-dependency trees between workspaces. Git-to-Git replacement is also deferred until Slang has a
-global user remapping policy or package-index integration. An edit changes the branch of the
+The workspace keeps one permanent Git repository per package URL under `.slang/repositories/` and
+checks out the selected commit as a worktree under `deps/`. Future versions may add a user-global
+immutable cache with copy-on-edit, let compiler sessions consume workspace metadata without
+`slang-package-includes.txt`, and share immutable dependency trees between workspaces. An edit
+changes the branch of the
 checkout at `deps/<name>`. It does not point that package at another directory.

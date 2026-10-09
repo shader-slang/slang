@@ -22,7 +22,8 @@ bool pathStartsWithParentComponent(const String& path);
 
 /// Reject a path that points at `.slang` unless the declaring package itself lives there.
 ///
-/// Consider this layout: the workspace at `/game` depends on `.slang/cache/evil`. That directory is
+/// Consider this layout: the workspace at `/game` depends on `.slang/repositories/evil`. That
+/// directory is
 /// under the workspace root, so a naive "stay inside the declaring tree" check would allow it, and
 /// a crafted lock could then treat resolver state as a path package. The intended rule is: normal
 /// packages cannot select trees under the workspace's hidden state directory.

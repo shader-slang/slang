@@ -7,18 +7,38 @@ namespace Slang
 namespace PackageTool
 {
 
+/// Directory of the permanent repository for `gitURL` under `projectRoot`.
+///
+/// A URL whose last path segment is `noise.git` is stored at
+/// `.slang/repositories/noise-` plus the first 8 hexadecimal characters of the SHA-1 of the
+/// exact URL. The name keeps the directory readable, and the hash keeps two URLs that end in
+/// the same name apart. The repository records that URL; opening the directory for a different
+/// URL fails and leaves it in place.
+String packageRepositoryPath(const String& projectRoot, const String& gitURL);
+
+/// Final path segment of `packageRepositoryPath`, without the `.slang/repositories/` prefix.
+String packageRepositoryDirectoryName(const String& gitURL);
+
 /// List canonical dotted release tags already present in a local clone, without contacting a
 /// remote.
 ///
-/// A tag that names a release with a non-canonical spelling, such as `v1.2.0` or `v01.2.3`, is
-/// omitted. When `outWarnings` is set, each omitted tag is reported once.
+/// Published tags are read from `refs/slang-cache/tags`. Tags under `refs/tags` are included only
+/// when that published namespace has no tags, so a normal repository still lists the tags created
+/// with `git tag`. A tag in `refs/tags` is not treated as a published release once the published
+/// namespace exists. A tag that names a release with a non-canonical spelling, such as `v1.2.0`
+/// when the canonical spelling is `v1.2`, is omitted. When `outWarnings` is set, each omitted tag
+/// is reported once.
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
     String& outError,
     List<String>* outWarnings = nullptr);
 
-/// Resolve `ref` from the origin-tracking refs and objects already present in a package cache.
+/// Resolve `ref` from the origin-tracking refs and published tags already present in a package
+/// repository.
+///
+/// A short tag name is read from `refs/slang-cache/tags` when that namespace has any tags, and
+/// from `refs/tags` otherwise. `HEAD` is `refs/slang-cache/origin/HEAD`.
 SlangResult resolveCachedReference(
     const String& repositoryPath,
     const String& ref,
@@ -90,13 +110,13 @@ SlangResult commitDeferredCacheReplacement(
     const DeferredCacheReplacement& replacement,
     String& outError);
 
-/// Clone or refresh a package cache from its origin.
+/// Create or refresh the permanent repository for `gitURL` at `repositoryPath`.
 ///
-/// When the cache exists but its origin is not `gitURL`, a repository with commits or tags that
-/// are not on a remote is left in place. If `outUnpushedReport` is set, that report is returned
-/// and `outActivePath` is a replacement clone of `gitURL`. Otherwise `--yes` (`assumeYes`) prints
-/// the report and replaces the cache; without it the call fails and deletes nothing. A cache whose
-/// history is already on a remote is replaced without an extra report.
+/// The repository is bare. Published branches are stored as `refs/remotes/origin/*` and published
+/// tags as `refs/slang-cache/tags/*`. Fetch does not write or prune `refs/heads/*` or
+/// `refs/tags/*`. A directory that already records a different URL is left in place and the call
+/// fails. The `assumeYes` and unpushed-report arguments remain for callers that used to replace a
+/// cache; this function does not delete the repository.
 SlangResult refreshPackageCache(
     const String& workingDirectory,
     const String& gitURL,
@@ -262,14 +282,16 @@ SlangResult getGitWorkingTreeRoot(
 /// Return the configured URL for the repository's `origin` remote.
 SlangResult getRepositoryOrigin(const String& repositoryPath, String& outOrigin, String& outError);
 
-/// Materialize `targetCommit` without discarding an existing checkout's work.
+/// Check out `targetCommit` at `destination` as a worktree of `cachePath`.
 ///
-/// If `destination` exists, it must be clean at `currentCommit`. `allowClean` explicitly permits
-/// deleting and recreating a checkout that has changed files, commits, stashes, or a different
-/// origin. `allowMovingRefs` permits cache staging to change existing named refs after the caller
-/// has disclosed and confirmed those moves. If the checkout is already clean at `targetCommit`,
-/// its work tree stays untouched and `outDidMaterialize` is false, although additive cached refs
-/// may still be staged.
+/// `cachePath` is the permanent repository for `gitURL`. A missing destination is added as a
+/// detached worktree. A worktree of that same repository is checked out in place. `allowClean`
+/// permits discarding uncommitted files, or detaching a worktree that belongs to a different
+/// repository. Commits, branches, tags, and stashes stay in the permanent repository either way.
+/// A destination that is its own Git repository is deleted only through the disclosed unpushed
+/// report. `allowMovingRefs` is unused: published refs are not copied into the worktree, because
+/// the worktree and the permanent repository share one ref namespace. If the checkout is already
+/// clean at `targetCommit`, its work tree stays untouched and `outDidMaterialize` is false.
 SlangResult materializeLockedRevision(
     const String& gitURL,
     const String& currentCommit,
@@ -285,8 +307,10 @@ SlangResult materializeLockedRevision(
 
 /// List cache refs whose existing names would move when staged into `destination`.
 ///
-/// New refs and objects are additive and are not reported. Tags keep their `refs/tags/*` names;
-/// origin branches keep their `refs/remotes/origin/*` names.
+/// New refs and objects are additive and are not reported. Published tags keep their
+/// `refs/slang-cache/tags/*` names; origin branches keep their `refs/remotes/origin/*` names.
+/// Tags under `refs/tags` are compared too, so a separate checkout that still has those names can
+/// be reported. A worktree of `cachePath` shares that namespace, so this list is empty.
 SlangResult collectMovingCachedRefs(
     const String& cachePath,
     const String& destination,

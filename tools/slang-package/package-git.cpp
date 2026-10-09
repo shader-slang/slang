@@ -3,6 +3,7 @@
 #include "package-git.h"
 
 #include "core/slang-command-line.h"
+#include "core/slang-crypto.h"
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
@@ -115,6 +116,50 @@ static String _offlineUpdateAdvice()
     return "run 'slang package update' without --offline";
 }
 
+static String _repositoryStem(const String& gitURL)
+{
+    String url = gitURL;
+    while (url.getLength() && (url.endsWith("/") || url.endsWith("\\")))
+        url = String(url.getUnownedSlice().head(url.getLength() - 1));
+
+    const Index slash = url.lastIndexOf('/');
+    const Index colon = url.lastIndexOf(':');
+    const Index split = slash > colon ? slash : colon;
+    String stem = split >= 0 ? String(url.getUnownedSlice().tail(split + 1)) : url;
+    if (stem.endsWith(".git"))
+        stem = String(stem.getUnownedSlice().head(stem.getLength() - 4));
+
+    StringBuilder safe;
+    for (Index i = 0; i < stem.getLength(); ++i)
+    {
+        const char c = stem[i];
+        const bool allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                             (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+        if (allowed)
+            safe.append(c);
+    }
+    String text = safe.produceString();
+    if (!text.getLength() || text == "." || text == "..")
+        text = "git";
+    return text;
+}
+
+String packageRepositoryDirectoryName(const String& gitURL)
+{
+    SHA1::Digest digest = SHA1::compute(gitURL.getBuffer(), gitURL.getLength());
+    String hash = digest.toString();
+    if (hash.getLength() > 8)
+        hash = String(hash.getUnownedSlice().head(8));
+    return _repositoryStem(gitURL) + "-" + hash;
+}
+
+String packageRepositoryPath(const String& projectRoot, const String& gitURL)
+{
+    return Path::combine(
+        Path::combine(Path::combine(projectRoot, ".slang"), "repositories"),
+        packageRepositoryDirectoryName(gitURL));
+}
+
 static Index _findCandidate(const List<TagCandidate>& candidates, const String& tag)
 {
     for (Index i = 0; i < candidates.getCount(); ++i)
@@ -127,13 +172,14 @@ static Index _findCandidate(const List<TagCandidate>& candidates, const String& 
 
 static SlangResult _parseReleaseTagLines(
     const String& text,
+    const UnownedStringSlice& prefix,
     List<TagCandidate>& outCandidates,
     String& outError,
     List<String>* outWarnings)
 {
     SLANG_UNUSED(outError);
     outCandidates.clear();
-    static const UnownedStringSlice kPrefix("refs/tags/");
+    const UnownedStringSlice kPrefix = prefix;
     for (auto line : LineParser(text.getUnownedSlice()))
     {
         List<UnownedStringSlice> fields;
@@ -169,37 +215,81 @@ static SlangResult _parseReleaseTagLines(
     return SLANG_OK;
 }
 
+static const UnownedStringSlice kPublishedTagPrefix("refs/slang-cache/tags/");
+static const UnownedStringSlice kLocalTagPrefix("refs/tags/");
+
+/// Render `for-each-ref` rows as `show-ref --dereference` lines for `prefix`.
+///
+/// An annotated tag's first line names the tag object and the following `^{}` line names the
+/// commit, which is the object a release candidate records. A lightweight tag has an empty peeled
+/// field and contributes one line.
+static SlangResult _dereferenceRefLines(
+    const String& repositoryPath,
+    const UnownedStringSlice& prefix,
+    String& outText,
+    bool& outAny,
+    String& outError)
+{
+    outText = String();
+    outAny = false;
+    List<String> arguments;
+    arguments.add("for-each-ref");
+    arguments.add("--format=%(objectname)|%(refname)|%(*objectname)");
+    arguments.add(prefix);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+
+    StringBuilder text;
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String row = line.trim();
+        if (!row.getLength())
+            continue;
+        Index first = row.indexOf('|');
+        Index second = first < 0 ? -1 : row.indexOf('|', first + 1);
+        if (first < 0 || second < 0)
+            continue;
+        String objectId = String(row.getUnownedSlice().head(first));
+        String refName = String(row.getUnownedSlice().subString(first + 1, second - first - 1));
+        String peeled = String(row.getUnownedSlice().tail(second + 1));
+        if (!refName.startsWith(prefix))
+            continue;
+        outAny = true;
+        text << objectId << " " << refName << "\n";
+        if (peeled.getLength())
+            text << peeled << " " << refName << "^{}\n";
+    }
+    outText = text.produceString();
+    return SLANG_OK;
+}
+
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
     String& outError,
     List<String>* outWarnings)
 {
-    List<String> arguments;
-    arguments.add("show-ref");
-    arguments.add("--tags");
-    arguments.add("--dereference");
-    ExecuteResult result;
-    CommandLine commandLine;
-    SLANG_RETURN_ON_FAIL(_executeGit(repositoryPath, arguments, commandLine, result, outError));
-    if (result.resultCode != 0)
-    {
-        if (result.standardOutput.trim().getLength() != 0)
-        {
-            outError = result.standardError.trim();
-            if (outError.getLength() == 0)
-                outError = String("Git command failed: ") + commandLine.toString();
-            return SLANG_FAIL;
-        }
-        if (result.standardError.trim().getLength() != 0)
-        {
-            outError = result.standardError.trim();
-            return SLANG_FAIL;
-        }
-        outCandidates.clear();
-        return SLANG_OK;
-    }
-    return _parseReleaseTagLines(result.standardOutput, outCandidates, outError, outWarnings);
+    String publishedText;
+    bool publishedAny = false;
+    SLANG_RETURN_ON_FAIL(_dereferenceRefLines(
+        repositoryPath,
+        kPublishedTagPrefix,
+        publishedText,
+        publishedAny,
+        outError));
+    if (publishedAny)
+        return _parseReleaseTagLines(
+            publishedText,
+            kPublishedTagPrefix,
+            outCandidates,
+            outError,
+            outWarnings);
+
+    String localText;
+    bool localAny = false;
+    SLANG_RETURN_ON_FAIL(
+        _dereferenceRefLines(repositoryPath, kLocalTagPrefix, localText, localAny, outError));
+    return _parseReleaseTagLines(localText, kLocalTagPrefix, outCandidates, outError, outWarnings);
 }
 
 static SlangResult _selectCommitFromRefLines(
@@ -210,6 +300,7 @@ static SlangResult _selectCommitFromRefLines(
 {
     String branchCommit;
     String tagCommit;
+    String publishedTagCommit;
     String directCommit;
     for (auto line : LineParser(text.getUnownedSlice()))
     {
@@ -223,23 +314,33 @@ static SlangResult _selectCommitFromRefLines(
             directCommit = commit;
         else if (reference == String("refs/remotes/origin/") + ref)
             branchCommit = commit;
-        else if (reference == String("refs/tags/") + ref)
+        else if (reference == String(kPublishedTagPrefix) + ref)
+        {
+            if (!publishedTagCommit.getLength())
+                publishedTagCommit = commit;
+        }
+        else if (reference == String(kPublishedTagPrefix) + ref + "^{}")
+            publishedTagCommit = commit;
+        else if (reference == String(kLocalTagPrefix) + ref)
         {
             if (!tagCommit.getLength())
                 tagCommit = commit;
         }
-        else if (reference == String("refs/tags/") + ref + "^{}")
+        else if (reference == String(kLocalTagPrefix) + ref + "^{}")
             tagCommit = commit;
         else if (ref.getUnownedSlice().startsWith("refs/tags/") && reference == ref + "^{}")
             directCommit = commit;
     }
-    if (branchCommit.getLength() && tagCommit.getLength())
+    if (!publishedTagCommit.getLength())
+        publishedTagCommit = tagCommit;
+    if (branchCommit.getLength() && publishedTagCommit.getLength())
     {
         outError = String("Git ref is ambiguous between a branch and tag; use a full ref: ") + ref;
         return SLANG_FAIL;
     }
-    outCommit = directCommit.getLength() ? directCommit
-                                         : (branchCommit.getLength() ? branchCommit : tagCommit);
+    outCommit = directCommit.getLength()
+                    ? directCommit
+                    : (branchCommit.getLength() ? branchCommit : publishedTagCommit);
     return SLANG_OK;
 }
 
@@ -283,7 +384,15 @@ SlangResult resolveCachedReference(
     }
     else if (!ref.getUnownedSlice().startsWith("refs/"))
     {
-        arguments.add(String("refs/tags/") + ref);
+        String publishedText;
+        bool publishedAny = false;
+        SLANG_RETURN_ON_FAIL(_dereferenceRefLines(
+            repositoryPath,
+            kPublishedTagPrefix,
+            publishedText,
+            publishedAny,
+            outError));
+        arguments.add(String(publishedAny ? kPublishedTagPrefix : kLocalTagPrefix) + ref);
         arguments.add(String("refs/remotes/origin/") + ref);
     }
     else
@@ -323,6 +432,14 @@ SlangResult resolveCachedReference(
 }
 
 static bool _hasGitDir(const String& path);
+
+static bool _hasGitMetadata(const String& path)
+{
+    if (File::exists(Path::combine(path, ".git")))
+        return true;
+    return File::exists(Path::combine(path, "HEAD")) &&
+           File::exists(Path::combine(path, "objects"));
+}
 
 static SlangResult _gitOutputLines(
     const String& repositoryPath,
@@ -690,7 +807,7 @@ SlangResult locatePreparedPackageCache(
     auto originMatches = [&](const String& path, bool& outMatches) -> SlangResult
     {
         outMatches = false;
-        if (!_hasGitDir(path))
+        if (!_hasGitMetadata(path))
             return SLANG_OK;
         String origin;
         SLANG_RETURN_ON_FAIL(getRepositoryOrigin(path, origin, outError));
@@ -749,103 +866,123 @@ static SlangResult _ensureRepository(
     String* outActivePath,
     String* outUnpushedReport)
 {
+    SLANG_UNUSED(canReplace);
+    SLANG_UNUSED(assumeYes);
     ExecuteResult result;
-    if (!File::exists(Path::combine(repositoryPath, ".git")))
+    if (!_hasGitMetadata(repositoryPath))
     {
         SlangPathType pathType;
         if (SLANG_SUCCEEDED(Path::getPathType(repositoryPath, &pathType)))
         {
-            outError = String("Package cache path is not a Git repository: ") + repositoryPath;
+            outError = String("Package repository path is not a Git repository: ") + repositoryPath;
             return SLANG_FAIL;
         }
         if (!allowRemote)
         {
-            outError = String("Package cache is missing; ") + _offlineUpdateAdvice() + ": " +
+            outError = String("Package repository is missing; ") + _offlineUpdateAdvice() + ": " +
                        repositoryPath;
             return SLANG_FAIL;
         }
-        List<String> cloneArguments;
-        cloneArguments.add("clone");
-        cloneArguments.add("--no-checkout");
-        cloneArguments.add("--");
-        cloneArguments.add(gitURL);
-        cloneArguments.add(repositoryPath);
-        SLANG_RETURN_ON_FAIL(_runGit(workingDirectory, cloneArguments, result, outError));
+        String parent = Path::getParentDirectory(repositoryPath);
+        if (parent.getLength() && !Path::createDirectoryRecursive(parent))
+        {
+            outError = String("Cannot create package repository directory: ") + parent;
+            return SLANG_FAIL;
+        }
+        List<String> initArguments;
+        initArguments.add("-c");
+        initArguments.add("init.templateDir=");
+        initArguments.add("-c");
+        initArguments.add("init.defaultBranch=main");
+        initArguments.add("init");
+        initArguments.add("--bare");
+        initArguments.add("--quiet");
+        initArguments.add(repositoryPath);
+        SLANG_RETURN_ON_FAIL(_runGit(workingDirectory, initArguments, result, outError));
+
+        // The bare repository must not have a branch checked out. Otherwise a worktree cannot
+        // check out that branch when an edit starts.
+        List<String> headArguments;
+        headArguments.add("symbolic-ref");
+        headArguments.add("HEAD");
+        headArguments.add("refs/slang-cache/primary");
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, headArguments, result, outError));
+
+        List<String> urlArguments;
+        urlArguments.add("config");
+        urlArguments.add("slang.packageUrl");
+        urlArguments.add(gitURL);
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, urlArguments, result, outError));
+
+        List<String> remoteArguments;
+        remoteArguments.add("remote");
+        remoteArguments.add("add");
+        remoteArguments.add("origin");
+        remoteArguments.add(gitURL);
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, remoteArguments, result, outError));
+
+        List<String> tagOptArguments;
+        tagOptArguments.add("config");
+        tagOptArguments.add("remote.origin.tagOpt");
+        tagOptArguments.add("--no-tags");
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, tagOptArguments, result, outError));
     }
 
-    List<String> remoteArguments;
-    remoteArguments.add("remote");
-    remoteArguments.add("get-url");
-    remoteArguments.add("origin");
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, remoteArguments, result, outError));
-    if (String(result.standardOutput.trim()) != gitURL)
+    List<String> recordedUrlArguments;
+    recordedUrlArguments.add("config");
+    recordedUrlArguments.add("--get");
+    recordedUrlArguments.add("slang.packageUrl");
+    int recordedCode = 0;
+    SLANG_RETURN_ON_FAIL(
+        _runGitCode(repositoryPath, recordedUrlArguments, recordedCode, result, outError));
+    if (recordedCode != 0 && recordedCode != 1)
     {
-        if (!allowRemote || !canReplace)
-        {
-            outError =
-                allowRemote
-                    ? String("Git reports a different origin after replacing package cache: ") +
-                          repositoryPath
-                    : String("Cached package origin does not match; ") + _offlineUpdateAdvice() +
-                          ": " + repositoryPath;
-            return SLANG_FAIL;
-        }
-        String report;
-        SLANG_RETURN_ON_FAIL(collectUnpushedRepositoryReport(repositoryPath, report, outError));
-        if (report.getLength() && outUnpushedReport)
-        {
-            String replacementPath = _replacementPackageCachePath(repositoryPath);
-            if (!Path::createDirectoryRecursive(Path::getParentDirectory(replacementPath)))
-            {
-                outError = String("Cannot create package cache directory: ") +
-                           Path::getParentDirectory(replacementPath);
-                return SLANG_FAIL;
-            }
-            SLANG_RETURN_ON_FAIL(_ensureRepository(
-                workingDirectory,
-                gitURL,
-                replacementPath,
-                true,
-                allowRemote,
-                outError,
-                false,
-                nullptr,
-                nullptr));
-            *outUnpushedReport = report;
-            if (outActivePath)
-                *outActivePath = replacementPath;
-            return SLANG_OK;
-        }
-        if (report.getLength())
-        {
-            if (!assumeYes)
-            {
-                outError = String("Refusing to delete ") + repositoryPath +
-                           " because it has commits or tags that are not on a remote:\n" + report +
-                           "The repository was left in place. Re-run with --yes to delete it.";
-                return SLANG_FAIL;
-            }
-            fprintf(
-                stdout,
-                "Deleting %s would drop commits or tags that are not on a remote:\n%s",
-                repositoryPath.getBuffer(),
-                report.getBuffer());
-        }
-        if (SLANG_FAILED(Path::removeNonEmpty(repositoryPath)))
-        {
-            outError = String("Cannot replace stale package cache: ") + repositoryPath;
-            return SLANG_FAIL;
-        }
-        return _ensureRepository(
-            workingDirectory,
-            gitURL,
-            repositoryPath,
-            false,
-            allowRemote,
-            outError,
-            assumeYes,
-            outActivePath,
-            outUnpushedReport);
+        outError = result.standardError.trim();
+        if (!outError.getLength())
+            outError = String("Cannot read the package URL recorded in ") + repositoryPath;
+        return SLANG_FAIL;
+    }
+    String recordedUrl = recordedCode == 0 ? String(result.standardOutput.trim()) : String();
+
+    List<String> originArguments;
+    originArguments.add("remote");
+    originArguments.add("get-url");
+    originArguments.add("origin");
+    int originCode = 0;
+    SLANG_RETURN_ON_FAIL(
+        _runGitCode(repositoryPath, originArguments, originCode, result, outError));
+    if (originCode != 0 && originCode != 2)
+    {
+        outError = result.standardError.trim();
+        if (!outError.getLength())
+            outError = String("Cannot read the origin of ") + repositoryPath;
+        return SLANG_FAIL;
+    }
+    String origin = originCode == 0 ? String(result.standardOutput.trim()) : String();
+    if ((recordedUrl.getLength() && recordedUrl != gitURL) ||
+        (origin.getLength() && origin != gitURL))
+    {
+        String existing = recordedUrl.getLength() ? recordedUrl : origin;
+        outError = String("Package repository ") + repositoryPath + " is already used by " +
+                   existing + ". The repository was left in place.";
+        return SLANG_FAIL;
+    }
+    if (!recordedUrl.getLength())
+    {
+        List<String> urlArguments;
+        urlArguments.add("config");
+        urlArguments.add("slang.packageUrl");
+        urlArguments.add(gitURL);
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, urlArguments, result, outError));
+    }
+    if (!origin.getLength())
+    {
+        List<String> remoteArguments;
+        remoteArguments.add("remote");
+        remoteArguments.add("add");
+        remoteArguments.add("origin");
+        remoteArguments.add(gitURL);
+        SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, remoteArguments, result, outError));
     }
 
     if (outActivePath)
@@ -859,11 +996,10 @@ static SlangResult _ensureRepository(
     List<String> fetchArguments;
     fetchArguments.add("fetch");
     fetchArguments.add("--prune");
-    fetchArguments.add("--prune-tags");
-    fetchArguments.add("--force");
+    fetchArguments.add("--no-tags");
     fetchArguments.add("origin");
     fetchArguments.add("+refs/heads/*:refs/remotes/origin/*");
-    fetchArguments.add("+refs/tags/*:refs/tags/*");
+    fetchArguments.add("+refs/tags/*:refs/slang-cache/tags/*");
     fetchArguments.add("+HEAD:refs/slang-cache/origin/HEAD");
     return _runGit(repositoryPath, fetchArguments, result, outError);
 }
@@ -1002,6 +1138,61 @@ SlangResult resolveLocalRevision(
     return SLANG_OK;
 }
 
+static bool _tagListContains(const List<String>& tags, const String& tag)
+{
+    for (const auto& existing : tags)
+    {
+        if (existing == tag)
+            return true;
+    }
+    return false;
+}
+
+static String _tagNameFromRef(const String& refName)
+{
+    if (refName.startsWith(kPublishedTagPrefix))
+        return String(refName.getUnownedSlice().tail(kPublishedTagPrefix.getLength()));
+    if (refName.startsWith(kLocalTagPrefix))
+        return String(refName.getUnownedSlice().tail(kLocalTagPrefix.getLength()));
+    return refName;
+}
+
+static SlangResult _tagNamesAtCommit(
+    const String& repositoryPath,
+    const String& commit,
+    List<String>& outTags,
+    String& outError)
+{
+    outTags.clear();
+    List<String> arguments;
+    arguments.add("tag");
+    arguments.add("--points-at");
+    arguments.add(commit);
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = line.trim();
+        if (tag.getLength() && !_tagListContains(outTags, tag))
+            outTags.add(tag);
+    }
+
+    arguments.clear();
+    arguments.add("for-each-ref");
+    arguments.add("--points-at");
+    arguments.add(commit);
+    arguments.add("--format=%(refname)");
+    arguments.add("refs/slang-cache/tags");
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    {
+        String tag = _tagNameFromRef(line.trim());
+        if (tag.getLength() && !_tagListContains(outTags, tag))
+            outTags.add(tag);
+    }
+    return SLANG_OK;
+}
+
 SlangResult findVersionTagAtHead(
     const String& repositoryPath,
     String& outTag,
@@ -1010,18 +1201,13 @@ SlangResult findVersionTagAtHead(
     String& outError,
     List<String>* outWarnings)
 {
-    List<String> arguments;
-    arguments.add("tag");
-    arguments.add("--points-at");
-    arguments.add("HEAD");
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    List<String> tags;
+    SLANG_RETURN_ON_FAIL(_tagNamesAtCommit(repositoryPath, "HEAD", tags, outError));
 
     outFound = false;
     outTag = String();
-    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    for (const auto& tag : tags)
     {
-        String tag = line.trim();
         PackageVersion version;
         if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, outWarnings))
             continue;
@@ -1048,29 +1234,41 @@ SlangResult findNearestReleaseTag(
 {
     outFound = false;
     outTag = String();
-    List<String> arguments;
-    arguments.add("tag");
-    arguments.add("--merged");
-    arguments.add(commit);
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    List<TagCandidate> tags;
+    SLANG_RETURN_ON_FAIL(
+        listReleaseTagsFromRepository(repositoryPath, tags, outError, outWarnings));
 
     String nearestTag;
     PackageVersion nearestVersion;
     Int nearestDistance = 0;
     bool haveNearest = false;
     bool nearestTied = false;
-    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    for (const auto& candidate : tags)
     {
-        String tag = line.trim();
-        PackageVersion version;
-        if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, outWarnings))
+        List<String> ancestorArguments;
+        ancestorArguments.add("merge-base");
+        ancestorArguments.add("--is-ancestor");
+        ancestorArguments.add(candidate.commit);
+        ancestorArguments.add(commit);
+        ExecuteResult ancestorResult;
+        int ancestorCode = 0;
+        SLANG_RETURN_ON_FAIL(
+            _runGitCode(repositoryPath, ancestorArguments, ancestorCode, ancestorResult, outError));
+        if (ancestorCode == 1)
             continue;
+        if (ancestorCode != 0)
+        {
+            outError = ancestorResult.standardError.trim();
+            if (!outError.getLength())
+                outError = String("Cannot tell whether tag '") + candidate.ref +
+                           "' is an ancestor of " + commit + ".";
+            return SLANG_FAIL;
+        }
 
         List<String> countArguments;
         countArguments.add("rev-list");
         countArguments.add("--count");
-        countArguments.add(tag + ".." + commit);
+        countArguments.add(candidate.commit + ".." + commit);
         ExecuteResult countResult;
         SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, countArguments, countResult, outError));
         String countText = countResult.standardOutput.trim();
@@ -1078,8 +1276,8 @@ SlangResult findNearestReleaseTag(
         if (SLANG_FAILED(StringUtil::parseInt(countText.getUnownedSlice(), distance)) ||
             distance < 0)
         {
-            outError =
-                String("Cannot measure distance from tag '") + tag + "' to commit " + commit + ".";
+            outError = String("Cannot measure distance from tag '") + candidate.ref +
+                       "' to commit " + commit + ".";
             return SLANG_FAIL;
         }
 
@@ -1088,10 +1286,12 @@ SlangResult findNearestReleaseTag(
             haveNearest = true;
             nearestTied = false;
             nearestDistance = distance;
-            nearestTag = tag;
-            nearestVersion = version;
+            nearestTag = candidate.ref;
+            nearestVersion = candidate.version;
         }
-        else if (distance == nearestDistance && (nearestTag != tag || nearestVersion != version))
+        else if (
+            distance == nearestDistance &&
+            (nearestTag != candidate.ref || nearestVersion != candidate.version))
         {
             nearestTied = true;
         }
@@ -1220,6 +1420,7 @@ static SlangResult _listCachedRefNames(
     arguments.add("for-each-ref");
     arguments.add("--format=%(refname)");
     arguments.add("refs/remotes/origin");
+    arguments.add("refs/slang-cache/tags");
     arguments.add("refs/tags");
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runGit(cachePath, arguments, result, outError));
@@ -1258,69 +1459,96 @@ SlangResult collectMovingCachedRefs(
     return SLANG_OK;
 }
 
-static SlangResult _stageCachedRepository(
-    const String& cachePath,
-    const String& destination,
-    const String& targetCommit,
-    bool allowMovingRefs,
-    String& outError)
+static SlangResult _canonicalGitCommonDir(const String& path, String& outDir, String& outError)
 {
-    bool cachedCommitExists = false;
-    SLANG_RETURN_ON_FAIL(_commitExists(cachePath, targetCommit, cachedCommitExists, outError));
-    if (!cachedCommitExists)
-    {
-        outError = String("Selected commit is not in the local cache: ") + targetCommit;
-        return SLANG_FAIL;
-    }
-
-    if (!allowMovingRefs)
-    {
-        List<String> movingRefs;
-        SLANG_RETURN_ON_FAIL(collectMovingCachedRefs(cachePath, destination, movingRefs, outError));
-        if (movingRefs.getCount())
-        {
-            outError = String("Cache staging would move an existing dependency ref without "
-                              "confirmation: ") +
-                       movingRefs[0];
-            return SLANG_FAIL;
-        }
-    }
-
-    List<String> cachedRefs;
-    SLANG_RETURN_ON_FAIL(_listCachedRefNames(cachePath, cachedRefs, outError));
     List<String> arguments;
+    arguments.add("rev-parse");
+    arguments.add("--git-common-dir");
     ExecuteResult result;
-    if (cachedRefs.getCount())
+    SLANG_RETURN_ON_FAIL(_runGit(path, arguments, result, outError));
+    String text = result.standardOutput.trim();
+    if (!Path::isAbsolute(text))
+        text = Path::combine(path, text);
+    if (SLANG_FAILED(Path::getCanonical(text, outDir)))
     {
-        arguments.add("fetch");
-        arguments.add("--force");
-        arguments.add("--no-tags");
-        arguments.add("--");
-        arguments.add(cachePath);
-        for (const auto& ref : cachedRefs)
-            arguments.add(String("+") + ref + ":" + ref);
-        SLANG_RETURN_ON_FAIL(_runGit(destination, arguments, result, outError));
-    }
-
-    bool exists = false;
-    SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
-    if (exists)
-        return SLANG_OK;
-
-    arguments.clear();
-    arguments.add("fetch");
-    arguments.add("--no-tags");
-    arguments.add("--");
-    arguments.add(cachePath);
-    arguments.add(targetCommit);
-    SLANG_RETURN_ON_FAIL(_runGit(destination, arguments, result, outError));
-    SLANG_RETURN_ON_FAIL(_commitExists(destination, targetCommit, exists, outError));
-    if (!exists)
-    {
-        outError = String("Selected commit is not in the local cache: ") + targetCommit;
+        outError = String("Cannot canonicalize Git directory: ") + text;
         return SLANG_FAIL;
     }
     return SLANG_OK;
+}
+
+static SlangResult _retainCommit(
+    const String& repositoryPath,
+    const String& commit,
+    String& outError)
+{
+    if (!commit.getLength())
+        return SLANG_OK;
+    List<String> arguments;
+    arguments.add("update-ref");
+    arguments.add(String("refs/slang-cache/retained/") + commit);
+    arguments.add(commit);
+    ExecuteResult result;
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+static SlangResult _discardWorktreeFiles(const String& repositoryPath, String& outError)
+{
+    ExecuteResult result;
+    List<String> arguments;
+    arguments.add("reset");
+    arguments.add("--hard");
+    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
+    arguments.clear();
+    arguments.add("clean");
+    arguments.add("-fd");
+    return _runGit(repositoryPath, arguments, result, outError);
+}
+
+static SlangResult _removeLinkedWorktree(const String& destination, String& outError)
+{
+    String commonDir;
+    SLANG_RETURN_ON_FAIL(_canonicalGitCommonDir(destination, commonDir, outError));
+    String head;
+    String headError;
+    if (SLANG_SUCCEEDED(getRepositoryHeadCommit(destination, head, headError)))
+        SLANG_RETURN_ON_FAIL(_retainCommit(destination, head, outError));
+    List<String> arguments;
+    arguments.add("worktree");
+    arguments.add("remove");
+    arguments.add("--force");
+    arguments.add(destination);
+    ExecuteResult result;
+    return _runGit(commonDir, arguments, result, outError);
+}
+
+static SlangResult _addDetachedWorktree(
+    const String& cachePath,
+    const String& destination,
+    const String& commit,
+    String& outError)
+{
+    bool exists = false;
+    SLANG_RETURN_ON_FAIL(_commitExists(cachePath, commit, exists, outError));
+    if (!exists)
+    {
+        outError = String("Selected commit is not in the local repository: ") + commit;
+        return SLANG_FAIL;
+    }
+    String parent = Path::getParentDirectory(destination);
+    if (parent.getLength() && !Path::createDirectoryRecursive(parent))
+    {
+        outError = String("Cannot create package destination: ") + parent;
+        return SLANG_FAIL;
+    }
+    List<String> arguments;
+    arguments.add("worktree");
+    arguments.add("add");
+    arguments.add("--detach");
+    arguments.add(destination);
+    arguments.add(commit);
+    ExecuteResult result;
+    return _runGit(cachePath, arguments, result, outError);
 }
 
 static SlangResult _removeCheckoutForReplacement(
@@ -1359,182 +1587,108 @@ static SlangResult _materializeRevision(
     const String& disclosedUnpushedReport,
     bool unpushedDeletionApproved)
 {
-    ExecuteResult result;
+    SLANG_UNUSED(gitURL);
+    SLANG_UNUSED(allowMovingRefs);
+    if (!_hasGitMetadata(cachePath))
+    {
+        outError = String("Package repository is missing: ") + cachePath;
+        return SLANG_FAIL;
+    }
+
     SlangPathType pathType;
-    bool destinationExisted = SLANG_SUCCEEDED(Path::getPathType(destination, &pathType));
+    const bool destinationExisted = SLANG_SUCCEEDED(Path::getPathType(destination, &pathType));
     if (!destinationExisted)
     {
-        if (!_hasGitDir(cachePath))
-        {
-            outError = String("Package cache is missing: ") + cachePath;
-            return SLANG_FAIL;
-        }
-        if (!Path::createDirectoryRecursive(destination))
-        {
-            outError = String("Cannot create package destination: ") + destination;
-            return SLANG_FAIL;
-        }
-        List<String> initArguments;
-        initArguments.add("init");
-        initArguments.add("-q");
-        SLANG_RETURN_ON_FAIL(_runGit(destination, initArguments, result, outError));
-        List<String> remoteAddArguments;
-        remoteAddArguments.add("remote");
-        remoteAddArguments.add("add");
-        remoteAddArguments.add("origin");
-        remoteAddArguments.add(gitURL);
-        SLANG_RETURN_ON_FAIL(_runGit(destination, remoteAddArguments, result, outError));
+        SLANG_RETURN_ON_FAIL(_addDetachedWorktree(cachePath, destination, targetCommit, outError));
         ioDidMaterialize = true;
-    }
-    else if (!_hasGitDir(destination))
-    {
-        if (!allowClean)
-        {
-            outError = String("Package destination is not a Git repository; refusing to replace "
-                              "it without --clean: ") +
-                       destination;
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(_removeCheckoutForReplacement(
-            destination,
-            disclosedUnpushedReport,
-            unpushedDeletionApproved,
-            "Cannot replace package destination: ",
-            outError));
-        return _materializeRevision(
-            gitURL,
-            String(),
-            targetCommit,
-            destination,
-            false,
-            allowMovingRefs,
-            cachePath,
-            ioDidMaterialize,
-            outError,
-            disclosedUnpushedReport,
-            unpushedDeletionApproved);
+        return SLANG_OK;
     }
 
-    List<String> remoteArguments;
-    remoteArguments.add("remote");
-    remoteArguments.add("get-url");
-    remoteArguments.add("origin");
-    SLANG_RETURN_ON_FAIL(_runGit(destination, remoteArguments, result, outError));
-    if (String(result.standardOutput.trim()) != gitURL)
+    bool sameRepository = false;
+    if (_hasGitMetadata(destination))
     {
-        if (!allowClean)
+        String destinationCommon;
+        String cacheCommon;
+        String commonError;
+        if (SLANG_SUCCEEDED(_canonicalGitCommonDir(destination, destinationCommon, commonError)) &&
+            SLANG_SUCCEEDED(_canonicalGitCommonDir(cachePath, cacheCommon, commonError)))
         {
-            outError = String("Package checkout has a different origin; refusing to replace it "
-                              "without --clean: ") +
-                       destination;
-            return SLANG_FAIL;
+            sameRepository = destinationCommon == cacheCommon;
         }
-        SLANG_RETURN_ON_FAIL(_removeCheckoutForReplacement(
-            destination,
-            disclosedUnpushedReport,
-            unpushedDeletionApproved,
-            "Cannot replace package checkout: ",
-            outError));
-        return _materializeRevision(
-            gitURL,
-            String(),
-            targetCommit,
-            destination,
-            false,
-            allowMovingRefs,
-            cachePath,
-            ioDidMaterialize,
-            outError,
-            disclosedUnpushedReport,
-            unpushedDeletionApproved);
     }
 
-    if (destinationExisted && currentCommit.getLength())
+    if (sameRepository)
     {
+        const String expected = currentCommit.getLength() ? currentCommit : targetCommit;
         GitWorkingTreeStatus status;
-        SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, currentCommit, status, outError));
-        const bool hasUncommittedState = status.changedFileCount != 0 || status.stashCount != 0;
-        if (!hasUncommittedState && status.headCommit == targetCommit)
-        {
-            // The work tree is current, but its tags and origin-tracking branches may still lag
-            // behind the cache. Stage those refs without checking out the files again.
-            return _stageCachedRepository(
-                cachePath,
-                destination,
-                targetCommit,
-                allowMovingRefs,
-                outError);
-        }
+        SLANG_RETURN_ON_FAIL(getWorkingTreeStatus(destination, expected, status, outError));
+        const bool filesClean = status.changedFileCount == 0;
+        if (filesClean && status.headCommit == targetCommit)
+            return SLANG_OK;
 
-        const bool isSafe = !hasUncommittedState && status.commitsAhead == 0 &&
-                            status.commitsBehind == 0 && status.headCommit == currentCommit;
-        if (!isSafe)
+        const bool atCurrent = currentCommit.getLength() && filesClean && status.stashCount == 0 &&
+                               status.commitsAhead == 0 && status.commitsBehind == 0 &&
+                               status.headCommit == currentCommit;
+        if (!atCurrent)
         {
             if (!allowClean)
             {
-                outError = String("Package checkout has changed files, commits, or stashes; "
-                                  "refusing to replace it without --clean: ") +
-                           destination;
+                outError = currentCommit.getLength()
+                               ? String("Package checkout has changed files, commits, or stashes; "
+                                        "refusing to replace it without --clean: ") +
+                                     destination
+                               : String("Package checkout is not owned by the current lock; "
+                                        "refusing to replace it without --clean: ") +
+                                     destination;
                 return SLANG_FAIL;
             }
-            SLANG_RETURN_ON_FAIL(_removeCheckoutForReplacement(
-                destination,
-                disclosedUnpushedReport,
-                unpushedDeletionApproved,
-                "Cannot replace package checkout: ",
-                outError));
-            return _materializeRevision(
-                gitURL,
-                String(),
-                targetCommit,
-                destination,
-                false,
-                allowMovingRefs,
-                cachePath,
-                ioDidMaterialize,
-                outError,
-                disclosedUnpushedReport,
-                unpushedDeletionApproved);
+            if (!filesClean)
+                SLANG_RETURN_ON_FAIL(_discardWorktreeFiles(destination, outError));
         }
+        SLANG_RETURN_ON_FAIL(_retainCommit(destination, status.headCommit, outError));
+        ioDidMaterialize = true;
+        return checkoutDetachedCommit(destination, targetCommit, outError);
     }
-    else if (destinationExisted)
+
+    if (!allowClean)
     {
-        if (!allowClean)
-        {
-            outError = String("Package checkout is not owned by the current lock; refusing to "
-                              "replace it without --clean: ") +
-                       destination;
-            return SLANG_FAIL;
-        }
+        outError = _hasGitMetadata(destination)
+                       ? String("Package checkout is not a worktree of the resolved repository; "
+                                "refusing to replace it without --clean: ") +
+                             destination
+                       : String("Package destination is not a Git repository; refusing to replace "
+                                "it without --clean: ") +
+                             destination;
+        return SLANG_FAIL;
+    }
+
+    SlangPathType gitType;
+    if (SLANG_SUCCEEDED(Path::getPathType(Path::combine(destination, ".git"), &gitType)) &&
+        gitType == SLANG_PATH_TYPE_FILE)
+    {
+        SLANG_RETURN_ON_FAIL(_removeLinkedWorktree(destination, outError));
+    }
+    else
+    {
         SLANG_RETURN_ON_FAIL(_removeCheckoutForReplacement(
             destination,
             disclosedUnpushedReport,
             unpushedDeletionApproved,
             "Cannot replace package checkout: ",
             outError));
-        return _materializeRevision(
-            gitURL,
-            String(),
-            targetCommit,
-            destination,
-            false,
-            allowMovingRefs,
-            cachePath,
-            ioDidMaterialize,
-            outError,
-            disclosedUnpushedReport,
-            unpushedDeletionApproved);
     }
-
-    ioDidMaterialize = true;
-    SLANG_RETURN_ON_FAIL(
-        _stageCachedRepository(cachePath, destination, targetCommit, allowMovingRefs, outError));
-
-    List<String> checkoutArguments;
-    checkoutArguments.add("checkout");
-    checkoutArguments.add("--detach");
-    checkoutArguments.add(targetCommit);
-    return _runGit(destination, checkoutArguments, result, outError);
+    return _materializeRevision(
+        gitURL,
+        String(),
+        targetCommit,
+        destination,
+        false,
+        allowMovingRefs,
+        cachePath,
+        ioDidMaterialize,
+        outError,
+        disclosedUnpushedReport,
+        unpushedDeletionApproved);
 }
 
 SlangResult materializeLockedRevision(
@@ -1729,14 +1883,16 @@ SlangResult listTagNames(const String& repositoryPath, List<String>& outTags, St
 {
     outTags.clear();
     List<String> arguments;
-    arguments.add("tag");
-    arguments.add("--list");
+    arguments.add("for-each-ref");
+    arguments.add("--format=%(refname)");
+    arguments.add("refs/tags");
+    arguments.add("refs/slang-cache/tags");
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
     for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
     {
-        String tag = line.trim();
-        if (tag.getLength())
+        String tag = _tagNameFromRef(line.trim());
+        if (tag.getLength() && !_tagListContains(outTags, tag))
             outTags.add(tag);
     }
     return SLANG_OK;
@@ -1797,15 +1953,10 @@ static SlangResult _canonicalTagsAtCommit(
     List<EditLineTag>& ioTags,
     String& outError)
 {
-    List<String> arguments;
-    arguments.add("tag");
-    arguments.add("--points-at");
-    arguments.add(commit);
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
-    for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
+    List<String> tags;
+    SLANG_RETURN_ON_FAIL(_tagNamesAtCommit(repositoryPath, commit, tags, outError));
+    for (const auto& tag : tags)
     {
-        String tag = line.trim();
         PackageVersion version;
         if (!tag.getLength() || !acceptCanonicalReleaseTag(tag, version, nullptr))
             continue;

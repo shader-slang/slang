@@ -78,7 +78,7 @@ public:
 
     SlangResult initialize(String& outError)
     {
-        cacheRoot = Path::combine(projectRoot, ".slang", "cache");
+        cacheRoot = Path::combine(Path::combine(projectRoot, ".slang"), "repositories");
         if (allowRemote && !Path::createDirectoryRecursive(cacheRoot))
         {
             outError = String("Cannot create package cache directory: ") + cacheRoot;
@@ -93,7 +93,7 @@ public:
         String& outRepositoryPath,
         String& outError)
     {
-        outRepositoryPath = Path::combine(cacheRoot, packageName);
+        outRepositoryPath = packageRepositoryPath(projectRoot, git);
         String cacheKey = packageName + "\n" + git;
         if (preparedPackages.indexOf(cacheKey) >= 0)
         {
@@ -122,7 +122,7 @@ public:
                 DeferredCacheReplacement replacement;
                 replacement.packageName = packageName;
                 replacement.gitURL = git;
-                replacement.canonicalPath = Path::combine(cacheRoot, packageName);
+                replacement.canonicalPath = packageRepositoryPath(projectRoot, git);
                 replacement.replacementPath = activePath;
                 replacement.report = unpushedReport;
                 deferredCacheReplacements.add(replacement);
