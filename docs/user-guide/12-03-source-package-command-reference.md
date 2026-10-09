@@ -131,12 +131,18 @@ change its version range. The declaration is a Git URL and a version range. The 
 dotted release tag, and the lock records that tag and commit. Check out a branch with
 [`edit`](#edit). Hold a solved release with [`pin`](#pin).
 
-`--path`, `--ref`, and `--as` are rejected. A dependency is a Git repository checked out at
-`deps/<name>`.
+A dependency is a Git repository checked out at `deps/<name>`. `<name>` identifies the package in
+the graph and must match the selected package manifest. `--path`, `--ref`, and `--as` are rejected.
 
-When `--git` is omitted, the command reads `SLANG_PACKAGE_INDEX`. That variable is a local path
-or an `http`/`https` URL of a package index. A relative path is resolved from the current
-directory. The index is JSON:
+When `--git` is omitted, the command reads `SLANG_PACKAGE_INDEX`. `fetch` and `update` do not.
+Remapping an existing graph uses [`--remap-urls`](#update).
+
+`SLANG_PACKAGE_INDEX`
+: A local path or an `http`/`https` URL of a package index. A relative path is resolved from the
+current directory. An `http` or `https` index is downloaded with `curl`. An explicit `--git` is
+used as given, and the variable is not read.
+
+The index is JSON:
 
 ```json
 {
@@ -147,17 +153,21 @@ directory. The index is JSON:
 }
 ```
 
-`schema_version` must be the integer `1`. `packages` maps a package name to one Git URL. The
-command writes that URL into `slang-package.json` as if `--git` had been passed. `--version` is
-still required. An explicit `--git` is used as given and the variable is not read. If
-the variable is unset or empty, omitting `--git` fails. An `http` or `https` index is downloaded
-with `curl`. When `curl` is not on `PATH`, the command warns that `curl` is not installed and
-fails because the name cannot be resolved without `--git` or an accessible index. A variable that
-is set but names an index that cannot be read fails, and so does a name the index does not list.
-`fetch` and `update` do not read `SLANG_PACKAGE_INDEX`. Remapping an existing graph uses
-[`--remap-urls`](#update).
+`schema_version`
+: The integer `1`.
 
-`<name>` identifies the package in the graph and must match the selected package manifest.
+`packages`
+: Maps a package name to one Git URL. The command writes that URL into `slang-package.json` as if
+`--git` had been passed. `--version` is still required.
+
+The command fails, and does not change the manifest, when:
+
+- `--git` is omitted and `SLANG_PACKAGE_INDEX` is unset or empty;
+- the variable names an index that cannot be read;
+- the index is an `http` or `https` URL and `curl` is not on `PATH` — the command warns that
+  `curl` is not installed, then fails because the name cannot be resolved without `--git` or an
+  accessible index;
+- the index does not list `<name>`.
 
 #### Options
 
@@ -167,14 +177,17 @@ characters or quotes, or use Git's command-executing `ext::` transport.
 
 `--version <range>`
 : Select a compatible release tag. A version is one or more decimal components with no `v`
-prefix, for example `1.4` or `1.4.0.2`. Trailing zero components are the same release, so
-`1.4.0` and `1.4` match the canonical tag `v1.4`, while `1.4.0.2` is the different release
-`v1.4.0.2`. Whitespace joins comparisons with AND and `||` joins alternatives, for example
-`>=1.2.0 <2.0.0 !=1.4.0`. `^1.2.3` means `>=1.2.3 <2`, `^0.0.0.4` means
-`>=0.0.0.4 <0.0.0.5`, and `~1.2.3` means `>=1.2.3 <1.3`. A `^` or `~` bound uses the components
-as written, so `^0.0.0` is narrower than `^0`. A bare version matches that one release.
+prefix. Trailing zero components are the same release, so `1.4.0` and `1.4` match the canonical
+tag `v1.4`, while `1.4.0.2` is the different release `v1.4.0.2`. A `^` or `~` bound uses the
+components as written, so `^0.0.0` is narrower than `^0`.
 
-`dependency pin` has been removed. Use [`pin`](#pin) to hold a solved version in the lock.
+    - `1.4` — that one release
+    - `>=1.2.0 <2.0.0` — whitespace joins comparisons with AND
+    - `>=1.2.0 <2.0.0 || 3.0.0` — `||` joins alternatives
+    - `!=1.4.0` — exclude one release
+    - `^1.2.3` — `>=1.2.3 <2`
+    - `^0.0.0.4` — `>=0.0.0.4 <0.0.0.5`
+    - `~1.2.3` — `>=1.2.3 <1.3`
 
 ### `dependency remove`
 
@@ -216,17 +229,23 @@ slang package pin <name>
 
 Set the pin boolean on a lock row. The boolean lives in `slang-package-lock.json`, not in
 `slang-package.json`. The manifest range is left as it was. `update` will not move a pinned
-version. `edit` and `unedit` leave the boolean as they found it. `edit <name> --advance` and an ending of
-`unedit` can move the version and leave the boolean set.
+version. `edit` and `unedit` leave the boolean as they found it. `edit <name> --advance` and an
+ending of `unedit` can move the version and leave the boolean set.
 
-`<version>` is an exact dotted version, and it is required when the dependency is not edited. The
-command resolves the canonical tag for that release, such as `v1.2` for `1.2` or `1.2.0`, stores
-that version and the tag's commit, and sets the boolean. The version has to satisfy every incoming
-constraint. When it does not, or when no canonical tag exists, `pin` fails and leaves the row
-unchanged.
+Not edited
+: `<version>` is required. It is an exact dotted version. The command resolves the canonical tag
+for that release, such as `v1.2` for `1.2` or `1.2.0`, stores that version and the tag's commit,
+and sets the boolean. The version has to satisfy every incoming constraint.
 
-While the dependency is edited, `pin <name>` sets the boolean and leaves the version and the
-branch alone. Passing `<version>` in that state fails.
+Edited
+: `pin <name>` sets the boolean and leaves the version and the branch alone.
+
+The command fails and leaves the row unchanged when:
+
+- `<version>` is omitted and the dependency is not edited;
+- `<version>` is passed while the dependency is edited;
+- the version does not satisfy every incoming constraint;
+- no canonical tag exists for that release.
 
 ## `unpin`
 
@@ -253,20 +272,32 @@ slang package edit <name> --advance
 
 ### Description
 
-`edit` applies to a dependency that is already resolved. The branch name is required. Without
-`--create`, the branch must already exist and the command checks it out in `deps/<name>`. With
-`--create`, a missing branch is created from the commit the dependency is resolved to. `--create`
-does not reset a branch that already exists.
+`edit` applies to a dependency that is already resolved. The lock row keeps the version, tag, and
+commit it already had, and records the branch beside them. The pin boolean is unchanged. Editing a
+pinned dependency starts the branch at the pinned commit. Editing a dependency that is not pinned
+does not set the boolean. `fetch` does not check out the represented commit.
 
-The lock row keeps the version, tag, and commit it already had, and records the branch beside
-them. The pin boolean is unchanged. Editing a pinned dependency starts the branch at the pinned
-commit. Editing a dependency that is not pinned does not set the boolean. `fetch` does not check
-out the represented commit.
+### Options
 
-`edit <name> --advance` looks for canonical release tags on one line of history: from the branch
-tip back to the commit of the release the row is representing. At a merge, a parent that does not
-contain that commit is skipped. When more than one parent contains it, the walk takes the first
-parent.
+`--branch <branch>`
+: Check out `<branch>` in `deps/<name>`. The branch must already exist unless `--create` is also
+given. Required, except with `--advance`.
+
+`--create`
+: Create a missing branch from the commit the dependency is resolved to. Requires `--branch`.
+Does not reset a branch that already exists.
+
+`--advance`
+: Replace the represented release with the greatest newer canonical tag on one line of history,
+as described below. Cannot be combined with `--branch` or `--create`. The package name is the
+first argument, so a dependency named `advance` is edited with `edit advance --branch <branch>`.
+`update` does not run this, and it does not change an edited checkout.
+
+### Advancing the represented release
+
+`edit <name> --advance` looks for canonical release tags from the branch tip back to the commit of
+the release the row is representing. At a merge, a parent that does not contain that commit is
+skipped. When more than one parent contains it, the walk takes the first parent.
 
 Consider a branch created at the `v1.2` commit, then updated by merging `main`:
 
@@ -283,15 +314,16 @@ adopt. The same merge performed the other way around, with `main` checked out, w
 `v1.4` as the first parent, and the walk would see `v1.4` on its way back to `v1.2`. The result
 follows whichever line was current at the merge.
 
-One `edit <name> --advance` replaces the version, the tag, and the commit with the
-greatest canonical tag on that walk that is newer than the stored version and that still satisfies
-incoming constraints. When `v1.3` and `v1.4` are both on the line, the row becomes `1.4`. The
-command does not stop at the next tag and wait for another advance. The branch stays, and the
-checkout does not move. `--advance` cannot be combined with `--branch` or `--create`. The package
-name is the first argument, so a dependency named `advance` is edited with
-`edit advance --branch <branch>`. When no such tag exists, or the walk never visits that commit,
-the command says so and leaves the row unchanged. `update` does not run this, and it does not change
-an edited checkout.
+One `edit <name> --advance`:
+
+- replaces the version, the tag, and the commit with the greatest canonical tag on that walk that
+  is newer than the stored version and that still satisfies incoming constraints;
+- when `v1.3` and `v1.4` are both on the line, makes the row `1.4`, rather than stopping at the
+  next tag;
+- leaves the branch checked out and does not move the checkout.
+
+When no such tag exists, or the walk never visits that commit, the command says so and leaves the
+row unchanged.
 
 ## `unedit`
 
@@ -303,46 +335,60 @@ slang package unedit <name> [--restore | --advance | --tag <version>] [--clean]
 
 ### Description
 
-End an edit on a release row: a version and a commit. Declining a prompt leaves the edit. There
-is no `--yes`. An ending that needs approval asks, and a run without a terminal fails and leaves
-the edit. `--advance`, `--restore`, and `--tag` select one ending and cannot be combined. None of
-them changes the pin boolean.
+End an edit on a release row: a version and a commit. None of the endings changes the pin boolean.
+An ending that needs approval asks. There is no `--yes`. Declining a prompt leaves the edit. A run
+without a terminal fails and leaves the edit.
 
-The command looks for a canonical release tag on the same line of history `edit <name> --advance` uses.
-The candidate is the greatest such tag that is strictly newer than the represented release and
-that still satisfies the dependency constraints. A tag that arrived only through a merge of some
-other line is not a candidate.
+The command looks for a canonical release tag on the same line of history
+[`edit --advance`](#advancing-the-represented-release) uses. The candidate is the greatest such tag
+that is strictly newer than the represented release and that still satisfies the dependency
+constraints. A tag that arrived only through a merge of some other line is not a candidate.
 
-When that newer tag is the commit that is checked out, the lock switches to that version and
-commit. The checkout does not move, and there is no prompt.
+With no ending flag, the command picks one of these outcomes:
 
-When the newer tag is behind the checked-out commit, the command tells how many commits would
-leave the workspace and asks whether to check out the tag. Approving writes that version and that
-tag's commit. Declining does not fall through to the older release.
+Checked-out commit is that newer tag
+: The lock switches to that version and commit. The checkout does not move, and there is no prompt.
 
-When a newer tag exists and none of them satisfy the constraints, the command says which tag was
-rejected and why, then offers only the release the edit is already representing.
+Newer tag is behind `HEAD`
+: The command tells how many commits would leave the workspace and asks whether to check out the
+tag. Approving writes that version and that tag's commit. Declining does not fall through to the
+older release.
 
-When no newer satisfying tag exists, the only ending is that same release. That requires approval
-even when the checkout is already on that commit.
+A newer tag exists and none satisfy the constraints
+: The command says which tag was rejected and why, then offers only the release the edit is already
+representing.
 
-`--advance` selects the newer tag and fails when no newer tag on that line satisfies the
-constraints. It asks only when the checkout would move.
+No newer satisfying tag
+: The only ending is that same release. That requires approval even when the checkout is already on
+that commit.
 
-`--restore` checks out the version and commit the edit is representing. After `edit <name> --advance`,
-that is the commit just advanced to. A newer legal tag is named and then left unused. This always
-asks.
+### Options
 
-`--tag <version>` creates a local annotated tag on the checked-out commit, then selects it the
-way `--advance` does without moving `HEAD`. `<version>` is an exact dotted version. The tag name
-is `v` plus the canonical spelling, so `1.4.0` creates `v1.4`. The command fails before creating
-the tag when the release already has a tag, the version is not strictly greater than the version
-stored on the edit, the version is not strictly greater than every canonical tag already on the
-edit line, or the version does not satisfy the constraints. The tag is not pushed.
+`--advance`, `--restore`, and `--tag` select one ending and cannot be combined.
 
-`--clean` discards uncommitted files, untracked files, and stashes so `HEAD` may move. It does
-not approve dropping commits that follow a tag. Apply it only for an ending that would move
-`HEAD`. A dirty checkout blocks that move until the changes are committed or `--clean` is passed.
+`--advance`
+: Select the newer tag. Fail when no newer tag on that line satisfies the constraints. Ask only
+when the checkout would move.
+
+`--restore`
+: Check out the version and commit the edit is representing. After `edit <name> --advance`, that is
+the commit just advanced to. A newer legal tag is named and then left unused. This always asks.
+
+`--tag <version>`
+: Create a local annotated tag on the checked-out commit, then select it the way `--advance` does
+without moving `HEAD`. `<version>` is an exact dotted version. The tag name is `v` plus the
+canonical spelling, so `1.4.0` creates `v1.4`. The tag is not pushed. The command fails before
+creating the tag when:
+
+    - the release already has a tag;
+    - the version is not strictly greater than the version stored on the edit;
+    - the version is not strictly greater than every canonical tag already on the edit line;
+    - the version does not satisfy the constraints.
+
+`--clean`
+: Discard uncommitted files, untracked files, and stashes so `HEAD` may move. It does not approve
+dropping commits that follow a tag. Apply it only for an ending that would move `HEAD`. A dirty
+checkout blocks that move until the changes are committed or `--clean` is passed.
 
 ## `fetch`
 
@@ -363,14 +409,15 @@ An edited checkout is left on its recorded branch. A clean tool-owned checkout a
 the correct origin and commit is left untouched. The command regenerates
 `slang-package-includes.txt`.
 
-When dependencies exist but the lock is absent, `fetch` runs `update` to create the first lock and
-uses the same confirmation behavior. When neither a lock nor a dependency graph exists, use
-`update` to create an empty lock.
+When the lock is absent:
 
-`fetch` installs the Git URLs recorded in the lock and does not read a remap index. With an
-existing lock, `--remap-urls <url>` re-resolves instead, using that index for every listed package
-name and saving the URL in the lock. `<url>` must be `http` or `https`. A later `update` keeps
-using the index stored in the lock. `fetch` cannot clear that policy; use `update --no-remap`.
+- dependencies exist: `fetch` runs `update` to create the first lock, with the same confirmation
+  behavior;
+- neither a lock nor dependencies exist: the command fails. Run `update` to create an empty lock.
+
+`fetch` installs the Git URLs recorded in the lock and does not read a remap index. `--remap-urls`
+is the exception. A later `update` keeps using an index stored in the lock. `fetch` cannot clear
+that policy; use `update --no-remap`.
 
 Fetch installs the commit recorded in the lock even when its original tag has since moved. It
 does not select newer releases or apply publisher retractions. Workspace exclusions are current
@@ -380,7 +427,9 @@ workspace policy and can make an existing lock stale.
 
 `--clean`
 : Permit replacement of a dirty, unowned, wrong-origin, or wrong-commit tool-owned checkout.
-Destructive replacements are listed before confirmation.
+Destructive replacements are listed before confirmation. Without this option, `fetch` stops before
+modifying any tree when a tool-owned checkout contains local state. Use `edit` to preserve that
+work, or pass `--clean` to discard it.
 
 `--yes`
 : Approve required checkout or moved-ref changes without an interactive prompt. With no changes
@@ -392,11 +441,9 @@ materialization. The legal workspace-graph and upstream-cache checks still run. 
 prints a warning.
 
 `--remap-urls <url>`
-: Re-resolve and record `<url>` as the lock's remap index. The same rules as
-[`update --remap-urls`](#update) apply. Passing the option twice, or omitting `<url>`, is an error.
-
-Without `--clean`, `fetch` stops before modifying any tree when a tool-owned checkout contains
-local state. Use `edit` to preserve that work or `--clean` to discard it.
+: Re-resolve and record `<url>` as the lock's remap index. `<url>` must be `http` or `https`. The
+same rules as [`update --remap-urls`](#update) apply, including the warning and error when `curl`
+is not installed. Passing the option twice, or omitting `<url>`, is an error.
 
 ## `update`
 
@@ -428,41 +475,32 @@ After materialization, update checks publishability for new or changed Git trees
 module layout and import-path uniqueness across the complete selected graph. The
 new lock is written only after those checks succeed.
 
-When the proposed lock differs, a package Git URL would change, a separate Git repository would be
-deleted, local checkout state would be discarded, or an existing named Git ref in a separate
-`deps/` repository would move, update asks for confirmation. Declining interactively changes
-nothing and succeeds. A
+Update asks before it applies a change that needs approval. The cases are listed under
+[Confirmation](#confirmation). Declining in a terminal changes nothing and succeeds. A
 non-interactive invocation that requires confirmation fails unless `--yes` is given.
 
-A separate Git repository is not deleted while it has commits or tags that are not on one of its
-remotes. The command lists those commits and tags with the confirmation. `--yes` approves that
-deletion after the list is printed. If the remotes cannot be contacted, the repository is left in
-place. Removing a worktree does not delete the permanent repository under `.slang/repositories`,
-so branches, tags, and commits there are kept without that list.
+A separate Git repository under `deps/` is deleted only when its commits and tags are on a remote:
+
+- the command lists commits and tags that are not on a remote, together with the confirmation;
+- `--yes` approves that deletion after the list is printed;
+- if the remotes cannot be contacted, the repository is left in place;
+- removing a worktree does not delete the permanent repository under `.slang/repositories`, so
+  branches, tags, and commits there are kept without that list.
 
 When the lock records a remap index, `update` reads that index and resolves every listed package
 name from its Git URL. Names the index does not list keep the manifest URL. The manifest itself is
-left unchanged. If the index cannot be read, the command fails and the lock stays. When `curl` is
-not on `PATH`, that failure is preceded by a warning that `curl` is not installed, and the error
-reports that the index cannot be accessed.
+left unchanged. A pin keeps its version. The checkout of an edited package is not moved onto
+another URL.
 
-`--remap-urls <url>` sets or replaces that index. `<url>` must be `http` or `https`. It is not
-taken from `SLANG_PACKAGE_INDEX`. The command lists each package whose Git URL would change, then
-one confirmation covers that list together with any other update changes. `--yes` approves it.
-Declining writes nothing. After approval the lock stores both `<url>` and the resolved Git URLs.
+During a remap, the command fails and the lock stays when:
 
-`--no-remap` clears the index and re-resolves from the manifest Git URLs. It lists packages whose
-URLs would change back and uses the same confirmation. `--no-remap` and `--remap-urls` together
-are an error.
-
-An edited package whose URL would change stops the command before the prompt. Unedit it first.
-A pin keeps its version. The canonical tag for that version must exist on the repository the
-resolve is using; if it does not, the solve fails and the lock stays. The checkout of an edited
-package is not moved onto another URL.
+- the index cannot be read;
+- `curl` is not on `PATH` — the command first warns that `curl` is not installed, and the error
+  says the index cannot be accessed;
+- an edited package's URL would change (unedit it first);
+- a pin's canonical tag is not on the repository the resolve is using.
 
 ### Options
-
-`--ignore-overrides` has been removed.
 
 `--clean`
 : Permit replacement of dirty or otherwise mismatched tool-owned checkouts. The affected
@@ -491,14 +529,16 @@ network-free preview.
 trees. The legal graph and cache checks still run, and the command prints a warning.
 
 `--remap-urls <url>`
-: Resolve listed packages from the Git URLs in the package index at `<url>`, and record `<url>` in
-the lock. `<url>` must be `http` or `https`. URL changes are listed and confirmed with the rest of
-the update. Passing the option twice, or omitting `<url>`, is an error. It cannot be combined
-with `--no-remap`.
+: Set or replace the lock's remap index with `<url>` and resolve listed packages from the Git URLs
+in that index. `<url>` must be `http` or `https`. It is not taken from `SLANG_PACKAGE_INDEX`. URL
+changes are listed with the rest of the update, and one confirmation covers that list. `--yes`
+approves it. Declining writes nothing. After approval the lock stores both `<url>` and the resolved
+Git URLs. Passing the option twice, or omitting `<url>`, is an error. It cannot be combined with
+`--no-remap`.
 
 `--no-remap`
-: Drop the lock's remap index and resolve from the manifest Git URLs. URL changes are listed and
-confirmed with the rest of the update.
+: Drop the lock's remap index and resolve from the manifest Git URLs. Packages whose URLs would
+change back are listed and confirmed with the rest of the update.
 
 ## `status`
 
@@ -520,9 +560,11 @@ stale lock, missing cache pins or checkouts, dirty checkouts, edits, or source l
 Suggested corrective commands are printed where appropriate.
 
 Like `git status`, reportable drift is information and does not itself make the command fail.
-`status` returns failure only when the required root manifest or an existing lock cannot be read
-and parsed well enough to produce a report, and when `slang-package-overlay.json` still contains
-entries.
+`status` returns nonzero only when:
+
+- the required root manifest cannot be read and parsed well enough to produce a report;
+- an existing lock cannot be read and parsed well enough to produce a report;
+- `slang-package-overlay.json` still contains entries.
 
 The command does not contact remotes, modify package state, inspect `out/`, or look for newer
 releases.
@@ -717,6 +759,8 @@ documentation; run `bundle` first.
 
 Without options, open `out/docs/index.md` with the platform's registered Markdown application.
 
+### Option
+
 `--print`
 : Print the canonical path to the generated index instead of opening it. This form is suitable for
 scripts.
@@ -763,11 +807,18 @@ stay as published. A remap does not rewrite them.
 
 `slang-package-lock.json`
 : Committed exact selected graph. Optional `remap_index` is the `http` or `https` package index
-`update` reads on later resolves. A release row records `git`, `ref`, `commit`, and `version`.
-An edit row records `git`, `branch`, `ref`, `version`, and `commit`. The tag and commit are the
-release the branch is representing, and that row is not something to commit. `pinned` is recorded
-only when the boolean is set. A `path` field is
-rejected.
+`update` reads on later resolves. `pinned` is recorded only when the boolean is set. A `path` field
+is rejected.
+
+    A release row records:
+
+    - `git`
+    - `ref` — the resolved canonical tag
+    - `commit`
+    - `version`
+
+    An edit row records those fields plus `branch`. The tag and commit are the release the branch
+    is representing. That row is not something to commit.
 
 `slang-package-overlay.json`
 : No longer used. `init` still lists it in `.gitignore`. A file that contains entries is an error.
@@ -796,6 +847,14 @@ Commands return zero on success and nonzero on errors. An interactively declined
 a successful no-op. `status` also returns zero for reportable drift such as an incomplete graph or
 dirty checkout; it fails only when required package metadata cannot be read well enough to produce
 the report.
+
+## Removed
+
+`dependency pin`
+: Removed. Use [`pin`](#pin).
+
+`update --ignore-overrides`
+: Removed.
 
 ## See also
 
