@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test for error 31156 (expected static custom derivative).
 // A static member function with a non-static derivative should trigger this error.

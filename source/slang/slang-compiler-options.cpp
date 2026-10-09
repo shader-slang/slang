@@ -370,6 +370,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLBinding:
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
+        case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
@@ -714,6 +715,13 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
     }
 
     // Handle diagnostic color setting.

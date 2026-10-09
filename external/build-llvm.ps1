@@ -106,6 +106,13 @@ Msg "##########################################################"
 Msg "# Fetching LLVM from $repo at $branch"
 Msg "##########################################################"
 git clone --depth 1 --branch $branch $repo $sourceDir
+if ($LASTEXITCODE -ne 0) { Fail "Failed to fetch LLVM from $repo at $branch" }
+
+# LLVM's ARM COFF linker must decode scaled load offsets as byte addends.
+# This backport can be removed when the pinned LLVM includes llvm/llvm-project#229712.
+$llvmPatch = Join-Path $PSScriptRoot "llvm-coff-pageoffset12l.patch"
+git -C $sourceDir apply $llvmPatch
+if ($LASTEXITCODE -ne 0) { Fail "Failed to apply $llvmPatch" }
 
 # Configure LLVM with CMake
 Msg "##########################################################"

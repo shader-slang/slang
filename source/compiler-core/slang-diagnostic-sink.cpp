@@ -671,7 +671,8 @@ bool DiagnosticSink::diagnoseRichImpl(
             getSourceLocationLexer(),
             sourceManager,
             {.enableTerminalColors = shouldEnableTerminalColors(),
-             .enableUnicode = shouldEnableUnicode()},
+             .enableUnicode = shouldEnableUnicode(),
+             .format = getDiagnosticFormat()},
             effectiveDiagnostic);
     }
 

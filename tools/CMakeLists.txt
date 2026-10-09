@@ -388,6 +388,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
     add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(slang-test slang-numerics-modules)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -509,7 +510,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             metal-cpp
             Threads::Threads
         LINK_WITH_FRAMEWORK Foundation Metal
-        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/examples
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
