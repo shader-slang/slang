@@ -1742,6 +1742,28 @@ static void collectGenericStructTypeUses(
     }
 }
 
+/// Diagnose each `uniform` array parameter of `funcDeclRef` whose type, after substituting
+/// any generic arguments in `funcDeclRef`, ends in an unsized array of ordinary data. We skip
+/// parameters that are not array-typed, because `visitParamDecl` already rejects any other
+/// unsized parameter type (E30072).
+static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
+    SemanticsVisitor* visitor,
+    DeclRef<FuncDecl> funcDeclRef)
+{
+    auto astBuilder = visitor->getASTBuilder();
+    for (auto paramDeclRef : getParameters(astBuilder, funcDeclRef))
+    {
+        auto param = paramDeclRef.getDecl();
+        if (!param->hasModifier<HLSLUniformModifier>() ||
+            !as<ArrayExpressionType>(param->getType()))
+            continue;
+        diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
+            visitor,
+            getType(astBuilder, paramDeclRef),
+            param);
+    }
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -2332,6 +2354,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             sink->diagnose(
                 Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{.param = param});
         }
+    }
+
+    // Uniform entry-point parameters share an implicit constant buffer, so they follow the same
+    // rule as global uniform parameters.
+    {
+        auto shared = SharedSemanticsContext::createForOptionalModule(
+            linkage,
+            module,
+            linkage->m_optionSet.getLanguageVersion(),
+            sink);
+        SemanticsVisitor visitor(shared);
+        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, entryPoint->getFuncDeclRef());
     }
 
     // Validate that varying parameter/return types are legal. Runs after the
@@ -3735,6 +3769,11 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     }
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
+
+    // `validateEntryPoint` cannot decide whether an element type such as `T` in
+    // `uniform T values[]` holds ordinary data, so we check the specialized parameters again.
+    if (genericSpecializationParamCount)
+        diagnoseUnsizedOrdinaryDataInEntryPointUniforms(&visitor, specializedFuncDeclRef);
 
     // Once the generic parameters (if any) have been dealt with,
     // any remaining specialization arguments are for existential/interface

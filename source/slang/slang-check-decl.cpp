@@ -3802,6 +3802,14 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         checkMutableGlobalVariableType(this, varDecl, varTypeTags);
     }
 
+    // A GLSL `buffer` global is a storage buffer rather than a member of the implicit constant
+    // buffer, and an explicit parameter group is checked against its element type below.
+    if (isGlobalShaderParameter(varDecl) && !varDecl->hasModifier<GLSLBufferModifier>() &&
+        !getConstantBufferElementType(varDecl->getType()))
+    {
+        diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(this, varDecl->getType(), varDecl);
+    }
+
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
         if (doesTypeHaveTag(elementType, TypeTag::Unsized))
@@ -22810,6 +22818,8 @@ VarDeclBase* getTrailingUnsizedArrayElement(
                         continue;
                     lastVarDecl = varDecl;
                 }
+                if (!lastVarDecl)
+                    return nullptr;
                 auto lastMember =
                     _getMemberDeclRef(getCurrentASTBuilder(), aggTypeDecl, lastVarDecl)
                         .as<VarDeclBase>();
@@ -22823,8 +22833,10 @@ VarDeclBase* getTrailingUnsizedArrayElement(
                 continue;
             }
         }
+        // Any other type, such as an error type or a generic parameter, has no trailing field
+        // to descend into.
+        return nullptr;
     }
-    return nullptr;
 }
 
 bool isImmutableBufferType(Type* type)
@@ -22914,6 +22926,110 @@ bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type)
 {
     HashSet<Decl*> seen;
     return _typeTransitivelyContainsOpaqueHandleImpl(visitor, type, seen);
+}
+
+/// Returns true if `type` is a resource handle that resource legalization moves out of an
+/// aggregate into its own binding, so that the handle occupies no ordinary (uniform) bytes.
+/// The list mirrors the object types that `_createTypeLayout` lays out as resources.
+static bool _isHandleWithoutOrdinaryData(Type* type)
+{
+    return as<ResourceType>(type) || as<SamplerStateType>(type) ||
+           as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type) ||
+           as<UniformParameterGroupType>(type) || as<GLSLShaderStorageBufferType>(type) ||
+           as<DynamicResourceType>(type) || as<SubpassInputType>(type) ||
+           as<GLSLInputAttachmentType>(type) || as<GLSLAtomicUintType>(type);
+}
+
+static bool _isTypeKnownToHoldOrdinaryDataImpl(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Decl*>& seen)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    if (_isHandleWithoutOrdinaryData(type))
+        return false;
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _isTypeKnownToHoldOrdinaryDataImpl(visitor, arrayType->getElementType(), seen);
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (_isTypeKnownToHoldOrdinaryDataImpl(visitor, tupleType->getMember(i), seen))
+                return true;
+        }
+        return false;
+    }
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto decl = declRefType->getDeclRef().getDecl();
+
+    // Every other builtin type, such as a scalar, vector, matrix, pointer or `Optional<T>`,
+    // is stored as ordinary data. So is an enum.
+    if (as<EnumDecl>(decl) || decl->hasModifier<BuiltinTypeModifier>() ||
+        decl->hasModifier<MagicTypeModifier>())
+        return true;
+
+    // A generic parameter, associated type or interface type is only resolved by
+    // specialization, so we cannot prove that it holds ordinary data.
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return false;
+
+    // A by-value cycle has unbounded size and is diagnosed elsewhere; we only need to stop.
+    auto structDecl = structDeclRef.getDecl();
+    if (!seen.add(structDecl))
+        return false;
+    auto astBuilder = visitor->getASTBuilder();
+    bool result = false;
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        visitor->ensureDecl(fieldDeclRef.getDecl(), DeclCheckState::SignatureChecked);
+        if (_isTypeKnownToHoldOrdinaryDataImpl(visitor, getType(astBuilder, fieldDeclRef), seen))
+        {
+            result = true;
+            break;
+        }
+    }
+    if (!result)
+    {
+        if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+            result = _isTypeKnownToHoldOrdinaryDataImpl(visitor, baseStructType, seen);
+    }
+    seen.remove(structDecl);
+    return result;
+}
+
+bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Decl*> seen;
+    return _isTypeKnownToHoldOrdinaryDataImpl(visitor, type, seen);
+}
+
+// The compiler packs the ordinary data of global and entry-point uniform parameters into an
+// implicit constant buffer (`GlobalParams` / `EntryPointParams`). Like an explicit `cbuffer`,
+// that buffer cannot hold an unsized array of ordinary data: the array has no finite layout,
+// so every later field would land at an unbounded offset. An unsized array whose elements are
+// only resource handles stays valid, because legalization turns it into a descriptor array.
+void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
+    SemanticsVisitor* visitor,
+    Type* type,
+    VarDeclBase* varDecl)
+{
+    if (!visitor->doesTypeHaveTag(type, TypeTag::Unsized))
+        return;
+    ArrayExpressionType* trailingArrayType = nullptr;
+    VarDeclBase* trailingArrayField =
+        getTrailingUnsizedArrayElement(type, varDecl, trailingArrayType);
+    if (!trailingArrayField ||
+        !isTypeKnownToHoldOrdinaryData(visitor, trailingArrayType->getElementType()))
+        return;
+    visitor->getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{
+        .type = trailingArrayType,
+        .field = trailingArrayField});
 }
 
 bool containsRecursiveTypeImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)

@@ -1,0 +1,51 @@
+// shader-slang/slang#13530: the compiler packs the ordinary data of global uniform
+// parameters into an implicit constant buffer. Like an explicit `cbuffer`, that buffer
+// cannot hold an unsized array of ordinary data, so we diagnose E31215 instead of
+// producing an invalid layout. Resource-only unsized arrays stay valid (see
+// unsized-array-implicit-constant-buffer-valid.slang).
+
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main
+
+uniform var input: float4[];
+//CHECK:    ^^^^^ unsized type in constant buffer
+//CHECK:    ^^^^^ cannot use unsized type 'vector<float,4>[]' in a constant buffer.
+uniform var addend: float4;
+
+uniform float4 nested[][2];
+//CHECK:       ^^^^^^ unsized type in constant buffer
+//CHECK:       ^^^^^^ cannot use unsized type 'vector<float,4>[2][]' in a constant buffer.
+
+struct TrailingData
+{
+    float4 a;
+    float4 x[];
+//CHECK:   ^ unsized type in constant buffer
+//CHECK:   ^ cannot use unsized type 'vector<float,4>[]' in a constant buffer.
+}
+uniform TrailingData trailing;
+
+// A resource field does not make the element resource-only: `v` is still ordinary data.
+struct Mixed
+{
+    Texture2D t;
+    float4 v;
+}
+uniform Mixed mixed[];
+//CHECK:      ^^^^^ unsized type in constant buffer
+//CHECK:      ^^^^^ cannot use unsized type 'Mixed[]' in a constant buffer.
+
+// A pointer is an address stored in uniform memory, not a resource binding.
+uniform float4* pointers[];
+//CHECK:        ^^^^^^^^ unsized type in constant buffer
+//CHECK:        ^^^^^^^^ cannot use unsized type 'Ptr<vector<float,4>
+
+SamplerState samplerState;
+RWStructuredBuffer<float4> output;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main()
+{
+    output[0] = input[2277] + addend + nested[3][1] + trailing.x[3] + mixed[2].v + *pointers[1] +
+                mixed[1].t.SampleLevel(samplerState, float2(0), 0);
+}

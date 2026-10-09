@@ -4634,6 +4634,22 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
+// Returns true if `type` is known to occupy ordinary (uniform) bytes in a constant buffer.
+// Resource handles occupy none, because resource legalization moves each handle out of its
+// aggregate into its own binding: `struct R { Texture2D t; SamplerState s; }` holds no
+// ordinary data, while `struct M { Texture2D t; float4 v; }` holds `v`. A pointer is an
+// address stored in uniform memory, so it is ordinary data. We return false when the answer
+// depends on specialization, as for a generic parameter `T` or an interface type.
+bool isTypeKnownToHoldOrdinaryData(SemanticsVisitor* visitor, Type* type);
+
+// Diagnose `varDecl`, a shader parameter that the compiler packs into an implicit
+// constant buffer, when `type` (its declared or specialized type) ends in an unsized
+// array of ordinary data.
+void diagnoseUnsizedOrdinaryDataInImplicitConstantBuffer(
+    SemanticsVisitor* visitor,
+    Type* type,
+    VarDeclBase* varDecl);
+
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

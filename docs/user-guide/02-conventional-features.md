@@ -168,8 +168,7 @@ int g( int b[] )
 {
     return f(b); // transitive calls are allowed.
 }
-uniform int unsizedParam[];
-void test()
+void test(int unsizedParam[])
 {
     g(unsizedParam); // Not OK, `unsizedParam` doesn't have a known size at compile time.
     int arr[3];
