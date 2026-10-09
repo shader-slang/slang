@@ -1,240 +1,96 @@
-name: Populate sccache
+name: Seed all LLVM prebuilts (manual)
 
 on:
-  schedule:
-    - cron: "*/30 * * * *" # Every 30 minutes
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 concurrency:
-  group: sccache-populate
+  group: llvm-prebuilt-seed
   cancel-in-progress: false
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
-  check-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      should-build: ${{ steps.check.outputs.should-build }}
-      last-commit: ${{ steps.check.outputs.last-commit }}
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    name: LLVM ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    # A native Windows ARM64 LLVM build can take nearly two hours by itself.
+    # Allow roughly twice that time for runner variance, compression, and staging.
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            compiler: gcc
+            platform: x86_64
+            runner: ubuntu-22.04
+          - os: linux
+            compiler: gcc
+            platform: aarch64
+            runner: ubuntu-24.04-arm
+          # The WASM job builds host LLVM, but requests its own cache key.
+          - os: linux
+            compiler: gcc
+            platform: wasm
+            runner: ubuntu-22.04
+          - os: macos
+            compiler: clang
+            platform: aarch64
+            runner: macos-latest
+          - os: windows
+            compiler: cl
+            platform: x86_64
+            runner: windows-2022
+          - os: windows
+            compiler: cl
+            platform: aarch64
+            runner: windows-11-vs2026-arm
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up native build tools
+        uses: ./.github/actions/common-setup
         with:
-          ref: ${{ github.event.repository.default_branch }}
-          fetch-depth: 10
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          config: release
+          build-llvm: false
 
-      - name: Check if all sccache caches exist
-        id: check
+      - name: Build LLVM from source
+        shell: bash
         run: |
-          # Get current master HEAD
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "last-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          ./external/build-llvm.sh --install-prefix "$(pwd)/build/llvm-project-install"
 
-          # Check that all sccache config caches exist for this commit
-          CONFIGS=(
-            "sccache-linux-gcc-x86_64-release-${CURRENT_COMMIT}"
-            "sccache-linux-gcc-x86_64-debug-${CURRENT_COMMIT}"
-            "sccache-macos-clang-aarch64-release-${CURRENT_COMMIT}"
-            "sccache-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-linux-gcc-aarch64-release-${CURRENT_COMMIT}"
-            "sccache-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
-            "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
-          )
-
-          MISSING=0
-          for key in "${CONFIGS[@]}"; do
-            COUNT=$(gh api "repos/${{ github.repository }}/actions/caches?key=${key}" --jq '.total_count' 2>/dev/null || echo "0")
-            if [ "$COUNT" -eq 0 ]; then
-              echo "❌ Missing: ${key}"
-              MISSING=$((MISSING + 1))
-            else
-              echo "✅ Found: ${key}"
-            fi
-          done
-
-          if [ "$MISSING" -eq 0 ]; then
-            echo "✅ All sccache caches exist for commit ${CURRENT_COMMIT}"
-            echo "should-build=false" >> $GITHUB_OUTPUT
-          else
-            echo "🔨 ${MISSING} cache(s) missing for commit ${CURRENT_COMMIT}, rebuilding all"
-            echo "should-build=true" >> $GITHUB_OUTPUT
-          fi
+      - name: Archive new prebuilt
+        id: archive
+        shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+        run: |
+          # Match setup-llvm-from-gcs's key and restore layout: archive the
+          # install contents directly, without an enclosing directory.
+          # Slang's CMake configuration requires both installed packages.
+          test -f build/llvm-project-install/lib/cmake/llvm/LLVMConfig.cmake
+          test -f build/llvm-project-install/lib/cmake/clang/ClangConfig.cmake
+          archive_path="${RUNNER_TEMP}/${LLVM_KEY}.tar.gz"
+          tar_path="$archive_path"
+          # Git Bash's GNU tar interprets a Windows drive-letter colon as a
+          # remote archive. Keep the native path for upload-artifact below.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            tar_path=$(cygpath -u "$archive_path")
+          fi
+          tar -czf "$tar_path" -C build/llvm-project-install .
+          tar -tzf "$tar_path" > /dev/null
+          echo "path=$archive_path" >> "$GITHUB_OUTPUT"
 
-  build-linux-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build-container.yml
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    with:
-      config: release
-      runs-on: '["ubuntu-22.04"]'
-
-  build-linux-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build-container.yml
-    permissions:
-      id-token: write
-      contents: read
-      packages: read
-    with:
-      config: debug
-      runs-on: '["ubuntu-22.04"]'
-
-  build-macos-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: macos
-      compiler: clang
-      platform: aarch64
-      config: release
-      runs-on: '["macos-latest"]'
-      warnings-as-errors: true
-      build-llvm: true
-      save-sccache: true
-
-  build-macos-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: macos
-      compiler: clang
-      platform: aarch64
-      config: debug
-      runs-on: '["macos-latest"]'
-      warnings-as-errors: true
-      build-llvm: true
-      save-sccache: true
-
-  build-linux-aarch64-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: linux
-      compiler: gcc
-      platform: aarch64
-      config: release
-      runs-on: '["ubuntu-24.04-arm"]'
-      warnings-as-errors: false
-      build-llvm: true
-      save-sccache: true
-
-  build-linux-aarch64-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: linux
-      compiler: gcc
-      platform: aarch64
-      config: debug
-      runs-on: '["ubuntu-24.04-arm"]'
-      warnings-as-errors: false
-      build-llvm: true
-      save-sccache: true
-
-  build-windows-release:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "build"]'
-      warnings-as-errors: true
-      build-llvm: true
-      save-sccache: true
-
-  build-windows-debug:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "build"]'
-      warnings-as-errors: true
-      build-llvm: true
-      save-sccache: true
-
-  # Populate the separate cache namespace used by the statically linked unit tests. A
-  # static build shares no objects with the shared builds above, so these need
-  # their own entries.
-  populate-static-unit-test-linux-aarch64:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
-    permissions:
-      contents: read
-    with:
-      os: linux
-      compiler: gcc
-      platform: aarch64
-      config: debug
-      runs-on: '["ubuntu-24.04-arm"]'
-      save-sccache: true
-
-  populate-static-unit-test-macos:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
-    permissions:
-      contents: read
-    with:
-      os: macos
-      compiler: clang
-      platform: aarch64
-      config: debug
-      runs-on: '["macos-latest"]'
-      save-sccache: true
-
-  populate-static-unit-test-windows:
-    needs: check-changes
-    if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
-    permissions:
-      contents: read
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["windows-2022"]'
-      save-sccache: true
+      - name: Stage new prebuilt for publication
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
