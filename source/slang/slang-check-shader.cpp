@@ -1778,19 +1778,23 @@ static void diagnoseUnsizedOrdinaryDataInEntryPointUniforms(
 /// `type_param`s, and the specialized declaration of each generic entry point. A composite such
 /// as `{library, mainModule, entryPoint}` can bind a `type_param` declared in `library` that
 /// only `mainModule` uses, so the arguments are only complete for the whole component type.
+/// A composite may list a module or an entry point more than once, so each is collected once.
 struct UnsizedOrdinaryDataSpecializationCollector : ComponentTypeVisitor
 {
     GlobalGenericArgs globalGenericArgs;
+    HashSet<Module*> moduleSet;
     List<Module*> modules;
+    HashSet<FuncDecl*> entryPointFuncDecls;
     List<DeclRef<FuncDecl>> entryPointFuncDeclRefs;
 
     void visitEntryPoint(
         EntryPoint* entryPoint,
         EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        entryPointFuncDeclRefs.add(
-            specializationInfo ? specializationInfo->specializedFuncDeclRef
-                               : entryPoint->getFuncDeclRef());
+        auto funcDeclRef = specializationInfo ? specializationInfo->specializedFuncDeclRef
+                                              : entryPoint->getFuncDeclRef();
+        if (entryPointFuncDecls.add(funcDeclRef.getDecl()))
+            entryPointFuncDeclRefs.add(funcDeclRef);
     }
 
     void visitRenamedEntryPoint(
@@ -1803,6 +1807,8 @@ struct UnsizedOrdinaryDataSpecializationCollector : ComponentTypeVisitor
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
         SLANG_OVERRIDE
     {
+        if (!moduleSet.add(module))
+            return;
         modules.add(module);
         if (!specializationInfo)
             return;
@@ -1852,6 +1858,15 @@ void diagnoseUnsizedOrdinaryDataAfterSpecialization(
                     &visitor,
                     module->getShaderParam(i).paramDeclRef.getDecl(),
                     &collector.globalGenericArgs);
+            }
+            // A module specialized on its own, as in `module->specialize(...)`, is not a
+            // component of its entry points, but they are compiled with its bindings once the
+            // specialized module is composed with them.
+            for (auto entryPoint : module->getEntryPoints())
+            {
+                auto funcDeclRef = entryPoint->getFuncDeclRef();
+                if (collector.entryPointFuncDecls.add(funcDeclRef.getDecl()))
+                    collector.entryPointFuncDeclRefs.add(funcDeclRef);
             }
         }
     }

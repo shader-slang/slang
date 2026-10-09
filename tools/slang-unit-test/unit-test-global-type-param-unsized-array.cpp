@@ -36,8 +36,16 @@ static const char* kGlobalTypeParamUnsizedArraySource = R"(
     }
     )";
 
+enum class Composition
+{
+    ModuleAndEntryPoint,
+    ModuleOnly,
+    ModuleTwiceAndEntryPoint,
+};
+
 static ComPtr<slang::IComponentType> specializeGlobalTypeParams(
     slang::ISession* session,
+    Composition composition,
     const char* elementTypeArg,
     const char* arrayTypeArg,
     ComPtr<slang::IBlob>& outDiagnostics)
@@ -55,18 +63,39 @@ static ComPtr<slang::IComponentType> specializeGlobalTypeParams(
     if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
         return nullptr;
 
-    slang::IComponentType* components[] = {module, entryPoint};
     ComPtr<slang::IComponentType> program;
-    if (SLANG_FAILED(session->createCompositeComponentType(components, 2, program.writeRef())))
+    SlangInt specArgCount = 2;
+    switch (composition)
+    {
+    case Composition::ModuleAndEntryPoint:
+        {
+            slang::IComponentType* components[] = {module, entryPoint};
+            session->createCompositeComponentType(components, 2, program.writeRef());
+            break;
+        }
+    case Composition::ModuleOnly:
+        program = module;
+        break;
+    case Composition::ModuleTwiceAndEntryPoint:
+        {
+            slang::IComponentType* components[] = {module, module, entryPoint};
+            session->createCompositeComponentType(components, 3, program.writeRef());
+            specArgCount = 4;
+            break;
+        }
+    }
+    if (!program)
         return nullptr;
 
     // We pass the types as expressions: reflection would lay out the unspecialized program,
     // and `TT globalValues[]` has no layout until `TT` is bound.
     slang::SpecializationArg specArgs[] = {
         slang::SpecializationArg::fromExpr(elementTypeArg),
+        slang::SpecializationArg::fromExpr(arrayTypeArg),
+        slang::SpecializationArg::fromExpr(elementTypeArg),
         slang::SpecializationArg::fromExpr(arrayTypeArg)};
     ComPtr<slang::IComponentType> specialized;
-    program->specialize(specArgs, 2, specialized.writeRef(), outDiagnostics.writeRef());
+    program->specialize(specArgs, specArgCount, specialized.writeRef(), outDiagnostics.writeRef());
     return specialized;
 }
 
@@ -152,13 +181,19 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
     sessionDesc.targets = &targetDesc;
 
     // `globalValues`, `entryPointValues` and `globalArray` each end in an unsized array of
-    // ordinary data once `TT := Data` and `TA := float4[]` are bound.
+    // ordinary data once `TT := Data` and `TA := float4[]` are bound, and each is reported once
+    // however the module and entry point are composed.
+    for (auto composition :
+         {Composition::ModuleAndEntryPoint,
+          Composition::ModuleOnly,
+          Composition::ModuleTwiceAndEntryPoint})
     {
         ComPtr<slang::ISession> session;
         SLANG_CHECK_ABORT(
             globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
         ComPtr<slang::IBlob> diagnostics;
-        auto specialized = specializeGlobalTypeParams(session, "Data", "float4[]", diagnostics);
+        auto specialized =
+            specializeGlobalTypeParams(session, composition, "Data", "float4[]", diagnostics);
         SLANG_CHECK(specialized == nullptr);
         SLANG_CHECK_ABORT(diagnostics != nullptr);
         auto text = (const char*)diagnostics->getBufferPointer();
@@ -175,6 +210,7 @@ SLANG_UNIT_TEST(globalTypeParamUnsizedArray)
         ComPtr<slang::IBlob> diagnostics;
         auto specialized = specializeGlobalTypeParams(
             session,
+            Composition::ModuleAndEntryPoint,
             "Texture2D<float4>",
             "Texture2D<float4>[]",
             diagnostics);
