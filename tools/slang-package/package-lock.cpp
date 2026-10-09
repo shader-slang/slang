@@ -76,23 +76,6 @@ SlangResult validateLockedDependency(
             return SLANG_FAIL;
         }
     }
-    // An edit replaces the commit locator with a branch, so the manifest's `ref` is not what the
-    // lock row is tracking until `unedit` lands on a release again.
-    if (dependency.ref.getLength() && !isEditedLockedPackage(lockedPackage))
-    {
-        if (!lockedPackage.path.getLength() && lockedPackage.ref != dependency.ref)
-        {
-            outError = String("Lock file no longer matches the pinned ref for dependency '") +
-                       dependency.name + "'. Run 'slang package update'.";
-            return SLANG_FAIL;
-        }
-        if (dependency.as.getLength() && !sameExactRelease(lockedPackage.version, dependency.as))
-        {
-            outError = String("Lock file no longer matches the pinned ref for dependency '") +
-                       dependency.name + "'. Run 'slang package update'.";
-            return SLANG_FAIL;
-        }
-    }
     return SLANG_OK;
 }
 

@@ -35,8 +35,9 @@ static void _printHelp(bool experimental = false)
         "\n"
         "Manifest (slang-package.json):\n"
         "  init              Create a package in the current directory.\n"
-        "  dependency add <name> [--git <url>] (--version <range> | --ref <ref> [--as <ver>])\n"
-        "                    Without --git, SLANG_PACKAGE_INDEX supplies the Git URL.\n"
+        "  dependency add <name> [--git <url>] --version <range>\n"
+        "                    Add a dependency. Adding the same name again changes its version\n"
+        "                    range. Without --git, SLANG_PACKAGE_INDEX supplies the Git URL.\n"
         "  dependency remove <name> | list\n"
         "  dep               Alias for dependency.\n"
         "\n"
@@ -1144,7 +1145,7 @@ static SlangResult _dependencyList(const String& projectRoot, String& outError)
                 dependency.path.getBuffer(),
                 dependency.as.getBuffer());
         }
-        else if (dependency.version.getLength())
+        else
         {
             fprintf(
                 stdout,
@@ -1152,17 +1153,6 @@ static SlangResult _dependencyList(const String& projectRoot, String& outError)
                 dependency.name.getBuffer(),
                 dependency.git.getBuffer(),
                 dependency.version.getBuffer());
-        }
-        else
-        {
-            fprintf(
-                stdout,
-                "  %s: %s ref %s%s%s\n",
-                dependency.name.getBuffer(),
-                dependency.git.getBuffer(),
-                dependency.ref.getBuffer(),
-                dependency.as.getLength() ? " as " : "",
-                dependency.as.getBuffer());
         }
     }
     return SLANG_OK;
@@ -2338,10 +2328,7 @@ static String _describeDependencyRequirement(const Dependency& dependency)
 {
     if (dependency.path.getLength())
         return String("path ") + dependency.path + " as " + dependency.as;
-    if (dependency.version.getLength())
-        return String("version ") + dependency.version;
-    return String("ref ") + dependency.ref +
-           (dependency.as.getLength() ? String(" as ") + dependency.as : String());
+    return String("version ") + dependency.version;
 }
 
 static void _getSortedDependencies(
@@ -3468,10 +3455,13 @@ SlangResult executeInDirectory(
                 }
                 else if (option == "--version")
                     dependency.version = value;
-                else if (option == "--ref")
-                    dependency.ref = value;
-                else if (option == "--as")
-                    dependency.as = value;
+                else if (option == "--ref" || option == "--as")
+                {
+                    outError = "dependency add selects a version range. The lock records the "
+                               "resolved tag; use edit to check out a branch and pin to hold a "
+                               "release.";
+                    return SLANG_FAIL;
+                }
                 else
                 {
                     outError = String("Unknown dependency add option: ") + option;
@@ -3511,14 +3501,10 @@ SlangResult executeInDirectory(
                 }
             }
             bool validGitVersion = dependency.git.getLength() && dependency.version.getLength() &&
-                                   !dependency.path.getLength() && !dependency.ref.getLength() &&
-                                   !dependency.as.getLength();
-            bool validGitRef = dependency.git.getLength() && dependency.ref.getLength() &&
-                               !dependency.path.getLength() && !dependency.version.getLength();
-            if (!(validGitVersion || validGitRef))
+                                   !dependency.path.getLength();
+            if (!validGitVersion)
             {
-                outError = "Dependency add requires --git URL --version RANGE, or --git URL "
-                           "--ref REF [--as VERSION].";
+                outError = "Dependency add requires --git URL --version RANGE.";
                 return SLANG_FAIL;
             }
             return _dependencyAdd(projectRoot, dependency, outError);

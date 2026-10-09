@@ -364,6 +364,13 @@ static SlangResult _readDependencies(
                 outError = String("Path dependencies are no longer supported: ") + dependency.name;
                 return SLANG_FAIL;
             }
+            if (key == "ref" || key == "as")
+            {
+                outError = String("Dependency '") + dependency.name +
+                           "' selects a version range. The lock records the resolved tag; use "
+                           "edit to check out a branch and pin to hold a release.";
+                return SLANG_FAIL;
+            }
         }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "git", dependency.git, outError));
@@ -387,56 +394,26 @@ static SlangResult _readDependencies(
         }
         SLANG_RETURN_ON_FAIL(
             _readOptionalString(container, pair.value, "version", dependency.version, outError));
-        SLANG_RETURN_ON_FAIL(
-            _readOptionalString(container, pair.value, "ref", dependency.ref, outError));
-        SLANG_RETURN_ON_FAIL(
-            _readOptionalString(container, pair.value, "as", dependency.as, outError));
         if (dependency.path.getLength())
         {
-            if (dependency.version.getLength() || dependency.ref.getLength() ||
-                !dependency.as.getLength())
+            if (dependency.version.getLength() || !dependency.as.getLength())
             {
                 outError =
                     String("Path dependency must contain 'path' and 'as' only: ") + dependency.name;
                 return SLANG_FAIL;
             }
         }
-        else
+        else if (!dependency.version.getLength())
         {
-            if (dependency.as.getLength() && !dependency.ref.getLength())
-            {
-                outError =
-                    String("Git dependency '") + dependency.name + "' has 'as' without 'ref'.";
-                return SLANG_FAIL;
-            }
-            if (dependency.ref.getLength() && !_isSafeGitRef(dependency.ref))
-            {
-                outError = String("Dependency has an unsafe Git ref: ") + dependency.name;
-                return SLANG_FAIL;
-            }
-            if (!dependency.version.getLength() && !dependency.ref.getLength())
-            {
-                outError =
-                    String("Git dependency '") + dependency.name + "' requires 'version' or 'ref'.";
-                return SLANG_FAIL;
-            }
-        }
-        PackageVersion providedVersion;
-        if (dependency.as.getLength())
-        {
-            SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, providedVersion, outError));
+            outError = String("Git dependency '") + dependency.name + "' requires 'version'.";
+            return SLANG_FAIL;
         }
         if (dependency.version.getLength())
         {
+            // Parsing the range is the check. The solver reads the same text later.
             VersionConstraint constraint;
             SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
-            if (dependency.as.getLength() && !constraint.matches(providedVersion))
-            {
-                outError = String("Dependency '") + dependency.name + "' provides version " +
-                           dependency.as + " via 'as', which does not satisfy 'version' " +
-                           dependency.version + ".";
-                return SLANG_FAIL;
-            }
+            SLANG_UNUSED(constraint);
         }
         for (const auto& existing : outDependencies)
         {
@@ -974,16 +951,6 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
         {
             _writeKey(writer, "version");
             writer.addStringValue(dependency.version.getUnownedSlice(), SourceLoc());
-        }
-        if (dependency.ref.getLength() != 0)
-        {
-            _writeKey(writer, "ref");
-            writer.addStringValue(dependency.ref.getUnownedSlice(), SourceLoc());
-            if (dependency.as.getLength() != 0)
-            {
-                _writeKey(writer, "as");
-                writer.addStringValue(dependency.as.getUnownedSlice(), SourceLoc());
-            }
         }
     }
     writer.endObject(SourceLoc());

@@ -168,10 +168,8 @@ The canonical tag is `v` plus that spelling, with no leading zeros and no traili
 `v1.2.0`, `v1.2.3.0`, and `v01.2.3` are ignored. The solver warns once for each ignored tag and
 names the canonical tag. These are dotted release identifiers, not Semantic Version values, and a
 component must fit in 32 bits. At most 32 components are accepted, counted before trailing zeros
-are removed. A manifest may instead pin an opaque branch or
-tag with `ref` and omit `as` to derive the solver identity from the nearest release tag on that
-line, or write `as` to assign it explicitly. `schema_version` in `slang-package.json` is only the
-file format version. A release row records the Git URL, canonical tag, exact version, and commit.
+are removed. `schema_version` in `slang-package.json` is only the file format version.
+A release row records the Git URL, canonical tag, exact version, and commit.
 An edit row records the Git URL, branch, and the version, canonical tag, and commit of the release
 that branch is representing. `edit <name> --advance` moves that version, tag, and commit together. `pinned`
 is a boolean on the row and is
@@ -194,14 +192,12 @@ ignored excludes are visible. Resolution skips excluded Git releases. Unlike a p
 exclusion changes the workspace's declared resolution intent, so
 `fetch` rejects a lock that still selects an excluded release and asks for `slang package update`.
 
-Each dependency entry has one of two shapes, matching `slang package dependency add`:
+Each dependency entry is a Git URL plus a `version` range, matching `slang package dependency add`.
+The solver selects the highest compatible dotted release tag. The lock records that tag and commit.
+A branch checkout is an edit on the lock row, and a held release is a pin on the lock row.
 
-- `git` plus `version` selects the highest compatible dotted release tag.
-- `git`, `ref`, and optional `as` selects an opaque branch, tag, or full 40-character commit ID.
-  Omit `as` to derive the exact solver version from the nearest release tag
-  reachable from that commit. Write `as` to claim a different identity.
-
-A `path` field is rejected. Every dependency is a Git repository checked out at `deps/<name>`.
+A `path`, `ref`, or `as` field is rejected. Every dependency is a Git repository checked out at
+`deps/<name>`.
 
 `git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
 `||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, `!=`, `^`, and `~`
@@ -212,13 +208,12 @@ means `>=1.2.3 <2`, `^0.2.3` means `>=0.2.3 <0.3`, `^0.0.3` means `>=0.0.3 <0.0.
 at least two are written, and the only component otherwise: `~1.2.3` means `>=1.2.3 <1.3`,
 `~1.2.3.4` means `>=1.2.3.4 <1.3`, and `~1` means `>=1 <2`. For example, `^1.2 !=1.5.0` accepts
 later 1.x releases except 1.5.0, and `~1.2.3 || ^2` accepts either alternative. Dependents still
-unify one version per package name: every incoming constraint must match that version. Both
-`version` and `as` omit the release tag's `v` prefix. A bare version matches one release, so
+unify one version per package name: every incoming constraint must match that version.
+`version` omits the release tag's `v` prefix. A bare version matches one release, so
 `1.2.3` also matches `1.2.3.0`. A `^` or `~` bound still uses every component that was written,
 including trailing zeros: `^0.0.0` means `>=0 <0.0.1`, which is narrower than `^0`. Because
-`2`, `2.0`, and `2.0.0` are the same release, `<2.0.0` does not match `2` or `2.0`. `ref` is a
-branch, tag, or full 40-character commit ID. A release row records that resolved commit. An edit
-row records a branch instead.
+`2`, `2.0`, and `2.0.0` are the same release, `<2.0.0` does not match `2` or `2.0`. A release
+row records the resolved tag and commit. An edit row records a branch instead.
 
 One package name identifies one node in the graph. Requirements from multiple dependents must use
 the same Git location. The resolver intersects their constraints and chooses the highest satisfying
@@ -380,13 +375,15 @@ entries. That file is no longer used. It also reports when a locked ref or commi
 the existing cache.
 It does not inspect `out/`, modify package state, or contact remotes.
 
-Use `slang package dependency add` and `dependency remove` to change direct manifest edges, and
-`dependency list` to inspect them. `dep` is an alias for `dependency`. Add accepts `--git URL --version RANGE` or
-`--git URL --ref REF [--as VERSION]`. When `--git` is omitted and `SLANG_PACKAGE_INDEX` names a
+Use `slang package dependency add` to add a direct dependency or to change the version range of
+one already declared: adding the same name again replaces that declaration. Use
+`dependency remove` to drop one, and `dependency list` to inspect them. `dep` is an alias for
+`dependency`. Add accepts `--git URL --version RANGE`.
+When `--git` is omitted and `SLANG_PACKAGE_INDEX` names a
 package index, the Git URL is copied from that index into the manifest. The variable is a local
 path, resolved from the current directory when it is relative, or an `http`/`https` URL. The
 index is a JSON object with `"schema_version": 1` and a `packages` map from package name to Git
-URL. `--version` or `--ref` is still required, and an explicit `--git` is not replaced.
+URL. `--version` is still required, and an explicit `--git` is not replaced.
 `fetch` and `update` do not read that variable. `update --remap-urls URL` records an `http` or
 `https` package index in the lock and resolves listed packages from it, leaving manifest URLs
 unchanged. A later `update` reuses the index stored in the lock. `update --no-remap` clears it

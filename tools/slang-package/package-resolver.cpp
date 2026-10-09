@@ -20,8 +20,6 @@ struct GitRequirement
     String git;
     /// Git URL written on the dependency edge before the remap index replaces it.
     String declaredGit;
-    String ref;
-    String as;
     VersionConstraint constraint;
 };
 
@@ -145,52 +143,6 @@ public:
         String repositoryPath;
         SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
         return listReleaseTagsFromRepository(repositoryPath, outCandidates, outError, warnings);
-    }
-
-    virtual SlangResult resolveReference(
-        const String& packageName,
-        const String& git,
-        const String& ref,
-        TagCandidate& outCandidate,
-        String& outError) override
-    {
-        String repositoryPath;
-        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
-        if (isGitObjectId(ref))
-        {
-            SlangResult result = allowRemote ? fetchCachedCommit(repositoryPath, ref, outError)
-                                             : requireCachedCommit(repositoryPath, ref, outError);
-            SLANG_RETURN_ON_FAIL(result);
-        }
-        return resolveCachedReference(repositoryPath, ref, outCandidate, outError);
-    }
-
-    virtual SlangResult deriveReleaseVersion(
-        const String& packageName,
-        const String& git,
-        const String& commit,
-        PackageVersion& outVersion,
-        String& outError) override
-    {
-        String repositoryPath;
-        SLANG_RETURN_ON_FAIL(ensureCachedRepository(packageName, git, repositoryPath, outError));
-        String tag;
-        bool found = false;
-        SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
-            repositoryPath,
-            commit,
-            tag,
-            outVersion,
-            found,
-            outError,
-            warnings));
-        if (!found)
-        {
-            outError = String("Pinned ref for package '") + packageName +
-                       "' has no semantic-version tag in its Git history. Pass 'as'.";
-            return SLANG_FAIL;
-        }
-        return SLANG_OK;
     }
 
     virtual SlangResult loadManifest(
@@ -317,66 +269,6 @@ public:
         return SLANG_OK;
     }
 
-    virtual SlangResult resolveReference(
-        const String& packageName,
-        const String& git,
-        const String& ref,
-        TagCandidate& outCandidate,
-        String& outError) override
-    {
-        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
-        if (localIndex < 0)
-            return gitSource.resolveReference(packageName, git, ref, outCandidate, outError);
-
-        const LocalPackage& localPackage = (*localPackages)[localIndex];
-        PackageVersion version;
-        SLANG_RETURN_ON_FAIL(parseExactVersion(localPackage.as, version, outError));
-        outCandidate = TagCandidate();
-        outCandidate.path = localPackage.path;
-        outCandidate.ref = ref;
-        outCandidate.version = version;
-        return SLANG_OK;
-    }
-
-    virtual SlangResult deriveReleaseVersion(
-        const String& packageName,
-        const String& git,
-        const String& commit,
-        PackageVersion& outVersion,
-        String& outError) override
-    {
-        Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
-        if (localIndex < 0)
-            return gitSource.deriveReleaseVersion(packageName, git, commit, outVersion, outError);
-
-        const LocalPackage& localPackage = (*localPackages)[localIndex];
-        if (localPackage.as.getLength())
-            return parseExactVersion(localPackage.as, outVersion, outError);
-
-        String checkout;
-        SLANG_RETURN_ON_FAIL(getLocalPackageRoot(projectRoot, localPackage, checkout, outError));
-        String headCommit = commit;
-        if (!headCommit.getLength())
-            SLANG_RETURN_ON_FAIL(getRepositoryHeadCommit(checkout, headCommit, outError));
-        String tag;
-        bool found = false;
-        SLANG_RETURN_ON_FAIL(findNearestReleaseTag(
-            checkout,
-            headCommit,
-            tag,
-            outVersion,
-            found,
-            outError,
-            warnings));
-        if (!found)
-        {
-            outError = String("Override for package '") + packageName +
-                       "' has no semantic-version tag in its Git history. Pass 'as'.";
-            return SLANG_FAIL;
-        }
-        return SLANG_OK;
-    }
-
     virtual SlangResult loadManifest(
         const String& packageName,
         const String& git,
@@ -416,7 +308,7 @@ public:
 /// relative path, and `a` also depends on `b` by path. Name identity is unique, so there is one
 /// `b`. The path edge wins, Git constraints that only the Git pin contributed must disappear, and
 /// transitives that existed only because of that pin must be pruned. Path packages are selected
-/// immediately; Git packages are searched by release tag or resolved from one pinned ref.
+/// immediately; Git packages are searched by release tag.
 /// `ownerKey` records which selected representation added each Git requirement so a later path
 /// selection can retract it. Every candidate has one effective release version, including paths
 /// and local overrides, so all incoming version constraints use the same matching path.
@@ -558,30 +450,6 @@ private:
                 return false;
         }
         return true;
-    }
-
-    bool getPinnedIdentity(
-        const ResolutionPackage& package,
-        String& outRef,
-        String& outAs,
-        PackageVersion& outVersion) const
-    {
-        for (const auto& requirement : package.gitRequirements)
-        {
-            if (!requirement.ref.getLength())
-                continue;
-            outRef = requirement.ref;
-            outAs = requirement.as;
-            if (outAs.getLength())
-            {
-                String error;
-                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseExactVersion(outAs, outVersion, error)));
-            }
-            else
-                outVersion = PackageVersion();
-            return true;
-        }
-        return false;
     }
 
     const Exclusion* findExclusion(const String& packageName, const PackageVersion& version) const
@@ -780,22 +648,6 @@ private:
         if (index < 0 || !packages[index].selected)
             return String();
         return packages[index].locked.version;
-    }
-
-    static String gitConstraintText(const Dependency& dependency)
-    {
-        String text = dependency.version;
-        if (dependency.ref.getLength())
-        {
-            String pin = String("ref ") + dependency.ref;
-            if (dependency.as.getLength())
-                pin = pin + " as " + dependency.as;
-            if (text.getLength())
-                text = text + ", " + pin;
-            else
-                text = pin;
-        }
-        return text;
     }
 
     void addConstraintNote(
@@ -1016,17 +868,6 @@ private:
                        dependency.as + ", which conflicts with a Git version constraint.";
             return SLANG_FAIL;
         }
-        String pinnedRef;
-        String pinnedAs;
-        PackageVersion pinnedVersion;
-        if (getPinnedIdentity(package, pinnedRef, pinnedAs, pinnedVersion) &&
-            pinnedAs.getLength() && pinnedVersion != pathVersion)
-        {
-            outError = String("Path dependency '") + dependency.name + "' provides version " +
-                       dependency.as + ", which conflicts with pinned Git version " + pinnedAs +
-                       ".";
-            return SLANG_FAIL;
-        }
         if (package.git.getLength())
         {
             addWarning(
@@ -1090,36 +931,15 @@ private:
                 String("Package '") + dependency.name + "' is required from more than one Git URL.";
             return SLANG_FAIL;
         }
-        if (dependency.ref.getLength())
-        {
-            for (const auto& existing : package.gitRequirements)
-            {
-                if (existing.ref.getLength() && existing.ref != dependency.ref)
-                {
-                    outError = String("Package '") + dependency.name +
-                               "' is pinned to more than one Git ref or 'as' version.";
-                    return SLANG_FAIL;
-                }
-                if (existing.ref.getLength() && existing.as.getLength() &&
-                    dependency.as.getLength() && !sameExactRelease(existing.as, dependency.as))
-                {
-                    outError = String("Package '") + dependency.name +
-                               "' is pinned to more than one Git ref or 'as' version.";
-                    return SLANG_FAIL;
-                }
-            }
-        }
 
         package.git = git;
         GitRequirement requirement;
         requirement.owner = declaringManifest.ownerKey;
         requirement.git = git;
         requirement.declaredGit = dependency.git;
-        requirement.ref = dependency.ref;
-        requirement.as = dependency.as;
         requirement.constraint = constraint;
         package.gitRequirements.add(requirement);
-        addConstraintNote(package, declaringManifest, gitConstraintText(dependency), constraint);
+        addConstraintNote(package, declaringManifest, dependency.version, constraint);
         return SLANG_OK;
     }
 
@@ -1167,14 +987,6 @@ private:
                            package.locked.version + ", which conflicts with a Git constraint.";
                 return SLANG_FAIL;
             }
-            if (dependency.ref.getLength() && dependency.as.getLength() &&
-                !sameExactRelease(dependency.as, package.locked.version))
-            {
-                outError = String("Path dependency '") + dependency.name + "' provides version " +
-                           package.locked.version + ", which conflicts with pinned Git version " +
-                           dependency.as + ".";
-                return SLANG_FAIL;
-            }
             SLANG_RETURN_ON_FAIL(
                 addGitRequirement(package, dependency, declaringManifest, constraint, outError));
             return SLANG_OK;
@@ -1190,15 +1002,6 @@ private:
             {
                 outError = String("Selected version of package '") + dependency.name +
                            "' conflicts with a transitive constraint.";
-                return SLANG_FAIL;
-            }
-            if (dependency.ref.getLength() &&
-                (package.locked.ref != dependency.ref ||
-                 (dependency.as.getLength() &&
-                  !sameExactRelease(package.locked.version, dependency.as))))
-            {
-                outError = String("Selected package '") + dependency.name +
-                           "' conflicts with a pinned Git ref.";
                 return SLANG_FAIL;
             }
         }
@@ -1406,49 +1209,10 @@ private:
 
         List<TagCandidate> candidates;
         List<Retraction> retractions;
-        String pinnedRef;
-        String pinnedAs;
-        PackageVersion pinnedVersion;
-        if (getPinnedIdentity(unresolved, pinnedRef, pinnedAs, pinnedVersion))
-        {
-            TagCandidate candidate;
-            SLANG_RETURN_ON_FAIL(source->resolveReference(
-                unresolved.name,
-                unresolved.git,
-                pinnedRef,
-                candidate,
-                outError));
-            if (!candidate.path.getLength())
-            {
-                if (pinnedAs.getLength())
-                    candidate.version = pinnedVersion;
-                else
-                {
-                    SLANG_RETURN_ON_FAIL(source->deriveReleaseVersion(
-                        unresolved.name,
-                        unresolved.git,
-                        candidate.commit,
-                        candidate.version,
-                        outError));
-                }
-                List<TagCandidate> releaseCandidates;
-                SLANG_RETURN_ON_FAIL(source->listReleaseTags(
-                    unresolved.name,
-                    unresolved.git,
-                    releaseCandidates,
-                    outError));
-                SLANG_RETURN_ON_FAIL(
-                    loadPublisherRetractions(unresolved, releaseCandidates, retractions, outError));
-            }
-            candidates.add(candidate);
-        }
-        else
-        {
-            SLANG_RETURN_ON_FAIL(
-                source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
-            SLANG_RETURN_ON_FAIL(
-                loadPublisherRetractions(unresolved, candidates, retractions, outError));
-        }
+        SLANG_RETURN_ON_FAIL(
+            source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
+        SLANG_RETURN_ON_FAIL(
+            loadPublisherRetractions(unresolved, candidates, retractions, outError));
         ResolveFailure lastNestedFailure;
         List<ResolveCandidateRejection> candidateRejections;
         for (const auto& candidate : candidates)
@@ -1516,9 +1280,7 @@ private:
 
             ResolutionPackage& selected = packages[unresolvedIndex];
             selected.selected = true;
-            if (getPinnedIdentity(selected, pinnedRef, pinnedAs, pinnedVersion))
-                selected.selectionKind = ResolveSelectionKind::PinnedRef;
-            else if (candidate.path.getLength())
+            if (candidate.path.getLength())
                 selected.selectionKind = ResolveSelectionKind::Override;
             else
                 selected.selectionKind = ResolveSelectionKind::HighestRelease;

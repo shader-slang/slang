@@ -122,20 +122,17 @@ Direct dependencies are kept in package-name order.
 
 ```text
 slang package dependency add <name> [--git <url>] --version <range>
-slang package dependency add <name> [--git <url>] --ref <ref> [--as <version>]
 ```
 
 #### Description
 
-Add a direct dependency, or replace the existing direct declaration with the same name. Exactly
-one of the two source forms must be used:
+Add a direct dependency. Adding the same name again replaces that declaration, which is how you
+change its version range. The declaration is a Git URL and a version range. The solver selects a
+dotted release tag, and the lock records that tag and commit. Check out a branch with
+[`edit`](#edit). Hold a solved release with [`pin`](#pin).
 
-- **Git version range** selects a dotted release tag from the Git repository.
-- **Git ref** selects a branch, tag, or commit. `--as` declares the exact version that the
-  selected source provides. When omitted, the resolver derives it from the nearest
-  release tag reachable from the resolved commit.
-
-`--path` is rejected. A dependency is a Git repository checked out at `deps/<name>`.
+`--path`, `--ref`, and `--as` are rejected. A dependency is a Git repository checked out at
+`deps/<name>`.
 
 When `--git` is omitted, the command reads `SLANG_PACKAGE_INDEX`. That variable is a local path
 or an `http`/`https` URL of a package index. A relative path is resolved from the current
@@ -151,8 +148,8 @@ directory. The index is JSON:
 ```
 
 `schema_version` must be the integer `1`. `packages` maps a package name to one Git URL. The
-command writes that URL into `slang-package.json` as if `--git` had been passed. `--version` or
-`--ref` is still required. An explicit `--git` is used as given and the variable is not read. If
+command writes that URL into `slang-package.json` as if `--git` had been passed. `--version` is
+still required. An explicit `--git` is used as given and the variable is not read. If
 the variable is unset or empty, omitting `--git` fails. A variable that is set but names an index
 that cannot be read fails, and so does a name the index does not list. `fetch` and `update` do
 not read `SLANG_PACKAGE_INDEX`. Remapping an existing graph uses [`--remap-urls`](#update).
@@ -173,12 +170,6 @@ prefix, for example `1.4` or `1.4.0.2`. Trailing zero components are the same re
 `>=1.2.0 <2.0.0 !=1.4.0`. `^1.2.3` means `>=1.2.3 <2`, `^0.0.0.4` means
 `>=0.0.0.4 <0.0.0.5`, and `~1.2.3` means `>=1.2.3 <1.3`. A `^` or `~` bound uses the components
 as written, so `^0.0.0` is narrower than `^0`. A bare version matches that one release.
-
-`--ref <ref>`
-: Select an opaque Git branch, tag, or commit instead of choosing a semantic-version release.
-
-`--as <version>`
-: Declare the exact dotted version provided by a Git ref, such as `1.4.0` or `1.4.0.2`.
 
 `dependency pin` has been removed. Use [`pin`](#pin) to hold a solved version in the lock.
 
@@ -206,9 +197,8 @@ slang package dependency list
 
 #### Description
 
-List direct dependencies from `slang-package.json`, including each Git version range or Git ref and
-optional provided version. It does not display transitive
-dependencies; use `tree` for the selected graph.
+List direct dependencies from `slang-package.json`, including each Git URL and version range. It
+does not display transitive dependencies; use `tree` for the selected graph.
 
 ## `pin`
 
@@ -647,7 +637,7 @@ slang package tree
 ### Description
 
 Print the current selected dependency graph from the workspace root. Each edge shows the selected
-package version and the declaring requirement: a version range or Git ref. Shared
+package version and the declaring version range. Shared
 subtrees are expanded once and marked `(*)` on later occurrences.
 
 The command requires a current lock and loads manifests from edited working trees or locked Git

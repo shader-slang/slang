@@ -41,22 +41,6 @@ public:
         List<TagCandidate>& outCandidates,
         String& outError) = 0;
 
-    /// Resolve a manifest `ref` to one exact commit.
-    virtual SlangResult resolveReference(
-        const String& packageName,
-        const String& git,
-        const String& ref,
-        TagCandidate& outCandidate,
-        String& outError) = 0;
-
-    /// Derive a solver version from release tags reachable from `commit`.
-    virtual SlangResult deriveReleaseVersion(
-        const String& packageName,
-        const String& git,
-        const String& commit,
-        PackageVersion& outVersion,
-        String& outError) = 0;
-
     virtual SlangResult loadManifest(
         const String& packageName,
         const String& git,

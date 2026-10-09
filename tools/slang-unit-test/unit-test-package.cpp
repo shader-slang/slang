@@ -303,8 +303,6 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
     Dependency pinned;
     pinned.name = "noise";
     pinned.version = ">=1.0.0 <2.0.0";
-    pinned.ref = "release";
-    pinned.as = "1.4.0";
     SLANG_CHECK(SLANG_SUCCEEDED(parseDependencyConstraint(pinned, constraint, error)));
     SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
     SLANG_CHECK(!constraint.matches(PackageVersion(9, 0, 0)));
@@ -355,7 +353,6 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies.getCount() == 1);
     SLANG_CHECK(manifest.dependencies[0].name == "noise");
     SLANG_CHECK(manifest.dependencies[0].version == ">=1.2.0 <2.0.0");
-    SLANG_CHECK(manifest.dependencies[0].ref.getLength() == 0);
     SLANG_CHECK(manifest.workspace.depsDirectory == "third-party");
     SLANG_CHECK(manifest.workspace.outputDirectory == "out");
     SLANG_CHECK(manifest.retractions.getCount() == 1);
@@ -382,21 +379,15 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                               "    }\n"
                               "  }\n"
                               "}\n";
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(readManifestText("pinned.json", pinnedText, manifest, error)));
-    SLANG_CHECK(manifest.dependencies[0].version == ">=1.0.0 <2.0.0");
-    SLANG_CHECK(manifest.dependencies[0].ref == "release-1.4");
-    SLANG_CHECK(manifest.dependencies[0].as == "1.4.0");
+    SLANG_CHECK(SLANG_FAILED(readManifestText("pinned.json", pinnedText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
 
     const String refOnlyText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
         "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
         "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(readManifestText("ref-only.json", refOnlyText, manifest, error)));
-    SLANG_CHECK(manifest.dependencies[0].version.getLength() == 0);
-    SLANG_CHECK(manifest.dependencies[0].ref == "main");
-    SLANG_CHECK(manifest.dependencies[0].as == "2.1.0");
+    SLANG_CHECK(SLANG_FAILED(readManifestText("ref-only.json", refOnlyText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
 
     const String contradictoryPinText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -405,15 +396,13 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"ref\":\"main\",\"as\":\"2.1.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("contradictory-pin.json", contradictoryPinText, manifest, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not satisfy")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
 
     const String missingAsText = "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
                                  "\"license_files\":[\"LICENSE\"],\"dependencies\":{\"noise\":{"
                                  "\"git\":\"https://example.com/noise.git\",\"ref\":\"main\"}}}";
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(readManifestText("missing-as.json", missingAsText, manifest, error)));
-    SLANG_CHECK(manifest.dependencies[0].ref == "main");
-    SLANG_CHECK(manifest.dependencies[0].as.getLength() == 0);
+    SLANG_CHECK(SLANG_FAILED(readManifestText("missing-as.json", missingAsText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
 
     const String asWithoutRefText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -422,6 +411,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "\"as\":\"2.1.0\"}}}";
     SLANG_CHECK(
         SLANG_FAILED(readManifestText("as-without-ref.json", asWithoutRefText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
 
     const String unsafeGitText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],"
@@ -2128,6 +2118,34 @@ SLANG_UNIT_TEST(PackageToolDependencyCommandsAndInitialFetch)
         error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid dependency name")) >= 0);
+    const char* refArguments[] = {
+        "slang-package",
+        "dependency",
+        "add",
+        "noise",
+        "--git",
+        "https://example.com/noise.git",
+        "--ref",
+        "main",
+    };
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
+    const char* asArguments[] = {
+        "slang-package",
+        "dependency",
+        "add",
+        "noise",
+        "--git",
+        "https://example.com/noise.git",
+        "--version",
+        "1",
+        "--as",
+        "1.0.0",
+    };
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(asArguments), asArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("version range")) >= 0);
     String manifestAfterInvalidAdd;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::readAllText(rootManifestPath, manifestAfterInvalidAdd)));
@@ -3352,60 +3370,6 @@ public:
         releases.add(release);
     }
 
-    void addRef(
-        const String& git,
-        const String& ref,
-        const String& version,
-        const Manifest& manifest)
-    {
-        InMemoryRelease release;
-        release.git = git;
-        release.manifest = manifest;
-        release.candidate.ref = ref;
-        release.candidate.commit = String("commit-") + ref;
-        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
-            PackageVersion::parse(version.getUnownedSlice(), release.candidate.version)));
-        releases.add(release);
-    }
-
-    virtual SlangResult resolveReference(
-        const String&,
-        const String& git,
-        const String& ref,
-        TagCandidate& outCandidate,
-        String& outError) override
-    {
-        for (const auto& release : releases)
-        {
-            if (release.git == git && release.candidate.ref == ref)
-            {
-                outCandidate = release.candidate;
-                return SLANG_OK;
-            }
-        }
-        outError = String("Missing in-memory ref for ") + git + "@" + ref;
-        return SLANG_FAIL;
-    }
-
-    virtual SlangResult deriveReleaseVersion(
-        const String&,
-        const String& git,
-        const String& commit,
-        PackageVersion& outVersion,
-        String& outError) override
-    {
-        for (const auto& release : releases)
-        {
-            if (release.git == git && release.candidate.commit == commit)
-            {
-                outVersion = release.candidate.version;
-                return SLANG_OK;
-            }
-        }
-        outError = String("Missing in-memory history for ") + git + "@" + commit;
-        return SLANG_FAIL;
-    }
-
     virtual SlangResult listReleaseTags(
         const String&,
         const String& git,
@@ -3777,76 +3741,6 @@ SLANG_UNIT_TEST(PackageResolverSlangToolchainNotEqual)
     root.slangToolchainConstraint = String(">=2027.0.0 || >=") + installedText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(_findLockedPackage(lock, "noise") != nullptr);
-}
-
-SLANG_UNIT_TEST(PackageResolverPinnedRefUsesClaimedVersion)
-{
-    InMemoryPackageSource source;
-    source.addRelease("memory:noise", "1.0.0", _makeManifest("noise"));
-    source.addRef("memory:noise", "main", "1.4.0", _makeManifest("noise"));
-
-    Manifest root = _makeManifest("root");
-    Dependency dependency;
-    dependency.name = "noise";
-    dependency.git = "memory:noise";
-    dependency.version = ">=1.0.0 <2.0.0";
-    dependency.ref = "main";
-    dependency.as = "1.4.0";
-    root.dependencies.add(dependency);
-
-    PackageTool::LockFile lock;
-    String error;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
-    const LockedPackage* noise = _findLockedPackage(lock, "noise");
-    SLANG_CHECK_ABORT(noise);
-    SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.4");
-    SLANG_CHECK(noise->commit == "commit-main");
-}
-
-SLANG_UNIT_TEST(PackageResolverPinnedRefDerivesAsFromHistory)
-{
-    InMemoryPackageSource source;
-    source.addRef("memory:noise", "main", "1.3.0", _makeManifest("noise"));
-
-    Manifest root = _makeManifest("root");
-    Dependency dependency;
-    dependency.name = "noise";
-    dependency.git = "memory:noise";
-    dependency.ref = "main";
-    root.dependencies.add(dependency);
-
-    PackageTool::LockFile lock;
-    String error;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
-    const LockedPackage* noise = _findLockedPackage(lock, "noise");
-    SLANG_CHECK_ABORT(noise);
-    SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.3");
-    SLANG_CHECK(noise->commit == "commit-main");
-}
-
-SLANG_UNIT_TEST(PackageResolverPinnedRefWithoutVersionConstraint)
-{
-    InMemoryPackageSource source;
-    source.addRef("memory:noise", "main", "1.4.0", _makeManifest("noise"));
-
-    Manifest root = _makeManifest("root");
-    Dependency dependency;
-    dependency.name = "noise";
-    dependency.git = "memory:noise";
-    dependency.ref = "main";
-    dependency.as = "1.4.0";
-    root.dependencies.add(dependency);
-
-    PackageTool::LockFile lock;
-    String error;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
-    const LockedPackage* noise = _findLockedPackage(lock, "noise");
-    SLANG_CHECK_ABORT(noise);
-    SLANG_CHECK(noise->ref == "main");
-    SLANG_CHECK(noise->version == "1.4");
-    SLANG_CHECK(noise->commit == "commit-main");
 }
 
 SLANG_UNIT_TEST(PackageResolverUsesLatestReleaseRetractions)
@@ -4409,36 +4303,6 @@ SLANG_UNIT_TEST(PackageResolverRejectsMultipleGitURLsForOnePackage)
             UnownedStringSlice("Package 'shared' is required from more than one Git URL.")) >= 0);
 }
 
-SLANG_UNIT_TEST(PackageResolverRejectsMultiplePinsForOnePackage)
-{
-    InMemoryPackageSource source;
-    Manifest a = _makeManifest("a");
-    Dependency sharedMain;
-    sharedMain.name = "shared";
-    sharedMain.git = "memory:shared";
-    sharedMain.version = ">=1.0.0 <2.0.0";
-    sharedMain.ref = "main";
-    sharedMain.as = "1.0.0";
-    a.dependencies.add(sharedMain);
-    source.addRelease("memory:a", "1.0.0", a);
-    Manifest b = _makeManifest("b");
-    Dependency sharedStable = sharedMain;
-    sharedStable.ref = "stable";
-    b.dependencies.add(sharedStable);
-    source.addRelease("memory:b", "1.0.0", b);
-
-    Manifest root = _makeManifest("root");
-    _addDependency(root, "a", "memory:a", ">=1.0.0");
-    _addDependency(root, "b", "memory:b", ">=1.0.0");
-
-    PackageTool::LockFile lock;
-    String error;
-    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
-    SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice(
-            "Package 'shared' is pinned to more than one Git ref or 'as' version.")) >= 0);
-}
-
 SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitRange)
 {
     TemporaryDirectory temp;
@@ -4492,8 +4356,6 @@ SLANG_UNIT_TEST(PackageResolverRejectsPathVersionOutsideGitPin)
     sharedPin.name = "shared";
     sharedPin.git = "memory:shared";
     sharedPin.version = ">=1.0.0 <3.0.0";
-    sharedPin.ref = "main";
-    sharedPin.as = "2.0.0";
     a.dependencies.add(sharedPin);
     source.addRelease("memory:a", "1.0.0", a);
     Manifest b = _makeManifest("b");

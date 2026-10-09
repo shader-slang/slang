@@ -23,13 +23,14 @@ struct Dependency
     String git;
     String path;
     /// Range constraint for a Git dependency, written without a `v` prefix.
-    String version;
-    /// An opaque Git branch, tag, or commit that pins this edge instead of selecting a release tag.
-    String ref;
-    /// Exact dotted version that a pinned Git ref or path dependency provides.
     ///
-    /// Omit this on a Git pin to derive the version from the nearest release tag reachable from
-    /// the resolved commit. Path dependencies still require it.
+    /// The lock records the tag and commit that satisfied this range. A branch checkout is an
+    /// edit on that lock row, not a second manifest form.
+    String version;
+    /// Exact dotted version claimed by a path dependency.
+    ///
+    /// Path dependencies are rejected. The field remains so an old in-memory edge can still be
+    /// diagnosed.
     String as;
 };
 
