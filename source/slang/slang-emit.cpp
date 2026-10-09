@@ -2303,7 +2303,7 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, target, sink);
+        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -2893,6 +2893,11 @@ Result linkAndOptimizeIR(
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
+
+    // Memory orders are validated on the final IR, after every pass that can fold an order to a
+    // constant or remove the atomic that uses it. For SPIR-V that point is in `legalizeIRForSPIRV`.
+    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
+        SLANG_PASS(validateAtomicMemoryOrders, target, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 

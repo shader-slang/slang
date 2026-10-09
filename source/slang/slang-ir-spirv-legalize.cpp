@@ -2885,7 +2885,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    SlangResult processModule()
+    void processModule()
     {
         determineSpirvVersion();
 
@@ -3041,16 +3041,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         specializeAddressSpace(m_module, &addressSpaceAssigner, m_sink);
 
         // For SPIR-V, we don't skip this validation, because we might then be generating
-        // invalid SPIR-V. An atomic that failed validation cannot be emitted (e.g. its memory
-        // order is not a constant), so we stop here instead of reaching the SPIR-V emitter.
+        // invalid SPIR-V.
         bool skipFuncParamValidation = false;
-        if (!validateAtomicOperations(
-                m_module,
-                skipFuncParamValidation,
-                m_sharedContext->m_targetRequest->getTarget(),
-                m_sink))
-            return SLANG_FAIL;
-        return SLANG_OK;
+        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()
@@ -3126,7 +3119,7 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     return snippet;
 }
 
-SlangResult legalizeSPIRV(
+void legalizeSPIRV(
     SPIRVEmitSharedContext* sharedContext,
     IRModule* module,
     CodeGenContext* codeGenContext)
@@ -3136,7 +3129,7 @@ SlangResult legalizeSPIRV(
         module,
         codeGenContext,
         codeGenContext->getSink());
-    return context.processModule();
+    context.processModule();
 }
 
 void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink, IRModule* module)
@@ -3441,7 +3434,7 @@ SlangResult legalizeIRForSPIRV(
     CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(entryPoints);
-    SLANG_RETURN_ON_FAIL(legalizeSPIRV(context, module, codeGenContext));
+    legalizeSPIRV(context, module, codeGenContext);
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
 
     // Widen any sub-32-bit access-chain index to 32 bits now that every producer -- including the
@@ -3458,6 +3451,15 @@ SlangResult legalizeIRForSPIRV(
 
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
+
+    // The IR is now in the shape the SPIR-V emitter reads its memory orders from: every order that
+    // folds to a constant has been folded, and atomics in removed code are gone. An atomic whose
+    // order is still invalid cannot be emitted, so we stop here.
+    if (!validateAtomicMemoryOrders(
+            module,
+            context->m_targetRequest->getTarget(),
+            codeGenContext->getSink()))
+        return SLANG_FAIL;
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
     insertFragmentShaderInterlock(context, module);

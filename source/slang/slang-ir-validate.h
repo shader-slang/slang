@@ -79,23 +79,18 @@ private:
 //   [numthreads(1, 1, 1)] void main() { atomicOp(gArray); }
 // If 'skipFuncParamValidation' is true, then the validation allows destinations that
 // lead back to in/inout parameters that we can't validate.
-//
-// The memory order operands are also validated against the operation (e.g. a load cannot
-// release). Orders must be compile-time constants only on targets that encode them (SPIR-V and
-// Metal); other targets ignore the order, so a non-constant order is accepted there.
-void validateAtomicOperations(
-    bool skipFuncParamValidation,
-    CodeGenTarget target,
-    DiagnosticSink* sink,
-    IRInst* inst);
+void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
-// Overload that takes IRModule* first for use with SLANG_PASS macro. Returns false if any atomic
-// operation in the module was diagnosed as an error.
-bool validateAtomicOperations(
-    IRModule* module,
-    bool skipFuncParamValidation,
-    CodeGenTarget target,
-    DiagnosticSink* sink);
+// Overload that takes IRModule* first for use with SLANG_PASS macro
+void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink);
+
+// Validate the memory order operands of every atomic operation against the operation, e.g. that a
+// load does not release. On targets that encode the order (SPIR-V, and Metal outside texture
+// atomics), the order must also be a constant `MemoryOrder` value. Requires the IR in its final
+// shape before emission, after specialization, inlining and constant folding, so that an order
+// forwarded through a generic, a helper or a `static` global is seen as the constant it folds to.
+// Returns false if any atomic operation was diagnosed as an error.
+bool validateAtomicMemoryOrders(IRModule* module, CodeGenTarget target, DiagnosticSink* sink);
 
 void validateVectorsAndMatrices(
     IRModule* module,
