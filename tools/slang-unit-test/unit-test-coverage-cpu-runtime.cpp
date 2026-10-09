@@ -682,7 +682,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     uint arm = (t > 1u)
         ? t + 1u // armTrue
         : t + 2u; // armFalse
-    outputBuffer[t] = value + choose(t) + uint(skipped) + arm;
+    uint pick = 0;
+    switch (t) // switchLine
+    {
+    case 0:
+        pick = 1;
+        break;
+    case 1:
+        pick = 2;
+        break;
+    default:
+        pick = 3;
+        break;
+    }
+    outputBuffer[t] = value + choose(t) + uint(skipped) + arm + pick;
 }
 )";
     struct ExpectedLine
@@ -721,7 +734,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                 modes.getArrayView(),
                 width,
                 dispatch);
-            const uint32_t expectedOutput[] = {32, 36, 38, 39};
+            const uint32_t expectedOutput[] = {33, 38, 41, 42};
             for (uint32_t t = 0; t < kThreadCount; ++t)
                 SLANG_CHECK(dispatch.outputValues[t] == expectedOutput[t]);
             for (auto expected : expectedLines)
@@ -742,6 +755,36 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
                 SLANG_CHECK(entries >= 1);
                 SLANG_CHECK(lineCount == (booleanMode ? 1 : expected.count));
             }
+            // Every dispatch arm of a switch, including its default, is attributed to
+            // the line of the switch condition, not to its case labels.
+            const auto switchLine = findLineContaining(source, "// switchLine");
+            uint32_t caseArms = 0;
+            uint32_t defaultArms = 0;
+            uint64_t caseCount = 0;
+            uint64_t defaultCount = 0;
+            for (uint32_t i = 0; i < dispatch.coverage->getEntryCount(); ++i)
+            {
+                slang::CoverageEntryInfo entry;
+                SLANG_CHECK_ABORT(dispatch.coverage->getEntryInfo(i, &entry) == SLANG_OK);
+                if (entry.kind != slang::CoverageEntryKind::Branch)
+                    continue;
+                if (entry.branchArmKind == slang::CoverageBranchArmKind::CaseArm)
+                {
+                    ++caseArms;
+                    caseCount += dispatch.getCount(entry);
+                    SLANG_CHECK(entry.line == switchLine);
+                }
+                else if (entry.branchArmKind == slang::CoverageBranchArmKind::DefaultArm)
+                {
+                    ++defaultArms;
+                    defaultCount += dispatch.getCount(entry);
+                    SLANG_CHECK(entry.line == switchLine);
+                }
+            }
+            SLANG_CHECK(caseArms == 2);
+            SLANG_CHECK(defaultArms == 1);
+            SLANG_CHECK(caseCount == 2);
+            SLANG_CHECK(defaultCount == (booleanMode ? 1 : 2));
             uint32_t rhsLine, rhsColumn;
             findSourcePosition(source, "< 200", rhsLine, rhsColumn);
             uint32_t rhsEntries = 0;

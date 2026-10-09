@@ -4153,9 +4153,14 @@ static SourceLoc getConditionLoc(Expr* expr)
 
 // Record evaluation of an expression at its own source location. Conditions and conditional
 // arms are not statements: without this marker, a multiline conditional can have branch coverage
-// on a line for which no line coverage exists. `dominatingExpr` is an expression whose marker
-// already runs on every path to `expr`, such as the condition of the `?:` that selects `expr`;
-// when both start on one source line the line is already counted, so no second probe is added.
+// on a line for which no line coverage exists.
+//
+// `dominatingExpr` is an optimization the caller must justify: it names an expression whose marker
+// already runs on every path to `expr`, such as the condition of the `?:` that selects `expr`.
+// When both start on one source line, `expr` adds no second probe. The check is local and does not
+// verify dominance, so passing an expression that does not dominate `expr` would drop a real line
+// event. It also does not deduplicate markers in general: several markers of one line from
+// different constructs are expected, and the exporters take the maximum over a line's entries.
 static void emitExpressionLineCoverage(
     IRGenContext* context,
     Expr* expr,
@@ -4215,7 +4220,9 @@ static uint32_t allocateConditionBranchSiteID(IRGenContext* context, Expr* condE
 
 // Lower the right operand of `&&` or `||` and report its decision. Its value is merged with the
 // short-circuited path before anything branches on it, so a two-way branch of its own carries the
-// arm markers.
+// arm markers. This emits a line event for the operand and, under branch coverage, inserts a
+// branch and a merge block after the operand's value is computed, so the insert point on return is
+// the merge block. `leftOperand` is the operand whose marker dominates this one.
 static IRInst* lowerShortCircuitRightOperand(
     IRGenContext* context,
     Expr* operand,
