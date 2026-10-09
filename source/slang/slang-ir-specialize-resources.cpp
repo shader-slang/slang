@@ -1293,6 +1293,24 @@ bool specializeResourceOutputs(
 
 // Move resource selection onto indices when all incoming values access the same heap or array.
 // For example, `c ? samplers[i] : samplers[j]` becomes `samplers[c ? i : j]`.
+// Array subscripts can have different integer types, so the selected indices need a common
+// type. Consider `select(c, samplers[i], samplers[j])`, where `i` is int and `j` is uint:
+//
+//     // Before:
+//     let %a : SamplerState = getElement(%samplers, %i : Int)
+//     let %b : SamplerState = getElement(%samplers, %j : UInt)
+//     let %s : SamplerState = select(%c, %a, %b)
+//
+//     // After (unused resource accesses omitted):
+//     let %iAsUInt : UInt = intCast(%i)
+//     let %s : UInt = select(%c, %iAsUInt, %j)
+//     let %index : UInt = nonUniformResourceIndex(%s)
+//     let %sampler : SamplerState = getElement(%samplers, %index)
+//
+// The original index calculations keep their types; we convert their results before the
+// selection. If an incoming index is 64-bit, the common type must also be 64-bit to avoid
+// truncating it. Selecting a descriptor does not change address calculations inside that
+// resource, which are handled separately.
 //
 // A loop can make this more complicated than matching the two operands of a select.
 // Consider this example:
@@ -1318,8 +1336,9 @@ bool specializeResourceOutputs(
 // requires every incoming value to already be an array access.
 //
 // We follow both block parameters and selects until we reach the resource accesses. If
-// they all use the same source and compatible types, we can change the entire selection
-// to use indices. The relevant IR changes look like this (other instructions omitted):
+// they all use the same source and resource type, we can change the entire selection
+// to use indices of a common integer type. The relevant IR changes look like this (other
+// instructions omitted):
 //
 //     // Before:
 //     block %header(param %s : SamplerState, ...):
@@ -1352,7 +1371,7 @@ bool specializeResourceOutputs(
 // becomes the index type, and a resource access after it supplies the original uses.
 // We check all incoming values before changing any instruction, so a rejected case leaves
 // the IR intact.
-static bool specializeResourceSelection(IRInst* selection)
+static bool specializeResourceSelection(TargetRequest* targetReq, IRInst* selection)
 {
     struct SelectionNode
     {
@@ -1371,12 +1390,13 @@ static bool specializeResourceSelection(IRInst* selection)
     List<IRInst*> workList;
     HashSet<IRInst*> visited;
     List<SelectionNode> nodes;
-    // A resource access maps to its index operand. A select or block parameter maps
-    // to itself, since we will change that instruction to produce an index.
+    // A resource access maps to its index operand, then to the converted index during
+    // rewriting. A select or block parameter maps to itself, since we will change that
+    // instruction to produce an index.
     Dictionary<IRInst*, IRInst*> indices;
     IRInst* representative = nullptr;
     IRInst* resourceSource = nullptr;
-    IRType* indexType = nullptr;
+    IRType* commonIndexType = nullptr;
     workList.add(selection);
     for (Index i = 0; i < workList.getCount(); i++)
     {
@@ -1448,12 +1468,27 @@ static bool specializeResourceSelection(IRInst* selection)
             default:
                 return false;
             }
-            if (representative && (inst->getOp() != representative->getOp() ||
-                                   source != resourceSource || index->getDataType() != indexType))
+            if (representative &&
+                (inst->getOp() != representative->getOp() || source != resourceSource))
                 return false;
             representative = inst;
             resourceSource = source;
-            indexType = index->getDataType();
+            // Valid array indices are nonnegative. The widest incoming type can hold all
+            // of them if we prefer unsigned when widths match. For example, Int and UInt
+            // use UInt, while UInt and Int64 use Int64. Preserve existing 64-bit indices
+            // without introducing 64-bit values when all incoming indices are narrower.
+            auto incomingIndexType = index->getDataType();
+            SLANG_RELEASE_ASSERT(isIntegralType(incomingIndexType));
+            if (!commonIndexType)
+                commonIndexType = incomingIndexType;
+            else
+            {
+                auto commonInfo = getIntTypeInfo(targetReq, commonIndexType);
+                auto incomingInfo = getIntTypeInfo(targetReq, incomingIndexType);
+                if (incomingInfo.width > commonInfo.width ||
+                    (incomingInfo.width == commonInfo.width && !incomingInfo.isSigned))
+                    commonIndexType = incomingIndexType;
+            }
             indices.add(inst, index);
             continue;
         }
@@ -1470,13 +1505,25 @@ static bool specializeResourceSelection(IRInst* selection)
     if (!representative)
         return false;
 
+    // Only insert casts after the whole graph has been accepted. Put each conversion before
+    // its original access: the index is available there, and the conversion will dominate
+    // every selection edge that previously used that resource, including loop back edges.
+    for (auto& [resource, index] : indices)
+    {
+        if (resource == index)
+            continue;
+        IRBuilder builder(resource);
+        builder.setInsertBefore(resource);
+        index = builder.emitCast(commonIndexType, index);
+    }
+
     // Keep the existing selects, block parameters, and branch argument positions. Only
     // their types and incoming values change; the original index computations stay where
     // they were. Recreate the resource after each selection for uses that need a resource.
     for (auto& node : nodes)
     {
         auto inst = node.inst;
-        inst->setFullType(indexType);
+        inst->setFullType(commonIndexType);
         IRBuilder builder(inst);
         setInsertAfterOrdinaryInst(&builder, inst);
         IRInst* index = inst;
@@ -1534,7 +1581,7 @@ static bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModul
                 if ((as<IRParam>(inst) && block != func->getFirstBlock()) || as<IRSelect>(inst))
                     selections.add(inst);
         for (auto selection : selections)
-            changed |= specializeResourceSelection(selection);
+            changed |= specializeResourceSelection(codeGenContext->getTargetReq(), selection);
     }
     return changed;
 }
