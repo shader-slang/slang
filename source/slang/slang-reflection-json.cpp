@@ -1433,7 +1433,12 @@ static void emitReflectionEntryPointJSON(
         emitReflectionParamJSON(writer, resultVarLayout, reflectionTracker);
     }
 
-    if (entryPoint->getStage() == SLANG_STAGE_COMPUTE)
+    // Every stage that takes `[numthreads]`, matching `needsNumThreads` in
+    // `slang-check-shader.cpp`. A thread-launch node has no attribute and reports its implicit
+    // size of 1x1x1.
+    auto stage = entryPoint->getStage();
+    if (stage == SLANG_STAGE_COMPUTE || stage == SLANG_STAGE_MESH ||
+        stage == SLANG_STAGE_AMPLIFICATION || stage == SLANG_STAGE_NODE)
     {
         SlangUInt threadGroupSize[3];
         entryPoint->getComputeThreadGroupSize(3, threadGroupSize);
