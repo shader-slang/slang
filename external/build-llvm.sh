@@ -111,6 +111,11 @@ msg "# Fetching LLVM from $repo at $branch"
 msg "##########################################################"
 git -c advice.detachedHead=false clone "$repo" --branch "$branch" "$source_dir" --depth 1
 
+# LLVM's ARM COFF linker must decode scaled load offsets as byte addends.
+# This backport can be removed when the pinned LLVM includes llvm/llvm-project#229712.
+script_dir=$(cd "$(dirname "$0")" && pwd)
+git -C "$source_dir" apply "$script_dir/llvm-coff-pageoffset12l.patch"
+
 msg "##########################################################"
 msg "# Configuring LLVM in $source_dir"
 msg "##########################################################"

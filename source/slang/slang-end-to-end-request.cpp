@@ -1124,7 +1124,14 @@ SlangResult EndToEndCompileRequest::maybeWriteContainer(const String& fileName)
     // Only write if there is something to write
     if (writeArtifact)
     {
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::writeContainer(writeArtifact, fileName));
+        // Report write failures here, so that callers that ignore the result still fail the compile
+        // through the sink's error count.
+        const SlangResult res = ArtifactContainerUtil::writeContainer(writeArtifact, fileName);
+        if (SLANG_FAILED(res))
+        {
+            getSink()->diagnose(Diagnostics::CannotWriteOutputFile{.path = fileName});
+            return res;
+        }
     }
 
     return SLANG_OK;
