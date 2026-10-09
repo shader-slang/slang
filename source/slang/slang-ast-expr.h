@@ -331,12 +331,30 @@ class IndexExpr : public Expr
     List<SourceLoc> argumentDelimeterLocs;
 };
 
+/// Tracks whether a selected callable still needs its receiver to be validated.
+enum class SelectedCallableReceiverCheckState
+{
+    None,
+    Pending,
+    Completed,
+};
+
 FIDDLE()
 class MemberExpr : public DeclRefExpr
 {
     FIDDLE(...)
     FIDDLE() Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
+
+    // These fields are transient semantic-checking state. Consider
+    // `value.mutatingMethod().staticField`. The inner method can be selected before lookup of the
+    // outer member determines that `staticField` discards its value qualifier. Selection marks the
+    // method's receiver check as pending. If the path is evaluated, finalization first rewrites any
+    // lambda capture and then advances the check to `Completed` before validating the receiver. If
+    // an outer static member discards the path, the visitor never reaches the pending check.
+    SelectedCallableReceiverCheckState selectedCallableReceiverCheckState =
+        SelectedCallableReceiverCheckState::None;
+    SourceLoc selectedCallableReceiverCheckLoc;
 };
 
 // Member expression that is dereferenced, e.g. `a->b`.
@@ -814,6 +832,13 @@ class HigherOrderInvokeExpr : public Expr
     FIDDLE(...)
     FIDDLE() Expr* baseFunction;
     FIDDLE() List<Name*> newParameterNames;
+
+    // For an expression such as `__fwd_diff(Type.method)`, the transformed function type begins
+    // with a parameter derived from the method receiver. Nested higher-order operators can add
+    // more than one such parameter. This count identifies the leading parameters that overload
+    // resolution normalizes in a temporary comparison type; the expression itself retains their
+    // actual modes.
+    FIDDLE() uint32_t receiverParameterPrefixCount = 0;
 };
 
 FIDDLE()

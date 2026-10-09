@@ -46,6 +46,21 @@ Module* StaticUnitTestEnv::checkModuleFromSource(
     const char* source,
     String* outDiagnostics)
 {
+    // Most fixtures exercise Slang, so the default overload uses a synthetic `.slang` path for
+    // dialect selection and source locations.
+    StringBuilder pathBuilder;
+    pathBuilder << moduleName << ".slang";
+    const String path = pathBuilder.produceString();
+
+    return checkModuleFromSourceAtPath(moduleName, path.getBuffer(), source, outDiagnostics);
+}
+
+Module* StaticUnitTestEnv::checkModuleFromSourceAtPath(
+    const char* moduleName,
+    const char* sourcePath,
+    const char* source,
+    String* outDiagnostics)
+{
     // Loading two modules under one name would silently return the cached first
     // module, turning the second case into a no-op that still passes. Fail
     // loudly instead.
@@ -55,19 +70,10 @@ Module* StaticUnitTestEnv::checkModuleFromSource(
     }
     m_usedModuleNames.add(moduleName);
 
-    // `loadModuleFromSourceString` takes a path separately from the module name, and
-    // uses it for the source locations in diagnostics. These sources are in memory and
-    // have no file, so synthesize one from the name rather than passing the bare name:
-    // `outDiagnostics` is how tests read diagnostics back, and "myTest.slang(3): error"
-    // reads as a location while "myTest(3): error" reads as nothing in particular.
-    StringBuilder pathBuilder;
-    pathBuilder << moduleName << ".slang";
-    const String path = pathBuilder.produceString();
-
     ComPtr<slang::IBlob> diagnostics;
     slang::IModule* module = m_session->loadModuleFromSourceString(
         moduleName,
-        path.getBuffer(),
+        sourcePath,
         source,
         diagnostics.writeRef());
 

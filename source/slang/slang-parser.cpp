@@ -2416,6 +2416,23 @@ static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
     }
 }
 
+/// Parses an optional `const` after a `FuncDecl` parameter list.
+///
+/// The dedicated modifier preserves the trailing spelling for semantic checking. The traditional
+/// and modern function parsers call this only after creating a `FuncDecl`, so constructors,
+/// accessors, and subscripts do not accept this syntax.
+static void parseOptionalCppStyleTrailingThisParamConstModifier(Parser* parser, FuncDecl* decl)
+{
+    Token constToken;
+    if (!AdvanceIf(parser, "const", &constToken))
+        return;
+
+    auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
+    modifier->keywordName = constToken.getName();
+    modifier->loc = constToken.getLoc();
+    addModifier(decl, modifier);
+}
+
 /// Complete parsing of a function using traditional (C-like) declarator syntax
 static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& declaratorInfo)
 {
@@ -2448,6 +2465,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
 
             if (AdvanceIf(parser, "throws"))
             {
@@ -5321,6 +5339,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             if (AdvanceIf(parser, "throws"))

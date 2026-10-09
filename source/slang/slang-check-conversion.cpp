@@ -1824,7 +1824,31 @@ bool SemanticsVisitor::_coerce(
     if (toType->equals(fromType))
     {
         if (outToExpr)
-            *outToExpr = fromExpr;
+        {
+            auto materializedExpr = fromExpr;
+            if (sink && as<FuncType>(toType))
+            {
+                // Consider passing `value.method<int>` to a parameter whose type exactly matches
+                // that specialization. Explicit generic application retained the selected member
+                // expression for this coercion to consume, and exact type equality returns here
+                // without another overload-completion step. Finalize that selected path now.
+                // Conversion-cost probes do not request an output expression or a diagnostic sink,
+                // so they remain side-effect-free.
+                auto callableExpr = materializedExpr;
+                // Parentheses preserve the same callable selection. The marker belongs to the
+                // inner callable, while finalization still traverses the original expression.
+                while (auto parenExpr = as<ParenExpr>(callableExpr))
+                    callableExpr = parenExpr->base;
+
+                SemanticsVisitor materializingVisitor(withSink(sink));
+                materializingVisitor.markSelectedCallableReceiverCheck(
+                    callableExpr,
+                    callableExpr->loc);
+                materializedExpr =
+                    materializingVisitor.maybeFinalizeSelectedExpressionPath(materializedExpr);
+            }
+            *outToExpr = materializedExpr;
+        }
         if (outCost)
             *outCost = kConversionCost_None;
         setWitnessOfConversionToBuiltinConversion();

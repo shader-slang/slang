@@ -50,11 +50,11 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
-/// Apply one declaration's source-level policy for its effective `this` parameter mode.
-///
-/// This operation only interprets declaration kind and modifiers. It does not apply the declared
-/// receiver type's copyability adjustment or any specialization.
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode);
+/// Returns whether `decl` ends the lexical scope of a surrounding receiver value. Lookup may
+/// still carry the enclosing `This` type across such a boundary. For example, a static method may
+/// refer to `This`, but not `this`. A generic wrapper follows its inner declaration once that
+/// declaration exists; while parsing the generic parameters, it has no receiver.
+bool isReceiverlessDeclarationBoundary(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
 
@@ -401,13 +401,17 @@ struct OverloadCandidate
 
     enum class Status
     {
+        // Generic inference can fail before the ordinary phase ladder begins. This terminal failure
+        // sentinel stays below `Unchecked` so status-based ranking still prefers every candidate
+        // that entered ordinary checking.
         GenericArgumentInferenceFailed,
+
+        // These values record the last successfully completed phase, in increasing order.
         Unchecked,
         ArityChecked,
         FixityChecked,
         TypeChecked,
-        DirectionChecked,
-        VisibilityChecked,
+        ConstraintsChecked,
         Applicable,
     };
     Status status = Status::Unchecked;
@@ -468,6 +472,19 @@ struct OverloadCandidate
     Index argMismatchArgIndex = -1;
     Type* argMismatchExpectedType = nullptr;
     Type* argMismatchActualType = nullptr;
+};
+
+/// Controls whether candidate completion publishes an evaluated callable path or a declaration
+/// that still needs a consuming operation to select it.
+///
+/// An explicit generic application selects a specialization, not an evaluated call, even when only
+/// one declaration is viable. An ambiguous application can retain several such declarations for a
+/// later call to resolve. Retained completion does not mark a candidate for receiver validation,
+/// and ambiguous retained candidate paths remain unvisited until selection.
+enum class OverloadCandidateCompletionMode
+{
+    Selected,
+    RetainedForFurtherResolution,
 };
 
 struct ResolvedOperatorOverload
@@ -1523,7 +1540,29 @@ public:
         result.m_parentLambdaExpr = expr;
         result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
         result.m_parentLambdaDecl = decl;
+
+        // A lambda body is evaluated separately from the expression that contains the lambda
+        // literal, so an unresolved member lookup outside the lambda cannot defer finalization
+        // inside the body.
+        result.m_isMemberBaseFinalizationDeferred = false;
         return result;
+    }
+
+    /// Returns a context that delays selected-path finalization while checking the base of one
+    /// unresolved member lookup.
+    ///
+    /// The outer lookup determines whether that base remains on the evaluated expression path or
+    /// is discarded by a static-member selection.
+    SemanticsContext withDeferredMemberBaseFinalization()
+    {
+        SemanticsContext result(*this);
+        result.m_isMemberBaseFinalizationDeferred = true;
+        return result;
+    }
+
+    bool isMemberBaseFinalizationDeferred() const
+    {
+        return m_isMemberBaseFinalizationDeferred;
     }
 
     UInt getDefaultCtorRecursionDepth() const { return m_defaultCtorRecursionDepth; }
@@ -1780,6 +1819,10 @@ protected:
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
     Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+
+    // This flag is true only in the recursive context that checks the base of the current
+    // unresolved member lookup.
+    bool m_isMemberBaseFinalizationDeferred = false;
     AssumedNonEmptyPackInfo* m_assumedNonEmptyPack = nullptr;
 };
 
@@ -2213,11 +2256,11 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
-    /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
-    /// references an outer-scope variable that needs to be captured into the lambda struct.
-    /// This handles the case where an expression was already checked by the parser's
-    /// two-phase generic disambiguation before the lambda capture context was established.
-    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
+    /// Rewrites captures and validates pending receiver checks on one selected, evaluated path.
+    Expr* maybeFinalizeSelectedExpressionPath(Expr* exprIn);
+
+    /// Checks `this` without rewriting it as a lambda capture.
+    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
 
     Expr* CreateErrorExpr(Expr* expr);
 
@@ -3221,7 +3264,7 @@ public:
     /// transition can finish, but leaves diagnostics to the final call that publishes the result.
     std::optional<ParamInfo> checkEffectiveThisParamInfo(
         Decl* decl,
-        bool shouldDiagnoseModeAttributes);
+        bool shouldDiagnoseModeSpecifiers);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);
@@ -3798,11 +3841,6 @@ public:
         OverloadResolveContext& context,
         OverloadCandidate& candidate);
 
-    bool TryCheckOverloadCandidateDirections(
-        OverloadResolveContext& /*context*/,
-        OverloadCandidate const& /*candidate*/
-    );
-
     /// Check if the given `expr` refers to an `in` function
     /// parameter, or part of one (through field reference, etc.).
     ///
@@ -3835,17 +3873,33 @@ public:
     // Create the representation of a given generic applied to some arguments
     Expr* createGenericDeclRef(Expr* baseExpr, Expr* originalExpr, SubstitutionSet substSet);
 
-    // Take an overload candidate that previously got through
-    // `TryCheckOverloadCandidate` above, and try to finish
-    // up the work and turn it into a real expression.
-    //
-    // If the candidate isn't actually applicable, this is
-    // where we'd start reporting the issue(s).
-    //
-    // A call whose callee expression has an `ErrorType` is itself returned with an
-    // `ErrorType`, as in `ResolveInvoke`, so consumers such as `visitTryExpr` can rely
-    // on any call that is not an error having a `FuncType`-typed callee.
-    Expr* CompleteOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
+    /// Completes a previously checked candidate and produces its expression.
+    ///
+    /// Selected completion marks and finalizes the evaluated callable path. Retained completion
+    /// produces a declaration or specialization without publishing a receiver check; a later
+    /// consuming operation selects the evaluated path. Candidate failures become diagnostics
+    /// during this non-speculative pass. A call with an invalid callee is returned as an error, so
+    /// consumers can assume that every non-error call has a `FuncType`-typed callee.
+    Expr* CompleteOverloadCandidate(
+        OverloadResolveContext& context,
+        OverloadCandidate& candidate,
+        OverloadCandidateCompletionMode completionMode = OverloadCandidateCompletionMode::Selected);
+
+    /// Checks the selected callable's receiver against its effective parameter mode.
+    ///
+    /// Returns `false` after diagnosing a receiver that cannot satisfy a writable mode. Warnings
+    /// about mutating a copy of an input parameter do not make the selected call invalid.
+    bool checkCallableReceiverAfterSelection(
+        Expr* receiverExpr,
+        DeclRef<CallableDecl> callableDeclRef,
+        SourceLoc location);
+
+    /// Marks a reconstructed selected callable for one receiver check.
+    ///
+    /// The callable's `MemberExpr` owns the idempotent state. Selected-path finalization consumes a
+    /// pending check after capture rewriting, while a static-member selection discards the marked
+    /// base without visiting it.
+    void markSelectedCallableReceiverCheck(Expr* callableExpr, SourceLoc location);
 
     // Implement a comparison operation between overload candidates,
     // so that the better candidate compares as less-than the other
@@ -3887,10 +3941,23 @@ public:
         OverloadCandidate& candidate,
         ConversionCost baseCost);
 
+    /// Adds candidates for invoking a checked higher-order expression.
+    ///
+    /// Each expression retains its actual function type. Candidate construction normalizes only a
+    /// temporary view of receiver-derived parameters so receiver mode cannot affect selection.
     void AddHigherOrderOverloadCandidates(
         Expr* funcExpr,
         OverloadResolveContext& context,
         ConversionCost baseCost);
+
+    /// Returns a temporary overload-resolution view of `funcType` with its receiver-derived
+    /// parameter prefix normalized to `in` mode.
+    ///
+    /// `HigherOrderInvokeExpr::receiverParameterPrefixCount` identifies exactly which leading
+    /// parameters to normalize. The expression itself retains its actual function type.
+    FuncType* getReceiverModeNeutralHigherOrderFunctionType(
+        HigherOrderInvokeExpr* expr,
+        FuncType* funcType);
 
     void AddFuncOverloadCandidate(
         LookupResultItem item,

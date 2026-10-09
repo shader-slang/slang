@@ -156,6 +156,31 @@ void emitParamPassingMode(ManglingContext* context, ParamPassingMode mode)
     }
 }
 
+/// Emits the symbol suffix for an ordinary callable's effective `this` parameter mode.
+/// `In` uses no suffix; `BorrowIn`, `BorrowInOut`, `Ref`, and `Out` use `c`, `m`, `r`, and `o`.
+static void emitThisParamMode(ManglingContext* context, ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        emitRaw(context, "o");
+        break;
+    case ParamPassingMode::BorrowInOut:
+        emitRaw(context, "m");
+        break;
+    case ParamPassingMode::BorrowIn:
+        emitRaw(context, "c");
+        break;
+    case ParamPassingMode::Ref:
+        emitRaw(context, "r");
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled effective `this` parameter mode");
+    }
+}
+
 void emitSimpleIntVal(ManglingContext* context, Val* val)
 {
     if (auto constVal = as<ConstantIntVal>(val))
@@ -886,30 +911,8 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             thisParamInfo
                 ? callableDeclRef.getDecl()->findModifier<SynthesizedParamPassingModeModifier>()
                 : nullptr;
-
-        // Keep the established mangling stable while changing the source of truth for the
-        // effective `this` parameter. Historically, ordinary callables emitted `m` and `r` only
-        // for modes requested directly with `[mutating]` and `[__ref]`; `[constref]`, a setter's
-        // writable default, and modes inherited from an enclosing declaration emitted no suffix.
-        // Direct function-type declarations emitted none of these suffixes. The checked
-        // information cannot reproduce those spelling distinctions by itself because several
-        // spellings intentionally produce the same ParamInfo, and overlapping attributes can
-        // produce more than one suffix even though they resolve to one effective mode.
-        //
-        // Source declarations therefore continue to use their spelling to reproduce the legacy
-        // suffix bits, even when they do not have an effective `this` parameter. Synthesized
-        // witness wrappers are different: their declaration-owned mode is an internal ABI fact,
-        // and wrappers with distinct modes must not receive the same symbol and be coalesced by
-        // linking. Those wrappers use the checked information below to encode that distinction.
-        bool isMutating = false;
-        bool isRefThis = false;
         bool isNoDiffThis =
             !hasDirectFuncType && callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>();
-        if (!hasDirectFuncType && !synthesizedThisMode)
-        {
-            isMutating = callableDeclRef.getDecl()->hasModifier<MutatingAttribute>();
-            isRefThis = callableDeclRef.getDecl()->hasModifier<RefAttribute>();
-        }
 
         // Include other signature-relevant modifiers.
         bool isFwdDiff = false;
@@ -929,10 +932,8 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             }
         }
 
-        if (isMutating)
-            emitRaw(context, "m");
-        if (isRefThis)
-            emitRaw(context, "r");
+        if (!hasDirectFuncType && thisParamInfo && !synthesizedThisMode)
+            emitThisParamMode(context, thisParamInfo->mode);
         if (isFwdDiff)
             emitRaw(context, "f");
         if (isBwdDiff)

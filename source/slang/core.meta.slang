@@ -4723,12 +4723,12 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 //@public:
-/// Mark a function or a property or subscript accessor as mutating. A mutating function receives the implicit `this` parameter
-/// as an `inout` parameter, so that mutations to members access from `this` argument will be visible to the caller.
+/// Marks a method, property accessor, or subscript accessor as mutating. Applying `[mutating]` to
+/// the declaration gives its implicit `this` parameter writable access to the receiver.
 ///
 /// @remarks
-/// By default, Slang treats all member functions as non-mutating. For example, consider the following function:
-/// ```csharp
+/// In Slang, methods declared on value types are non-mutating by default. For example:
+/// ```slang
 /// struct S
 /// {
 ///    int x;
@@ -4739,9 +4739,10 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 /// }
 ///
 /// ```
-/// The line `x = 1` will lead to a compile time error because by-default, all member methods in Slang are non-mutating. To
-/// allow `foo` to modify `x`, you can use `[mutating]` to mark the function as such:
-/// ```csharp
+/// The line `x = 1` produces a compile-time error because `this` is immutable. Applying
+/// `[mutating]` to `foo` changes its `this` parameter to `inout`, which allows the method to modify
+/// `x`:
+/// ```slang
 /// struct S
 /// {
 ///    int x;
@@ -4757,13 +4758,15 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
-/// Marks a function or a property and subscript accessor as non-mutating. A non-mutating function receives the implicit `this` parameter
-/// as an `in` parameter, so mutations to members accessed from `this` argument will be prohibited by the compiler.
+/// Marks a method, property accessor, or subscript accessor as non-mutating. Applying
+/// `[nonmutating]` to the declaration makes its implicit `this` parameter read-only. A copyable
+/// receiver uses `in`; a non-copyable receiver uses a read-only borrow because it cannot be copied
+/// into the declaration.
 /// @remarks
-/// Member functions of a type are non-mutating by default, so this attribute is not necessary in most cases.
-/// However, the `set` accessor of a property or subscript is mutating by default, and you can use `[nonmutating]` to mark it as non-mutating.
+/// In Slang, methods declared on value types are non-mutating by default, so this attribute is
+/// usually most useful on a `set` accessor, which is mutating by default.
 /// For example:
-/// ```csharp
+/// ```slang
 /// struct S
 /// {
 ///    int* ptr_x;
@@ -4772,18 +4775,18 @@ attribute_syntax [mutating] : MutatingAttribute;
 ///      get { return *ptr_x; }
 ///
 ///      [nonmutating]
-///      set { *ptr_x = value; }
+///      set { *ptr_x = newValue; }
 ///    }
 /// }
 /// uniform S s; // `s` is not mutable.
 /// void test() { s.x = 1; } // OK, because the `set` accessor is non-mutating.
 /// ```
-/// In the above example, the property `x` reads and writes to a memory location pointed to by `ptr_x`. Therefore, the `set` accessor is not actually
-/// modifying any field of `S`, and does not need to take `this` as an `inout` parameter. Using `[nonmutating]` here on the set accessor will allow
-/// it to be called with a non-mutating value of `S`.
+/// In this example, the property writes the memory location addressed by `ptr_x`, but it does not
+/// modify the `ptr_x` field stored in `S`. The setter therefore does not need an `inout` `this`
+/// parameter, and `[nonmutating]` lets it be called on an immutable `S` value.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a

@@ -2017,7 +2017,19 @@ Modifier* SemanticsVisitor::checkModifier(
             getSink()->diagnose(Diagnostics::ConstexprOnCallableIgnored{.modifier = m});
         }
     }
-    if (as<ConstModifier>(m))
+    if (as<CppStyleTrailingThisParamConstModifier>(m))
+    {
+        // We keep the modifier after diagnosing a dialect mismatch. Receiver validation can then
+        // reject a declaration without an instance receiver, while an instance method still uses
+        // the modifier's read-only meaning during body checking.
+        auto translationUnit = getShared()->getTranslationUnitRequest();
+        if (!translationUnit || translationUnit->sourceLanguage != SourceLanguage::HLSL)
+        {
+            getSink()->diagnose(
+                Diagnostics::CppStyleTrailingThisParamConstRequiresHlsl{.modifier = m});
+        }
+    }
+    else if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
         {

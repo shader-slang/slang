@@ -37,7 +37,8 @@ void computeMain<TBias: IPackedVal>(
         // pLocal.bias[0].unpack<float>() involves a generic method call that
         // triggers tryParseGenericApp during parsing. This pre-checks the
         // expression chain containing pLocal before the lambda capture context
-        // exists. The LambdaCaptureVisitor must retroactively fix the capture.
+        // exists. Semantic checking must revisit the selected expression path
+        // once the lambda capture context is available.
         pLocal.output[x] = pLocal.bias[0].unpack<float>();
         return value;
     };

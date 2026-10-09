@@ -1341,86 +1341,82 @@ FIDDLE() namespace Slang
                                (std::underlying_type_t<LookupOptions>)b);
     }
 
+    /// Records one implicit operation that lookup deferred until expression reconstruction.
+    ///
+    /// The linked list is stored in the order that `ConstructLookupResultExpr` applies its
+    /// operations to the evolving base expression.
     class LookupResultItem_Breadcrumb : public RefObject
     {
     public:
         enum class Kind : uint8_t
         {
-            // The lookup process looked "through" an in-scope
-            // declaration to the fields inside of it, so that
-            // even if lookup started with a simple name `f`,
-            // it needs to result in a member expression `obj.f`.
+            /// Lookup crossed an in-scope declaration to reach one of its members, so expression
+            /// reconstruction must form a member expression such as `object.member`.
             Member,
 
-            // The lookup process took a pointer(-like) value, and then
-            // proceeded to derefence it and look at the thing(s)
-            // it points to instead, so that the final expression
-            // needs to have `(*obj)`
+            /// Lookup dereferenced a pointer-like value, so expression reconstruction must form an
+            /// implicit dereference such as `*object`.
             Deref,
 
-            // The lookup process saw a value `obj` of type `T` and
-            // took into account an in-scope constraint that says
-            // `T` is a subtype of some other type `U`, so that
-            // lookup was able to find a member through type `U`
-            // instead.
+            /// Lookup used a subtype witness to find a member through a supertype of the original
+            /// base expression.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            /// Lookup crossed an enclosing type while a current instance was available, so the
+            /// reconstructed reference needs a `this` value as its base.
+            ThisValue,
+
+            /// Lookup crossed an enclosing type without a current instance, so the reconstructed
+            /// reference needs the `This` type as its base.
+            ThisType,
         };
 
-        // The kind of lookup step that was performed
+        /// Identifies the implicit operation that expression reconstruction must apply.
         Kind kind;
 
-        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
-        // and is that value mutable?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
-
-        // As needed, a reference to the declaration that faciliated
-        // the lookup step.
-        //
-        // For a `Member` lookup step, this is the declaration whose
-        // members were implicitly pulled into scope.
-        //
-        // For a `Constraint` lookup step, this is the `ConstraintDecl`
-        // that serves to witness the subtype relationship.
-        //
+        /// Stores the declaration involved in the lookup step, when its kind requires one.
+        ///
+        /// A `Member` step stores the declaration whose members were brought into scope. A
+        /// `SuperType` step stores the declaration through which lookup found the subtype relation.
+        /// A `ThisValue` or `ThisType` step stores the aggregate or extension crossed by lookup, or
+        /// the explicit `This` type declaration used inside an interface default implementation.
         DeclRef<Decl> declRef;
 
+        /// Stores the subtype witness for a `SuperType` step. Other kinds leave this null.
         Val* val = nullptr;
 
-        // The next implicit step that the lookup process took to
-        // arrive at a final value.
+        /// Stores the lexical scope used to reconstruct a `this` expression.
+        ///
+        /// This field is non-null exactly for `Kind::ThisValue`; every other kind leaves it null.
+        Scope* thisValueScope = nullptr;
+
+        /// Links to the next implicit operation that expression reconstruction applies.
         RefPtr<LookupResultItem_Breadcrumb> next;
 
         LookupResultItem_Breadcrumb(
             Kind kind,
             DeclRef<Decl> declRef,
             Val* val,
-            RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
+            Scope* thisValueScope,
+            RefPtr<LookupResultItem_Breadcrumb> next)
             : kind(kind)
-            , thisParameterMode(thisParameterMode)
             , declRef(declRef)
             , val(val)
+            , thisValueScope(thisValueScope)
             , next(next)
         {
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisValue) == (thisValueScope != nullptr));
+        }
+
+        Scope* getThisValueScope() const
+        {
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisValue);
+            SLANG_RELEASE_ASSERT(thisValueScope);
+            return thisValueScope;
         }
 
     protected:
-        // Needed for serialization
+        // Serialization constructs an empty breadcrumb before filling its fields.
         LookupResultItem_Breadcrumb() = default;
     };
 

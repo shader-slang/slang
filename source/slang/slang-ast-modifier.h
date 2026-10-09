@@ -33,6 +33,16 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Represents `const` written after a function parameter list.
+///
+/// This spelling requests a read-only effective `this` parameter. Keeping it distinct from
+/// `ConstModifier` prevents a trailing receiver qualifier from being mistaken for prefix `const`.
+FIDDLE()
+class CppStyleTrailingThisParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {

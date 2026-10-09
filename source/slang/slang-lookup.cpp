@@ -25,16 +25,44 @@ DeclRef<ExtensionDecl> applyExtensionToType(
 //
 
 
-// Helper for constructing breadcrumb trails during lookup, without unnecessary heap allocaiton
+/// Represents a stack-local breadcrumb used while recursive lookup explores one candidate path.
+///
+/// Each node points to the preceding lookup operation through `prev`. Once lookup finds a result,
+/// `CreateLookupResultItem` reverses this temporary chain into the persistent order in which
+/// expression reconstruction must apply the operations.
 struct BreadcrumbInfo
 {
     LookupResultItem::Breadcrumb::Kind kind;
-    LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode =
-        LookupResultItem::Breadcrumb::ThisParameterMode::Default;
     DeclRef<Decl> declRef;
     Val* val = nullptr;
+    Scope* thisValueScope = nullptr;
     BreadcrumbInfo* prev = nullptr;
 };
+
+/// Creates the breadcrumb that starts a lookup path from an implicit `this` value or `This` type.
+///
+/// A value breadcrumb preserves the original lexical scope so that expression reconstruction can
+/// check `this` with the same containing callable that initiated lookup. A type breadcrumb does not
+/// reconstruct a value and therefore has no scope.
+static BreadcrumbInfo _makeThisBreadcrumbInfo(
+    LookupResultItem::Breadcrumb::Kind kind,
+    DeclRef<Decl> declRef,
+    Scope* lookupOriginScope)
+{
+    SLANG_RELEASE_ASSERT(
+        kind == LookupResultItem::Breadcrumb::Kind::ThisValue ||
+        kind == LookupResultItem::Breadcrumb::Kind::ThisType);
+
+    BreadcrumbInfo result;
+    result.kind = kind;
+    result.declRef = declRef;
+    if (kind == LookupResultItem::Breadcrumb::Kind::ThisValue)
+    {
+        SLANG_RELEASE_ASSERT(lookupOriginScope);
+        result.thisValueScope = lookupOriginScope;
+    }
+    return result;
+}
 
 //
 
@@ -157,8 +185,8 @@ LookupResultItem CreateLookupResultItem(DeclRef<Decl> declRef, BreadcrumbInfo* b
             bb->kind,
             bb->declRef,
             bb->val,
-            breadcrumbs,
-            bb->thisParameterMode);
+            bb->thisValueScope,
+            breadcrumbs);
     }
     item.breadcrumbs = breadcrumbs;
     return item;
@@ -789,7 +817,7 @@ static void _lookUpInScopes(
     LookupRequest const& request,
     LookupResult& result)
 {
-    auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
+    bool isThisValueAvailable = true;
 
     auto scope = request.scope;
 
@@ -800,10 +828,12 @@ static void _lookUpInScopes(
 
     for (; scope != endScope; scope = scope->parent)
     {
+        auto lexicalScope = scope;
+
         // Note that we consider all "peer" scopes together,
         // so that a hit in one of them does not preclude
         // also finding a hit in another
-        for (auto link = scope; link; link = link->nextSibling)
+        for (auto link = lexicalScope; link; link = link->nextSibling)
         {
             auto containerDecl = link->containerDecl;
 
@@ -856,11 +886,11 @@ static void _lookUpInScopes(
                 // mark the base of the member reference, so we create
                 // a "breadcrumb" here to track that fact.
                 //
-                BreadcrumbInfo breadcrumb;
-                breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
-                breadcrumb.thisParameterMode = thisParameterMode;
-                breadcrumb.declRef = aggTypeDeclBaseRef;
-                breadcrumb.prev = nullptr;
+                auto breadcrumb = _makeThisBreadcrumbInfo(
+                    isThisValueAvailable ? LookupResultItem::Breadcrumb::Kind::ThisValue
+                                         : LookupResultItem::Breadcrumb::Kind::ThisType,
+                    aggTypeDeclBaseRef,
+                    request.scope);
                 BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
                 if (auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
@@ -954,11 +984,11 @@ static void _lookUpInScopes(
                 // look up in the `This` type instead.
                 if (getText(name) != "This")
                 {
-                    BreadcrumbInfo breadcrumb;
-                    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
-                    breadcrumb.thisParameterMode = thisParameterMode;
-                    breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
-                    breadcrumb.prev = nullptr;
+                    auto breadcrumb = _makeThisBreadcrumbInfo(
+                        isThisValueAvailable ? LookupResultItem::Breadcrumb::Kind::ThisValue
+                                             : LookupResultItem::Breadcrumb::Kind::ThisType,
+                        DeclRef<Decl>(defaultImplDecl->thisTypeDecl),
+                        request.scope);
                     Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
                 }
@@ -973,94 +1003,14 @@ static void _lookUpInScopes(
                 break;
             }
 
-            // Before we proceed up to the next outer scope to perform lookup
-            // again, we need to consider what the current scope tells us
-            // about how to interpret uses of `this` or `This`. For example, the
-            // effective `this` parameter of a writable method makes the `this`
-            // value used for lookup an l-value.
-            //
-            // Similarly, if we look up a member in a type from the scope
-            // of some nested type, then there shouldn't be a `this` expression
-            // for the outer type; only its `This` type is available.
-            //
-            if (containerDeclRef.is<ConstructorDecl>())
-            {
-                // In the context of an `__init` declaration, the members of
-                // the surrounding type are accessible through a mutable `this`.
-                //
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
-            }
-            else if (auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>())
-            {
-                // Header checking can perform lookup through the callable that is currently being
-                // checked. Its effective `this` parameter information is attached only after that
-                // header pass completes, so querying it here would recursively try to finish the
-                // same declaration. Use the declaration spelling only as a bootstrap below;
-                // lookup performed from the body and later phases takes the checked-data path.
-                if (funcDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked))
-                {
-                    std::optional<ParamInfo> thisParamInfo;
-                    if (request.semantics)
-                    {
-                        thisParamInfo = request.semantics->findEffectiveThisParamInfo(funcDeclRef);
-                    }
-                    else
-                    {
-                        thisParamInfo = findEffectiveThisParamInfo(astBuilder, funcDeclRef);
-                    }
+        }
 
-                    if (thisParamInfo)
-                    {
-                        thisParameterMode =
-                            isThisExprWritable(funcDeclRef.as<CallableDecl>(), *thisParamInfo)
-                                ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
-                                : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
-                    }
-                    else
-                    {
-                        // A function without an effective `this` parameter only has access to
-                        // `This`.
-                        thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                    }
-                }
-                else if (isEffectivelyStatic(funcDeclRef.getDecl()))
-                {
-                    // Signature checking can need lookup before the checked parameter information
-                    // is attached. Staticness is already known at that point and must still prevent
-                    // lookup from constructing a `this` value.
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-                }
-                else
-                {
-                    // This branch is deliberately limited to the declaration's unchecked header.
-                    // Default-value expressions can perform nested lookup here, so preserve enough
-                    // of the source/internal mode policy to construct a writable `this` when the
-                    // declaration requires one. Once signature checking completes,
-                    // `isThisExprWritable` combines the attached `ParamInfo` with the class-setter
-                    // body rule documented there.
-                    auto bootstrapMode =
-                        applyThisParamModePolicy(funcDeclRef.getDecl(), ParamPassingMode::In);
-                    bool isWritable = doesParamPassingModeIndicateWritableStorage(bootstrapMode);
-                    if (auto synthesizedMode =
-                            funcDeclRef.getDecl()
-                                ->findModifier<SynthesizedParamPassingModeModifier>())
-                    {
-                        isWritable =
-                            doesParamPassingModeIndicateWritableStorage(synthesizedMode->mode);
-                    }
-                    thisParameterMode =
-                        isWritable
-                            ? LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue
-                            : LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
-                }
-            }
-            else if (containerDeclRef.as<AggTypeDeclBase>())
-            {
-                // When lookup moves from a nested typed declaration to an outer scope, there is no
-                // `this` expression for the outer type, and only the `This` type is available.
-                //
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
-            }
+        // Sibling scopes are peers in one lookup step. Receiver availability changes only after
+        // all peers have been searched, when lookup moves to the lexical parent scope.
+        auto lexicalContainerDecl = lexicalScope->containerDecl;
+        if (isReceiverlessDeclarationBoundary(lexicalContainerDecl))
+        {
+            isThisValueAvailable = false;
         }
 
         if (result.isValid())

@@ -80,6 +80,15 @@ public:
         const char* source,
         String* outDiagnostics = nullptr);
 
+    /// Parses and semantically checks `source`, using `sourcePath` for source locations and
+    /// source-language selection. This otherwise has the same contract as
+    /// `checkModuleFromSource`.
+    Module* checkModuleFromSourceAtPath(
+        const char* moduleName,
+        const char* sourcePath,
+        const char* source,
+        String* outDiagnostics = nullptr);
+
 private:
     ComPtr<slang::ISession> m_session;
     Linkage* m_linkage = nullptr;

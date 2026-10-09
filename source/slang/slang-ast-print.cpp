@@ -1622,6 +1622,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         }
 
         sb << ")";
+        if (funcDeclRef.getDecl()->hasModifier<CppStyleTrailingThisParamConstModifier>())
+            sb << " const";
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
@@ -1636,10 +1638,15 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
 {
     if (auto genericDecl = as<GenericDecl>(decl))
     {
+        SLANG_RELEASE_ASSERT(genericDecl->inner);
         decl = genericDecl->inner;
     }
     for (auto modifier : decl->modifiers)
     {
+        // `addDeclParams` prints the trailing modifier after the function parameter list.
+        if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+            continue;
+
         if (modifier->getKeywordName())
         {
             if (m_optionFlags & OptionFlag::NoInternalKeywords)
@@ -1753,6 +1760,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     DeclRef<Decl> declRef = inDeclRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
+        SLANG_RELEASE_ASSERT(genericDeclRef.getDecl()->inner);
         declRef =
             m_astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
     }
@@ -1784,6 +1792,20 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     addDeclKindPrefix(declRef.getDecl());
     addDeclPath(declRef);
     addDeclParams(declRef);
+
+    // `addDeclParams` prints only the parameter list represented by its declaration. For
+    // `f<T>(T value) const`, language-server signature help calls it on the `GenericDecl` while the
+    // cursor is inside `<...>` and must receive only `<T>`. A complete declaration signature must
+    // instead include `<T>(T value) const`, so append the inner declaration's parameter list here.
+    // This call does nothing when the generic wraps a declaration other than a callable.
+    if (auto genericDeclRef = declRef.as<GenericDecl>())
+    {
+        SLANG_RELEASE_ASSERT(genericDeclRef.getDecl()->inner);
+        auto innerDeclRef = m_astBuilder->getMemberDeclRef<Decl>(
+            genericDeclRef,
+            genericDeclRef.getDecl()->inner);
+        addDeclParams(innerDeclRef);
+    }
     addDeclResultType(declRef);
 }
 

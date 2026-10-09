@@ -88,7 +88,7 @@ void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
     if (auto varDecl = as<VarDeclBase>(decl))
     {
         if (varDecl->initExpr)
-            varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
+            varDecl->initExpr = maybeFinalizeSelectedExpressionPath(varDecl->initExpr);
     }
 }
 
@@ -292,7 +292,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = maybeRegisterLambdaCapture(e);
+    e = maybeFinalizeSelectedExpressionPath(e);
     e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }

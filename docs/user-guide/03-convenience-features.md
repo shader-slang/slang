@@ -114,9 +114,12 @@ using namespace ns1.ns2; // alternative syntax.
 void test() { f(); } // OK.
 ```
 
-## Member functions
+<a id="member-functions"></a>
 
-Slang supports defining member functions in `struct`s. For example, it is allowed to write:
+## Methods
+
+Slang supports defining methods in `struct`s.
+For example:
 
 ```slang
 struct Foo
@@ -128,14 +131,14 @@ struct Foo
 }
 ```
 
-You can use the `.` syntax to invoke member functions:
+Use the `.` syntax to invoke a method:
 
 ```slang
 Foo foo;
 int rs = foo.compute(1,2);
 ```
 
-Slang also supports static member functions. For example:
+Slang also supports static methods:
 
 ```slang
 struct Foo
@@ -147,7 +150,7 @@ struct Foo
 }
 ```
 
-Static member functions are accessed the same way as other static members, via either the type name or an instance of the type:
+Access a static method through either the type name or an instance of the type:
 
 ```slang
 int rs = Foo.staticMethod(a, b);
@@ -161,9 +164,16 @@ Foo foo;
 int rs = foo.staticMethod(a,b);
 ```
 
-### Mutability of member functions
+### Receiver mutability
 
-For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
+An instance method, or an accessor of an instance property or subscript, has an implicit `this` parameter for the receiver of the method or accessor call.
+A module-scope accessor, or an accessor of a `static` property or subscript, has no instance receiver.
+
+For a method declared on a value type such as a `struct`, the `this` parameter is read-only by default, so the method body cannot modify the receiver.
+A copyable receiver uses the `in` parameter-passing mode; a non-copyable receiver instead uses a read-only borrow because it cannot be copied into the method.
+A property or subscript getter has the same read-only default, while a setter is mutating by default.
+
+You can apply the `[mutating]` attribute to a method or accessor declaration to change the mode of the `this` parameter to `inout`, which lets the method or accessor body modify the receiver:
 
 ```slang
 struct Foo
@@ -180,9 +190,22 @@ struct Foo
 void test()
 {
     Foo f;
-    f.setCount(1); // Compiles
+    f.setCount(1); // Compiles.
 }
 ```
+
+You can apply the `[nonmutating]` attribute to a method or accessor declaration to request a read-only `this` parameter, which prevents the method or accessor body from modifying the receiver.
+The compiler uses `in` for a copyable receiver and a read-only borrow for a non-copyable receiver.
+This attribute is useful on a setter declared on a value type because a setter is mutating by default.
+
+A method or accessor declared on a Slang `class` always has an `in` `this` parameter.
+The compiler rejects receiver-mode specifiers on such declarations.
+
+The parameter-passing mode of `this` does not distinguish overloads.
+Declarations with otherwise identical signatures belong to the same redeclaration family regardless of that mode.
+Their effective `this` parameter modes must then agree: equivalent spellings are compatible, while different modes produce a receiver-mismatch diagnostic.
+
+For the corresponding rules in the HLSL dialect, see [The HLSL-Flavored Dialect](a1-06-hlsl-dialect.md#member-function-receivers).
 
 ## Properties
 
