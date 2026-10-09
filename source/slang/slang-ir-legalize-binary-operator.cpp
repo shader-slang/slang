@@ -19,6 +19,35 @@ static bool isVectorOrMatrix(IRType* type)
     }
 };
 
+/// Return the element type of a vector or matrix.
+static IRType* getVectorOrMatrixElementType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        return vectorType->getElementType();
+
+    auto matrixType = as<IRMatrixType>(type);
+    SLANG_ASSERT(matrixType);
+    return matrixType->getElementType();
+}
+
+/// Return a vector or matrix with the same shape and a new element type.
+static IRType* replaceVectorOrMatrixElementType(
+    IRBuilder& builder,
+    IRType* type,
+    IRType* elementType)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        return builder.getVectorType(elementType, vectorType->getElementCount());
+
+    auto matrixType = as<IRMatrixType>(type);
+    SLANG_ASSERT(matrixType);
+    return builder.getMatrixType(
+        elementType,
+        matrixType->getRowCount(),
+        matrixType->getColumnCount(),
+        matrixType->getLayout());
+}
+
 static bool isDivisionByMatrix(IRInst* inst)
 {
     return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
@@ -32,7 +61,9 @@ static bool isMatrixDividedByScalar(IRInst* inst)
 
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
 // type, then the scalar is converted to a composite type.
-static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
+static void legalizeScalarOperandsToMatchComposite(
+    IRInst* inst,
+    bool preserveShiftOperandElementType)
 {
     if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
         as<IRBasicType>(inst->getOperand(1)->getDataType()))
@@ -41,12 +72,22 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         builder.setInsertBefore(inst);
         IRType* compositeType = inst->getOperand(0)->getDataType();
         IRInst* scalarValue = inst->getOperand(1);
-        // Retain the scalar type for shifts
+        // WGSL and Metal retain the shift amount's element type. HostVM instead derives one
+        // element width from the left operand and uses it for both operands.
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
-            auto vectorType = as<IRVectorType>(compositeType);
-            compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+            if (preserveShiftOperandElementType)
+            {
+                compositeType = replaceVectorOrMatrixElementType(
+                    builder,
+                    compositeType,
+                    scalarValue->getDataType());
+            }
+            else
+            {
+                IRType* elementType = getVectorOrMatrixElementType(compositeType);
+                scalarValue = builder.emitCast(elementType, scalarValue);
+            }
         }
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
@@ -59,16 +100,63 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         builder.setInsertBefore(inst);
         IRType* compositeType = inst->getOperand(1)->getDataType();
         IRInst* scalarValue = inst->getOperand(0);
-        // Retain the scalar type for shifts
+        // WGSL and Metal retain the shift amount's element type. HostVM instead derives one
+        // element width from the right operand and uses it for both operands.
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
-            auto vectorType = as<IRVectorType>(compositeType);
-            compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+            if (preserveShiftOperandElementType)
+            {
+                compositeType = replaceVectorOrMatrixElementType(
+                    builder,
+                    compositeType,
+                    scalarValue->getDataType());
+            }
+            else
+            {
+                IRType* elementType = getVectorOrMatrixElementType(compositeType);
+                scalarValue = builder.emitCast(elementType, scalarValue);
+            }
         }
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
     }
+}
+
+static void legalizeScalarOperandsOfBinaryOpsRec(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_FRem:
+    case kIROp_IRem:
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Geq:
+    case kIROp_Leq:
+        legalizeScalarOperandsToMatchComposite(inst, false);
+        break;
+    default:
+        for (auto child : inst->getModifiableChildren())
+            legalizeScalarOperandsOfBinaryOpsRec(child);
+        break;
+    }
+}
+
+void legalizeScalarOperandsOfBinaryOps(IRModule* module)
+{
+    legalizeScalarOperandsOfBinaryOpsRec(module->getModuleInst());
 }
 
 // Replaces a division by scalar operation by a multiplication.
@@ -140,7 +228,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     // type. Division by matrix is not supported on Metal and WGSL.
     if (!isMatrixDividedByScalar(inst))
     {
-        legalizeScalarOperandsToMatchComposite(inst);
+        legalizeScalarOperandsToMatchComposite(inst, true);
     }
     else if (isWGPUTarget(targetProgram->getTargetReq()->getTarget()))
     {
