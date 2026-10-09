@@ -920,6 +920,15 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
+            if (paramType.isLeftValue && arg.argExpr->type.isLeftValue)
+            {
+                if (auto castExpr = as<BuiltinCastExpr>(coercedExpr);
+                    castExpr && isArrayMatrixLayoutConversion(castExpr->type, arg.argExpr->type))
+                {
+                    coercedExpr = CreateImplicitCastExpr(castExpr->type, arg.argExpr);
+                }
+            }
+
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
                 !isInterfaceType(arg.type) && isInterfaceType(paramType.type))

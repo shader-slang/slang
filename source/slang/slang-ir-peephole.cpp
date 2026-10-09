@@ -1531,6 +1531,29 @@ struct PeepholeContext : InstPassBase
                                 }
                             }
                         }
+                        else if (auto toArr = as<IRArrayType>(toType))
+                        {
+                            auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                            auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                            if (as<IRArrayType>(fromArr) && fromCountLit && toCountLit &&
+                                fromCountLit->getValue() == toCountLit->getValue())
+                            {
+                                List<IRInst*> elems;
+                                auto count = (UInt)toCountLit->getValue();
+                                elems.setCount((Index)count);
+                                for (UInt i = 0; i < count; ++i)
+                                {
+                                    elems[(Index)i] = builder.emitCast(
+                                        toArr->getElementType(),
+                                        builder.emitElementExtract(val, i));
+                                }
+                                auto newInst =
+                                    builder.emitMakeArray(toType, count, elems.getBuffer());
+                                inst->replaceUsesWith(newInst);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }

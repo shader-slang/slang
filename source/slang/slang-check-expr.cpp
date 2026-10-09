@@ -3921,6 +3921,8 @@ static bool _canLValueCoerce(Type* a, Type* b)
     // We can *assume* here that if they are coercable, that dimensions of vectors
     // and matrices match. We might want to assert to be sure...
     SLANG_ASSERT(a != b);
+    if (isArrayMatrixLayoutConversion(b, a))
+        return true;
     if (a->astNodeType == b->astNodeType)
     {
         if (auto matA = as<MatrixExpressionType>(a))

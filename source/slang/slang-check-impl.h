@@ -4612,6 +4612,8 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
 bool isUnsizedArrayType(Type* type);
 
+bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType);
+
 bool isInterfaceType(Type* type);
 
 bool isImmutableBufferType(Type* type);
