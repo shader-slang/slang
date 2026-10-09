@@ -1,8 +1,5 @@
 #pragma once
 
-#include "compiler-core/slang-source-loc.h"
-#include "core/slang-dictionary.h"
-#include "core/slang-list.h"
 #include "slang-ast-support-types.h"
 #include "slang-compiler-fwd.h"
 
@@ -168,17 +165,6 @@ struct StructuralRayTracingEntryPointInfo
         StructuralRayTracingHitAttributesKind::None;
 };
 
-/// Records the first structural and legacy pipeline uses seen in one source module.
-///
-/// `diagnosed` prevents later calls or entry-point discovery from repeating the same mixed-API
-/// diagnostic for that module.
-struct RayTracingAPIUsage
-{
-    Decl* structuralDecl = nullptr;
-    Decl* legacyDecl = nullptr;
-    bool diagnosed = false;
-};
-
 /// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
 ///
 /// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty
@@ -202,99 +188,60 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
 /// Module membership alone does not grant compiler-recognized behavior.
 bool isStructuralRayTracingDeclaration(Decl* declaration);
 
-/// Retains semantic checking state for structural ray tracing within one linkage.
+/// Returns the stage represented by the interface's AST type, including the intersection
+/// marker.
+StructuralRayTracingStageKind getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl);
+
+/// Returns whether the interface represents an executable stage with an `invoke` requirement.
+bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl);
+
+/// Returns the stage represented by the input's AST type, or `Count` for an ordinary type.
+StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
+
+/// Returns the metadata role represented by the interface's AST type, or `Count` otherwise.
+StructuralRayTracingMetadataKind getStructuralRayTracingMetadataKind(InterfaceDecl* interfaceDecl);
+
+/// Returns whether the accessor belongs to a property annotated as a stage payload view.
+bool isStructuralRayTracingPayloadStageInputAccessor(FunctionDeclBase* functionDecl);
+
+/// Returns the source contract of an annotated trace overload, or `None` for other functions.
+StructuralRayTracingTraceMethodKind getStructuralRayTracingTraceMethodKind(
+    FunctionDeclBase* functionDecl);
+
+/// Reads an annotated trace overload and the index of its annotated payload parameter.
+StructuralRayTracingTraceMethodInfo getStructuralRayTracingTraceMethodInfo(
+    FunctionDeclBase* functionDecl);
+
+/// Returns whether the function is an annotated structural trace operation.
+bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl);
+
+/// Returns whether the function is an annotated structural callable operation.
+bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);
+
+/// Returns the requirement's role from its name and its declaring interface's AST type.
+StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
+    AssocTypeDecl* requirement);
+
+/// Resolves an associated type through the exact supplied interface-conformance path.
 ///
-/// Compiler-recognized declaration roles come from their AST type or operation annotation. Only
-/// completed implementation selections and diagnostic bookkeeping are cached here; module import
-/// does not populate this state or modify declaration identity.
-class StructuralRayTracingCheckingState
-{
-public:
-    /// Returns the stage represented by the interface's AST type, including the intersection
-    /// marker.
-    StructuralRayTracingStageKind getStageKind(InterfaceDecl* interfaceDecl) const;
+/// Returns null if the interface and its inherited interfaces do not declare the requested
+/// requirement, or the selected witness does not provide a type value.
+Type* resolveStructuralRayTracingAssociatedType(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind);
 
-    /// Returns whether the interface represents an executable stage with an `invoke` requirement.
-    bool isExecutableStageInterface(InterfaceDecl* interfaceDecl) const;
+/// Resolves the constraint on an associated type through the supplied conformance path.
+SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind);
 
-    /// Returns the stage represented by the input's AST type, or `Count` for an ordinary type.
-    StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
+/// Classifies the attribute model from the primitive's AST type.
+StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(Type* primitiveType);
 
-    /// Returns the metadata role represented by the interface's AST type, or `Count` otherwise.
-    StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
-
-    /// Returns whether the accessor belongs to a property annotated as a stage payload view.
-    bool isPayloadStageInputAccessor(FunctionDeclBase* functionDecl) const;
-
-    /// Returns the source contract of an annotated trace overload, or `None` for other functions.
-    StructuralRayTracingTraceMethodKind getTraceMethodKind(FunctionDeclBase* functionDecl) const;
-
-    /// Reads an annotated trace overload and the index of its annotated payload parameter.
-    StructuralRayTracingTraceMethodInfo getTraceMethodInfo(FunctionDeclBase* functionDecl) const;
-
-    /// Returns whether the function is an annotated structural trace operation.
-    bool isTraceMethod(FunctionDeclBase* functionDecl) const
-    {
-        return getTraceMethodKind(functionDecl) != StructuralRayTracingTraceMethodKind::None;
-    }
-
-    /// Returns whether the function is an annotated structural callable operation.
-    bool isCallShaderMethod(FunctionDeclBase* functionDecl) const;
-
-    /// Returns the requirement's role from its name and its declaring interface's AST type.
-    StructuralRayTracingAssociatedTypeKind getAssociatedTypeKind(AssocTypeDecl* requirement) const;
-
-    /// Resolves an associated type through the exact supplied interface-conformance path.
-    ///
-    /// Returns null if the interface and its inherited interfaces do not declare the requested
-    /// requirement, or the selected witness does not provide a type value.
-    Type* resolveAssociatedType(
-        ASTBuilder* astBuilder,
-        SubtypeWitness* witness,
-        StructuralRayTracingAssociatedTypeKind kind) const;
-
-    /// Resolves the constraint on an associated type through the supplied conformance path.
-    SubtypeWitness* resolveAssociatedTypeConstraint(
-        ASTBuilder* astBuilder,
-        SubtypeWitness* witness,
-        StructuralRayTracingAssociatedTypeKind kind) const;
-
-    /// Classifies the attribute model from the primitive's AST type.
-    StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
-
-    /// Returns this executable interface's `invoke` requirement, or null for other interfaces.
-    FunctionDeclBase* getStageInvokeRequirement(InterfaceDecl* interfaceDecl) const;
-
-    /// Records the concrete method selected by an executable stage's conformance witness.
-    void registerStageImplementation(
-        FunctionDeclBase* implementation,
-        StructuralRayTracingStageKind kind);
-
-    /// Returns the role of a stage requirement or previously selected implementation method.
-    StructuralRayTracingStageKind getStageKind(FunctionDeclBase* implementation) const;
-
-    /// Returns true the first time checking validates an aggregate declaration's stage storage.
-    bool beginStageRepresentationDeclarationCheck(AggTypeDecl* declaration);
-
-    /// Returns true the first time checking validates a non-aggregate stage's representation.
-    bool beginStageRepresentationTypeCheck(Type* type);
-
-    /// Records one pipeline use and reports whether it completes a new mixed-API pair.
-    ///
-    /// A true result requests one diagnostic at `decl`; `outOtherDecl` identifies the earlier
-    /// use of the other API. Later uses in the same module do not repeat the diagnostic.
-    bool registerAPIUse(
-        Module* module,
-        RayTracingAPIFamily family,
-        Decl* decl,
-        Decl** outOtherDecl);
-
-private:
-    Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
-    HashSet<AggTypeDecl*> m_stageDeclarationsWithCheckedRepresentation;
-    HashSet<Type*> m_stageTypesWithCheckedRepresentation;
-    Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
-};
+/// Returns this executable interface's `invoke` requirement, or null for other interfaces.
+FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl);
 
 /// Returns the source declaration path used as the name hint for a structural ray-tracing type.
 ///

@@ -199,8 +199,7 @@ bool isStructuralRayTracingDeclaration(Decl* declaration)
     return intrinsicModifier && intrinsicModifier->irOp == kIROp_TraceProgramDescriptorType;
 }
 
-StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageKind(
-    InterfaceDecl* interfaceDecl) const
+StructuralRayTracingStageKind getStructuralRayTracingStageKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
     {
@@ -220,16 +219,14 @@ StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageKind(
     }
 }
 
-bool StructuralRayTracingCheckingState::isExecutableStageInterface(
-    InterfaceDecl* interfaceDecl) const
+bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl)
 {
     auto modifier = interfaceDecl ? interfaceDecl->findModifier<MagicTypeModifier>() : nullptr;
     return modifier && modifier->magicNodeType &&
            modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>();
 }
 
-StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageInputKind(
-    AggTypeDecl* typeDecl) const
+StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl)
 {
     switch (_getMagicTypeClass(typeDecl))
     {
@@ -248,8 +245,7 @@ StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageInputKi
     }
 }
 
-StructuralRayTracingMetadataKind StructuralRayTracingCheckingState::getMetadataKind(
-    InterfaceDecl* interfaceDecl) const
+StructuralRayTracingMetadataKind getStructuralRayTracingMetadataKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
     {
@@ -268,8 +264,8 @@ StructuralRayTracingMetadataKind StructuralRayTracingCheckingState::getMetadataK
     }
 }
 
-StructuralRayTracingAssociatedTypeKind StructuralRayTracingCheckingState::getAssociatedTypeKind(
-    AssocTypeDecl* requirement) const
+StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
+    AssocTypeDecl* requirement)
 {
     if (!requirement || !requirement->getName())
         return StructuralRayTracingAssociatedTypeKind::Count;
@@ -356,7 +352,6 @@ StructuralRayTracingAssociatedTypeKind StructuralRayTracingCheckingState::getAss
 // requirement. The checked interface facets identify that declaration; projecting the original
 // witness preserves this path even when HitContext has another IStageContext conformance.
 static AssocTypeDecl* _findStructuralAssociatedRequirement(
-    const StructuralRayTracingCheckingState& state,
     SubtypeWitness*& witness,
     StructuralRayTracingAssociatedTypeKind kind)
 {
@@ -378,7 +373,7 @@ static AssocTypeDecl* _findStructuralAssociatedRequirement(
             continue;
         for (auto requirement : owner.getDecl()->getDirectMemberDeclsOfType<AssocTypeDecl>())
         {
-            if (state.getAssociatedTypeKind(requirement) != kind)
+            if (getStructuralRayTracingAssociatedTypeKind(requirement) != kind)
                 continue;
             witness = sharedSemantics->tryProjectInterfaceSubtypeWitness(witness, facet->getType());
             return witness ? requirement : nullptr;
@@ -387,12 +382,12 @@ static AssocTypeDecl* _findStructuralAssociatedRequirement(
     return nullptr;
 }
 
-Type* StructuralRayTracingCheckingState::resolveAssociatedType(
+Type* resolveStructuralRayTracingAssociatedType(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind) const
+    StructuralRayTracingAssociatedTypeKind kind)
 {
-    auto requirement = _findStructuralAssociatedRequirement(*this, witness, kind);
+    auto requirement = _findStructuralAssociatedRequirement(witness, kind);
     if (!requirement)
         return nullptr;
     auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
@@ -444,15 +439,15 @@ static ASTNodeType _getAssociatedTypeConstraintClass(StructuralRayTracingAssocia
     }
 }
 
-SubtypeWitness* StructuralRayTracingCheckingState::resolveAssociatedTypeConstraint(
+SubtypeWitness* resolveStructuralRayTracingAssociatedTypeConstraint(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind) const
+    StructuralRayTracingAssociatedTypeKind kind)
 {
     auto expectedInterfaceClass = _getAssociatedTypeConstraintClass(kind);
     if (expectedInterfaceClass == ASTNodeType::CountOf)
         return nullptr;
-    auto associatedType = _findStructuralAssociatedRequirement(*this, witness, kind);
+    auto associatedType = _findStructuralAssociatedRequirement(witness, kind);
     if (!associatedType)
         return nullptr;
     auto owner = as<InterfaceDecl>(associatedType->parentDecl);
@@ -485,8 +480,7 @@ SubtypeWitness* StructuralRayTracingCheckingState::resolveAssociatedTypeConstrai
     return nullptr;
 }
 
-StructuralRayTracingHitAttributesKind StructuralRayTracingCheckingState::getHitAttributesKind(
-    Type* primitiveType) const
+StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(Type* primitiveType)
 {
     primitiveType = primitiveType ? as<Type>(primitiveType->resolve()) : nullptr;
     if (as<TrianglePrimitiveType>(primitiveType))
@@ -498,21 +492,20 @@ StructuralRayTracingHitAttributesKind StructuralRayTracingCheckingState::getHitA
                : StructuralRayTracingHitAttributesKind::None;
 }
 
-bool StructuralRayTracingCheckingState::isPayloadStageInputAccessor(
-    FunctionDeclBase* functionDecl) const
+bool isStructuralRayTracingPayloadStageInputAccessor(FunctionDeclBase* functionDecl)
 {
     auto propertyDecl = functionDecl ? as<PropertyDecl>(functionDecl->parentDecl) : nullptr;
     return propertyDecl && propertyDecl->hasModifier<RayTracingPayloadAttribute>();
 }
 
-StructuralRayTracingTraceMethodKind StructuralRayTracingCheckingState::getTraceMethodKind(
-    FunctionDeclBase* functionDecl) const
+StructuralRayTracingTraceMethodKind getStructuralRayTracingTraceMethodKind(
+    FunctionDeclBase* functionDecl)
 {
-    return getTraceMethodInfo(functionDecl).kind;
+    return getStructuralRayTracingTraceMethodInfo(functionDecl).kind;
 }
 
-StructuralRayTracingTraceMethodInfo StructuralRayTracingCheckingState::getTraceMethodInfo(
-    FunctionDeclBase* functionDecl) const
+StructuralRayTracingTraceMethodInfo getStructuralRayTracingTraceMethodInfo(
+    FunctionDeclBase* functionDecl)
 {
     StructuralRayTracingTraceMethodInfo result;
     if (!functionDecl || !functionDecl->hasModifier<RayTracingTraceAttribute>())
@@ -532,15 +525,20 @@ StructuralRayTracingTraceMethodInfo StructuralRayTracingCheckingState::getTraceM
     return result;
 }
 
-bool StructuralRayTracingCheckingState::isCallShaderMethod(FunctionDeclBase* functionDecl) const
+bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl)
+{
+    return getStructuralRayTracingTraceMethodKind(functionDecl) !=
+           StructuralRayTracingTraceMethodKind::None;
+}
+
+bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl)
 {
     return functionDecl && functionDecl->hasModifier<RayTracingCallShaderAttribute>();
 }
 
-FunctionDeclBase* StructuralRayTracingCheckingState::getStageInvokeRequirement(
-    InterfaceDecl* interfaceDecl) const
+FunctionDeclBase* getStructuralRayTracingStageInvokeRequirement(InterfaceDecl* interfaceDecl)
 {
-    if (!isExecutableStageInterface(interfaceDecl))
+    if (!isExecutableStructuralRayTracingStageInterface(interfaceDecl))
         return nullptr;
     for (auto member : interfaceDecl->getDirectMemberDeclsOfType<FunctionDeclBase>())
     {
@@ -581,64 +579,5 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
     return result;
 }
 
-
-void StructuralRayTracingCheckingState::registerStageImplementation(
-    FunctionDeclBase* implementation,
-    StructuralRayTracingStageKind kind)
-{
-    if (implementation && kind != StructuralRayTracingStageKind::Count)
-        m_stageImplementations[implementation] = kind;
-}
-
-StructuralRayTracingStageKind StructuralRayTracingCheckingState::getStageKind(
-    FunctionDeclBase* implementation) const
-{
-    if (!implementation)
-        return StructuralRayTracingStageKind::Count;
-    if (auto interfaceDecl = as<InterfaceDecl>(implementation->parentDecl))
-    {
-        if (implementation == getStageInvokeRequirement(interfaceDecl))
-            return getStageKind(interfaceDecl);
-    }
-    if (auto kind = m_stageImplementations.tryGetValue(implementation))
-        return *kind;
-    return StructuralRayTracingStageKind::Count;
-}
-
-bool StructuralRayTracingCheckingState::beginStageRepresentationDeclarationCheck(
-    AggTypeDecl* declaration)
-{
-    return declaration && m_stageDeclarationsWithCheckedRepresentation.add(declaration);
-}
-
-bool StructuralRayTracingCheckingState::beginStageRepresentationTypeCheck(Type* type)
-{
-    return type && m_stageTypesWithCheckedRepresentation.add(type);
-}
-
-bool StructuralRayTracingCheckingState::registerAPIUse(
-    Module* module,
-    RayTracingAPIFamily family,
-    Decl* decl,
-    Decl** outOtherDecl)
-{
-    *outOtherDecl = nullptr;
-    if (!module || !decl)
-        return false;
-
-    auto& usage = m_apiUsage.getOrAddValue(module, RayTracingAPIUsage());
-    auto& currentDecl =
-        family == RayTracingAPIFamily::Structural ? usage.structuralDecl : usage.legacyDecl;
-    auto otherDecl =
-        family == RayTracingAPIFamily::Structural ? usage.legacyDecl : usage.structuralDecl;
-    if (!currentDecl)
-        currentDecl = decl;
-    if (!otherDecl || usage.diagnosed)
-        return false;
-
-    usage.diagnosed = true;
-    *outOtherDecl = otherDecl;
-    return true;
-}
 
 } // namespace Slang

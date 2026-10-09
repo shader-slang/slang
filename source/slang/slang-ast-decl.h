@@ -874,6 +874,12 @@ class ModuleDecl : public NamespaceDeclBase
     //
     Module* module = nullptr;
 
+    /// First checked use of each ray-tracing pipeline API in this module. A native entry point
+    /// may be selected after body checking (or after loading the serialized module), so that
+    /// later check must still see an earlier structural call or conformance, and vice versa.
+    FIDDLE() Decl* structuralRayTracingUse = nullptr;
+    FIDDLE() Decl* legacyRayTracingUse = nullptr;
+
     /// Map a decl to the list of its associated decls.
     ///
     /// This mapping is filled in during semantic checking, as the decl declarations get checked or

@@ -3487,11 +3487,6 @@ void FrontEndCompileRequest::checkEntryPoints()
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
         }
     }
-
-    for (auto translationUnit : translationUnits)
-    {
-        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
-    }
 }
 
 

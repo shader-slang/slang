@@ -27,12 +27,15 @@ struct TestClosestHit : rt::IClosestHitShader
         this.invoke(input);
 //CHECK:     ^^^^^^ direct invocation of a structural ray-tracing stage
 //CHECK:     ^^^^^^ a structural ray-tracing stage method may only be invoked by compiler-generated dispatch
+
+        invoke(input);
+//CHECK:^^^^^^ direct invocation of a structural ray-tracing stage
+//CHECK:^^^^^^ a structural ray-tracing stage method may only be invoked by compiler-generated dispatch
     }
 }
 
-// A stage implementation loaded from serialized standard-module IR does not replay the source
-// conformance-registration path. Its checked parent witness must still identify `invoke` as a
-// compiler-dispatched stage method.
+// A stage implementation loaded from a serialized standard module does not recheck its source
+// body. Its checked conformance must still identify `invoke` as a compiler-dispatched method.
 extension rt::NoClosestHit<TestHitContext>
 {
     void illegal(in rt::ClosestHitInput<TestHitContext> input)

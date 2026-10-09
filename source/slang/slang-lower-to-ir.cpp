@@ -42,6 +42,7 @@
 #include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -12215,9 +12216,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // witness tables retain ordinary interface lowering; the non-executable intersection
         // placeholder contract remains an ordinary interface.
         auto interfaceOp = kIROp_InterfaceType;
-        auto& checkingState = context->getLinkage()->getStructuralRayTracingCheckingState();
-        if (checkingState.isExecutableStageInterface(decl))
-            interfaceOp = getStructuralRayTracingStageInterfaceOp(checkingState.getStageKind(decl));
+        if (isExecutableStructuralRayTracingStageInterface(decl))
+            interfaceOp =
+                getStructuralRayTracingStageInterfaceOp(getStructuralRayTracingStageKind(decl));
 
         IRInterfaceType* irInterface =
             subBuilder->createInterfaceType(interfaceOp, operandCount, nullptr);
@@ -13900,8 +13901,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // silently compiling it away. Normal serialization and specialization retain the decoration.
     void addStructuralRayTracingSourceOperationDecoration(IRFunc* irFunc, FunctionDeclBase* decl)
     {
-        auto& checkingState = context->getLinkage()->getStructuralRayTracingCheckingState();
-        auto traceKind = checkingState.getTraceMethodKind(decl);
+        auto traceKind = getStructuralRayTracingTraceMethodKind(decl);
         if (traceKind != StructuralRayTracingTraceMethodKind::None)
         {
             auto operationKind =
@@ -13910,7 +13910,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     : StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload;
             addStructuralRayTracingSourceOperation(*getBuilder(), irFunc, operationKind);
         }
-        else if (checkingState.isCallShaderMethod(decl))
+        else if (isStructuralRayTracingCallShaderMethod(decl))
         {
             addStructuralRayTracingSourceOperation(
                 *getBuilder(),

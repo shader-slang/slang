@@ -178,6 +178,14 @@ arguments. They are not registered in the core library's global magic-type map. 
 associated types and `invoke` implementation from its selected conformance witness so generic
 specializations and independently declared contracts retain their own identities.
 
+Do not keep a stage-implementation registry on `Linkage` or cache stage identity on an `invoke`
+method. One generic method can implement both an ordinary type and a shader type. Direct-call
+validation uses the actual receiver's conformance and its selected implementation. Module checking
+validates stage capabilities and input parameters through the completed conformance witnesses.
+Representation diagnostics use the semantic checker's existing duplicate suppression. The first
+structural and legacy API uses are retained on the module declaration so later entry-point selection
+can enforce the same-module mixing restriction, including after serialization.
+
 ## Additional API and integration updates
 
 These are additive declarations or behavior corrections rather than the main source migrations:

@@ -3084,7 +3084,8 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
-    void registerStructuralRayTracingStageConformance(
+    void checkStructuralRayTracingModule(ModuleDecl* moduleDecl);
+    void checkStructuralRayTracingStageConformance(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable,
         SourceLoc conformanceLoc);
@@ -4418,9 +4419,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     bool* outFoundStruct,
     StructuralRayTracingEntryPointInfo* outInfo);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
-void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink);
-void registerRayTracingAPICall(
-    Linkage* linkage,
+void checkRayTracingAPICall(
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
     DiagnosticSink* sink);
