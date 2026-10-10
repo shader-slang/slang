@@ -2250,7 +2250,7 @@ public:
     // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
     // Version 34 is the earliest module version with the updated AST node numbering.
     const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 34;
+    const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

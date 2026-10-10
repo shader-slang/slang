@@ -6285,6 +6285,25 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
 }
 
+void getMatrixLayoutAxisCounts(
+    size_t rowCount,
+    size_t columnCount,
+    MatrixLayoutMode matrixLayoutMode,
+    size_t& outLayoutMajorCount,
+    size_t& outLayoutMinorCount)
+{
+    if (matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
+    {
+        outLayoutMajorCount = columnCount;
+        outLayoutMinorCount = rowCount;
+    }
+    else
+    {
+        outLayoutMajorCount = rowCount;
+        outLayoutMinorCount = columnCount;
+    }
+}
+
 RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     TypeLayoutContext const& context,
     Type* type,
@@ -6414,14 +6433,14 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         // just an array of row vectors, while a column-major one
         // is just an array of column vectors.
         //
-        size_t layoutMajorCount = rowCount;
-        size_t layoutMinorCount = colCount;
-        if (context.matrixLayoutMode == kMatrixLayoutMode_ColumnMajor)
-        {
-            size_t tmp = layoutMajorCount;
-            layoutMajorCount = layoutMinorCount;
-            layoutMinorCount = tmp;
-        }
+        size_t layoutMajorCount = 0;
+        size_t layoutMinorCount = 0;
+        getMatrixLayoutAxisCounts(
+            rowCount,
+            colCount,
+            context.matrixLayoutMode,
+            layoutMajorCount,
+            layoutMinorCount);
 
         RefPtr<TypeLayout> elementTypeLayout = new TypeLayout();
         elementTypeLayout->type = elementType;
