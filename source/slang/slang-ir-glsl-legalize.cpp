@@ -291,6 +291,23 @@ List<IRInst*> ScalarizedVal::leafAddresses()
     return ret;
 }
 
+static void addPatchDecorationToNonSystemValueLeaves(IRBuilder* builder, ScalarizedVal& value)
+{
+    for (auto leafAddr : value.leafAddresses())
+    {
+        auto leafLayout = findVarLayout(leafAddr);
+        // Every leaf of a legalized varying has a layout attached in
+        // `createVarLayoutForLegalizedGlobalParam`.
+        SLANG_ASSERT(leafLayout);
+        // System values are skipped: the SPIR-V emitter already adds Patch to the
+        // gl_TessLevel* globals standing in for the SV_TessFactor/SV_InsideTessFactor
+        // semantics, while others such as gl_TessCoord must not be patch at all.
+        if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
+            continue;
+        builder->addGLSLPatchDecoration(leafAddr);
+    }
+}
+
 struct GLSLLegalizationContext
 {
     Session* session;
@@ -1446,17 +1463,7 @@ void invokePatchConstantFuncInHullShader(
     context->entryPointFunc = entryPoint;
     context->stage = Stage::Hull;
 
-    for (auto leafAddr : patchConstantFuncOutputVal.leafAddresses())
-    {
-        if (auto leafLayout = findVarLayout(leafAddr))
-        {
-            // system values (SV_TessFactor/SV_InsideTessFactor) are skipped as the emitter
-            // already adds Patch to them
-            if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
-                continue;
-        }
-        builder.addGLSLPatchDecoration(leafAddr);
-    }
+    addPatchDecorationToNonSystemValueLeaves(&builder, patchConstantFuncOutputVal);
 
     fixUpFuncType(constantFunc);
 }
@@ -4448,22 +4455,11 @@ void legalizeEntryPointParameterForGLSL(
         // Domain shader patch constant inputs: a varying input that isn't
         // InputPatch/OutputPatch (handled by legalizePatchParam above).
         // Patch constants are always passed by const reference
-        // (translateEntryPointInParamToBorrow). System values are skipped
-        // here: the emitter already adds Patch to the SV_TessFactor/
-        // SV_InsideTessFactor globals (gl_TessLevel*), and other system
-        // values such as gl_TessCoord must not get it.
+        // (translateEntryPointInParamToBorrow).
         if (stage == Stage::Domain)
         {
             SLANG_ASSERT(!as<IRHLSLPatchType>(valueType));
-            for (auto addr : globalValue.leafAddresses())
-            {
-                if (auto leafLayout = findVarLayout(addr))
-                {
-                    if (leafLayout->findAttr<IRSystemValueSemanticAttr>())
-                        continue;
-                }
-                builder->addGLSLPatchDecoration(addr);
-            }
+            addPatchDecorationToNonSystemValueLeaves(builder, globalValue);
         }
 
         for (auto dec : pp->getDecorations())
