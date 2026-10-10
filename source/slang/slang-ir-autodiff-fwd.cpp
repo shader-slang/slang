@@ -3686,10 +3686,10 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         higherOrderFwdDiffFwdWitness);
 
     auto higherOrderFwdDiffBwdWitness = builder.emitIntrinsicInst(
-        (IRType*)builder.emitSpecializeInst(
+        (IRType*)builder.getWitnessTableType((IRType*)builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->backwardDifferentiableInterfaceType,
-            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue())),
+            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue()))),
         kIROp_SynthesizedBackwardDerivativeWitnessTable,
         1,
         &higherOrderfwdDiffFn);
@@ -3731,6 +3731,12 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
     // The IBackwardDifferentiable requirements are addressed by built-in requirement *role*
     // rather than by operand position, so this is robust to the order in which the requirements
     // (and the relocated `BwdCallable : IBwdCallable` conformance) appear in the interface.
+    //
+    // The table we build is a complete conformance: every requirement gets a real value, because
+    // a call through any of them looks it up. The interface has six requirements (`BwdCallable`,
+    // its `IBwdCallable` conformance, `MinimalContext`, `apply_bwd`, `remat` and the legacy
+    // `bwd_diff`), so a new one must be filled here too.
+    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 6);
     IRInst* typeOperand = baseFunc->getFullType();
 
     auto contextType = builder.emitIntrinsicInst(
@@ -3745,6 +3751,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             BuiltinRequirementKind::BwdCallableContextType)
             ->getRequirementKey(),
         contextType);
+    IRInst* propFunc = nullptr;
     {
         auto callableConformanceBaseType = cast<IRInterfaceType>(
             getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
@@ -3757,7 +3764,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             builder.createWitnessTable((IRType*)callableConformanceType, (IRType*)contextType);
 
         IRInst* propFuncOperands[] = {typeOperand, contextType};
-        auto propFunc = builder.emitIntrinsicInst(
+        propFunc = builder.emitIntrinsicInst(
             (IRType*)builder.emitIntrinsicInst(
                 builder.getTypeKind(),
                 kIROp_BwdCallableFuncType,
@@ -3799,9 +3806,10 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
 
     // apply_bwd func.
     // ApplyForBwdFuncType<FType, MinimalContext> — second operand is MinimalContext.
+    IRInst* applyFunc = nullptr;
     {
         IRInst* applyFuncTypeOperands[] = {typeOperand, minimalContextType};
-        auto applyFunc = builder.emitBackwardDifferentiatePrimalInst(
+        applyFunc = builder.emitBackwardDifferentiatePrimalInst(
             (IRType*)builder.emitIntrinsicInst(
                 builder.getTypeKind(),
                 kIROp_ApplyForBwdFuncType,
@@ -3819,9 +3827,10 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
 
     // remat func.
     // RematFuncType<FType, MinimalContext, FullContext> — operands are minimalCtx, fullCtx.
+    IRInst* rematFunc = nullptr;
     {
         IRInst* rematFuncTypeOperands[] = {typeOperand, minimalContextType, contextType};
-        auto rematFunc = builder.emitIntrinsicInst(
+        rematFunc = builder.emitIntrinsicInst(
             (IRType*)builder.emitIntrinsicInst(
                 builder.getTypeKind(),
                 kIROp_RematFuncType,
@@ -3839,15 +3848,36 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             rematFunc);
     }
 
+    // The legacy `bwd_diff` requirement is the combined backward derivative, as opposed to the
+    // `apply_bwd`/`remat`/`BwdCallable` split, and it is what a `bwd_diff(g)(...)` call looks up,
+    // so a call written as `bwd_diff(fwd_diff(f))(...)` reaches this entry. We fill it with
+    // `LegacyBackwardDifferentiate(apply_bwd, remat, BwdCallable.operator())`, the operands
+    // `maybeTranslateLegacyBackwardDerivative` expects and the shape that
+    // `trySynthesizeDiffFuncRequirementWitness` (slang-check-decl.cpp) builds for a declared
+    // function. That translator reads the inst's own type as the derivative's function type, so we
+    // resolve the type here.
     {
-        // bwd_diff (legacy) - should never be required, so we just emit a poison value.
+        DifferentiableTypeConformanceContext diffTypeContext(sharedContext);
+        auto bwdDiffFuncType = diffTypeContext.resolveType(
+            &builder,
+            builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                kIROp_BackwardDiffFuncType,
+                1,
+                &typeOperand));
+        IRInst* legacyBwdDiffOperands[] = {applyFunc, rematFunc, propFunc};
+        auto legacyBwdDiffFunc = builder.emitIntrinsicInst(
+            (IRType*)bwdDiffFuncType,
+            kIROp_LegacyBackwardDifferentiate,
+            3,
+            legacyBwdDiffOperands);
         builder.createWitnessTableEntry(
             newWitnessTable,
             getInterfaceEntryByBuiltinRequirement(
                 baseConformanceType,
                 BuiltinRequirementKind::LegacyBackwardDerivativeFunc)
                 ->getRequirementKey(),
-            builder.getPoison(builder.getVoidType()));
+            legacyBwdDiffFunc);
     }
 
     return newWitnessTable;

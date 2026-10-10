@@ -149,6 +149,30 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
     return true;
 }
 
+// Returns true if `key` is the key of a function-valued backward-derivative requirement:
+// `apply_bwd`, `remat` and the legacy combined `bwd_diff` of `IBackwardDifferentiable`, or the
+// propagate function `IBwdCallable.operator()`. These mirror the op families that
+// `isBackwardDerivativeValue` recognizes (primal, remat, legacy combined and propagate); the
+// context types and the `BwdCallable : IBwdCallable` witness are not functions and are excluded.
+// No user syntax is known to reach the `remat` or propagate keys; we keep them for parity with the
+// op switch.
+static bool isBackwardDerivativeRequirementKey(IRInst* key)
+{
+    auto decor = key->findDecoration<IRBuiltinRequirementDecoration>();
+    if (!decor)
+        return false;
+    switch ((BuiltinRequirementKind)decor->getKind())
+    {
+    case BuiltinRequirementKind::BwdApplyFunc:
+    case BuiltinRequirementKind::BwdCallableRematFunc:
+    case BuiltinRequirementKind::BwdCallablePropFunc:
+    case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isBackwardDerivativeValue(IRInst* inst)
 {
     if (!inst)
@@ -157,9 +181,21 @@ bool isBackwardDerivativeValue(IRInst* inst)
     // itself), so a specialized/generic backward-derivative value such as
     // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
     inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
+
+    // A backward derivative can also be a witness lookup rather than a differentiation op. For a
+    // declared `g`, `bwd_diff(g)` lowers to `LegacyBackwardDifferentiate`, but the
+    // `IBackwardDifferentiable` conformance of `fwd_diff(f)` is a
+    // `SynthesizedBackwardDerivativeWitnessTable` that only the translation pass materializes. Both
+    // `checkAutoDiffUsages` and the translation backstop therefore see `bwd_diff(fwd_diff(f))` and
+    // `__apply(fwd_diff(f))` as a `LookupWitnessMethod`, which we recognize by the requirement's
+    // role. We match any witness table, not only a synthesized one, because a lookup of one of
+    // these keys yields a backward derivative whichever conformance provides it.
+    if (auto lookup = as<IRLookupWitnessMethod>(inst))
+        return isBackwardDerivativeRequirementKey(lookup->getRequirementKey());
+
     switch (inst->getOp())
     {
-    // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
+    // The differentiation ops that yield a backward-derivative function (a `bwd_diff` result),
     // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms, and
     // the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
     // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately excluded,
