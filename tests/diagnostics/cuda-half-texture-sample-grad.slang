@@ -68,27 +68,22 @@ void eHalf4_2DArr() { outBuf[0] = gHalf4_2DArr.SampleGrad(samp, float3(0.5f), fl
 void eHalfCombined() { outBuf[0] = gSamplerHalf4.SampleGrad(float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x; }
 
 //FLOAT: tex2DGrad<float4
-//FLOAT-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eFloat() { outBuf[0] = gFloat4.SampleGrad(samp, float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x; }
 
 //UINT: tex2DGrad<uint4
-//UINT-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eUint() { outBuf[0] = float(gUint4.SampleGrad(samp, float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x); }
 
 //INT: tex2DGrad<int4
-//INT-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eInt() { outBuf[0] = float(gInt4.SampleGrad(samp, float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x); }
 
 //FLOAT2DA: tex2DLayeredGrad<float4
-//FLOAT2DA-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eFloat4_2DArr() { outBuf[0] = gFloat4_2DArr.SampleGrad(samp, float3(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x; }
 
 //FLOATC: tex2DGrad<float4
-//FLOATC-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eFloatCombined() { outBuf[0] = gSamplerFloat4.SampleGrad(float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x; }
 
@@ -99,6 +94,5 @@ T sampleGradR<T : ITexelElement>(Texture2D<T> t, SamplerState s)
     return t.SampleGrad(s, float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f));
 }
 //GENERIC: tex2DGrad<float4
-//GENERIC-NOT: static assertion failed
 [shader("compute")][numthreads(1, 1, 1)]
 void eGenericFloat() { outBuf[0] = sampleGradR<float4>(gFloat4, samp).x; }

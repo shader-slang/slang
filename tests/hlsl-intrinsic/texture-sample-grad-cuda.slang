@@ -44,9 +44,10 @@ RWStructuredBuffer<uint3> outU3;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Each float4 call below pins its full argument list: the coordinates, then the int layer for
-    // array shapes, then gradX before gradY. The gradients are hoisted into temporaries, so
-    // the checks capture those names from their declarations.
+    // Each float4 call below pins its full argument list: the coordinates, then the int layer
+    // for array shapes, then gradX before gradY. The emitter hoists the float2/float3 gradient
+    // constants into temporaries that later calls share, so the checks capture those names
+    // from their declarations; the 1D gradients stay inline literals.
     // CUDA: tex1DGrad<float4 >({{.*}}t1D_0), ((0.5f)), ((0.25f)), ((0.125f)))
     outF4[0] = t1D.SampleGrad(samp, 0.5, 0.25, 0.125);
 

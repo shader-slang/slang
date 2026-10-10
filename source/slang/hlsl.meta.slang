@@ -2300,11 +2300,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
             case cuda:
-                // CUDA's __nv_itex_trait has no half or 3-component texel specializations.
-                // A half texel would produce CUDA that NVRTC rejects, so we reject it here; a
-                // 3-component texel type fetches four components and reshapes back to three.
-                // Separately, the 3D and cube forms take float4 gradients, so we pad the float3
-                // gradients with a zero w component.
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no half or 3-component texel
+                // overloads. A half texel is rejected here because NVRTC would reject the
+                // CUDA; a float3/int3/uint3 texel fetches four components and reshapes back
+                // to three (other 3-component texel types stay unsupported, as for
+                // SampleLevel). The 3D and cube forms take float4 gradients, so we pad the
+                // float3 gradients with a zero w component.
                 static_assert(!__isHalf<T>(),
                     "'SampleGrad' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
                 if (isArray != 0)
@@ -3997,11 +3998,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
             __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
             case cuda:
-                // CUDA's __nv_itex_trait has no half or 3-component texel specializations.
-                // A half texel would produce CUDA that NVRTC rejects, so we reject it here; a
-                // 3-component texel type fetches four components and reshapes back to three.
-                // Separately, the 3D and cube forms take float4 gradients, so we pad the float3
-                // gradients with a zero w component.
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no half or 3-component texel
+                // overloads. A half texel is rejected here because NVRTC would reject the
+                // CUDA; a float3/int3/uint3 texel fetches four components and reshapes back
+                // to three (other 3-component texel types stay unsupported, as for
+                // SampleLevel). The 3D and cube forms take float4 gradients, so we pad the
+                // float3 gradients with a zero w component.
                 // The CUtexObject bound for the texture carries its own sampler state, so the
                 // SamplerState operand ($1) is not passed to CUDA.
                 static_assert(!__isHalf<T>(),
