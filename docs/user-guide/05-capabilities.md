@@ -292,6 +292,11 @@ void myFunc()
 The capability requirement of `myFunc` is `(spirv | hlsl)`, meaning that the function can be called from a context where either `spirv` or `hlsl` capability
 is available.
 
+When `myFunc` is compiled for a target that has no matching case, such as CUDA, there is no code to generate for it. Normally the capability check rejects such a call
+first. If capability checking is disabled with `-ignore-capabilities`, or if the call is otherwise not caught, Slang reports error E41037 for each `__target_switch`
+without a matching case that is still reachable after dead-code elimination, together with the call stack that reaches it. A function that is never called
+from an entry point is removed before this check, so it does not cause an error.
+
 ### Capability Incompatibilities
 
 The function declaration must be a superset of the capabilities the function body uses **for any shader stage/target the function declaration implicitly/explicitly requires**.

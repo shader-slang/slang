@@ -66,7 +66,11 @@ void checkForMissingReturnsRec(
         {
             auto terminator = block->getTerminator();
 
-            if (auto missingReturn = as<IRMissingReturn>(terminator))
+            // A `missingReturn` that replaced a `__target_switch` without a case for this target
+            // is not a missing `return` in user code; `diagnoseReachableNoTargetCase` reports it
+            // with a more precise error once dead code has been removed.
+            auto missingReturn = as<IRMissingReturn>(terminator);
+            if (missingReturn && !missingReturn->findDecoration<IRNoTargetCaseDecoration>())
             {
                 diagnoseMissingReturnForTarget(
                     missingReturn,

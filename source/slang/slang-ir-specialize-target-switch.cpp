@@ -1,5 +1,6 @@
 #include "slang-ir-specialize-target-switch.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-ir-dce.h"
@@ -9,6 +10,28 @@
 
 namespace Slang
 {
+// A `__target_switch` with no case for the current target is legal as long as the code that
+// contains it is never generated: the core module links such functions into every target and
+// relies on DCE to remove the ones that are not called (e.g. `__sincos_metal` on CUDA). We
+// therefore do not diagnose here. Instead we mark the `missingReturn` that replaces the switch,
+// recording the switch location and the name of its function (which is lost once the function is
+// inlined), so that `diagnoseReachableNoTargetCase` can report it if it survives to code
+// generation.
+static void markMissingReturnAsNoTargetCase(
+    IRBuilder& builder,
+    IRInst* missingReturn,
+    IRGlobalValueWithCode* code,
+    IRTargetSwitch* targetSwitch)
+{
+    StringBuilder funcName;
+    printDiagnosticArg(funcName, code);
+    missingReturn->sourceLoc = targetSwitch->sourceLoc;
+    builder.addDecoration(
+        missingReturn,
+        kIROp_NoTargetCaseDecoration,
+        builder.getStringValue(funcName.getUnownedSlice()));
+}
+
 void specializeTargetSwitch(
     TargetRequest* target,
     IRGlobalValueWithCode* code,
@@ -84,7 +107,9 @@ void specializeTargetSwitch(
                         .location = targetSwitch->sourceLoc,
                     });
                 }
-                builder.emitMissingReturn();
+                auto missingReturn = builder.emitMissingReturn();
+                if (!failedImplies)
+                    markMissingReturnAsNoTargetCase(builder, missingReturn, code, targetSwitch);
             }
             targetSwitch->removeAndDeallocate();
             changed = true;
@@ -104,6 +129,32 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
         if (auto code = as<IRGlobalValueWithCode>(globalInst))
         {
             specializeTargetSwitch(target, code, sink);
+        }
+    }
+}
+
+void diagnoseReachableNoTargetCase(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto code = as<IRGlobalValueWithCode>(globalInst);
+        if (!code)
+            continue;
+        for (auto block : code->getBlocks())
+        {
+            auto missingReturn = as<IRMissingReturn>(block->getTerminator());
+            if (!missingReturn)
+                continue;
+            auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>();
+            if (!noTargetCase)
+                continue;
+            sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
+                .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
+                .targetName =
+                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget())),
+                .location = missingReturn->sourceLoc,
+            });
+            diagnoseCallStack(missingReturn, sink);
         }
     }
 }

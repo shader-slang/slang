@@ -1892,6 +1892,14 @@ local insts = {
 			-- Lowering does not apply it to static data members, which also use `IRGlobalVar`.
 			{ fileOrNamespaceScopeStaticVar = { struct_name = "FileOrNamespaceScopeStaticVarDecoration" } },
 			{
+				noTargetCase = {
+					-- Marks the `missingReturn` that replaces a `__target_switch` with no case for the
+					-- current target. The operand names the function that contained the switch.
+					struct_name = "NoTargetCaseDecoration",
+					operands = { { "funcNameOperand", "IRStringLit" } },
+				},
+			},
+			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
 					operands = { { "SPIRVVersionOperand", "IRConstant" } },

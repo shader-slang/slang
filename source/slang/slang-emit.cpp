@@ -114,6 +114,7 @@
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-stage-switch.h"
+#include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
@@ -2569,6 +2570,12 @@ Result linkAndOptimizeIR(
     // pure no-op and gating drops no diagnostic.
     if (requiredLoweringPassSet.lateRequireCapability)
         SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+
+    // A `missingReturn` left by a `__target_switch` without a case for this target is only
+    // produced at link time, before the last `calcRequiredLoweringPassSet` scan, so the
+    // `missingReturn` flag covers it.
+    if (requiredLoweringPassSet.missingReturn)
+        SLANG_PASS(diagnoseReachableNoTargetCase, targetRequest, sink);
 
     SLANG_PASS(cleanUpVoidType);
 

@@ -5323,6 +5323,13 @@ warning(
     span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
+err(
+    "target-switch-no-case-for-target",
+    41037,
+    "no implementation of '~funcName' for the current target",
+    span { loc = "location", message = "'~funcName' has no implementation for target '~targetName'; this code path cannot be generated" }
+)
+
 warning(
     "using-uninitialized-global-variable",
     41017,
