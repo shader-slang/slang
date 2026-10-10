@@ -3436,10 +3436,10 @@ Expr* SemanticsVisitor::coerce(
     DiagnosticSink* sink)
 {
     diagnoseReadOfWriteOnlyRef(fromExpr, sink);
-    return coerceToMemoryLocation(site, toType, fromExpr, sink);
+    return coerceForWriteOnlyArgument(site, toType, fromExpr, sink);
 }
 
-Expr* SemanticsVisitor::coerceToMemoryLocation(
+Expr* SemanticsVisitor::coerceForWriteOnlyArgument(
     CoercionSite site,
     Type* toType,
     Expr* fromExpr,

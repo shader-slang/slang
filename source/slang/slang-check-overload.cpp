@@ -958,7 +958,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                                        !context.isCoercionConversionCall;
             Expr* coercedExpr =
                 readsArgument ? coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink())
-                              : coerceToMemoryLocation(
+                              : coerceForWriteOnlyArgument(
                                     CoercionSite::Argument,
                                     paramType,
                                     arg.argExpr,

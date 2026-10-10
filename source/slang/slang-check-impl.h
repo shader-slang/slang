@@ -2462,10 +2462,11 @@ public:
     /// parameter's memory location is reported.
     Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
-    /// Coerce `fromExpr` to `toType` as `coerce` does, for an argument that is not read: one
-    /// bound to an `out` or `__ref_writeonly` parameter, whose expression must resolve to a
-    /// memory location (or an abstract storage location with a `ref` accessor).
-    Expr* coerceToMemoryLocation(
+    /// Coerce `fromExpr` to `toType` as `coerce` does, for an argument that the callee only
+    /// writes: one bound to an `out` or `__ref_writeonly` parameter. A `__ref_writeonly`
+    /// argument must resolve to a memory location (or an abstract storage location with a `ref`
+    /// accessor); an `out` argument may be any writable abstract storage location.
+    Expr* coerceForWriteOnlyArgument(
         CoercionSite site,
         Type* toType,
         Expr* fromExpr,

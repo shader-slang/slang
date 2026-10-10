@@ -2003,10 +2003,8 @@ FIDDLE() namespace Slang
 
     /// Returns whether a parameter of mode `mode` may read the value of its argument.
     ///
-    /// Only an `out` or `__ref_writeonly` parameter never reads its argument: the argument
-    /// must resolve to a memory location (or an abstract storage location with a `ref`
-    /// accessor) that the callee writes. Every other mode, including `inout` and `__ref`,
-    /// may read the argument's value.
+    /// Only an `out` or `__ref_writeonly` parameter never reads its argument; the callee only
+    /// writes it. Every other mode, including `inout` and `__ref`, may read the argument's value.
     inline bool doesParamPassingModeReadArgument(ParamPassingMode mode)
     {
         switch (mode)
