@@ -3686,10 +3686,10 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         higherOrderFwdDiffFwdWitness);
 
     auto higherOrderFwdDiffBwdWitness = builder.emitIntrinsicInst(
-        (IRType*)builder.emitSpecializeInst(
+        (IRType*)builder.getWitnessTableType((IRType*)builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->backwardDifferentiableInterfaceType,
-            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue())),
+            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue()))),
         kIROp_SynthesizedBackwardDerivativeWitnessTable,
         1,
         &higherOrderfwdDiffFn);

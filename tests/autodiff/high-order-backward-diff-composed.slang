@@ -6,11 +6,13 @@
 // the output tangent, and `(2 * s, 0) = (6, 0)` for a gradient on the output primal. The
 // `IView` conformers cover methods that implement an interface requirement, called directly on
 // the concrete type, and the `out`/`inout` functions cover the other parameter directions.
+// `g3` calls a forward derivative itself, so differentiating it needs the backward conformance of
+// `fwd_diff(fwd_diff(f3))`, which only the translation pass synthesizes.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage compute -entry computeMain
 
-//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
@@ -53,6 +55,15 @@ float viaCustom(CustomView v, float s) { return v.read(s); }
 
 [Differentiable]
 void sqOut(float x, out float y) { y = x * x; }
+
+[Differentiable]
+float f3(float s) { return s * s * s; }
+
+[Differentiable]
+float g3(float x) { return fwd_diff(f3)(diffPair(x, 1.0)).d; }
+
+[Differentiable]
+DifferentialPair<float> fwdG3(DifferentialPair<float> x) { return fwd_diff(g3)(x); }
 
 [Differentiable]
 void sqInout(float x, inout float y) { y = y * x * x; }
@@ -156,6 +167,28 @@ void computeMain()
     outputBuffer[23] = kx.d.d;
     outputBuffer[24] = ky.d.p;
     outputBuffer[25] = ky.d.d;
+
+    // `fwd_diff(g3)` computes `(3 * x * x, 6 * x * dx)`, so a gradient on the output tangent gives
+    // `(6 * dx, 6 * x) = (6, 18)` and a gradient on the output primal gives `(6 * x, 0) = (18, 0)`.
+    // The wrapper `fwdG3` gives the same result as the composed form.
+    // CHECK-NEXT: {{^}}6.0
+    // CHECK-NEXT: {{^}}18.0
+    // CHECK-NEXT: {{^}}18.0
+    // CHECK-NEXT: {{^}}0.0
+    // CHECK-NEXT: {{^}}6.0
+    // CHECK-NEXT: {{^}}18.0
+    var m = diffPair(diffPair(3.0, 1.0));
+    bwd_diff(fwd_diff(g3))(m, diffPair(0.0, 1.0));
+    outputBuffer[26] = m.d.p;
+    outputBuffer[27] = m.d.d;
+    var m2 = diffPair(diffPair(3.0, 1.0));
+    bwd_diff(fwd_diff(g3))(m2, diffPair(1.0, 0.0));
+    outputBuffer[28] = m2.d.p;
+    outputBuffer[29] = m2.d.d;
+    var mw = diffPair(diffPair(3.0, 1.0));
+    bwd_diff(fwdG3)(mw, diffPair(0.0, 1.0));
+    outputBuffer[30] = mw.d.p;
+    outputBuffer[31] = mw.d.d;
 }
 
 // SPIRV: OpEntryPoint GLCompute
