@@ -8,10 +8,7 @@ using namespace rhi;
 
 namespace gfx_test
 {
-// Verifies that a store through a `[format("rgba8")]` RWTexture1DArray / RWTexture2DArray of
-// `float4` converts the texel to unorm8 on CUDA (issue #13554). The texel is read back on the host
-// after the dispatch completes, because a kernel cannot portably read back a surface it has just
-// written, and CUDA has no formatted layered surface read.
+// Creates a zero-filled two-layer RGBA8Unorm 1D or 2D array texture that a shader can write.
 static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
 {
     const uint32_t width = 2;
@@ -24,8 +21,8 @@ static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
     desc.arrayLength = layerCount;
     desc.mipCount = 1;
     desc.format = Format::RGBA8Unorm;
-    desc.usage = TextureUsage::UnorderedAccess | TextureUsage::CopySource |
-                 TextureUsage::CopyDestination;
+    desc.usage =
+        TextureUsage::UnorderedAccess | TextureUsage::CopySource | TextureUsage::CopyDestination;
     desc.defaultState = ResourceState::UnorderedAccess;
 
     uint32_t zeros[width * height] = {};
@@ -42,19 +39,29 @@ static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
     return texture;
 }
 
-// Returns the texel at (x, y) of `layer`, packed as RGBA8 with R in the low byte.
-static uint32_t readTexel(IDevice* device, ITexture* texture, uint32_t layer, uint32_t x, uint32_t y)
+// Checks that the RGBA8 texel at (x, 0) of `layer` matches `expected` within one unit per channel,
+// since the rounding of a float that lands exactly between two unorm8 values is up to the hardware.
+static void checkTexel(
+    IDevice* device,
+    ITexture* texture,
+    uint32_t layer,
+    uint32_t x,
+    std::array<int, 4> expected)
 {
     ComPtr<ISlangBlob> blob;
     SubresourceLayout layout;
     GFX_CHECK_CALL_ABORT(device->readTexture(texture, layer, 0, blob.writeRef(), &layout));
-    const uint8_t* texel = (const uint8_t*)blob->getBufferPointer() + y * layout.rowPitch +
-                           x * layout.colPitch;
-    uint32_t value = 0;
-    ::memcpy(&value, texel, sizeof(value));
-    return value;
+    const uint8_t* texel = (const uint8_t*)blob->getBufferPointer() + x * layout.colPitch;
+    for (int i = 0; i < 4; ++i)
+    {
+        SLANG_CHECK(abs(int(texel[i]) - expected[i]) <= 1);
+    }
 }
 
+// Verifies that a store through a `[format("rgba8")]` RWTexture1DArray / RWTexture2DArray of
+// `float4` converts the texel to unorm8 on CUDA (issue #13554). We read the texels back on the host
+// after the dispatch completes, because CUDA has no formatted layered surface read and a kernel
+// cannot rely on reading a surface it has just written.
 void cudaLayeredFormatWriteTestImpl(IDevice* device, UnitTestContext* context)
 {
     ComPtr<IShaderProgram> shaderProgram;
@@ -88,15 +95,14 @@ void cudaLayeredFormatWriteTestImpl(IDevice* device, UnitTestContext* context)
         queue->waitOnHost();
     }
 
-    // float4(0.25, 0.5, 0.75, 1.0) as unorm8 is (64, 128, 191, 255).
-    SLANG_CHECK(readTexel(device, texture2DArray, 1, 1, 0) == 0xFFBF8040u);
-    SLANG_CHECK(readTexel(device, texture2DArray, 0, 1, 0) == 0u);
-    SLANG_CHECK(readTexel(device, texture2DArray, 1, 0, 0) == 0u);
+    // Only texel x = 1 of layer 1 was written; its neighbours and layer 0 stay zero.
+    checkTexel(device, texture2DArray, 1, 1, {64, 128, 191, 255});
+    checkTexel(device, texture2DArray, 1, 0, {0, 0, 0, 0});
+    checkTexel(device, texture2DArray, 0, 1, {0, 0, 0, 0});
 
-    // float4(1.0, 0.75, 0.5, 0.25) as unorm8 is (255, 191, 128, 64).
-    SLANG_CHECK(readTexel(device, texture1DArray, 1, 1, 0) == 0x4080BFFFu);
-    SLANG_CHECK(readTexel(device, texture1DArray, 0, 1, 0) == 0u);
-    SLANG_CHECK(readTexel(device, texture1DArray, 1, 0, 0) == 0u);
+    checkTexel(device, texture1DArray, 1, 1, {255, 191, 128, 64});
+    checkTexel(device, texture1DArray, 1, 0, {0, 0, 0, 0});
+    checkTexel(device, texture1DArray, 0, 1, {0, 0, 0, 0});
 }
 
 SLANG_UNIT_TEST(cudaLayeredFormatWrite)
