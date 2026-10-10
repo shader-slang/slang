@@ -1269,7 +1269,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     // fast_float and `_hexFloatLiteralToDouble` do not understand digit separators, so we
     // decode a copy of the number with them removed. `numberToDecode`, and `cursor` once
     // decoding has advanced it, may point into that local copy: they are only compared
-    // against each other, and every out-parameter slices `content` instead.
+    // against each other, and `outErrorContent` slices `content` instead.
     String numberWithoutSeparators;
     UnownedStringSlice numberToDecode = number;
     if (number.indexOf('_') >= 0)
