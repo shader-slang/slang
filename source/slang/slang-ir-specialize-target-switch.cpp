@@ -13,10 +13,10 @@ namespace Slang
 // A `__target_switch` with no case for the current target is legal as long as the code that
 // contains it is never generated: the core module links such functions into every target and
 // relies on DCE to remove the ones that are not called (e.g. `__sincos_metal` on CUDA). We
-// therefore do not diagnose here. Instead we mark the `missingReturn` that replaces the switch,
-// recording the switch location and the name of its function (which is lost once the function is
-// inlined), so that `diagnoseReachableNoTargetCase` can report it if it survives to code
-// generation.
+// therefore do not diagnose here. Instead we mark the `missingReturn` that replaces the switch
+// with the name of its function, which is lost once the function is inlined, so that it can be
+// reported if it survives to code generation. The `missingReturn` takes the switch location, which
+// inlining replaces with the location of the call.
 static void markMissingReturnAsNoTargetCase(
     IRBuilder& builder,
     IRInst* missingReturn,
@@ -133,7 +133,27 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
     }
 }
 
-void diagnoseReachableNoTargetCase(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+bool isNoTargetCaseMissingReturn(IRMissingReturn* missingReturn)
+{
+    return missingReturn->findDecoration<IRNoTargetCaseDecoration>() != nullptr;
+}
+
+void diagnoseNoTargetCase(
+    IRMissingReturn* missingReturn,
+    CodeGenTarget target,
+    DiagnosticSink* sink)
+{
+    auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>();
+    SLANG_ASSERT(noTargetCase);
+    sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
+        .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
+        .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
+        .location = missingReturn->sourceLoc,
+    });
+    diagnoseCallStack(missingReturn, sink);
+}
+
+void diagnoseReachableNoTargetCase(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -143,18 +163,8 @@ void diagnoseReachableNoTargetCase(IRModule* module, TargetRequest* target, Diag
         for (auto block : code->getBlocks())
         {
             auto missingReturn = as<IRMissingReturn>(block->getTerminator());
-            if (!missingReturn)
-                continue;
-            auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>();
-            if (!noTargetCase)
-                continue;
-            sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
-                .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
-                .targetName =
-                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget())),
-                .location = missingReturn->sourceLoc,
-            });
-            diagnoseCallStack(missingReturn, sink);
+            if (missingReturn && isNoTargetCaseMissingReturn(missingReturn))
+                diagnoseNoTargetCase(missingReturn, target, sink);
         }
     }
 }

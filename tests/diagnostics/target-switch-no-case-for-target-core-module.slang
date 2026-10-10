@@ -30,15 +30,16 @@
 //TEST:SIMPLE(filecheck=CLEAN):-target spirv -entry unusedMetalOnly -stage compute -ignore-capabilities
 
 // `SampleLevel` is force-inlined, so the error points at the call in user code.
-// SAMPLE: error[E41037]: no implementation of '_Texture.SampleLevel' for the current target
+// SAMPLE: error[E41037]: __target_switch has no case for the current target
 // SAMPLE: output[0] = tex.SampleLevel(
-// SAMPLE: has no implementation for target '{{cuda|ptx}}'
+// SAMPLE: '_Texture.SampleLevel' contains a __target_switch with no case for target '{{cuda|ptx}}'
 
-// LOAD: error[E41037]: no implementation of '_Texture.Load' for the current target
-// LOAD: has no implementation for target '{{cuda|ptx|cpp}}'
+// LOAD: error[E41037]: __target_switch has no case for the current target
+// LOAD: '_Texture.Load' contains a __target_switch with no case for target '{{cuda|ptx|cpp}}'
 // LOAD: note: see call to '_Texture.Load'
 // LOAD: output[2] = typedBuf[0];
 
+// CLEAN: result code = 0
 // CLEAN-NOT: error[
 
 Texture2D<float4> tex;

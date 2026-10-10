@@ -5326,8 +5326,8 @@ warning(
 err(
     "target-switch-no-case-for-target",
     41037,
-    "no implementation of '~funcName' for the current target",
-    span { loc = "location", message = "'~funcName' has no implementation for target '~targetName'; this code path cannot be generated" }
+    "__target_switch has no case for the current target",
+    span { loc = "location", message = "'~funcName' contains a __target_switch with no case for target '~targetName', so this code cannot be generated" }
 )
 
 warning(

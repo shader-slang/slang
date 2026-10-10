@@ -2575,7 +2575,7 @@ Result linkAndOptimizeIR(
     // produced at link time, before the last `calcRequiredLoweringPassSet` scan, so the
     // `missingReturn` flag covers it.
     if (requiredLoweringPassSet.missingReturn)
-        SLANG_PASS(diagnoseReachableNoTargetCase, targetRequest, sink);
+        SLANG_PASS(diagnoseReachableNoTargetCase, target, sink);
 
     SLANG_PASS(cleanUpVoidType);
 

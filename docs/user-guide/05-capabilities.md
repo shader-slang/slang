@@ -293,9 +293,9 @@ The capability requirement of `myFunc` is `(spirv | hlsl)`, meaning that the fun
 is available.
 
 When `myFunc` is compiled for a target that has no matching case, such as CUDA, there is no code to generate for it. Normally the capability check rejects such a call
-first. If capability checking is disabled with `-ignore-capabilities`, or if the call is otherwise not caught, Slang reports error E41037 for each `__target_switch`
-without a matching case that is still reachable after dead-code elimination, together with the call stack that reaches it. A function that is never called
-from an entry point is removed before this check, so it does not cause an error.
+first. If capability checking is disabled with `-ignore-capabilities`, or if the code is reached in a way the capability check does not cover (for example an exported
+function), Slang reports error E41037 where such a `__target_switch` is still present after dead-code elimination, together with the call stack that reaches it.
+A function that is removed as dead code, such as one that no entry point calls and that is not exported, does not cause this error.
 
 ### Capability Incompatibilities
 

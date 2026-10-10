@@ -18,6 +18,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=SPIRV):-target spirv -entry spirvVoidFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=SPIRV):-target wgsl -entry spirvVoidFunc -stage compute -ignore-capabilities
 
+// On these targets the error is reported before the passes that follow it, which cannot handle a
+// function that returns a resource but falls off its end.
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target spirv -entry resourceFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target wgsl -entry resourceFunc -stage compute -ignore-capabilities
+
 RWStructuredBuffer<float> output;
 
 float twice(float x)
@@ -25,7 +31,7 @@ float twice(float x)
     __target_switch
 /*CHECK:
     ^^^^^^^^^^^^^^^ E41037
-    ^^^^^^^^^^^^^^^ 'twice' has no implementation for target
+    ^^^^^^^^^^^^^^^ 'twice' contains a __target_switch with no case for target
 */
     {
     case hlsl:
@@ -47,7 +53,7 @@ void setToTwo(inout float x)
     __target_switch
 /*VOID:
     ^^^^^^^^^^^^^^^ E41037
-    ^^^^^^^^^^^^^^^ 'setToTwo' has no implementation for target
+    ^^^^^^^^^^^^^^^ 'setToTwo' contains a __target_switch with no case for target
 */
     {
     case hlsl:
@@ -71,7 +77,7 @@ T twiceGeneric<T : __BuiltinFloatingPointType>(T x)
     __target_switch
 /*GENERIC:
     ^^^^^^^^^^^^^^^ E41037
-    ^^^^^^^^^^^^^^^ 'twiceGeneric' has no implementation for target
+    ^^^^^^^^^^^^^^^ 'twiceGeneric' contains a __target_switch with no case for target
 */
     {
     case hlsl:
@@ -93,7 +99,7 @@ void metalOnlySet(inout float x)
     __target_switch
 /*SPIRV:
     ^^^^^^^^^^^^^^^ E41037
-    ^^^^^^^^^^^^^^^ 'metalOnlySet' has no implementation for target
+    ^^^^^^^^^^^^^^^ 'metalOnlySet' contains a __target_switch with no case for target
 */
     {
     case metal:
@@ -108,4 +114,27 @@ void spirvVoidFunc()
     metalOnlySet(v);
 //SPIRV:        ^ see call to 'metalOnlySet'
     output[0] = v;
+}
+
+Texture2D<float4> tex;
+RWStructuredBuffer<float4> output4;
+
+Texture2D<float4> pickTexture()
+{
+    __target_switch
+/*RESOURCE:
+    ^^^^^^^^^^^^^^^ E41037
+    ^^^^^^^^^^^^^^^ 'pickTexture' contains a __target_switch with no case for target
+*/
+    {
+    case metal:
+        return tex;
+    }
+}
+
+[numthreads(1, 1, 1)]
+void resourceFunc()
+{
+    output4[0] = pickTexture().Load(int3(0));
+//RESOURCE:                 ^ see call to 'pickTexture'
 }
