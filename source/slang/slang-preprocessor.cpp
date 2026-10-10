@@ -2981,9 +2981,13 @@ static void beginConditional(PreprocessorDirectiveContext* context, bool enable)
 //
 
 // Conditional expressions are evaluated in `IntegerLiteralValue` (signed 64-bit), the type the
-// lexer decodes integer literals into. Literal suffixes are ignored, and a literal above
-// INT64_MAX is reinterpreted as a negative value. Arithmetic that overflows wraps around.
+// lexer decodes integer literals into. Literals are decoded as in code (base prefixes, octal,
+// digit separators), but there is no unsigned mode: suffixes are ignored, and a literal between
+// INT64_MAX and UINT64_MAX is reinterpreted as a negative value. Arithmetic that overflows wraps.
 typedef IntegerLiteralValue PreprocessorExpressionValue;
+
+// Signed overflow is undefined in C++, so wrapping operations compute in the unsigned type of
+// the same width and convert back, which gives the two's-complement result.
 typedef std::make_unsigned_t<PreprocessorExpressionValue> UnsignedPreprocessorExpressionValue;
 
 // Forward-declaretion
@@ -3193,9 +3197,10 @@ static int GetInfixOpPrecedence(Token const& opToken)
     }
 };
 
-// Returns `count` reduced modulo the width of `PreprocessorExpressionValue`. Shifting by a
-// negative count, or by the width or more, is undefined in C++, so we mask every count; constant
-// folding in code masks non-negative counts the same way (`_tryFoldConstantShift`).
+// Returns the shift count to use for `count`: its value as an unsigned 64-bit number, modulo 64
+// (so `-1` becomes 63). Shifting by a negative count, or by 64 or more, is undefined in C++, and
+// the preprocessor has no way to leave a shift unevaluated, so every count is reduced; x86 shift
+// instructions reduce counts the same way.
 static int _getPreprocessorShiftCount(PreprocessorExpressionValue count)
 {
     return int(
@@ -3233,7 +3238,8 @@ static PreprocessorExpressionValue EvaluateInfixOp(
                 return 0;
             }
             // `INT64_MIN / -1` is undefined in C++ (and traps on x86), so division by -1 is
-            // wrapping negation, as GCC and Clang compute it.
+            // wrapping negation, as in the GCC and Clang preprocessors and in front-end constant
+            // folding (`BuiltinOperationIntVal::tryFoldImpl`).
             if (right == -1)
                 return PreprocessorExpressionValue(0 - UnsignedPreprocessorExpressionValue(left));
             return left / right;

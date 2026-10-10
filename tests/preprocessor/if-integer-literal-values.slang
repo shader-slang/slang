@@ -1,6 +1,7 @@
 // Integer literals in `#if` expressions are decoded like literals in code: base prefixes,
-// octal, digit separators, and values that do not fit in 32 bits (#13545). Evaluation is in
-// signed 64 bits: a literal above INT64_MAX reads as negative, and literal suffixes are ignored.
+// octal, digit separators, and values that do not fit in 32 bits (#13545). Evaluation is signed
+// 64-bit with no unsigned mode: a literal between INT64_MAX and UINT64_MAX reads as negative,
+// and literal suffixes are ignored.
 
 //TEST:INTERPRET(filecheck=CHECK):
 void main()
@@ -102,4 +103,27 @@ void main()
     printf("suffixes ignored: FAIL\n");
 #endif
     // CHECK-NEXT: suffixes ignored: ok
+
+    // A literal on the line after an escaped newline is copied into an unterminated buffer;
+    // decoding must stop at the end of the literal.
+#if 5 ==\
+5
+    printf("continued literal: ok\n");
+#else
+    printf("continued literal: FAIL\n");
+#endif
+    // CHECK-NEXT: continued literal: ok
+
+#if 0 == \
+    0
+    printf("continued zero: ok\n");
+#else
+    printf("continued zero: FAIL\n");
+#endif
+    // CHECK-NEXT: continued zero: ok
+
+    int continued = 1 + \
+        7;
+    printf("continued code literal: %d\n", continued);
+    // CHECK-NEXT: continued code literal: 8
 }
