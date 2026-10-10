@@ -2284,7 +2284,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -2299,6 +2299,84 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
             case glsl:
                 __intrinsic_asm "$ctextureGrad($0, $1, $2, $3)$z";
+            case cuda:
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no __half overload, so a
+                // half texel produces CUDA that NVRTC rejects; we reject it here. Their 3D
+                // and cube gradients are float4, so we widen the float3 gradients below.
+                static_assert(!__isHalf<T>(),
+                    "'SampleGrad' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredGrad<float4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredGrad<int4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredGrad<uint4>($0, ($1).x, int(($1).y), ($2), ($3)))";
+                        __intrinsic_asm "tex1DLayeredGrad<$T0>($0, ($1).x, int(($1).y), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredGrad<float4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredGrad<int4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredGrad<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3)))";
+                        __intrinsic_asm "tex2DLayeredGrad<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2), ($3))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredGrad<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredGrad<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredGrad<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapLayeredGrad<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DGrad<float4>($0, ($1), ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DGrad<int4>($0, ($1), ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DGrad<uint4>($0, ($1), ($2), ($3)))";
+                        __intrinsic_asm "tex1DGrad<$T0>($0, ($1), ($2), ($3))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DGrad<float4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DGrad<int4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DGrad<uint4>($0, ($1).x, ($1).y, ($2), ($3)))";
+                        __intrinsic_asm "tex2DGrad<$T0>($0, ($1).x, ($1).y, ($2), ($3))";
+                    case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "tex3DGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapGrad<float4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapGrad<int4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapGrad<uint4>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapGrad<$T0>($0, ($1).x, ($1).y, ($1).z, make_float4(($2).x, ($2).y, ($2).z, 0.0f), make_float4(($3).x, ($3).y, ($3).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
             case spirv:
                 return spirv_asm
                 {
@@ -3877,7 +3955,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         __target_switch
@@ -3916,6 +3994,84 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "<invalid intrinsic>";
             case glsl:
             __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
+            case cuda:
+                // The 'tex*Grad<T>' CUDA runtime built-ins have no __half overload, so a
+                // half texel produces CUDA that NVRTC rejects; we reject it here. Their 3D
+                // and cube gradients are float4, so we widen the float3 gradients below.
+                static_assert(!__isHalf<T>(),
+                    "'SampleGrad' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
+                if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredGrad<float4>($0, ($2).x, int(($2).y), ($3), ($4)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredGrad<int4>($0, ($2).x, int(($2).y), ($3), ($4)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredGrad<uint4>($0, ($2).x, int(($2).y), ($3), ($4)))";
+                        __intrinsic_asm "tex1DLayeredGrad<$T0>($0, ($2).x, int(($2).y), ($3), ($4))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredGrad<float4>($0, ($2).x, ($2).y, int(($2).z), ($3), ($4)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredGrad<int4>($0, ($2).x, ($2).y, int(($2).z), ($3), ($4)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredGrad<uint4>($0, ($2).x, ($2).y, int(($2).z), ($3), ($4)))";
+                        __intrinsic_asm "tex2DLayeredGrad<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3), ($4))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredGrad<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredGrad<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredGrad<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapLayeredGrad<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DGrad<float4>($0, ($2), ($3), ($4)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DGrad<int4>($0, ($2), ($3), ($4)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DGrad<uint4>($0, ($2), ($3), ($4)))";
+                        __intrinsic_asm "tex1DGrad<$T0>($0, ($2), ($3), ($4))";
+                    case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DGrad<float4>($0, ($2).x, ($2).y, ($3), ($4)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DGrad<int4>($0, ($2).x, ($2).y, ($3), ($4)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DGrad<uint4>($0, ($2).x, ($2).y, ($3), ($4)))";
+                        __intrinsic_asm "tex2DGrad<$T0>($0, ($2).x, ($2).y, ($3), ($4))";
+                    case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DGrad<float4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DGrad<int4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DGrad<uint4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        __intrinsic_asm "tex3DGrad<$T0>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f))";
+                    case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapGrad<float4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapGrad<int4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapGrad<uint4>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f)))";
+                        __intrinsic_asm "texCubemapGrad<$T0>($0, ($2).x, ($2).y, ($2).z, make_float4(($3).x, ($3).y, ($3).z, 0.0f), make_float4(($4).x, ($4).y, ($4).z, 0.0f))";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
