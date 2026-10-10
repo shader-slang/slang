@@ -2980,8 +2980,15 @@ static void beginConditional(PreprocessorDirectiveContext* context, bool enable)
 // Preprocessor Conditional Expressions
 //
 
-// Conditional expressions are always of type `int`
-typedef int PreprocessorExpressionValue;
+// Conditional expressions are evaluated in `IntegerLiteralValue` (signed 64-bit), the type the
+// lexer decodes integer literals into. Literals are decoded as in code (base prefixes, octal,
+// digit separators), but there is no unsigned mode: suffixes are ignored, and a literal between
+// INT64_MAX and UINT64_MAX is reinterpreted as a negative value. Arithmetic that overflows wraps.
+typedef IntegerLiteralValue PreprocessorExpressionValue;
+
+// Signed overflow is undefined in C++, so wrapping operations compute in the unsigned type of
+// the same width and convert back, which gives the two's-complement result.
+typedef std::make_unsigned_t<PreprocessorExpressionValue> UnsignedPreprocessorExpressionValue;
 
 // Forward-declaretion
 static PreprocessorExpressionValue _parseAndEvaluateExpression(
@@ -3005,7 +3012,8 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
     {
     // handle prefix unary ops
     case TokenType::OpSub:
-        return -ParseAndEvaluateUnaryExpression(context);
+        return PreprocessorExpressionValue(
+            0 - UnsignedPreprocessorExpressionValue(ParseAndEvaluateUnaryExpression(context)));
     case TokenType::OpNot:
         return !ParseAndEvaluateUnaryExpression(context);
     case TokenType::OpBitNot:
@@ -3026,7 +3034,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
         }
 
     case TokenType::IntegerLiteral:
-        return stringToInt(token.getContent());
+        return getIntegerLiteralValue(token, GetSink(context));
 
     case TokenType::Identifier:
         {
@@ -3189,6 +3197,17 @@ static int GetInfixOpPrecedence(Token const& opToken)
     }
 };
 
+// Returns the shift count to use for `count`: its value as an unsigned 64-bit number, modulo 64
+// (so `-1` becomes 63). Shifting by a negative count, or by 64 or more, is undefined in C++, and
+// the preprocessor has no way to leave a shift unevaluated, so every count is reduced; x86 shift
+// instructions reduce counts the same way.
+static int _getPreprocessorShiftCount(PreprocessorExpressionValue count)
+{
+    return int(
+        UnsignedPreprocessorExpressionValue(count) %
+        std::numeric_limits<UnsignedPreprocessorExpressionValue>::digits);
+}
+
 // Evaluate one infix operation in a preprocessor
 // conditional expression
 static PreprocessorExpressionValue EvaluateInfixOp(
@@ -3205,7 +3224,8 @@ static PreprocessorExpressionValue EvaluateInfixOp(
         break;
 
     case TokenType::OpMul:
-        return left * right;
+        return PreprocessorExpressionValue(
+            UnsignedPreprocessorExpressionValue(left) * UnsignedPreprocessorExpressionValue(right));
     case TokenType::OpDiv:
         {
             if (right == 0)
@@ -3217,6 +3237,11 @@ static PreprocessorExpressionValue EvaluateInfixOp(
                 }
                 return 0;
             }
+            // `INT64_MIN / -1` is undefined in C++ (and traps on x86), so division by -1 is
+            // wrapping negation, as in the GCC and Clang preprocessors and in front-end constant
+            // folding (`BuiltinOperationIntVal::tryFoldImpl`).
+            if (right == -1)
+                return PreprocessorExpressionValue(0 - UnsignedPreprocessorExpressionValue(left));
             return left / right;
         }
     case TokenType::OpMod:
@@ -3230,16 +3255,22 @@ static PreprocessorExpressionValue EvaluateInfixOp(
                 }
                 return 0;
             }
+            // Any value modulo -1 is 0, and `INT64_MIN % -1` is undefined in C++.
+            if (right == -1)
+                return 0;
             return left % right;
         }
     case TokenType::OpAdd:
-        return left + right;
+        return PreprocessorExpressionValue(
+            UnsignedPreprocessorExpressionValue(left) + UnsignedPreprocessorExpressionValue(right));
     case TokenType::OpSub:
-        return left - right;
+        return PreprocessorExpressionValue(
+            UnsignedPreprocessorExpressionValue(left) - UnsignedPreprocessorExpressionValue(right));
     case TokenType::OpLsh:
-        return left << right;
+        return PreprocessorExpressionValue(
+            UnsignedPreprocessorExpressionValue(left) << _getPreprocessorShiftCount(right));
     case TokenType::OpRsh:
-        return left >> right;
+        return left >> _getPreprocessorShiftCount(right);
     case TokenType::OpLess:
         return left < right ? 1 : 0;
     case TokenType::OpGreater:
