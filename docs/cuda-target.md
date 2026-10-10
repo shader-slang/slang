@@ -147,7 +147,7 @@ RWTexture2D<float2> rwt2D_2;
 
 The format names used are the same as for [GLSL layout format types](<https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)>). If no format is specified Slang will _assume_ that the format is the same as the type specified.
 
-Hardware write conversions are available for `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray` and `RWTexture2DArray` whose element type is a `float`, `int` or `uint` scalar, 2-vector or 4-vector.
+Hardware write conversions are available for `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray` and `RWTexture2DArray` whose element type is a `float`, `int` or `uint` scalar, 2-vector or 4-vector; other element types (3-vectors, `half`, 64-bit types) are not supported and fail when the generated CUDA is compiled.
 
 Note that the format attribution is on variables/parameters/fields and not part of the type system. This means that if you have a scenario like...
 
