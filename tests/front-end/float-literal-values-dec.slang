@@ -59,6 +59,15 @@ void main()
     // Note: 0111'1011'1111'1110
     //CHECK-NEXT: 0x7bff
 
+    // digit separators are ignored
+    h = 1_000.5hf;
+    printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
+    //CHECK-NEXT: 0x63d1
+
+    h = 1_0#INFhf;
+    printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
+    //CHECK-NEXT: 0x7c00
+
 
     ////// floats //////
     f = 0.0f;
@@ -118,6 +127,56 @@ void main()
     // Note: 0111'1111'0111'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7f7fffff
 
+    // digit separators are ignored in the integer part, fraction and exponent
+    f = 1_000.5f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x447a2000
+
+    f = 1.000_5f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3f801062
+
+    f = 1e1_0;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x501502f9
+
+    f = 1_000_000.;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x49742400
+
+    f = 0_0.5f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3f000000
+
+    f = 1_0e+4;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x47c35000
+
+    f = 1_0#INF;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x7f800000
+
+    // a separator may also sit next to `.`, `e` or a suffix
+    f = 1._5;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3fc00000
+
+    f = 1.5_f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3fc00000
+
+    f = .5_0f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x3f000000
+
+    f = 1e_5;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x47c35000
+
+    f = 0_e5;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    //CHECK-NEXT: 0x00000000
+
 
     ////// doubles //////
     d = 0.0LF;
@@ -170,4 +229,13 @@ void main()
     printf("0x%016llx\n", bit_cast<uint64_t>(d));
     // Note: 0111'1111'1110'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7fefffffffffffff
+
+    // digit separators are ignored
+    d = 1_234_567.890_625LF;
+    printf("0x%016llx\n", bit_cast<uint64_t>(d));
+    //CHECK-NEXT: 0x4132d687e4000000
+
+    d = 1e-1_0LF;
+    printf("0x%016llx\n", bit_cast<uint64_t>(d));
+    //CHECK-NEXT: 0x3ddb7cdfd9d7bdbb
 }
