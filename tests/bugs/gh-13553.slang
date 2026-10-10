@@ -79,7 +79,6 @@ void computeMain()
     // CHECK-NEXT: -4
     // CHECK-NEXT: -16
 
-    // Unsigned scalar shifted by a signed vector: the result is `uint3`.
     uint3 u = uint(five) << int3(a);
     store3(18, int3(u));
     // CHECK-NEXT: 10
