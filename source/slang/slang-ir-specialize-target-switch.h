@@ -13,8 +13,6 @@ enum class CodeGenTarget;
 //
 void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
 
-// Returns true if `missingReturn` replaced a `__target_switch` that has no case for the target.
-//
 bool isNoTargetCaseMissingReturn(IRMissingReturn* missingReturn);
 
 // Report that the code ending in `missingReturn`, which must satisfy
