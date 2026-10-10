@@ -4,6 +4,7 @@
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-specialize-target-switch.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -32,6 +33,17 @@ static void diagnoseMissingReturnForTarget(
     CodeGenTarget target,
     bool diagnoseWarning)
 {
+    // A `missingReturn` that replaced a `__target_switch` without a case for the target is not a
+    // missing `return` in user code, so we report the more precise error in place of the
+    // missing-return error. Targets that accept missing returns get it from
+    // `diagnoseReachableNoTargetCase` once dead code has been removed.
+    if (isNoTargetCaseMissingReturn(missingReturn))
+    {
+        if (!doesTargetAllowMissingReturns(target))
+            diagnoseNoTargetCase(missingReturn, target, sink);
+        return;
+    }
+
     if (languageVersion >= SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C)
     {
         sink->diagnose(

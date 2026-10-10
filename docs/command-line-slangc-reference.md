@@ -148,7 +148,7 @@ Many capability warnings will become an error.
 
 <a id="ignore-capabilities"></a>
 ### -ignore-capabilities
-Do not warn or error if capabilities are violated 
+Do not warn or error if capabilities are violated. Code that is still reached but has no implementation for the target (a __target_switch without a matching case) remains an error. 
 
 
 <a id="minimum-slang-optimization"></a>
