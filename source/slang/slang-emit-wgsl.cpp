@@ -1634,6 +1634,22 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_Less:
+    case kIROp_Greater:
+    case kIROp_Leq:
+    case kIROp_Geq:
+        {
+            // WGSL template-list discovery reads `ident <` as opening a template list that a later
+            // `>` or `>=` closes, even across a `,`, so `f(a < b, a > b)` parses as `f(a<b, a> b)`.
+            // We always parenthesize relational comparisons so that no `<` or `>` they contain is
+            // visible at the level of an enclosing argument list. `<=` cannot open a template
+            // list, but we treat all four operators alike so the rule stays simple.
+            // https://www.w3.org/TR/WGSL/#template-lists-sec
+            m_writer->emit("(");
+            defaultEmitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_BitXor:
     case kIROp_BitOr:
     case kIROp_BitAnd:
