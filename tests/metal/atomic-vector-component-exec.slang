@@ -1,4 +1,4 @@
-// Atomics on lanes of a vector must update exactly the addressed lane (#13551).
+// Atomics on elements of a vector must update exactly the addressed element (#13551).
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -shaderobj -output-using-type
@@ -24,6 +24,8 @@ void computeMain(uint3 id: SV_DispatchThreadID)
         vecs[1] = gs;
 }
 
+// Each of the 4 threads adds 1 to `vecs[0].y` and `id.x + 1` to `vecs[0][id.x]`, giving 1 6 3 4.
+// Threads 0 and 2 add 10 to `gs.x`, threads 1 and 3 to `gs.y`; `gs.z` and `gs.w` stay 0.
 // BUF: 1
 // BUF-NEXT: 6
 // BUF-NEXT: 3

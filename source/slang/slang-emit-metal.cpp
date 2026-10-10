@@ -1010,8 +1010,10 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GetElementPtr:
         {
             // MSL rejects the address of a vector element (`&v[i]` and `&v.x` alike), so we
-            // address a lane through a scalar pointer to the vector, `((T <addrspace>*)(&v)) + i`.
-            // Both `T<N>` and `packed_T<N>` store their lanes as contiguous `T`s.
+            // address an element through a scalar pointer to the vector,
+            // `((T <addrspace>*)(&v)) + i`; both `T<N>` and `packed_T<N>` store their elements as
+            // contiguous `T`s. Only uses that need the address itself, such as an atomic
+            // destination, reach here: loads and stores go through `emitDereferenceOperand`.
             auto basePtrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
             if (!basePtrType)
                 break;

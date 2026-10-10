@@ -1,20 +1,19 @@
-// An atomic whose destination is one lane of a vector must not take the address of a vector
-// element, which MSL rejects ("address of vector element requested"). The lane is addressed
+// An atomic whose destination is one element of a vector must not take the address of that
+// element, which MSL rejects ("address of vector element requested"). The element is addressed
 // through a scalar pointer to the vector's storage instead (#13551).
 
 //TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=NOLANE):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NOELEMADDR):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HELPER):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute
 
 // No atomic destination takes the address of a vector element (`&v[i]` or `&v.x`), which MSL rejects.
-// NOLANE-NOT: {{\(atomic_[a-z]+ [a-z]+\*\)\(&.*(\]|\.[xyzw])\)\)}}
+// NOELEMADDR-NOT: {{\(atomic_[a-z]+ [a-z]+\*\)\(&.*(\]|\.[xyzw])\)\)}}
 
 struct Cell
 {
     uint4 data;
     int2 a;
-    float f;
     uint3 b;
     uint2x2 m;
 };
@@ -24,9 +23,12 @@ RWStructuredBuffer<uint4> vecs;
 RWStructuredBuffer<uint> outBuf;
 groupshared uint4 gs;
 
-// A lane passed by reference to a helper that performs the atomic; the lane pointer is formed
-// inside the specialized helper.
+// An element passed by reference to a helper that performs the atomic. `[noRefInline]` keeps the
+// helper from being inlined, and because the argument is rooted at a shader parameter, buffer-load
+// specialization rewrites the helper to address `cells` itself, so the element pointer is formed
+// inside the helper rather than copied through a temporary.
 // HELPER: void bump_{{[0-9]+}}(
+// HELPER-NOT: {{\[\[kernel\]\]}}
 // HELPER: atomic_fetch_add_explicit(((atomic_uint device*)(((uint device*)(&{{.*}}->data_{{[0-9]+}})) + {{.*}})), 1U
 [noRefInline]
 void bump(__ref uint x)
@@ -37,7 +39,7 @@ void bump(__ref uint x)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 id: SV_DispatchThreadID)
 {
-    // A `uint4` member of a structured-buffer element (stored as `packed_uint4`), constant lanes.
+    // A `uint4` member of a structured-buffer element (stored as `packed_uint4`), constant index.
     // MTL: atomic_fetch_add_explicit(((atomic_uint device*)(((uint device*)(&{{.*}}->data_{{[0-9]+}})) + int(0))), 1U
     // MTL: atomic_fetch_add_explicit(((atomic_uint device*)(((uint device*)(&{{.*}}->data_{{[0-9]+}})) + int(3))), 4U
     // LIB-DAG: call {{.*}}.atomic.global.add.u.i32
@@ -55,7 +57,7 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     InterlockedAdd(cells[0].a.y, 1);
     InterlockedAdd(cells[0].b.z, 1u);
 
-    // A lane of a `groupshared` vector keeps the `threadgroup` address space.
+    // An element of a `groupshared` vector keeps the `threadgroup` address space.
     // MTL: atomic_fetch_add_explicit(((atomic_uint threadgroup*)(((uint threadgroup*)({{.*}}gs_{{[0-9]+}})) + int(1))), 1U
     // LIB-DAG: call {{.*}}.atomic.local.add.u.i32
     InterlockedAdd(gs.y, 1u);
@@ -72,7 +74,7 @@ void computeMain(uint3 id: SV_DispatchThreadID)
     uint prev;
     InterlockedExchange(cells[0].data.w, 2u, prev);
 
-    // A matrix element: the row is an array element (addressable), the column is a lane.
+    // A matrix element: the row is an array element (addressable), the column a vector element.
     // MTL: atomic_fetch_add_explicit(((atomic_uint device*)(((uint device*)(&{{.*}}->data_{{[0-9]+}}[int(1)])) + int(0))), 1U
     InterlockedAdd(cells[0].m[1][0], 1u);
 
