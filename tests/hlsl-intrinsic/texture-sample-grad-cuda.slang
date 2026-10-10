@@ -12,7 +12,11 @@ Texture3D<float4> t3D;
 TextureCube<float4> tCube;
 TextureCubeArray<float4> tCubeArr;
 
+Texture1D<float3> t1DF3;
+Texture1DArray<float3> t1DArrF3;
 Texture2D<float3> t2DF3;
+Texture2DArray<float3> t2DArrF3;
+TextureCube<float3> tCubeF3;
 Texture3D<float3> t3DF3;
 TextureCubeArray<float3> tCubeArrF3;
 Texture2D<int3> t2DI3;
@@ -77,13 +81,29 @@ void computeMain()
     // A 3-component texel type fetches four components and reshapes to float3; the
     // 3-component template argument is never instantiated. Each negative check
     // precedes its positive so the exclusion window ends at the correct fetch.
+    // CUDA-NOT: tex1DGrad<float3
+    // CUDA: _slang_vector_reshape<float, 3, float, 4>(tex1DGrad<float4>
+    outF3[4] = t1DF3.SampleGrad(samp, 0.5, 0.01, 0.02);
+
+    // CUDA-NOT: tex1DLayeredGrad<float3
+    // CUDA: _slang_vector_reshape<float, 3, float, 4>(tex1DLayeredGrad<float4>
+    outF3[5] = t1DArrF3.SampleGrad(samp, float2(0.5, 1.0), 0.01, 0.02);
+
     // CUDA-NOT: tex2DGrad<float3
     // CUDA: _slang_vector_reshape<float, 3, float, 4>(tex2DGrad<float4>
     outF3[0] = t2DF3.SampleGrad(samp, float2(0.5, 0.5), float2(0.01, 0.0), float2(0.0, 0.01));
 
+    // CUDA-NOT: tex2DLayeredGrad<float3
+    // CUDA: _slang_vector_reshape<float, 3, float, 4>(tex2DLayeredGrad<float4>
+    outF3[6] = t2DArrF3.SampleGrad(samp, float3(0.5, 0.5, 1.0), float2(0.01, 0.0), float2(0.0, 0.01));
+
     // CUDA-NOT: tex3DGrad<float3
     // CUDA: _slang_vector_reshape<float, 3, float, 4>(tex3DGrad<float4>
     outF3[1] = t3DF3.SampleGrad(samp, float3(0.5, 0.5, 0.5), float3(0.01, 0.0, 0.0), float3(0.0, 0.01, 0.0));
+
+    // CUDA-NOT: texCubemapGrad<float3
+    // CUDA: _slang_vector_reshape<float, 3, float, 4>(texCubemapGrad<float4>
+    outF3[7] = tCubeF3.SampleGrad(samp, float3(1.0, 0.0, 0.0), float3(0.0, 0.01, 0.0), float3(0.0, 0.0, 0.01));
 
     // CUDA-NOT: texCubemapLayeredGrad<float3
     // CUDA: _slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredGrad<float4>
