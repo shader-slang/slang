@@ -1,8 +1,9 @@
 // Separators preserve integer-literal token boundaries: a `.x` swizzle still ends the
 // integer, `0_` selects decimal (not octal), and separators may follow the radix prefix,
 // end the literal, or repeat. `0x1e_5` stays a hexadecimal integer: `e` is a hex digit there, not an exponent.
+// tests/diagnostics/float-literal-digit-separators.slang checks that these spellings produce no diagnostic.
 
-//TEST:INTERPRET(filecheck=CHECK):  -warnings-as-errors all
+//TEST:INTERPRET(filecheck=CHECK):
 void main()
 {
     printf("%d\n", 1_0.x);
@@ -11,6 +12,8 @@ void main()
     // CHECK-NEXT: 1
     printf("%d\n", 0_7);
     // CHECK-NEXT: 7
+    printf("%d\n", 0_19);
+    // CHECK-NEXT: 19
     printf("%d\n", 0x_FF);
     // CHECK-NEXT: 255
     printf("%d\n", 0x1e_5);

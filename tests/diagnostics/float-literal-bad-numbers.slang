@@ -20,4 +20,8 @@ void main() {
     x = 0x1p_;
 //CHECK:^^^^^ invalid floating-point number
 //CHECK:^^^^^ invalid floating-point number '0x1p_' on floating-point literal
+
+    x = 1.0e_;
+//CHECK:^^^^^ invalid floating-point number
+//CHECK:^^^^^ invalid floating-point number '1.0e_' on floating-point literal
 }

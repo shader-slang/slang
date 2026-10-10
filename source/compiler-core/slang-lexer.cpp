@@ -1395,7 +1395,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         }
     }
 
-    // check for special exponent for infinity
+    // Characters the decoder did not consume make the significand invalid.
     if (cursor != numberToDecode.end())
     {
         literalType = FloatingPointLiteralType::BadSignificand;

@@ -45,7 +45,7 @@ the list [`int`, `int64_t`] which can represent the specified literal value. If 
 a `uint64_t` and a warning is given. The type of a hexadecimal non-suffixed integer literal is the first type from the list
 [`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64-bit integer literals, see the documentation on [64-bit type support](../64bit-type-support.md).
 
-Integer and floating-point literals may contain `_` digit separators: `1_000_000`, `0xFF_FF`, `1_000.5f` and `1.5e1_0`. A separator may appear anywhere after the first digit or radix prefix, including next to `.`, `e`/`p` or a suffix. Except directly after an initial `0`, separators do not affect the numeric value; `0_10` is decimal 10, whereas `010` is octal 8.
+Integer and floating-point literals may contain `_` digit separators: `1_000_000`, `0xFF_FF`, `1_000.5f` and `1.5e1_0`. A separator may appear anywhere after the first digit or radix prefix, including on either side of `.`, after `e`/`p` or its sign, and before a suffix; it may not separate `e`/`p` from its sign or appear inside or after a suffix. Except directly after an initial `0`, separators do not affect the numeric value; `0_10` is decimal 10, whereas `010` is octal 8.
 
 See also [Literal Expressions](../language-reference/expressions-literal.md) in the language reference manual for details.
 
