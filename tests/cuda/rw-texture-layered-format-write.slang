@@ -1,10 +1,8 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 
-// Regression test for issue #13554: a store to a `[format]` RWTexture1DArray/RWTexture2DArray whose
-// element type differs from the format calls `surf{1D,2D}Layeredwrite_convert`, which emits a
-// formatted layered surface store (`sust.p.a1d` / `sust.p.a2d`) with the layer as the first
-// coordinate. The runtime check that the hardware converts the texel is
+// Each texture's format differs from its element type, which forces the converting layered-write
+// path (`surf{1D,2D}Layeredwrite_convert`). The runtime check is
 // tools/gfx-unit-test/cuda-layered-format-write.cpp.
 
 [format("rgba8")] RWTexture2DArray<float4> a2;
@@ -15,6 +13,8 @@
 [format("rgba8")] RWTexture1DArray<float4> a1;
 [format("rg16f")] RWTexture1DArray<float2> a1h;
 [format("r16f")] RWTexture1DArray<float> a1s;
+[format("rg8ui")] RWTexture1DArray<uint2> a1u;
+[format("rgba8i")] RWTexture1DArray<int4> a1i;
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -50,4 +50,12 @@ void computeMain()
     // CUDA: surf1DLayeredwrite_convert<float>
     // PTX: sust.p.a1d.b32.zero
     a1s[uint2(9, 11)] = 0.25;
+
+    // CUDA: surf1DLayeredwrite_convert<uint2 >
+    // PTX: sust.p.a1d.v2.b32.zero
+    a1u[uint2(9, 11)] = uint2(1, 2);
+
+    // CUDA: surf1DLayeredwrite_convert<int4 >
+    // PTX: sust.p.a1d.v4.b32.zero
+    a1i[uint2(9, 11)] = int4(-1, -2, 3, 4);
 }

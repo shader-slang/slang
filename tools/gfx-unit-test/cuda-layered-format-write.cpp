@@ -12,7 +12,6 @@ static const uint32_t kWidth = 4;
 static const uint32_t kHeight = 4;
 static const uint32_t kLayerCount = 4;
 
-// Creates a zero-filled RGBA8Unorm 1D or 2D array texture that a shader can write.
 static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
 {
     const uint32_t height = type == TextureType::Texture2DArray ? kHeight : 1;
@@ -41,9 +40,8 @@ static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
     return texture;
 }
 
-// Checks every texel of every layer of `texture`: the texel at (x, y, layer) must match `expected`
-// within one unit per channel, since the rounding of a float that lands exactly between two unorm8
-// values is up to the hardware, and every other texel must still be zero.
+// We allow one unorm8 code of error per channel, because 0.5 and 0.75 do not map exactly to a code
+// and the rounding is up to the hardware.
 static void checkSingleTexelWritten(
     IDevice* device,
     ITexture* texture,

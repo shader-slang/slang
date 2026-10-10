@@ -1665,9 +1665,8 @@ SLANG_SURF1DWRITE_CONVERT_IMPL(int, "r")
 
 // surf1DLayeredwrite_convert
 
-// The CUDA runtime has no formatted layered surface write, so we use `sust.p.a1d` directly. Its
-// coordinate vector is {layer, x}. The PTX ISA syntax lists `sust.p` only for `.1d/.2d/.3d`, but
-// ptxas accepts the `.a1d/.a2d` forms and LLVM's NVPTX backend defines them.
+// CUDA has no formatted layered surface-write API, so we use PTX `sust.p.a1d` directly. Its
+// coordinate vector is {layer, x}.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
@@ -1801,8 +1800,8 @@ SLANG_SURF2DWRITE_CONVERT_IMPL(int, "r")
 
 // surf2DLayeredwrite_convert
 
-// As for 1D arrays, we use `sust.p.a2d` directly. Its coordinate vector is {layer, x, y, unused};
-// we repeat y in the unused slot, as nvcc does for `surf2DLayeredwrite`.
+// The `sust.p.a2d` coordinate vector is {layer, x, y, unused}; we repeat y in the unused slot, as
+// nvcc does for `surf2DLayeredwrite`.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
