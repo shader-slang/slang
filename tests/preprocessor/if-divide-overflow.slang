@@ -1,6 +1,6 @@
 // Overflowing arithmetic in an `#if` expression wraps instead of trapping or invoking undefined
-// behavior. The int32-minimum `/ -1` and `% -1` rows are the inputs that crashed the compiler
-// with SIGFPE when `#if` evaluated in 32 bits. The INT64_MIN rows reach the `/ -1` and `% -1`
+// behavior. `INT32_MIN / -1` and `% -1` trap (SIGFPE on x86) when computed in 32 bits and fit in
+// the 64-bit evaluator, so those rows check the width. The INT64_MIN rows reach the `/ -1` and `% -1`
 // special cases, where the quotient wraps (as in the GCC and Clang preprocessors) and the
 // remainder is 0. The remaining rows pin wrapping `+`, `-`, `*`, unary `-` and shift counts
 // reduced modulo 64.
