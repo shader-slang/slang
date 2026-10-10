@@ -1489,7 +1489,7 @@ enum Access : uint64_t
 
     /// The data being referred to can only be written through the reference.
     /// This is only valid as the access of a `RefParam`, which represents a
-    /// `__ref_writeonly` parameter; `Ptr` and `Ref` reject it.
+    /// `__ref_writeonly` parameter; any generic other than `RefParam` rejects it.
     WriteOnly = $((uint64_t)AccessQualifier::WriteOnly),
 }
 

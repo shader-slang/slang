@@ -1288,9 +1288,9 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     {
                         parsedModifier->loc = nameToken.loc;
                     }
-                    // A keyword that spells two modifiers (`__ref_readonly`) locates both at the
-                    // keyword. We match on the keyword name so that the markers `layout(...)`
-                    // produces keep their (invalid) location.
+                    // A keyword that spells two modifiers (`__ref_readonly`) gives both the
+                    // keyword's source location. We match on the keyword name so that the markers
+                    // `layout(...)` produces keep their (invalid) source location.
                     for (auto m = parsedModifier->next; m; m = m->next)
                     {
                         if (!m->loc.isValid() && m->keywordName == parsedModifier->keywordName)
@@ -10707,7 +10707,7 @@ static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
 
 /// Parse a `__ref_readonly` or `__ref_writeonly` keyword into a `RefModifier` followed by the
 /// reference-access modifier of class `T`. `ParseModifiers` gives both modifiers the keyword's
-/// location, so a diagnostic on either one points at the keyword the user wrote.
+/// source location, so a diagnostic on either one points at the keyword the user wrote.
 template<typename T>
 static NodeBase* parseRefWithAccessModifier(Parser* parser, char const* keyword)
 {

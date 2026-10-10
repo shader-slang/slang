@@ -287,6 +287,27 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     return true;
 }
 
+/// Does `conversionExpr`, the result of coercing the argument of a one-argument type call such
+/// as `Q(x)` or `(float)x`, read the argument's value?
+///
+/// Consider `Q(x)`, where `x` is a `__ref_writeonly int`. If `Q` has `__init(int)`, the call reads
+/// `x`; if it has `__init(__ref_writeonly int)` or `__init(out int)`, it only writes `x`. A
+/// conversion that is not a constructor call, such as a builtin cast, reads its argument. A result
+/// that still denotes the argument's memory location (the identity conversion `int(x)`, or a
+/// type-equality view) has not read it yet: whatever consumes the result decides.
+static bool doesTypeConversionReadArgument(Expr* conversionExpr)
+{
+    if (conversionExpr->type.isWriteOnlyRef)
+        return false;
+    auto invokeExpr = as<InvokeExpr>(conversionExpr);
+    auto calleeExpr = invokeExpr ? as<DeclRefExpr>(invokeExpr->functionExpr) : nullptr;
+    auto ctorDecl = calleeExpr ? as<ConstructorDecl>(calleeExpr->declRef.getDecl()) : nullptr;
+    if (!ctorDecl || ctorDecl->getParameters().isEmpty())
+        return true;
+    return doesParamPassingModeReadArgument(
+        getParamPassingMode(ctorDecl->getParameters().getFirst()));
+}
+
 static bool isArrayDecl(Decl* decl)
 {
     if (auto magicMod = decl->findModifier<MagicTypeModifier>())
@@ -594,6 +615,14 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     getType(m_astBuilder, valParamRef),
                     argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+                if (context.mode == OverloadResolveContext::Mode::ForReal)
+                {
+                    diagnoseWriteOnlyAccessOutsideRefParam(
+                        genericDeclRef.getDecl(),
+                        getType(m_astBuilder, valParamRef),
+                        val,
+                        arg);
+                }
             }
 
             // If any of the above checking steps fail and we don't
@@ -814,6 +843,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     Index argCount = context.getArgCount();
 
     List<QualType> paramTypes;
+    List<ParamPassingMode> paramModes;
     List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
@@ -824,6 +854,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             paramDecls.add(param);
             paramTypes.add(getParamQualType(m_astBuilder, param));
+            paramModes.add(getParamPassingMode(param.getDecl()));
         }
         break;
 
@@ -833,8 +864,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
-                paramTypes.add(paramType);
+                paramTypes.add(getParamQualType(funcType->getParamTypeWithModeWrapper(i)));
+                paramModes.add(funcType->getParamPassingMode(i));
             }
         }
         break;
@@ -920,26 +951,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            // An `inout` argument is read as well as written, so it is checked separately
-            // in `ResolveInvoke`. A GLSL `writeonly` parameter receives the restriction
-            // instead of reading the argument.
-            bool bindsLocation = paramType.isLeftValue || context.isCoercionConversionCall;
-            if (candidate.flavor == OverloadCandidate::Flavor::Func &&
-                paramIndex < paramDecls.getCount())
-            {
-                if (auto memoryQualifiers = paramDecls[paramIndex]
-                                                .getDecl()
-                                                ->findModifier<MemoryQualifierSetModifier>())
-                {
-                    if (memoryQualifiers->getMemoryQualifierBit() &
-                        MemoryQualifierSetModifier::Flags::kWriteOnly)
-                        bindsLocation = true;
-                }
-            }
+            // Only an argument that the parameter reads can read a `__ref_writeonly` memory
+            // location. The argument of a conversion call that `_coerce` forms is the
+            // expression being coerced, whose read the consumer of that coercion reports.
+            const bool readsArgument = doesParamPassingModeReadArgument(paramModes[paramIndex]) &&
+                                       !context.isCoercionConversionCall;
             Expr* coercedExpr =
-                bindsLocation
-                    ? coerceBoundLocation(CoercionSite::Argument, paramType, arg.argExpr, getSink())
-                    : coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
+                readsArgument ? coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink())
+                              : coerceToMemoryLocation(
+                                    CoercionSite::Argument,
+                                    paramType,
+                                    arg.argExpr,
+                                    getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
@@ -1107,18 +1130,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     //
     if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        // A receiver passed by value or `inout` is read, while an `out` or `[__ref]` receiver is
-        // bound as a location. A resource handle's methods are exempt: the restriction is on the
-        // resource's contents, and a method's signature does not say whether it reads them.
-        const auto thisMode = thisParamInfo->mode;
-        const bool readsThis = thisMode == ParamPassingMode::In ||
-                               thisMode == ParamPassingMode::BorrowIn ||
-                               thisMode == ParamPassingMode::BorrowInOut;
-        if (context.mode == OverloadResolveContext::Mode::ForReal && readsThis &&
-            context.baseExpr && context.baseExpr->type.isWriteOnly &&
+        // The receiver binds to `this` by the same rule as an argument binds to a parameter.
+        // A resource handle's methods are exempt: the restriction is on the resource's
+        // contents, and a method's signature does not say whether it reads them.
+        if (context.mode == OverloadResolveContext::Mode::ForReal &&
+            doesParamPassingModeReadArgument(thisParamInfo->mode) && context.baseExpr &&
             !isOpaqueHandleType(context.baseExpr->type))
         {
-            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = context.baseExpr});
+            diagnoseReadOfWriteOnlyRef(context.baseExpr, getSink());
         }
 
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
@@ -1709,10 +1728,10 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     // Whether a subscript reads its base depends on the accessor chosen later, so
-                    // the element inherits the base's write-only restriction and `coerce` reports
-                    // a value use.
-                    if (context.baseExpr && context.baseExpr->type.isWriteOnly)
-                        callExpr->type.isWriteOnly = true;
+                    // the element is treated as part of a `__ref_writeonly` base's memory
+                    // location and `coerce` reports a value use.
+                    if (context.baseExpr && context.baseExpr->type.isWriteOnlyRef)
+                        callExpr->type.isWriteOnlyRef = true;
 
                     const auto& decl = subscriptDeclRef.getDecl();
                     for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
@@ -3596,7 +3615,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     resultInvokeExpr->loc = expr->loc;
                 }
                 if (coerceResult)
+                {
+                    // The conversion call binds its argument without reporting a read (see
+                    // `isCoercionConversionCall`), and nothing coerces this call's result from the
+                    // argument, so we report the read here.
+                    if (doesTypeConversionReadArgument(resultExpr))
+                        diagnoseReadOfWriteOnlyRef(expr->arguments[0], getSink());
                     return resultExpr;
+                }
                 typeOverloadChecked = true;
             }
         }

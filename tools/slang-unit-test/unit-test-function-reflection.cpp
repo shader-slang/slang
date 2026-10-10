@@ -673,9 +673,9 @@ SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
     }
 }
 
-// Checking represents `const` on a `__ref` parameter as a reference-access modifier, so
-// reflection reports `const` for a read-only reference and for a by-value `const` parameter,
-// and not for a read-write reference.
+// Reflection reports `const` for a parameter whose effective mode is `RefReadOnly` (spelled
+// `const __ref`, `__ref const` or `__ref_readonly`) and for a by-value `const` parameter, and
+// not for a read-write reference.
 SLANG_UNIT_TEST(functionReflectionConstRefParam)
 {
     const char* source = R"(

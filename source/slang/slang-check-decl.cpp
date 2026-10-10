@@ -1697,8 +1697,12 @@ QualType getTypeForDeclRef(
             // We make references immutable when the shadow must alias its parameter instead.
             isLValue = !shadowVar->shouldBeImmutableAlias;
         }
+        // A parameter's reference access comes from its effective passing mode, which
+        // `getParamPassingMode` computes from the modifiers and the parameter type.
+        auto paramDecl = as<ParamDecl>(varDeclRef.getDecl());
+        const auto paramMode = paramDecl ? getParamPassingMode(paramDecl) : ParamPassingMode::In;
         if (varDeclRef.getDecl()->findModifier<ConstModifier>() ||
-            varDeclRef.getDecl()->findModifier<ReadOnlyModifier>())
+            paramMode == ParamPassingMode::RefReadOnly)
             isLValue = false;
 
         // Global-scope shader parameters should not be writable,
@@ -1750,11 +1754,11 @@ QualType getTypeForDeclRef(
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kWriteOnly)
                 isWriteOnly = true;
         }
-        if (varDeclRef.getDecl()->hasModifier<WriteOnlyModifier>())
-            isWriteOnly = true;
 
         qualType.isLeftValue = isLValue;
         qualType.isWriteOnly = isWriteOnly;
+        // A `RefWriteOnly` parameter is the one passed as `RefParam<T, Access.WriteOnly>`.
+        qualType.isWriteOnlyRef = paramMode == ParamPassingMode::RefWriteOnly;
         return qualType;
     }
     else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -2668,8 +2672,7 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     initExpr = maybeOpenRef(initExpr);
 
     // An inferred-type initializer is not coerced, so `coerce` cannot report the read.
-    if (initExpr->type.isWriteOnly)
-        getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
+    diagnoseReadOfWriteOnlyRef(initExpr, getSink());
 
     // TODO: We might need some additional steps here to ensure
     // that the type of the expression is one we are okay with
@@ -3601,6 +3604,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
         auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
+
+        // `coerce` reports a `__ref_writeonly` source, so an expression that is both GLSL
+        // `writeonly` and a write-only reference is reported only once.
+        if (initExpr->type.isWriteOnly && !initExpr->type.isWriteOnlyRef)
+            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
@@ -4846,7 +4854,19 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     }
 
     if (decl->initExpr)
+    {
         decl->initExpr = CheckTerm(decl->initExpr);
+
+        // A default argument does not pass through generic-argument binding, so we check it here.
+        if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        {
+            diagnoseWriteOnlyAccessOutsideRefParam(
+                genericDecl,
+                decl->type.type,
+                tryConstantFoldExpr(decl->initExpr, ConstantFoldingKind::LinkTime, nullptr),
+                decl->initExpr);
+        }
+    }
 
     if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);

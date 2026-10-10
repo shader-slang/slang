@@ -633,7 +633,13 @@ FIDDLE() namespace Slang
         FIDDLE() Type* type = nullptr;
         FIDDLE() bool isLeftValue = false;
         FIDDLE() bool hasReadOnlyOnTarget = false;
+
+        /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
+
+        /// The expression denotes (part of) the memory location bound to a
+        /// `RefParam<T, Access.WriteOnly>` parameter, so any read of its value is an error.
+        FIDDLE() bool isWriteOnlyRef = false;
 
         QualType() = default;
 
@@ -1992,6 +1998,33 @@ FIDDLE() namespace Slang
         default:
             SLANG_UNEXPECTED("unhandled parameter-passing mode");
             UNREACHABLE_RETURN(false);
+        }
+    }
+
+    /// Returns whether a parameter of mode `mode` may read the value of its argument.
+    ///
+    /// Only an `out` or `__ref_writeonly` parameter never reads its argument: the argument
+    /// must resolve to a memory location (or an abstract storage location with a `ref`
+    /// accessor) that the callee writes. Every other mode, including `inout` and `__ref`,
+    /// may read the argument's value.
+    inline bool doesParamPassingModeReadArgument(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::RefWriteOnly:
+            return false;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+            return true;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(true);
         }
     }
 

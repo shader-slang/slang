@@ -1453,7 +1453,7 @@ err(
     "write-only-access-not-allowed",
     30035,
     "'Access.WriteOnly' is only valid for a reference parameter type",
-    span { loc = "typeExp:Expr", message = "'~type:Type' cannot use 'Access.WriteOnly'; it is only valid as the access of 'RefParam'." }
+    span { loc = "arg:Expr", message = "'~generic:Decl' cannot use 'Access.WriteOnly'; it is only valid as the access of 'RefParam'." }
 )
 
 err(

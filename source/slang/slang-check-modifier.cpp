@@ -1982,7 +1982,9 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             if (!ignoreUnallowedModifier)
             {
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
+                // A keyword that spells two modifiers (`__ref_writeonly`) would otherwise be
+                // reported once for each of them, at the same keyword.
+                diagnoseOnce(Diagnostics::ModifierNotAllowed{.modifier = m});
                 return nullptr;
             }
             return m;
@@ -2493,11 +2495,6 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
-    // On a `__ref` parameter, `const` is the legacy spelling of `__ref_readonly`, so we represent
-    // it the same way, as a `ReadOnlyModifier`. We decide this before the loop below, which unlinks
-    // each modifier as it goes. A by-value `const` stays a `ConstModifier`.
-    const bool isRefParam = as<ParamDecl>(syntaxNode) && syntaxNode->hasModifier<RefModifier>();
-
     Modifier* modifier = syntaxNode->modifiers.first;
     bool ignoreUnallowedModifier = false;
     while (modifier)
@@ -2521,15 +2518,6 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 
         // may return a list of modifiers
         auto checkedModifier = checkModifier(modifier, syntaxNode, ignoreUnallowedModifier);
-
-        if (isRefParam && as<ConstModifier>(checkedModifier))
-        {
-            SLANG_ASSERT(!checkedModifier->next);
-            auto readOnly = m_astBuilder->create<ReadOnlyModifier>();
-            readOnly->loc = checkedModifier->loc;
-            readOnly->keywordName = checkedModifier->keywordName;
-            checkedModifier = readOnly;
-        }
 
         if (checkedModifier)
         {
@@ -2556,13 +2544,24 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     //
     // A keyword that spells two modifiers (`__ref_readonly`) can conflict through both of them,
     // so we report each keyword once.
+    //
+    // On a `__ref` parameter, `const` is the legacy spelling of `__ref_readonly`, so it is one of
+    // the parameter's reference-access spellings and conflicts with the others.
+    bool isRefParam = false;
+    if (as<ParamDecl>(syntaxNode))
+    {
+        for (modifier = resultModifiers; modifier; modifier = modifier->next)
+            isRefParam = isRefParam || as<RefModifier>(modifier);
+    }
     SourceLoc lastConflictLoc;
     for (modifier = resultModifiers; modifier; modifier = modifier->next)
     {
         // Check if a modifier belonging to the same conflict group is already
         // defined.
         Modifier* existingModifier = nullptr;
-        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
+        auto conflictGroup = isRefParam && as<ConstModifier>(modifier)
+                                 ? getModifierConflictGroupKind(ASTNodeType::ReadOnlyModifier)
+                                 : getModifierConflictGroupKind(modifier->astNodeType);
         if (conflictGroup != ASTNodeType::NodeBase)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))

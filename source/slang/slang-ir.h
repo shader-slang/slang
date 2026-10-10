@@ -2248,7 +2248,8 @@ public:
     //
     // Adding `ReadOnlyModifier` and `WriteOnlyModifier` shifts the sequential `ASTNodeType`
     // values, so a version-34 module's later AST nodes would be decoded as different classes.
-    // Version 35 is the earliest module version with the updated AST node numbering.
+    // Version 35 is the earliest module version with the updated AST node numbering, and with
+    // the `QualType::isWriteOnlyRef` field in serialized expressions.
     const static UInt k_minSupportedModuleVersion = 35;
     const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);

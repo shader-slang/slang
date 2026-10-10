@@ -200,6 +200,23 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     return val;
 }
 
+void SemanticsVisitor::diagnoseWriteOnlyAccessOutsideRefParam(
+    GenericDecl* genericDecl,
+    Type* paramType,
+    Val* val,
+    Expr* argExpr)
+{
+    auto constantVal = as<ConstantIntVal>(val);
+    if (!constantVal || constantVal->getValue() != (IntegerLiteralValue)AccessQualifier::WriteOnly)
+        return;
+    if (!paramType || !paramType->equals(m_astBuilder->getMagicEnumType("AccessQualifier")))
+        return;
+    if (genericDecl == getASTBuilder()->getSharedASTBuilder()->tryFindMagicDecl("RefParamType"))
+        return;
+    getSink()->diagnose(
+        Diagnostics::WriteOnlyAccessNotAllowed{.generic = genericDecl, .arg = argExpr});
+}
+
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
 {
     return ExtractGenericArgInteger(
@@ -465,23 +482,6 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     .access = (int64_t)*accessQualifier,
                     .type = result,
                     .typeExp = typeExp.exp});
-            }
-            *outProperType = getASTBuilder()->getErrorType();
-            return false;
-        }
-    }
-
-    // `Access.WriteOnly` describes a `__ref_writeonly` parameter only; a `Ptr` or `Ref`
-    // value cannot promise that it is never read through.
-    if (as<PtrType>(result) || as<ExplicitRefType>(result))
-    {
-        auto accessQualifier = as<PtrTypeBase>(result)->tryGetAccessQualifierValue();
-        if (accessQualifier && *accessQualifier == AccessQualifier::WriteOnly)
-        {
-            if (diagSink)
-            {
-                diagSink->diagnose(
-                    Diagnostics::WriteOnlyAccessNotAllowed{.type = result, .typeExp = typeExp.exp});
             }
             *outProperType = getASTBuilder()->getErrorType();
             return false;
