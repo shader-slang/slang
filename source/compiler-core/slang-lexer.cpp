@@ -1395,7 +1395,6 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         }
     }
 
-    // Characters the decoder did not consume make the significand invalid.
     if (cursor != numberToDecode.end())
     {
         literalType = FloatingPointLiteralType::BadSignificand;
