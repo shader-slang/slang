@@ -92,6 +92,8 @@ void eFloat4_2DArr() { outBuf[0] = gFloat4_2DArr.SampleGrad(samp, float3(0.5f), 
 [shader("compute")][numthreads(1, 1, 1)]
 void eFloatCombined() { outBuf[0] = gSamplerFloat4.SampleGrad(float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f)).x; }
 
+// The guard is a `static_assert(!__isHalf<T>())` over a type predicate, which folds to a
+// concrete bool per specialization, so it must not fire while the generic body is checked.
 T sampleGradR<T : ITexelElement>(Texture2D<T> t, SamplerState s)
 {
     return t.SampleGrad(s, float2(0.5f), float2(0.01f, 0.0f), float2(0.0f, 0.01f));
