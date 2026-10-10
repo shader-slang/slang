@@ -8,30 +8,32 @@ using namespace rhi;
 
 namespace gfx_test
 {
-// Creates a zero-filled two-layer RGBA8Unorm 1D or 2D array texture that a shader can write.
+static const uint32_t kWidth = 4;
+static const uint32_t kHeight = 4;
+static const uint32_t kLayerCount = 4;
+
+// Creates a zero-filled RGBA8Unorm 1D or 2D array texture that a shader can write.
 static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
 {
-    const uint32_t width = 2;
-    const uint32_t height = type == TextureType::Texture2DArray ? 2 : 1;
-    const uint32_t layerCount = 2;
+    const uint32_t height = type == TextureType::Texture2DArray ? kHeight : 1;
 
     TextureDesc desc = {};
     desc.type = type;
-    desc.size = {width, height, 1};
-    desc.arrayLength = layerCount;
+    desc.size = {kWidth, height, 1};
+    desc.arrayLength = kLayerCount;
     desc.mipCount = 1;
     desc.format = Format::RGBA8Unorm;
     desc.usage =
         TextureUsage::UnorderedAccess | TextureUsage::CopySource | TextureUsage::CopyDestination;
     desc.defaultState = ResourceState::UnorderedAccess;
 
-    uint32_t zeros[width * height] = {};
-    SubresourceData initData[layerCount];
+    uint32_t zeros[kWidth * kHeight] = {};
+    SubresourceData initData[kLayerCount];
     for (auto& data : initData)
     {
         data.data = zeros;
-        data.rowPitch = width * sizeof(uint32_t);
-        data.slicePitch = width * height * sizeof(uint32_t);
+        data.rowPitch = kWidth * sizeof(uint32_t);
+        data.slicePitch = kWidth * height * sizeof(uint32_t);
     }
 
     ComPtr<ITexture> texture;
@@ -39,29 +41,38 @@ static ComPtr<ITexture> createLayeredTexture(IDevice* device, TextureType type)
     return texture;
 }
 
-// Checks that the RGBA8 texel at (x, 0) of `layer` matches `expected` within one unit per channel,
-// since the rounding of a float that lands exactly between two unorm8 values is up to the hardware.
-static void checkTexel(
+// Checks every texel of every layer of `texture`: the texel at (x, y, layer) must match `expected`
+// within one unit per channel, since the rounding of a float that lands exactly between two unorm8
+// values is up to the hardware, and every other texel must still be zero.
+static void checkSingleTexelWritten(
     IDevice* device,
     ITexture* texture,
-    uint32_t layer,
     uint32_t x,
+    uint32_t y,
+    uint32_t layer,
     std::array<int, 4> expected)
 {
-    ComPtr<ISlangBlob> blob;
-    SubresourceLayout layout;
-    GFX_CHECK_CALL_ABORT(device->readTexture(texture, layer, 0, blob.writeRef(), &layout));
-    const uint8_t* texel = (const uint8_t*)blob->getBufferPointer() + x * layout.colPitch;
-    for (int i = 0; i < 4; ++i)
+    for (uint32_t l = 0; l < kLayerCount; ++l)
     {
-        SLANG_CHECK(abs(int(texel[i]) - expected[i]) <= 1);
+        ComPtr<ISlangBlob> blob;
+        SubresourceLayout layout;
+        GFX_CHECK_CALL_ABORT(device->readTexture(texture, l, 0, blob.writeRef(), &layout));
+        for (uint32_t ty = 0; ty < layout.size.height; ++ty)
+        {
+            for (uint32_t tx = 0; tx < layout.size.width; ++tx)
+            {
+                const uint8_t* texel = (const uint8_t*)blob->getBufferPointer() +
+                                       ty * layout.rowPitch + tx * layout.colPitch;
+                const bool isWritten = tx == x && ty == y && l == layer;
+                for (int i = 0; i < 4; ++i)
+                {
+                    SLANG_CHECK(abs(int(texel[i]) - (isWritten ? expected[i] : 0)) <= 1);
+                }
+            }
+        }
     }
 }
 
-// Verifies that a store through a `[format("rgba8")]` RWTexture1DArray / RWTexture2DArray of
-// `float4` converts the texel to unorm8 on CUDA (issue #13554). We read the texels back on the host
-// after the dispatch completes, because CUDA has no formatted layered surface read and a kernel
-// cannot rely on reading a surface it has just written.
 void cudaLayeredFormatWriteTestImpl(IDevice* device, UnitTestContext* context)
 {
     ComPtr<IShaderProgram> shaderProgram;
@@ -95,14 +106,8 @@ void cudaLayeredFormatWriteTestImpl(IDevice* device, UnitTestContext* context)
         queue->waitOnHost();
     }
 
-    // Only texel x = 1 of layer 1 was written; its neighbours and layer 0 stay zero.
-    checkTexel(device, texture2DArray, 1, 1, {64, 128, 191, 255});
-    checkTexel(device, texture2DArray, 1, 0, {0, 0, 0, 0});
-    checkTexel(device, texture2DArray, 0, 1, {0, 0, 0, 0});
-
-    checkTexel(device, texture1DArray, 1, 1, {255, 191, 128, 64});
-    checkTexel(device, texture1DArray, 1, 0, {0, 0, 0, 0});
-    checkTexel(device, texture1DArray, 0, 1, {0, 0, 0, 0});
+    checkSingleTexelWritten(device, texture2DArray, 2, 1, 3, {64, 128, 191, 255});
+    checkSingleTexelWritten(device, texture1DArray, 2, 0, 3, {255, 191, 128, 64});
 }
 
 SLANG_UNIT_TEST(cudaLayeredFormatWrite)
