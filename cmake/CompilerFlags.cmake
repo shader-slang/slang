@@ -253,6 +253,17 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
+    # GCC before 14.3 can resume a file one line short after an #include once a
+    # translation unit passes 0x50000000 source locations, where GCC stops
+    # packing ranges into locations (GCC PR108900, fixed in GCC 14.3 and 15).
+    # Our largest translation units pass that point, and FIDDLE keys its
+    # generated macros on __LINE__, so the skew expands another header's
+    # FIDDLE_<line> body. -flarge-source-files stops range packing, which keeps
+    # them far below it.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_supported_cxx_flags(${target} PRIVATE -flarge-source-files)
+    endif()
+
     # Strip the absolute source directory prefix from __FILE__ so that build-machine
     # paths are not baked into the binary's read-only data section.
     #
