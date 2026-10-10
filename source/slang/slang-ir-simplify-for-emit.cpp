@@ -341,6 +341,29 @@ struct SimplifyForEmitContext : public InstPassBase
             processInst(followUpWorkList[i]);
     }
 
+    // A shift has the type of its left operand, but its amount may be any integer type
+    // (`int3 >> uint3`, `int(s) >> uint3`). The C++ and CUDA preludes only define vector operators
+    // over a single vector type, so we give both operands the result type; converting the amount
+    // preserves every valid shift count.
+    void convertVectorShiftOperandsToResultType(IRBuilder& builder, IRInst* inst)
+    {
+        SLANG_ASSERT(inst->getOperandCount() == 2);
+        auto resultType = cast<IRVectorType>(inst->getDataType());
+        for (UInt a = 0; a < 2; a++)
+        {
+            auto operand = inst->getOperand(a);
+            if (as<IRBasicType>(operand->getDataType()))
+            {
+                auto element = builder.emitCast(resultType->getElementType(), operand);
+                inst->setOperand(a, builder.emitMakeVectorFromScalar(resultType, element));
+            }
+            else
+            {
+                inst->setOperand(a, builder.emitCast(resultType, operand));
+            }
+        }
+    }
+
     void unifyBinaryExprOperands(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(func->getModule());
@@ -351,6 +374,15 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
+                case kIROp_Lsh:
+                case kIROp_Rsh:
+                    if (as<IRVectorType>(inst->getDataType()))
+                    {
+                        builder.setInsertBefore(inst);
+                        convertVectorShiftOperandsToResultType(builder, inst);
+                        break;
+                    }
+                    [[fallthrough]];
                 case kIROp_Add:
                 case kIROp_Sub:
                 case kIROp_Mul:
@@ -368,8 +400,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 case kIROp_Greater:
                 case kIROp_Eql:
                 case kIROp_Neq:
-                case kIROp_Lsh:
-                case kIROp_Rsh:
                     builder.setInsertBefore(inst);
                     SLANG_ASSERT(inst->getOperandCount() == 2);
                     if (as<IRVectorType>(inst->getDataType()))
