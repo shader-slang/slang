@@ -1756,11 +1756,27 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Neg:
         {
             auto opType = inst->getOperand(0)->getDataType();
-            if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
+            if (auto matrixType = as<IRMatrixType>(opType))
             {
-                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
-                // native unary '-' only for signed float/int vectors; matrices and unsigned
-                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // WGSL has neither a unary '-' on matrices nor a single-scalar matrix constructor,
+                // so "matCxR<T>(0) - op0" is invalid. Scalar * matrix is native, and multiplying
+                // by -1 also flips the sign of a zero element as '-x' does. Only float matrices
+                // reach this point; integer and bool matrices are lowered to arrays beforehand.
+                // op0 is the right-hand side of '*', so an additive operand keeps its parentheses.
+                m_writer->emit("(");
+                emitType(matrixType->getElementType());
+                m_writer->emit("(-1) * ");
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Mul)));
+                m_writer->emit(")");
+                return true;
+            }
+            if (as<IRVectorType>(opType))
+            {
+                // Lower every vector negation uniformly to "(type(0) - op0)". (WGSL has a native
+                // unary '-' only for signed float/int vectors; unsigned vectors have none, and the
+                // subtraction matches '-x' for the signed cases too.)
                 // The explicit parentheses wrap the whole subtraction, so its outer context is
                 // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
                 // and emit op0 as the subtraction's right-hand side. This wraps an operand that

@@ -77,8 +77,7 @@ void computeMain()
 
 // HALF: enable f16;
 // HALF-NOT: mat2x2<f16>(0)
-// HALF: (f16(-1) * a_{{[0-9]+}})
-[shader("compute")]
+// HALF: (f16(-1) * mat2x2<f16>(
 [numthreads(1, 1, 1)]
 void halfMain(uniform RWStructuredBuffer<half4> halfBuffer)
 {
