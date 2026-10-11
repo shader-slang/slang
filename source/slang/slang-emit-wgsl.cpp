@@ -1759,12 +1759,12 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (auto matrixType = as<IRMatrixType>(opType))
             {
                 // WGSL has neither a unary '-' on matrices nor a single-scalar matrix constructor,
-                // so "matCxR<T>(0) - op0" is invalid. Scalar * matrix is native, and multiplying
-                // by -1 also flips the sign of a zero element as '-x' does. Only float matrices
-                // reach this point; integer and bool matrices are lowered to arrays beforehand.
-                // op0 is the right-hand side of '*', so an additive operand keeps its parentheses.
+                // so we negate by multiplying with the scalar -1, which also preserves the sign of
+                // zero. legalizeMatrixTypes lowers integer and bool matrices to arrays for WGSL.
+                auto elementType = matrixType->getElementType();
+                SLANG_ASSERT(isFloatingType(elementType));
                 m_writer->emit("(");
-                emitType(matrixType->getElementType());
+                emitType(elementType);
                 m_writer->emit("(-1) * ");
                 emitOperand(
                     inst->getOperand(0),
@@ -1774,9 +1774,8 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             if (as<IRVectorType>(opType))
             {
-                // Lower every vector negation uniformly to "(type(0) - op0)". (WGSL has a native
-                // unary '-' only for signed float/int vectors; unsigned vectors have none, and the
-                // subtraction matches '-x' for the signed cases too.)
+                // We lower every vector negation uniformly to "(type(0) - op0)". (WGSL has a native
+                // unary '-' only for signed float/int vectors; unsigned vectors have none.)
                 // The explicit parentheses wrap the whole subtraction, so its outer context is
                 // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
                 // and emit op0 as the subtraction's right-hand side. This wraps an operand that
