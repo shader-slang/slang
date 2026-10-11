@@ -253,6 +253,19 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
+    # GCC before 14.3 (PR108900) numbers the rest of a file one line too low
+    # when an #include in it lands exactly where the translation unit's
+    # location values cross LINE_MAP_MAX_LOCATION_WITH_PACKED_RANGES
+    # (0x50000000). FIDDLE keys its generated macros on __LINE__, so a FIDDLE on
+    # line N then expands FIDDLE_<N-1>, which another header may define. With
+    # -flarge-source-files GCC packs no ranges into location values, so each
+    # line uses far fewer of them and our largest translation units stay well
+    # below the threshold. The flag is cheap, so we pass it to every GCC; the
+    # block can go once the minimum supported GCC is 14.3.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        add_supported_cxx_flags(${target} PRIVATE -flarge-source-files)
+    endif()
+
     # Strip the absolute source directory prefix from __FILE__ so that build-machine
     # paths are not baked into the binary's read-only data section.
     #
