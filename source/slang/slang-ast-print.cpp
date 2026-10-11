@@ -1579,8 +1579,10 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                         sb << toSlice("in ");
                     }
 
-                    // And this to params/variables (not the type)
-                    if (paramDecl->hasModifier<ConstModifier>())
+                    // And this to params/variables (not the type). A `__ref_readonly`
+                    // parameter prints as its legacy spelling, `const __ref`.
+                    if (paramDecl->hasModifier<ConstModifier>() ||
+                        getParamPassingMode(paramDecl) == ParamPassingMode::RefReadOnly)
                     {
                         sb << toSlice("const ");
                     }

@@ -28,6 +28,13 @@ QualType::QualType(Type* type)
                 isLeftValue = false;
                 break;
 
+            // Checking rejects a write-only `Ref`, but a write-only memory location
+            // may still be assigned and must not be read.
+            case AccessQualifier::WriteOnly:
+                isLeftValue = true;
+                isWriteOnlyRef = true;
+                break;
+
             default:
                 SLANG_UNEXPECTED("unhandled access qualifier");
                 break;
@@ -90,6 +97,22 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
+AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::RefReadWrite:
+        return AccessQualifier::ReadWrite;
+    case ParamPassingMode::RefReadOnly:
+        return AccessQualifier::Read;
+    case ParamPassingMode::RefWriteOnly:
+        return AccessQualifier::WriteOnly;
+    default:
+        SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
+        UNREACHABLE_RETURN(AccessQualifier::ReadWrite);
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
     switch (direction)
@@ -100,8 +123,14 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
     case ParamPassingMode::Out:
         sb << "out";
         break;
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         sb << "ref";
+        break;
+    case ParamPassingMode::RefReadOnly:
+        sb << "readonly ref";
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sb << "writeonly ref";
         break;
     case ParamPassingMode::BorrowInOut:
         sb << "inout";

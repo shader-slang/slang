@@ -1443,6 +1443,20 @@ err(
 )
 
 err(
+    "invalid-ref-param-access",
+    30034,
+    "invalid access for a reference parameter type",
+    span { loc = "typeExp:Expr", message = "'~access:Int' is not a valid access for '~type:Type'; expected 'Access.ReadWrite', 'Access.Read', 'Access.Immutable' or 'Access.WriteOnly'." }
+)
+
+err(
+    "write-only-access-not-allowed",
+    30035,
+    "'Access.WriteOnly' is only valid for a reference parameter type",
+    span { loc = "arg:Expr", message = "'~generic:Decl' cannot use 'Access.WriteOnly'; it is only valid as the access of 'RefParam'." }
+)
+
+err(
     "non-addressable-type-in-structured-buffer",
     30031,
     "non-addressable type cannot be used in StructuredBuffer",

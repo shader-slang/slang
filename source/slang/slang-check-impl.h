@@ -1877,6 +1877,19 @@ public:
     DeclRefType* getExprDeclRefType(Expr* expr);
     LookupResult lookupConstructorsInType(Type* type, Scope* sourceScope);
 
+    /// Report E30035 at `argExpr` if `val`, the value bound to a generic value parameter of
+    /// type `paramType` of `genericDecl`, is `Access.WriteOnly` and `genericDecl` is not
+    /// `RefParam`.
+    ///
+    /// `Access.WriteOnly` describes only a `__ref_writeonly` parameter, which is represented as
+    /// `RefParam<T, Access.WriteOnly>`. Any other generic could use it to form a value, such as a
+    /// `Ptr`, that promises it is never read through, so we reject it where the argument binds.
+    void diagnoseWriteOnlyAccessOutsideRefParam(
+        GenericDecl* genericDecl,
+        Type* paramType,
+        Val* val,
+        Expr* argExpr);
+
     /// Is `decl` usable as a static member?
     bool isDeclUsableAsStaticMember(Decl* decl);
 
@@ -2444,8 +2457,20 @@ public:
     ///
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
+    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible.
+    /// The destination reads the value, so a `fromExpr` that denotes a `__ref_writeonly`
+    /// parameter's memory location is reported.
     Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
+
+    /// Coerce `fromExpr` to `toType` as `coerce` does, for an argument that the callee only
+    /// writes: one bound to an `out` or `__ref_writeonly` parameter. A `__ref_writeonly`
+    /// argument must resolve to a memory location (or an abstract storage location with a `ref`
+    /// accessor); an `out` argument may be any writable abstract storage location.
+    Expr* coerceForWriteOnlyArgument(
+        CoercionSite site,
+        Type* toType,
+        Expr* fromExpr,
+        DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -3741,6 +3766,12 @@ public:
 
         bool disallowNestedConversions = false;
 
+        /// Is this the call to a conversion initializer that `_coerce` forms? Its argument is
+        /// the expression being coerced, so the read of a `__ref_writeonly` argument is reported
+        /// by the consumer of the coercion (`coerce()`, or the one-argument type-call fast path
+        /// in `ResolveInvoke`) rather than at this call, which would report it a second time.
+        bool isCoercionConversionCall = false;
+
         Expr* baseExpr = nullptr;
 
         // Are we still trying out candidates, or are we
@@ -4633,6 +4664,13 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // Test if `type` can be an opaque handle on certain targets, this includes
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
+
+/// Report E30119 on `sink` if `expr` denotes (part of) the memory location bound to a
+/// `__ref_writeonly` parameter, for a use that reads the value of `expr`.
+///
+/// We report through this one helper both from `coerce()` and from the few value uses that do
+/// not coerce their operand, such as an inferred-type initializer or `__getAddress`.
+void diagnoseReadOfWriteOnlyRef(Expr* expr, DiagnosticSink* sink);
 
 // Returns true if `type` itself is an opaque handle type, or if it is a struct
 // (or array thereof) that transitively contains an opaque handle field.

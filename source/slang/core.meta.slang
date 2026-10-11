@@ -1486,6 +1486,11 @@ enum Access : uint64_t
     /// qualifier than `Read`, and may allow the backend to perform more aggressive
     /// optimizations.
     Immutable = $((uint64_t)AccessQualifier::Immutable),
+
+    /// The data being referred to can only be written through the reference.
+    /// This is only valid as the access of a `RefParam`, which represents a
+    /// `__ref_writeonly` parameter; any generic other than `RefParam` rejects it.
+    WriteOnly = $((uint64_t)AccessQualifier::WriteOnly),
 }
 
 //@public:
@@ -1847,7 +1852,7 @@ struct BorrowInOutParam<T>
 
 __magic_type(RefParamType)
 __intrinsic_type($(kIROp_RefParamType))
-struct RefParam<T>
+struct RefParam<T, Access access = Access::ReadWrite>
 {};
 
 __magic_type(BorrowInParamType)

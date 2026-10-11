@@ -1288,6 +1288,14 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     {
                         parsedModifier->loc = nameToken.loc;
                     }
+                    // A keyword that spells two modifiers (`__ref_readonly`) gives both the
+                    // keyword's source location. We match on the keyword name so that the markers
+                    // `layout(...)` produces keep their (invalid) source location.
+                    for (auto m = parsedModifier->next; m; m = m->next)
+                    {
+                        if (!m->loc.isValid() && m->keywordName == parsedModifier->keywordName)
+                            m->loc = nameToken.loc;
+                    }
                     if (as<VisibilityModifier>(parsedModifier))
                     {
                         if (auto currentModule = parser->getCurrentModuleDecl())
@@ -10697,6 +10705,35 @@ static NodeBase* parseWriteonlyModifier(Parser* parser, void* /*userData*/)
     return listBuilder.getFirst();
 }
 
+/// Parse a `__ref_readonly` or `__ref_writeonly` keyword into a `RefModifier` followed by the
+/// reference-access modifier of class `T`. `ParseModifiers` gives both modifiers the keyword's
+/// source location, so a diagnostic on either one points at the keyword the user wrote.
+template<typename T>
+static NodeBase* parseRefWithAccessModifier(Parser* parser, char const* keyword)
+{
+    ModifierListBuilder listBuilder;
+
+    auto refMod = parser->astBuilder->create<RefModifier>();
+    refMod->keywordName = getName(parser, keyword);
+    listBuilder.add(refMod);
+
+    auto accessMod = parser->astBuilder->create<T>();
+    accessMod->keywordName = refMod->keywordName;
+    listBuilder.add(accessMod);
+
+    return listBuilder.getFirst();
+}
+
+static NodeBase* parseRefReadOnlyModifier(Parser* parser, void* /*userData*/)
+{
+    return parseRefWithAccessModifier<ReadOnlyModifier>(parser, "__ref_readonly");
+}
+
+static NodeBase* parseRefWriteOnlyModifier(Parser* parser, void* /*userData*/)
+{
+    return parseRefWithAccessModifier<WriteOnlyModifier>(parser, "__ref_writeonly");
+}
+
 static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 {
     ModifierListBuilder listBuilder;
@@ -11089,6 +11126,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__ref_readonly", parseRefReadOnlyModifier),
+    _makeParseModifier("__ref_writeonly", parseRefWriteOnlyModifier),
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),

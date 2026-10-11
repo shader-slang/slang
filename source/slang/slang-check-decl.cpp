@@ -1698,7 +1698,12 @@ QualType getTypeForDeclRef(
             // We make references immutable when the shadow must alias its parameter instead.
             isLValue = !shadowVar->shouldBeImmutableAlias;
         }
-        if (varDeclRef.getDecl()->findModifier<ConstModifier>())
+        // A parameter's reference access comes from its effective passing mode, which
+        // `getParamPassingMode` computes from the modifiers and the parameter type.
+        auto paramDecl = as<ParamDecl>(varDeclRef.getDecl());
+        const auto paramMode = paramDecl ? getParamPassingMode(paramDecl) : ParamPassingMode::In;
+        if (varDeclRef.getDecl()->findModifier<ConstModifier>() ||
+            paramMode == ParamPassingMode::RefReadOnly)
             isLValue = false;
 
         // Global-scope shader parameters should not be writable,
@@ -1753,6 +1758,8 @@ QualType getTypeForDeclRef(
 
         qualType.isLeftValue = isLValue;
         qualType.isWriteOnly = isWriteOnly;
+        // A `RefWriteOnly` parameter is the one passed as `RefParam<T, Access.WriteOnly>`.
+        qualType.isWriteOnlyRef = paramMode == ParamPassingMode::RefWriteOnly;
         return qualType;
     }
     else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -2664,6 +2671,9 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     SemanticsVisitor subVisitor(contextToUse);
     initExpr = subVisitor.CheckExpr(initExpr);
     initExpr = maybeOpenRef(initExpr);
+
+    // An inferred-type initializer is not coerced, so `coerce` cannot report the read.
+    diagnoseReadOfWriteOnlyRef(initExpr, getSink());
 
     // TODO: We might need some additional steps here to ensure
     // that the type of the expression is one we are okay with
@@ -3596,7 +3606,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
 
-        if (initExpr->type.isWriteOnly)
+        // `coerce` reports a `__ref_writeonly` source, so an expression that is both GLSL
+        // `writeonly` and a write-only reference is reported only once.
+        if (initExpr->type.isWriteOnly && !initExpr->type.isWriteOnlyRef)
             getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
@@ -4843,7 +4855,19 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     }
 
     if (decl->initExpr)
+    {
         decl->initExpr = CheckTerm(decl->initExpr);
+
+        // A default argument does not pass through generic-argument binding, so we check it here.
+        if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        {
+            diagnoseWriteOnlyAccessOutsideRefParam(
+                genericDecl,
+                decl->type.type,
+                tryConstantFoldExpr(decl->initExpr, ConstantFoldingKind::LinkTime, nullptr),
+                decl->initExpr);
+        }
+    }
 
     if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
@@ -7424,6 +7448,45 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synthesized, visibility);
+    }
+}
+
+/// Add the modifiers that spell `mode` to `paramDecl`. A parameter built from a
+/// function type has only its effective mode, and several spellings (`const __ref`
+/// and `__ref_readonly`, a legacy alias, an inferred mode) produce the same mode, so
+/// we spell each mode one canonical way.
+static void addModifiersForParamPassingMode(
+    ASTBuilder* astBuilder,
+    ParamDecl* paramDecl,
+    ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        break;
+    case ParamPassingMode::Out:
+        addModifier(paramDecl, astBuilder->create<OutModifier>());
+        break;
+    case ParamPassingMode::BorrowInOut:
+        addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        break;
+    case ParamPassingMode::BorrowIn:
+        addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        break;
+    case ParamPassingMode::RefReadWrite:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        break;
+    case ParamPassingMode::RefReadOnly:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        addModifier(paramDecl, astBuilder->create<ReadOnlyModifier>());
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        addModifier(paramDecl, astBuilder->create<RefModifier>());
+        addModifier(paramDecl, astBuilder->create<WriteOnlyModifier>());
+        break;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        break;
     }
 }
 
@@ -15277,23 +15340,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        switch (paramDir)
-        {
-        case ParamPassingMode::BorrowInOut:
-            addModifier(param, m_astBuilder->create<InOutModifier>());
-            break;
-        case ParamPassingMode::Out:
-            addModifier(param, m_astBuilder->create<OutModifier>());
-            break;
-        case ParamPassingMode::Ref:
-            addModifier(param, m_astBuilder->create<RefModifier>());
-            break;
-        case ParamPassingMode::BorrowIn:
-            addModifier(param, m_astBuilder->create<BorrowModifier>());
-            break;
-        default:
-            break;
-        }
+        addModifiersForParamPassingMode(m_astBuilder, param, paramDir);
         decl->addMember(param);
     }
 }
@@ -17149,7 +17196,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isByReferenceParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17178,7 +17225,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isByReferenceParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }
@@ -17422,7 +17469,7 @@ ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode def
     else if (policyDecl->hasModifier<ConstRefAttribute>())
         mode = ParamPassingMode::BorrowIn;
     else if (policyDecl->hasModifier<RefAttribute>())
-        mode = ParamPassingMode::Ref;
+        mode = ParamPassingMode::RefReadWrite;
     else if (policyDecl->hasModifier<NonmutatingAttribute>())
         mode = ParamPassingMode::In;
     else if (as<SetterDecl>(policyDecl))

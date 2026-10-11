@@ -3494,7 +3494,13 @@ $(type_info.return_type) $(type_info.method_name)(
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
+    // A read-write reference. A pass that rebuilds the type of an existing
+    // parameter passes that parameter's access to the overload below instead.
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+    IRRefParamType* getRefParamType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,

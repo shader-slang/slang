@@ -3298,6 +3298,14 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(
         break;
     case SLANG_MODIFIER_CONST:
         modifier = var->findModifier<ConstModifier>();
+        // A `__ref_readonly` parameter reflects as `const`, the legacy spelling of its mode.
+        // Clients only test the result for null, so we return the modifier that spells the mode.
+        if (auto paramDecl = as<ParamDecl>(var);
+            !modifier && paramDecl &&
+            getParamPassingMode(paramDecl) == ParamPassingMode::RefReadOnly)
+        {
+            modifier = paramDecl->findModifier<ReadOnlyModifier>();
+        }
         break;
     case SLANG_MODIFIER_NO_DIFF:
         modifier = var->findModifier<NoDiffModifier>();

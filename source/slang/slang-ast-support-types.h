@@ -633,7 +633,13 @@ FIDDLE() namespace Slang
         FIDDLE() Type* type = nullptr;
         FIDDLE() bool isLeftValue = false;
         FIDDLE() bool hasReadOnlyOnTarget = false;
+
+        /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
+
+        /// The expression denotes (part of) the memory location bound to a
+        /// `RefParam<T, Access.WriteOnly>` parameter, so any read of its value is an error.
+        FIDDLE() bool isWriteOnlyRef = false;
 
         QualType() = default;
 
@@ -1908,8 +1914,46 @@ FIDDLE() namespace Slang
         /// This parameter-passing mode is more-or-less just syntactic
         /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
         ///
-        Ref,
+        RefReadWrite,
+
+        /// Pass a reference to a memory location that the callee may only read.
+        ///
+        /// Indicated by the `__ref_readonly` modifier on a parameter, or by
+        /// its legacy spelling `const __ref` (or `__ref const`).
+        ///
+        /// The same rules as `RefReadWrite` apply to the argument and to
+        /// aliasing access paths; only the callee's access through the
+        /// parameter is restricted.
+        ///
+        RefReadOnly,
+
+        /// Pass a reference to a memory location that the callee may only write.
+        ///
+        /// Indicated by the `__ref_writeonly` modifier on a parameter, and
+        /// represented as `RefParam<T, Access.WriteOnly>`.
+        ///
+        RefWriteOnly,
     };
+
+    /// Is `mode` one of the `Ref*` modes, which always pass the address of
+    /// the argument's memory location?
+    inline bool isByReferenceParamPassingMode(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Get the access qualifier that a parameter type wrapper (`RefParamType`
+    /// in the AST, `IRRefParamType` in the IR) records for a `Ref*` mode.
+    ///
+    AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
 
     /// Combined semantic information about a parameter's type and parameter-passing mode.
     ///
@@ -1942,7 +1986,9 @@ FIDDLE() namespace Slang
         {
         case ParamPassingMode::Out:
         case ParamPassingMode::BorrowInOut:
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             return true;
 
         case ParamPassingMode::In:
@@ -1952,6 +1998,31 @@ FIDDLE() namespace Slang
         default:
             SLANG_UNEXPECTED("unhandled parameter-passing mode");
             UNREACHABLE_RETURN(false);
+        }
+    }
+
+    /// Returns whether a parameter of mode `mode` may read the value of its argument.
+    ///
+    /// Only an `out` or `__ref_writeonly` parameter never reads its argument; the callee only
+    /// writes it. Every other mode, including `inout` and `__ref`, may read the argument's value.
+    inline bool doesParamPassingModeReadArgument(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::RefWriteOnly:
+            return false;
+
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+            return true;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(true);
         }
     }
 
