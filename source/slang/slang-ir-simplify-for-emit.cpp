@@ -341,6 +341,37 @@ struct SimplifyForEmitContext : public InstPassBase
             processInst(followUpWorkList[i]);
     }
 
+    // Convert both operands of the vector shift `inst` to its result type, inserting the
+    // conversions before `inst`. A scalar operand is converted to the result's element type and
+    // then splat.
+    //
+    // A shift's result has the element type of its left operand (`int3 >> uint3` and
+    // `int s >> uint3` both give `int3`), but its amount may be any integer type, and the C++
+    // and CUDA preludes only define vector operators over a single vector type. The result type
+    // is the only correct common type: splatting `s` to the amount's type `uint3` would turn an
+    // arithmetic shift into a logical one. Narrowing the amount to the result element type keeps
+    // every count in [0, bit width of the result element); Slang does not define a shift by a
+    // count outside that range (#9374).
+    void convertVectorShiftOperandsToResultType(IRBuilder& builder, IRInst* inst)
+    {
+        SLANG_ASSERT(inst->getOperandCount() == 2);
+        builder.setInsertBefore(inst);
+        auto resultType = cast<IRVectorType>(inst->getDataType());
+        for (UInt a = 0; a < 2; a++)
+        {
+            auto operand = inst->getOperand(a);
+            if (as<IRBasicType>(operand->getDataType()))
+            {
+                auto element = builder.emitCast(resultType->getElementType(), operand);
+                inst->setOperand(a, builder.emitMakeVectorFromScalar(resultType, element));
+            }
+            else
+            {
+                inst->setOperand(a, builder.emitCast(resultType, operand));
+            }
+        }
+    }
+
     void unifyBinaryExprOperands(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(func->getModule());
@@ -351,6 +382,16 @@ struct SimplifyForEmitContext : public InstPassBase
             {
                 switch (inst->getOp())
                 {
+                case kIROp_Lsh:
+                case kIROp_Rsh:
+                    if (as<IRVectorType>(inst->getDataType()))
+                    {
+                        convertVectorShiftOperandsToResultType(builder, inst);
+                        break;
+                    }
+                    // Scalar shifts need no unification. Matrix shifts are not supported on these
+                    // targets, because neither prelude defines a matrix shift operator.
+                    [[fallthrough]];
                 case kIROp_Add:
                 case kIROp_Sub:
                 case kIROp_Mul:
@@ -368,8 +409,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 case kIROp_Greater:
                 case kIROp_Eql:
                 case kIROp_Neq:
-                case kIROp_Lsh:
-                case kIROp_Rsh:
                     builder.setInsertBefore(inst);
                     SLANG_ASSERT(inst->getOperandCount() == 2);
                     if (as<IRVectorType>(inst->getDataType()))
