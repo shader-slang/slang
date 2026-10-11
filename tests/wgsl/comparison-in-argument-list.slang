@@ -65,22 +65,27 @@ Flags compareInInitializerList(float a, float b)
     return f;
 }
 
-// WGSL has no vector `&&`/`||`, so the emitter lowers them to `select(...)` argument lists.
+// WGSL has no vector `&&`/`||`, so the emitter lowers them to `select(...)` argument lists with
+// the right-hand operand first. The operands are ordered so that a `<` precedes a `>`/`>=` there.
 [noinline]
-bool2 compareInVectorAnd(float2 u, float2 v)
+bool2 compareInVectorAnd(float2 u, float2 v, float2 w)
 {
-    // WGSL-DAG: select(vec2<bool>(false), (u{{[_0-9]+}} >= v{{[_0-9]+}}), (u{{[_0-9]+}} <= v{{[_0-9]+}}))
-    return (u <= v) && (u >= v);
+    // WGSL-DAG: select(vec2<bool>(false), (u{{[_0-9]+}} < w{{[_0-9]+}}), (u{{[_0-9]+}} >= v{{[_0-9]+}}))
+    return (u >= v) && (u < w);
 }
 
 [noinline]
-bool2 compareInVectorOr(float2 u, float2 v)
+bool2 compareInVectorOr(float2 u, float2 v, float2 w)
 {
-    // WGSL-DAG: select((u{{[_0-9]+}} > v{{[_0-9]+}}), vec2<bool>(true), (u{{[_0-9]+}} < v{{[_0-9]+}}))
-    return (u < v) || (u > v);
+    // WGSL-DAG: select((u{{[_0-9]+}} < w{{[_0-9]+}}), vec2<bool>(true), (u{{[_0-9]+}} > v{{[_0-9]+}}))
+    return (u > v) || (u < w);
 }
 
-// No comparison's right-hand operand may be followed directly by the `,` of an enclosing list.
+// A bare comparison followed by a list `,` is the shape that lets its `<` pair with a later `>`.
+// The pattern matches a spaced relational operator (the emitter prints ` op `, which excludes
+// `vec2<bool>` and `->`) whose right-hand operand, skipping up to two levels of nested
+// parentheses, runs into a `,`. It has its own run so that it scans the whole output rather
+// than only the text after the last WGSL-DAG match.
 // NOBARE-NOT: {{ (<|>|<=|>=) ([^,;()]|\(([^()]|\([^()]*\))*\))+, }}
 
 [shader("compute")]
@@ -91,12 +96,12 @@ void computeMain()
     float b = floatInput[1];
     float c = floatInput[2];
     float2 u = float2(a, b);
-    float2 v = float2(c, b + 1.0);
+    float2 v = float2(c, a);
 
     bool2 ctor = compareInConstructor(a, c);
     Flags flags = compareInInitializerList(a, c);
-    bool2 vecAnd = compareInVectorAnd(u, v);
-    bool2 vecOr = compareInVectorOr(u, v);
+    bool2 vecAnd = compareInVectorAnd(u, v, float2(b, b));
+    bool2 vecOr = compareInVectorOr(u, v, float2(c, b + 1.0));
 
     // Operands are chosen so that swapping `<` with `<=`, or `>` with `>=`, changes the result.
     // BUF: 0
