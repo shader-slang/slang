@@ -345,12 +345,13 @@ struct SimplifyForEmitContext : public InstPassBase
     // conversions before `inst`. A scalar operand is converted to the result's element type and
     // then splat.
     //
-    // A shift has the type of its left operand, but its amount may be any integer type
-    // (`int3 >> uint3`, `int(s) >> uint3`), and the C++ and CUDA preludes only define vector
-    // operators over a single vector type. The result type is the only correct common type:
-    // splatting `int(s)` to the amount's type `uint3` would turn an arithmetic shift into a
-    // logical one. A valid shift count lies in [0, bit width of the result element), so it is
-    // representable in the result element type and the conversion does not change it.
+    // A shift's result has the element type of its left operand (`int3 >> uint3` and
+    // `int s >> uint3` both give `int3`), but its amount may be any integer type, and the C++
+    // and CUDA preludes only define vector operators over a single vector type. The result type
+    // is the only correct common type: splatting `s` to the amount's type `uint3` would turn an
+    // arithmetic shift into a logical one. Narrowing the amount to the result element type keeps
+    // every count in [0, bit width of the result element); Slang does not define a shift by a
+    // count outside that range (#9374).
     void convertVectorShiftOperandsToResultType(IRBuilder& builder, IRInst* inst)
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);
@@ -388,6 +389,8 @@ struct SimplifyForEmitContext : public InstPassBase
                         convertVectorShiftOperandsToResultType(builder, inst);
                         break;
                     }
+                    // Scalar shifts need no unification. Matrix shifts are not supported on these
+                    // targets, because neither prelude defines a matrix shift operator.
                     [[fallthrough]];
                 case kIROp_Add:
                 case kIROp_Sub:

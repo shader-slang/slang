@@ -1,8 +1,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13553
 //
-// A shift takes the type of its left operand, and its shift amount may have a different integer
-// type (`int3 >> uint3`, `int s >> uint3`). The C++ and CUDA preludes only define vector operators
-// over one vector type, so both operands must be converted to the result type before emit.
+// A shift's result has the element type of its left operand, and its shift amount may have a
+// different integer type (`int3 >> uint3`, `int s >> uint3`). The C++ and CUDA preludes only
+// define vector operators over one vector type, so both operands must be converted to the result
+// type before emit.
 // Inputs come from a buffer so that no shift is folded at compile time, and no case shifts a
 // negative value left (undefined before C++20).
 
@@ -16,6 +17,8 @@
 // CUDA: int3 [[AMOUNT:[A-Za-z0-9_]+]] = make_int3 ((int)a_0.x, (int)a_0.y, (int)a_0.z);
 // CUDA-NEXT: store3_0(int(0), v_1 >> [[AMOUNT]]);
 // CUDA: store3_0(int(3), make_int3 ({{[^)]*}}) >> {{[A-Za-z0-9_]+}});
+// An unsigned scalar is splat to `uint3`, not to the `int3` of its amount.
+// CUDA: uint3 u_0 = make_uint3 ({{.*}}) << {{[A-Za-z0-9_]+}};
 
 // NVRTC accepts the emitted CUDA source.
 // PTX: .entry computeMain
@@ -81,7 +84,8 @@ void computeMain()
     // CHECK-NEXT: -4
     // CHECK-NEXT: -16
 
-    // The scalar is splat to the result type `uint3`, not to the amount's type `int3`.
+    // The scalar is splat to the result type `uint3`, not to the amount's type `int3`. Both give
+    // the same bits here, so the CUDA FileCheck above guards the splat type.
     uint3 u = uint(five) << int3(a);
     store3(18, int3(u));
     // CHECK-NEXT: 10
