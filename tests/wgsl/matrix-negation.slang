@@ -68,7 +68,6 @@ void computeMain()
     // BUF-NEXT: -36
     outputBuffer[4] = sum(-(m + n));
 
-    // A negated constant matrix used as a 'mul' operand.
     // WGSL-DAG: (f32(-1) * mat2x2<f32>(1.0f, 2.0f, -3.0f, 4.0f))
     // BUF-NEXT: -5
     float2 p = mul(float2(input[0], input[1]), -M2);
