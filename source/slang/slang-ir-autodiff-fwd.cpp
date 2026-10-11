@@ -1019,6 +1019,13 @@ struct ForwardDiffTranslationContext
             primalCallee,
             AnnotationKind::FwdDiffBackwardDerivativeWitnessTable);
 
+        // A void table is an absent optional higher-order conformance; there is nothing to
+        // annotate.
+        if (as<IRVoidLit>(fwdDiffFwdTable))
+            fwdDiffFwdTable = nullptr;
+        if (as<IRVoidLit>(fwdDiffBwdTable))
+            fwdDiffBwdTable = nullptr;
+
         if (fwdDiffFwdTable)
         {
             IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(

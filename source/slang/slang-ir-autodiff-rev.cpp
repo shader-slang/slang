@@ -274,7 +274,7 @@ struct BackwardDiffTranslationContext
         // Split first block into a paramter block.
         makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
 
-        unzipDiffInsts(autoDiffSharedContext, fwdDiffFunc);
+        unzipDiffInsts(autoDiffSharedContext, sink, fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.

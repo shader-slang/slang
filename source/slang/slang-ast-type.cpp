@@ -315,7 +315,7 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
-static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
+Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -481,6 +481,27 @@ static std::optional<ParamPassingMode> _getBackwardCallableParamMode(ParamPassin
     }
 }
 
+// Gets the function type whose parameters `diffTypeWitness` describes. An `__associatedfunc`
+// declares no parameters, so its declared type is used instead.
+static FuncType* getFuncTypeForDerivative(
+    ASTBuilder* astBuilder,
+    DeclRef<CallableDecl> baseFuncDeclRef,
+    DiffTypeInfoWitness* diffTypeWitness)
+{
+    if (!hasDirectFuncType(baseFuncDeclRef))
+        return getFuncType(astBuilder, baseFuncDeclRef);
+
+    auto resolvedType = as<FuncType>(substituteType(
+                                         SubstitutionSet(baseFuncDeclRef),
+                                         astBuilder,
+                                         baseFuncDeclRef.getDecl()->funcType.type)
+                                         ->resolve());
+    SLANG_RELEASE_ASSERT(
+        resolvedType &&
+        resolvedType->getParamCount() == (Count)diffTypeWitness->getParamTypeCount());
+    return resolvedType;
+}
+
 Val* BwdCallableFuncType::_resolveImplOverride()
 {
     // Resolve all three operands.
@@ -498,7 +519,7 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         List<Type*> newParamTypes;
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        auto funcType = getFuncTypeForDerivative(astBuilder, baseFuncDeclRef, diffTypeWitness);
 
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
@@ -615,7 +636,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         List<Type*> newParamTypes;
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        auto funcType = getFuncTypeForDerivative(astBuilder, baseFuncDeclRef, diffTypeWitness);
 
         // The result type is Tuple<FuncResultType, MinimalContextType> when non-void,
         // or just MinimalContextType when the function returns void.
@@ -713,7 +734,7 @@ Val* RematFuncType::_resolveImplOverride()
         List<Type*> newParamTypes;
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        auto funcType = getFuncTypeForDerivative(astBuilder, baseFuncDeclRef, diffTypeWitness);
 
         // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
@@ -821,7 +842,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         List<Type*> newParamTypes;
 
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        auto funcType = getFuncTypeForDerivative(astBuilder, baseFuncDeclRef, diffTypeWitness);
 
         // The backward diff return type is void.
         auto resultType = astBuilder->getVoidType();
@@ -973,7 +994,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
 
         auto astBuilder = getCurrentASTBuilder();
         auto baseFuncDeclRef = getCallableDeclRefFromFuncTypeBase(resolvedBase);
-        auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
+        auto funcType = getFuncTypeForDerivative(astBuilder, baseFuncDeclRef, diffTypeWitness);
 
         auto thisParamType = diffTypeWitness->getThisParamType();
         if (thisParamType)

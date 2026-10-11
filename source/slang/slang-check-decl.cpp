@@ -10179,6 +10179,56 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     return doesSignatureMatch;
 }
 
+/// Returns whether the higher-order conformance of the synthesized derivative `synFuncDecl` is
+/// recorded. Only a member method's derivative is reached through an interface, and core-module
+/// methods keep the absent entry, which would otherwise add tables to every module using their
+/// conformances.
+static bool needsHigherOrderDiffWitness(SynthesizedFuncDecl* synFuncDecl)
+{
+    if (synFuncDecl->operands.getCount() == 0)
+        return false;
+    auto baseDeclRef = as<DeclRefBase>(synFuncDecl->operands[0]);
+    auto baseDecl = baseDeclRef ? as<FunctionDeclBase>(baseDeclRef->getDecl()) : nullptr;
+    if (!baseDecl || isFromCoreModule(baseDecl))
+        return false;
+    auto parent = baseDecl->parentDecl;
+    if (as<GenericDecl>(parent))
+        parent = parent->parentDecl;
+    // An accessor belongs to its subscript or property.
+    if (as<AccessorDecl>(baseDecl))
+    {
+        if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
+            parent = parent->parentDecl;
+        if (as<GenericDecl>(parent))
+            parent = parent->parentDecl;
+    }
+    return as<AggTypeDeclBase>(parent) != nullptr;
+}
+
+/// Finds the conformance of `synFuncDecl` to `superType` in the extension synthesized with it,
+/// without the general subtype search, which can recurse through that same conformance.
+SubtypeWitness* SemanticsVisitor::findSynthesizedHigherOrderDiffWitness(
+    SynthesizedFuncDecl* synFuncDecl,
+    Type* subType,
+    Type* superType)
+{
+    for (auto extDecl : getShared()->getCandidateExtensionsForTypeDecl(synFuncDecl))
+    {
+        auto extDeclRef = applyExtensionToType(extDecl, subType);
+        if (!extDeclRef)
+            continue;
+        for (auto inheritanceDecl : extDecl->getDirectMemberDeclsOfType<InheritanceDecl>())
+        {
+            auto inheritanceDeclRef = m_astBuilder->getMemberDeclRef(extDeclRef, inheritanceDecl);
+            auto baseType = getBaseType(m_astBuilder, inheritanceDeclRef);
+            if (!baseType || !baseType->equals(superType))
+                continue;
+            return m_astBuilder->getDeclaredSubtypeWitness(subType, superType, inheritanceDeclRef);
+        }
+    }
+    return nullptr;
+}
+
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
 {
     auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
@@ -10489,15 +10539,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             {
                 ensureDecl(constraintSubCallableDeclRef, DeclCheckState::ReadyForLookup);
 
-                // `IForwardDifferentiable.fwd_diff` is `[MaybeDifferentiable]`, so a witness table
-                // may omit the higher-order derivative of a synthesized forward derivative
-                // function. If we eagerly chase that optional constraint while building the first
-                // `IForwardDifferentiable` witness table, lookup can recurse through the same
-                // synthesized `fwd_diff` conformance. Record absence here; explicit higher-order
-                // differentiation still goes through the hard conformance paths. This uses the
-                // same `NoneWitness` representation as the ordinary optional-constraint fallback
-                // below and the generic solver's optional witness arguments; `visitNoneWitness`
-                // lowers it to the sentinel witness table consumed by optional constraint checks.
+                // Resolving this optional constraint in general can recurse through the same
+                // synthesized conformance, so it is looked up directly.
                 if (isOptionalConstraint &&
                     as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
                 {
@@ -10506,9 +10549,17 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     {
                         if (synFuncDecl->irOp == kIROp_ForwardDifferentiate)
                         {
+                            SubtypeWitness* witness = nullptr;
+                            if (needsHigherOrderDiffWitness(synFuncDecl))
+                                witness = findSynthesizedHigherOrderDiffWitness(
+                                    synFuncDecl,
+                                    constraintSub,
+                                    constraintSup);
                             witnessTable->add(
                                 requiredConstraintDeclRef.getDecl(),
-                                m_astBuilder->getOrCreate<NoneWitness>());
+                                witness
+                                    ? RequirementWitness(witness)
+                                    : RequirementWitness(m_astBuilder->getOrCreate<NoneWitness>()));
                             return true;
                         }
                     }

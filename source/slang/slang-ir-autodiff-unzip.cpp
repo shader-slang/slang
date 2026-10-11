@@ -23,8 +23,10 @@ struct UnzippingContext
 
     IRBlock* firstDiffBlock;
 
-    UnzippingContext(AutoDiffSharedContext* autodiffContext)
-        : autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
+    DiagnosticSink* sink = nullptr;
+
+    UnzippingContext(AutoDiffSharedContext* autodiffContext, DiagnosticSink* sink)
+        : autodiffContext(autodiffContext), diffTypeContext(autodiffContext), sink(sink)
     {
     }
 
@@ -219,6 +221,64 @@ struct UnzippingContext
         }
     }
 
+    /// Splits a call whose optional backward derivative is absent into the primal call and zero
+    /// differentials for its result and its `out`/`inout` arguments.
+    InstPair splitCallWithoutBackwardDerivative(
+        IRBuilder* primalBuilder,
+        IRBuilder* diffBuilder,
+        IRCall* mixedCall,
+        IRInst* primalFunc)
+    {
+        // Only a callee that is not differentiable at all has a zero derivative.
+        auto fwdFunc =
+            diffTypeContext.tryGetAssociationOfKind(primalFunc, AnnotationKind::ForwardDerivative);
+        if (fwdFunc && !as<IRVoidLit>(fwdFunc) && sink)
+        {
+            sink->diagnose(Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
+                .diffLevel = "backward",
+                .funcName = getResolvedInstForDecorations(primalFunc),
+                .location = mixedCall->sourceLoc,
+            });
+        }
+
+        List<IRInst*> primalArgs;
+        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
+        {
+            auto arg = mixedCall->getArg(ii);
+            if (!isMixedDifferentialInst(arg))
+            {
+                primalArgs.add(arg);
+                continue;
+            }
+            primalArgs.add(lookupPrimalInst(arg));
+            auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
+            if (!argPtrType)
+                continue;
+            auto pairType = as<IRDifferentialPairType>(argPtrType->getValueType());
+            if (!pairType)
+                continue;
+            auto primalValueType = pairType->getValueType();
+            auto zero = diffTypeContext.emitDZeroOfDiffInstType(diffBuilder, primalValueType);
+            diffBuilder->markInstAsDifferential(zero, primalValueType);
+            auto store = diffBuilder->emitStore(lookupDiffInst(arg), zero);
+            diffBuilder->markInstAsDifferential(store, primalValueType);
+        }
+
+        auto primalFuncType = as<IRFuncType>(primalFunc->getDataType());
+        SLANG_RELEASE_ASSERT(primalFuncType);
+        auto primalResultType = primalFuncType->getResultType();
+        auto primalCall = primalBuilder->emitCallInst(primalResultType, primalFunc, primalArgs);
+        primalBuilder->markInstAsPrimal(primalCall);
+
+        IRInst* diffVal = nullptr;
+        if (diffTypeContext.tryGetDifferentiableValueType(primalResultType))
+        {
+            diffVal = diffTypeContext.emitDZeroOfDiffInstType(diffBuilder, primalResultType);
+            diffBuilder->markInstAsDifferential(diffVal, primalResultType);
+        }
+        return InstPair(primalCall, diffVal);
+    }
+
     InstPair splitCall(IRBuilder* primalBuilder, IRBuilder* diffBuilder, IRCall* mixedCall)
     {
         IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
@@ -229,6 +289,12 @@ struct UnzippingContext
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             AnnotationKind::BackwardDerivativeApply);
+        if (as<IRVoidLit>(applyBwdFunc))
+            return splitCallWithoutBackwardDerivative(
+                primalBuilder,
+                diffBuilder,
+                mixedCall,
+                baseFn);
         auto applyBwdFuncType = cast<IRFuncType>(
             diffTypeContext.resolveType(&globalBuilder, applyBwdFunc->getDataType()));
         applyBwdFuncType =
@@ -1300,9 +1366,9 @@ static IRBlock* getFirstRecomputeBlock(IRFunc* func)
     return nullptr;
 }
 
-void unzipDiffInsts(AutoDiffSharedContext* context, IRFunc* func)
+void unzipDiffInsts(AutoDiffSharedContext* context, DiagnosticSink* sink, IRFunc* func)
 {
-    UnzippingContext unzipContext(context);
+    UnzippingContext unzipContext(context, sink);
     unzipContext.unzipFunc(func);
 }
 

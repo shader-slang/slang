@@ -3302,6 +3302,10 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    SubtypeWitness* findSynthesizedHigherOrderDiffWitness(
+        SynthesizedFuncDecl* synFuncDecl,
+        Type* subType,
+        Type* superType);
     Type* getForwardDiffFuncInterfaceType(Type* baseType);
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
