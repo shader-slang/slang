@@ -67,11 +67,13 @@ void computeMain()
     // CHECK-NEXT: 4
     // CHECK-NEXT: 8
 
+    // A 64-bit amount is narrowed to the 32-bit result element without changing the count.
     store3(12, int3(five, 1, 2) << int64_t3(a));
     // CHECK-NEXT: 10
     // CHECK-NEXT: 4
     // CHECK-NEXT: 16
 
+    // `>>=` is inlined to a plain `>>`, so it takes the same conversion.
     int3 c = v;
     c >>= uint3(a.z, a.y, a.x);
     store3(15, c);
@@ -79,6 +81,7 @@ void computeMain()
     // CHECK-NEXT: -4
     // CHECK-NEXT: -16
 
+    // The scalar is splat to the result type `uint3`, not to the amount's type `int3`.
     uint3 u = uint(five) << int3(a);
     store3(18, int3(u));
     // CHECK-NEXT: 10
@@ -99,6 +102,7 @@ void computeMain()
     // CHECK-NEXT: -16
     // CHECK-NEXT: 12
 
+    // A signed 64-bit amount is narrowed to an unsigned 16-bit element; the shift stays logical.
     uint16_t3 narrowU = uint16_t3(uint3(uint(s))) >> int64_t3(a);
     store3(27, int3(narrowU));
     // CHECK-NEXT: 32764

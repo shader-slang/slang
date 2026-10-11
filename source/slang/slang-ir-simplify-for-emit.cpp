@@ -341,13 +341,20 @@ struct SimplifyForEmitContext : public InstPassBase
             processInst(followUpWorkList[i]);
     }
 
+    // Convert both operands of the vector shift `inst` to its result type, inserting the
+    // conversions before `inst`. A scalar operand is converted to the result's element type and
+    // then splat.
+    //
     // A shift has the type of its left operand, but its amount may be any integer type
-    // (`int3 >> uint3`, `int(s) >> uint3`). The C++ and CUDA preludes only define vector operators
-    // over a single vector type, so we give both operands the result type; converting the amount
-    // preserves every valid shift count.
+    // (`int3 >> uint3`, `int(s) >> uint3`), and the C++ and CUDA preludes only define vector
+    // operators over a single vector type. The result type is the only correct common type:
+    // splatting `int(s)` to the amount's type `uint3` would turn an arithmetic shift into a
+    // logical one. A valid shift count lies in [0, bit width of the result element), so it is
+    // representable in the result element type and the conversion does not change it.
     void convertVectorShiftOperandsToResultType(IRBuilder& builder, IRInst* inst)
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);
+        builder.setInsertBefore(inst);
         auto resultType = cast<IRVectorType>(inst->getDataType());
         for (UInt a = 0; a < 2; a++)
         {
@@ -378,7 +385,6 @@ struct SimplifyForEmitContext : public InstPassBase
                 case kIROp_Rsh:
                     if (as<IRVectorType>(inst->getDataType()))
                     {
-                        builder.setInsertBefore(inst);
                         convertVectorShiftOperandsToResultType(builder, inst);
                         break;
                     }
