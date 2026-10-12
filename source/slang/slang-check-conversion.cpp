@@ -1748,11 +1748,6 @@ static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
     return false;
 }
 
-bool isArrayMatrixLayoutConversion(Type* toType, Type* fromType)
-{
-    return as<ArrayExpressionType>(toType) && isMatrixLayoutConversion(toType, fromType);
-}
-
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,

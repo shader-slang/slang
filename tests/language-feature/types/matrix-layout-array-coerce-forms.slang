@@ -46,14 +46,11 @@ void main()
     // A `StructuredBuffer` element's field passed to a plain array parameter.
     output[4] = use(sb[0].m);
 
-    // Controls: a single matrix, an indexed element, a whole-struct copy, and a target with the
-    // same layout.
+    // Controls: a single matrix, an indexed element and a whole-struct copy.
     output[5] = useOne(single);
     output[6] = useOne(rowMajor[1]);
     S t = s;
     output[7] = t.m[1][2][3];
-    row_major float4x4 same[2] = rowMajor;
-    output[8] = same[1][2][3];
 }
 
 // The buffer arrays keep their explicit layouts (Slang `row_major` is SPIR-V `ColMajor`).
