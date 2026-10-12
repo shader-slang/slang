@@ -62,11 +62,11 @@ struct MatrixTypeLoweringContext
         workListSet.add(inst);
     }
 
-    // Returns whether `matrixType` has no native representation on the target and must be lowered
-    // to an array of row vectors. LLVM CPU targets lower every matrix; WGSL targets lower every
-    // non-floating element type, because WGSL matrices are float-only; SPIR-V, GLSL and Metal lower
-    // bool and 32-bit int/uint. On WGSL, `validateVectorsAndMatrices` then rejects the resulting
-    // vectors when their element type is not 32 bits wide.
+    // Returns whether `matrixType` must be lowered to an array of row vectors. LLVM CPU targets
+    // lower every matrix; WGSL targets lower every non-floating element type, because WGSL
+    // matrices are float-only; SPIR-V, GLSL and Metal lower bool and 32-bit int/uint. On WGSL,
+    // `validateVectorsAndMatrices` then rejects the resulting integer vectors whose element type
+    // is not 32 bits wide.
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
         SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
