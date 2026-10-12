@@ -5380,11 +5380,7 @@ void _collectBuiltinDeclsThatNeedRegistrationRec(Decl* decl, List<Decl*>& ioDecl
 
 void collectBuiltinDeclsThatNeedRegistration(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
 {
-    // Only core declarations belong to the session-wide builtin lookup. An ordinary module's
-    // `__magic_type` annotation already preserves its special AST class through serialization;
-    // registering it globally would let unrelated modules overwrite each other's declarations.
-    if (isFromCoreModule(moduleDecl))
-        _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
+    _collectBuiltinDeclsThatNeedRegistrationRec(moduleDecl, outDecls);
 }
 
 Type* unwrapArrayType(Type* type)

@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-09. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-11. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -63,7 +63,8 @@ creates Metal resources or erases the descriptor on native SBT targets.
 The module uses ordinary Slang module compilation. Its descriptor declaration uses the existing
 `__intrinsic_type(TraceProgramDescriptor)` modifier; normal generic lowering preserves both the
 schema and its conformance witness. Opaque-type checks read that same intrinsic modifier. There
-is no dedicated build option, module privilege, or descriptor AST type.
+is no dedicated descriptor build option or descriptor AST type. Section 9 records the agreed
+builtin-module loading design, which still needs implementation.
 
 ## 4. Share Metal tables across payload types
 
@@ -181,16 +182,17 @@ Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.sl
 shared C++ header; do not copy numeric IDs into the module. Ship this generated include with the
 other RT source files so source compilation and serialized imports use the same declarations.
 
-Remove the old import-time declaration registration and IR opcode replacement. Loading a module
-must not depend on the `slang.raytracing` name or its installation location. The same declarations
-work through source imports and serialized modules, and an unannotated interface named
-`IMissShader` remains an ordinary interface. Source trace and callable operations carry annotations
-that normal lowering turns into their existing structural-operation IR metadata.
+Remove the old RT-specific declaration discovery and IR opcode replacement. Stage checking reads
+the declaration annotations preserved through source imports and serialized modules; an
+unannotated interface named `IMissShader` remains an ordinary interface. Source trace and callable
+operations carry annotations that normal lowering turns into their existing structural-operation
+IR metadata. Builtin loading and ownership are separate responsibilities, described in section 9.
 
 Module-defined magic types retain their checked declaration references, including generic
-arguments. They are not registered in the core library's global magic-type map. Resolve a stage's
-associated types and `invoke` implementation from its selected conformance witness so generic
-specializations and independently declared contracts retain their own identities.
+arguments. Resolve a stage's associated types and `invoke` implementation from its selected
+conformance witness so generic specializations retain their own identities. The RT-specific
+restriction on collecting builtin-registration entries has been removed; existing registration
+can be used when the RT library has builtin ownership.
 
 Do not keep a stage-implementation registry on `Linkage` or cache stage identity on an `invoke`
 method. One generic method can implement both an ordinary type and a shader type. Direct-call
@@ -205,8 +207,9 @@ can enforce the same-module mixing restriction, including after serialization.
 All additional semantic rules and declaration-identity queries live in
 `source/slang/slang-check-structural-ray-tracing.cpp`, with examples beside the rule implementations.
 Conformance, expression, entry-point, and code-generation boundaries call into that file.
-The ordinary library constraints remain the source of truth for type relationships; there is no
-ray-tracing module build mode, import hook, or global declaration registry.
+The ordinary library constraints remain the source of truth for type relationships. The semantic
+rules do not require a separate registry of stage implementations. Library loading and builtin
+registration should use the existing builtin mechanisms described in section 9.
 
 Schemas, hit groups, and shader lists can be constructed, stored, and used by ordinary generics.
 A value such as `MySchema schema = {};` neither constructs shader instances nor allocates an SBT.
@@ -220,6 +223,23 @@ An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload
 annotations from the full implementation. Backend adapters must preserve the native payload
 representation needed by the existing target legalization passes. The no-payload convenience
 overload remains a separate operation; this change does not infer its payload at runtime.
+
+## 9. Load RT as an optional builtin module
+
+**Status: agreed design; global-session loading and caching are not yet implemented.**
+
+Compile the RT library separately from core so it does not increase core compilation time. Load
+it only on the first `import slang.raytracing`, and reuse the loaded module for subsequent imports
+in the same global session. An application that does not import RT should not load it.
+
+The global session should own the RT declarations, as it owns the other builtin declarations.
+The existing builtin-registration machinery can then store them with the correct lifetime.
+Keep the declarations and extensions out of the application's scope until it imports RT.
+Builtin ownership does not imply automatic visibility.
+
+The current cleanup restores the original builtin-registration collection function. The current
+module loader still uses ordinary module ownership; moving RT to builtin ownership remains
+integration work. Do not introduce a separate RT stage-implementation registry for that work.
 
 ## Additional API and integration updates
 
