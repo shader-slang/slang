@@ -11,11 +11,13 @@ implementing raytracing;
 namespace rt
 {
 
-// Structural operations carry their identity through ordinary AST and IR serialization.
-// These internal attributes do not require a special compilation mode or import hook.
+// Trace's annotation is used only by frontend checking: a structural implementation may call
+// native TraceRay without selecting both source API families. Metal dispatch itself is an
+// explicit metalTraceRay IR instruction emitted by the internal intrinsic functions.
 __attributeTarget(FuncDecl)
 internal attribute_syntax [__RayTracingTrace] : RayTracingTraceAttribute;
 
+// Callable dispatch still carries an operation decoration until it has its own IR instruction.
 __attributeTarget(FuncDecl)
 internal attribute_syntax [__RayTracingCallShader] : RayTracingCallShaderAttribute;
 

@@ -184,9 +184,10 @@ other RT source files so source compilation and serialized imports use the same 
 
 Remove the old RT-specific declaration discovery and IR opcode replacement. Stage checking reads
 the declaration annotations preserved through source imports and serialized modules; an
-unannotated interface named `IMissShader` remains an ordinary interface. Source trace and callable
-operations carry annotations that normal lowering turns into their existing structural-operation
-IR metadata. Builtin loading and ownership are separate responsibilities, described in section 9.
+unannotated interface named `IMissShader` remains an ordinary interface. The source trace annotation
+is retained only for frontend API-family checking; Metal trace calls now lower to an explicit IR
+instruction, as described in section 11. Callable dispatch still uses its source-operation IR
+decoration. Builtin loading and ownership are separate responsibilities, described in section 9.
 
 Module-defined magic types retain their checked declaration references, including generic
 arguments. Resolve a stage's associated types and `invoke` implementation from its selected
@@ -239,10 +240,12 @@ public void trace(RayTraversalDesc desc,
 ```
 
 These wrappers have no operation annotation. Only the payload-taking implementation carries
-`__RayTracingTrace`; both public call forms therefore reach the same marked operation. Remove
+`__RayTracingTrace`; this identifies structural API use in frontend checking and allows the library
+implementation to call native `TraceRay` without falsely mixing the two source APIs. Both public
+call forms reach that implementation. The annotation no longer creates trace IR metadata. Remove
 `__RayTracingPayload`, the explicit/implicit method classifier, and the separate implicit-payload
-IR operation kind from the full implementation. The remaining kinds are `Trace = 0` and
-`CallShader = 2`; value 1 is unused. Rebuild serialized RT modules after this change.
+IR operation kind from the full implementation. Only `CallShader = 2` remains in the source-operation
+decoration enum; values 0 and 1 are unused. Rebuild serialized RT modules after this change.
 
 Post-link lowering must normalize the internal empty value with the reached stages' application
 empty payload types. The frontend neither selects a unique application empty type nor inserts an
@@ -251,7 +254,8 @@ argument. That normalization and native adapters remain work for the full implem
 The current same-module mixed-API check records direct calls to annotated functions and stage
 declarations. It does not propagate use through ordinary wrappers in imported modules. A client
 that only calls the no-payload wrapper can therefore miss that frontend diagnostic; the later
-check still rejects an unfinished trace reachable from an entry point.
+check still rejects a reachable Metal trace instruction. Native paths remain blocked by the
+descriptor and stage-adapter checks until their implementation is available.
 
 ## 9. Load RT as an optional builtin module
 
@@ -305,6 +309,45 @@ support.
 requirement can be missed; some invalid target uses can therefore pass frontend checking. This
 missing diagnostic does not require duplicate API overloads. The general capability fix is outside
 PR1.
+
+## 11. Lower Metal trace calls through one explicit IR operation
+
+The public API still has the same two trace extensions and four overloads. Their Metal branches
+now call internal `__metalTraceRay<Schema, Payload>` or `__metalTraceRayMotion<Schema, Payload>`.
+Both declarations use the existing `__intrinsic_op(metalTraceRay)` modifier. Ordinary intrinsic-call
+lowering emits `IRMetalTraceRay`; no new parser rule or AST lowering special case is needed.
+
+For example, a no-payload motion call forwards an `EmptyTracePayload` to the ordinary payload
+overload. Its Metal branch then passes the ray fields, descriptor, payload and time to the motion
+intrinsic. The resulting instruction has these operands, in order:
+
+```text
+scene, descriptor, rayFlags, instanceMask,
+sbtOffset, sbtStride, missIndex,
+rayOrigin, rayTMin, rayDirection, rayTMax, payload[, time]
+```
+
+There are 12 operands without motion and 13 with motion. An absent `time` means no motion;
+a present `time` of zero still requests motion sampling at zero. Preserve that distinction rather
+than substituting a zero time for the no-motion form. The descriptor's existing IR type preserves
+the schema and its conformance witness, including the exact motion and acceleration-structure
+types. The payload operand is an ordinary typed `inout` pointer. Later Metal lowering can use
+those types directly without reconstructing generic arguments from a callee or a second schema
+operand.
+
+Remove the trace source-operation decoration and its `Trace` enum value from the full
+implementation. Keep `__RayTracingTrace` for the frontend API-family checks described in section 8;
+removing that annotation would make the library's own native `TraceRay` calls appear to mix the
+legacy and structural APIs. Callable dispatch keeps its decoration until it has a dedicated
+operation. The serialized name for `metalTraceRay` has stable ID 912.
+
+After `linkIR` selects target-switch branches, the centralized unfinished-operation check walks
+functions reachable from entry points and looks for the actual `IRMetalTraceRay` instruction.
+Unused functions do not cause a trace diagnostic, and native branches do not acquire a Metal
+operation. Descriptor layout and native stage-adapter guards still prevent incomplete native
+paths from generating code. A later backend pass must consume this operation and generate the
+Metal intersector dispatch, shared tables, adapters and payload transport; that synthesis is
+deferred.
 
 ## Additional API and integration updates
 

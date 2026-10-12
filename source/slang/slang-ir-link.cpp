@@ -542,7 +542,7 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// definition of `MyMiss.invoke`, while the selected program owns its checked
 /// `structuralRayTracingEntryPointInfo`. Linking must merge that decoration onto the selected body
 /// so later adapter synthesis receives the semantic stage contract regardless of request order.
-/// Trusted structural trace and callable functions similarly retain their source-operation marker
+/// Structural callable functions similarly retain their source-operation marker
 /// when a different module contributes the selected definition.
 ///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,

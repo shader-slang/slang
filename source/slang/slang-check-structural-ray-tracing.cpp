@@ -363,10 +363,10 @@ StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(T
     }
 }
 
-// Identifies the trace implementation that later dispatch lowering must replace.
-// For example, trace(desc, scene, program) is an ordinary library wrapper that creates an empty
-// payload and calls the annotated trace(desc, scene, program, payload) overload. Only the latter
-// needs an operation marker; overload resolution and function lowering handle the wrapper.
+// Identifies the structural trace API for the frontend's source-family checks.
+// For example, its native branch may call core TraceRay without treating the library itself as
+// mixing the two public APIs. Metal lowering instead recognizes the explicit IRMetalTraceRay
+// instruction; this annotation no longer creates a trace-operation decoration.
 bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl)
 {
     return functionDecl && functionDecl->hasModifier<RayTracingTraceAttribute>();
@@ -1612,8 +1612,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
         return false;
 
     auto functionDecl = as<FunctionDeclBase>(functionDeclRef->declRef.getDecl());
-    if (isStructuralRayTracingTraceMethod(functionDecl) ||
-        isStructuralRayTracingCallShaderMethod(functionDecl))
+    if (isStructuralRayTracingCallShaderMethod(functionDecl))
         return false;
 
     StructuralRayTracingTypeUse use;
@@ -1836,12 +1835,15 @@ static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
     return found;
 }
 
-// Prevents reachable structural dispatch placeholders from silently becoming empty calls.
+// Prevents reachable structural dispatch operations from reaching emission before lowering.
 //
 // Consider a ray-generation entry point calling tracer.trace(desc, scene, program). Its ordinary
-// library wrapper creates an empty payload and calls the marked payload overload. Follow the
-// ordinary entry-point reference graph, including that wrapper and generic specializations, to
-// find the operation that still needs dispatch lowering. An unreachable overload is harmless.
+// library wrapper creates an empty payload and calls the payload overload. On Metal, that body
+// calls __metalTraceRay or __metalTraceRayMotion, which lowers directly to IRMetalTraceRay. Follow
+// the ordinary reference graph through wrappers and generic specializations, then inspect each
+// reached function's instructions. linkIR has already selected target-switch branches, so native
+// paths do not acquire a Metal diagnostic. An unreachable function is harmless. Callable dispatch
+// still uses its existing function decoration until its own instruction is introduced.
 static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, DiagnosticSink* sink)
 {
     bool found = false;
@@ -1853,26 +1855,37 @@ static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, D
         if (!func || entryPoints.getCount() == 0)
             continue;
         auto marker = func->findDecoration<IRStructuralRayTracingSourceOperationDecoration>();
-        if (!marker)
-            continue;
-
-        auto operationKindInst = as<IRIntLit>(marker->getOperationKind());
-        SLANG_RELEASE_ASSERT(operationKindInst);
-        auto operationKind = StructuralRayTracingSourceOperationKind(operationKindInst->getValue());
         const char* operationName = nullptr;
-        switch (operationKind)
+        if (marker)
         {
-        case StructuralRayTracingSourceOperationKind::Trace:
-            operationName = "trace";
-            break;
-        case StructuralRayTracingSourceOperationKind::CallShader:
+            auto operationKindInst = as<IRIntLit>(marker->getOperationKind());
+            SLANG_RELEASE_ASSERT(operationKindInst);
+            SLANG_RELEASE_ASSERT(
+                StructuralRayTracingSourceOperationKind(operationKindInst->getValue()) ==
+                StructuralRayTracingSourceOperationKind::CallShader);
             operationName = "callShader";
-            break;
-        default:
-            SLANG_UNEXPECTED("invalid structural ray-tracing source operation marker");
+        }
+        else
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto instruction : block->getOrdinaryInsts())
+                {
+                    if (as<IRMetalTraceRay>(instruction))
+                    {
+                        operationName = "trace";
+                        break;
+                    }
+                }
+                if (operationName)
+                    break;
+            }
         }
 
-        // Diagnose the user's entry point rather than the marker's installed-library location.
+        if (!operationName)
+            continue;
+
+        // Diagnose the user's entry point rather than the operation's installed-library location.
         for (auto entryPoint : entryPoints)
         {
             sink->diagnose(Diagnostics::UnloweredStructuralRayTracingSourceOperation{

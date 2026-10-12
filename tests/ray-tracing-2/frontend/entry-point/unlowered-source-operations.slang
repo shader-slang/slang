@@ -1,15 +1,15 @@
-// Until structural operation lowering replaces these calls, target code generation must reject
-// them rather than emit the empty standard-module bodies. Selecting each entry point also verifies
-// that an unused marked overload does not trigger the post-link reachability check.
+// Native trace calls retain their opaque structural descriptor until target adapter lowering
+// chooses its representation. Callable dispatch also retains its unfinished operation marker.
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=TRACE): -experimental-feature -entry traceMain -stage raygeneration -target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=PAYLOAD): -experimental-feature -entry tracePayloadMain -stage raygeneration -target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL): -experimental-feature -entry callMain -stage raygeneration -target hlsl
 
-// TRACE: unlowered-source-operations.slang:90:6
-// TRACE: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
-// PAYLOAD: unlowered-source-operations.slang:97:6
-// PAYLOAD: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
-// CALL: unlowered-source-operations.slang:105:6
+// TRACE-NOT: structural ray-tracing operation 'trace'
+// TRACE: structural ray-tracing program descriptor must be lowered before target code generation
+// TRACE-NOT: structural ray-tracing operation 'trace'
+// PAYLOAD-NOT: structural ray-tracing operation 'trace'
+// PAYLOAD: structural ray-tracing program descriptor must be lowered before target code generation
+// PAYLOAD-NOT: structural ray-tracing operation 'trace'
 // CALL: structural ray-tracing operation 'callShader' reachable from this entry point must be lowered
 
 import slang.raytracing;

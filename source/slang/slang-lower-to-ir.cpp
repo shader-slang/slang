@@ -13895,20 +13895,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return true;
     }
 
-    // Mark the functions whose bodies still need structural dispatch lowering. For example,
-    // trace(desc, scene, program) forwards an empty value to the payload overload through an
-    // ordinary call. Mark only that payload overload; reachability follows the wrapper to it.
-    // Serialization and specialization preserve the marker until dispatch lowering consumes it.
+    // Callable dispatch still uses a marked function until it has an explicit IR operation.
+    // Metal trace calls already lower through __intrinsic_op to IRMetalTraceRay, so they need
+    // no function decoration. Ordinary serialization preserves that instruction and its operands.
     void addStructuralRayTracingSourceOperationDecoration(IRFunc* irFunc, FunctionDeclBase* decl)
     {
-        if (isStructuralRayTracingTraceMethod(decl))
-        {
-            addStructuralRayTracingSourceOperation(
-                *getBuilder(),
-                irFunc,
-                StructuralRayTracingSourceOperationKind::Trace);
-        }
-        else if (isStructuralRayTracingCallShaderMethod(decl))
+        if (isStructuralRayTracingCallShaderMethod(decl))
         {
             addStructuralRayTracingSourceOperation(
                 *getBuilder(),

@@ -13,6 +13,90 @@ namespace rt
 internal struct EmptyTracePayload
 {}
 
+/// Emits the Metal trace operation for traversal without motion.
+///
+/// The ordinary intrinsic-call lowering passes these arguments directly to `metalTraceRay`.
+/// Its absent time operand selects no motion. The descriptor and payload pointer retain their
+/// checked types, so lowering does not need to recover generic arguments from a function name.
+///
+/// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
+/// @tparam Payload Mutable payload type used by the selected hit and miss programs.
+/// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
+/// @param[in] descriptor Program descriptor whose type retains the schema and its conformance.
+/// @param[in] rayFlags Traversal and hit-shader control flags.
+/// @param[in] instanceMask Mask used to select acceleration-structure instances.
+/// @param[in] sbtOffset Offset of the selected ray type within each geometry's hit records.
+/// @param[in] sbtStride Number of hit records per geometry, measured in records rather than bytes.
+/// @param[in] missIndex Index of the selected miss record.
+/// @param[in] rayOrigin Ray origin in world space.
+/// @param[in] rayTMin Minimum accepted ray distance.
+/// @param[in] rayDirection Ray direction in world space.
+/// @param[in] rayTMax Maximum accepted ray distance.
+/// @param[in,out] payload Payload storage read and updated by the selected shaders.
+/// @par Constraints
+/// Requires a Metal trace stage and `Schema.TraceContext.Motion == NoMotion`.
+/// @todo Lower this operation to Metal intersector dispatch in the backend adapter slice.
+[require(metal, structural_raytracing_trace)]
+__intrinsic_op(metalTraceRay)
+internal void __metalTraceRay<Schema, Payload>(
+    Schema.TraceContext.AccelerationStructure accelerationStructure,
+    TraceProgramDescriptor<Schema> descriptor,
+    uint rayFlags,
+    uint instanceMask,
+    uint sbtOffset,
+    uint sbtStride,
+    uint missIndex,
+    float3 rayOrigin,
+    float rayTMin,
+    float3 rayDirection,
+    float rayTMax,
+    inout Payload payload)
+    where Schema : ITraceProgramSchema
+    where Schema.TraceContext.Motion == NoMotion;
+
+/// Emits the same Metal trace operation with an explicit motion-sampling time.
+///
+/// The final time operand distinguishes this operation from a no-motion trace, even when time
+/// is zero. The descriptor's schema retains whether primitives, instances, or both can move.
+///
+/// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
+/// @tparam Payload Mutable payload type used by the selected hit and miss programs.
+/// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
+/// @param[in] descriptor Program descriptor whose type retains the schema and its conformance.
+/// @param[in] rayFlags Traversal and hit-shader control flags.
+/// @param[in] instanceMask Mask used to select acceleration-structure instances.
+/// @param[in] sbtOffset Offset of the selected ray type within each geometry's hit records.
+/// @param[in] sbtStride Number of hit records per geometry, measured in records rather than bytes.
+/// @param[in] missIndex Index of the selected miss record.
+/// @param[in] rayOrigin Ray origin in world space.
+/// @param[in] rayTMin Minimum accepted ray distance.
+/// @param[in] rayDirection Ray direction in world space.
+/// @param[in] rayTMax Maximum accepted ray distance.
+/// @param[in,out] payload Payload storage read and updated by the selected shaders.
+/// @param[in] time Time at which traversal samples moving geometry and instance transforms.
+/// @par Constraints
+/// Requires Metal 2.4 and a trace stage. `Schema.TraceContext.Motion : IEnabledRayMotion`
+/// admits primitive motion, instance motion, and their combination.
+/// @todo Lower this operation to Metal intersector dispatch in the backend adapter slice.
+[require(metallib_2_4, structural_raytracing_trace)]
+__intrinsic_op(metalTraceRay)
+internal void __metalTraceRayMotion<Schema, Payload>(
+    Schema.TraceContext.AccelerationStructure accelerationStructure,
+    TraceProgramDescriptor<Schema> descriptor,
+    uint rayFlags,
+    uint instanceMask,
+    uint sbtOffset,
+    uint sbtStride,
+    uint missIndex,
+    float3 rayOrigin,
+    float rayTMin,
+    float3 rayDirection,
+    float rayTMax,
+    inout Payload payload,
+    float time)
+    where Schema : ITraceProgramSchema
+    where Schema.TraceContext.Motion : IEnabledRayMotion;
+
 /// Provides schema-typed structural trace and callable dispatch operations.
 ///
 /// No-motion and motion-enabled traversal each have overloads with and without a payload.
@@ -78,7 +162,19 @@ public extension<Schema> RayTracer<Schema>
         __target_switch
         {
         case metal:
-            // TODO: Lower this structural operation to Metal intersector dispatch before emission.
+            __metalTraceRay<Schema, Payload>(
+                accelerationStructure,
+                descriptor,
+                desc.rayFlags,
+                desc.instanceMask,
+                desc.sbtOffset,
+                desc.sbtStride,
+                desc.missIndex,
+                desc.ray.Origin,
+                desc.ray.TMin,
+                desc.ray.Direction,
+                desc.ray.TMax,
+                payload);
             break;
         default:
             // These targets support only AccelerationStructure. The cast lets this generic
@@ -151,7 +247,20 @@ public extension<Schema> RayTracer<Schema>
         __target_switch
         {
         case metal:
-            // TODO: Lower this structural operation to Metal intersector dispatch before emission.
+            __metalTraceRayMotion<Schema, Payload>(
+                accelerationStructure,
+                descriptor,
+                desc.rayFlags,
+                desc.instanceMask,
+                desc.sbtOffset,
+                desc.sbtStride,
+                desc.missIndex,
+                desc.ray.Origin,
+                desc.ray.TMin,
+                desc.ray.Direction,
+                desc.ray.TMax,
+                payload,
+                desc.time);
             break;
         case cuda:
             // TODO: Add the timed OptiX path to the core TraceMotionRay intrinsic, then reuse it

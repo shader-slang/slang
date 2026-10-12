@@ -80,9 +80,8 @@ enum class RayTracingAPIFamily
 /// legalization begins.
 enum class StructuralRayTracingSourceOperationKind
 {
-    Trace = 0,
-    // Value 1 previously marked an implicit-payload trace. Its ordinary library wrapper now
-    // forwards to Trace, so leave that value unused rather than changing CallShader's saved value.
+    // Values 0 and 1 previously marked trace functions. Metal tracing now has an explicit IR
+    // instruction; leave those values unused rather than changing CallShader's saved value.
     CallShader = 2,
 };
 
@@ -148,7 +147,7 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 /// Returns the stage named by the input struct's KnownBuiltin annotation, or Count otherwise.
 StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
 
-/// Returns whether the function is an annotated structural trace operation.
+/// Returns whether the function belongs to the structural trace API for source-family checking.
 bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl);
 
 /// Returns whether the function is an annotated structural callable operation.
