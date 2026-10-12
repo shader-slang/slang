@@ -363,26 +363,13 @@ StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(T
     }
 }
 
-// Distinguishes source dispatch overloads for later adapter lowering. For example,
-// trace(desc, scene, program, payload) has an annotated parameter even when payload is empty;
-// the overload without that parameter selects the implicit-payload operation instead.
-StructuralRayTracingTraceMethodKind getStructuralRayTracingTraceMethodKind(
-    FunctionDeclBase* functionDecl)
-{
-    if (!functionDecl || !functionDecl->hasModifier<RayTracingTraceAttribute>())
-        return StructuralRayTracingTraceMethodKind::None;
-    for (auto parameter : functionDecl->getParameters())
-    {
-        if (parameter->hasModifier<RayTracingPayloadAttribute>())
-            return StructuralRayTracingTraceMethodKind::ExplicitPayload;
-    }
-    return StructuralRayTracingTraceMethodKind::ImplicitEmptyPayload;
-}
-
+// Identifies the trace implementation that later dispatch lowering must replace.
+// For example, trace(desc, scene, program) is an ordinary library wrapper that creates an empty
+// payload and calls the annotated trace(desc, scene, program, payload) overload. Only the latter
+// needs an operation marker; overload resolution and function lowering handle the wrapper.
 bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl)
 {
-    return getStructuralRayTracingTraceMethodKind(functionDecl) !=
-           StructuralRayTracingTraceMethodKind::None;
+    return functionDecl && functionDecl->hasModifier<RayTracingTraceAttribute>();
 }
 
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl)
@@ -547,7 +534,11 @@ static void _checkRayTracingAPIUse(
 
 // Accounts for pipeline calls when checking the module's API family.
 // For example, helper() { TraceRay(...); } selects the legacy family even if helper is not an
-// entry point. A structural trace wrapper may use TraceRay internally without selecting both.
+// entry point. An annotated structural trace implementation may use TraceRay without selecting
+// both. This check only recognizes direct calls to annotated operations. For example, calling an
+// ordinary no-payload wrapper from an imported module does not record structural use in the
+// caller's module; its call to the annotated payload overload records use in the library module
+// instead.
 void checkRayTracingAPICall(
     FunctionDeclBase* caller,
     FunctionDeclBase* callee,
@@ -1847,10 +1838,10 @@ static bool _diagnoseUnloweredStructuralRayTracingEntryPoints(
 
 // Prevents reachable structural dispatch placeholders from silently becoming empty calls.
 //
-// Consider a ray-generation entry point calling `helper()`, which calls `tracer.trace(...)`.
-// The library overload carries a source-operation marker until dispatch lowering consumes it.
-// Follow the ordinary entry-point reference graph, including generic specializations, to reject
-// the reachable placeholder. An imported overload that no entry point reaches is harmless.
+// Consider a ray-generation entry point calling tracer.trace(desc, scene, program). Its ordinary
+// library wrapper creates an empty payload and calls the marked payload overload. Follow the
+// ordinary entry-point reference graph, including that wrapper and generic specializations, to
+// find the operation that still needs dispatch lowering. An unreachable overload is harmless.
 static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, DiagnosticSink* sink)
 {
     bool found = false;
@@ -1871,11 +1862,8 @@ static bool _diagnoseUnloweredStructuralRayTracingOperations(IRModule* module, D
         const char* operationName = nullptr;
         switch (operationKind)
         {
-        case StructuralRayTracingSourceOperationKind::TraceExplicitPayload:
-            operationName = "trace with explicit payload";
-            break;
-        case StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload:
-            operationName = "trace with implicit empty payload";
+        case StructuralRayTracingSourceOperationKind::Trace:
+            operationName = "trace";
             break;
         case StructuralRayTracingSourceOperationKind::CallShader:
             operationName = "callShader";

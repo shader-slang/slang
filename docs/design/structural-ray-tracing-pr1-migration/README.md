@@ -173,8 +173,8 @@ containers, and the two built-in primitive attribute models. Preserve these decl
 do not introduce a special AST class for each supporting library type.
 
 The annotation constants now belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
-The module's `compiler-intrinsics.slang` also declares its three internal operation attributes:
-`__RayTracingTrace`, `__RayTracingCallShader`, and `__RayTracingPayload`. Core no longer declares
+The module's `compiler-intrinsics.slang` also declares two internal operation attributes:
+`__RayTracingTrace` and `__RayTracingCallShader`. Core no longer declares
 these RT-only names. The C++ attribute classes and checker stay in the compiler.
 
 Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
@@ -221,8 +221,37 @@ broader type-only uses would require validating the eventual specialized body.
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
 `input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
 annotations from the full implementation. Backend adapters must preserve the native payload
-representation needed by the existing target legalization passes. The no-payload convenience
-overload remains a separate operation; this change does not infer its payload at runtime.
+representation needed by the existing target legalization passes.
+
+All eight no-payload overloads now forward through an ordinary library call:
+
+```slang
+internal struct EmptyTracePayload {}
+
+// Inside the appropriate RayTracer<Schema> extension:
+public void trace(RayTraversalDesc desc,
+    Schema.TraceContext.AccelerationStructure scene,
+    TraceProgramDescriptor<Schema> program)
+{
+    EmptyTracePayload payload = {};
+    trace(desc, scene, program, payload);
+}
+```
+
+These wrappers have no operation annotation. Only the payload-taking implementation carries
+`__RayTracingTrace`; both public call forms therefore reach the same marked operation. Remove
+`__RayTracingPayload`, the explicit/implicit method classifier, and the separate implicit-payload
+IR operation kind from the full implementation. The remaining kinds are `Trace = 0` and
+`CallShader = 2`; value 1 is unused. Rebuild serialized RT modules after this change.
+
+Post-link lowering must normalize the internal empty value with the reached stages' application
+empty payload types. The frontend neither selects a unique application empty type nor inserts an
+argument. That normalization and native adapters remain work for the full implementation.
+
+The current same-module mixed-API check records direct calls to annotated functions and stage
+declarations. It does not propagate use through ordinary wrappers in imported modules. A client
+that only calls the no-payload wrapper can therefore miss that frontend diagnostic; the later
+check still rejects an unfinished trace reachable from an entry point.
 
 ## 9. Load RT as an optional builtin module
 

@@ -8,11 +8,8 @@ void traceOperation() {}
 [__RayTracingCallShader]
 void callableOperation() {}
 
-void payloadParameter([__RayTracingPayload] inout uint value) {}
-
 static const int stageContextRole = __RayTracingBuiltin.StageContext;
 
 // CHECK-DAG: unknown attribute '__RayTracingTrace'
 // CHECK-DAG: unknown attribute '__RayTracingCallShader'
-// CHECK-DAG: unknown attribute '__RayTracingPayload'
 // CHECK-DAG: undefined identifier '__RayTracingBuiltin'

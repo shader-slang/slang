@@ -10,14 +10,18 @@ internal attribute_syntax [__RayTracingTrace] : RayTracingTraceAttribute;
 __attributeTarget(FuncDecl)
 internal attribute_syntax [__RayTracingCallShader] : RayTracingCallShaderAttribute;
 
-__attributeTarget(ParamDecl)
-internal attribute_syntax [__RayTracingPayload] : RayTracingPayloadAttribute;
+internal struct EmptyPayload
+{}
+
+// An ordinary wrapper must keep the annotated operation reachable, including after serialization.
+public void trace()
+{
+    EmptyPayload payload = {};
+    trace(payload);
+}
 
 [__RayTracingTrace]
-public void traceWithoutPayload() {}
-
-[__RayTracingTrace]
-public void traceWithPayload([__RayTracingPayload] inout uint payload) {}
+public void trace<Payload>(inout Payload payload) {}
 
 [__RayTracingCallShader]
 public void callShader() {}

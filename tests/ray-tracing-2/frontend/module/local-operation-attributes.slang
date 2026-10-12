@@ -8,17 +8,19 @@
 
 // A different serialized filename keeps the first three checks on the source import path.
 // Module-local attribute syntax must identify each operation before and after serialization.
+// The no-payload call reaches the same marked operation through an ordinary library wrapper;
+// its internal empty payload type must remain usable when the library is imported.
 import local_operation_library;
 
 void traceMain()
 {
-    traceWithoutPayload();
+    trace();
 }
 
 void tracePayloadMain()
 {
     uint payload = 0;
-    traceWithPayload(payload);
+    trace(payload);
 }
 
 void callableMain()
@@ -26,6 +28,6 @@ void callableMain()
     callShader();
 }
 
-// TRACE: structural ray-tracing operation 'trace with implicit empty payload' reachable from this entry point must be lowered
-// PAYLOAD: structural ray-tracing operation 'trace with explicit payload' reachable from this entry point must be lowered
+// TRACE: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
+// PAYLOAD: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
 // CALL: structural ray-tracing operation 'callShader' reachable from this entry point must be lowered

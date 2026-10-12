@@ -64,8 +64,8 @@ void addStructuralRayTracingSourceOperation(
     StructuralRayTracingSourceOperationKind kind)
 {
     SLANG_RELEASE_ASSERT(
-        func && kind >= StructuralRayTracingSourceOperationKind::TraceExplicitPayload &&
-        kind < StructuralRayTracingSourceOperationKind::Count);
+        func && (kind == StructuralRayTracingSourceOperationKind::Trace ||
+                 kind == StructuralRayTracingSourceOperationKind::CallShader));
 
     if (auto existing = func->findDecoration<IRStructuralRayTracingSourceOperationDecoration>())
     {

@@ -73,17 +73,6 @@ enum class RayTracingAPIFamily
     Legacy,
 };
 
-/// Distinguishes the two annotated `RayTracer.trace` source contracts.
-///
-/// The explicit form owns an `inout` payload parameter. The implicit form represents the schema's
-/// unique empty payload without exposing a payload value in source.
-enum class StructuralRayTracingTraceMethodKind
-{
-    None,
-    ExplicitPayload,
-    ImplicitEmptyPayload,
-};
-
 /// Identifies a structural operation that still requires target-independent lowering.
 ///
 /// These values are serialized on the corresponding standard-module IR functions. They describe
@@ -91,10 +80,10 @@ enum class StructuralRayTracingTraceMethodKind
 /// legalization begins.
 enum class StructuralRayTracingSourceOperationKind
 {
-    TraceExplicitPayload,
-    TraceImplicitEmptyPayload,
-    CallShader,
-    Count,
+    Trace = 0,
+    // Value 1 previously marked an implicit-payload trace. Its ordinary library wrapper now
+    // forwards to Trace, so leave that value unused rather than changing CallShader's saved value.
+    CallShader = 2,
 };
 
 /// Classifies how a selected hit stage obtains its intersection attributes.
@@ -158,10 +147,6 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 
 /// Returns the stage named by the input struct's KnownBuiltin annotation, or Count otherwise.
 StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
-
-/// Returns the source contract of an annotated trace overload, or `None` for other functions.
-StructuralRayTracingTraceMethodKind getStructuralRayTracingTraceMethodKind(
-    FunctionDeclBase* functionDecl);
 
 /// Returns whether the function is an annotated structural trace operation.
 bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl);

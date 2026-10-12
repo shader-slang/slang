@@ -19,7 +19,4 @@ internal attribute_syntax [__RayTracingTrace] : RayTracingTraceAttribute;
 __attributeTarget(FuncDecl)
 internal attribute_syntax [__RayTracingCallShader] : RayTracingCallShaderAttribute;
 
-__attributeTarget(ParamDecl)
-internal attribute_syntax [__RayTracingPayload] : RayTracingPayloadAttribute;
-
 } // namespace rt

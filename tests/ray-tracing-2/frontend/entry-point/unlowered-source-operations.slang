@@ -6,9 +6,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL): -experimental-feature -entry callMain -stage raygeneration -target hlsl
 
 // TRACE: unlowered-source-operations.slang:90:6
-// TRACE: structural ray-tracing operation 'trace with implicit empty payload' reachable from this entry point must be lowered
+// TRACE: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
 // PAYLOAD: unlowered-source-operations.slang:97:6
-// PAYLOAD: structural ray-tracing operation 'trace with explicit payload' reachable from this entry point must be lowered
+// PAYLOAD: structural ray-tracing operation 'trace' reachable from this entry point must be lowered
 // CALL: unlowered-source-operations.slang:105:6
 // CALL: structural ray-tracing operation 'callShader' reachable from this entry point must be lowered
 

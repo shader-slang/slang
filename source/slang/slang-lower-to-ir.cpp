@@ -13895,20 +13895,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return true;
     }
 
-    // Preserve the checked meaning of annotated trace and callable operations on their function
-    // IR. For example, an implicit-empty-payload trace has an empty source body until structural
-    // lowering implements it; this marker lets codegen reject an unlowered call instead of
-    // silently compiling it away. Normal serialization and specialization retain the decoration.
+    // Mark the functions whose bodies still need structural dispatch lowering. For example,
+    // trace(desc, scene, program) forwards an empty value to the payload overload through an
+    // ordinary call. Mark only that payload overload; reachability follows the wrapper to it.
+    // Serialization and specialization preserve the marker until dispatch lowering consumes it.
     void addStructuralRayTracingSourceOperationDecoration(IRFunc* irFunc, FunctionDeclBase* decl)
     {
-        auto traceKind = getStructuralRayTracingTraceMethodKind(decl);
-        if (traceKind != StructuralRayTracingTraceMethodKind::None)
+        if (isStructuralRayTracingTraceMethod(decl))
         {
-            auto operationKind =
-                traceKind == StructuralRayTracingTraceMethodKind::ExplicitPayload
-                    ? StructuralRayTracingSourceOperationKind::TraceExplicitPayload
-                    : StructuralRayTracingSourceOperationKind::TraceImplicitEmptyPayload;
-            addStructuralRayTracingSourceOperation(*getBuilder(), irFunc, operationKind);
+            addStructuralRayTracingSourceOperation(
+                *getBuilder(),
+                irFunc,
+                StructuralRayTracingSourceOperationKind::Trace);
         }
         else if (isStructuralRayTracingCallShaderMethod(decl))
         {
