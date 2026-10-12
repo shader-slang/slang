@@ -57,6 +57,8 @@ set(core_module_source_common_args
     OBJECT
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
+    EXTRA_COMPILE_OPTIONS_PRIVATE
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     LINK_WITH_PRIVATE
     core
     slang-capability-defs
