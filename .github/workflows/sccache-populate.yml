@@ -55,7 +55,7 @@ jobs:
               # The WASM Slang build requests host LLVM under its own cache key.
               {"os": "linux", "compiler": "gcc", "platform": "wasm", "runner": "ubuntu-22.04"},
               {"os": "macos", "compiler": "clang", "platform": "aarch64", "runner": "macos-latest"},
-              {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": "windows-2022"},
+              {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": ["Windows", "self-hosted", "build"]},
               {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm"},
           ]
           recipe_hash = os.environ["LLVM_HASH"]
@@ -147,6 +147,26 @@ jobs:
           config: release
           build-llvm: false
 
+      # Match the oldest Windows x64 consumer; a newer MSVC library can
+      # require standard-library symbols absent from that consumer's toolset.
+      - name: Select Windows x64 consumer toolset
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          arch: x64
+          toolset: 14.43
+
+      - name: Verify Windows x64 consumer toolset
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        shell: pwsh
+        run: |
+          if ($env:VCToolsVersion -notlike '14.43.*') {
+            throw "Expected MSVC 14.43, found $env:VCToolsVersion"
+          }
+          Write-Output "LLVM producer MSVC: $env:VCToolsVersion"
+
       - name: Restore or build LLVM
         id: llvm
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -170,11 +190,20 @@ jobs:
           # Match the pinned LLVM release's minimum language standard.
           target_compile_features(llvm-prebuilt-smoke PRIVATE cxx_std_17)
           target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
-          target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
+          llvm_config(llvm-prebuilt-smoke ${LLVM_TARGETS_TO_BUILD}
+            core support filecheck orcjit codegen mc mcparser)
+          target_link_libraries(llvm-prebuilt-smoke PRIVATE
+            clangBasic clangCodeGen clangDriver clangLex clangFrontend clangFrontendTool)
           EOF
           cat > build/llvm-prebuilt-smoke/main.cpp <<'EOF'
           #include <llvm/Support/raw_ostream.h>
-          int main() { llvm::outs() << "LLVM prebuilt works\n"; }
+          #include <llvm/Support/TargetSelect.h>
+          #include <clang/Basic/Version.h>
+          int main()
+          {
+              llvm::InitializeAllTargetMCs();
+              llvm::outs() << clang::getClangFullVersion() << "\n";
+          }
           EOF
           cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/native \
             -G Ninja -DCMAKE_BUILD_TYPE=Release \

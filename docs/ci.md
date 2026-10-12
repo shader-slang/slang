@@ -55,6 +55,10 @@ and running a small LLVM consumer before staging an archive. Linux x86_64 also
 runs that check inside the Slang CI build container. The recipe explicitly disables
 optional zstd support so dependencies do not vary with packages on the build host.
 
+Windows x64 LLVM population uses the GCP build pool and explicitly selects MSVC
+14.43 to match the existing consumers. A newer producer toolset can introduce
+standard-library symbols that their older linker cannot resolve.
+
 LLVM itself is built in Release mode, including for Windows Debug Slang builds
 because of the differences in Debug/Release standard libraries. We cache the
 installed build product rather than using sccache for LLVM compilation. See the
