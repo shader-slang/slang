@@ -5,6 +5,8 @@
 //TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain -DRWBAB
 //DXIL: result code = 0
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute
+//SPIRV: OpExtInst {{.*}} NMax
 
 // CHECK: type: float
 // CHECK-NEXT: 5.0

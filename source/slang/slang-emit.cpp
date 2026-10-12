@@ -1557,6 +1557,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // The linker can resolve an external type to a definition containing resources or an unsized
+    // array. We need to validate mutable storage after those fields become available.
+    // We check the linked IR at the specialization checkpoint, before resource legalization
+    // assumes that each mutable global has a supported type.
+    if (!validateMutableGlobalVariableTypes(irModule, sink))
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
@@ -1968,8 +1975,10 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
         // Give empty ray/callable payloads physical storage at native interfaces before type
-        // legalization erases their logical values. Ordinary helper signatures/copies are left
-        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
+        // legalization erases their logical values, and wrap non-struct D3D payloads and hit
+        // attributes in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
         SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
 
         if (isMetalTarget(targetRequest))

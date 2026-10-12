@@ -33,9 +33,9 @@ void computeMain()
 // HLSL-NOT: }
 // HLSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
 
-// SPIR-V has no matrix `FMin`/`FMax`, so the concrete overload applies the vector instruction to
+// SPIR-V has no matrix `NMin`/`NMax`, so the concrete overload applies the vector instruction to
 // each row; a matrix-typed extended instruction would be invalid SPIR-V.
 // SPIRV-NOT: OpExtInst %mat3v3float
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMin
-// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMax
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMin
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} NMax
 // SPIRV-NOT: OpExtInst %mat3v3float
