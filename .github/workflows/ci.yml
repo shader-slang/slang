@@ -200,6 +200,7 @@ jobs:
       os: linux
       compiler: gcc
       platform: wasm
+      build-llvm: false
       config: release
       runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 

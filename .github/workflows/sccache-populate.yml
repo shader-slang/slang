@@ -29,6 +29,7 @@ jobs:
       last-commit: ${{ steps.check.outputs.last-commit }}
       llvm-hash: ${{ steps.llvm.outputs.hash }}
       llvm-matrix: ${{ steps.llvm.outputs.matrix }}
+      llvm-missing: ${{ steps.llvm.outputs.missing }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -52,8 +53,6 @@ jobs:
           configurations = [
               {"os": "linux", "compiler": "gcc", "platform": "x86_64", "runner": "ubuntu-22.04"},
               {"os": "linux", "compiler": "gcc", "platform": "aarch64", "runner": "ubuntu-24.04-arm"},
-              # The WASM Slang build requests host LLVM under its own cache key.
-              {"os": "linux", "compiler": "gcc", "platform": "wasm", "runner": "ubuntu-22.04"},
               {"os": "macos", "compiler": "clang", "platform": "aarch64", "runner": "macos-latest"},
               {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": ["Windows", "self-hosted", "build"]},
               {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm"},
@@ -72,9 +71,10 @@ jobs:
                   print(f"Missing: {key}")
                   missing.append(config)
 
-          matrix = {"include": missing} if missing else []
+          matrix = {"include": missing}
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write(f"hash={recipe_hash}\n")
+              output.write(f"missing={str(bool(missing)).lower()}\n")
               output.write(f"matrix={json.dumps(matrix, separators=(',', ':'))}\n")
 
       - name: Check if all sccache caches exist
@@ -122,7 +122,7 @@ jobs:
 
   populate-llvm:
     needs: check-changes
-    if: needs.check-changes.outputs.llvm-matrix != '[]'
+    if: needs.check-changes.outputs.llvm-missing == 'true'
     name: LLVM ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     # A native Windows ARM64 LLVM build can take nearly two hours by itself.
@@ -212,20 +212,27 @@ jobs:
           cmake --build build/llvm-prebuilt-smoke/native
           build/llvm-prebuilt-smoke/native/llvm-prebuilt-smoke
 
-      - name: Validate Linux prebuilt in the Slang CI container
-        if: matrix.os == 'linux' && (matrix.platform == 'x86_64' || matrix.platform == 'wasm')
+      - name: Validate Linux prebuilt in both CI consumer containers
+        if: matrix.os == 'linux' && matrix.platform == 'x86_64'
         shell: bash
         run: |
-          # Use the consumer image from ci-slang-build-container.yml rather
-          # than trusting optional packages installed on the native builder.
-          docker run --rm --volume "$(pwd):/workspace" --workdir /workspace \
-            ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0 bash -c '
-              cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/container \
-                -G Ninja -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_PREFIX_PATH=/workspace/build/llvm-project-install &&
-              cmake --build build/llvm-prebuilt-smoke/container &&
-              build/llvm-prebuilt-smoke/container/llvm-prebuilt-smoke
-            '
+          # Match both consumers of the Linux GCC x64 archive: normal builds
+          # and the Clang sanitizer build. Keep separate CMake build trees.
+          for consumer in gpu clang; do
+            case "$consumer" in
+              gpu) image=ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0; cc=gcc; cxx=g++ ;;
+              clang) image=ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1; cc=clang; cxx=clang++ ;;
+            esac
+            docker run --rm --volume "$(pwd):/workspace" --workdir /workspace \
+              --env "CC=$cc" --env "CXX=$cxx" --env "CONSUMER=$consumer" \
+              "$image" bash -c '
+                cmake -S build/llvm-prebuilt-smoke -B "build/llvm-prebuilt-smoke/$CONSUMER" \
+                  -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_PREFIX_PATH=/workspace/build/llvm-project-install &&
+                cmake --build "build/llvm-prebuilt-smoke/$CONSUMER" &&
+                "build/llvm-prebuilt-smoke/$CONSUMER/llvm-prebuilt-smoke"
+              '
+          done
 
       - name: Archive new prebuilt
         if: steps.llvm.outputs.cache-hit != 'true'
@@ -263,7 +270,7 @@ jobs:
   publish-llvm:
     needs: [check-changes, populate-llvm]
     # Publish successful platforms even if another platform's cold build fails.
-    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.llvm-matrix != '[]' }}
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.llvm-missing == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -319,22 +326,71 @@ jobs:
             rm "$published_archive"
           done
 
-      - name: Require all missing platforms to finish
-        if: needs.populate-llvm.result != 'success'
-        shell: bash
-        run: |
-          echo "Some LLVM builds failed; completed archives were published, but LLVM population is incomplete."
-          exit 1
-
-  # When every recipe-keyed LLVM prebuilt already exists, publish-llvm is
-  # skipped because there is nothing to upload. Slang's commit-keyed object
-  # caches can still be missing, so warming accepts that skipped publisher
-  # and separately requires should-build=true. A failed publisher blocks warming.
-  build-linux-release:
-    needs: [check-changes, publish-llvm]
+  report-llvm-population:
+    needs: [check-changes, populate-llvm, publish-llvm]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.check-changes.outputs.llvm-missing == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require complete population
+        env:
+          BUILD_RESULT: ${{ needs.populate-llvm.result }}
+          PUBLISH_RESULT: ${{ needs.publish-llvm.result }}
+        run: |
+          if [ "$BUILD_RESULT" != success ] || [ "$PUBLISH_RESULT" != success ]; then
+            echo "LLVM population is incomplete; cache warming can still use available platform keys."
+            exit 1
+          fi
+
+  llvm-ready:
+    needs: [check-changes, publish-llvm]
+    # Probe after publication even if another platform failed. Each warming
+    # job requires its own public key, never a skipped/failed publisher result.
+    if: ${{ !cancelled() && needs.check-changes.result == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      linux-x86_64: ${{ steps.ready.outputs.linux-x86_64 }}
+      linux-aarch64: ${{ steps.ready.outputs.linux-aarch64 }}
+      macos-aarch64: ${{ steps.ready.outputs.macos-aarch64 }}
+      windows-x86_64: ${{ steps.ready.outputs.windows-x86_64 }}
+    steps:
+      - name: Check the keys consumed by Slang cache warming
+        id: ready
+        shell: python
+        env:
+          LLVM_HASH: ${{ needs.check-changes.outputs.llvm-hash }}
+        run: |
+          import os
+          import urllib.error
+          import urllib.request
+
+          configurations = {
+              "linux-x86_64": "linux-gcc-x86_64",
+              "linux-aarch64": "linux-gcc-aarch64",
+              "macos-aarch64": "macos-clang-aarch64",
+              "windows-x86_64": "windows-cl-x86_64",
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              for name, platform in configurations.items():
+                  key = f"llvm-{platform}-{os.environ['LLVM_HASH']}"
+                  url = f"https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/{key}.tar.gz"
+                  available = True
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30):
+                          print(f"Ready: {key}")
+                  except urllib.error.HTTPError as error:
+                      if error.code != 404:
+                          raise
+                      available = False
+                      print(f"Unavailable: {key}; skipping this platform's cache warming")
+                  output.write(f"{name}={str(available).lower()}\n")
+
+  build-linux-release:
+    needs: [check-changes, llvm-ready]
+    if: >-
+      !cancelled() && needs.check-changes.result == 'success' &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.linux-x86_64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     permissions:
@@ -346,10 +402,10 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-debug:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.linux-x86_64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     permissions:
@@ -361,10 +417,10 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
 
   build-macos-release:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.macos-aarch64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
@@ -381,10 +437,10 @@ jobs:
       save-sccache: true
 
   build-macos-debug:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.macos-aarch64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
@@ -401,10 +457,10 @@ jobs:
       save-sccache: true
 
   build-linux-aarch64-release:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.linux-aarch64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
@@ -421,10 +477,10 @@ jobs:
       save-sccache: true
 
   build-linux-aarch64-debug:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.linux-aarch64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
@@ -441,10 +497,10 @@ jobs:
       save-sccache: true
 
   build-windows-release:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.windows-x86_64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
@@ -461,10 +517,10 @@ jobs:
       save-sccache: true
 
   build-windows-debug:
-    needs: [check-changes, publish-llvm]
+    needs: [check-changes, llvm-ready]
     if: >-
       !cancelled() && needs.check-changes.result == 'success' &&
-      (needs.publish-llvm.result == 'success' || needs.publish-llvm.result == 'skipped') &&
+      needs.llvm-ready.result == 'success' && needs.llvm-ready.outputs.windows-x86_64 == 'true' &&
       needs.check-changes.outputs.should-build == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
