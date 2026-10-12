@@ -62,6 +62,11 @@ struct MatrixTypeLoweringContext
         workListSet.add(inst);
     }
 
+    // Returns whether `matrixType` has no native representation on the target and must be lowered
+    // to an array of row vectors. LLVM CPU targets lower every matrix; WGSL targets lower every
+    // non-floating element type, because WGSL matrices are float-only; SPIR-V, GLSL and Metal lower
+    // bool and 32-bit int/uint. On WGSL, `validateVectorsAndMatrices` then rejects the resulting
+    // vectors when their element type is not 32 bits wide.
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
         SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
@@ -74,9 +79,6 @@ struct MatrixTypeLoweringContext
         }
 
         auto elementType = matrixType->getElementType();
-
-        // WGSL matrices are float-only, so every other element type becomes an array of vectors,
-        // whose element width is then checked like any other WGSL vector.
         if (isWGPUTarget(targetProgram->getTargetReq()))
             return !isFloatingType(elementType);
 
@@ -421,8 +423,8 @@ struct MatrixTypeLoweringContext
 
         // A matrix comparison such as `float4x4 == float4x4` produces a `bool`
         // matrix result. `getReplacement` dispatches here whenever the result OR
-        // an operand needs lowering, and since `shouldLowerMatrixType` lowers only
-        // bool/int/uint matrices, the bool-matrix *result* forces dispatch even
+        // an operand needs lowering, and since `shouldLowerMatrixType` never lowers
+        // float matrices outside LLVM, the bool-matrix *result* forces dispatch even
         // when the float operands themselves do not need lowering. That is why
         // this function -- unlike `legalizeBinaryOperation`, which treats the
         // all-non-lowered case as `SLANG_UNREACHABLE` -- accepts matrix operands

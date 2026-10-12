@@ -11,8 +11,8 @@
 // signed vectors, unsigned vectors and matrices.
 //
 // The inputs are derived from SV_DispatchThreadID so the negation is applied to runtime values;
-// negation of a scalar or vector compile-time constant is folded away before emission and would
-// not exercise this path.
+// negation of a scalar compile-time constant is folded away before emission and would not
+// exercise this path.
 
 RWStructuredBuffer<float3> outVec;
 RWStructuredBuffer<uint3> outUVec;
