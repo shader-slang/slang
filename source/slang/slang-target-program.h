@@ -46,7 +46,8 @@ public:
     ///
     /// If this is the first time the layout has been
     /// requested, report any errors that arise during
-    /// layout to the given `sink`.
+    /// layout to the given `sink`. Returns null if layout
+    /// reported errors, on this request or an earlier one.
     ///
     ProgramLayout* getOrCreateLayout(DiagnosticSink* sink);
 
@@ -126,6 +127,9 @@ private:
 
     // The computed layout, if it has been generated yet
     RefPtr<ProgramLayout> m_layout;
+
+    // Whether generating `m_layout` reported errors
+    bool m_layoutHasErrors = false;
 
     CompilerOptionSet m_optionSet;
     // Parallel backend emission shares these lazy result caches across threads.

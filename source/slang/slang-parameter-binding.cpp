@@ -4849,10 +4849,16 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 
     if (!m_layout)
     {
+        auto errorCountBefore = sink->getErrorCount();
         m_layout = generateParameterBindings(this, sink);
-        if (sink->getErrorCount() != 0)
-            return nullptr;
+        if (sink->getErrorCount() != errorCountBefore)
+            m_layoutHasErrors = true;
     }
+
+    // Layout generation reported errors on an earlier call (to a different sink, or this one).
+    // Don't hand out the layout of an invalid program, or build IR for it.
+    if (m_layoutHasErrors)
+        return nullptr;
 
     if (m_layout && !m_irModuleForLayout)
     {
