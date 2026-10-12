@@ -1590,6 +1590,20 @@ err(
 )
 
 err(
+    "this-param-mode-attribute-without-effective-this-param",
+    30428,
+    "attribute requires an effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+)
+
+err(
+    "this-param-mode-attribute-on-class-member",
+    30429,
+    "attribute cannot change a source-declared class member's effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
@@ -1685,6 +1699,27 @@ err(
     30076,
     "global variable cannot have opaque type",
     span { loc = "decl:Decl", message = "global variable cannot have opaque type." }
+)
+
+err(
+    "mutable-global-requires-addressable-type",
+    30088,
+    "mutable global variable requires an addressable type",
+    span { loc = "decl:Decl", message = "a mutable static global variable requires an addressable type." }
+)
+
+err(
+    "opaque-type-in-mutable-global",
+    30089,
+    "mutable global variable has an opaque type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot contain an opaque value of type '~type:IRInst'." }
+)
+
+err(
+    "unsized-type-in-mutable-global",
+    30074,
+    "mutable global variable has an unsized type after linking",
+    span { loc = "location", message = "a mutable static global variable cannot have unsized type '~type:IRInst'." }
 )
 
 err(
@@ -3155,7 +3190,7 @@ warning(
     "deprecated-usage",
     31200,
     "use of deprecated declaration",
-    span { loc = "location", message = "~declName:Name has been deprecated: ~message" }
+    span { loc = "location", message = "~decl:Decl has been deprecated: ~message" }
 )
 
 err(
@@ -3204,7 +3239,7 @@ err(
     "removed-usage",
     31207,
     "use of removed declaration",
-    span { loc = "location", message = "~declName:Name has been removed since language version '~sinceVersion:Int': ~message" }
+    span { loc = "location", message = "~decl:Decl has been removed since language version '~sinceVersion:Int': ~message" }
 )
 
 err(
@@ -4115,6 +4150,27 @@ err(
     31109,
     "'set' parameter type mismatch",
     span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
+)
+
+err(
+    "set-accessor-param-cannot-have-default-value",
+    31163,
+    "a 'set' parameter cannot have a default value",
+    span { loc = "initExpr:Expr", message = "the value passed to a 'set' accessor is always supplied by an assignment" }
+)
+
+err(
+    "set-accessor-param-must-be-input-only",
+    31164,
+    "a 'set' parameter must be input-only",
+    span { loc = "param:Decl", message = "'set' parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
+    "subscript-param-must-be-input-only",
+    31165,
+    "a subscript parameter must be input-only",
+    span { loc = "param:Decl", message = "subscript parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
 )
 
 err(
@@ -5195,6 +5251,13 @@ err(
     41009,
     "non-void function must return",
     span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
+)
+
+err(
+    "missing-return-not-allowed-in-slang-202c",
+    40025,
+    "non-void function must return in Slang 202c and later",
+    span { loc = "location", message = "non-void function must return in all cases in Slang 202c and later" }
 )
 
 warning(

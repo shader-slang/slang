@@ -3281,7 +3281,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                            : ImageOpConstants::notMultisampled;
         SpvWord sampled = 2;
         requireSPIRVCapability(SpvCapabilityInputAttachment);
-        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
         setImageFormatCapabilityAndExtension(SpvImageFormatUnknown, SpvCapabilityShader);
         return emitOpTypeImage(
             assignee,
@@ -5934,8 +5933,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitSubpassLoad(SpvInstParent* parent, IRSubpassLoad* inst)
     {
-        requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
-
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto zeroVec = builder.emitMakeVectorFromScalar(
