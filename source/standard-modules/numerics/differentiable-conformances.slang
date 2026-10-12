@@ -351,10 +351,12 @@ public extension<
     SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_UNARY_REQUIREMENT(                           \
         reciprocalSquareRoot, __differentiableNumericsRsqrt)
 
+// The extrema adapters accept a complete matrix, including its layout parameter. We therefore
+// use the direct binary requirement rather than mapping the operation over scalar elements.
 #define SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_ORDERING_REQUIREMENTS                    \
-    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         minimum, __differentiableNumericsMinimum)                               \
-    SLANG_NUMERICS_DIFFERENTIABLE_MATRIX_BINARY_REQUIREMENT(                          \
+    SLANG_NUMERICS_DIFFERENTIABLE_BINARY_REQUIREMENT(                                 \
         maximum, __differentiableNumericsMaximum)
 
 public extension<

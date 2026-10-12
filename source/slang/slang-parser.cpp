@@ -215,7 +215,15 @@ public:
     bool LookAheadToken(const char* string, int offset);
 
     void parseSourceFile(ContainerDecl* parentDecl);
+    // Parse a struct declaration.
     Decl* ParseStruct();
+
+    // Parse a struct declaration into the supplied, newly allocated node.
+    //
+    // Requires `class` to be the next token for an `HLSLClassDecl`, and `struct` otherwise.
+    // Returns the declaration, or a `GenericDecl` containing it when a generic parameter
+    // clause is present.
+    Decl* ParseStruct(StructDecl* decl);
     ClassDecl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
     Stmt* ParseStatement(
@@ -223,6 +231,11 @@ public:
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     Stmt* parseBlockStatement(
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    // Test whether lookahead is a declaration keyword allowed in statement contexts.
+    //
+    // Skips modifiers without consuming tokens. Recognizes `struct` in all dialects
+    // and `class` in the HLSL dialect.
+    bool isLookaheadADeclKeywordAllowedInStmtContexts();
     Stmt* parseLabelStatement();
     DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
     IfStmt* parseIfStatement();
@@ -3620,7 +3633,13 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     }
     else if (parser->LookAheadToken("class"))
     {
-        auto decl = parser->ParseClass();
+        // HLSL `class` declarations have value semantics and use the struct grammar.
+        // Slang `class` declarations use the reference-type `ClassDecl` representation.
+        Decl* decl;
+        if (parser->getSourceLanguage() == SourceLanguage::HLSL)
+            decl = parser->ParseStruct(parser->astBuilder->create<HLSLClassDecl>());
+        else
+            decl = parser->ParseClass();
         typeSpec.decl = decl;
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
@@ -5505,6 +5524,20 @@ static ParamDecl* parseAttributeParamDecl(Parser* parser)
     return paramDecl;
 }
 
+// Return the declaration kind whose nesting rules apply to `declType`.
+//
+// HACK: We report struct subclasses as `StructDecl` because `isDeclAllowed` uses
+// exact `ASTNodeType` checks instead of ranges that account for subclasses.
+// For example, both nodes in HLSL `class Outer { class Inner { int x; }; };`
+// must be checked as structs. The AST nodes themselves keep their actual types.
+// TODO (#13499): Declaration nesting validity belongs in semantic checking, not the parser.
+static ASTNodeType getDeclTypeForNestingValidity(ASTNodeType declType)
+{
+    if (SyntaxClass<NodeBase>(declType).isSubClassOf<StructDecl>())
+        return ASTNodeType::StructDecl;
+    return declType;
+}
+
 static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
 {
     switch (declType)
@@ -5549,6 +5582,9 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
 // Can a decl of `declType` be allowed as a children of `parentType`?
 static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeType declType)
 {
+    parentType = getDeclTypeForNestingValidity(parentType);
+    declType = getDeclTypeForNestingValidity(declType);
+
     // If decl is not known as a decl that can be written by the user (e.g. a synthesized decl
     // type), then we just allow it.
     if (!shouldDeclBeCheckedForNestingValidity(declType))
@@ -5845,7 +5881,88 @@ static void addSpecialGLSLModifiersBasedOnType(Parser* parser, Decl* decl, Modif
     }
 }
 
-// Finish up work on a declaration that was parsed
+// Create a shadow variable for a uniform parameter when HLSL compatibility is enabled.
+//
+// Requires `decl->parentDecl` to identify a non-generic lexical scope, with `decl` not yet
+// inserted into lookup. Returns `nullptr` for non-HLSL input, a disabled option, or a declaration
+// that is not a mutable uniform shader parameter. On success, this function copies visibility,
+// transfers `__transparent`, and renames the parameter while recording its original name.
+// The caller inserts both declarations into that scope and assigns the shadow's lexical parent.
+static UniformParameterShadowVarDecl* createUniformParameterShadowVarIfNeeded(
+    Parser* parser,
+    Decl* decl)
+{
+    // We only apply uniform parameter shadowing to HLSL declarations.
+    if (parser->getSourceLanguage() != SourceLanguage::HLSL)
+        return nullptr;
+
+    // Global uniform shader parameters are immutable unless legacy compatibility is enabled.
+    if (!parser->options.optionSet.getBoolOption(
+            CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility))
+        return nullptr;
+
+    // We first determine whether the declaration is a uniform shader parameter.
+    // `CompleteDecl` has assigned its lexical parent, so `isGlobalShaderParameter` can
+    // distinguish file and namespace parameters from local variables and members.
+    auto parameter = as<VarDecl>(decl);
+    if (!parameter)
+        return nullptr;
+    if (!isGlobalShaderParameter(parameter))
+        return nullptr;
+
+    // An explicitly immutable declaration must remain immutable in compatibility mode.
+    // We check both `const` and `let` before constructing a shadow variable.
+    if (parameter->hasModifier<ConstModifier>())
+        return nullptr;
+    if (as<LetDecl>(parameter))
+        return nullptr;
+
+    // We now construct the variable that lookup will find in place of the parameter.
+    auto shadowVar = parser->astBuilder->create<UniformParameterShadowVarDecl>();
+    shadowVar->loc = parameter->loc;
+    shadowVar->nameAndLoc = parameter->nameAndLoc;
+    shadowVar->uniformParameter = parameter;
+
+    // We need to choose modifiers for the shadow. It replaces the parameter for lookup, so
+    // lookup must apply the parameter's visibility to the shadow declaration.
+    if (auto visibility = parameter->findModifier<VisibilityModifier>())
+    {
+        addModifier(
+            shadowVar,
+            as<VisibilityModifier>(parser->astBuilder->createByNodeType(visibility->astNodeType)));
+    }
+    // We leave binding and layout modifiers on the underlying parameter. They affect the
+    // program's binary interface and reflection; the shadow is only used in its implementation.
+
+    // The parser desugars a legacy `cbuffer` into a variable with the `__transparent` modifier.
+    // With this modifier, lookup in the containing scope can find members of the variable.
+    // We want lookup to find members of the shadow, so we transfer the modifier to it.
+    if (auto transparent = parameter->findModifier<TransparentModifier>())
+    {
+        removeModifier(parameter, transparent);
+        // `removeModifier` unlinks the modifier without clearing `next`. We detach that link
+        // so that `addModifier` transfers only `__transparent`, leaving later modifiers in place.
+        transparent->next = nullptr;
+        addModifier(shadowVar, transparent);
+    }
+
+    // Both declarations will enter the same scope, so we rename the parameter to leave its
+    // original name available for the shadow. Reflection and diagnostics must still identify
+    // the parameter by its original name; legacy `cbuffer` parsing already records that name.
+    if (!parameter->hasModifier<ParameterGroupReflectionName>())
+    {
+        auto reflectionName = parser->astBuilder->create<ParameterGroupReflectionName>();
+        reflectionName->nameAndLoc = parameter->nameAndLoc;
+        addModifier(parameter, reflectionName);
+    }
+    // We use an internal name containing `$`, which the lexer does not accept in identifiers.
+    // A later user declaration therefore cannot collide with the renamed parameter.
+    parameter->nameAndLoc.name =
+        getName(parser, "$uniformParameter_" + getText(parameter->getName()));
+    return shadowVar;
+}
+
+// Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
     Decl* decl,
@@ -5936,8 +6053,17 @@ static void CompleteDecl(
 
         if (!as<GenericDecl>(containerDecl))
         {
-            // Make sure the decl is properly nested inside its lexical parent
+            // Legacy HLSL code may treat a uniform parameter as a mutable temporary. We assign
+            // the lexical parent so the helper can identify file and namespace parameters.
+            decl->parentDecl = containerDecl;
+            auto shadowVar = createUniformParameterShadowVarIfNeeded(parser, decl);
+
+            // The helper has finished renaming the parameter and transferring `__transparent`.
+            // We can now insert both declarations without exposing the parameter's members
+            // through lookup. Generic declarations are handled by the separate case below.
             AddMember(containerDecl, decl);
+            if (shadowVar)
+                AddMember(containerDecl, shadowVar);
 
             // As a special case, if we are adding an unscoped enum to container, we should also
             // create static const decls for each enum case and add them to the container.
@@ -6523,9 +6649,13 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
 Decl* Parser::ParseStruct()
 {
-    StructDecl* rs = astBuilder->create<StructDecl>();
-    ReadToken("struct");
-    FillPosition(rs);
+    return this->ParseStruct(astBuilder->create<StructDecl>());
+}
+
+Decl* Parser::ParseStruct(StructDecl* decl)
+{
+    ReadToken(as<HLSLClassDecl>(decl) ? "class" : "struct");
+    FillPosition(decl);
 
     if (LookAheadToken(TokenType::LBracket))
     {
@@ -6541,7 +6671,7 @@ Decl* Parser::ParseStruct()
         }
         // note: no diagnostics before Slang version 2025
 
-        Modifier** modifierLink = &rs->modifiers.first;
+        Modifier** modifierLink = &decl->modifiers.first;
 
         // Even if this syntax is now removed in Slang 2026, we'll still parse
         // it to keep the diagnostics output sane.
@@ -6553,12 +6683,12 @@ Decl* Parser::ParseStruct()
 
     if (LookAheadToken(TokenType::Identifier))
     {
-        rs->nameAndLoc = expectIdentifier(this);
+        decl->nameAndLoc = expectIdentifier(this);
     }
     else
     {
-        rs->nameAndLoc.name = generateName(this);
-        rs->nameAndLoc.loc = rs->loc;
+        decl->nameAndLoc.name = generateName(this);
+        decl->nameAndLoc.loc = decl->loc;
     }
     return parseOptGenericDecl(
         this,
@@ -6566,11 +6696,11 @@ Decl* Parser::ParseStruct()
         {
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
-            parseOptionalInheritanceClause(this, rs);
+            parseOptionalInheritanceClause(this, decl);
             if (AdvanceIf(this, TokenType::OpAssign))
             {
-                rs->aliasedType = ParseTypeExp();
-                PushScope(rs);
+                decl->aliasedType = ParseTypeExp();
+                PushScope(decl);
                 PopScope();
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
@@ -6579,16 +6709,16 @@ Decl* Parser::ParseStruct()
                         .expectedToken = "';'",
                         .location = this->tokenReader.peekToken().loc});
                 }
-                return rs;
+                return decl;
             }
             if (LookAheadToken(TokenType::Semicolon))
             {
-                rs->hasBody = false;
-                return rs;
+                decl->hasBody = false;
+                return decl;
             }
             maybeParseGenericConstraints(this, genericParent);
-            parseDeclBody(this, rs);
-            return rs;
+            parseDeclBody(this, decl);
+            return decl;
         });
 }
 
@@ -7310,6 +7440,22 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     return false;
 }
 
+bool Parser::isLookaheadADeclKeywordAllowedInStmtContexts()
+{
+    // HACK: `parseBlockStatement` routes only selected declaration keywords through
+    // `ParseDecl`. For example, HLSL `class Local { int x; };` needs that route rather
+    // than expression parsing. This allow-list mixes parsing with placement rules.
+    // TODO (#13499): We should register `struct` and `class` as `SyntaxDecl`s in the language
+    // scope. After modifiers, block parsing should look up an identifier and use
+    // `ParseDecl` when its syntax declaration represents a declaration AST node.
+    // Semantic checking should then enforce which declarations are allowed in blocks.
+    if (lookAheadTokenAfterModifiers(this, "struct"))
+        return true;
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return false;
+    return lookAheadTokenAfterModifiers(this, "class");
+}
+
 Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
 {
     if (!beginMatch(this, MatchedTokenType::CurlyBraces))
@@ -7354,7 +7500,7 @@ Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
     };
     while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
     {
-        if (lookAheadTokenAfterModifiers(this, "struct"))
+        if (isLookaheadADeclKeywordAllowedInStmtContexts())
         {
             auto declBase = ParseDecl(this, scopeDecl);
             if (auto declGroup = as<DeclGroup>(declBase))

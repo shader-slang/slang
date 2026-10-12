@@ -115,25 +115,36 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         }
     }
 
+    // Determine whether to initialize `globalVar` explicitly at the start of each entry point.
+    //
+    // Requires a variable with an initializer and without `IRActualGlobalRate`, as selected
+    // by `processModule`. The `moveGlobalVarInitializationToEntryPoints` pass calls this predicate
+    // to select initializer functions called from each entry point. Returns `false` when
+    // initialization can remain in the variable's declaration.
     bool shouldMoveGlobalVarInitialization(IRGlobalVar* globalVar)
     {
-        // Currently CoopVector for DXC cannot be created from
-        // constructors with arguments. When CoopVector is used as a
-        // global variable, its initialization has to happen at the
-        // beginning of the entry point.
-        //
-        // At the same time, we don't want to apply
-        // "moveGlobalVarInitializationToEntryPoints" to the rest of
-        // the global variables when targeting HLSL.
-        //
-        if (isD3DTarget(m_targetProgram->getTargetReq()))
-        {
-            auto valueType = globalVar->getDataType()->getValueType();
-            if (as<IRCoopVectorType>(valueType))
-                return true;
-            return false;
-        }
-        return true;
+        // This pass expresses initialization as ordinary calls for non-HLSL target pipelines.
+        // HLSL emission can instead retain declaration initializers, except for the types below.
+        if (!isHLSLBasedTarget(m_targetProgram->getTargetReq()->getTarget()))
+            return true;
+
+        auto valueType = globalVar->getDataType()->getValueType();
+
+        // Consider `uniform uint input[2]; static uint copy[2] = input;`. The HLSL emitter
+        // would generate an array-returning initializer function after array-return legalization
+        // has run. `moveGlobalVarInitializationToEntryPoints` creates that function before
+        // `legalizeArrayReturnType` replaces the return value with an `out` parameter.
+        if (as<IRArrayType>(valueType))
+            return true;
+
+        // DXC cannot initialize a global `CoopVector` by calling a constructor with arguments.
+        // We move all `CoopVector` initializers rather than inspect constructor expressions.
+        // An initializer function executes the constructor outside the global declaration.
+        if (as<IRCoopVectorType>(valueType))
+            return true;
+
+        // HLSL emission can include the remaining initializers in their variable declarations.
+        return false;
     }
 
     void processGlobalVarWithInit(IRGlobalVar* globalVar, IRBlock* firstBlock)

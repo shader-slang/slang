@@ -1096,6 +1096,7 @@ meanings of their `CompilerOptionValue` encodings.
 | MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
+| EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1150,6 +1151,46 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+
+### Backwards Compatibility Option for Legacy HLSL
+
+For HLSL inputs, `-Gec` enables additional backwards-compatibility features for legacy HLSL.
+The equivalent API option is `CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility`.
+The option currently enables uniform parameter temporaries; additional legacy HLSL behaviors may be added in the future.
+It has no effect on Slang or GLSL inputs.
+
+#### Uniform Parameter Temporaries
+
+With `-Gec`, file and namespace uniform parameters can be used as mutable temporaries within each shader invocation, subject to the same type restrictions as mutable `static` globals.
+For example:
+
+```hlsl
+uint x;
+cbuffer Settings { uint y; };
+
+void setValues(uint value)
+{
+    x = value;
+    y = value + 1;
+}
+```
+
+Each copy starts with the corresponding shader input's value for every entry-point invocation.
+Assignments and `out`/`inout` arguments update that private copy; they do not modify the constant buffer.
+Reflection continues to describe the original shader inputs and their bindings.
+Semantic checking enforces explicit `readonly` and `writeonly` qualifiers on the temporary or alias.
+
+The temporary has the parameter's type.
+For a legacy `cbuffer`, the compiler instead uses a struct containing the buffer's fields, so assignments update a private copy of those fields.
+This type selection also applies when the struct contains a resource.
+
+Slang currently cannot allocate mutable global storage for opaque, unsized, or non-addressable types.
+Parameters with known types in these categories remain read-only aliases, including resource parameters, explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, and structs containing resources.
+The compiler also treats the contents of a legacy buffer containing resources as one read-only struct.
+Reading these parameters with `-Gec` does not allocate mutable resource storage.
+A type supplied during linking is initially accepted for a mutable temporary when no unsupported storage requirement is known.
+If the linked definition requires opaque or unsized storage, the compiler reports that unsupported storage after linking.
+Uniform parameter temporaries do not change specialization constants or declarations already marked `static`, `const`, or `groupshared`.
 
 ### Compiler Option ABI Stability
 
