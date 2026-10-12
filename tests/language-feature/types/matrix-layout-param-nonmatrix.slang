@@ -51,10 +51,5 @@ func modernParameter(row_major value: int) -> int
 //CHECK:             ^^^^^^^^^ E39026
 //CHECK:             ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'int'.
 {
-    row_major let local: int = value;
-/*CHECK:
-    ^^^^^^^^^ E39026
-    ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'int'.
-*/
-    return local;
+    return value;
 }

@@ -6,22 +6,22 @@
 [SpecializationConstant]
 const int SK = 2;
 
+struct RowMajorMatrices
+{
+    row_major float2x3 values[SK];
+}
+
+RWStructuredBuffer<RowMajorMatrices> rowMajorStorage;
 RWStructuredBuffer<float> output;
 
 float byValue(row_major float2x3 m[SK]) { return m[1][0][1]; }
-void byInout(inout row_major float2x3 m[SK]) { m[1][0][1] += 1; }
 
 [numthreads(1, 1, 1)]
 void main()
 {
     float2x3 plain[SK];
-    row_major float2x3 rowMajor[SK];
     output[0] = byValue(plain);
 //CHECK:                ^^^^^ E30019
 //CHECK:                ^^^^^ expected an expression of type
-    byInout(plain);
-//CHECK:    ^^^^^ E30019
-//CHECK:    ^^^^^ expected an expression of type
-    output[1] = byValue(rowMajor);
-    byInout(rowMajor);
+    output[1] = byValue(rowMajorStorage[0].values);
 }

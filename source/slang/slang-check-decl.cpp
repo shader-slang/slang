@@ -14669,14 +14669,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         }
     }
 
-    // Signatures match up to matrix layout, but calls are checked against the primary
-    // declaration while each body is lowered with its own parameter types. For a parameter passed
-    // by value, `inout`/`out`, `__ref` or `__constref`, the call still reads and writes the right
-    // logical values, including through buffer and `groupshared` storage
-    // (matrix-layout-array-param-call.slang). A pointer's pointee layout decides how memory is
-    // read, and nothing converts between two pointee layouts, so two declarations whose pointer
-    // parameters differ in a pointee's matrix layout conflict. This runs after the two-bodies
-    // check so that two definitions still report a redefinition.
+    // A pointer's pointee layout decides how memory is read, and nothing converts between two
+    // pointee layouts, so two declarations whose pointer parameters differ in a pointee's matrix
+    // layout conflict. This runs after the two-bodies check so that two definitions still report a
+    // redefinition.
     if (doPointerParamLayoutsDiffer(newDeclRef, oldDeclRef))
     {
         getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});

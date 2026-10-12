@@ -3066,8 +3066,8 @@ public:
     /// a pointer to them, an interim rule until mangled names encode the layout
     /// (shader-slang/slang#13383). For two declarations whose parameters differ only in layout:
     /// - two bodies are a redefinition (E30201);
-    /// - a prototype and a definition are one function when the difference is in a parameter
-    ///   passed by value, `inout`/`out`, `__ref` or `__constref`;
+    /// - a prototype and a definition are one function when the difference is not behind a
+    ///   pointer;
     /// - they conflict (E30200, in `checkFuncRedeclaration`) when the difference is behind a
     ///   pointer, because nothing converts the memory a pointer refers to.
     /// Return types are not part of this comparison; `checkFuncRedeclaration` requires them to be
