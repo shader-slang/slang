@@ -9,6 +9,23 @@
 namespace Slang
 {
 
+bool isHLSLBasedTarget(CodeGenTarget target)
+{
+    // We identify targets that require the HLSL emission rules. DXBC and DXIL compilation,
+    // including their assembly variants, passes emitted HLSL to a downstream compiler.
+    switch (target)
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isHeterogeneousTarget(CodeGenTarget target)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(target)).style ==

@@ -114,6 +114,7 @@ struct IRSpecContextBase
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
     HashSet<IRInst*> globalsWithClonedAnnotations;
+    HashSet<AnnotationCacheKey> clonedAnnotationKeys;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
@@ -227,8 +228,6 @@ IRInst* cloneInst(
 
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
-    SLANG_UNUSED(clonedInst);
-
     // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
     // derivative functions and differential type/zero/add/pair witnesses. Every
     // `AnnotationKind` is differentiability-related (see the note at its
@@ -260,8 +259,16 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
 
     auto annotations =
         originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
+    // We clone at most one annotation per (cloned target, kind), because `tryLookupAnnotation`
+    // assumes a single value per (target, kind) and `cloneGlobalValueImpl` unions the
+    // annotations of several declarations of one symbol onto one clone.
     for (auto annotation : annotations)
+    {
+        AnnotationCacheKey key = {clonedInst, AnnotationKind(annotation->getConformanceID())};
+        if (!context->clonedAnnotationKeys.add(key))
+            continue;
         cloneInst(context, context->builder, annotation, annotation);
+    }
 }
 
 IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
@@ -1543,7 +1550,24 @@ IRInst* cloneGlobalValueImpl(
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
+
+    // A linked symbol can have several same-mangled-name declarations across the input
+    // modules (e.g. an importing module's `[import]` and the defining module's `[export]`),
+    // which link collapses into this one inst. Any of them may carry module-scope auto-diff
+    // trait annotations, since the module that differentiates a symbol records them on its
+    // own declaration, which need not be the one selected as `originalInst`. We therefore
+    // recover the annotations from every declaration, not just `originalInst`. The selected
+    // declaration is cloned first and `cloneAnnotations` dedups per (cloned target, kind) with
+    // every call keyed on `clonedValue`, so the selected declaration's annotations take
+    // precedence and a sibling only supplies a kind it lacks. A declaration in the module we
+    // are linking into is skipped: its annotations stay in place, and its linking info is not
+    // prebuilt.
     cloneAnnotations(context, clonedValue, originalInst);
+    for (auto s = originalValues.sym; s; s = s->nextWithSameName)
+    {
+        if (s->irGlobalValue->getModule() != context->getModule())
+            cloneAnnotations(context, clonedValue, s->irGlobalValue);
+    }
     return clonedValue;
 }
 

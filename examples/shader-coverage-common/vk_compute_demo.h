@@ -5,34 +5,10 @@
 // demo code linear. MoltenVK-friendly: enables VK_KHR_portability_*
 // extensions when present.
 //
-// ============================================================
-// WHEN slang-rhi PR #739 LANDS, THIS WHOLE FILE BECOMES OBSOLETE.
-// ============================================================
-//
-// Today the demo uses raw Vulkan because slang-rhi main has no way to
-// bind hidden synthetic resources (the synthesized `__slang_coverage`
-// buffer) — its binding API is reflection-driven, and Slang's coverage
-// IR pass synthesizes the buffer after reflection. PR #739 adds
-// `bindSyntheticResource(IShaderProgram*, IShaderObject*, id, Binding)`
-// which closes that gap.
-//
-// Once #739 merges and the slang-rhi submodule is bumped, the
-// migration is:
-//   1. In each main.cpp, replace `vkdemo::Context` + Buffer/Pipeline calls
-//      with slang-rhi's IDevice / IBuffer / IComputePipeline / etc.
-//   2. Replace the raw vkUpdateDescriptorSets for the coverage buffer
-//      with `bindSyntheticResource(...)`.
-//   3. Switch the demo's CMakeLists.txt to use the `example()` helper
-//      (which links slang-rhi via the standard slang examples convention).
-//   4. Drop the `[[vk::binding]]` annotations on the user-visible
-//      resources in the slang sources if you want — slang-rhi binds by
-//      name and doesn't need them. (Leaving them in is harmless.)
-//   5. Once all callers have migrated, remove this shared header and
-//      `vk_compute_demo.cpp` from shader-coverage-common.
-//
-// Image-pipeline, BVH-traversal, and the Vulkan path of the selectable-backend
-// example use this same implementation. It handles only Vulkan runtime work;
-// Slang compilation, counter decoding, and reporting remain in the callers.
+// This is the direct Vulkan binding reference used by shader-coverage-backends.
+// The image-pipeline and BVH examples instead demonstrate slang-rhi's synthetic
+// resource API. Keep the native path available for applications with their own
+// GPU runtime; it does not require slang-rhi.
 
 #pragma once
 
