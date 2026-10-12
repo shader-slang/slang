@@ -20,20 +20,20 @@ native Windows ARM64 cold builds can take nearly two hours.
 The [Populate sccache workflow](../.github/workflows/sccache-populate.yml)
 checks LLVM prebuilts independently of Slang's object caches on its schedule,
 manual dispatch, and changes to the LLVM recipe or population implementation on
-`master`. It checks the six main CI keys:
-Linux GCC x86_64, ARM64, and WASM; macOS Clang ARM64; and Windows MSVC x86_64 and
-ARM64. The WASM entry builds host LLVM, preserving the key requested by the WASM
-Slang build. Only missing keys start native builders, each with a four-hour
+`master`. It checks five main CI keys:
+Linux GCC x86_64 and ARM64; macOS Clang ARM64; and Windows MSVC x86_64 and ARM64.
+WASM disables LLVM, so its setup does not download or populate an LLVM archive. Only missing keys start native builders, each with a four-hour
 timeout. They stage new archives for an Ubuntu job that authenticates, installs the Cloud
 SDK, publishes completed archives, and downloads each public object to check it
 matches the staged archive byte for byte. Publication is
 restricted to the upstream repository's `master` ref.
 
-Slang cache-warming builds wait for LLVM population to complete, then run only
-when their commit-based sccache entries are missing. A complete sccache no longer
-skips missing LLVM prebuilts. If an LLVM build fails, successful platforms can
-still be published, but the workflow reports incomplete population and does not
-start the LLVM-dependent Slang builds. The next scheduled run retries missing keys.
+Slang cache-warming builds run when their commit-based sccache entries are missing
+and their own platform's LLVM archive is publicly available after publication. A
+complete sccache no longer skips missing LLVM prebuilts. Failed LLVM platforms
+still make the separate population report fail, while successfully cached or
+published platforms can warm Slang caches. An unrelated platform failure does
+not suppress that warming. The next scheduled run retries missing LLVM keys.
 
 To repair missing prebuilts, a maintainer can select **Populate sccache**
 in GitHub Actions and run it on `master`, or use:
@@ -51,9 +51,12 @@ Rerunning a PR cannot publish a missing prebuilt, because its ref is not `master
 Recipe changes on a PR can still require a cold build before they reach `master`.
 
 Population verifies the installed LLVM and Clang packages by compiling, linking,
-and running a small LLVM consumer before staging an archive. Linux x86_64 also
-runs that check inside the Slang CI build container. The recipe explicitly disables
-optional zstd support so dependencies do not vary with packages on the build host.
+and running a small LLVM consumer before staging an archive. It links the LLVM
+and Clang component set used by slang-llvm. Linux x86_64 repeats that check in
+both the normal GCC build container and the Clang sanitizer container. The recipe
+explicitly disables optional zstd support so the build does not acquire a zstd
+dependency from packages on the build host. Other optional dependencies retain
+the existing LLVM defaults and are covered by the consumer checks.
 
 Windows x64 LLVM population uses the GCP build pool and explicitly selects MSVC
 14.43 to match the existing consumers. A newer producer toolset can introduce
@@ -62,7 +65,7 @@ standard-library symbols that their older linker cannot resolve.
 LLVM itself is built in Release mode, including for Windows Debug Slang builds
 because of the differences in Debug/Release standard libraries. We cache the
 installed build product rather than using sccache for LLVM compilation. See the
-[Slang CI LLVM-cache documentation](https://slang.gitlab-master-pages.nvidia.com/slang-ci-docs/caching/llvm-cache)
+[Internal NVIDIA Slang CI LLVM-cache documentation](https://slang.gitlab-master-pages.nvidia.com/slang-ci-docs/caching/llvm-cache)
 for the infrastructure details.
 
 ## sccache
