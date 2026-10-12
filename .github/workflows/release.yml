@@ -103,6 +103,9 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{matrix.build-slang-llvm}}
+          # Release downloads or builds LLVM without GCS upload credentials.
+          # The population workflow publishes missing prebuilts separately.
+          upload-llvm: "false"
 
       - name: Build slang generators
         run: |
