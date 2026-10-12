@@ -2607,7 +2607,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = meshOutputType;
 
             // TODO: Ellie, this is probably not the right place to handle this
             // On GLSL the indices type is built in and as such doesn't consume
@@ -2639,7 +2639,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = patchType;
 
             for (auto rr : elementTypeLayout->resourceInfos)
             {
