@@ -7791,18 +7791,22 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
     }
 
-    auto funcCallee = as<FuncDecl>(callee->declRef.getDecl());
-    Stmt* catchStmt = nullptr;
-    if (funcCallee)
+    // A call that is not an `ErrorType` has a callee that overload resolution typed as a
+    // `FuncType`, whatever kind of declaration or value it names (see
+    // `CompleteOverloadCandidate`), with the error type substituted for this call site.
+    // The `MustUseTryClauseToCallAThrowFunc` check in `CheckInvokeExprWithCheckedOperands`
+    // reads the same `FuncType`.
+    auto calleeFuncType = as<FuncType>(callee->type);
+    SLANG_RELEASE_ASSERT(calleeFuncType);
+    auto calleeDecl = callee->declRef.getDecl();
+    auto calleeErrorType = calleeFuncType->getErrorType();
+    if (calleeErrorType->equals(m_astBuilder->getBottomType()))
     {
-        if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
-        {
-            getSink()->diagnose(
-                Diagnostics::TryInvokeCalleeShouldThrow{.callee = funcCallee, .expr = expr});
-            return expr;
-        }
-        catchStmt = findMatchingCatchStmt(funcCallee->errorType);
+        getSink()->diagnose(
+            Diagnostics::TryInvokeCalleeShouldThrow{.callee = calleeDecl, .expr = expr});
+        return expr;
     }
+    Stmt* catchStmt = findMatchingCatchStmt(calleeErrorType);
 
     if (FindOuterStmt<DeferStmt>(catchStmt))
     {
@@ -7825,11 +7829,11 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
             getSink()->diagnose(Diagnostics::UncaughtTryCallInNonThrowFunc{.expr = expr});
             return expr;
         }
-        if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
+        if (!parentFunc->errorType->equals(calleeErrorType))
         {
             getSink()->diagnose(Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
-                .calleeErrorType = funcCallee->errorType,
-                .callee = funcCallee,
+                .calleeErrorType = calleeErrorType,
+                .callee = calleeDecl,
                 .callerErrorType = parentFunc->errorType,
                 .expr = expr});
             return expr;
