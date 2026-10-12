@@ -90,12 +90,13 @@ void halfMain(uniform RWStructuredBuffer<half4> halfBuffer)
     halfBuffer[1] = half4(r[0], r[1]);
 }
 
+// The matrix is converted from a float matrix, so no 64-bit vector exists until legalizeMatrixTypes
+// lowers the matrix itself; the resulting vector type has no source location.
+//I64: disallowed vector element type
+//I64: vector with disallowed element type 'int64_t' encountered
 [numthreads(1, 1, 1)]
-void int64Main(uniform RWStructuredBuffer<int64_t> int64Buffer)
+void int64Main(uniform RWStructuredBuffer<float2x2> int64Buffer)
 {
-    matrix<int64_t, 2, 2> m =
-//I64:                    ^ disallowed vector element type
-//I64:                    ^ vector with disallowed element type 'int64_t' encountered
-        matrix<int64_t, 2, 2>(int64Buffer[0], int64Buffer[1], int64Buffer[2], int64Buffer[3]);
-    int64Buffer[4] = (-m)[0][0];
+    matrix<int64_t, 2, 2> m = matrix<int64_t, 2, 2>(int64Buffer[0]);
+    int64Buffer[1] = float2x2(-m);
 }
