@@ -32,25 +32,6 @@ bool isRayTracingStageInterfaceModifier(MagicTypeModifier* modifier, Decl* decl)
 // Schemas, lists, and hit groups are ordinary values. Empty payloads are ordinary payloads.
 // Their ordinary generic uses are allowed; stage/input generic uses retain the restriction below.
 
-bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl)
-{
-    if (!functionDecl || !functionDecl->getName())
-        return false;
-
-    auto name = functionDecl->getName()->text.getUnownedSlice();
-    if (name != "TraceRay" && name != "TraceMotionRay" && name != "CallShader")
-        return false;
-
-    for (auto parent = functionDecl->parentDecl; parent; parent = parent->parentDecl)
-    {
-        if (as<AggTypeDecl>(parent))
-            return false;
-        if (auto moduleDecl = as<ModuleDecl>(parent))
-            return moduleDecl->hasModifier<FromCoreModuleModifier>();
-    }
-    return false;
-}
-
 static String _getStructuralRayTracingSourceDeclName(Decl* decl)
 {
     if (!decl)
@@ -363,15 +344,6 @@ StructuralRayTracingHitAttributesKind getStructuralRayTracingHitAttributesKind(T
     }
 }
 
-// Identifies the structural trace API for the frontend's source-family checks.
-// For example, its native branch may call core TraceRay without treating the library itself as
-// mixing the two public APIs. Metal lowering instead recognizes the explicit IRMetalTraceRay
-// instruction; this annotation no longer creates a trace-operation decoration.
-bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl)
-{
-    return functionDecl && functionDecl->hasModifier<RayTracingTraceAttribute>();
-}
-
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl)
 {
     return functionDecl && functionDecl->hasModifier<RayTracingCallShaderAttribute>();
@@ -498,7 +470,10 @@ static void _checkStructuralRayTracingStageStorage(
 
 // Rejects a module that uses both pipeline APIs under the current interoperability contract.
 // For example, an rt::IMissShader implementation and a separate [shader("miss")] function in
-// the same module conflict. RayQuery/HitObject operations do not select that pipeline API.
+// the same module conflict. Dispatch calls do not select the module's API family: an ordinary
+// library wrapper such as rt::RayTracer.trace may call TraceRay in its native target branch.
+// The compiler handles the resulting intrinsic operation without treating that implementation
+// detail as a legacy shader declaration.
 // This is an explicit compatibility policy, not a consequence of ordinary interface conformance.
 static void _checkRayTracingAPIUse(
     Module* module,
@@ -530,36 +505,6 @@ static void _checkRayTracingAPIUse(
         .otherAPI = otherAPI,
         .currentDecl = decl,
         .otherDecl = otherDecl});
-}
-
-// Accounts for pipeline calls when checking the module's API family.
-// For example, helper() { TraceRay(...); } selects the legacy family even if helper is not an
-// entry point. An annotated structural trace implementation may use TraceRay without selecting
-// both. This check only recognizes direct calls to annotated operations. For example, calling an
-// ordinary no-payload wrapper from an imported module does not record structural use in the
-// caller's module; its call to the annotated payload overload records use in the library module
-// instead.
-void checkRayTracingAPICall(
-    FunctionDeclBase* caller,
-    FunctionDeclBase* callee,
-    DiagnosticSink* sink)
-{
-    if (!caller || !callee)
-        return;
-
-    auto callerModule = getModule(caller);
-    if (!callerModule || isStructuralRayTracingTraceMethod(caller) ||
-        isStructuralRayTracingCallShaderMethod(caller))
-        return;
-
-    if (isStructuralRayTracingTraceMethod(callee) || isStructuralRayTracingCallShaderMethod(callee))
-    {
-        _checkRayTracingAPIUse(callerModule, RayTracingAPIFamily::Structural, caller, sink);
-    }
-    else if (isCoreLegacyRayTracingPipelineMethod(callee))
-    {
-        _checkRayTracingAPIUse(callerModule, RayTracingAPIFamily::Legacy, caller, sink);
-    }
 }
 
 // Validates the receiver of each completed executable-stage conformance.

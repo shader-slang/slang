@@ -25,12 +25,6 @@ class MagicTypeModifier;
 /// Allows only the executable-stage magic type family on ordinary interface declarations.
 bool isRayTracingStageInterfaceModifier(MagicTypeModifier* modifier, Decl* decl);
 
-/// Returns whether `functionDecl` is one of the top-level legacy pipeline intrinsics in `core`.
-///
-/// The check deliberately excludes methods such as `RayQuery.TraceRayInline` and
-/// `HitObject.TraceRay`: those are separate APIs that may coexist with a structural pipeline.
-bool isCoreLegacyRayTracingPipelineMethod(FunctionDeclBase* functionDecl);
-
 /// Identifies one logical stage contract represented by a dedicated AST type.
 ///
 /// The value selects the stage profile and IR interface opcode. `Count` is the invalid value.
@@ -63,10 +57,11 @@ enum class StructuralRayTracingAssociatedTypeKind
     Count,
 };
 
-/// Distinguishes the structural pipeline API from the legacy pipeline intrinsics.
+/// Distinguishes structural shader declarations from legacy shader entry points.
 ///
-/// The frontend records the first use of each family per source module so it can diagnose a mixed
-/// pipeline model once without treating ray queries and hit-object APIs as legacy pipeline use.
+/// The frontend records the first shader declaration or stage-input use of each family per module
+/// so it can diagnose mixing the two shader models once. Ordinary dispatch calls do not select
+/// either family.
 enum class RayTracingAPIFamily
 {
     Structural,
@@ -146,9 +141,6 @@ bool isExecutableStructuralRayTracingStageInterface(InterfaceDecl* interfaceDecl
 
 /// Returns the stage named by the input struct's KnownBuiltin annotation, or Count otherwise.
 StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl* typeDecl);
-
-/// Returns whether the function belongs to the structural trace API for source-family checking.
-bool isStructuralRayTracingTraceMethod(FunctionDeclBase* functionDecl);
 
 /// Returns whether the function is an annotated structural callable operation.
 bool isStructuralRayTracingCallShaderMethod(FunctionDeclBase* functionDecl);

@@ -1,5 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry main -stage raygeneration -no-codegen
 
+// A structural stage and its caller can use both the public trace wrapper and native TraceRay.
+// Calling a tracing function does not introduce a second shader declaration model.
 import slang.raytracing;
 
 struct Payload
@@ -21,9 +23,6 @@ struct MissContext : rt::IPayloadContext
 }
 
 struct StructuralMiss : rt::IMissShader
-/*CHECK:
-       ^^^^^^^^^^^^^^ the same module also uses the structural API
-*/
 {
     typealias Context = MissContext;
     void invoke(rt::MissInput<MissContext> input) {}
@@ -40,11 +39,7 @@ struct Schema : rt::ITraceProgramSchema
 rt::AccelerationStructure scene;
 rt::TraceProgramDescriptor<Schema> program;
 
-void legacyTrace(rt::RayTraversalDesc desc, inout Payload payload)
-/*CHECK:
-     ^^^^^^^^^^^ cannot mix legacy and structural ray-tracing APIs in one module
-     ^^^^^^^^^^^ this declaration uses the legacy API
-*/
+void traceNative(rt::RayTraversalDesc desc, inout Payload payload)
 {
     TraceRay(scene, 0, 0xff, 0, 0, 0, desc.ray, payload);
 }
@@ -57,5 +52,5 @@ void main()
 
     rt::RayTracer<Schema> tracer;
     tracer.trace(desc, scene, program, payload);
-    legacyTrace(desc, payload);
+    traceNative(desc, payload);
 }

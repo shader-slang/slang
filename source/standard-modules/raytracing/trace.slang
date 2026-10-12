@@ -152,7 +152,6 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
-    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -237,7 +236,6 @@ public extension<Schema> RayTracer<Schema>
     /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
     /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
     [ForceInline]
-    [__RayTracingTrace]
     public void trace<Payload>(
         RayTraversalDesc desc,
         Schema.TraceContext.AccelerationStructure accelerationStructure,
@@ -266,6 +264,7 @@ public extension<Schema> RayTracer<Schema>
             // TODO: Add the timed OptiX path to the core TraceMotionRay intrinsic, then reuse it
             // here as on GLSL/SPIR-V. The current core intrinsic only supports those two targets;
             // the CUDA TraceRay prelude wrapper fixes ray time to zero and cannot implement this.
+            static_assert(false, "CUDA structural ray-tracing motion is not implemented");
             break;
         case glsl:
         case spirv:

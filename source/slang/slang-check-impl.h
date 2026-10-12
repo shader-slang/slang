@@ -4418,10 +4418,6 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     bool* outFoundStruct,
     StructuralRayTracingEntryPointInfo* outInfo);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
-void checkRayTracingAPICall(
-    FunctionDeclBase* caller,
-    FunctionDeclBase* callee,
-    DiagnosticSink* sink);
 
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)

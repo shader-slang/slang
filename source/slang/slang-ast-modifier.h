@@ -2392,15 +2392,6 @@ class FunctionInterfaceAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// Identifies a structural trace API for frontend API-family checking.
-/// Its implementation may call legacy native intrinsics without mixing the two source APIs.
-/// Metal dispatch is represented by IRMetalTraceRay, not by this attribute.
-FIDDLE()
-class RayTracingTraceAttribute : public Attribute
-{
-    FIDDLE(...)
-};
-
 /// Identifies a structural callable-dispatch declaration for ordinary function lowering.
 FIDDLE()
 class RayTracingCallShaderAttribute : public Attribute

@@ -876,7 +876,8 @@ class ModuleDecl : public NamespaceDeclBase
 
     /// First checked use of each ray-tracing pipeline API in this module. A native entry point
     /// may be selected after body checking (or after loading the serialized module), so that
-    /// later check must still see an earlier structural call or conformance, and vice versa.
+    /// later check must still see an earlier structural shader conformance or stage-input use,
+    /// and vice versa. Ordinary dispatch calls do not select an API family.
     FIDDLE() Decl* structuralRayTracingUse = nullptr;
     FIDDLE() Decl* legacyRayTracingUse = nullptr;
 

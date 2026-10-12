@@ -173,9 +173,10 @@ containers, and the two built-in primitive attribute models. Preserve these decl
 do not introduce a special AST class for each supporting library type.
 
 The annotation constants now belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
-The module's `compiler-intrinsics.slang` also declares two internal operation attributes:
-`__RayTracingTrace` and `__RayTracingCallShader`. Core no longer declares
-these RT-only names. The C++ attribute classes and checker stay in the compiler.
+The module's `compiler-intrinsics.slang` also declares the internal callable attribute
+`__RayTracingCallShader`. Core no longer declares this RT-only name. Its C++ attribute class
+and checker stay in the compiler. Remove `__RayTracingTrace` and its C++ attribute class;
+public trace methods need no trace-specific annotation.
 
 Build `raytracing-builtins.meta.slang` into the ordinary `raytracing-builtins.slang` include using
 `slang-standard-module-generator`. Its values come directly from `KnownBuiltinDeclName` in the
@@ -184,10 +185,10 @@ other RT source files so source compilation and serialized imports use the same 
 
 Remove the old RT-specific declaration discovery and IR opcode replacement. Stage checking reads
 the declaration annotations preserved through source imports and serialized modules; an
-unannotated interface named `IMissShader` remains an ordinary interface. The source trace annotation
-is retained only for frontend API-family checking; Metal trace calls now lower to an explicit IR
-instruction, as described in section 11. Callable dispatch still uses its source-operation IR
-decoration. Builtin loading and ownership are separate responsibilities, described in section 9.
+unannotated interface named `IMissShader` remains an ordinary interface. Metal trace calls lower
+to an explicit IR instruction, as described in section 11. Callable dispatch still uses its
+source-operation IR decoration. Builtin loading and ownership are separate responsibilities,
+described in section 9.
 
 Module-defined magic types retain their checked declaration references, including generic
 arguments. Resolve a stage's associated types and `invoke` implementation from its selected
@@ -200,8 +201,8 @@ method. One generic method can implement both an ordinary type and a shader type
 validation uses the actual receiver's conformance and its selected implementation. Module checking
 validates stage capabilities and input parameters through the completed conformance witnesses.
 Representation diagnostics use the semantic checker's existing duplicate suppression. The first
-structural and legacy API uses are retained on the module declaration so later entry-point selection
-can enforce the same-module mixing restriction, including after serialization.
+structural and legacy shader declarations are retained on the module declaration so later
+entry-point selection can enforce the same-module mixing restriction, including after serialization.
 
 ## 8. Centralize special rules and allow ordinary metadata/payload values
 
@@ -239,23 +240,29 @@ public void trace(RayTraversalDesc desc,
 }
 ```
 
-These wrappers have no operation annotation. Only the payload-taking implementation carries
-`__RayTracingTrace`; this identifies structural API use in frontend checking and allows the library
-implementation to call native `TraceRay` without falsely mixing the two source APIs. Both public
-call forms reach that implementation. The annotation no longer creates trace IR metadata. Remove
-`__RayTracingPayload`, the explicit/implicit method classifier, and the separate implicit-payload
-IR operation kind from the full implementation. Only `CallShader = 2` remains in the source-operation
-decoration enum; values 0 and 1 are unused. Rebuild serialized RT modules after this change.
+Both wrappers and payload-taking implementations are ordinary library methods without trace
+annotations. Both public call forms reach the same payload implementation. Remove
+`__RayTracingTrace`, `__RayTracingPayload`, the explicit/implicit method classifier, and the separate
+implicit-payload IR operation kind from the full implementation. Only `CallShader = 2` remains
+in the source-operation decoration enum; values 0 and 1 are unused. Rebuild serialized RT modules
+after this change.
 
 Post-link lowering must normalize the internal empty value with the reached stages' application
 empty payload types. The frontend neither selects a unique application empty type nor inserts an
 argument. That normalization and native adapters remain work for the full implementation.
 
-The current same-module mixed-API check records direct calls to annotated functions and stage
-declarations. It does not propagate use through ordinary wrappers in imported modules. A client
-that only calls the no-payload wrapper can therefore miss that frontend diagnostic; the later
-check still rejects a reachable Metal trace instruction. Native paths remain blocked by the
-descriptor and stage-adapter checks until their implementation is available.
+Only shader declarations choose the module's API family; dispatch calls do not. A structural stage
+conformance or a function parameter using a structural stage input records structural use. A
+native hit, miss, intersection or callable entry records legacy use, including an entry selected
+later through the command line. Declaring both families in one module remains an error.
+
+Remove the call-level API bookkeeping, including name recognition for core `TraceRay`,
+`TraceMotionRay` and `CallShader`. A structural shader may call a native tracing function, and
+a native shader may call an ordinary structural trace wrapper, without the call itself recording
+a second family. Imports and helper layers therefore do not change the family classification.
+Keep the independent stage/input rules, capability checks and unfinished-backend guards. The
+post-link check still rejects a reachable Metal trace instruction; descriptor and stage-adapter
+checks still block incomplete native paths.
 
 ## 9. Load RT as an optional builtin module
 
@@ -304,11 +311,19 @@ is already `AccelerationStructure`, so the cast preserves the same handle. Metal
 branch, where multilevel traversal will be implemented. This does not add native multilevel
 support.
 
+The CUDA motion branch now contains
+`static_assert(false, "CUDA structural ray-tracing motion is not implemented")`.
+Its pending OptiX implementation can no longer silently do nothing. Core `TraceMotionRay` currently
+supports GLSL/SPIR-V, while the CUDA `TraceRay` wrapper fixes time to zero and cannot implement a
+motion call. The current descriptor guard can diagnose first, before the compiler checks this
+assertion; the explicit failure remains necessary when descriptor lowering is implemented.
+
 `MultiLevelAccelerationStructure<N>` retains its Metal requirement. There is a separate compiler
 [capability-checking bug](https://github.com/shader-slang/slang/issues/13579) where a generic type's
 requirement can be missed; some invalid target uses can therefore pass frontend checking. This
 missing diagnostic does not require duplicate API overloads. The general capability fix is outside
-PR1.
+PR1. The multilevel HLSL negative test is disabled with a reference to that issue until the
+capability check is fixed; it is no longer listed as an expected failure.
 
 ## 11. Lower Metal trace calls through one explicit IR operation
 
@@ -336,10 +351,10 @@ those types directly without reconstructing generic arguments from a callee or a
 operand.
 
 Remove the trace source-operation decoration and its `Trace` enum value from the full
-implementation. Keep `__RayTracingTrace` for the frontend API-family checks described in section 8;
-removing that annotation would make the library's own native `TraceRay` calls appear to mix the
-legacy and structural APIs. Callable dispatch keeps its decoration until it has a dedicated
-operation. The serialized name for `metalTraceRay` has stable ID 912.
+implementation, together with `__RayTracingTrace`. Shader declarations now choose the API family,
+so the library's native `TraceRay` calls need no annotation-based exemption. Keep
+`__RayTracingCallShader` for its callable IR decoration and existing generic-argument exception;
+it has no API-family role. The serialized name for `metalTraceRay` has stable ID 912.
 
 After `linkIR` selects target-switch branches, the centralized unfinished-operation check walks
 functions reachable from entry points and looks for the actual `IRMetalTraceRay` instruction.
@@ -376,8 +391,9 @@ These are additive declarations or behavior corrections rather than the main sou
   concrete multilevel handle declares only the derived conformance. The portable handle retains
   an extension on the existing core `RaytracingAccelerationStructure` to preserve its resource type.
 - **Unimplemented paths:** Metal getters and operations now diagnose missing synthesis instead
-  of returning fabricated values. The full implementation must supply real lowering. CUDA
-  `geometryIndex` and `time` also have explicit pending paths. Front-end-only diagnostic tests
+  of returning fabricated values. The full implementation must supply real lowering. CUDA motion
+  trace has an explicit pending-implementation assertion; `geometryIndex` and `time` also have
+  explicit pending paths. Front-end-only diagnostic tests
   need to be reconciled with implemented backend paths during integration.
 - **Capabilities:** preserve ordinary capability inference for callable-stage checks rather than
   restoring the bespoke source call graph. `CurveData` requires Metal 3.1; triangle properties use

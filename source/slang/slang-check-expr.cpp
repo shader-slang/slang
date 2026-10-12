@@ -4408,8 +4408,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            checkRayTracingAPICall(m_parentFunc, funcDeclBase, getSink());
-
             if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
             {
                 return CreateErrorExpr(invoke);
