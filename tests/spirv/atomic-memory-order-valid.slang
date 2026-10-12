@@ -4,6 +4,7 @@
 // AcquireRelease = 72. Relaxed is None (0), with no storage-class bit.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -minimum-slang-optimization
 
 RWStructuredBuffer<Atomic<uint>> flag;
 RWStructuredBuffer<uint> outb;
@@ -30,4 +31,10 @@ void computeMain()
     outb[1] = flag[0].compareExchange(0, 1, MemoryOrder.AcquireRelease, MemoryOrder.Acquire);
     // CHECK-DAG: OpAtomicCompareExchange {{.*}} %uint_68 %uint_0
     outb[2] = flag[0].compareExchange(0, 1, MemoryOrder.Release, MemoryOrder.Relaxed);
+    // CHECK-DAG: OpAtomicISub {{.*}} %uint_68
+    outb[3] = flag[0].sub(1, MemoryOrder.Release);
+    // CHECK-DAG: OpAtomicIDecrement {{.*}} %uint_66
+    outb[4] = flag[0].decrement(MemoryOrder.Acquire);
+    // CHECK-DAG: OpAtomicUMax {{.*}} %uint_72
+    outb[5] = flag[0].max(1, MemoryOrder.AcquireRelease);
 }

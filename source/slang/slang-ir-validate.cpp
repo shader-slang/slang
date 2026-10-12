@@ -664,7 +664,7 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
 // a `Release` success order with an `Acquire` failure order, which the "at least as strong" rule
 // rejects. Other SPIR-V and Vulkan constraints on memory semantics, such as Vulkan's ban on
 // `SequentiallyConsistent`, are outside this check. We report a violation (E41405, E41406) on
-// every target, including those whose emitters drop or widen the order.
+// every target that emits atomics, including those whose emitters drop or widen the order.
 //
 // The SPIR-V and Metal emitters also read each order as a constant (`emitMemorySemanticMask`,
 // `emitMemoryOrderOperand`), so on those targets, except for Metal texture atomics, which take no

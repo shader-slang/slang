@@ -1,7 +1,7 @@
 // Memory orders are validated on the final IR, so these programs compile on every target: an
 // order held in a `static const` global folds to its constant, and an atomic in a branch that is
-// removed as dead code is never checked. The -g2 directives check that neither depends on the
-// debug-info level.
+// removed as dead code is never checked. The -g2 and -minimum-slang-optimization directives check
+// that neither depends on the debug-info or optimization level.
 //
 // An atomic intrinsic declared without an order (ORDERLESS_ATOMIC) has no order to check. It runs
 // on HLSL only, because the SPIR-V and Metal emitters assume every order is present.
@@ -10,6 +10,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -g2
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute -g2
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -minimum-slang-optimization
+//TEST:SIMPLE(filecheck=CHECK):-target metal -entry computeMain -stage compute -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl -entry computeMain -stage compute

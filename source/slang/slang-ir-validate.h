@@ -93,8 +93,9 @@ void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, Di
 // folding and dead-code elimination. An order forwarded through a generic value parameter, a
 // `[ForceInline]` function or a `static const` global is then the constant it folds to, and an
 // atomic in removed code is gone. An order passed to a function that is not inlined stays a
-// parameter. Each target runs this pass exactly once, at the end of `legalizeIRForSPIRV` for direct
-// SPIR-V emission and at the end of `linkAndOptimizeIR` for every other target.
+// parameter. Each target that emits atomics runs this pass exactly once, at the end of
+// `legalizeIRForSPIRV` for direct SPIR-V emission and at the end of `linkAndOptimizeIR` for every
+// other target except HostVM, which leaves `linkAndOptimizeIR` early and has no atomic operations.
 bool validateAtomicMemoryOrders(IRModule* module, CodeGenTarget target, DiagnosticSink* sink);
 
 void validateVectorsAndMatrices(

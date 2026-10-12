@@ -1,7 +1,8 @@
 // SPIR-V and Metal encode the memory order of an atomic operation in the generated code, so they
 // require it to be a compile-time constant `MemoryOrder` value. The other targets ignore the
-// order and accept the same code. The rows cover each operand position that holds an order: load
-// and increment, store, exchange and add, and both orders of compareExchange.
+// order and accept the same code, as does SPIR-V produced through GLSL. The rows cover every
+// atomic operation, and so each operand position that holds an order, including both orders of
+// compareExchange.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal
@@ -9,6 +10,7 @@
 //TEST:SIMPLE(filecheck=CHECK_OK):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_OK):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_OK):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_OK):-target spirv -emit-spirv-via-glsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<uint>> flag;
 RWStructuredBuffer<uint> outb;
@@ -58,6 +60,35 @@ void computeMain()
     outb[9] = flag[0].compareExchange(0, 1, (MemoryOrder)7, (MemoryOrder)7);
 //CHECK:                             ^ E41408
 //CHECK:                             ^ 7 is not a valid MemoryOrder value
+    outb[10] = flag[0].decrement((MemoryOrder)dynamicOrder);
+//CHECK:                        ^ E41407
+//CHECK:                        ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[11] = flag[0].sub(1, (MemoryOrder)dynamicOrder);
+//CHECK:                  ^ E41407
+//CHECK:                  ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[12] = flag[0].and(1, (MemoryOrder)dynamicOrder);
+//CHECK:                  ^ E41407
+//CHECK:                  ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[13] = flag[0].or(1, (MemoryOrder)dynamicOrder);
+//CHECK:                 ^ E41407
+//CHECK:                 ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[14] = flag[0].xor(1, (MemoryOrder)dynamicOrder);
+//CHECK:                  ^ E41407
+//CHECK:                  ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[15] = flag[0].min(1, (MemoryOrder)dynamicOrder);
+//CHECK:                  ^ E41407
+//CHECK:                  ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[16] = flag[0].max(1, (MemoryOrder)dynamicOrder);
+//CHECK:                  ^ E41407
+//CHECK:                  ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[17] = flag[0].compareExchange(0, 1, (MemoryOrder)dynamicOrder, (MemoryOrder)dynamicOrder);
+//CHECK:                              ^ E41407
+//CHECK:                              ^ the memory order of an atomic operation must be a compile-time constant when targeting
+    outb[18] = flag[0].compareExchange(0, 1, (MemoryOrder)7, (MemoryOrder)dynamicOrder);
+//CHECK:                              ^ E41408
+//CHECK:                              ^ 7 is not a valid MemoryOrder value
+//CHECK:                              ^ E41407
+//CHECK:                              ^ the memory order of an atomic operation must be a compile-time constant when targeting
 }
 
 // CHECK_OK: result code = 0

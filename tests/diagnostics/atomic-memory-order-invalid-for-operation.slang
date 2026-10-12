@@ -10,6 +10,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -emit-spirv-via-glsl
 
 RWStructuredBuffer<Atomic<uint>> flag;
 RWStructuredBuffer<uint> outb;
