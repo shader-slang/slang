@@ -19,13 +19,20 @@ float differentiable<T : IDifferentiable>(T x) { return 2; }
 float sized(float4x4 x[2]) { return 1; }
 float sized(float4x4 x[]) { return 2; }
 
+struct S
+{
+    row_major float4x4 a[2];
+}
+
+//TEST_INPUT:ubuffer(data=[0], stride=128):name sb
+StructuredBuffer<S> sb;
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    row_major float4x4 a[2] = { float4x4(1), float4x4(2) };
-    output[0] = unconstrained(a);
-    output[1] = differentiable(a);
-    output[2] = sized(a);
+    output[0] = unconstrained(sb[0].a);
+    output[1] = differentiable(sb[0].a);
+    output[2] = sized(sb[0].a);
 }
 
 // CHECK: type: float
