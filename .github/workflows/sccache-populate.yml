@@ -1,4 +1,4 @@
-name: Seed all LLVM prebuilts (manual)
+name: Rebuild Windows x64 LLVM with consumer MSVC (manual)
 
 on:
   workflow_dispatch:
@@ -22,31 +22,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: linux
-            compiler: gcc
-            platform: x86_64
-            runner: ubuntu-22.04
-          - os: linux
-            compiler: gcc
-            platform: aarch64
-            runner: ubuntu-24.04-arm
-          # The WASM job builds host LLVM, but requests its own cache key.
-          - os: linux
-            compiler: gcc
-            platform: wasm
-            runner: ubuntu-22.04
-          - os: macos
-            compiler: clang
-            platform: aarch64
-            runner: macos-latest
           - os: windows
             compiler: cl
             platform: x86_64
-            runner: windows-2022
-          - os: windows
-            compiler: cl
-            platform: aarch64
-            runner: windows-11-vs2026-arm
+            runner: [Windows, self-hosted, build]
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
@@ -59,15 +38,31 @@ jobs:
           config: release
           build-llvm: false
 
-      - name: Restore or build LLVM
-        id: llvm
-        uses: ./.github/actions/setup-llvm-from-gcs
+      # Use the same pool and toolset as the Slang Windows x64 consumers.
+      - name: Select MSVC 14.43
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
-          os: ${{ matrix.os }}
-          compiler: ${{ matrix.compiler }}
-          platform: ${{ matrix.platform }}
-          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
-          upload-if-missing: "false"
+          arch: x64
+          toolset: 14.43
+
+      - name: Verify consumer toolchain
+        shell: pwsh
+        run: |
+          if ($env:VCToolsVersion -notlike '14.43.*') {
+            throw "Expected MSVC 14.43, found $env:VCToolsVersion"
+          }
+          Write-Output "LLVM producer MSVC: $env:VCToolsVersion"
+          cl 2>&1 | ForEach-Object { Write-Output $_ }
+          $global:LASTEXITCODE = 0
+
+      - name: Rebuild LLVM with the consumer toolset
+        id: llvm
+        shell: bash
+        run: |
+          # Force a rebuild instead of restoring the incompatible 14.44 archive.
+          ./external/build-llvm.sh --install-prefix "$(pwd)/build/llvm-project-install"
 
       - name: Validate installed LLVM and Clang packages
         shell: bash
@@ -82,11 +77,20 @@ jobs:
           # Match the pinned LLVM release's minimum language standard.
           target_compile_features(llvm-prebuilt-smoke PRIVATE cxx_std_17)
           target_include_directories(llvm-prebuilt-smoke PRIVATE ${LLVM_INCLUDE_DIRS})
-          target_link_libraries(llvm-prebuilt-smoke PRIVATE LLVMSupport)
+          llvm_config(llvm-prebuilt-smoke ${LLVM_TARGETS_TO_BUILD}
+            core support filecheck orcjit codegen mc mcparser)
+          target_link_libraries(llvm-prebuilt-smoke PRIVATE
+            clangBasic clangCodeGen clangDriver clangLex clangFrontend clangFrontendTool)
           EOF
           cat > build/llvm-prebuilt-smoke/main.cpp <<'EOF'
           #include <llvm/Support/raw_ostream.h>
-          int main() { llvm::outs() << "LLVM prebuilt works\n"; }
+          #include <llvm/Support/TargetSelect.h>
+          #include <clang/Basic/Version.h>
+          int main()
+          {
+              llvm::InitializeAllTargetMCs();
+              llvm::outs() << clang::getClangFullVersion() << "\n";
+          }
           EOF
           cmake -S build/llvm-prebuilt-smoke -B build/llvm-prebuilt-smoke/native \
             -G Ninja -DCMAKE_BUILD_TYPE=Release \
