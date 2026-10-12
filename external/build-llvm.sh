@@ -128,7 +128,7 @@ cmake_arguments_for_slang=(
   -DLLVM_INCLUDE_TESTS=0
   -DLLVM_ENABLE_TERMINFO=0
   # Prebuilts are consumed in CI containers that may not provide zstd.
-  # Do not let optional compression dependencies depend on the build host.
+  # Keep zstd detection from adding a dependency on the build host's packages.
   -DLLVM_ENABLE_ZSTD=OFF
   -DLLVM_FORCE_VC_REVISION=0
   -DLLVM_FORCE_VC_REPOSITORY="https://github.com/llvm/llvm-project"
