@@ -6,13 +6,13 @@
 // operand such as "a + b" -- equal precedence to '-', and the RHS of the left-associative '-' --
 // must be wrapped in its own parentheses: "-(a + b)" must emit "(vec3<f32>(0) - (a + b))".
 // Without the inner parentheses the expression reassociates to "-a + b", silently changing the
-// result. Matrices have no unary '-' either and are lowered to "(T(-1) * operand)", where an
-// additive operand likewise needs its own parentheses. This covers signed vectors, unsigned
-// vectors and matrices.
+// result. Matrices have no unary '-' either and are lowered to "(T(-1) * operand)"; there an
+// additive operand needs its own parentheses because '+' binds looser than '*'. This covers
+// signed vectors, unsigned vectors and matrices.
 //
 // The inputs are derived from SV_DispatchThreadID so the negation is applied to runtime values;
-// negation of a compile-time constant is folded away before emission and would not exercise this
-// path.
+// negation of a scalar or vector compile-time constant is folded away before emission and would
+// not exercise this path.
 
 RWStructuredBuffer<float3> outVec;
 RWStructuredBuffer<uint3> outUVec;

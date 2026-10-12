@@ -1,9 +1,13 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
+// A separate run so that the NOZERO-NOT check applies to the whole output.
 //TEST:SIMPLE(filecheck=NOZERO): -target wgsl -entry computeMain -stage compute
+// The f16 entry point is checked as text only; Tint does not compile it here.
 //TEST:SIMPLE(filecheck=HALF): -target wgsl -entry halfMain -stage compute
-// Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
+// Validate the computeMain WGSL through Tint on CI (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+// A 64-bit integer matrix is lowered to an array of vectors and rejected like any i64 vector.
+//DIAGNOSTIC_TEST:SIMPLE(diag=I64): -target wgsl -entry int64Main -stage compute
 
 // WGSL has no unary '-' on matrices and no single-scalar matrix constructor, so a matrix negation
 // cannot be written as "-m" or as "matCxR<T>(0) - m" (#13571). The WGSL emitter multiplies by the
@@ -60,7 +64,7 @@ void computeMain()
     outputBuffer[2] = sum(-m23);
 
     // WGSL-DAG: (f32(-1) * (f32(-1) * n_{{[0-9]+}}))
-    // BUF-NEXT: 26
+    // BUF-NEXT: {{^}}26{{$}}
     outputBuffer[3] = sum(-(-n));
 
     // The operand binds looser than '*', so it keeps its own parentheses.
@@ -68,6 +72,7 @@ void computeMain()
     // BUF-NEXT: -36
     outputBuffer[4] = sum(-(m + n));
 
+    // A negated static const matrix in mul(), the reporter's shape; it is not constant-folded.
     // WGSL-DAG: (f32(-1) * mat2x2<f32>(1.0f, 2.0f, -3.0f, 4.0f))
     // BUF-NEXT: -5
     float2 p = mul(float2(input[0], input[1]), -M2);
@@ -83,4 +88,14 @@ void halfMain(uniform RWStructuredBuffer<half4> halfBuffer)
     half2x2 a = half2x2(halfBuffer[0].x, halfBuffer[0].y, halfBuffer[0].z, halfBuffer[0].w);
     half2x2 r = -a;
     halfBuffer[1] = half4(r[0], r[1]);
+}
+
+[numthreads(1, 1, 1)]
+void int64Main(uniform RWStructuredBuffer<int64_t> int64Buffer)
+{
+    matrix<int64_t, 2, 2> m =
+//I64:                    ^ disallowed vector element type
+//I64:                    ^ vector with disallowed element type 'int64_t' encountered
+        matrix<int64_t, 2, 2>(int64Buffer[0], int64Buffer[1], int64Buffer[2], int64Buffer[3]);
+    int64Buffer[4] = (-m)[0][0];
 }

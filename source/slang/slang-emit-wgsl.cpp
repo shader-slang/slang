@@ -1759,10 +1759,11 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (auto matrixType = as<IRMatrixType>(opType))
             {
                 // WGSL has neither a unary '-' on matrices nor a single-scalar matrix constructor,
-                // so we negate by multiplying with the scalar -1, which also preserves the sign of
-                // zero. legalizeMatrixTypes lowers integer and bool matrices to arrays for WGSL.
+                // so we negate by multiplying with the scalar -1. op0 is the right-hand side of
+                // '*', so an operand that binds looser than '*' (e.g. "a + b") keeps its own
+                // parentheses. legalizeMatrixTypes lowers every non-float matrix for WGSL.
                 auto elementType = matrixType->getElementType();
-                SLANG_ASSERT(isFloatingType(elementType));
+                SLANG_RELEASE_ASSERT(isFloatingType(elementType));
                 m_writer->emit("(");
                 emitType(elementType);
                 m_writer->emit("(-1) * ");

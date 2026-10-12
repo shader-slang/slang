@@ -74,6 +74,12 @@ struct MatrixTypeLoweringContext
         }
 
         auto elementType = matrixType->getElementType();
+
+        // WGSL matrices are float-only, so every other element type becomes an array of vectors,
+        // whose element width is then checked like any other WGSL vector.
+        if (isWGPUTarget(targetProgram->getTargetReq()))
+            return !isFloatingType(elementType);
+
         return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                as<IRIntType>(elementType);
     }
