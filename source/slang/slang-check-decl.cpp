@@ -753,6 +753,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void checkCallableErrorType(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
@@ -16410,6 +16411,26 @@ void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl*
     getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
+// We set a callable's error type when its header is checked. If one is present, either a
+// `throws` clause (only `FuncDecl`s can spell one) or a type filled in by witness synthesis, it is
+// checked, and `CheckProperType` leaves an already-resolved type as it is. Otherwise the callable
+// gets `Bottom`, the type with no values, meaning it cannot throw. Checking of `throw` and `try`
+// reads `errorType` on the function whose body is being checked and relies on it being set, so
+// every `FunctionDeclBase` with a body passes through here.
+void SemanticsDeclHeaderVisitor::checkCallableErrorType(CallableDecl* decl)
+{
+    auto errorType = decl->errorType;
+    if (errorType.type || errorType.exp)
+    {
+        errorType = CheckProperType(errorType);
+    }
+    else
+    {
+        errorType = TypeExp(m_astBuilder->getBottomType());
+    }
+    decl->errorType = errorType;
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -16434,16 +16455,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         }
     }
 
-    auto errorType = decl->errorType;
-    if (errorType.type || errorType.exp)
-    {
-        errorType = CheckProperType(errorType);
-    }
-    else
-    {
-        errorType = TypeExp(m_astBuilder->getBottomType());
-    }
-    decl->errorType = errorType;
+    checkCallableErrorType(decl);
 
     // TODO: This is a workaround to make sure that the function's type constraints are represented
     // as a Constraint(sub=Lookup(This, funcDecl), sup=...), instead of referring to the function
@@ -17956,6 +17968,9 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
         }
     }
 
+    // Accessors skip `checkCallableDeclCommon` and cannot spell `throws`, so this gives the body
+    // the `Bottom` error type that `throw`/`try` checking reads.
+    checkCallableErrorType(decl);
     checkDifferentiableCallableSignature(decl);
 }
 
@@ -18058,6 +18073,8 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
             .mode = newValueMode,
             .param = newValueParam});
     }
+    // As for the other accessors in `visitAccessorDecl`.
+    checkCallableErrorType(decl);
     checkDifferentiableCallableSignature(decl);
 }
 
