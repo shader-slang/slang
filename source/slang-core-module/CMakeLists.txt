@@ -58,6 +58,8 @@ set(core_module_source_common_args
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     EXTRA_COMPILE_OPTIONS_PRIVATE
+    # MSVC ASan builds of the embedded meta.slang source can exceed the default
+    # COFF section limit (C1128); same rule as slang_build_args in source/slang.
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     LINK_WITH_PRIVATE
     core
