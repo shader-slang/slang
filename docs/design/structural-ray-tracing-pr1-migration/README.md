@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-11. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-12. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -223,7 +223,7 @@ An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload
 annotations from the full implementation. Backend adapters must preserve the native payload
 representation needed by the existing target legalization passes.
 
-All eight no-payload overloads now forward through an ordinary library call:
+All four no-payload overloads now forward through an ordinary library call:
 
 ```slang
 internal struct EmptyTracePayload {}
@@ -269,6 +269,35 @@ Builtin ownership does not imply automatic visibility.
 The current cleanup restores the original builtin-registration collection function. The current
 module loader still uses ordinary module ownership; moving RT to builtin ownership remains
 integration work. Do not introduce a separate RT stage-implementation registry for that work.
+
+## 10. Share trace overloads between acceleration-structure types
+
+`RayTracer<Schema>` now has eight `trace` overloads instead of sixteen: one payload-taking method
+and one no-payload wrapper for each of `NoMotion`, `PrimitiveMotion`, `InstanceMotion`, and
+`PrimitiveAndInstanceMotion`. Each extension constrains the motion type only. Both native and
+multilevel acceleration structures use the same parameter:
+
+```slang
+Schema.TraceContext.AccelerationStructure accelerationStructure
+```
+
+That parameter already requires the supplied scene to have the schema's acceleration-structure
+type. Remove the separate multilevel overloads, their `maxLevelCount` method parameter, and the
+native-handle equality constraints. Callers use `tracer.trace(desc, scene, program, payload)` for
+either handle type; they do not supply a separate depth argument. The depth remains part of a
+multilevel schema's `MultiLevelAccelerationStructure<N>` type.
+
+The native branches pass `bit_cast<AccelerationStructure>(accelerationStructure)` to `TraceRay`
+or `TraceMotionRay`, whose parameter is concrete. On their supported targets the schema handle
+is already `AccelerationStructure`, so the cast preserves the same handle. Metal uses its own
+branch, where multilevel traversal will be implemented. This does not add native multilevel
+support.
+
+`MultiLevelAccelerationStructure<N>` retains its Metal requirement. There is a separate compiler
+[capability-checking bug](https://github.com/shader-slang/slang/issues/13579) where a generic type's
+requirement can be missed; some invalid target uses can therefore pass frontend checking. This
+missing diagnostic does not require duplicate API overloads. The general capability fix is outside
+PR1.
 
 ## Additional API and integration updates
 
