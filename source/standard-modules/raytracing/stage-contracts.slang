@@ -17,6 +17,9 @@ public interface IClosestHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
     ///
+    /// The compiler follows this requirement to collect types for later native stage generation.
+    /// `StageContext` identifies the requirement even if the library renames `Context`.
+    ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
     /// the group's `Context`.
@@ -41,6 +44,9 @@ __magic_type(AnyHitShaderType)
 public interface IAnyHitShader
 {
     /// Defines the payload, primitive, and shader-record types available to this stage.
+    ///
+    /// The compiler follows this requirement to collect types for later native stage generation.
+    /// `StageContext` identifies the requirement even if the library renames `Context`.
     ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this shader requires this type to equal
@@ -71,6 +77,9 @@ public interface IAnyHitShader
 public interface IIntersectionStage
 {
     /// Defines the shared context for procedural or hardware intersection.
+    ///
+    /// The compiler follows this requirement to collect types for later native stage generation.
+    /// `StageContext` identifies the requirement even if the library renames `Context`.
     ///
     /// @par Constraints
     /// Must conform to `IHitContext`. A hit group using this stage requires this type to equal
@@ -116,6 +125,9 @@ public interface IMissShader
 {
     /// Defines the trace payload and shader-record types available to this stage.
     ///
+    /// The compiler follows this requirement to collect types for later native stage generation.
+    /// `StageContext` identifies the requirement even if the library renames `Context`.
+    ///
     /// @par Constraints
     /// Must conform to `IPayloadContext`.
     [KnownBuiltin(__RayTracingBuiltin.StageContext)]
@@ -138,6 +150,9 @@ __magic_type(CallableShaderType)
 public interface ICallableShader
 {
     /// Defines the callable-data and shader-record types available to this stage.
+    ///
+    /// The compiler follows this requirement to collect types for later native stage generation.
+    /// `StageContext` identifies the requirement even if the library renames `Context`.
     ///
     /// @par Constraints
     /// Must conform to `ICallableContext`.

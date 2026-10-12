@@ -52,6 +52,9 @@ public interface IStageContext
 
     /// Describes the host-supplied record bytes that this stage reads through `input.record`.
     ///
+    /// The compiler records this type for later generation of shader-record access. The
+    /// `StageRecord` annotation identifies this requirement even if its name changes.
+    ///
     /// @par Constraints
     /// This associated type has no conformance constraint. Use `void` when the stage has no
     /// record data. For a non-void type, the application must supply matching record data using
@@ -70,6 +73,9 @@ public interface IStageContext
 public interface IPayloadContext : IStageContext
 {
     /// Describes the mutable ray payload exchanged between a trace call and its hit or miss stage.
+    ///
+    /// The compiler records this type for later generation of native stage functions and payload
+    /// access. The `PayloadContextPayload` annotation keeps that lookup independent of its name.
     ///
     /// @par Constraints
     /// This associated type has no conformance constraint. The trace call's payload and the

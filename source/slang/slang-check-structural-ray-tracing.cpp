@@ -217,6 +217,12 @@ StructuralRayTracingStageKind getStructuralRayTracingStageInputKind(AggTypeDecl*
     }
 }
 
+// Identifies requirements whose concrete types are recorded for later backend code generation.
+// Consider `SkyMiss.Context = SkyContext`, with `SkyContext.Payload = ColorPayload`: generating
+// the native miss function will need ColorPayload, so checking must find these requirements and
+// read their ordinary Slang conformance results. Looking them up by name would also work. We use
+// KnownBuiltin roles so renaming Context to ShaderContext while keeping StageContext requires no
+// compiler lookup change; it is a maintenance choice, not a shortcut for resolving the types.
 StructuralRayTracingAssociatedTypeKind getStructuralRayTracingAssociatedTypeKind(
     AssocTypeDecl* requirement)
 {
