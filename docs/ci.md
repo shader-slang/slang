@@ -64,9 +64,7 @@ standard-library symbols that their older linker cannot resolve.
 
 LLVM itself is built in Release mode, including for Windows Debug Slang builds
 because of the differences in Debug/Release standard libraries. We cache the
-installed build product rather than using sccache for LLVM compilation. See the
-[Internal NVIDIA Slang CI LLVM-cache documentation](https://slang.gitlab-master-pages.nvidia.com/slang-ci-docs/caching/llvm-cache)
-for the infrastructure details.
+installed build product rather than using sccache for LLVM compilation.
 
 ## sccache
 
