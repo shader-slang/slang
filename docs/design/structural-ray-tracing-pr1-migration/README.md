@@ -223,7 +223,7 @@ An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload
 annotations from the full implementation. Backend adapters must preserve the native payload
 representation needed by the existing target legalization passes.
 
-All four no-payload overloads now forward through an ordinary library call:
+Both no-payload overloads forward through an ordinary library call:
 
 ```slang
 internal struct EmptyTracePayload {}
@@ -270,12 +270,19 @@ The current cleanup restores the original builtin-registration collection functi
 module loader still uses ordinary module ownership; moving RT to builtin ownership remains
 integration work. Do not introduce a separate RT stage-implementation registry for that work.
 
-## 10. Share trace overloads between acceleration-structure types
+## 10. Share trace overloads across handles and enabled motion types
 
-`RayTracer<Schema>` now has eight `trace` overloads instead of sixteen: one payload-taking method
-and one no-payload wrapper for each of `NoMotion`, `PrimitiveMotion`, `InstanceMotion`, and
-`PrimitiveAndInstanceMotion`. Each extension constrains the motion type only. Both native and
-multilevel acceleration structures use the same parameter:
+`RayTracer<Schema>` has four `trace` overloads: a payload-taking method and a no-payload wrapper
+for each of two extensions. One requires `Schema.TraceContext.Motion == NoMotion`; the other
+requires `Schema.TraceContext.Motion : IEnabledRayMotion`. The enabled-motion extension accepts
+`PrimitiveMotion`, `InstanceMotion`, and `PrimitiveAndInstanceMotion`, and passes `desc.time` to
+the target implementation. Stage-input `time` accessors already use this same interface constraint.
+
+Keep those three concrete motion types. They retain their target requirements and tell Metal
+lowering which motion settings to use. Sharing the method body does not erase the exact type
+from `Schema.TraceContext.Motion`.
+
+Both native and multilevel acceleration structures use the same parameter:
 
 ```slang
 Schema.TraceContext.AccelerationStructure accelerationStructure

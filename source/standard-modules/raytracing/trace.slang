@@ -15,8 +15,10 @@ internal struct EmptyTracePayload
 
 /// Provides schema-typed structural trace and callable dispatch operations.
 ///
-/// Each motion model has overloads with and without a payload. Both take the schema's
-/// `AccelerationStructure` type, so native and multilevel handles share the same overloads.
+/// No-motion and motion-enabled traversal each have overloads with and without a payload.
+/// The three enabled motion types share one extension; the schema retains the exact motion
+/// choice for target lowering. Both extensions take the schema's `AccelerationStructure` type,
+/// so native and multilevel handles share the same overloads.
 /// `ITraceContext` requires that type to conform to `IAccelerationStructure`;
 /// `MultiLevelAccelerationStructure<N>` declares its Metal requirement on the type itself.
 /// Later lowering will map each call to the target's tracing operation.
@@ -95,71 +97,26 @@ public extension<Schema> RayTracer<Schema>
     }
 }
 
-/// Traces the schema's acceleration structure with primitive motion on Metal.
+/// Traces the schema's acceleration structure at the supplied ray time.
+///
+/// The intended Vulkan and OptiX lowering maps instance-motion calls to `TraceMotionRay`.
+/// Metal lowering reads `Schema.TraceContext.Motion` to select primitive motion, instance
+/// motion, or both. Sharing this method preserves that choice in the schema type.
 ///
 /// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
 /// @par Specialization
 /// Extends `RayTracer<Schema>` with these constraints:
 /// - `Schema : ITraceProgramSchema` supplies the trace context and shader lists.
-/// - `Schema.TraceContext.Motion == PrimitiveMotion` selects motion of geometry within a primitive
-///   acceleration structure.
-[require(structural_raytracing_trace, metallib_2_4)]
-public extension<Schema> RayTracer<Schema>
-    where Schema : ITraceProgramSchema
-    where Schema.TraceContext.Motion == PrimitiveMotion
-{
-    /// Traces without application payload data and Metal primitive-motion traversal.
-    ///
-    /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
-    /// `desc.time` selects the time used for motion during traversal.
-    /// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
-    /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
-    [ForceInline]
-    public void trace(
-        RayTraversalDesc desc,
-        Schema.TraceContext.AccelerationStructure accelerationStructure,
-        TraceProgramDescriptor<Schema> descriptor)
-    {
-        EmptyTracePayload payload = {};
-        trace(desc, accelerationStructure, descriptor, payload);
-    }
-
-    /// Traces with a mutable payload and Metal primitive-motion traversal.
-    ///
-    /// @tparam Payload Payload type shared with reachable hit and miss stages.
-    /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
-    /// `desc.time` selects the time used for motion during traversal.
-    /// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
-    /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
-    /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
-    [ForceInline]
-    [__RayTracingTrace]
-    public void trace<Payload>(
-        RayTraversalDesc desc,
-        Schema.TraceContext.AccelerationStructure accelerationStructure,
-        TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
-    {
-        // TODO: Lower this structural operation to Metal intersector dispatch before emission.
-    }
-}
-
-/// Traces the schema's acceleration structure with instance motion.
-///
-/// The intended Vulkan and OptiX lowering maps the payload overload to `TraceMotionRay`; the
-/// intended Metal lowering emits the equivalent intersector configuration.
-///
-/// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
-/// @par Specialization
-/// Extends `RayTracer<Schema>` with these constraints:
-/// - `Schema : ITraceProgramSchema` supplies the trace context and shader lists.
-/// - `Schema.TraceContext.Motion == InstanceMotion` selects motion of instance transforms.
+/// - `Schema.TraceContext.Motion : IEnabledRayMotion` admits `PrimitiveMotion`, `InstanceMotion`,
+///   and `PrimitiveAndInstanceMotion`. `NoMotion` uses the other extension.
+/// The selected motion type retains its own target requirements: primitive and combined motion
+/// require Metal 2.4, while instance motion also supports native motion-blur targets.
 [require(structural_raytracing_trace, structural_raytracing_instance_motion)]
 public extension<Schema> RayTracer<Schema>
     where Schema : ITraceProgramSchema
-    where Schema.TraceContext.Motion == InstanceMotion
+    where Schema.TraceContext.Motion : IEnabledRayMotion
 {
-    /// Traces without application payload data and with instance motion.
+    /// Traces without application payload data at the time given by `desc.time`.
     ///
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
     /// `desc.time` selects the time used for motion during traversal.
@@ -175,7 +132,7 @@ public extension<Schema> RayTracer<Schema>
         trace(desc, accelerationStructure, descriptor, payload);
     }
 
-    /// Traces with a mutable payload and instance motion.
+    /// Traces with a mutable payload at the time given by `desc.time`.
     ///
     /// @tparam Payload Payload type shared with reachable hit and miss stages.
     /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
@@ -218,55 +175,6 @@ public extension<Schema> RayTracer<Schema>
         default:
             break;
         }
-    }
-}
-
-/// Traces the schema's acceleration structure with primitive and instance motion on Metal.
-///
-/// @tparam Schema Trace-program schema; must conform to `ITraceProgramSchema`.
-/// @par Specialization
-/// Extends `RayTracer<Schema>` with these constraints:
-/// - `Schema : ITraceProgramSchema` supplies the trace context and shader lists.
-/// - `Schema.TraceContext.Motion == PrimitiveAndInstanceMotion` selects both geometry
-///   motion and motion of instance transforms.
-[require(structural_raytracing_trace, metallib_2_4)]
-public extension<Schema> RayTracer<Schema>
-    where Schema : ITraceProgramSchema
-    where Schema.TraceContext.Motion == PrimitiveAndInstanceMotion
-{
-    /// Traces without application payload data and combined Metal motion traversal.
-    ///
-    /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
-    /// `desc.time` selects the time used for motion during traversal.
-    /// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
-    /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
-    [ForceInline]
-    public void trace(
-        RayTraversalDesc desc,
-        Schema.TraceContext.AccelerationStructure accelerationStructure,
-        TraceProgramDescriptor<Schema> descriptor)
-    {
-        EmptyTracePayload payload = {};
-        trace(desc, accelerationStructure, descriptor, payload);
-    }
-
-    /// Traces with a mutable payload and combined Metal motion traversal.
-    ///
-    /// @tparam Payload Payload type shared with reachable hit and miss stages.
-    /// @param[in] desc Ray, traversal flags, instance mask, and shader-record selectors.
-    /// `desc.time` selects the time used for motion during traversal.
-    /// @param[in] accelerationStructure Handle of exactly `Schema.TraceContext.AccelerationStructure`.
-    /// @param[in] descriptor Program and shader-record descriptor for the same `Schema`.
-    /// @param[in,out] payload Payload storage read and updated by the reached hit or miss stages.
-    [ForceInline]
-    [__RayTracingTrace]
-    public void trace<Payload>(
-        RayTraversalDesc desc,
-        Schema.TraceContext.AccelerationStructure accelerationStructure,
-        TraceProgramDescriptor<Schema> descriptor,
-        inout Payload payload)
-    {
-        // TODO: Lower this structural operation to Metal intersector dispatch before emission.
     }
 }
 
