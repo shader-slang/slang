@@ -785,24 +785,52 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
+            // The constructor is type-checked against a temporary sink so that a
+            // genuine overload-match failure can be swallowed and retried through
+            // the legacy initializer-list path. Once we commit to the
+            // constructor, however, any diagnostics it produced are real and must
+            // be surfaced on the caller's sink. This includes warnings such as a
+            // `[deprecated]` constructor (which leave `getErrorCount() == 0` and
+            // were previously lost) as well as errors such as a `[RemovedSince]`
+            // constructor. We only forward when actually building the result
+            // expression (`outExpr != nullptr`); a `canCoerce()` viability probe
+            // passes `outExpr == nullptr` and must stay silent (see `canCoerce`).
+            auto forwardDiagnostics = [&]()
+            {
+                if (!outExpr || tempSink.outputBuffer.getLength() == 0)
+                    return;
+                getSink()->diagnoseRaw(
+                    tempSink.getErrorCount() ? Severity::Error : Severity::Warning,
+                    tempSink.outputBuffer.getUnownedSlice());
+            };
+
+            // A genuine overload-match failure yields an error expression,
+            // whereas a matched constructor that merely emitted diagnostics
+            // (e.g. it is `[deprecated]` or `[RemovedSince]`) still yields a
+            // valid constructor-call expression.
             if (tempSink.getErrorCount())
             {
                 HashSet<Type*> isVisit;
-                if (!isCStyleType(toType, isVisit))
-                {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    tempSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                    // For non-c-style types, we will always return true when there
-                    // is a ctor, so that we do not fallback to legacy initializer list logic
-                    // in `_coerceInitializerList()` and produce unrelated errors.
-                    if (outExpr)
-                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
-                    return true;
-                }
-                return false;
+                const bool ctorMatched = !IsErrorExpr(ctorInvokeExpr);
+
+                // For a C-style type, a genuine match failure should fall back to
+                // the legacy initializer-list logic in `_coerceInitializerList()`.
+                // But when the constructor actually matched and the error is about
+                // that constructor itself (for example it has been removed via
+                // `[RemovedSince]`), falling back would silently discard the
+                // error, so we surface it here instead.
+                if (isCStyleType(toType, isVisit) && !ctorMatched)
+                    return false;
+
+                forwardDiagnostics();
+
+                // For non-c-style types (and matched-but-errored C-style ctors),
+                // we always return true when there is a ctor, so that we do not
+                // fallback to legacy initializer list logic in
+                // `_coerceInitializerList()` and produce unrelated errors.
+                if (outExpr)
+                    *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                return true;
             }
 
             // The explicit constructor matched and type-checked, so this is a
@@ -813,6 +841,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
             // `createCtorInvokeExprForAbstractType`, which return `true`
             // independent of `outExpr`.
+            forwardDiagnostics();
             if (outExpr)
                 *outExpr = ctorInvokeExpr;
             return true;
@@ -1669,6 +1698,32 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
+bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
+{
+    // Only builtin scalars are eligible, and `bool` is excluded: it already has
+    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // so routing it through the enum->tag->bool composite would introduce a
+    // second, competing representation of the same conversion.
+    auto toBasicType = as<BasicExpressionType>(toType);
+    if (!toBasicType || toBasicType->getBaseType() == BaseType::Bool)
+        return false;
+
+    // The enum must be unscoped, tested through the shared `isUnscopedEnum`
+    // predicate (also used by the parser). It recognizes `UnscopedEnumAttribute`
+    // — attached for `-unscoped-enum` (non-generic enums only) or an explicit
+    // `[UnscopedEnum]` (any enum) — as well as a still-unchecked `[UnscopedEnum]`
+    // for parser-time callers; by the time coercion runs the attribute is checked.
+    if (!isUnscopedEnum(enumDecl))
+        return false;
+
+    // The widening is an HLSL-compatibility feature, so it applies only when the
+    // current translation unit is the HLSL-flavored dialect. The translation
+    // unit request is absent on some paths (e.g. entry-point specialization and
+    // reflection), which correctly reads as "not HLSL".
+    auto translationUnit = getShared()->getTranslationUnitRequest();
+    return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -2163,6 +2218,58 @@ bool SemanticsVisitor::_coerce(
             }
             return true;
         }
+
+        // HLSL compatibility: an unscoped enum in an
+        // HLSL-dialect translation unit may also convert implicitly to any
+        // builtin scalar its tag type can reach, performed as two implicit
+        // rounds that mirror the reverse composite below: first enum -> tag,
+        // then tag -> destination. Consider `enum Color { Red, Green, Blue };
+        // float f = Color.Green;` in a `.hlsl` file compiled with
+        // `-unscoped-enum`: `Color` coerces to `int` (its tag), then `int` to
+        // `float`. This fires only at implicit sites; explicit casts such as
+        // `float(Color.Green)` already succeed through the target's initializer path.
+        if (site != CoercionSite::ExplicitCoercion &&
+            isEnumToBuiltinScalarConversionEnabled(enumDecl, toType))
+        {
+            Expr* tagExpr = nullptr;
+            if (fromExpr)
+            {
+                auto castToTag = getASTBuilder()->create<BuiltinCastExpr>();
+                castToTag->type = tagType;
+                castToTag->loc = fromExpr->loc;
+                castToTag->base = fromExpr;
+                tagExpr = castToTag;
+            }
+
+            Expr* convertedExpr = nullptr;
+            ConversionCost innerCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    toType,
+                    outToExpr ? &convertedExpr : nullptr,
+                    QualType(tagType),
+                    tagExpr,
+                    sink,
+                    &innerCost,
+                    nullptr))
+            {
+                // Cost is additive across the two rounds: the enum -> tag leg
+                // reuses kConversionCost_RankPromotion (matching the direct
+                // enum -> tag case above) plus the inner tag -> destination cost.
+                // This keeps enum -> tag (150) cheaper than enum -> float
+                // (150 + 400 = 550), so overload resolution still prefers the
+                // tag. No E30081 "unrecommended implicit conversion" warning
+                // fires on this path: we return here, before the
+                // initializer-overload branch that emits it, and the inner leg
+                // (int -> float, 400) stays below that branch's threshold (500).
+                if (outCost)
+                    *outCost = kConversionCost_RankPromotion + innerCost;
+                if (outToExpr)
+                    *outToExpr = convertedExpr;
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
+        }
     }
 
     // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
@@ -2368,6 +2475,9 @@ bool SemanticsVisitor::_coerce(
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
+            // The recursive coercion below diagnoses against this synthesized
+            // dereference, so it must carry the operand's source location.
+            derefExpr->loc = fromExpr->loc;
         }
 
         ConversionCost subCost = kConversionCost_None;
@@ -2604,6 +2714,16 @@ bool SemanticsVisitor::_coerce(
     {
         AddTypeOverloadCandidates(toType, overloadContext);
     }
+
+    // `canCoerce` performs a speculative cost probe by passing a null `outToExpr`; materialized
+    // conversions pass storage for the result. Apply the legacy compatibility fallback in both
+    // cases, but supply the sink only for a materialized conversion. A null sink explicitly
+    // requests a non-diagnostic operation, so there is nowhere to report the deprecation.
+    bool usedLegacyGenericParameterCountFallback =
+        tryResolveOverloadUsingLegacyGenericParameterCountFallback(
+            overloadContext,
+            overloadContext.loc,
+            outToExpr ? sink : nullptr);
 
     // After all of the overload candidates have been added
     // to the context and processed, we need to see whether
@@ -2907,8 +3027,11 @@ bool SemanticsVisitor::_coerce(
 
             // TODO: Register associated differentiable methods & types here as well.
         }
-        if (!cachedMethod)
+        if (!cachedMethod && !usedLegacyGenericParameterCountFallback)
         {
+            // Never cache a conversion selected by the legacy compatibility fallback. A cost probe
+            // must not hide a later source-level warning, and every materialized source occurrence
+            // must resolve and report its own use of the deprecated rule.
             // We can only cache the method if it is a public, otherwise we may not be able to
             // use this method depending on where we are performing the coercion.
             if (overloadContext.bestCandidate->item.declRef &&

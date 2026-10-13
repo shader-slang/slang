@@ -1,14 +1,14 @@
 // slang-downstream-compiler.cpp
 #include "slang-downstream-compiler.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-castable.h"
+#include "core/slang-char-util.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-helper.h"
@@ -56,8 +56,23 @@ void* DownstreamCompilerBase::getInterface(const Guid& guid)
 
 void* DownstreamCompilerBase::getObject(const Guid& guid)
 {
-    SLANG_UNUSED(guid);
+    // The path-provider capability is not ISlangUnknown-based, so it is exposed only as a borrowed
+    // object via castAs/getObject -- never through getInterface, which also backs the ref-counting
+    // queryInterface and so must hand out only releasable ISlangUnknown-derived interfaces.
+    if (guid == IDownstreamCompilerPathProvider::getTypeGuid())
+    {
+        return static_cast<IDownstreamCompilerPathProvider*>(this);
+    }
     return nullptr;
+}
+
+SlangResult DownstreamCompilerBase::getPathFromSymbol(void* symbolInLib, slang::IBlob** outPath)
+{
+    String path = SharedLibraryUtils::getSharedLibraryFileName(symbolInLib);
+    if (path.getLength() == 0)
+        return SLANG_E_NOT_AVAILABLE;
+    *outPath = StringBlob::moveCreate(path).detach();
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/

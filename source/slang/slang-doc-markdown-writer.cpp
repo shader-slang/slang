@@ -1,10 +1,10 @@
 // slang-doc-markdown-writer.cpp
 #include "slang-doc-markdown-writer.h"
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-token-reader.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-token-reader.h"
+#include "core/slang-type-text-util.h"
 #include "slang-ast-builder.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"

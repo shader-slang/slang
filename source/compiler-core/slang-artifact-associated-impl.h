@@ -2,8 +2,8 @@
 #ifndef SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 #define SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-com-object.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact-associated.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
@@ -206,6 +206,7 @@ struct SyntheticResourceRecord
     int32_t uniformOffset = -1;
     int32_t uniformStride = 0;
     String debugName;
+    int32_t bindlessIndex = -1;
 };
 
 // Internal registry for stable synthetic resource ids. Public API

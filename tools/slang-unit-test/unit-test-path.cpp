@@ -1,6 +1,6 @@
 // unit-test-path.cpp
 
-#include "../../source/core/slang-io.h"
+#include "core/slang-io.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

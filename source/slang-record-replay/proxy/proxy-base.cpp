@@ -1,7 +1,5 @@
 #include "proxy-base.h"
 
-#include "../replay-context.h"
-#include "../replay-shared.h"
 #include "proxy-compile-request.h"
 #include "proxy-compile-result.h"
 #include "proxy-component-type.h"
@@ -10,6 +8,8 @@
 #include "proxy-mutable-file-system.h"
 #include "proxy-session.h"
 #include "proxy-shared-library.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-shared.h"
 
 namespace SlangRecord
 {
@@ -114,6 +114,16 @@ ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
 
     // Not a registered proxy, return as-is
     return proxy;
+}
+
+std::atomic<int>& testsOnlyReplayNullFileSystemLiveCount()
+{
+    // Function-local static (module-lifetime), so the count is independent of any
+    // ReplayContext lifecycle. It is declared SLANG_API in proxy-global-session.h so
+    // the unit-test module links to this single definition rather than a hidden
+    // per-module copy (see the declaration comment).
+    static std::atomic<int> count{0};
+    return count;
 }
 
 

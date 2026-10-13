@@ -472,6 +472,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 {
                     if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
                         paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+                    if (auto alignmentAttr = originalParamGroupLayout->findAlignmentAttr(resKind))
+                        paramGroupTypeLayoutBuilder.addAlignment(alignmentAttr);
                 }
                 auto newElementVarLayout = elementVarLayoutBuilder.build();
                 // The "containerVarLayout" part should remain unchanged from the original layout.

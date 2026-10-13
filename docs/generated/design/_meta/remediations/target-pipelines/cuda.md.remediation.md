@@ -1,39 +1,36 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:14:20Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T12:52:00Z
 target_doc: target-pipelines/cuda.md
 review_report: ../../reviews/target-pipelines/cuda.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 3
+  fixed: 5
+  rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated: 0
 ---
 
 # Remediation report for target-pipelines/cuda.md
 
 ## Summary
-Verified all four findings against the current on-disk target document
-and source at HEAD. No body edits were required. Three findings
-(F-001, F-002, F-004) are rejected as bogus because the current
-document already complies: it describes the `PTX -> CUDASource` mapping
-correctly throughout, already carries a `checkStaticAssert` table row,
-and already cites the refreshed line numbers the reviewer requested.
-Those three findings describe an earlier draft that had already been
-rewritten before this cycle. F-003 (a missing `watched_paths` entry) is
-valid but deferred: it needs a manifest change, which is out of scope
-for the remediation stage. The target document is unchanged, so
-`target_doc_source_commit_after` equals `_before`.
+
+All five findings (one critical, two major, two minor) were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and all five held up, so all five were fixed. The critical fix reverses the CPU-like classification: CUDA source artifacts carry payload `CUDA`, not `Cpp`, so `performTypeInlining` and `checkGetStringHashInsts` run while `lowerCombinedTextureSamplers` is unreachable. The document was edited. Two follow-ups for the operator are noted at the end: the per-document prompt still carries the wrong CPU-like instruction, and `source/compiler-core/slang-artifact-desc-util.cpp` is now cited but is not in the page's `watched_paths`.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | Doc already complies. The intro (target doc lines 14-32) states a final `PTX` request does **not** drive the pipeline as `CodeGenTarget::PTX`, maps it to `CUDASource` via `_getDefaultSourceForTarget` (`source/slang/slang-code-gen.cpp:261-262`), and says the whole IR pipeline "therefore sees `CUDASource`". Every affected row (lines 157, 350, 360) and the Phase prose (lines 98-102, 696, 787, 815) already qualifies with "final `PTX` runs as `CUDASource`". The misdescription the finding cites is not present. | — |
-| F-002 | rejected-bogus | Doc already complies. The Phase B table has a `checkStaticAssert` row (#63, target doc line 371) with file `slang-emit.cpp`, gate `(always)`, and a note that it is a direct call, matching the `cSA` diagram node; the source call is at `source/slang/slang-emit.cpp:1795`. The contract's one-row-per-node requirement is met. | — |
-| F-003 | deferred | Valid and in-scope: the page cites and links `source/slang/slang-ir-synthesize-active-mask.cpp` (target doc lines 67, 480, 730) but `regenerate.py show target-pipelines/cuda.md` confirms it is absent from the resolved `watched_paths`, so changes to that source would not mark the page stale. The fix is a manifest `watched_paths` expansion, which the remediation stage may not edit. The cited link itself resolves (the file exists), so no doc-body fix applies. Follow-up: add `source/slang/slang-ir-synthesize-active-mask.cpp` to the cuda.md `watched_paths` in the manifest, then re-digest. | — |
-| F-004 | rejected-bogus | Doc already complies. The page already cites line ~2680 for `shouldLegalizeExistentialAndResourceTypes = false`, line ~2635 for `new CUDASourceEmitter`, and line ~2766 for artifact wrapping — the exact values the finding requests — confirmed at `source/slang/slang-emit.cpp:2680`, `:2635`, `:2766`. No stale line references remain. | — |
+| F-001 | fixed | Confirmed. `source/slang/slang-emit.cpp:995` sets `artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target))`; `source/compiler-core/slang-artifact-desc-util.cpp:306-309` maps `SLANG_CUDA_SOURCE` and `SLANG_CUDA_HEADER` to `Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0)`; and `ArtifactDescUtil::isCpuLikeTarget` (line 602) returns, for `ArtifactKind::Source`, true only when the payload equals `Payload::C` or `Payload::Cpp` (line 612) — an exact equality test, not `isDerivedFrom`. CUDA is therefore not CPU-like. Consequently `performTypeInlining` (guarded by `!isCpuLikeTarget` at line 1636) and `checkGetStringHashInsts` (`!isCpuLikeTarget && shouldRunNonEssentialValidation()`, lines 1646-1647) both run for CUDA, and the switch at line 1758 breaks out of its `default` arm at line 1761 before reaching `lowerCombinedTextureSamplers` at line 1769. | Phase B prose item 5 rewritten to state the pass is skipped and why; diagram nodes `pTIN`/`cGSHI` changed from skipped to running with their real gates and `lCTS` changed to skipped; table rows for `performTypeInlining` and `checkGetStringHashInsts` changed from `-` *(skip)* to numbered rows 42a/42b, and row 51 `lowerCombinedTextureSamplers` changed to a `-` *(skip)* row; `combinedTextureSamplers` gate row corrected; one `isCpuLikeTarget` row added to the context-predicate gate table. |
+| F-002 | fixed | Confirmed. `source/slang/slang-ir-legalize-varying-params.cpp:2570-2577` shows `legalizeEntryPointVaryingParamsForCUDA` calling `inlineShaderTerminatingCalleesForRayEntryPoints` (line 2576) before `processModule`, and lines 1939-1958 are a genuine fixed-point loop: `for (bool changed = true; changed;)` re-collects every `IRCall` whose resolved callee satisfies `funcReachesShaderTerminatingIntrinsic` and inlines all of them per iteration. The bound is `Index maxIterations = reachable.getCount() + 1` (line 1937), enforced only by `SLANG_ASSERT(iterationCount++ <= maxIterations)` (line 1941). The page's "single traversal, not a fixed-point iteration" was wrong. | `## Loops in the pipeline`: first paragraph narrowed to "the orchestrator invokes no pass more than once"; second paragraph replaced with the loop's condition, per-iteration body, decreasing-depth convergence argument, and the verbatim bound and assertion. |
+| F-003 | fixed | Confirmed. `source/slang/slang-emit.cpp:1589-1596` is an `if (!minimalOptimization) simplifyIR; else if (requiredLoweringPassSet.generics) eliminateDeadCode;` pair, and `source/slang/slang-emit.cpp:1938-1941` is an `if (minimalOptimization) eliminateDeadCode; else simplifyIR;` pair. Neither `eliminateDeadCode` arm had its own diagram node or table row, so the one-node/one-row coverage rule at `docs/generated/design/_meta/prompts/_common.md:329-338,364-368` was not met. | Phase B diagram: added gate diamonds `minOptGateA` / `minOptGateB` with the alternative `eliminateDeadCode` nodes `dceGen` / `dceLegal` and rewired the three affected edges. Table: row 33 split into 33a (`simplifyIR`) / 33b (`eliminateDeadCode`, `else if reqSet.generics`); row 57 split into 57a (`eliminateDeadCode`) / 57b (`simplifyIR`), with the pre-existing `lowerUntypedResourceHandleToUInt` row renumbered 57b -> 57c to avoid a duplicate label. One `generics` row added to the `RequiredLoweringPassSet` gate table. |
+| F-004 | fixed | Confirmed by re-deriving both citations with `rg -n` against `source/slang/slang-emit.cpp` at HEAD: the `SLANG_PASS(inlineGlobalConstantsForLegalization)` call is at line 1795 (its condition spans lines 1791-1793) and the CPU/CUDA `else`-branch `legalizeEmptyTypes` at line 1911; the diagram's 1624 and 1728 were both stale. | Phase B diagram labels: `line 1624` -> `lines 1791-1795` (the range covering condition and call, matching table row 54) and `line 1728` -> `line 1911`. |
+| F-005 | fixed | Confirmed. `docs/generated/design/_meta/prompts/_common.md:66-67` requires the first body paragraph to name both the coverage and the intended reader; `docs/generated/design/_meta/prompts/target-pipelines-cuda.md:12-15` names compiler developers. The intro named only the subject. | Intro: added one sentence naming compiler developers looking for CUDA pass order, gates, and OptiX handling as the intended reader. |
+
+## Operator follow-ups
+
+- `docs/generated/design/_meta/prompts/target-pipelines-cuda.md:60` still instructs the generator that "`lowerCombinedTextureSamplers` runs for CUDA via the CPU-like" fallthrough. Remediation may not edit prompts (`_remediate.md:92-93`), so this needs the out-of-band correction the reviewer asked for, or the next regeneration will reintroduce F-001.
+- The F-001 fix cites `source/compiler-core/slang-artifact-desc-util.cpp`, which is not in this page's `watched_paths` (`regenerate.py show target-pipelines/cuda.md`). The `isCpuLikeTarget` predicate is load-bearing for three CUDA pass decisions, so the manifest entry should gain that path.

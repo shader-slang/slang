@@ -1,0 +1,51 @@
+schema_version: 1
+id: private-nested-enum-locationless-visibility-errors
+bundle: design/name-resolution/visibility
+suspected_kind: wrong-diagnostic
+title: "[visibility] `private enum` in a struct emits 28 errors with no source location"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/name-resolution/visibility/_repro/private-nested-enum.slang -target hlsl"
+  source_slang: docs/generated/tests/design/name-resolution/visibility/_repro/private-nested-enum.slang
+  exit_code: 255
+  observed_summary: |
+    Declaring a `private` enum as a member of a struct —
+
+        struct S
+        {
+            private enum Mode { Fast, Slow }
+        }
+
+    — is rejected with 28 diagnostics that carry no source location at
+    all: 14 repetitions of `error[E30604]: references less visible type`
+    alternating with 14 of `error[E30601]: visibility higher than
+    parent`, each printed as a bare one-line message with no `--> file:
+    line:col`, no source excerpt and no decl name. There is nothing in
+    the output a user can act on. Changing the single keyword to
+    `internal enum Mode { Fast, Slow }` in the same position compiles
+    cleanly, and `private struct`/`private` methods and fields in the
+    same position are accepted, so the rejection is specific to
+    `private` on a nested enum. The same location-less flood appears for
+    a module-scope `internal enum` when the module is declared `public
+    module ...;` and compiled with `-std 2025`.
+  stderr_tail: "error[E30604]: references less visible type\nerror[E30601]: visibility higher than parent (x14 pairs, none carrying a source location)"
+expected:
+  claim: |
+    A `private` enum declared inside a struct is a member of a type, so
+    the declaration-site private check should accept it the way it
+    accepts a private nested struct, field or method; and in any case
+    every emitted E30601 / E30604 diagnostic must carry a source
+    location naming the offending declaration rather than being printed
+    location-less.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/private-visibility.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/name-resolution/visibility.md#per-keyword-semantics
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug (private is genuinely illegal on a nested enum): ruled out as an explanation for the output shape — even if the rejection is intended, the diagnostics must name a location; a top-level `private enum` is correctly reported as E30603 with a caret."
+    - "The diagnostics belong to the enum's synthesized conformance members (comparison operators / tag-type witnesses) which have no user-written location; if so the fix is to attribute them to the enum declaration and to cap their visibility the way other synthesized members are capped."

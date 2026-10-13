@@ -1,7 +1,7 @@
 // slang-ir-loop-unroll.h
 #pragma once
 
-#include "../core/slang-list.h"
+#include "core/slang-list.h"
 
 namespace Slang
 {

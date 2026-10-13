@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#eliminatephis-with-default-options
-//META: doc_section_digest=2b0ff9304692be73626bf7bd3c50f028f4c346a134dc0949d2343d82c090c772
-//META: purpose=Conditional struct selection (non-vector composite select) lowers to an if/else block assigning a local of the struct type; the HLSL-only legalizeNonVectorCompositeSelect arm does not run for Metal but eliminatePhis already produces the same shape.
+//META: doc_section_digest=e0c92ad13ee96c904e5b118ad8e34d030d04052671354fe0520c1057981ecef2
+//META: purpose=A struct-valued conditional lowers to an if/else assigning a local of the struct type even though the HLSL-only `legalizeNonVectorCompositeSelect` pass does not run for Metal.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `legalizeNonVectorCompositeSelect` is HLSL-only and does not
-// run for Metal, but Metal's default phi elimination already
-// turns `cond ? structA : structB` into an if/else write-back to
-// a local of the struct type.
+// Verifies that Metal reaches the same emitted shape as HLSL for a
+// non-vector composite select by a different route: the HLSL-only
+// select-legalization pass is filtered out, but default phi elimination
+// already turns the merged struct value into per-branch writes to a local.
+// CHECK asserts a local of the struct type is declared and that an
+// if/else pair follows, rather than a ternary over whole structs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
-//META: purpose=Negative - [ForceUnroll] on a function declaration is rejected with E31002 "invalid attribute placement"; the attribute is loop-statement-only despite the doc listing its AST origin generically as "[ForceUnroll] attribute".
+//META: doc_section_digest=4b61bbe5577fdd277138f6c76e47bb415b4e0d9c6365f3fd1961205026f01739
+//META: purpose=Negative - [ForceUnroll] on a function declaration is rejected with E31002 because the attribute is valid only on a loop statement.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Negative - the BUNDLE doc gaps already flag that ForceUnroll is
-// loop-statement-only. This test pins the diagnostic that fires
-// when the attribute is misplaced on a function declaration.
+// Verifies the placement restriction implied by `ForceUnroll` being a
+// loop-control decoration: written on a function declaration the attribute
+// never reaches lowering. The caret annotation pins the attribute span and
+// the code CHECK pins E31002, so both the position and the identity of the
+// diagnostic are asserted.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
 uniform RWStructuredBuffer<int> buf;

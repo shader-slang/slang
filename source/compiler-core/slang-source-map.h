@@ -1,9 +1,9 @@
 #ifndef SLANG_COMPILER_CORE_SOURCE_MAP_H
 #define SLANG_COMPILER_CORE_SOURCE_MAP_H
 
-#include "../core/slang-list.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string.h"
+#include "core/slang-list.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string.h"
 #include "slang.h"
 
 namespace Slang

@@ -1,6 +1,6 @@
-#include "../../source/core/slang-io.h"
-#include "../../source/slang-record-replay/replay-context.h"
-#include "../../source/slang-record-replay/replay-stream-decoder.h"
+#include "core/slang-io.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-stream-decoder.h"
 
 #include <memory>
 #include <stdio.h>

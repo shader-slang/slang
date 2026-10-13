@@ -1,7 +1,7 @@
 #include "slang-tint-compiler.h"
 
-#include "../../external/slang-tint-headers/slang-tint.h"
 #include "slang-artifact-associated-impl.h"
+#include "slang-tint-headers/slang-tint.h"
 
 namespace Slang
 {
@@ -24,6 +24,11 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
+    {
+        return getPathFromSymbol((void*)m_compile, outPath);
+    }
 
     SlangResult compile(IArtifact* const sourceArtifact, IArtifact** outArtifact);
 

@@ -13,4 +13,4 @@ void main(inout TestType t)
 }
 
 // CHECK: OpEntryPoint MissKHR %main "main" %t_0
-// CHECK: OpExtInst %void %2 DebugGlobalVariable {{.*}} %t_0
+// CHECK: OpExtInst %void %{{.*}} DebugGlobalVariable {{.*}} %t_0

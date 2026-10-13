@@ -14,6 +14,10 @@
 // `out` and that at least one assignment to the result parameter appears.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -34,3 +38,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // CHECK: void writeOut_{{[0-9]+}}(out int result_{{[0-9]+}},
 // CHECK: result_{{[0-9]+}} =
+
+// GLSL: void writeOut_{{[0-9]+}}(out int result_{{[0-9]+}},
+// GLSL: result_{{[0-9]+}} =
+
+// MTL: void writeOut_{{[0-9]+}}(int thread* result_{{[0-9]+}},
+// MTL: *result_{{[0-9]+}} =
+
+// WGSL: fn writeOut_{{[0-9]+}}( result_{{[0-9]+}} : ptr<function, i32>
+// WGSL: (*result_{{[0-9]+}}) =
+
+// SPIRV: %_ptr_Function_int = OpTypePointer Function %int
+// SPIRV: %writeOut = OpFunction %void DontInline
+// SPIRV: %result = OpFunctionParameter %_ptr_Function_int
+// SPIRV: OpStore %result

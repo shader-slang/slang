@@ -2,7 +2,7 @@
 
 #include "slang-pass-wrapper.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 

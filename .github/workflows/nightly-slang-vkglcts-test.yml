@@ -11,6 +11,9 @@ env:
   DISABLE_CTS_SLANG: 0
   ACTIONS_RUNNER_DEBUG: true
   ACTIONS_STEP_DEBUG: true
+  # The only place the CTS release/version is spelled out. Everything else
+  # derives the download name and the extracted directory from this.
+  CTS_PACKAGE: VK-GL-CTS_WithSlang-0.0.9-win64
 jobs:
   build:
     strategy:
@@ -75,11 +78,16 @@ jobs:
             -DSLANG_ENABLE_TESTS=1 \
             "${cmake_launcher_defines[@]}"
           cmake --workflow --preset "${{matrix.config}}"
+      - name: Resolve CTS paths
+        run: |
+          # Forward slashes work for pwsh, deqp-vk and upload-artifact alike.
+          echo "CTS_ZIP=${{ github.workspace }}/${CTS_PACKAGE}.zip" >> "$GITHUB_ENV"
+          echo "CTS_DIR=${{ github.workspace }}/${CTS_PACKAGE}" >> "$GITHUB_ENV"
       - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
         with:
           latest: true
           repository: "shader-slang/VK-GL-CTS"
-          fileName: "VK-GL-CTS_WithSlang-0.0.7-win64.zip"
+          fileName: "${{ env.CTS_PACKAGE }}.zip"
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/VK-GL-CTS"
@@ -91,34 +99,38 @@ jobs:
       - name: vkcts setup
         shell: pwsh
         run: |
-          Expand-Archive VK-GL-CTS_WithSlang-0.0.7-win64.zip
+          Expand-Archive -Path $env:CTS_ZIP -DestinationPath $env:CTS_DIR
 
-          copy ${{ github.workspace }}\build\Release\bin\slang-compiler.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-compiler.dll
-          copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glslang.dll
-          copy ${{ github.workspace }}\build\Release\bin\slang-glsl-module.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glsl-module.dll
-          copy ${{ github.workspace }}\build\Release\bin\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\test-server.exe
+          copy ${{ github.workspace }}\build\Release\bin\slang-compiler.dll "${env:CTS_DIR}\slang-compiler.dll"
+          copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll "${env:CTS_DIR}\slang-glslang.dll"
+          copy ${{ github.workspace }}\build\Release\bin\slang-glsl-module.dll "${env:CTS_DIR}\slang-glsl-module.dll"
+          copy ${{ github.workspace }}\build\Release\bin\test-server.exe "${env:CTS_DIR}\test-server.exe"
 
-          copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-passing-tests.txt
-          copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-waiver-tests.xml
+          copy ${{ github.workspace }}\test-lists\test-lists\slang-passing-tests.txt "${env:CTS_DIR}\slang-passing-tests.txt"
+          copy ${{ github.workspace }}\test-lists\test-lists\slang-waiver-tests.xml "${env:CTS_DIR}\slang-waiver-tests.xml"
 
       - name: dump device info
         shell: pwsh
-        working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64
+        working-directory: ${{ env.CTS_DIR }}
         run: |
           .\deqp-vk.exe --deqp-case=dEQP-VK.info.device
           Get-Content -Path TestResults.qpa
 
       - name: vkcts run
         shell: pwsh
-        working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64
+        working-directory: ${{ env.CTS_DIR }}
         run: |
-          .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-waiver-tests.xml
+          .\deqp-vk.exe "--deqp-archive-dir=${env:CTS_DIR}" "--deqp-caselist-file=${env:CTS_DIR}\slang-passing-tests.txt" "--deqp-waiver-file=${env:CTS_DIR}\slang-waiver-tests.xml"
 
-      - name: Dump TestResults.qpa if failed
-        shell: pwsh
-        if: ${{ !success() }}
-        working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64
-        run: Get-Content TestResults.qpa -Tail 1000
+      - name: Upload TestResults.qpa if failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: vkcts-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.CTS_DIR }}/TestResults.qpa
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 9
 
       - name: success notification
         id: slack-notify-success

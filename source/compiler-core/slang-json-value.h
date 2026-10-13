@@ -2,8 +2,8 @@
 #ifndef SLANG_JSON_VALUE_H
 #define SLANG_JSON_VALUE_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-rtti-info.h"
+#include "core/slang-basic.h"
+#include "core/slang-rtti-info.h"
 #include "slang-diagnostic-sink.h"
 #include "slang-json-parser.h"
 #include "slang-source-loc.h"

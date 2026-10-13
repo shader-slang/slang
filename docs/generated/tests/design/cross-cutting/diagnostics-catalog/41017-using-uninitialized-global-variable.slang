@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=6776e11de638191cb13e8f055d385357ab3b24276a8462e574863bec2eda15b9
 //META: purpose=Fires diagnostic E41017 (using-uninitialized-global-variable) - use of uninitialized global variable
 //META: intent=negative
 //META: pipeline_stage=ir-pass
@@ -22,4 +22,4 @@ RWStructuredBuffer<int> o;
 [numthreads(1,1,1)]
 void main() { o[0] = gz; }
 
-// CHECK: E41017
+//CHECK: E41017

@@ -61,7 +61,8 @@
 // 1. Float pass (processNonUniformResourceIndex / floatNonUniformResourceIndex):
 //    Bubbles the NonUniformResourceIndex wrapper outward through the
 //    use-def chain (GetElement, Load, MakeCombinedTextureSampler,
-//    CombinedTextureSamplerGetTexture, ImageTexelPointer, etc.).
+//    CombinedTextureSamplerGetTexture, ImageTexelPointer, and the
+//    integer/bitwise index arithmetic in isNonUniformIndexArithmeticOp()).
 //    When the wrapper reaches an instruction the pass cannot float
 //    through (e.g. the spirv_asm boundary), the decoration phase
 //    walks back through the chain via decorateNonUniformChain to
@@ -201,12 +202,15 @@ void processNonUniformResourceIndex(
 {
     // Float `NonUniformResourceIndex()` outward along the use-def chain, from
     // the wrapped index toward the leaf operation that consumes the resource,
-    // then decorate the resulting chain. The processing switch below enumerates
-    // the full set of op kinds this floats through (GetElementPtr, GetElement,
+    // then decorate the resulting chain. The processing switch below lists the
+    // explicitly-named op kinds this floats through (GetElementPtr, GetElement,
     // Load, IntCast, MakeCombinedTextureSampler, CombinedTextureSamplerGet*,
-    // ImageTexelPointer, GetLegalizedSPIRVGlobalParamAddr, ...); see the
-    // architecture overview at the top of this file for how the float pass and
-    // the legalize forward scan divide the work.
+    // ImageTexelPointer, GetLegalizedSPIRVGlobalParamAddr); the integer/bitwise
+    // index-arithmetic ops are handled in the `default` arm via
+    // isNonUniformIndexArithmeticOp() rather than as `case` labels, so consult
+    // that predicate for the arithmetic op-set. See the architecture overview at
+    // the top of this file for how the float pass and the legalize forward scan
+    // divide the work.
     List<IRInst*> resWorkList;
 
     // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
@@ -237,6 +241,28 @@ void processNonUniformResourceIndex(
                 builder.setInsertBefore(user);
 
                 IRInst* newUser = nullptr;
+
+                // Re-emit `user` with every operand that is the wrapper `inst`
+                // replaced by the wrapped value `inst->getOperand(0)`, keeping the
+                // same op and result type -- turning op(NonUniformResourceIndex(x), ...)
+                // into op(x, ...) so the caller can re-wrap the result. Used for ops
+                // that pass non-uniformity through to their result unchanged: the
+                // combined-sampler accessors, the image-texel pointer, and integer
+                // index arithmetic.
+                auto floatThroughOperands = [&]() -> IRInst*
+                {
+                    ShortList<IRInst*> operands;
+                    for (UInt opIndex = 0; opIndex < user->getOperandCount(); opIndex++)
+                        operands.add(
+                            user->getOperand(opIndex) == inst ? inst->getOperand(0)
+                                                              : user->getOperand(opIndex));
+                    return builder.emitIntrinsicInst(
+                        user->getFullType(),
+                        user->getOp(),
+                        operands.getCount(),
+                        operands.getArrayView().getBuffer());
+                };
+
                 switch (user->getOp())
                 {
                 case kIROp_IntCast:
@@ -370,21 +396,23 @@ void processNonUniformResourceIndex(
                 case kIROp_CombinedTextureSamplerGetTexture:
                 case kIROp_CombinedTextureSamplerGetSampler:
                 case kIROp_ImageTexelPointer:
-                    {
-                        ShortList<IRInst*> operands;
-                        for (UInt i = 0; i < user->getOperandCount(); i++)
-                            operands.add(
-                                user->getOperand(i) == inst ? inst->getOperand(0)
-                                                            : user->getOperand(i));
-                        newUser = builder.emitIntrinsicInst(
-                            user->getFullType(),
-                            user->getOp(),
-                            operands.getCount(),
-                            operands.getArrayView().getBuffer());
-                    }
+                    newUser = floatThroughOperands();
                     break;
                 default:
-                    // Ignore for all other unknown insts.
+                    // Integer index arithmetic: non-uniformity is contagious, so an
+                    // elementwise integer/bitwise op with a non-uniform operand yields a
+                    // non-uniform result. Float the wrapper onto the op result so the
+                    // consumed resource operand stays marked, e.g. for
+                    // buffers[NonUniformResourceIndex(i) * i]:
+                    //   NonUniformResourceIndex(i) * i -> NonUniformResourceIndex(i * i)
+                    // SPIR-V only: Slang itself must emit the position-specific
+                    // OpDecorate NonUniform that Vulkan requires for divergent descriptor
+                    // indexing (VUID-RuntimeSpirv-None-10148); other targets keep the
+                    // wrapper on the sub-expression and let their downstream compiler
+                    // propagate it (see the file header). Any other op is left alone.
+                    if (floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
+                        isNonUniformIndexArithmeticOp(user->getOp()))
+                        newUser = floatThroughOperands();
                     break;
                 };
 
@@ -413,6 +441,15 @@ void processNonUniformResourceIndex(
                 case kIROp_CombinedTextureSamplerGetSampler:
                 case kIROp_ImageTexelPointer:
                     resWorkList.add(nonuniformUser);
+                    break;
+                default:
+                    // Integer arithmetic floated just above: keep the freshly wrapped
+                    // result on the worklist so it continues bubbling toward the leaf.
+                    // This is only reached with `newUser` set (the `if (!newUser) return;`
+                    // above bailed out otherwise), i.e. in SPIR-V mode -- so unlike the
+                    // floating arm above it need not re-check floatMode == SPIRV here.
+                    if (isNonUniformIndexArithmeticOp(user->getOp()))
+                        resWorkList.add(nonuniformUser);
                     break;
                 };
 

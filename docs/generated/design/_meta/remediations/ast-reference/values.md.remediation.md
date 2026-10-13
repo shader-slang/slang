@@ -1,28 +1,41 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T13:58:31Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T13:55:00Z
 target_doc: ast-reference/values.md
 review_report: ../../reviews/ast-reference/values.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 3
+  fixed: 5
+  rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 0
+  deferred: 1
   escalated: 0
 ---
 
 # Remediation report for ast-reference/values.md
 
 ## Summary
-All three findings were verified against the watched header `source/slang/slang-ast-val.h` and the target doc at HEAD and found bogus. F-001's four operand sub-claims each describe text the doc does not contain; every cited row already matches the source. F-002's `Operand semantics` header does not exist (all tables use `Key fields`). F-003's separate `Audience:` paragraph does not exist (the first paragraph already names coverage and reader). No edits were applied; `target_doc_source_commit_after` equals `_before`.
+
+Five of six findings were fixed and one was deferred. The critical
+hash-consing finding was real: the universal pointer-identity guarantee
+is now scoped to values built through `ASTBuilder::getOrCreate`, with
+the `DifferentiateVal` substitution path named as the exception. The
+`ModifierVal` storage claim, the `DifferentiateVal` data-shape claim,
+the stale "outside this page's watched paths" text for
+`TypeEqualityWitness`, and the missing pipeline cross-reference were
+each corrected in place. F-004 (nine `## Nodes` sub-tables instead of
+one) is a genuine contract deviation but needs a whole-section
+restructure shared with `modifiers.md`, so it is deferred.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | All four cited rows already match the header. `LookupDeclRef` (values.md:133) lists `declToLookup: Decl`, `lookupSource: Type`, `witness: SubtypeWitness` — matches `slang-ast-val.h:68-77`; never says base/requirementKey. `PolynomialIntValFactor` (values.md:174) lists `param: IntVal` — matches `getParam()->IntVal*` at `slang-ast-val.h:530`; never says `DeclRefBase`. `HigherOrderDiffTypeTranslationWitness` (values.md:202) lists `baseWitness: Witness` — matches `getBaseWitness()` at `slang-ast-val.h:1039`; never says function-type. `HasDiffTypeInfoWitness` (values.md:216) lists `declRef: DeclRef<HasDiffTypeInfoConstraintDecl>` — matches `slang-ast-val.h:1116-1121`; never says "type operand". | — |
-| F-002 | rejected-bogus | All nine `## Nodes` header rows read the standard columns Class, Parent, Key fields, Grammar, Summary (values.md:129,143,172,186,206,213,228,244,255), matching `_common.md:104`. The string `Operand semantics` does not occur in the document. | — |
-| F-003 | rejected-bogus | The first body paragraph (values.md:12-17) states both coverage ("the reference for the non-Type `Val` subclasses...") and intended reader ("It is for a contributor reading or writing checker / IR-lowering code..."), satisfying `_common.md:65-66`. No separate `Audience:` paragraph exists. | — |
+| F-001 | fixed | Verified at HEAD: `source/slang/slang-ast-val.cpp:3278` builds the substituted `DifferentiateVal` with `createByNodeType`, and `source/slang/slang-ast-builder.cpp:446-450` shows that entry point only calls `SyntaxClass::createInstance`, never the `getOrCreate` cache. The universal guarantee was therefore false. Neither file is in this page's `watched_paths`, so the new prose names the functions without citing their line numbers. | `## Source`: guarantee scoped to values built through `ASTBuilder::getOrCreate`; `### Hash-consing and the ASTBuilder`: "Every"/"every" softened to "Almost every" and a sentence added naming `DifferentiateVal::_substituteImplOverride` as the exception |
+| F-002 | fixed | Confirmed: `source/slang/slang-ast-expr.h:947` declares `ModifiedTypeExpr::modifiers` as syntax-level `Modifiers`, and `source/slang/slang-check-expr.cpp:9266,9306,9311` builds a separate `List<Val*> modifierVals` and passes it to `getModifiedType`, so the expression never stores `ModifierVal`s. | `### Modifier values`: storage attributed to `ModifiedType` alone, with checking a `ModifiedTypeExpr` described as the producer that converts its syntax modifiers into these values |
+| F-003 | fixed | Confirmed: `source/slang/slang-ast-val.h:1220-1282` gives the base a single `getFunc()` operand and the five subclasses add no state, so "pairs a differentiation direction with the `DeclRef`" misdescribed both the data shape and the artifact subclasses. | `### Differentiation values`: first sentence now says each node stores only the function decl-ref and that the subclass selects a mode or a backward-derivative artifact; trailing surface-syntax parenthetical promoted to its own sentence |
+| F-004 | deferred | Correct against `docs/generated/design/_meta/prompts/_common.md:99` ("a single table"), and the page is an outlier: `declarations.md`, `expressions.md`, `statements.md`, and `types.md` each use one table. The fix is not a one-row edit — it must relocate five interstitial `###` prose paragraphs (two of them just rewritten under F-002 and F-003) into `## Notable nodes` and drops those sub-headings as anchor targets. `modifiers.md` has 26 such sub-tables, so the family-wide convention should be settled in one pass. Follow-up: regenerate `## Nodes` for `values.md` and `modifiers.md` together, or state the sub-table allowance in the family contract. | — |
+| F-005 | fixed | The document-text half is correct and was fixed: `regenerate.py show ast-reference/values.md` resolves four files including both checker sources, so the "outside this page's watched paths" claim was stale. The front-matter `watched_paths_digest` half is out of scope here — `docs/generated/design/_meta/prompts/_remediate.md:97-100` reserves that field for the operator's `mark-fresh` run. | `### TypeEqualityWitness`: stale "adding these paths would let this callout cite them" text replaced with direct citations to `SemanticsVisitor::createTypeEqualityWitness` (`slang-check-conformance.cpp:531`) and its callers at `slang-check-inheritance.cpp:699,2024,2084` |
+| F-006 | fixed | Confirmed: `docs/generated/design/_meta/prompts/_common.md:119-122` requires the relevant `pipeline/` page, and the list had none. `pipeline/03-semantic-check.md` is a manifest key (`manifest.yaml:131`) and is the stage that constructs these values. | `## See also`: added a `../pipeline/03-semantic-check.md` bullet naming conformance checking and constant folding as the producers |

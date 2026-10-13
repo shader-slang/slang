@@ -1,7 +1,7 @@
 // metal-swap-chain.cpp
 #include "metal-swap-chain.h"
 
-#include "../apple/cocoa-util.h"
+#include "gfx/apple/cocoa-util.h"
 #include "metal-util.h"
 
 namespace gfx

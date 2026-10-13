@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4c471a8cc08c04ec32fa794345402afdfbb8835d7faedda552618eba646154c6
+//META: doc_section_digest=b8f904aecf9e728d9c4d1931e51614ef4449f41fd9569c18771a86d6e39c87f9
 //META: purpose=Fires diagnostic E30510 (loop-in-diff-func-require-unroll-or-max-iters) -- loop in differentiable function needs attributes
 //META: intent=negative
 //META: pipeline_stage=check
@@ -26,4 +26,4 @@ void main() {
 }
 
 
-// CHECK: E30510
+//CHECK: E30510

@@ -18,7 +18,7 @@ namespace slang_llvm
 /// recognise, then hands it to the LLJITBuilder. On non-x86_64 hosts (or
 /// without the env var) this is a no-op.
 ///
-/// Prefer `createAVX512SafeLLJIT()` over calling this helper directly: it
+/// Prefer `createSlangLLJIT()` over calling this helper directly: it
 /// pairs the disable step with `LLJITBuilder::create()` so a future caller
 /// can't accidentally construct an LLJIT without the mitigation. See
 /// https://github.com/shader-slang/slang/issues/11062.
@@ -29,18 +29,14 @@ namespace slang_llvm
 /// remove this helper entirely.
 void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder);
 
-/// Construct an LLJIT with AVX-512 conditionally disabled in its JIT
-/// TargetMachine. Equivalent to:
-///
-///   LLJITBuilder b;
-///   disableAVX512ForJIT(b);
-///   return b.create();
+/// Construct an LLJIT using Slang's platform configuration.
 ///
 /// `disableAVX512ForJIT` only fires when SLANG_DISABLE_AVX512=1 is set in
-/// the environment; otherwise this is a plain `LLJITBuilder().create()`.
-/// Use this from every LLJIT construction site in slang-llvm so the
-/// mitigation can't be forgotten. See #11062.
-llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> createAVX512SafeLLJIT();
+/// the environment. On 64-bit Windows, RuntimeDyld uses one ordered allocation
+/// per object so COFF image-relative relocations always have valid offsets.
+/// Use this from every LLJIT construction site in slang-llvm so neither
+/// configuration can be forgotten.
+llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> createSlangLLJIT();
 
 /* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
 the LLVMDownstreamCompileResult and the compilation that created it */

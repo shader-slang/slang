@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_PERFORMANCE_PROFILER_H
 #define SLANG_CORE_PERFORMANCE_PROFILER_H
 
-#include "../core/slang-list.h"
+#include "core/slang-list.h"
 #include "slang-com-helper.h"
 #include "slang-string.h"
 

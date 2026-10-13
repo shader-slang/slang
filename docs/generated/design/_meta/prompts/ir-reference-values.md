@@ -52,8 +52,12 @@ The relevant Lua ranges start with the `Constant` group around line
   bit-ops are usually emitted by `tryLowerIntrinsic` or the
   `visit*Expr` family. Memory ops typically come from
   `visitVarDecl`, `visitMemberExpr`, `visitIndexExpr`, etc.
-- `defaultConstruct`, `Poison`, and `LoadFromUninitializedMemory`
-  are typically `(synthesized)` (introduced by IR passes).
+- `defaultConstruct`, `Poison`, and `LoadFromUninitializedMemory` are
+  introduced by IR passes rather than by AST lowering. Name the
+  specific pass; the retired catch-all `(synthesized)` is not
+  acceptable, and an opcode nothing in `source/` constructs is marked
+  **no producer at HEAD** (see the column contract in
+  [_common.md](_common.md)).
 
 ## Notable opcodes
 

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=bfcf3adbb7a4f7b57cbc3f2a6c653be628187f4c04c1be07986060fff22278b1
+//META: doc_section_digest=701ef041ecc9acb580aec0126cc654822bf8eaa07965de60e5d1027dc054f31a
 //META: purpose=Fires diagnostic E30516 (initializer-list-member-visibility-mismatch) -- member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list
 //META: intent=negative
 //META: pipeline_stage=check
@@ -20,4 +20,4 @@ public struct S {
 void main() { S s = {5}; }
 
 
-// CHECK: E30516
+//CHECK: E30516

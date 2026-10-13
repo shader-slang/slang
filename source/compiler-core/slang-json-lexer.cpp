@@ -1,7 +1,7 @@
 // slang-json-lexer.cpp
 #include "slang-json-lexer.h"
 
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 #include "slang-json-diagnostics.h"
 
 /*

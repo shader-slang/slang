@@ -1,6 +1,6 @@
 // unit-test-rtti.cpp
 
-#include "../../source/core/slang-rtti-info.h"
+#include "core/slang-rtti-info.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

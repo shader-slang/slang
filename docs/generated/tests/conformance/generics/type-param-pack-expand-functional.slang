@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/language-reference/generics.md#type-param-packs
-//META: doc_section_digest=1d7c4d9f36d4d30dc9d8e89006174f0691c6f26a9618f3cb1da30611dc1fe7df
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#type-parameter-pack
+//META: doc_section_digest=f0666c2d444ef1f203d4941f9f3316ff8c39bef6547ab07edd2666e6a16554d6
 //META: purpose=A type parameter pack expanded with `expand ... each ...` produces one call per pack element, in order.
 //META: intent=functional
 //META: pipeline_stage=runtime

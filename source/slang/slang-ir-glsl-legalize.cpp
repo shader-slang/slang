@@ -1044,22 +1044,35 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    // Traverse the entire access chain for the current leaf var and see if
-    // there are interpolation mode decorations along the way.
-    // Make sure we respect the decoration on the inner most node.
-    // So that the decoration on a struct field overrides the outer decoration
-    // on a parameter of the struct type.
+    // Use the innermost interpolation mode, but scan the entire declaration
+    // chain for precise. A field may specify nointerpolation while its enclosing
+    // output parameter specifies precise; both qualifiers apply to the field.
+    bool foundInterpolationMode = false;
     for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
         auto paramInfo = outerParamInfo->outerParam;
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
-        if (auto interpolationModeDecor =
-                decorParent->findDecoration<IRInterpolationModeDecoration>())
+        // A precise output field or parameter remains precise after scalarization.
+        // Keep that qualifier on the resulting output address so the SPIR-V backend
+        // can trace the values stored into it after the original declaration is gone.
+        if (kind == LayoutResourceKind::VaryingOutput &&
+            decorParent->findDecoration<IRPreciseDecoration>() &&
+            !globalParam->findDecoration<IRPreciseDecoration>())
         {
-            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
-            break;
+            builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
+        }
+        if (!foundInterpolationMode)
+        {
+            if (auto interpolationModeDecor =
+                    decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                builder->addInterpolationModeDecoration(
+                    globalParam,
+                    interpolationModeDecor->getMode());
+                foundInterpolationMode = true;
+            }
         }
     }
 
@@ -4043,14 +4056,17 @@ void legalizeEntryPointParameterForGLSL(
     // which is what current emit code assumes, but may not be more generally applicable.
     if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        // The topology is normally on the function already (recorded at lowering); a parameter
+        // that still carries it must agree. Linked or deserialized IR may carry it only on the
+        // parameter, so lift it in that case. Mirrors the IRStreamOutputTypeDecoration handling
+        // below.
+        if (auto existing = func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, geomDecor->getOp());
+            SLANG_ASSERT(existing->getOp() == geomDecor->getOp());
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have "
-                             "IRGeometryInputPrimitiveTypeDecoration decoration");
+            builder->addDecoration(func, geomDecor->getOp());
         }
     }
 
@@ -4354,49 +4370,31 @@ void legalizeEntryPointParameterForGLSL(
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
-            auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
-            if (as<IRStructType>(globalVarType))
+            // Route by the scalarized shape, not by the proxy var's syntactic type.
+            // A struct scalarizes to a `tuple` whether standalone or array-nested
+            // (`in triangle S arr[3];`); the array-nested proxy var has array type even
+            // though its scalarized value is a tuple, so a syntactic type test does not
+            // identify the tuple case. `tryReplaceUsesOfStageInput` rewrites the reads of
+            // a tuple structurally (by array element, then by field); it leaves the proxy
+            // var and the stores that initialize it in place (they persist to the emitted
+            // output). The `address` branch below instead splices in the real input and
+            // deallocates the proxy here.
+            if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
             {
                 tryReplaceUsesOfStageInput(context, globalValue, globalVar);
             }
             else
             {
-
-                auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-
-                // When we relate a "global variable" to a "global parameter" using
-                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
-                // is dependent on the global parameter's type. Struct types for example will relate
-                // to the tuple flavor, while vector types will be related to the address flavor.
-                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
-                {
-                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
-                    {
-                        for (auto elem : tupleVal->elements)
-                        {
-                            if (elem.key == key)
-                            {
-                                realGlobalVar = elem.val.irValue;
-                                if (!realGlobalVar &&
-                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
-                                {
-                                    if (auto typeAdapterVal =
-                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
-                                    {
-                                        realGlobalVar = typeAdapterVal->val.irValue;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                if (globalValue.flavor == ScalarizedVal::Flavor::address)
                 {
                     realGlobalVar = globalValue.irValue;
                 }
                 else
+                    // Other flavors (e.g. a top-level `typeAdapter` for a
+                    // type-adapted system value) had their uses rewritten by the
+                    // `tryReplaceUsesOfStageInput(context, globalValue, pp)` call above,
+                    // so there is nothing to splice here.
                     continue;
                 SLANG_ASSERT(realGlobalVar);
 
@@ -4418,9 +4416,6 @@ void legalizeEntryPointParameterForGLSL(
                             }
                         }
                     });
-                // we will be replacing uses of `globalVarToReplace`. We need
-                // globalVarToReplaceNextUse to catch the next use before it is removed from the
-                // list of uses.
                 globalVar->replaceUsesWith(realGlobalVar);
                 globalVar->removeAndDeallocate();
             }
@@ -5113,6 +5108,49 @@ void legalizeEntryPointsForGLSL(
     assignRayPayloadHitObjectAttributeLocations(module);
 
     decorateModuleWithSPIRVVersion(module, glslExtensionTracker->getSPIRVVersion());
+}
+
+// Rewrite a single `switch` on a `bool` condition into the equivalent integer switch:
+// cast the condition bool->int (Khronos emitters lower this to an OpSelect) and replace
+// each case value with the matching `IRIntLit` (`true`->1, `false`->0).
+//
+// A case value on a bool-conditioned switch is a canonical `IRBoolLit`, whether written
+// literally (`case true:`/`case false:`) or produced by a `switch` on an `enum : bool` (whose
+// labels `lowerEnumType` canonicalizes from the enum type to `IRBoolLit`).
+static void legalizeBoolSwitch(IRSwitch* switchInst)
+{
+    if (!as<IRBoolType>(switchInst->getCondition()->getDataType()))
+        return;
+
+    IRBuilder builder(switchInst);
+    auto intType = builder.getIntType();
+
+    builder.setInsertBefore(switchInst);
+    auto intCondition = builder.emitCast(intType, switchInst->getCondition());
+    switchInst->condition.set(intCondition);
+
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        auto caseConstant = as<IRBoolLit>(switchInst->getCaseValue(i));
+        SLANG_RELEASE_ASSERT(caseConstant);
+        auto intLit = builder.getIntValue(intType, caseConstant->value.intVal != 0 ? 1 : 0);
+        switchInst->getCaseValueUse(i)->set(intLit);
+    }
+}
+
+void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            if (auto switchInst = as<IRSwitch>(block->getTerminator()))
+                legalizeBoolSwitch(switchInst);
+        }
+    }
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)

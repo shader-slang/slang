@@ -1,0 +1,56 @@
+schema_version: 1
+id: getattributeatvertex-vector-overload-skips-pervertex-check
+bundle: coverage/check-expr
+suspected_kind: wrong-diagnostic
+title: "GetAttributeAtVertex vector overload skips the per-vertex-input check"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc -target spirv <file> -o /tmp/o.spv"
+  source_slang: tests/diagnostics/get-vertex-attribute.slang
+  observed_summary: |
+    The scalar and vector overloads of `GetAttributeAtVertex` disagree about whether the
+    argument has to be a `nointerpolation` / `pervertex` varying input. In one shader:
+      struct VOut { float s; float4 v; }
+      [shader("fragment")]
+      float4 fsmain(VOut vout) : SV_Target
+      {
+          float  a = GetAttributeAtVertex(vout.s, 0);
+          float4 b = GetAttributeAtVertex(vout.v, 0);
+          return b + a;
+      }
+    only the scalar call is diagnosed:
+      error[E39027]: 'GetAttributeAtVertex' must reference vertex input
+        --> line 5 ... 'GetAttributeAtVertex' must reference a vertex input directly, and the
+            vertex input must be decorated with 'pervertex' or 'nointerpolation'.
+    The `float4` call on the same undecorated struct produces no diagnostic at all.
+    Feeding the vector overload an argument that is not even a declaration reference then
+    fails much later, at code emit:
+      struct VIn { nointerpolation float4 c : COLOR; }
+      float4 test(VIn i) { return GetAttributeAtVertex(i.c + 1, 0); }
+      internal error[E99999]: unimplemented feature in Slang compiler:
+        unexpected IR opcode during code emit
+    In source/slang/hlsl.meta.slang the scalar overload (around line 11731) carries
+    `[KnownBuiltin($((int)KnownBuiltinDeclName::GetAttributeAtVertex))]`; the
+    `vector<T,N>` overload (around line 11763) does not, and
+    `SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation` only runs the check for
+    callees that carry that attribute.
+  exit_code: 255
+  stderr_tail: "internal error[E99999]: unimplemented feature in Slang compiler: unexpected IR opcode during code emit"
+expected:
+  claim: |
+    A `GetAttributeAtVertex` call on a varying input that is not decorated with
+    'pervertex'/'nointerpolation' should be rejected with E39027 regardless of whether the
+    attribute is a scalar, a vector, or a matrix; the vector case should not compile
+    silently, and a non-declaration argument should not reach code emit.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/get-vertex-attribute.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "The vector overload is intentionally unchecked: no note in hlsl.meta.slang says so, and the doc comment on the vector overload repeats the same 'must have been declared with nointerpolation' requirement as the scalar one."
+    - "The difference is target-specific: ruled out — both calls are in the same shader and the same -target spirv invocation."

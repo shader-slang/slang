@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=b26c53a58827a63a4737a5ffecaebc522ed5c26fb08cf18d16f61f7f73fc1386
+//META: doc_section_digest=a8c63f994f633433f3521c7c3e2d13a6571e3455a05377a935b0362fe399079c
 //META: purpose=Fires diagnostic E31123 (invalid-guid) -- invalid GUID
 //META: intent=negative
 //META: pipeline_stage=check
@@ -17,4 +17,4 @@
 interface IFoo {}
 
 
-// CHECK: E31123
+//CHECK: E31123

@@ -1,0 +1,53 @@
+schema_version: 1
+id: glsl-hull-patch-constant-system-value-param-rejected
+bundle: coverage/legalize
+suspected_kind: wrong-diagnostic
+title: "Patch-constant sysval param rejected on GLSL/SPIR-V but accepted on HLSL"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: glsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/cand/hull2.slang -target glsl -entry main -stage hull"
+  source_slang: docs/generated/tests/coverage/legalize/hull-patch-constant-func-spirv.slang
+  observed_summary: |
+    A hull shader whose `[patchconstantfunc]` takes a scalar system-value parameter is
+    accepted on -target hlsl but rejected on -target glsl and -target spirv:
+
+      HscOut constants(uint pid : SV_PrimitiveID)
+      { ... }
+      [domain("tri")][partitioning("integer")][outputtopology("triangle_cw")]
+      [outputcontrolpoints(3)][patchconstantfunc("constants")]
+      [shader("hull")]
+      HsOut main(InputPatch<VOut, 3> ip, uint cpid : SV_OutputControlPointID) { ... }
+
+    -target hlsl emits `HscOut_0 constants_0(uint pid_0 : SV_PrimitiveID)` normally.
+    -target glsl / -target spirv both fail:
+
+      error[E57002]: unknown patch constant parameter
+        --> hull2.slang:5:23
+        | HscOut constants(uint pid : SV_PrimitiveID)
+        |                       ^^^ unknown patch constant parameter 'pid'.
+
+    Substituting SV_OutputControlPointID for SV_PrimitiveID gives the identical error.
+    `invokePathConstantFuncInHullShader` (slang-ir-glsl-legalize.cpp:1296-1330) has
+    explicit handling for exactly these two semantics, but reaches the
+    `UnknownPatchConstantParameter` diagnostic first: patch-constant-function
+    parameters carry no `IRVarLayout`, so the `if (!layout)` guard at :1299 fires
+    before the semantic is ever inspected. Both named branches therefore appear to be
+    unreachable for input that comes from the CLI.
+expected:
+  claim: |
+    A patch-constant function parameter carrying SV_PrimitiveID or
+    SV_OutputControlPointID should be accepted on the GLSL/SPIR-V path and bound to the
+    corresponding builtin, as the code at slang-ir-glsl-legalize.cpp:1305-1315 already
+    intends and as the HLSL target already does for the same source.
+  citation_kind: sibling-test
+  citation: tests/hlsl/simple-hull-shader-1.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "The semantics are genuinely unsupported on Vulkan: ruled out — gl_PrimitiveID and gl_InvocationID are both available in a tessellation-control shader, and the legalizer contains code specifically to bind them."
+    - "Test bug: ruled out — the only change between the accepted HLSL compile and the rejected GLSL compile is the -target flag."

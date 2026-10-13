@@ -11,9 +11,16 @@
 
 // Verifies that a bare identifier inside a compute shader resolves to a field of
 // a global-scope `tbuffer` via implicit tbuffer lookup. The bare name `multiplier`
-// must resolve to `TParams.multiplier` without qualification. CHECK asserts the
-// emitted HLSL contains `tbuffer` and `multiplier`, confirming the lookup and emission.
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+// must resolve to `TParams.multiplier` without qualification. Each back-end lowers
+// a tbuffer differently (HLSL keeps `tbuffer`, Metal uses `texture_buffer<>`,
+// GLSL/WGSL fall back to a uniform block), so the claim is checked on every shader
+// text target the back-end can express it on. `-target spirv-asm` is recorded as an
+// Untested `unsupported-on-target` row in the bundle README: the SPIR-V emitter has
+// no lowering for the `TextureBuffer` global and aborts with an internal error.
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 tbuffer TParams
 {
@@ -29,5 +36,21 @@ void computeMain()
     outBuf[0] = multiplier * 2;
 }
 
-// CHECK: tbuffer
-// CHECK: multiplier
+// HLSL keeps the `tbuffer` construct and qualifies the bare name through the
+// parameter-group instance.
+//HLSL-DAG: tbuffer TParams_{{[0-9]+}} :
+//HLSL-DAG: TParams_{{[0-9]+}}.multiplier_{{[0-9]+}}
+
+// GLSL lowers the tbuffer to a std140 uniform block; the bare name still reads
+// through that block instance.
+//GLSL-DAG: {{^}}layout(std140) uniform block_
+//GLSL-DAG: TParams_{{[0-9]+}}.multiplier_{{[0-9]+}}
+
+// Metal lowers the tbuffer to a `texture_buffer<>` bound at a texture slot; the
+// bare name emits as a field read through that pointer.
+//METAL-DAG: texture_buffer<
+//METAL-DAG: TParams_{{[0-9]+}}->multiplier_{{[0-9]+}}
+
+// WGSL binds the parameter group as a `var<uniform>` struct and qualifies the read.
+//WGSL-DAG: var<uniform> TParams_{{[0-9]+}} :
+//WGSL-DAG: TParams_{{[0-9]+}}.multiplier_{{[0-9]+}}

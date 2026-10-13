@@ -1,7 +1,7 @@
 #ifndef SLANG_DIRECTORY_UTIL_H
 #define SLANG_DIRECTORY_UTIL_H
 
-#include "../../source/core/slang-io.h"
+#include "core/slang-io.h"
 
 class CombinePathVisitor : public Slang::Path::Visitor
 {

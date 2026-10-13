@@ -1,31 +1,38 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:15:34Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T14:45:00Z
 target_doc: name-resolution/overload-resolution.md
 review_report: ../../reviews/name-resolution/overload-resolution.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
   fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
+  rejected_out_of_scope: 1
+  deferred: 1
   escalated: 0
 ---
 
 # Remediation report for name-resolution/overload-resolution.md
 
 ## Summary
-
-All five review findings were verified against the watched source at commit `eb9403ef5` and fixed. All five were factually correct and within this page's contract: three majors (F-001, F-002, F-003) corrected algorithm-step descriptions that misstated which candidate flavor is delegated, how per-argument cost is computed, and what the directions step actually checks; two minors (F-004, F-005) corrected the `PartiallyAppliedGenericExpr` data-shape claim and the operator-cache-key description. No findings were rejected, deferred, or escalated.
+Five findings were verified at the recorded commit and fixed: the intro's
+unqualified bypass claim, two wrong candidate-source bullets, the
+`kConversionCost_RankPromotion` meaning, the invented partial-generic closing
+contexts, and an unsupported edge-case bullet that was removed. The digest
+finding is reserved for the operator, and the `core.meta.slang` scope finding
+is deferred because it needs a manifest change. Breakdown: 5 fixed, 0
+rejected-bogus, 1 rejected-out-of-scope, 1 deferred, 0 escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed: `slang-check-overload.cpp:791-794` delegates only `Flavor::Generic` (default is `SLANG_UNEXPECTED`); `:2846-2851` creates the `UnspecializedGeneric` candidate post-inference-failure; `:1394-1405` handles `GenericArgumentInferenceFailed` in the early error path, never reaching the construction switch; `:1540-1559` builds `PartiallyAppliedGenericExpr` under `Flavor::Generic`. | Rewrote the type-check delegation bullet and the finalize construction switch so only `Flavor::Generic` is delegated/wrapped, and described `UnspecializedGeneric` as the recorded failed-inference candidate handled by the early error path. |
-| F-002 | fixed | Confirmed: `slang-check-overload.cpp:824-837` calls `canCoerce` and adds the reported `cost`; `slang-check-conversion.cpp:2551-2556` reports too-high implicit conversions as possible so the overload can be selected and diagnosed at reification. | Replaced the `getImplicitConversionCostWithKnownArg`/`canConvertImplicitly` prose in the type-check step and the Conversion-costs intro with `canCoerce`-based accumulation and the report-as-possible behavior. |
-| F-003 | fixed | Confirmed: `slang-check-overload.cpp:1018-1024` says general l-value checking is done elsewhere and this step only checks `this` mutability; `:1030-1039` rejects a mutating method on an immutable base, emitting `MutatingMethodOnImmutableValue`. | Rewrote the directions step to describe the mutating-`this` check and its diagnostics instead of general in/out/inout/ref l-value enforcement. |
-| F-004 | fixed | Confirmed: `slang-ast-expr.h:955-964` stores `baseGenericDeclRef` and `providedOrdinaryArgs` with a comment that witness arguments are not stored there; `slang-check-overload.cpp:1552-1558` stores only the ordinary-argument prefix. | Rephrased the data-shape claim to name `baseGenericDeclRef` plus the provided ordinary-argument prefix and note witness arguments are formed later. |
-| F-005 | fixed | Confirmed: `slang-check-impl.h:197-209` declares `operatorName`, `isGLSLMode`, `args[2]`; `:230-264` sets `operatorName = intrinsicOp->op` from an `IntrinsicOpModifier` on an applicable overload. | Updated the cache-key prose to include `isGLSLMode`, the two `BasicTypeKey` operands, and the intrinsic-op-modifier derivation of `operatorName`. |
+| F-001 | fixed | Confirmed: `source/slang/slang-check-expr.cpp:4794-4797` returns `nullptr` for GLSL-scope matrix operators and vector equality, and `:4821-4822` returns `nullptr` for mixed-type shifts, so those operands resume normal resolution. | Intro: bypass restricted to the operand shapes `convertToBuiltinArithmeticOp` accepts, with one sentence naming the declined cases that fall through to the general path. |
+| F-002 | fixed | Confirmed: `source/slang/slang-check-overload.cpp:3098-3101` takes one `LookupResultItem` and dispatches by decl kind, while `:3166-3181` is the `LookupResult` iterator. `:2612-2623` sets no `exprVal`; `AddFuncExprOverloadCandidate` at `:2625-2639` does, and is called for a function-typed `ParamDecl` at `:3151`. | `### Probe phase`: `AddDeclRefOverloadCandidates` bullet rewritten as the per-item dispatcher naming `AddOverloadCandidates` as the iterator; `AddFuncOverloadCandidate(FuncType*)` bullet extended with the `AddFuncExprOverloadCandidate` sibling. |
+| F-003 | fixed | Confirmed: `source/slang/slang-ast-support-types.h:121-124` groups the constant under "Conversion that is lossless and keeps the 'kind' of the value the same"; nothing preserves rank. | `## Conversion costs` table: `kConversionCost_RankPromotion` meaning changed to "lossless promotion to a higher rank within the same conversion kind". |
+| F-004 | fixed | Confirmed: `source/slang/slang-check-overload.cpp:3228-3239` is the only semantic consumer that resumes inference, handing `baseGenericDeclRef` and `providedOrdinaryArgs` to `addOverloadCandidatesForCallToGeneric`. `source/slang/slang-check-expr.cpp:2345` only unwraps the base. No ascription or second generic-application path exists. | `## Partial generic application`: the speculative "type ascription / later `GenericAppExpr<...>` / another argument" sentence replaced with the call-site inference path plus its citation. |
+| F-005 | fixed | Confirmed unsupported: `AddFuncExprOverloadCandidate` (`source/slang/slang-check-overload.cpp:2625-2639`) never sets `candidate.item`, while `CompareLookupResultItems` dereferences `left.declRef.getDecl()` at `:1926` and `CompareOverloadCandidates` ranks by `left->item.declRef` at `:2428-2434`. The per-doc prompt's required edge-case list (`docs/generated/design/_meta/prompts/name-resolution-overload-resolution.md:91-105`) does not include this case. | `## Edge cases and failure modes`: the "First-class function value vs declared callable" bullet deleted. |
+| F-006 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md:97-100` reserves `watched_paths_digest` for the operator's `mark-fresh` run and forbids the remediator from editing it. | — |
+| F-007 | deferred | The finding is correct: `docs/generated/design/_meta/manifest.yaml:528-536` omits `source/slang/core.meta.slang`, so `_common.md:185-188` is violated. The remedy the scope rule prescribes is a `watched_paths` expansion, which `_remediate.md:93-94` forbids the remediator from making and `:72-78` names as the archetypal deferral. Follow-up: add `source/slang/core.meta.slang` to this page's `watched_paths`, then link the cited `vector<T,4>` and `__init<T : __EnumType>` declarations. Deleting the claims instead would drop accurate cost-model content the prompt asks for. | — |

@@ -1,7 +1,7 @@
 #ifndef SLANG_MARKDOWN_H_INCLUDED
 #define SLANG_MARKDOWN_H_INCLUDED
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

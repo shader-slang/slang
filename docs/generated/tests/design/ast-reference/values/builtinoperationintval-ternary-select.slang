@@ -1,16 +1,15 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:25Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#builtinoperationintval-and-the-single-representation-invariant
-//META: doc_section_digest=4229b55a01470c7ad99014966f3313e48dd3d9bca875bef59b0f7b4c86cbc182
-//META: purpose=A conditional operator ?: over generic value operands is a symbolic compile-time integer that folds to the selected branch after substitution; each instantiation carries the branch its condition picks.
+//META: doc_section_digest=7294e983132681667c88eb7937aa63061a1f9c975bb9567ce8dd36184dcda775
+//META: purpose=The conditional operator is one of the resolved-operator-call forms that reaches the symbolic builtin-operation value, so a ?: over a generic value parameter folds to the branch its condition selects.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that `?:` (a resolved-operator-call form of the symbolic
-// builtin operation) participates in a compile-time array bound. The
+// Verifies that `?:` participates in a compile-time array bound. The
 // parameter type int[(N > 4) ? 4 : N] is instantiated twice: N = 7
 // must select the true branch (bound 4) and N = 2 the false branch
 // (bound 2); each call type-checks only against the folded branch

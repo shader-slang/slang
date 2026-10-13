@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#varexpr-and-declrefexpr
-//META: doc_section_digest=1048119061754018682d979f5542202272f2f067f0a41b1b806037278d497506
+//META: doc_section_digest=d41eb7e3da9d1c66fee3952dce01afeadec7647fa5526911668777fd6602e274
 //META: purpose=A VarExpr whose name lookup finds nothing is rejected with an "undefined identifier" diagnostic.
 //META: intent=negative
 //META: pipeline_stage=check

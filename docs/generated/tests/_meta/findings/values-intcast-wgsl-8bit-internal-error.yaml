@@ -1,0 +1,47 @@
+schema_version: 1
+id: values-intcast-wgsl-8bit-internal-error
+bundle: design/ir-reference/values
+suspected_kind: wrong-diagnostic
+title: "[values] 8-bit int on WGSL aborts emit instead of diagnosing"
+observed_at: "2026-08-05T00:00:00Z"
+scope: wgsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ir-reference/values/intcast-emit-spirv-extend-signedness.slang -target wgsl -stage compute -entry main"
+  source_slang: docs/generated/tests/design/ir-reference/values/intcast-emit-spirv-extend-signedness.slang
+  observed_summary: |
+    WGSL has no integer type narrower than `i32`/`u32`, so a shader that declares an
+    `int8_t` / `uint8_t` uniform cannot be emitted for that target. Rather than
+    reporting that as a capability / unsupported-type diagnostic, the WGSL emitter
+    aborts with an internal exception and no source location:
+      error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE
+      unexpected: 8 bit integer type emitted
+    The same shader emits cleanly on spirv-asm (`OpSConvert` / `OpUConvert`), hlsl and
+    glsl (`int8_t` / `uint8_t`, glsl additionally requesting
+    `GL_EXT_shader_8bit_storage`), and metal (`char` / `uchar`). Repro shader:
+      uniform int8_t s8;
+      uniform uint8_t u8;
+      uniform RWStructuredBuffer<int> ibuf;
+      uniform RWStructuredBuffer<uint> ubuf;
+      [numthreads(1, 1, 1)]
+      void main() { ibuf[0] = int(s8); ubuf[0] = uint(u8); }
+  exit_code: 255
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: 8 bit integer type emitted"
+expected:
+  claim: |
+    An 8-bit integer declaration targeted at WGSL, which has no sub-32-bit integer
+    type, should be rejected with a normal diagnostic that names the unsupported type
+    and points at the declaration, the way other target-capability shortfalls are
+    reported. An `InternalError` abort gives the user no source location and reads as
+    a compiler crash rather than an unsupported-feature message.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/values.md#conversions
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/generated/design/ir-reference/values.md#conversions
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the same shader emits cleanly on spirv-asm, hlsl, glsl and metal; only the WGSL back-end aborts."
+    - "Intentional unsupported-feature refusal: partly — WGSL genuinely cannot express an 8-bit integer, so refusing is correct; what is wrong is the *form* of the refusal (internal exception, no location) rather than the refusal itself. Filed as wrong-diagnostic, not wrong-codegen, for that reason."
+    - "Missing WGSL polyfill (emit i32 and mask): rejected as the expectation here — that would change the declared storage layout of a uniform block, so a diagnostic is the safer contract."

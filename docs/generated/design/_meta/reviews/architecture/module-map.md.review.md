@@ -1,45 +1,47 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:26:46+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:18:41+00:00
 target_doc: architecture/module-map.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: 3fedec1d8eadc2bf2e0fb417739cd43fb662af67bb19d9334c40fa0168b98cc4
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 8f8f11ba3fefd6f5527363f5b7ce223022ccac1773c5e77ca1ff8000d572a91d
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: fail
-  style_consistency: pass
-  source_alignment: pass
+  style_consistency: partial
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 4
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 0
+  major: 1
+  minor: 3
   nit: 0
 ---
 
 # Review report for architecture/module-map.md
 
 ## Summary
-The included rows I spot-checked are generally accurate, but the document does not meet its prompt's exhaustive lookup-table contract. Two major watched file families are missing from the map: several `source/compiler-core/` infrastructure families and multiple `source/slang/` families such as the language server and reflection API.
+The map is broadly accurate and all checked paths resolve, but it still falls short of the prompt's exhaustive logical-unit inventory. The most important issue is that independently useful watched units remain absent from the `core`, `compiler-core`, and compiler-orchestration tables. Three smaller issues concern one inaccurate AST responsibility, pervasive unlinked source citations, and a conflation of the two core-module embedding stages.
 
 ## Items checked
-- Ran `regenerate.py show architecture/module-map.md` and reviewed the target document, `_common.md`, `architecture-module-map.md`, the dependency document `architecture/overview.md`, and representative resolved watched source files from `prelude/`, `source/core/`, `source/compiler-core/`, `source/slang/`, `source/slangc/`, and peer `source/*` directories.
-- Checked front matter for all required keys, the recorded target source commit, the warning string, and a 64-character hex watched-path digest copied from the target document.
-- Spot-checked more than 10 concrete included claims against source files, including claims about `slang-lexer`, `slang-token`, `SourceManager`, `DiagnosticSink`, `slang-parser`, `slang-preprocessor`, AST families, `slang-lower-to-ir`, `slang-ir-insts.lua`, `slang-emit-hlsl`, and `source/slangc/main.cpp`.
-- Checked representative omitted watched files against the prompt's "mechanical, exhaustive decomposition" requirement and the quality checklist requiring table paths to come from watched paths.
-- Checked the visible relative links used for generated peer documents and representative workspace files; no dangling relative links were found in the checked set.
+- Read the target, `_common.md`, the per-doc prompt, `architecture/overview.md`, and the resolved watched inputs from `regenerate.py show` at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Verified 202 inline entries in table `Files` cells in their stated source groups and resolved all 59 Markdown link targets; generated peer-page links point to manifest pages.
+- Spot-checked more than 10 factual claims, including the built-in cache format, lexer and diagnostics roles, compile-request/session/module ownership, AST cloning and substitution caching, IR-family counts, emit backends, standard modules, record/replay, WASM bindings, and `slangc`.
+- Verified that the body contains no line-number citations, so there were zero source line citations to re-derive.
+- Recomputed the watched-path digest, checked all mandatory front-matter fields, and confirmed the 23,719-byte body is below the 32-KB cap.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## source/compiler-core/ — language-agnostic compiler infrastructure`, lines 56-70 | The compiler-core table is not exhaustive. It includes lexer, diagnostics, artifacts, downstream compiler glue, include search, JSON lexer, and command-line args, but omits watched logical units for JSON parsing/value/RPC, language-server protocol types, rich diagnostic rendering, source maps, and several downstream compiler adapters. | `source/compiler-core/slang-json-parser.cpp:14` defines `JSONParser::_parseObject`; `source/compiler-core/slang-json-rpc-connection.cpp:19` defines `JSONRPCConnection::init`; `source/compiler-core/slang-language-server-protocol.h:13` opens the `LanguageServerProtocol` namespace; `source/compiler-core/slang-rich-diagnostics-render.cpp:33-37` describes diagnostic layout and rendering. | Add compact rows for the omitted compiler-core families, grouping related files where appropriate, for example JSON parsing/value/RPC, language-server protocol, rich diagnostic rendering, source maps, and remaining downstream compiler adapters. |
-| F-002 | major | `## source/slang/ — frontend, IR, passes, emit`, lines 72-235 | The `source/slang/` section omits major watched file families, so the page is not the promised file-level lookup table. In particular, there is no row or subgroup for the Slang language server family and no row for the reflection API implementation. | `source/slang/slang-language-server.cpp:3` says the file implements the Slang language server and includes the completion, document-symbol, inlay-hint, semantic-token, and AST-lookup helpers at `source/slang/slang-language-server.cpp:20-24`; `source/slang/slang-reflection-api.cpp:27` starts conversion routines for the strongly typed reflection API. | Add rows or a short subgroup for `slang-language-server*` and `slang-reflection-*` / reflection API files, and sweep the remaining watched `source/slang/*.h` and `*.cpp` files for similar omitted families before marking the map complete. |
+| F-001 | major | Group tables, especially lines 35-97 | The document is not the requested exhaustive decomposition. Examples of absent, independently useful watched units include HTTP packet transport, memory file systems, RIFF support, process execution, Metal/Tint downstream compiler discovery, and central orchestration types such as `CodeGenContext`, `TargetProgram`, and `TranslationUnitRequest`. | The manifest describes this page as an inventory of every logical unit at `docs/generated/design/_meta/manifest.yaml:37-43`. Representative omitted declarations are in `source/core/slang-http.h:81-101`, `source/core/slang-memory-file-system.h:11-30`, `source/core/slang-process-util.h:28-41`, `source/compiler-core/slang-metal-compiler.h:10-15`, `source/compiler-core/slang-tint-compiler.h:9-14`, `source/slang/slang-code-gen.h:90-91`, and `source/slang/slang-target-program.h:25-34`. | Add compact rows for these omitted families and perform a watched-file-to-row coverage sweep. Where the size cap discourages one row per pair, use explicit catch-all family rows that name the covered files and responsibilities. |
+| F-002 | minor | AST table, line 127 | The responsibility `Layout assigned during AST traversal` misstates `slang-ast-natural-layout`: the implementation recursively computes and caches a type's natural size; it does not assign a layout during a general AST traversal. | `source/slang/slang-ast-natural-layout.h:85-88` exposes `ASTNaturalLayoutContext::calcSize`, and `source/slang/slang-ast-natural-layout.cpp:92-106` computes and caches `NaturalSize`. | Change the responsibility to “Computes and caches natural sizes for AST types.” |
+| F-003 | minor | Tables throughout, for example lines 42-50 and 59-76 | Most source filenames are inline code rather than Markdown links. This violates the universal citation rule and weakens a page whose primary purpose is navigation. | `docs/generated/design/_meta/prompts/_common.md:43-45` requires source-file citations to use workspace-relative Markdown links; the report found 202 unlinked inline entries in `Files` cells. | Convert each file or compact file-family citation in `Files` cells to a workspace-relative link, retaining grouped notation where useful. |
+| F-004 | minor | Core-module table, line 272 | The single row says both core-module files are “compiled into `libslang`,” conflating the source-embedding target used to bootstrap generation with the generated binary-module embedding target linked as needed into the library. | `source/slang-core-module/CMakeLists.txt:52-89` defines the source-embedding targets; lines 93-95 say that source generates the embeddable core module; lines 198-217 define the separate generated-module embed and no-embed targets. | Split the row into “bootstrap source embedding” (`slang-embedded-core-module-source.cpp`) and “compiled core-module embedding” (`slang-embedded-core-module.cpp`), with their distinct build roles. |
 
 ## No-issues notes
-- The front matter is structurally valid and uses the target document's own source commit and watched-path digest.
-- The large `slang-ir-*` pass family is appropriately summarized by category rather than enumerating hundreds of pass files, which matches the per-doc prompt.
-- The `source/slang-record-replay/` and `source/slang-llvm/` sections correctly identify those peer directories as separate logical unit groups from the main `source/slang/` target.
+- All 59 relative links resolve at the recorded source commit, and every checked `Files` entry names an existing file in its stated group.
+- The `slang-ir-*` estimate is accurate at 162 `.cpp` plus 162 headers and is appropriately summarized instead of enumerated.
+- Front matter is complete, and the recomputed watched-path digest exactly matches the target document.

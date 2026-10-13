@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3           tid    : SV_DispatchThreadID,
@@ -33,3 +35,9 @@ void computeMain(uint3           tid    : SV_DispatchThreadID,
 // METAL: constant* entryPointParams_
 // WGSL maps the uniform entry-point parameter to var<uniform>.
 // WGSL: var<uniform> entryPointParams_
+// GLSL collapses the single `uniform` entry-point parameter into a push-constant block,
+// matching the SPIRV PushConstant result above.
+// GLSL: layout(push_constant)
+// GLSL: }entryPointParams_
+// HLSL has no push-constant construct; the uniform parameter becomes a cbuffer on `b`.
+// HLSL: cbuffer entryPointParams_{{.*}} : register(b

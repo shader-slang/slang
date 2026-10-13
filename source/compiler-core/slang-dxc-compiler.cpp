@@ -1,14 +1,14 @@
 // slang-dxc-compiler.cpp
 #include "slang-dxc-compiler.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-char-util.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
@@ -35,7 +35,7 @@
 #include <windows.h>
 #endif
 
-#include "../../external/dxc/dxcapi.h"
+#include "dxc/dxcapi.h"
 
 #ifndef _WIN32
 #ifdef __uuidof
@@ -252,6 +252,10 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE
+    {
+        return getPathFromSymbol((void*)m_createInstance, outPath);
+    }
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);

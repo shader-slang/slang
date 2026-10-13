@@ -1,7 +1,7 @@
 // slang-parameter-binding.cpp
 #include "slang-parameter-binding.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -2337,6 +2337,22 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     return typeLayout;
 }
 
+// Diagnose that the current target provides no type-layout rules for a
+// ray-tracing entry-point parameter (payload or hit attributes) of `stage`.
+// Some targets do not support ray tracing at all (e.g. Metal, whose payload,
+// callable-payload, and hit-attribute rules are all null) or may lack rules for
+// a specific parameter kind; reporting this keeps callers from dereferencing a
+// null rules pointer during type layout.
+static void diagnoseUnsupportedRayTracingParameter(
+    ParameterBindingContext* context,
+    Stage stage,
+    SourceLoc loc)
+{
+    getSink(context)->diagnose(Diagnostics::TargetDoesNotSupportRayTracingParameters{
+        .stage = getStageName(stage),
+        .location = loc});
+}
+
 // Returns nullptr when `type` is not valid in a varying parameter position
 // (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
@@ -2422,17 +2438,17 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getRayPayloadParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getRayPayloadParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getCallablePayloadParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getCallablePayloadParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
         }
     }
     else
@@ -2461,10 +2477,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::AnyHit:
         case Stage::ClosestHit:
             // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getHitAttributesParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
         }
     }
 
@@ -2591,7 +2607,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = meshOutputType;
 
             // TODO: Ellie, this is probably not the right place to handle this
             // On GLSL the indices type is built in and as such doesn't consume
@@ -2623,7 +2639,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = patchType;
 
             for (auto rr : elementTypeLayout->resourceInfos)
             {
@@ -4833,10 +4849,16 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 
     if (!m_layout)
     {
+        auto errorCountBefore = sink->getErrorCount();
         m_layout = generateParameterBindings(this, sink);
-        if (sink->getErrorCount() != 0)
-            return nullptr;
+        if (sink->getErrorCount() != errorCountBefore)
+            m_layoutHasErrors = true;
     }
+
+    // Layout generation reported errors on an earlier call (to a different sink, or this one).
+    // Don't hand out the layout of an invalid program, or build IR for it.
+    if (m_layoutHasErrors)
+        return nullptr;
 
     if (m_layout && !m_irModuleForLayout)
     {

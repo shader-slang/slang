@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry vsMain -stage vertex
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry vsMain -stage vertex
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry vsMain -stage vertex
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry vsMain -stage vertex
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry vsMain -stage vertex
 
 struct VSOutput {
     float4 pos : SV_Position;
@@ -39,3 +41,10 @@ VSOutput vsMain(float3 pos : POSITION, float2 uv : TEXCOORD0)
 // WGSL emits @vertex and output struct field with @builtin(position).
 // WGSL-DAG: @vertex
 // WGSL-DAG: @builtin(position)
+// GLSL maps Output-address-space values to `out` varyings and the gl_Position builtin.
+// GLSL: out vec2 entryPointParam_vsMain_uv_
+// GLSL: gl_Position =
+// HLSL keeps them as semantic-annotated fields of the returned struct.
+// HLSL: float4 pos_{{.*}} : SV_Position;
+// HLSL: float2 uv_{{.*}} : TEXCOORD0;
+// HLSL: VSOutput_{{[0-9]+}} vsMain(

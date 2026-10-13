@@ -22,7 +22,7 @@ Result VKBufferHandleRAII::init(
     bool isShared,
     VkExternalMemoryHandleTypeFlagsKHR extMemHandleType)
 {
-    assert(!isInitialized());
+    SLANG_ASSERT(!isInitialized());
 
     m_api = &api;
     m_memory = VK_NULL_HANDLE;
@@ -48,7 +48,7 @@ Result VKBufferHandleRAII::init(
     api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
 
     int memoryTypeIndex = api.findMemoryTypeIndex(memoryReqs.memoryTypeBits, reqMemoryProperties);
-    assert(memoryTypeIndex >= 0);
+    SLANG_ASSERT(memoryTypeIndex >= 0);
 
     VkMemoryPropertyFlags actualMemoryProperites =
         api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
@@ -97,7 +97,7 @@ Result VKBufferHandleRAII::init(
 BufferResourceImpl::BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* renderer)
     : Parent(desc), m_renderer(renderer)
 {
-    assert(renderer);
+    SLANG_ASSERT(renderer);
 }
 
 BufferResourceImpl::~BufferResourceImpl()

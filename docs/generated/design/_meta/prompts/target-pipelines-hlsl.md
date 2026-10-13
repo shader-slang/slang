@@ -53,8 +53,8 @@ and how the emitted HLSL source flows into DXC (DXIL) or fxc
   `floatNonUniformResourceIndex` (line ~1980 `!isSPIRV`),
   `legalizeArrayReturnType` (line ~2151 `!isMetalTarget && !isSPIRV`),
   `legalizeUniformBufferLoad` (`isKhronosTarget || target == HLSL`),
-  `eliminatePhis` with **default** options (no register
-  allocation),
+  `eliminatePhis` with default options (which, note, *do* use
+  register allocation — see below),
   `applyVariableScopeCorrection` (line ~2324 `target != SPIRV`).
 - **Phase D — HLSL emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` (line ~2365) through the
@@ -116,8 +116,14 @@ Cover at least:
 - `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` — only
   fires for non-Khronos targets, so it runs for HLSL but **not**
   for SPIR-V / GLSL.
-- `eliminatePhis` with default options — contrast with SPIR-V
-  which sets `useRegisterAllocation = true`.
+- `eliminatePhis` with default options. Do **not** write that this
+  contrasts with SPIR-V: the defaults in
+  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
+  `useRegisterAllocation = true`, and the direct-SPIR-V branch in
+  `slang-emit.cpp` assigns those *same* two values, so there is no
+  difference to contrast. An earlier revision of this prompt asserted
+  the opposite and put that error on the page.
 - `applyVariableScopeCorrection` — emits scope-correcting copies
   required by HLSL but not SPIR-V.
 - The downstream DXC / fxc chain: DXC is the default for shader

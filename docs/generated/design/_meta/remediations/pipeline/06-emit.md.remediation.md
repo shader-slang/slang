@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:05:46Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T15:00:00Z
 target_doc: pipeline/06-emit.md
 review_report: ../../reviews/pipeline/06-emit.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 2
-  rejected_out_of_scope: 0
+  fixed: 3
+  rejected_bogus: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -17,10 +17,14 @@ actions:
 # Remediation report for pipeline/06-emit.md
 
 ## Summary
-Both findings were verified against the current target doc and the watched sources at HEAD. Each describes text the current draft no longer contains: the doc already qualifies the new-backend checklist by textual vs. direct path (F-001) and already narrows the include claim while noting SPIR-V's forward declaration (F-002). The reviewer assessed an earlier draft. No body edits were made; both findings are rejected-bogus.
+
+Four findings were reviewed. Three were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and fixed: the obsolete watched-set claims around the dispatcher, the blanket statement that every artefact carries post-emit metadata, and the claim that every textual target ships a prelude header. The major finding concerns the front-matter `watched_paths_digest` and was rejected as out of scope. The document was edited.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | Current `## Adding a new backend` step 2 (`docs/generated/design/pipeline/06-emit.md` lines 233-243) already restricts `emitEntryPointsSourceFromIR` to "a textual target" and adds "A direct/non-textual backend instead follows the pattern of SPIR-V, LLVM, and VM bytecode: a separate emit function (`emitSPIRVForEntryPointsDirectly`, `emitLLVMForEntryPoints`, `emitVMByteCodeForEntryPoints`)". Source confirms these functions at `source/slang/slang-emit.cpp:3251`, `:3338`, and `source/slang/slang-emit-vm.cpp:1191`. The recommended qualification is already present. | — |
-| F-002 | rejected-bogus | Current `## Emit dispatcher` (`docs/generated/design/pipeline/06-emit.md` lines 50-55) already states the includes "pull in the header-backed emit helpers used by this file" and that "Direct SPIR-V is not header-included here; it is wired via the `emitSPIRVFromIR` forward declaration and implemented in slang-emit-spirv.cpp". Source confirms no `slang-emit-spirv.h` in the include block (`source/slang/slang-emit.cpp` lines 14-25) and the forward declaration at `source/slang/slang-emit.cpp:2787`. The recommended narrower claim is already present. | — |
+| F-001 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md` lines 97-100 reserve `generated_at`, `source_commit`, and `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run: "Do not edit those three fields yourself." The digest is refreshed when the operator marks this page fresh after the edits below. | — |
+| F-002 | fixed | The manifest entry for this page now watches `source/slang/slang-code-gen.cpp` and `source/slang/slang-global-session.cpp` alongside `slang-emit.cpp` and the `slang-emit-*` glob, so both stale claims were wrong. Only the `prelude/*.h` contents remain unwatched. | `## Emit dispatcher`: dropped the "not in the watched paths" qualifier and the anchor link. `## Paths outside the watched set`: rewritten to list the current watched set and retain only the `prelude/*.h` gap. |
+| F-003 | fixed | Verified at HEAD: `source/slang/slang-emit.cpp:2975` associates metadata on the source artifact and `:3524` on direct SPIR-V, while the HostVM artifact created at `:3581-3582` and `emitLLVMForEntryPoints` at `:3587` do not; `linkedIR.metadata` appears nowhere else in the file. | `## Inputs and outputs`: metadata sentence split out and qualified by emit path. |
+| F-004 | fixed | `source/slang/slang-global-session.cpp:125-128` registers language preludes only for CUDA, C++, and HLSL; `emitEntryPointsSourceFromIR` handles Torch and heterogeneous host output separately. The page's own later paragraph already said GLSL, Metal, and WGSL have no `prelude/` header. | `## Preludes`: opening sentence now scopes shipped preludes to the targets in the table and notes the others rely on backend-emitted vocabulary. |

@@ -10,7 +10,7 @@
 // cost of implicit conversions between the base types.
 //
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-type-system-shared.h"
 
 namespace Slang

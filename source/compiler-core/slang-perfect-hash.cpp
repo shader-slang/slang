@@ -1,7 +1,7 @@
 #include "slang-perfect-hash.h"
 
-#include "../core/slang-string-util.h"
-#include "../core/slang-writer.h"
+#include "core/slang-string-util.h"
+#include "core/slang-writer.h"
 
 namespace Slang
 {

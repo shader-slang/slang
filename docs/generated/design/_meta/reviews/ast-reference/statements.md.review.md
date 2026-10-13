@@ -1,22 +1,22 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:27:48+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:17:46+00:00
 target_doc: ast-reference/statements.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: ef75dc1de48b06f0b01fd7da196735cab6033928aab034bca2cebfd41fe221d7
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 070b3ccec0f278478300fb9f59f4c0f312a12c4abadffcc0764197842e97ad2b
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
-  style_consistency: pass
+  completeness: partial
+  style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 4
+finding_count: 5
 severity_breakdown:
   critical: 0
-  major: 0
+  major: 1
   minor: 4
   nit: 0
 ---
@@ -24,26 +24,27 @@ severity_breakdown:
 # Review report for ast-reference/statements.md
 
 ## Summary
-The statements page covers the concrete classes in `slang-ast-stmt.h` and has valid front matter and links. I found four minor source-alignment problems, mostly around exact parser names or surface syntax that differs from the watched parser.
+The page is structurally complete, covers every concrete class in the watched statement header, and has valid links and front matter. Five findings remain. The most important is that it equates `ScopeStmt` inheritance with opening a lexical scope, although the parser creates no statement-owned scope for `WhileStmt`, `DoWhileStmt`, or `SwitchStmt`.
 
 ## Items checked
-- Ran `regenerate.py show ast-reference/statements.md` and used only the reported prompt, dependencies, and watched files: `source/slang/slang-ast-stmt.h`, `source/slang/slang-ast-base.h`, and `source/slang/slang-parser.cpp`.
-- Read the target document front matter/body, `_common.md`, `ast-reference-statements.md`, dependency docs `ast-reference/base.md` and `syntax-reference/grammar.md`.
-- Checked front matter for all required keys, the recorded target source commit, the warning string, and a 64-character hex watched-path digest.
-- Verified the required AST-reference sections are present and that every concrete `FIDDLE()` class in `slang-ast-stmt.h` appears in the Nodes table, including helper `UniqueStmtIDNode`.
-- Spot-checked more than 10 source-backed claims against the watched files, including `ScopeStmt`, `SeqStmt`, `BlockStmt`, `BreakableStmt`, `ChildStmt`, `TargetCaseStmt`, `ForStmt`, `UnscopedForStmt`, `CompileTimeForStmt`, `ThrowStmt`, `CatchStmt`, and `RequireCapabilityStmt`.
-- Resolved the document's workspace-relative source and generated-doc links that were in scope for this page; no broken target paths were found.
+- Verified the document against all three resolved watched files at `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which is also the review-time `HEAD`.
+- Checked all 30 concrete classes and their table fields against `slang-ast-stmt.h`, plus every abstract intermediate shown in the hierarchy.
+- Re-derived all 24 line-number citation occurrences (22 distinct ranges or lines) in `slang-parser.cpp`; each cited line identifies the stated enum, call site, or function definition.
+- Verified more than 30 factual claims, including parser dispatch, deferred body parsing, block sequencing, loop construction, target-switch cases, catch chaining, labels, and capability-name validation.
+- Resolved all 41 relative links, including anchors, and checked both dependency documents: `ast-reference/base.md` and `syntax-reference/grammar.md`.
+- Checked the mandatory sections, front-matter keys, warning text, 64-character hexadecimal digest shape, and the 49,152-byte size cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Source`, lines 20-23 | The source section names the parser entry point as `parseStatement`, but the watched parser declares and defines it as `ParseStatement` on `Parser`. | `source/slang/slang-parser.cpp:209` declares `Stmt* ParseStatement(Stmt* parentStmt = nullptr);`; `source/slang/slang-parser.cpp:6902` defines `Stmt* Parser::ParseStatement(Stmt* parentStmt)`. | Change `parseStatement` to `Parser::ParseStatement` or ``ParseStatement``. |
-| F-002 | minor | `## Nodes`, line 112 | The `ThrowStmt` row summarizes the syntax as `throw e;`, but the watched parser's `ParseThrowStatement` reads `throw` and an expression without consuming a semicolon. | `source/slang/slang-parser.cpp:7568` through `source/slang/slang-parser.cpp:7575` show `ParseThrowStatement` calling `ReadToken("throw")` and `ParseExpression()` and then returning; unlike `ParseExpressionStatement` at `source/slang/slang-parser.cpp:7577`, it has no `ReadToken(TokenType::Semicolon)`. | Remove the semicolon from the `ThrowStmt` summary or explicitly note that the current parser routine does not consume one. |
-| F-003 | minor | `## Nodes`, line 115 and `### RequireCapabilityStmt`, lines 220-225 | The page labels the statement as `require_capability`, but the watched parser recognizes the camel-case internal keyword `__requireCapability`. | `source/slang/slang-parser.cpp:6969` dispatches on `LookAheadToken("__requireCapability")`; `source/slang/slang-parser.cpp:7588` documents the production as `__requireCapability '(' identifier (',' identifier)* ')' ';'`; `source/slang/slang-parser.cpp:7593` reads `__requireCapability`. | Use `__requireCapability` in the row summary and notable-node prose, or mark the Grammar cell `(none)` if the grammar page does not expose this internal statement production. |
-| F-004 | minor | `### CompileTimeForStmt`, lines 164-171 | The notable-node prose says `CompileTimeForStmt` backs "`[ForceInline]`-style range loops over generic value parameters," but the watched parser shows a `$for (name in Range(...))` syntax and no connection to `ForceInline` in this parse path. | `source/slang/slang-parser.cpp:6888` reads a leading `$`, then `parseCompileTimeForStmt` reads `for`, the loop variable, `in`, and `Range(...)` at `source/slang/slang-parser.cpp:6842` through `source/slang/slang-parser.cpp:6873`. | Replace the `ForceInline` comparison with the actual `$for (... in Range(...))` parser shape, and leave lowering details to the linked pipeline page. |
+| F-001 | major | `## Family hierarchy`, lines 42-46; `### BlockStmt and SeqStmt`, lines 134-139; `### Loop family`, lines 203-205 | The page presents `ScopeStmt` inheritance as the lexical-scope axis and concludes that every loop is “scope-introducing.” That is not how the watched parser constructs these nodes: only `ForStmt` receives and conditionally pushes its own `ScopeDecl`; `WhileStmt` and `DoWhileStmt` receive none, and `SwitchStmt` relies on its parsed `BlockStmt` for a scope rather than owning one itself. | `source/slang/slang-parser.cpp:6572-6581` creates `SwitchStmt` without assigning `scopeDecl`; `source/slang/slang-parser.cpp:7394-7420` creates and pushes the `ForStmt` scope; `source/slang/slang-parser.cpp:7457-7479` creates `WhileStmt` and `DoWhileStmt` without any scope operation. | Describe `ScopeStmt` as a structural base used by several control-flow groupings, then state precisely which parser routines create a statement-owned `ScopeDecl`: block, scoped `for`, GPU foreach, and compile-time `for`. Explain that a switch's block supplies its lexical scope and that while/do-while do not add a separate one. |
+| F-002 | minor | `### Loop family`, lines 206-209 | The page says `ParseForStatement` “rejects” an initializer that is not a `DeclStmt` or `ExpressionStmt`, but the function emits a diagnostic and continues constructing and returning the `ForStmt`. | `source/slang/slang-parser.cpp:7424-7437` diagnoses the unexpected statement without returning or clearing it; the function returns `stmt` at `source/slang/slang-parser.cpp:7454`. | Replace “rejects” with “diagnoses” and, if useful, note that parser recovery retains the constructed loop node. |
+| F-003 | minor | `## Nodes`, `DeferStmt` row, line 123 | The summary spells the form as `defer S;`, implying that `defer` itself requires a trailing semicolon. The parser consumes `defer` followed by an arbitrary `Stmt`, so a deferred block has no extra semicolon. | `source/slang/slang-parser.cpp:7571-7577` calls `ParseStatement()` immediately after `ReadToken("defer")`; `docs/generated/design/syntax-reference/grammar.md:439` specifies `DeferStmt ::= 'defer' Stmt`. | Change the generic spelling to `defer S`; optionally use `defer f();` and `defer { ... }` as examples if both forms need illustration. |
+| F-004 | minor | `## Nodes`, `DeferStmt` row, line 123; `### DeferStmt`, lines 264-268 | The page describes IR lowering in detail (“scope-exit handlers”), even though the per-document prompt explicitly forbids IR-level statement lowering and asks this page to stop at the AST node and link to the lowering page. | `docs/generated/design/_meta/prompts/ast-reference-statements.md:39-42` asks for the AST shape and a pipeline citation; lines 50-55 forbid IR-level lowering. | Retain that `DeferStmt::statement` stores the deferred statement and link to `pipeline/04-ast-to-ir.md`; remove the claims about enqueueing and scope-exit-handler materialization. |
+| F-005 | minor | Intro, lines 12-16 | The first body paragraph says what the page covers but not who it is for; the audience appears in a separate paragraph. The universal contract requires both in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state the coverage and intended reader. | Merge the audience sentence into the opening paragraph. |
 
 ## No-issues notes
-- The `## Nodes` table includes all concrete statement classes declared in `slang-ast-stmt.h`, while keeping abstract intermediates in the hierarchy diagram rather than the table.
-- The distinction between `BlockStmt` and `SeqStmt` is supported by `parseBlockStatement`, which creates a `BlockStmt` with `scopeDecl` and wraps multiple body statements in a `SeqStmt`.
-- The target-switch rows match the shared parser implementation where `parseTargetSwitchStmt` and `parseStageSwitchStmt` both call `parseTargetSwitchStmtImpl`.
+- Every concrete `FIDDLE()` class in `slang-ast-stmt.h`, including `UniqueStmtIDNode`, appears exactly once in the Nodes table; abstract intermediates remain in the hierarchy.
+- The two-stage `UnparsedStmt` account and all associated parser citations match `parseOptBody` and `parseUnparsedStmt`.
+- The target-switch explanation correctly captures shared parsing, immediate capability-name validation, default-label encoding, and shared bodies for stacked labels.

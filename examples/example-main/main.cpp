@@ -1,4 +1,4 @@
-#include "../stacktrace-windows/common.h"
+#include "stacktrace-windows/common.h"
 
 #include <stdio.h>
 #include <stdlib.h>

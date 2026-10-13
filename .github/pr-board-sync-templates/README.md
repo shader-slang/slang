@@ -25,14 +25,15 @@ the reference for what slang runs.
 | `example-pr-maintenance.yml` | `.github/workflows/pr-maintenance.yml` | no | PR lifecycle + reviews (`pull_request_target`, `pull_request_review`, `check_suite`). |
 | `example-pr-checks-complete.yml` | `.github/workflows/pr-checks-complete.yml` | **yes** — list this repo's workflow names | CI / gating-check results via `workflow_run` (Actions CI does not emit usable `check_suite`). |
 | `example-pr-commit-status.yml` | `.github/workflows/pr-commit-status.yml` | no | External commit statuses via the `status` event. |
+| `example-pr-sweep-nightly.yml` | `.github/workflows/pr-sweep-nightly.yml` | no | Nightly / on-demand sweep of every open PR in this repo (`mode: sweep`). |
 | `example-pr-review-fork-bridge.yml` | `.github/workflows/pr-review-fork-bridge.yml` | no | Optional: stage 1 of the real-time fork-PR review relay. |
 | `example-pr-review-fork-apply.yml` | `.github/workflows/pr-review-fork-apply.yml` | no | Optional: stage 2 (privileged) of the fork-PR review relay. |
 
 ## Onboarding a repo
 
-1. Copy `example-pr-maintenance.yml`, `example-pr-commit-status.yml`, and
-   `example-pr-checks-complete.yml` into the repo's `.github/workflows/`
-   (dropping the `example-` prefix).
+1. Copy `example-pr-maintenance.yml`, `example-pr-commit-status.yml`,
+   `example-pr-checks-complete.yml`, and `example-pr-sweep-nightly.yml` into the
+   repo's `.github/workflows/` (dropping the `example-` prefix).
 2. In `pr-checks-complete.yml`, replace the `workflows:` list with **this repo's**
    gating workflow `name:`s (at minimum its CI workflow). `workflow_run` can only
    reference workflows in the same repo, by name. Do **not** list the board-sync's
@@ -42,12 +43,19 @@ the reference for what slang runs.
 4. Ensure the org-level secret `SLANG_PR_BOT_TOKEN` (a dedicated bot PAT with org
    Projects RW + Members read; repo Contents read, Pull requests write, Issues
    write, Metadata read) is available to the repo. The callers map only that
-   secret; the reusable workflow uses it for every call, so callers should keep
-   `permissions: {}` to drop the unused `GITHUB_TOKEN` scopes.
+   secret. Repo-scoped writes are made as `github-actions[bot]`, so each calling
+   job grants `issues: write` (assignees, linked issues, and comments) and
+   `pull-requests: write` (review requests). The reusable workflow uses the PAT
+   for org-team reads and ProjectsV2 writes, which `GITHUB_TOKEN` cannot do, and
+   as a compatibility fallback for assignment/reviewer writes while existing
+   callers roll out these grants. Comments never fall back to the PAT because
+   that would subscribe its human owner to the PR.
 
-The nightly sweep (`pr-sweep-nightly.yml`, `mode: sweep`) remains the idempotent
+The nightly sweep (`pr-sweep-nightly.yml`, `mode: sweep`) is the idempotent
 backstop for anything the per-event path cannot see (missed webhooks, failed runs,
-post-hoc issue links, board drift). See
+post-hoc issue links, board drift). Each consuming repo needs its own copy: the
+reusable workflow sweeps `context.repo` of the **caller**, so a schedule in
+slangpy reconciles slangpy's open PRs, not slang's. See
 [`../workflows/pr-board-sync.md`](../workflows/pr-board-sync.md) for the full
 architecture.
 

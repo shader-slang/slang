@@ -3,7 +3,6 @@
 #include "slang-signal.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <cstddef>
 #include <cstring>
 #include <stdint.h>

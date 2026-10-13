@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:28:39Z
-//META: source_commit=7a45a039cb7fb0a34e9184c7069a96bccdf08115
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=2adc733a81916b42380544b008460df5b366206d39b999775293a73fe57f1756
+//META: doc_section_digest=8661d99511cfbac4ddbac2f0c7e26c6482606dcfb0d70903168829b486372184
 //META: purpose=The reversed pack-count spelling `IntExpr == countof(Pack)` is rejected with a dedicated diagnostic (E30437) instead of being misread as a type constraint.
 //META: intent=negative
 //META: pipeline_stage=parse

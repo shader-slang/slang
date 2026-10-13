@@ -82,11 +82,19 @@ For every dimension that is not `pass`, file at least one finding.
    the source does not support either way (speculation).
 6. **front_matter_validity** — The YAML front-matter contains every
    required key (`generated`, `model`, `generated_at`,
-   `source_commit`, `watched_paths_digest`, `warning`). The
-   `watched_paths_digest` matches what `regenerate.py digest <doc>`
-   would produce at `source_commit` (you do not need to recompute
-   it; flag only obvious mismatches such as a non-hex value or a
-   missing field).
+   `source_commit`, `watched_paths_digest`, `warning`). Check only
+   that the keys are present and well-formed (for example, flag a
+   non-hex or missing digest).
+
+   Do **not** file a finding because the front-matter
+   `watched_paths_digest` differs from `regenerate.py digest <doc>`.
+   The two disagree routinely and harmlessly: `mark-fresh` records the
+   real digest in `freshness.json` without rewriting the document, so
+   the front-matter copy is only as current as whatever the generating
+   agent last typed. For an aggregator page whose `watched_paths` glob
+   matches its own directory the value cannot be made to agree at all,
+   because writing it into the page changes the page. Staleness is
+   tracked in `freshness.json`, not in the document.
 
 ## Severity
 
@@ -176,7 +184,7 @@ reviewer_model: <model identifier, e.g. gpt-5-2026-01-15>
 reviewed_at: <ISO 8601 UTC, seconds precision, e.g. 2026-05-15T18:00:00+00:00>
 target_doc: <manifest key of the reviewed document>
 target_doc_source_commit: <the `source_commit` from the reviewed doc's front-matter>
-target_doc_watched_paths_digest: <the `watched_paths_digest` from the reviewed doc's front-matter>
+target_doc_watched_paths_digest: <the output of `regenerate.py digest <doc>` — NOT the doc's front-matter copy, which is routinely stale>
 source_commit: <HEAD SHA at review time>
 checklist:
   factual_accuracy: pass | partial | fail

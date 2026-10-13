@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#cuda-python-ffi-attributes
-//META: doc_section_digest=3b673e659791f55ec3bcf6e28fd250cbd2b9866ccde0280dfbe5a7d075f519d9
-//META: purpose=`CudaKernelAttribute` (`[CudaKernel]`) marks a function as a CUDA kernel; the emitted CUDA carries the `__global__` decoration.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#cuda--python--ffi-attributes
+//META: doc_section_digest=123b7667975a062eadd9a683c067ebc0122e7a4eb83b99fbe3e0b85a0e15878c
+//META: purpose=`[CudaKernel]` marks a function as a CUDA kernel; the emitted CUDA carries the `__global__` decoration.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `CudaKernelAttribute` is the AST node behind the `[CudaKernel]`
-// attribute. The CUDA emit path attaches the `__global__` function
-// qualifier to such a function so it is callable from the host as a
-// CUDA kernel.
+// Verifies the attribute changes the emitted CUDA function qualifier, which is
+// what makes the function launchable from the host. CHECK asserts the emitted
+// CUDA declares the function `__global__`; an ordinary Slang function would be
+// emitted as a plain device function instead.
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 

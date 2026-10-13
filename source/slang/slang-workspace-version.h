@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../compiler-core/slang-language-server-protocol.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-com-object.h"
+#include "compiler-core/slang-language-server-protocol.h"
+#include "core/slang-basic.h"
+#include "core/slang-com-object.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang-compiler.h"
@@ -171,7 +171,8 @@ public:
     List<String> additionalSearchPaths;
     OrderedHashSet<String> workspaceSearchPaths;
     List<OwnedPreprocessorMacroDefinition> predefinedMacros;
-    bool searchInWorkspace = true;
+    static constexpr bool kDefaultSearchInWorkspace = true;
+    bool searchInWorkspace = kDefaultSearchInWorkspace;
     WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
 
     // Language version assumed for files with no `#language` directive, from the

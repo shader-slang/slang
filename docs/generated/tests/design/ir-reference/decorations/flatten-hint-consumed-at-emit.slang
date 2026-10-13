@@ -1,22 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:10:36Z
-//META: source_commit=f39188078fe010048714735213c24a7cb15532b9
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#branch-flatten-loopcontrol
-//META: doc_section_digest=262cdb3047c0e840655e74b96e0546c7c47439596c001991c8eb9e996922be06
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#branch--flatten--loopcontrol
+//META: doc_section_digest=f2ba884d83c46721a4e1598e9622f13a2cab5e3cbdcc2f2993805ccbe9c8f247
 //META: purpose=The [flatten] hint is consumed by the backend emit step: HLSL re-emits the [flatten] attribute on the conditional and SPIR-V encodes the Flatten selection control on the conditional's merge.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the flatten hint carries no IR semantics of its own and is
-// consumed at emit to pick the predicated control-flow strategy on the
-// target: the HLSL backend prints the [flatten] attribute back onto
-// the if statement, and the SPIR-V backend encodes the same hint as
-// the Flatten selection-control mask on OpSelectionMerge. The
-// condition depends on the dispatch thread id and the result escapes
-// through a buffer write, so the conditional survives to the emit
-// step.
+// Verifies that `flatten` is a pass-through hint the backend reads to pick
+// the predicated control-flow strategy. The HLSL CHECK asserts the
+// attribute reappears on the `if`; the SPIR-V CHECK asserts the same hint
+// becomes the `Flatten` mask on `OpSelectionMerge`. The two targets encode
+// the identical hint differently, which is why both are observed.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -O0 -entry main -stage compute

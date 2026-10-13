@@ -15,6 +15,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0 -g2
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
@@ -38,6 +39,17 @@ void main()
 // GLSL emits the static data member as a module-scope int variable initialized to 5.
 // GLSL: int b_{{[0-9]+}}
 // GLSL: b_{{[0-9]+}} = 5
+
+// SPIR-V allocates the static data member as a module-scope variable in the Private storage
+// class (SPIR-V's global storage for a shader-invocation-private variable), initializes it to
+// 5, and reads it back through that variable when `TestStruct.b` is accessed. Pinned at
+// `-O0 -g2`: at the default optimization level (and at plain -O0) the read of `TestStruct.b`
+// is constant-folded and the global variable disappears from the module entirely.
+// SPV: %_ptr_Private_int = OpTypePointer Private %int
+// SPV: %int_5 = OpConstant %int 5
+// SPV: %b = OpVariable %_ptr_Private_int Private
+// SPV: OpStore %b %int_5
+// SPV: {{%[0-9]+}} = OpLoad %int %b
 
 // Metal folds the static into a KernelContext struct field initialized to int(5).
 // METAL: b_{{[0-9]+}}

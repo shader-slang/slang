@@ -1,5 +1,5 @@
-#include "../core/slang-io.h"
-#include "../core/slang-string.h"
+#include "core/slang-io.h"
+#include "core/slang-string.h"
 
 #include <stdio.h>
 #include <string.h>

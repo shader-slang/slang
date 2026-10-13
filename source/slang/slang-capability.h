@@ -1,9 +1,10 @@
 // slang-capability.h
 #pragma once
 
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-string.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-string.h"
 
 #include <optional>
 #include <stdint.h>
@@ -488,6 +489,8 @@ bool isInternalCapabilityName(CapabilityName name);
 
 CapabilityAtom getLatestSpirvAtom();
 CapabilityAtom getLatestMetalAtom();
+CapabilityAtom getLatestHlslAtom();
+CapabilityAtom getLatestGlslAtom();
 
 /// For debug purposes ensure a casted CapabilityAtom is valid
 template<typename T>
@@ -497,6 +500,11 @@ inline CapabilityAtom asAtom(T name)
     return CapabilityAtom(name);
 }
 
+/// Returns the CUDA Shader Model version named by a `_cuda_sm_X_Y` capability atom
+/// (for example `_cuda_sm_8_9` -> 8.9), or an unset `SemanticVersion` for any atom that
+/// does not name a CUDA SM.
+SemanticVersion getCUDASMVersionForAtom(CapabilityAtom atom);
+
 /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 
@@ -505,9 +513,17 @@ UnownedStringSlice capabilityNameToString(CapabilityName name);
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 
-/// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
 bool isTargetVersionAtom(CapabilityAtom name);
+bool isSpirvVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
+
+/// True if any `-capability` in `requestedCapabilities` would raise the emitted target version of
+/// `targetVersionFamily` above what `profileCaps` pins; false when `profileCaps` pins no version of
+/// that family. Mirrors the capability fold in `TargetRequest::getTargetCaps()`.
+bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+    const CapabilitySet& profileCaps,
+    const List<CapabilityName>& requestedCapabilities,
+    CapabilityAtom targetVersionFamily);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

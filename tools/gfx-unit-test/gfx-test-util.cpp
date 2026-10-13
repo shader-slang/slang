@@ -295,7 +295,7 @@ void initializeRenderDoc()
         pRENDERDOC_GetAPI RENDERDOC_GetAPI =
             (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
         int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
-        assert(ret == 1);
+        SLANG_ASSERT(ret == 1);
     }
 }
 void renderDocBeginFrame()

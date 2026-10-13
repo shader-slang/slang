@@ -1,9 +1,9 @@
 #ifndef SLANG_DIAGNOSTIC_SINK_H
 #define SLANG_DIAGNOSTIC_SINK_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-writer.h"
 #include "slang-source-loc.h"
 #include "slang-token.h"
 #include "slang.h"
@@ -220,8 +220,9 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
     {
-        // If we want to force generation of rich diagnostics do that here
-        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        // Both rich and Visual Studio output consume structured diagnostics.
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics) ||
+            m_diagnosticFormat == SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
         {
             DiagnosticArg as[] = {DiagnosticArg(args)...};
             return diagnoseRichImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
@@ -236,8 +237,9 @@ public:
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
-        // If we want to force generation of rich diagnostics do that here
-        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        // Both rich and Visual Studio output consume structured diagnostics.
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics) ||
+            m_diagnosticFormat == SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
         {
             return diagnoseRichImpl(getDiagnosticPos(pos), info, 0, nullptr);
         }
@@ -337,6 +339,14 @@ public:
     uint32_t getEnabledWarningLevels() const { return m_enabledWarningLevels; }
     void setEnabledWarningLevels(uint32_t levels) { m_enabledWarningLevels = levels; }
 
+    /// Get/set the per-diagnostic severity overrides (the map populated by -W<name>/-Wno-<name>
+    /// through overrideDiagnosticSeverity).
+    const Dictionary<int, Severity>& getSeverityOverrides() const { return m_severityOverrides; }
+    void setSeverityOverrides(const Dictionary<int, Severity>& overrides)
+    {
+        m_severityOverrides = overrides;
+    }
+
     /// Get the (optional) diagnostic sink lexer. This is used to
     /// improve quality of highlighting a locations token. If not set, will just have a single
     /// character caret at location
@@ -346,8 +356,12 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
-    /// Set the diagnostic color mode for rich diagnostics
-    /// AUTO will check writer->isConsole() to determine if colors should be used
+    /// Select how human-readable diagnostics are presented.
+    void setDiagnosticFormat(SlangDiagnosticFormat format) { m_diagnosticFormat = format; }
+    SlangDiagnosticFormat getDiagnosticFormat() const { return m_diagnosticFormat; }
+
+    /// Set the diagnostic color mode for rich diagnostics.
+    /// AUTO checks writer->isConsole() to determine if colors should be used.
     void setDiagnosticColorMode(SlangDiagnosticColor mode) { m_diagnosticColorMode = mode; }
     SlangDiagnosticColor getDiagnosticColorMode() const { return m_diagnosticColorMode; }
 
@@ -410,6 +424,7 @@ public:
     {
         init(sourceManager, sourceLocationLexer);
     }
+
     /// Ctor that also copies display/settings state from an optional parent sink.
     DiagnosticSink(
         SourceManager* sourceManager,
@@ -420,11 +435,14 @@ public:
         if (parentSink)
         {
             setFlags(parentSink->getFlags());
+            setDiagnosticFormat(parentSink->getDiagnosticFormat());
             setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
             setEnableUnicode(parentSink->getEnableUnicode());
             setEnabledWarningLevels(parentSink->getEnabledWarningLevels());
+            setSeverityOverrides(parentSink->getSeverityOverrides());
         }
     }
+
     /// Default Ctor
     DiagnosticSink()
         : m_sourceManager(nullptr), m_sourceLocationLexer(nullptr)
@@ -501,6 +519,8 @@ protected:
     uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Extra));
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    SlangDiagnosticFormat m_diagnosticFormat = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
 
     // Rich diagnostics rendering options
     SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;

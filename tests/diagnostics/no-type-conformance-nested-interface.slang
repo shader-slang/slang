@@ -43,20 +43,14 @@ struct AlsoWrapped
     IFoo anotherFoo;
 }
 
-// Non-entry-point helper with an interface-typed parameter. The
-// walker explicitly skips functions without IREntryPointDecoration
-// to avoid false positives on imported-library helpers like
-// slangpy's `write_arg(IPrintable)` whose body contains an
-// unresolved lookup until inlining replaces the parameter with a
-// concrete type. The exhaustive-CHECK mode of this test pins that
-// behaviour: if the walker were broadened to non-entry-point
-// functions, this `helper.getValue()` call would emit an
-// unannotated E50100 for `IUnused` and the test would fail.
 interface IUnused
 {
     float getValue();
 }
 
+// `unusedHelper` has no callers, so dead-code elimination removes it before the
+// diagnostic walker runs and no E50100 is emitted for `IUnused`; this
+// exhaustive-CHECK test fails if a stray one ever appears.
 float unusedHelper(IUnused helper)
 {
     return helper.getValue();

@@ -10,11 +10,11 @@
 #ifdef _MSC_VER
 #pragma warning(disable : 4996)
 #endif
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-io.h"
+#include "core/slang-list.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
 
 #include <stdio.h>
 #include <stdlib.h>

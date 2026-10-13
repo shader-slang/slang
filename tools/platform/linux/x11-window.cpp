@@ -1,6 +1,6 @@
 #ifdef SLANG_ENABLE_XLIB
 
-#include "../window.h"
+#include "platform/window.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>

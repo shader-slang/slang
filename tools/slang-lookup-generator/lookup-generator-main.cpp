@@ -1,12 +1,12 @@
 // perfect-hash-main.cpp
 
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/compiler-core/slang-lexer.h"
-#include "../../source/compiler-core/slang-perfect-hash-codegen.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-secure-crt.h"
-#include "../../source/core/slang-string-util.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-value.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-perfect-hash-codegen.h"
+#include "core/slang-io.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-string-util.h"
 
 #include <stdio.h>
 

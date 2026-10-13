@@ -8,8 +8,8 @@
 // code generation and/or layout for that target.
 //
 
-#include "../compiler-core/slang-target-builtin-type-layout-info.h"
-#include "../core/slang-string.h"
+#include "compiler-core/slang-target-builtin-type-layout-info.h"
+#include "core/slang-string.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
@@ -69,6 +69,10 @@ class TargetRequest;
 
 /// Are we generating code for a D3D API?
 bool isD3DTarget(TargetRequest* targetReq);
+bool isD3DTarget(CodeGenTarget target);
+
+// Test whether code generation for `target` emits HLSL, directly or for a downstream compiler.
+bool isHLSLBasedTarget(CodeGenTarget target);
 
 // Are we generating code for Metal?
 bool isMetalTarget(TargetRequest* targetReq);

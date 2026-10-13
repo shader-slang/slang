@@ -15,6 +15,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -O0
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
@@ -44,6 +45,14 @@ void main()
 // GLSL: struct MyStruct_{{[0-9]+}}
 // GLSL: publicField_{{[0-9]+}}
 // GLSL: defaultField_{{[0-9]+}}
+
+// SPIR-V keeps both the `public` and the default-visibility field as members of MyStruct, and
+// both are written from `main` (outside the struct). Pinned at -O0 because the default
+// optimization level folds the two stores plus their sum into a single constant.
+// SPV: OpName %MyStruct "MyStruct"
+// SPV: OpMemberName %MyStruct 0 "publicField"
+// SPV: OpMemberName %MyStruct 1 "defaultField"
+// SPV: %MyStruct = OpTypeStruct %int %int
 
 // Metal emits struct MyStruct with both fields.
 // METAL: struct MyStruct_{{[0-9]+}}

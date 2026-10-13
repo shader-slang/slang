@@ -40,6 +40,11 @@ on:
         type: boolean
         default: false
         description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
+      slang-user-skills:
+        required: false
+        type: boolean
+        default: false
+        description: "Validate the bundled Slang user skills and their examples"
       gpu-api-only:
         required: false
         type: boolean
@@ -50,6 +55,11 @@ on:
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
+      api:
+        required: false
+        type: string
+        default: ""
+        description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
 
 jobs:
   test-slang:
@@ -87,6 +97,16 @@ jobs:
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
 
+      - name: Checkout Slang user skills
+        if: inputs.slang-user-skills
+        run: |
+          git submodule sync -- external/slang-user-skills
+          git submodule update --init --depth=1 external/slang-user-skills
+
+      - name: Test user-skills package verifier
+        if: inputs.slang-user-skills
+        run: python3 extras/tests/test_verify_user_skills_package.py
+
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
@@ -95,6 +115,13 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
+          cpu-only: ${{ inputs.cpu-only }}
+
+      - name: Validate Slang user-skill examples
+        if: inputs.slang-user-skills
+        run: >-
+          python3 external/slang-user-skills/scripts/validate-examples.py
+          --slangc "$bin_dir/slangc"
 
       # slang-test's CUDA pass-through compiles through NVRTC, so the
       # offline (non-NVRTC) branch of the prelude is never compiled by the
@@ -111,6 +138,8 @@ jobs:
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
+        env:
+          API_INPUT: ${{ inputs.api }}
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
@@ -147,7 +176,11 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+          if [[ -n "$API_INPUT" ]]; then
+            # Explicit override: caller supplies the exact -api expression,
+            # e.g. "dx11+dx12" or "vk+cuda+cpu+llvm" for a per-engine split.
+            api_expr="$API_INPUT"
+          elif [[ "${{ inputs.cpu-only }}" == "true" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
             # ignored by the test filter rather than run-and-failed.
             api_expr="cpu+llvm"

@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> output)
@@ -31,3 +33,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> outpu
 // METAL: thread_position_in_grid
 // WGSL maps SV_DispatchThreadID to @builtin(global_invocation_id).
 // WGSL: @builtin(global_invocation_id)
+// GLSL maps the Input-address-space parameter to the gl_GlobalInvocationID builtin.
+// GLSL: gl_GlobalInvocationID
+// HLSL keeps it as an SV_DispatchThreadID-semantic entry-point input parameter.
+// HLSL: void computeMain(uint3 tid_{{.*}} : SV_DispatchThreadID)

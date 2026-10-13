@@ -2,7 +2,7 @@
 #ifndef SLANG_MODULE_LIBRARY_H
 #define SLANG_MODULE_LIBRARY_H
 
-#include "../compiler-core/slang-artifact-representation.h"
+#include "compiler-core/slang-artifact-representation.h"
 #include "slang-compiler.h"
 
 namespace Slang

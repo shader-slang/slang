@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:30:46+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#eliminatephis-with-default-options
-//META: doc_section_digest=552c08e936c00c01fc40525a781af719987034dc141a0640ccef762362e861d5
+//META: doc_section_digest=952b4b8bab84fb048622082284a7ab2ba264b8c1eb3e38f8c5aabf3b7aad5169
 //META: purpose=CUDA uses eliminatePhis with default options so an if/else-merged value becomes a named local temporary assigned in each branch.
 //META: intent=functional
 //META: pipeline_stage=emit

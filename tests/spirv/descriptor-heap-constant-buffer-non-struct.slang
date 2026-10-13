@@ -68,58 +68,51 @@ void mainHandleArray(
     output[0] = getDescriptorFromHandle(inputs[index]);
 }
 
-// main1/main2/main3 — scalar, vector, and matrix elements stay in the Uniform storage
-// class (they have no nested-array addressing through the buffer pointer, so the missing
-// pointer-type ArrayStride of #11483 does not affect them). The array element type
-// (main4) is handled separately by the CHECK_ARRAY prefix below.
+// main1/main2/main3 — scalar, vector, and matrix elements are wrapped into a block struct and
+// fetched as a uniform-buffer descriptor whose data pointer is an untyped Uniform pointer, with
+// the member reached through an untyped access chain (since #12226).
 //
-// The synthesized wrapper must carry Block decoration (required for Uniform storage class).
+// The synthesized wrapper must carry Block + member layout decoration.
 // CHECK: OpName %[[CB:cbuffer_[A-Za-z0-9_]+_t]]
-// CHECK-NOT: %_ptr_Function_[[CB]]
 // CHECK: OpDecorate %[[CB]] Block
-
-// The synthesized wrapper must carry member layout decoration.
 // CHECK: OpMemberDecorate %[[CB]] 0 Offset 0
+// The descriptor-heap load produces an untyped Uniform buffer pointer, and the element is
+// reached with an untyped access chain naming the wrapper struct — never a typed StorageBuffer
+// constant-buffer pointer.
+// CHECK: OpTypeBufferEXT Uniform
+// CHECK: %[[UNIFORM_PTR:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// CHECK: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// CHECK: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %[[CB]]
+// CHECK-NOT: OpTypePointer StorageBuffer %[[CB]]
 
-// The pointer to the uniform block must be in Uniform storage class.
-// CHECK-NOT: %_ptr_Function_[[CB]]
-// CHECK: %[[CB_PTR:_ptr_Uniform_[A-Za-z0-9_]+]] = OpTypePointer Uniform %[[CB]]
-
-// The descriptor-heap access must produce a buffer pointer.
-// CHECK-NOT: %_ptr_Function_[[CB]]
-// CHECK: OpBufferPointerEXT %[[CB_PTR]]
-
-// Access to the wrapped element must use Uniform storage class, not Function.
-// CHECK: OpAccessChain %_ptr_Uniform
-// CHECK-NOT: %_ptr_Function_[[CB]]
-
-// main4 — ConstantBuffer<float[4]> via heap: the array element is wrapped into a block
-// struct, and the descriptor-heap buffer pointer must be StorageBuffer so the nested
-// array pointer type carries a pointer-type ArrayStride (#11483); a Uniform pointer would
-// leave the nested `input[2]` read undefined.
+// main4 — ConstantBuffer<float[4]> via heap: the array element is wrapped into a block struct
+// and addressed through the untyped Uniform pointer. The nested array carries an ordinary
+// array-type ArrayStride (16 under std140); no pointer-type ArrayStride is needed.
 // CHECK_ARRAY: OpName %[[CBA:_Array_std140_float4]] "_Array_std140_float4"
 // CHECK_ARRAY-DAG: OpDecorate %[[CBA]] Block
-// CHECK_ARRAY-DAG: OpDecorate %_ptr_StorageBuffer__arr_float_int_4 ArrayStride 16
-// CHECK_ARRAY: %[[CBA_PTR:_ptr_StorageBuffer__Array_std140_float4]] = OpTypePointer StorageBuffer %[[CBA]]
-// CHECK_ARRAY: OpBufferPointerEXT %[[CBA_PTR]]
+// CHECK_ARRAY-DAG: OpDecorate %_arr_float_int_4 ArrayStride 16
+// CHECK_ARRAY: %[[UNIFORM_PTR:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// CHECK_ARRAY: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// CHECK_ARRAY: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %[[CBA]]
 
+// The wrapper type is created once and both value users are rewritten (no duplicate
+// `cbuffer_float_t_` name), and both fetches share the untyped Uniform pointer.
 // SHARED: OpName %[[CB:cbuffer_float_t]] "cbuffer_float_t"
 // SHARED-NOT: cbuffer_float_t_
 // SHARED: OpDecorate %[[CB]] Block
-// SHARED-NOT: cbuffer_float_t_
 // SHARED: OpMemberDecorate %[[CB]] 0 Offset 0
-// SHARED: %[[CB_PTR:_ptr_Uniform_cbuffer_float_t]] = OpTypePointer Uniform %[[CB]]
-// SHARED-NOT: cbuffer_float_t_
-// SHARED: OpBufferPointerEXT %[[CB_PTR]]
-// SHARED: OpAccessChain %_ptr_Uniform_float
-// SHARED: OpBufferPointerEXT %[[CB_PTR]]
-// SHARED: OpAccessChain %_ptr_Uniform_float
+// SHARED: %[[UNIFORM_PTR:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// SHARED: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// SHARED: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %[[CB]]
+// SHARED: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// SHARED: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %[[CB]]
 // SHARED-NOT: cbuffer_float_t_
 
 // HANDLE_ARRAY: OpName %[[CB:cbuffer_float_t]] "cbuffer_float_t"
 // HANDLE_ARRAY: OpDecorate %[[CB]] Block
 // HANDLE_ARRAY: OpMemberDecorate %[[CB]] 0 Offset 0
-// HANDLE_ARRAY: %[[CB_PTR:_ptr_Uniform_cbuffer_float_t]] = OpTypePointer Uniform %[[CB]]
-// HANDLE_ARRAY: OpAccessChain %_ptr_PushConstant__arr_v2uint_int_4
-// HANDLE_ARRAY: OpBufferPointerEXT %[[CB_PTR]]
-// HANDLE_ARRAY: OpAccessChain %_ptr_Uniform_float
+// HANDLE_ARRAY-DAG: OpTypeArray %v2uint %int_4
+// HANDLE_ARRAY-DAG: %[[UNIFORM_PTR:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// HANDLE_ARRAY: OpAccessChain %_ptr_PushConstant_{{(_arr_v2uint_int_4|v2uint)}}
+// HANDLE_ARRAY: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// HANDLE_ARRAY: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %[[CB]]

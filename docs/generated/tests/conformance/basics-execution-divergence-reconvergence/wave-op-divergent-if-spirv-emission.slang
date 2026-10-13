@@ -16,6 +16,8 @@
 // inside the respective arms.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
@@ -44,6 +46,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: OpSelectionMerge
 // CHECK: OpGroupNonUniformUMin
 // CHECK: OpGroupNonUniformUMax
+
+// HLSL: the structured counterpart of the SPIRV arms — if preserved, with
+// WaveActiveMin in the then-arm and WaveActiveMax in the else-arm.
+// CHECK_HLSL: if(
+// CHECK_HLSL: WaveActiveMin
+// CHECK_HLSL: WaveActiveMax
+
+// GLSL: if preserved; subgroupMin in the then-arm, subgroupMax in the else-arm.
+// CHECK_GLSL: if(
+// CHECK_GLSL: subgroupMin
+// CHECK_GLSL: subgroupMax
 
 // Metal: if preserved; simd_min in the then-arm, simd_max in the else-arm.
 // CHECK_METAL: if(

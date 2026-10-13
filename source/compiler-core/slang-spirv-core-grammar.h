@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../core/slang-dictionary.h"
-#include "../core/slang-smart-pointer.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-smart-pointer.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string.h"
 
 #include <optional>
 #include <spirv/unified1/NonSemanticShaderDebugInfo100.h>

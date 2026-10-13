@@ -26,10 +26,10 @@
 //   * NO-LINK-MD — like MARKDOWN minus the Quick Links section and the
 //     per-heading `<a id>` anchors.
 
-#include "../../source/core/slang-command-options-writer.h"
-#include "../../source/core/slang-command-options.h"
-#include "../../source/core/slang-name-value.h"
-#include "../../source/core/slang-string.h"
+#include "core/slang-command-options-writer.h"
+#include "core/slang-command-options.h"
+#include "core/slang-name-value.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

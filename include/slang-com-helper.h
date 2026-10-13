@@ -7,6 +7,7 @@
 #include "slang.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <atomic>
 #include <iterator>
 

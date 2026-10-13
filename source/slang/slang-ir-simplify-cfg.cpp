@@ -354,6 +354,10 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
             switch (inst->getOp())
             {
             case kIROp_DebugLine:
+            case kIROp_DebugScope:
+            case kIROp_DebugNoScope:
+                // These are attribution-only markers, with no runtime or control-flow effect.
+                // As in switch forwarding below, the destination retains its own scope marker.
                 continue;
 
             case kIROp_UnconditionalBranch:
@@ -448,6 +452,8 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
             switch (inst->getOp())
             {
             case kIROp_DebugLine:
+            case kIROp_DebugScope:
+            case kIROp_DebugNoScope:
                 continue;
 
             case kIROp_UnconditionalBranch:
@@ -589,6 +595,8 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
                 switch (inst->getOp())
                 {
                 case kIROp_DebugLine:
+                case kIROp_DebugScope:
+                case kIROp_DebugNoScope:
                     continue;
                 case kIROp_UnconditionalBranch:
                     branch = as<IRUnconditionalBranch>(inst);
@@ -957,25 +965,58 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                     break;
                 changed = true;
                 simplificationContext = CFGSimplificationContext();
-                Index paramIndex = 0;
+                // Move the non-parameter instructions first, then replace the parameters. The
+                // order matters both ways: `replaceUsesWith` can re-parent a hoistable user
+                // between the two blocks (global value numbering), so no walk may span a
+                // replacement, and the parameters must outlive this walk because
+                // `branch->getArg()` is indexed by parameter position below.
                 auto inst = successor->getFirstDecorationOrChild();
                 while (inst)
                 {
                     auto next = inst->getNextInst();
-                    if (inst->getOp() == kIROp_Param)
-                    {
-                        inst->replaceUsesWith(branch->getArg(paramIndex));
-                        paramIndex++;
-                    }
-                    else
+                    if (inst->getOp() != kIROp_Param)
                     {
                         inst->removeFromParent();
                         inst->insertAtEnd(block);
                     }
                     inst = next;
                 }
+                // Walk only `successor`'s parameters, never its children generally.
+                // `replaceUsesWith` can re-parent a hoistable user of the parameter being
+                // replaced, and `addHoistableInst` always places it after the leading parameter
+                // run (`slang-ir.cpp:1875-1878`). Since `param` is not hoistable
+                // (`slang-ir-insts.lua`), the cursor itself is never moved, and `getNextParam`
+                // stops at the first non-parameter — so a re-parented user can never be reached.
+                //
+                // That early stop is also why the positional correspondence below is worth
+                // checking: `getArg` is unchecked, so a parameter run broken by a non-parameter
+                // would silently pair the wrong argument with each parameter. Nothing but the check
+                // consumes the count, so it is computed under the same `_DEBUG` gate the assertion
+                // itself uses.
+#ifdef _DEBUG
+                {
+                    UInt paramCount = 0;
+                    for (auto pp = successor->getFirstParam(); pp; pp = pp->getNextParam())
+                        paramCount++;
+                    SLANG_ASSERT(branch->getArgCount() == paramCount);
+                }
+#endif
+                Index paramIndex = 0;
+                auto param = successor->getFirstParam();
+                while (param)
+                {
+                    auto nextParam = param->getNextParam();
+                    param->replaceUsesWith(branch->getArg(paramIndex));
+                    paramIndex++;
+                    param = nextParam;
+                }
                 branch->removeAndDeallocate();
                 SLANG_ASSERT(!successor->hasUses());
+                // `hasUses` only covers branches targeting the block, and the deallocation below
+                // recurses into children without checking theirs, so assert the emptiness the two
+                // walks are responsible for establishing. Parameters legitimately remain: they are
+                // replaced, not moved, and are freed by the recursion.
+                SLANG_ASSERT(!successor->getFirstOrdinaryInst());
                 successor->removeAndDeallocate();
 
                 break;

@@ -1,8 +1,8 @@
 #ifndef SLANG_COMPILER_OPTIONS_H
 #define SLANG_COMPILER_OPTIONS_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-crypto.h"
+#include "core/slang-basic.h"
+#include "core/slang-crypto.h"
 #include "slang-generated-capability-defs.h"
 #include "slang-profile.h"
 #include "slang.h"
@@ -95,6 +95,27 @@ struct CompilerOptionSet
 
     static bool allowDuplicate(CompilerOptionName name);
 
+    /// Return true if `name` is an option that each level (session, target, component type) holds
+    /// only for itself, so it is never inherited or copied from another level.
+    ///
+    /// `DownstreamArgs` is the only such option. A tool's arguments from every level must all reach
+    /// it, and repeated arguments (e.g. `-D A -D B` given one token per entry) must survive as
+    /// given. So the levels cannot be merged into one another by matching entries; instead each
+    /// level keeps its own list, and `TargetProgram` concatenates them once, lowest level first.
+    static bool isLevelLocal(CompilerOptionName name);
+
+    /// Return a copy of this set without the level-local options, for seeding the option set of
+    /// another level from this one.
+    CompilerOptionSet copyWithoutLevelLocalOptions() const;
+
+    /// Append `values` to the entries stored for the level-local option `name`. `values` may be
+    /// this set's own list for `name`.
+    void appendLevelLocal(CompilerOptionName name, const List<CompilerOptionValue>& values);
+
+    /// Append a CLI-like reconstruction of the stored options to `sb`, for the descriptive command
+    /// line embedded in debug info. Only the option kinds it explicitly handles are emitted; it
+    /// reports what is stored (which for some options is a default materialized during option
+    /// resolution) and does not add implicit defaults for absent options.
     void writeCommandLineArgs(Session* globalSession, StringBuilder& sb);
 
     OrderedDictionary<CompilerOptionName, List<CompilerOptionValue>> options;
@@ -154,7 +175,7 @@ struct CompilerOptionSet
                 {
                     if (replaceDuplicate)
                     {
-                        (*v)[index].intValue2 = element.intValue;
+                        (*v)[index].intValue2 = element.intValue2;
                         (*v)[index].stringValue2 = element.stringValue2;
                     }
                 }
@@ -168,23 +189,29 @@ struct CompilerOptionSet
         options[name] = List<CompilerOptionValue>{value};
     }
 
-    // Copy settings from other, and replace the current setting.
+    // Copy settings from other, and replace the current setting. Level-local options from other
+    // are appended to the current ones.
     void overrideWith(const CompilerOptionSet& other)
     {
         for (auto& kv : other.options)
         {
-            if (allowDuplicate(kv.key))
+            if (isLevelLocal(kv.key))
+                appendLevelLocal(kv.key, kv.value);
+            else if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, true);
             else
                 set(kv.key, kv.value);
         }
     }
 
-    // Copy settings from other, but do not replace the current setting
+    // Copy settings from other, but do not replace the current setting. Level-local options are
+    // not inherited.
     void inheritFrom(const CompilerOptionSet& other)
     {
         for (auto& kv : other.options)
         {
+            if (isLevelLocal(kv.key))
+                continue;
             if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, false);
             else
@@ -371,6 +398,11 @@ struct CompilerOptionSet
     bool shouldEmitSeparateDebugInfo()
     {
         return getBoolOption(CompilerOptionName::EmitSeparateDebug);
+    }
+
+    bool shouldIncludeSourceInDebugInfo()
+    {
+        return getBoolOption(CompilerOptionName::DebugInfoIncludeSource);
     }
 
     bool shouldEmitRichDiagnostics()

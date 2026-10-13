@@ -1,6 +1,6 @@
 // unit-test-utf8-decode.cpp
 
-#include "../../source/core/slang-char-encode.h"
+#include "core/slang-char-encode.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

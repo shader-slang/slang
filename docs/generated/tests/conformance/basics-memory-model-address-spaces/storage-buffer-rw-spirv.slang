@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<float> rwbuf;
 StructuredBuffer<float>   robuf;
@@ -38,3 +40,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // WGSL maps read-only to var<storage, read> and read-write to var<storage, read_write>.
 // WGSL: var<storage, read> robuf_
 // WGSL-DAG: var<storage, read_write> rwbuf_
+// GLSL emits the read-only form as a `readonly buffer` block and the read-write form as a
+// plain `buffer` block; both are the std430 Storage-buffer address space.
+// GLSL: readonly buffer StructuredBuffer_float
+// GLSL: } robuf_
+// GLSL: layout(std430, binding = {{[0-9]+}}) buffer StructuredBuffer_float
+// GLSL: } rwbuf_
+// HLSL splits the same address space by access: `t` register (SRV) vs `u` register (UAV).
+// HLSL: StructuredBuffer<float{{.*}}> robuf_{{.*}} : register(t
+// HLSL: RWStructuredBuffer<float{{.*}}> rwbuf_{{.*}} : register(u

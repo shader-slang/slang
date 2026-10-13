@@ -1,9 +1,9 @@
 // slang-visual-studio-compiler-util.cpp
 #include "slang-visual-studio-compiler-util.h"
 
-#include "../core/slang-common.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-common.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
 #include "slang-com-helper.h"
 
 // if Visual Studio import the visual studio platform specific header
@@ -11,7 +11,7 @@
 #include "windows/slang-win-visual-studio-util.h"
 #endif
 
-#include "../core/slang-io.h"
+#include "core/slang-io.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-representation-impl.h"

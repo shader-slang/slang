@@ -24,6 +24,16 @@ test maps to a documented claim) would erode. See
 `docs/generated/tests/_meta/prompts/_common.md` for the full statement of this
 contract.
 
+This restriction is about **provenance, not breadth**. It forbids choosing
+tests by looking at uncovered code; it does **not** forbid systematically
+expanding a documented *family* (per-op, per-type, per-shape variants) when
+the family is confirmed by an authoritative surface — the language
+reference or the core-module declarations — and each variant's behaviour is
+established by *running the compiler*, not assumed. That is the
+[`_claims.md` § Systematic variant expansion](_claims.md) rule, and it is
+the primary lever for deepening emission / legalization coverage when the
+design doc states a rule generically without enumerating its cells.
+
 ## What to do
 
 1. **Re-read the source doc carefully.** Do not skim. Look for
@@ -80,6 +90,18 @@ contract.
    and fed back into the doc-regeneration workflow. Write the
    **Suggested addition** cell as an actionable instruction so the
    doc-regen agent can act on it verbatim.
+
+6. **Expand documented families systematically (the depth lever).** When
+   the source doc names a family or grid generically — "the atomic
+   intrinsics", "the buffer-layout rules", "the supported numeric widths" —
+   but does not enumerate its members, instantiate the individual cells per
+   [`_claims.md` § Systematic variant expansion](_claims.md): enumerate
+   candidate cells from the language-reference / core-module surface, **run
+   each one and classify** (clean output → pin the real emitted text; clean
+   rejection → negative test; crash/abort → a finding, never a loosened
+   green test), prune cells that emit identically, and record the doc gap
+   that the family was not enumerated. This is how a re-read pass adds
+   emission depth without ever consulting a coverage report.
 
 ## Update README.md
 

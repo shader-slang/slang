@@ -1,11 +1,11 @@
 // slang-artifact-container-util.cpp
 #include "slang-artifact-container-util.h"
 
-#include "../core/slang-castable.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-zip-file-system.h"
+#include "core/slang-castable.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-zip-file-system.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-util.h"

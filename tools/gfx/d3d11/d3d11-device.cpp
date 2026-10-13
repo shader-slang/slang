@@ -1241,9 +1241,9 @@ void DeviceImpl::setVertexBuffers(
     const Offset* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
-    assert(slotCount <= kMaxVertexBuffers);
-    assert(m_currentPipelineState); // The pipeline state should be created before setting vertex
-                                    // buffers.
+    SLANG_ASSERT(slotCount <= kMaxVertexBuffers);
+    SLANG_ASSERT(m_currentPipelineState); // The pipeline state should be created before setting
+                                          // vertex buffers.
 
     UINT vertexStrides[kMaxVertexBuffers];
     UINT vertexOffsets[kMaxVertexBuffers];
@@ -1279,7 +1279,7 @@ void DeviceImpl::setIndexBuffer(IBufferResource* buffer, Format indexFormat, Off
 void DeviceImpl::setViewports(GfxCount count, Viewport const* viewports)
 {
     static const int kMaxViewports = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
-    assert(count <= kMaxViewports);
+    SLANG_ASSERT(count <= kMaxViewports);
 
     D3D11_VIEWPORT dxViewports[kMaxViewports];
     for (GfxIndex ii = 0; ii < count; ++ii)
@@ -1301,7 +1301,7 @@ void DeviceImpl::setViewports(GfxCount count, Viewport const* viewports)
 void DeviceImpl::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
     static const int kMaxScissorRects = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
-    assert(count <= kMaxScissorRects);
+    SLANG_ASSERT(count <= kMaxScissorRects);
 
     D3D11_RECT dxRects[kMaxScissorRects];
     for (GfxIndex ii = 0; ii < count; ++ii)

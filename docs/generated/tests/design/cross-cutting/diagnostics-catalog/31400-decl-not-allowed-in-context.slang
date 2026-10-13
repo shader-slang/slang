@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=c3da2cd08f8897cb71c5a931106edbbb3dc29ad453c3bf64e000488949e7e3f4
 //META: purpose=Fires diagnostic E31400 (decl-not-allowed-in-context) - declaration not allowed in this context
 //META: intent=negative
 //META: pipeline_stage=check
@@ -22,4 +22,4 @@ interface IFoo
     int x;
 }
 
-// CHECK: E31400
+//CHECK: E31400

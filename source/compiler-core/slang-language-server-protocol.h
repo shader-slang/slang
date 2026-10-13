@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/core/slang-rtti-info.h"
+#include "compiler-core/slang-json-value.h"
+#include "core/slang-rtti-info.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -313,15 +313,15 @@ struct WorkspaceFolder
 
 struct InitializeParams
 {
+    // The single workspace root used by clients that do not send `workspaceFolders`.
+    JSONOptional<String> rootUri;
+
+    // Deprecated by LSP in favor of `rootUri`, but still sent by some older clients.
+    JSONOptional<String> rootPath;
+
     List<WorkspaceFolder> workspaceFolders;
     static const UnownedStringSlice methodName;
     static const StructRttiInfo g_rttiInfo;
-};
-
-struct NullResponse
-{
-    static const StructRttiInfo g_rttiInfo;
-    static NullResponse* get();
 };
 
 struct InitializeResult

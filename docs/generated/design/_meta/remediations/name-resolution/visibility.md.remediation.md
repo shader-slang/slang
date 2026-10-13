@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:04:47Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T14:25:00Z
 target_doc: name-resolution/visibility.md
 review_report: ../../reviews/name-resolution/visibility.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 2
-  rejected_out_of_scope: 0
+  fixed: 5
+  rejected_bogus: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -17,12 +17,21 @@ actions:
 # Remediation report for name-resolution/visibility.md
 
 ## Summary
-
-Both findings were verified against the watched sources and rejected as bogus: the prose each finding quotes as the document's "current" text is not present in the target document at `source_commit` c21ead2, and the existing text already states the source-backed position the reviewer recommends. The reviewer appears to have evaluated an earlier revision. No edits were made, so `target_doc_source_commit_after` equals `_before`. The action counts (2 rejected-bogus) sum to the review's finding_count of 2.
+Five of the six findings were verified against the source at the recorded
+commit and fixed with local wording corrections: the `languageVersion`
+lifecycle, the `GenericTypeConstraintDecl` fall-through, the
+`_getTypeVisibility` recursion shape, the parent-visibility cap, and the
+`using` target kind. The digest finding is reserved for the operator.
+Breakdown: 5 fixed, 0 rejected-bogus, 1 rejected-out-of-scope, 0 deferred, 0
+escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | The quoted claim ("New sessions therefore reject modules whose declared version is older than 2025 by default") is absent (verified by grep for "reject" near the language-version section). Lines 72-77 already state `SlangGlobalSessionDesc::minLanguageVersion` defaults to `SLANG_LANGUAGE_VERSION_2025` and "records a preferred floor and is not consulted by the visibility-classification path in the watched sources" — the source-backed framing F-001 recommends. Consistent with `include/slang.h:5654-5655` (comment: "oldest Slang language version that any sessions will use"). The cited counter-evidence files `slang-compiler.cpp`/`slang-preprocessor.cpp` are also outside this page's `watched_paths`. | — |
-| F-002 | rejected-bogus | The quoted framing ("constructed without an explicit visibility modifier and inherit the parent's default") is absent (verified by grep). Lines 254-278 already state synthesized members are "assigned a visibility at their synthesis site rather than relying on the module default," citing `addVisibilityModifier(synthesized, Math::Min(parentVisibility, requirementVisibility))` at `source/slang/slang-check-decl.cpp` 7442-7451, 8523-8531, 8902-8910, and `addVisibilityModifier(decl, getDeclVisibility(parent))` at lines 3873-3878, 3933-3937, plus `slang-check-expr.cpp` line 817. All cited sites verified accurate against source — this is exactly the rewrite F-002 asks for. | — |
+| F-001 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md:97-100` reserves `watched_paths_digest` for the operator's `mark-fresh` run and forbids the remediator from editing it. | — |
+| F-002 | fixed | Confirmed: `source/slang/slang-compile-request.cpp:324-325` reads `optionSet.getLanguageVersion()` and `:339` assigns it to `translationUnitSyntax->languageVersion`; `source/slang/slang-parser.cpp:1221-1227` defines `maybeUpgradeLanguageVersionFromLegacy` (legacy to 2025), called at `:1260`, `:1365`, `:1404`. No version is parsed from the `module` declaration. Follow-up for the operator: adding these two files to `watched_paths` is a manifest change outside this stage. | `## Concepts`, `languageVersion` bullet: "set from the `module` declaration's version (or the linkage default)" replaced with the option-set initialization plus the parser's legacy-to-2025 upgrade, flagged as living outside the watched paths. |
+| F-003 | fixed | Confirmed: `source/slang/slang-check-decl.cpp:21260-21262` returns `DeclVisibility::Default` when `as<GenericDecl>(decl->parentDecl)` fails. | `### Per-keyword semantics`, generic-parameter fall-through bullet: qualified to parents that are a `GenericDecl` and added the `Default` fall-back for other parents. |
+| F-004 | fixed | Confirmed: `source/slang/slang-check-expr.cpp:1117` guards the recursion with `as<DeclRefType>(arg)`, so non-`DeclRefType` generic arguments are skipped. | `### Container-level cap`, first paragraph: "any generic type arguments" replaced with "its declaration-reference generic arguments" plus a clause naming the `DeclRefType` guard. |
+| F-005 | fixed | Confirmed: `source/slang/slang-check-modifier.cpp:2376-2381` initializes `parentDecl = decl` and breaks at the first `AggTypeDeclBase`, so an aggregate is compared with itself at `:2385`. | `### Container-level cap`, `checkVisibility` paragraph: parent cap restated as the nearest enclosing `AggTypeDeclBase` with a sentence noting the self-comparison for aggregates. |
+| F-006 | fixed | Confirmed: `source/slang/slang-check-decl.cpp:17332-17333` says "a namespace (or a module, since modules are namespace-like)" and `:17362`/`:17373` test `NamespaceDeclBase`. | `## Edge cases and failure modes`, `using` bullet: "only brings a *namespace* into scope" replaced with "only brings a *namespace-like* container into scope — a namespace or a module". |

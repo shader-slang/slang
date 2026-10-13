@@ -2,7 +2,7 @@
 #ifndef SLANG_DOC_EXTRACTOR_H
 #define SLANG_DOC_EXTRACTOR_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-lexer.h"
 #include "slang-source-loc.h"
 

@@ -1,4 +1,5 @@
-//TEST:SIMPLE: -o tests/bugs/gh-10445.slang-module
+//TEST:SIMPLE(filecheck=PRODUCE): -o tests/bugs/gh-10445.slang-module
+//PRODUCE: note[E00088]
 //TEST:SIMPLE(filecheck=MODULE-CHECK): -target hlsl -stage compute -entry computeMain tests/bugs/gh-10445.slang-module
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 

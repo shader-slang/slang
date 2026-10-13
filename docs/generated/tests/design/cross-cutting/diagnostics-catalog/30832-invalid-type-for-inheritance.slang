@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=78b676a931841582a3f9004a6de23aa0de99d885227faa8a42bbec7770cf7b88
+//META: doc_section_digest=5d6ee6445b71c93c1ebf8a8fb3ba37b51c110bd16bcc3fc9f486dc04b16e47f9
 //META: purpose=Fires diagnostic E30832 (invalid-type-for-inheritance) -- type '~type:Type' cannot be used for inheritance
 //META: intent=negative
 //META: pipeline_stage=check
@@ -16,4 +16,4 @@
 struct S<T> : T {}
 
 
-// CHECK: E30832
+//CHECK: E30832

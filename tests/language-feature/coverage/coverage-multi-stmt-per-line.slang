@@ -1,9 +1,17 @@
-// Locks in the per-inst-UID design: each `IncrementCoverageCounter` op
-// gets its own counter slot, even when multiple ops originate from the
-// same source line. The old design deduplicated slots by (file, line),
-// which would have collapsed the three statements on line 9 below into
-// one or two slots. If someone reintroduces that dedupe, this test
-// regresses.
+// Locks in how multiple statements on one source line are handled.
+//
+// Each `IncrementCoverageCounter` op keeps its own source coverage
+// entry, with its own column, so the metadata never deduplicates by
+// (file, line) — the three statements on line 24 below produce three
+// entries. That entry-level distinctness is asserted by the
+// `coverageTracingMetadata` unit test, which reads the metadata API.
+//
+// What they do *not* each get is a counter. All four statements here
+// sit in one basic block, so they provably execute the same number of
+// times and are coalesced onto a single counter and a single probe.
+// This is what keeps instrumented shader code small; per-line reporting
+// is unaffected, because hosts accumulate per entry and every entry
+// still reads this one slot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage
 
@@ -17,9 +25,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = a + b + c;
 }
 
-// The three statements on one source line must each produce a distinct
-// atomic add on a distinct slot. If the compiler dedupes back to
-// (file, line), slots 2 and 3 here would disappear.
-//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}
-//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(3\)}}
+// One straight-line region means exactly one atomic add, on slot 0.
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+
+// If coalescing regresses to one counter per statement, slot 1 appears
+// and this fails.
+//CHECK-NOT: _slang_coverage{{.*int\(1\)}}

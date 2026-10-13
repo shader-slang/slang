@@ -10,6 +10,7 @@ name: PR Maintenance
 # Pair this with the other example callers in this directory for full coverage:
 #   - example-pr-checks-complete.yml  CI / gating-check results -> board
 #   - example-pr-commit-status.yml    external commit statuses -> board
+#   - example-pr-sweep-nightly.yml    nightly / on-demand sweep of open PRs
 #   - example-pr-review-fork-bridge.yml + example-pr-review-fork-apply.yml
 #                                     real-time fork-PR review handling
 #
@@ -52,6 +53,11 @@ jobs:
     if: >-
       github.event_name != 'pull_request_review' ||
       github.event.pull_request.head.repo.fork == false
+    # Repo-scoped writes (assignees, review requests, comments) use
+    # github-actions[bot]; org-team reads and ProjectsV2 writes still use the PAT.
+    permissions:
+      issues: write
+      pull-requests: write
     uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
     secrets:
       SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

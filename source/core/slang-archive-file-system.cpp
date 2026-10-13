@@ -1,6 +1,6 @@
 #include "slang-archive-file-system.h"
 
-#include "../core/slang-castable.h"
+#include "core/slang-castable.h"
 #include "slang-blob.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <memory>
 #include <stddef.h>
+#include <type_traits>
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
@@ -138,6 +139,30 @@ struct glslang_CompileRequest_1_2
     const char* entryPointName; // The name of the entrypoint that will appear in output spirv.
 };
 
+// 1.3 version
+struct glslang_CompileRequest_1_3 : public glslang_CompileRequest_1_2
+{
+    /// Set from 1.2
+    void set(const glslang_CompileRequest_1_2& in);
+
+    // spirv-opt CLI-style pass flags forwarded from `-Xspirv-opt`, registered on top of the preset
+    // passes for the selected optimization level. Null / zero count means none. Borrowed for the
+    // duration of the synchronous compile call: the producer keeps the storage alive across the
+    // call, and the callee neither retains nor frees it.
+    const char* const* spirvOptimizationFlags;
+    size_t spirvOptimizationFlagCount;
+};
+
+// _1_3 is copied/zeroed bytewise (memset + same-type memcpy in the entry-point shims), so it must
+// stay trivially copyable, and it must remain a _1_2 subclass so callers can slice to the base.
+static_assert(std::is_trivially_copyable<glslang_CompileRequest_1_3>::value);
+static_assert(std::is_base_of<glslang_CompileRequest_1_2, glslang_CompileRequest_1_3>::value);
+// Total-size regression guard: the two appended fields must be exactly the growth over _1_2 (this
+// catches an accidental added/removed field or padding change; it does not police field order).
+static_assert(
+    sizeof(glslang_CompileRequest_1_3) ==
+    sizeof(glslang_CompileRequest_1_2) + sizeof(const char* const*) + sizeof(size_t));
+
 inline void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
 {
     SLANG_GLSLANG_COMPILE_REQUEST_1_0(SLANG_GLSLANG_FIELD_COPY)
@@ -153,6 +178,17 @@ inline void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in
     memcpy(this, &in, sizeof(in));
 }
 
+inline void glslang_CompileRequest_1_3::set(const glslang_CompileRequest_1_2& in)
+{
+    // Copy the _1_2 base, then zero the fields _1_3 adds so an old caller that only knows about
+    // _1_2 doesn't leave them with garbage. `in.sizeInBytes` is the _1_2 size, so restore this
+    // struct's own size after the copy.
+    static_cast<glslang_CompileRequest_1_2&>(*this) = in;
+    sizeInBytes = sizeof(*this);
+    spirvOptimizationFlags = nullptr;
+    spirvOptimizationFlagCount = 0;
+}
+
 typedef struct glslang_LinkRequest_t
 {
     const uint32_t** modules;    // Input: array of pointers to SPIR-V modules
@@ -165,6 +201,7 @@ typedef struct glslang_LinkRequest_t
 typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
+typedef int (*glslang_CompileFunc_1_3)(glslang_CompileRequest_1_3* request);
 typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(

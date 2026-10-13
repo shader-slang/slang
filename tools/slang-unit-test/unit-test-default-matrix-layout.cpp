@@ -1,6 +1,6 @@
 // unit-test-default-matrix-layout.cpp
 
-#include "../../source/core/slang-list.h"
+#include "core/slang-list.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

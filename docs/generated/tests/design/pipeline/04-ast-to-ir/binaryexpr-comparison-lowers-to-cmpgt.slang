@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T16:30:00Z
-//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
+//META: doc_section_digest=73a8b7d64d9596c97c899fba163502910f89289de9adea3eac1da3e0599596e6
 //META: purpose=A builtin comparison site (`a > 0`, a checker fast-path BuiltinOperatorExpr) lowers to a comparison IR opcode (`cmpGT`) — the doc's BuiltinOperatorExpr row.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // Int)` in the IR. The doc lists `IREq` as the example for the row;
 // `cmpGT` is the comparison opcode for the `>` operator.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

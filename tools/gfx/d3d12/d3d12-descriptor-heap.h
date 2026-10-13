@@ -145,7 +145,7 @@ public:
         int index = m_allocator.alloc(1);
         if (index < 0)
         {
-            assert(!"descriptor allocation failed");
+            SLANG_ASSERT_FAILURE("descriptor allocation failed");
             return SLANG_FAIL;
         }
 
@@ -207,7 +207,7 @@ public:
             else
                 return (int)m;
         }
-        assert(
+        SLANG_ASSERT(
             m_subHeapStartingIndex[l] <= descriptorIndex &&
             m_subHeapStartingIndex[l] + m_subHeaps[l]->getSize() > descriptorIndex);
         return (int)l;
@@ -255,7 +255,7 @@ public:
         int index = allocate(1);
         if (index < 0)
         {
-            assert(!"descriptor allocation failed");
+            SLANG_ASSERT_FAILURE("descriptor allocation failed");
             return SLANG_FAIL;
         }
 
@@ -333,8 +333,8 @@ public:
             newSubHeap();
             return allocate(count);
         }
-        assert(result <= 0xFFFFFF);
-        assert(m_subHeapIndex <= 255);
+        SLANG_ASSERT(result <= 0xFFFFFF);
+        SLANG_ASSERT(m_subHeapIndex <= 255);
         return (m_subHeapIndex << 24) + result;
     }
 
@@ -344,9 +344,9 @@ public:
         return m_subHeaps[subHeapIndex].getCpuHandle(index & 0xFFFFFF);
     }
 
-    void free(int index, int count) { assert(0 && "not supported"); }
+    void free(int index, int count) { SLANG_ASSERT_FAILURE("not supported"); }
 
-    void free(D3D12Descriptor descriptor) { assert(0 && "not supported"); }
+    void free(D3D12Descriptor descriptor) { SLANG_ASSERT_FAILURE("not supported"); }
 
     void freeAll()
     {
@@ -508,7 +508,7 @@ int D3D12DescriptorHeap::allocate(int numDescriptors)
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE int D3D12DescriptorHeap::placeAt(int index)
 {
-    assert(index >= 0 && index < m_totalSize);
+    SLANG_ASSERT(index >= 0 && index < m_totalSize);
     m_currentIndex = index + 1;
     return index;
 }
@@ -516,7 +516,7 @@ SLANG_FORCE_INLINE int D3D12DescriptorHeap::placeAt(int index)
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getCpuHandle(int index) const
 {
-    assert(index >= 0 && index < m_totalSize);
+    SLANG_ASSERT(index >= 0 && index < m_totalSize);
     D3D12_CPU_DESCRIPTOR_HANDLE start = m_heap->GetCPUDescriptorHandleForHeapStart();
     D3D12_CPU_DESCRIPTOR_HANDLE dst;
     dst.ptr = start.ptr + m_descriptorSize * index;
@@ -525,7 +525,7 @@ SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getCpuHandle
 // ---------------------------------------------------------------------------
 SLANG_FORCE_INLINE D3D12_GPU_DESCRIPTOR_HANDLE D3D12DescriptorHeap::getGpuHandle(int index) const
 {
-    assert(index >= 0 && index < m_totalSize);
+    SLANG_ASSERT(index >= 0 && index < m_totalSize);
     D3D12_GPU_DESCRIPTOR_HANDLE start = m_heap->GetGPUDescriptorHandleForHeapStart();
     D3D12_GPU_DESCRIPTOR_HANDLE dst;
     dst.ptr = start.ptr + m_descriptorSize * index;

@@ -1,0 +1,56 @@
+schema_version: 1
+id: glsl-hull-patch-constant-func-void-return
+bundle: coverage/legalize
+suspected_kind: wrong-codegen
+title: "Hull patch-constant function emits a non-void GLSL signature with a bare return"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: glsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc tests/hlsl/simple-hull-shader-1.slang -target glsl -entry hullMain -stage hull -allow-glsl"
+  source_slang: docs/generated/tests/coverage/legalize/hull-patch-constant-func-spirv.slang
+  observed_summary: |
+    The GLSL emitted for a hull shader's `[patchconstantfunc]` keeps the function's
+    original struct return type but has its `return <value>` rewritten into a bare
+    `return;`, so the generated GLSL does not compile.
+
+    From the shipped test tests/hlsl/simple-hull-shader-1.slang, -target glsl:
+
+      HscOut_0 constants_0()
+      {
+          ...
+          gl_TessLevelOuter[0] = ...;
+          gl_TessLevelInner[1] = ...;
+          return;                       // <-- non-void function, no value
+      }
+
+    Round-tripping through glslang fails:
+
+      glslang: <file>(9): error : 'return' : non-void function must return a value
+      glslang: <file>(9): error : '' : compilation terminated
+
+    `invokePathConstantFuncInHullShader` (slang-ir-glsl-legalize.cpp:1229) rewrites the
+    patch-constant function's return into stores to the tess-factor / varying-output
+    globals, and calls `fixUpFuncType(entryPoint, voidType)` for the *entry point*, but
+    the patch-constant function itself keeps its old result type. The SPIR-V arm is
+    unaffected. The existing hull tests under tests/ only FileCheck `location = N`
+    lines, so they pass despite the emitted GLSL being uncompilable.
+  exit_code: 0
+  stderr_tail: "glslang:  <file>(9): error :  'return' : non-void function must return a value"
+expected:
+  claim: |
+    After the patch-constant function's return value has been redirected into the
+    tess-factor and varying-output globals, the function's own result type should be
+    fixed up to void (as the entry point's is), so the emitted GLSL declares
+    `void constants_0(...)` and the bare `return;` is legal.
+  citation_kind: sibling-test
+  citation: tests/hlsl/simple-hull-shader-1.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the repro is a shipped test under tests/, unmodified."
+    - "glslang being over-strict: ruled out — a non-void function falling off a bare `return;` is invalid in GLSL as it is in C."
+    - "Only affects the -allow-glsl path: ruled out — the same shape appears for a plain Slang hull shader with no -allow-glsl."

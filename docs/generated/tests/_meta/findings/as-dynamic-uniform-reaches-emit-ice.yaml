@@ -1,0 +1,47 @@
+schema_version: 1
+id: as-dynamic-uniform-reaches-emit-ice
+bundle: design/ir-reference/misc
+suspected_kind: wrong-diagnostic
+title: "asDynamicUniform without -validate-uniformity aborts every backend at emit"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ir-reference/misc/treat-as-dynamic-uniform.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/design/ir-reference/misc/treat-as-dynamic-uniform.slang
+  observed_summary: |
+    A call to the core-module `asDynamicUniform<T>` compiles and emits normally when
+    `-validate-uniformity` is passed, but without that flag the `TreatAsDynamicUniform`
+    inst survives to code emit and every backend aborts:
+      hlsl / glsl / metal / wgsl / cuda / cpp:
+        internal error[E99999]: unimplemented feature in Slang compiler:
+        unexpected IR opcode during code emit
+      spirv-asm:
+        error[E99997]: ... InternalError ... unimplemented: Unhandled local inst in
+        spirv-emit: let %u : %2 = TreatAsDynamicUniform(%3)
+    Minimal shader (identical apart from the flag to the committed test, which passes with
+    the flag):
+      uint u = asDynamicUniform(tid.x);
+      outputBuffer[0] = (int)u;
+    `asDynamicUniform` carries no capability or flag gate at its declaration, so the call is
+    accepted by the checker in both modes; only the emit stage differs.
+  exit_code: 255
+  stderr_tail: "internal error[E99999]: unimplemented feature in Slang compiler: unexpected IR opcode during code emit"
+expected:
+  claim: |
+    misc.md lists `TreatAsDynamicUniform` as a marker whose meaning is "marks a value
+    dynamically uniform; read by slang-ir-uniformity.cpp" — a compile-time annotation with no
+    target-code counterpart. Whether or not the uniformity checker runs, the marker should be
+    stripped before emit (or the call rejected at check time with a real diagnostic naming the
+    required option), not reach a backend and abort with an internal error.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/misc.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ir-reference/misc.md#storage-type-legalization-casts
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the only difference between the passing and aborting runs is the presence of -validate-uniformity; the shader text is unchanged."
+    - "asDynamicUniform is only meaningful under -validate-uniformity: plausible, and in that case the right behaviour is a check-time diagnostic naming the option rather than an internal error at emit."
+    - "Same root cause as the __getLegalizedSPIRVGlobalParamAddr abort observed in the same bundle (another marker-style intrinsic that reaches emit unremoved): possible shared cause, recorded here only as an observation."

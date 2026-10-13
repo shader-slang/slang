@@ -1,0 +1,37 @@
+schema_version: 1
+id: generics-existentials-global-generic-param-constraint-sigsegv
+bundle: design/ir-reference/generics-and-existentials
+suspected_kind: sigsegv
+title: "Constrained module-scope `type_param T : I` with interface dispatch SIGSEGVs"
+observed_at: "2026-06-06T10:32:40+00:00"
+scope: spirv
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ir-reference/generics-and-existentials/global-generic-param-with-constraint.slang -target spirv-asm -o /dev/null -entry main -stage compute"
+  source_slang: docs/generated/tests/design/ir-reference/generics-and-existentials/global-generic-param-with-constraint.slang
+  observed_summary: |
+    A module-scope constrained generic parameter (`type_param T : IFoo;`) whose
+    value is dispatched through the interface (`val.run(inVal)`) crashes the
+    compiler with a segmentation fault (exit code 139, no diagnostic emitted)
+    during full compilation to SPIR-V.
+
+    The LOWER-TO-IR dump is produced correctly first (it shows the two expected
+    `global_generic_param` lets — one `Type`, one `witness_table_t(%IFoo)`), so
+    the crash is in a later pass (specialization / link / emit), not in lowering.
+    An unconstrained module-scope `type_param T;` compiles fine.
+  exit_code: 139
+expected:
+  claim: |
+    A constrained module-scope `type_param T : I` lowers to two
+    `global_generic_param` instructions (the type and its conformance witness)
+    and a method dispatch on it should compile to a valid module-generic SPIR-V
+    output (or emit a graceful diagnostic), not crash the compiler.
+  citation_kind: doc
+  citation: docs/generated/design/ir-reference/generics-and-existentials.md
+provenance:
+  agent_model: claude-opus-4-8
+  source_commit: a8f6d4f7d1b2ceb7e22201ca7523f8671c92bde8
+  doc_anchor: docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Invalid input the compiler should reject: ruled out — the unconstrained form compiles and the LOWER-TO-IR dump for the constrained form is well-formed; a crash is never the correct response."

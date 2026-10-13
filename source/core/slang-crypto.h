@@ -1,7 +1,7 @@
 #pragma once
-#include "../core/slang-blob.h"
-#include "../core/slang-list.h"
-#include "../core/slang-string.h"
+#include "core/slang-blob.h"
+#include "core/slang-list.h"
+#include "core/slang-string.h"
 #include "slang.h"
 
 namespace Slang

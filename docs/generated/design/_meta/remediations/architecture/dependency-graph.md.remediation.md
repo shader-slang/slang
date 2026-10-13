@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T13:57:39Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:06:00Z
 target_doc: architecture/dependency-graph.md
 review_report: ../../reviews/architecture/dependency-graph.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
+  fixed: 3
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -17,9 +17,11 @@ actions:
 # Remediation report for architecture/dependency-graph.md
 
 ## Summary
-One major finding reviewed and fixed. F-001 flagged the wasm target's `slang-lookup-tables` dependency as absent. Verified against `source/slang-wasm/CMakeLists.txt:21` (`LINK_WITH_PRIVATE ... slang-lookup-tables`). The mermaid diagram already contains `slangWasm --> lookupTables` (target doc line 86) and the edge-citation row's edge label already names `lookup-tables`; the sole real gap was the citation row's vague `Clause` cell, which I made concrete by spelling out the full `LINK_WITH_PRIVATE` list including `slang-lookup-tables`. No findings were rejected, deferred, or escalated.
+All three findings were verified against the build files and fixed. The diagram now keeps to subsystem granularity: the four generated-code targets defined inside `source/slang/` were removed as nodes and are described in prose instead, with the resulting `slang-core-module` to `source/slang/` relationship made explicit as a labelled edge. The source-ownership invariant was qualified for embedded builds, and the stale root-CMake line citation was corrected. The document was edited; it is now 12275 bytes against the 16384-byte cap and `regenerate.py lint` passes.
 
 ## Actions
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed via `source/slang-wasm/CMakeLists.txt:21`; wasm links `slang-lookup-tables`. Diagram edge (target doc line 86) and citation-row edge label already covered it; only the `Clause` cell lacked explicit `slang-lookup-tables` verification. In-scope per the prompt's every-edge-justified-by-CMake contract. | Edge-citation row for `slang-wasm`: replaced generic `LINK_WITH_PRIVATE clause` with full list `miniz lz4_static slang core compiler-core slang-capability-defs slang-capability-lookup slang-fiddle-output slang-lookup-tables`. |
+| F-001 | fixed | Confirmed: the prompt checklist at `docs/generated/design/_meta/prompts/architecture-dependency-graph.md:42-44` requires every node to be a `source/` directory or a `module-map.md` heading, and `slang-fiddle-output`, `slang-capability-defs`, `slang-capability-lookup`, `slang-lookup-tables` are targets declared in `source/slang/CMakeLists.txt` (lines 57, 62-64, 199, 277-278), not subsystems. | Removed the four node declarations and their 14 edges; added a `coreModule` to `slangLib` edge labelled "generated targets"; added a paragraph after the diagram naming the four generated targets, their consumers, and the `source/slang-core-module/` dependency on artefacts owned by `source/slang/`; collapsed the four per-target rows in `## Edge citations` and reworded the `slang` and `slang-wasm` rows. |
+| F-002 | fixed | Confirmed: `source/slang/CMakeLists.txt:322-329` builds `slang-common-objects` from `.`, while the library targets at lines 330-358 are declared `NO_SOURCE` and link it, so "the only target" was wrong for embedded builds. | `## Notable invariants`: reworded to a subsystem-level claim and named `slang` (non-embedded) versus `slang-common-objects` (`SLANG_EMBED_CORE_MODULE` on) as the source-owning target. |
+| F-003 | fixed | Confirmed: `CMakeLists.txt:366` is `SLANG_ENABLE_RELEASE_DEBUG_INFO`; `SLANG_SLANG_LLVM_FLAVOR` is the `enum_option` identifier at line 386, used through line 401. | Changed "around line 366" to "lines 385-401" in the `slang-llvm` note. |

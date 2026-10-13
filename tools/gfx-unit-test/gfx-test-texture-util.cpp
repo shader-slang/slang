@@ -202,7 +202,7 @@ void generateTextureData(RefPtr<TextureInfo> texture, ValidationTextureFormatBas
             uint32_t mipDepth = std::max(extent.depth >> mip, 1u);
             uint32_t mipSize = mipWidth * mipHeight * mipDepth * texelSize;
             subresource->textureData = ::malloc(mipSize);
-            assert(subresource->textureData != nullptr);
+            SLANG_ASSERT(subresource->textureData != nullptr);
 
             subresource->extent.width = mipWidth;
             subresource->extent.height = mipHeight;

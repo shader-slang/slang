@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
-//META: doc_ref=docs/generated/design/ast-reference/expressions.md#invokeexpr-and-the-call-operator-cast-unification
-//META: doc_section_digest=159873da063c0de0bb81f96fd4bec64b70eb1664f509af0a10c8eee0b3e19e7f
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/expressions.md#invokeexpr-and-the-call--operator--cast-unification
+//META: doc_section_digest=bed8880e5d3d3d67324d1cc51b8508d2d1f9ce1f6e5e3f3eadf4c071f728a402
 //META: purpose=An InvokeExpr whose argument-list length does not match any candidate is rejected with a "not enough arguments to call" diagnostic.
 //META: intent=negative
 //META: pipeline_stage=check

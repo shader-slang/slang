@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:30:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
-//META: purpose=Fires diagnostic W40010 (float-literal-too-small) - floating-point literal too small
+//META: doc_section_digest=ff94ea622e1962194e31e69e083b6850c1de29f3eed19f8502ddf0e55138535c
+//META: purpose=Fires diagnostic E40010 (float-literal-too-small) - floating-point literal too small
 //META: intent=negative
 //META: pipeline_stage=check
 //META: catalog_code=40010
@@ -12,10 +12,10 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // A non-zero float literal smaller than the smallest
-// representable subnormal of the target type triggers W40010.
+// representable subnormal of the target type triggers E40010.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 static const half g = 1.0e-30h;
 
-// CHECK: W40010
+//CHECK: E40010

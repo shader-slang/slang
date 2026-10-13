@@ -1,9 +1,9 @@
 #ifndef SLANG_CONTAINER_POOL_H
 #define SLANG_CONTAINER_POOL_H
 
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-virtual-object-pool.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-virtual-object-pool.h"
 
 // A pool to allow reuse of common types of containers to avoid
 // frequent resizing and rehashing.

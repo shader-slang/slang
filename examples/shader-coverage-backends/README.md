@@ -10,18 +10,28 @@ workflow — compile, discover the hidden counter buffer through
 through `ICoverageTracingMetadata` — is identical everywhere, and that
 only the binding step's shape changes per backend:
 
-| Backend  | Binding model exercised                                                                              |
-| -------- | ---------------------------------------------------------------------------------------------------- |
-| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset`  |
-| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol    |
-| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set         |
-| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit                |
+| Backend  | Binding model exercised                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------- |
+| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset` |
+| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol   |
+| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set        |
+| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit               |
 
 Each path is a compact implementation of the corresponding recipe in
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
 For coverage-driven _analysis_ workflows on realistic kernels, see the
 sibling examples `shader-coverage-image-pipeline` and
 `shader-coverage-bvh-traversal`.
+
+This example intentionally uses native APIs and has no slang-rhi dependency.
+For the RHI integration path, start with
+[`shader-coverage-image-pipeline`](../shader-coverage-image-pipeline/); the
+[BVH example](../shader-coverage-bvh-traversal/) also shows explicit placement.
+
+The Vulkan path uses the shared
+[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
+and [implementation](../shader-coverage-common/vk_compute_demo.cpp), which remains the native Vulkan reference. It is compiled only when a Vulkan loader
+is found; the CPU, CUDA, and Metal paths do not depend on it.
 
 ## Running
 
@@ -72,6 +82,18 @@ open coverage-html/index.html    # macOS; Linux: xdg-open, Windows: start
 `python3 tools/coverage-html/slang-coverage-html.py cpu.lcov --output-dir coverage-html`
 produces an equivalent report.
 
+### Shared counter decoding
+
+After each backend has completed its dispatch and made the counter bytes
+host-visible, `report()` in [`main.cpp`](main.cpp) calls
+[`decodeCoverageCounters()`](../shader-coverage-common/coverage-counters.h).
+This example helper converts little-endian 32- or 64-bit slots to `uint64_t`
+values without an alignment requirement. It uses the effective
+`CoverageBufferInfo::elementByteWidth`, not the requested width.
+The report then iterates metadata entries and reads `hits[entry.counterIndex]`;
+entry indices and counter indices are not interchangeable. The saved
+`.counters.bin` still contains the original bytes at the original width.
+
 ## Options
 
 - `--counter-width=32|64` — counter element width (default 32, which
@@ -86,6 +108,15 @@ produces an equivalent report.
   when running from outside the source tree.
 
 ## Build requirements
+
+To build without slang-rhi (tests also require RHI, so disable them):
+
+```bash
+cmake -S . -B build-native -G "Ninja Multi-Config" \
+    -DSLANG_ENABLE_SLANG_RHI=OFF -DSLANG_ENABLE_TESTS=OFF \
+    -DSLANG_ENABLE_EXAMPLES=ON
+cmake --build build-native --config Release --target shader-coverage-backends
+```
 
 - CPU path: a system C++ toolchain for host-callable compilation.
   Required — coverage instrumentation is skipped on the slang-llvm JIT

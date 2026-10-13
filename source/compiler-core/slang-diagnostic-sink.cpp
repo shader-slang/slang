@@ -1,11 +1,11 @@
 // slang-diagnostic-sink.cpp
 #include "slang-diagnostic-sink.h"
 
-#include "../compiler-core/slang-rich-diagnostics-render.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-string-util.h"
+#include "compiler-core/slang-rich-diagnostics-render.h"
+#include "core/slang-char-util.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-string-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name-convention-util.h"
 #include "slang-name.h"
@@ -671,7 +671,8 @@ bool DiagnosticSink::diagnoseRichImpl(
             getSourceLocationLexer(),
             sourceManager,
             {.enableTerminalColors = shouldEnableTerminalColors(),
-             .enableUnicode = shouldEnableUnicode()},
+             .enableUnicode = shouldEnableUnicode(),
+             .format = getDiagnosticFormat()},
             effectiveDiagnostic);
     }
 
@@ -963,29 +964,33 @@ void outputExceptionDiagnostic(
     DiagnosticSink& sink,
     slang::IBlob** outDiagnostics)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Internal severity to prevent exception leak from loadModule
     }
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)
     {
         // Catch and ignore the AbortCompilationException that diagnoseRaw throws
         // for Fatal severity to prevent exception leak from loadModule
     }
+#endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
 

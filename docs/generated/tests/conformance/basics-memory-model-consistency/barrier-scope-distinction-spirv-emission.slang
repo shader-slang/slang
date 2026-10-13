@@ -31,6 +31,9 @@
 //TEST:SIMPLE(filecheck=GLSLALLCHECK):-target glsl -entry computeAllMain -stage compute
 //TEST:SIMPLE(filecheck=GLSLDEVCHECK):-target glsl -entry computeDevMain -stage compute
 //TEST:SIMPLE(filecheck=GLSLGRPCHECK):-target glsl -entry computeGrpMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLALLCHECK):-target hlsl -entry computeAllMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLDEVCHECK):-target hlsl -entry computeDevMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLGRPCHECK):-target hlsl -entry computeGrpMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 groupshared uint shared1[64];
@@ -116,6 +119,16 @@ void computeGrpMain(uint3 tid : SV_DispatchThreadID, uint3 gid : SV_GroupThreadI
 // GLSLGRPCHECK: memoryBarrier
 // GLSLGRPCHECK-SAME: gl_ScopeWorkgroup
 // GLSLGRPCHECK-SAME: gl_StorageSemanticsShared
+
+// HLSL keeps the three scopes as three distinct intrinsic spellings, which is the
+// surface-level counterpart of the three distinct SPIRV semantics operands. Each
+// entry point must emit its own spelling and not one of the other two.
+// HLSLALLCHECK: AllMemoryBarrier()
+// HLSLALLCHECK-NOT: DeviceMemoryBarrier
+// HLSLDEVCHECK: DeviceMemoryBarrier()
+// HLSLDEVCHECK-NOT: GroupMemoryBarrier
+// HLSLGRPCHECK: GroupMemoryBarrier()
+// HLSLGRPCHECK-NOT: DeviceMemoryBarrier
 
 // Targets not covered by emission directives:
 //   cpp    - AllMemoryBarrier/DeviceMemoryBarrier/GroupMemoryBarrier not available on cpp target (E36107 capability gate).

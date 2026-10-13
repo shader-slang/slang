@@ -6,10 +6,10 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "../compiler-core/slang-source-loc.h"
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
+#include "compiler-core/slang-source-loc.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
 #include "slang-ast-type.h"
 #include "slang-container-pool.h"
 #include "slang-ir-insts-enum.h"
@@ -2242,24 +2242,22 @@ public:
     IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
     void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
+    // Binary module loading checks this range before decoding serialized AST and IR.
+    // Adding an IR instruction requires a new writer version. Earlier modules can remain
+    // supported when their AST and IR representations are compatible with the reader.
     //
-    // The range of module versions this compiler supports
-    //
-    // This will need to be updated if for example an instruction is removed,
-    // the max supported version should be incremented and the min supported
-    // version set to above the last version an instance of that instruction
-    // could be found
-    //
-    // Additionally this should be updated when new instructions are added,
-    // however only k_maxSupportedModuleVersion needs to be incremented in that
-    // case
-    //
-    // It represents the version of module regarding semantics and doesn't have
-    // anything to do with serialization format
-    //
-    const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 26;
+    // Adding `UniformParameterShadowVarDecl` shifts the sequential `ASTNodeType` values.
+    // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
+    // Version 34 is the earliest module version with the updated AST node numbering.
+    const static UInt k_minSupportedModuleVersion = 34;
+    const static UInt k_maxSupportedModuleVersion = 34;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// Returns whether `version` is in the inclusive range this compiler can load.
+    static bool isModuleVersionSupported(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
 
 private:
     friend struct IRSerialReadContext;

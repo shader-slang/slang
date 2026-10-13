@@ -1,7 +1,7 @@
 #pragma once
-#include "../core/slang-crypto.h"
-#include "../core/slang-io.h"
-#include "../core/slang-string.h"
+#include "core/slang-crypto.h"
+#include "core/slang-io.h"
+#include "core/slang-string.h"
 #include "slang.h"
 
 #include <mutex>

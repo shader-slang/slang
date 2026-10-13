@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:03:42+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=gpt-6
+//META: generated_at=2026-09-29T07:48:53+00:00
+//META: source_commit=3bb522221d5db85fbdf8dcf441c05ffc3b801358
 //META: doc_ref=docs/language-reference/basics-execution-divergence-reconvergence.md#divergence
-//META: doc_section_digest=7748f330eccf2fb718b5ba2c0f9aff0035f24f4197647463775fd43f1b5ebbb9
+//META: doc_section_digest=55e4138f7b51a582d48fae00eb4b7bca5a411cd2c22c90e424f145698370dc0a
 //META: purpose=Loop statement: SPIRV emits OpLoopMerge marking the loop merge block where all threads reconverge after the loop exits.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -14,6 +14,8 @@
 // (divergence); once every thread exits, all reconverge at the post-loop point.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
@@ -38,13 +40,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // SPIRV: OpLoopMerge marks the block where all threads reconverge after the loop.
 // CHECK: OpLoopMerge
 
+// HLSL: for-loop lowered to a top-test infinite loop with a break; the code
+// after the loop is the reconvergence point.
+// CHECK_HLSL: for(;;)
+// CHECK_HLSL: break
+
+// GLSL: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_GLSL: for(;;)
+// CHECK_GLSL: break
+
 // Metal: for-loop lowered to a top-test infinite loop with a break.
 // CHECK_METAL: for(;;)
 // CHECK_METAL: break
 
-// WGSL: for-loop lowered to a top-test infinite loop with a break.
-// CHECK_WGSL: for(;;)
-// CHECK_WGSL: break
+// WGSL uses its native loop statement with the same explicit exit.
+// CHECK_WGSL: loop
+// CHECK_WGSL-NEXT: {
+// CHECK_WGSL: break;
 
 // CUDA: for-loop lowered to a top-test infinite loop with a break.
 // CHECK_CUDA: for(;;)

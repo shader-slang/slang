@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=5564328489fb0769a5142651d7ec41cf34dd5aade70763c9a42892c1a5f8b30b
+//META: doc_section_digest=239d4a444aef94a5c462d450823a67c259b6e81be9a849181f196bde97897305
 //META: purpose=Fires diagnostic E31148 (cannot-resolve-derivative-function) -- cannot resolve derivative function
 //META: intent=negative
 //META: pipeline_stage=check
@@ -18,4 +18,4 @@
 float f(float x) { return x; }
 
 
-// CHECK: E31148
+//CHECK: E31148

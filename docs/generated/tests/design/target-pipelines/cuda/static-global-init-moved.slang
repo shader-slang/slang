@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:40:21+00:00
-//META: source_commit=4e394f5c941b8145021611e1d3016b1f27a4ba52
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#inlineglobalconstantsforlegalization-for-cuda
-//META: doc_section_digest=429f7fe82b3dcfac3d26efec1b4c672716be1f4b213a8dcc4b88cc04f2e6b7e3
+//META: doc_section_digest=1ae5c9f73b18aba098dabdf605b7649d4106a39cff7093c91f713a17528d350e
 //META: purpose=CUDASource always runs inlineGlobalConstantsForLegalization (a final PTX request runs the pipeline as CUDASource and takes the same short-circuit; only CUDAHeader skips) so a static module-scope constant is inlined at its use sites as the literal value because nvrtc rejects dynamic __device__ initialization.
 //META: intent=functional
 //META: pipeline_stage=emit

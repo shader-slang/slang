@@ -3,7 +3,7 @@
 #ifndef SLANG_PASS_WRAPPER_H
 #define SLANG_PASS_WRAPPER_H
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-code-gen.h"
 #include "slang-compiler-options.h"
 

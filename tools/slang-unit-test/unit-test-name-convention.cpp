@@ -22,8 +22,8 @@
 //     `makeUpper`, `makeLower`) decode/encode the
 //     NameConvention enum's flag layout.
 
-#include "../../source/compiler-core/slang-name-convention-util.h"
-#include "../../source/core/slang-string.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

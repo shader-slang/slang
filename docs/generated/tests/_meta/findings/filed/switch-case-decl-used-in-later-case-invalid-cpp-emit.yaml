@@ -1,0 +1,46 @@
+schema_version: 1
+id: switch-case-decl-used-in-later-case-invalid-cpp-emit
+bundle: design/ast-reference/statements
+suspected_kind: wrong-codegen
+title: "[cpp -g2] cross-case switch var emits undeclared identifier"
+observed_at: 2026-08-04T00:00:00+00:00
+scope: cpp
+evidence:
+  command: build/RelWithDebInfo/bin/slangc -target cpp -g2 docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang
+  source_slang: docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang
+  observed_summary: |
+    A local declared under `case 1:` and assigned/read under `case 2:`
+    of the same `switch` is accepted by the frontend without any
+    diagnostic, but the C++ emitted with debug info (`-g2`, which is
+    what `slang-test`'s `-cpu` COMPARE_COMPUTE path uses) contains
+    `_S1 = shared_0;` inside the `case 1:` block while `shared_0` is
+    never declared anywhere in the emitted translation unit. clang
+    rejects the generated file with "use of undeclared identifier
+    'shared_0'", so the test aborts before producing any output.
+    Without `-g2` the same source emits valid C++ (the variable is
+    optimized into the case-local assignment), and a variable declared
+    and used within a single case emits fine with `-g2`; the breakage
+    needs both the debug-info emit and the cross-case use.
+  exit_code: 1
+  stderr_tail: "clang 18.1: switchstmt-case-decl-used-in-later-case.slang(28): error :  use of undeclared identifier 'shared_0'"
+expected:
+  claim: |
+    Slang should either reject a variable that is declared under one
+    switch case label and used under another (the behaviour the
+    existing hand-written test says it should have: "Slang should
+    either: 1. Require variables used across fall-through to be
+    declared before the switch 2. Or emit an error for this pattern"),
+    or emit C++ in which that variable is declared in a scope that
+    covers every case that reads it. Silently emitting a reference to
+    an undeclared identifier is wrong in either reading.
+  citation_kind: sibling-test
+  citation: tests/language-feature/switch-fallthrough/fallthrough-var-declared-in-case.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ast-reference/statements.md#blockstmt-and-seqstmt
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: partly possible — the sibling test above documents that variables shared across switch cases are not yet supported. But the frontend accepts this program silently (it even resolves the name across case labels, as the companion diagnostic test shows), so the failure mode is invalid generated source rather than a rejected program."
+    - "Debug-info-only artefact: the bad reference appears only under -g2, so the defect most likely sits in the debug-variable emission rather than in switch lowering itself. Recorded as observation, not as a root-cause claim."

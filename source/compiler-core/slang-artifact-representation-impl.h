@@ -2,8 +2,8 @@
 #ifndef SLANG_ARTIFACT_REPRESENTATION_IMPL_H
 #define SLANG_ARTIFACT_REPRESENTATION_IMPL_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-com-object.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact-representation.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"

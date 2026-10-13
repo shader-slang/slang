@@ -1,14 +1,14 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T13:58:52Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:08:38Z
 target_doc: cross-cutting/core-module.md
 review_report: ../../reviews/cross-cutting/core-module.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
-  rejected_bogus: 1
+  fixed: 2
+  rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -18,15 +18,16 @@ actions:
 
 ## Summary
 
-The review filed one minor finding (F-001) about the GLSL-module loading
-description. Verified against the current target document and source: the
-sentence the finding quotes as problematic does not exist in the doc, and the
-doc already states exactly the wording the finding recommends. F-001 does not
-apply to the current doc, so it is rejected as bogus. No edit was made this
-cycle; `target_doc_source_commit_after` equals `_before`.
+Both findings were verified against the build files and both were
+correct, so both were fixed. The critical finding (F-001) was applied
+in three places where the page repeated the false "errors surface only
+at runtime" claim for `SLANG_EMBED_CORE_MODULE=OFF`; the major finding
+(F-002) rewrote the prelude delivery description. No findings were
+rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | The quoted text "Loading it is target-conditional: the compiler pulls it in when the user is compiling GLSL or asks for GLSL-flavoured names" is absent from the target doc. `docs/generated/design/cross-cutting/core-module.md:121-127` already ties loading to `SlangGlobalSessionDesc::enableGLSL`, cites the `if (desc->enableGLSL)` branch (verified `source/slang/slang-api.cpp:218`) and the `glslModuleName` / `getBuiltinModule(BuiltinModuleName::GLSL)` retrieval (verified `source/slang/slang-session.cpp:1520,1523`) — i.e. the finding's own recommendation is already implemented in the doc. | — |
+| F-001 | fixed | Verified: `source/slang/CMakeLists.txt:393-404` makes `generate_core_module_cache` an `ALL` target depending on `generate_core_module`, which runs `slang-bootstrap -compile-core-module` (`source/slang-core-module/CMakeLists.txt:141-166`); `source/standard-modules/neural/CMakeLists.txt:54,82` and `.../experimental/CMakeLists.txt:49` add the same dependency under `ALL`. A non-embedded build therefore compiles the meta-source during the build. | Rewrote the three "surface at runtime" passages (`## Core module`; `## Building the core module` option list and step 4) to say errors surface from the separate `generate_core_module` step that a normal build still runs, with runtime compilation as the no-cache fallback. |
+| F-002 | fixed | Verified: `prelude/CMakeLists.txt:6-21` runs `slang-embed` per `*-prelude.h`; `source/slang/slang-global-session.cpp:126-128` registers the embedded CUDA/C++/HLSL strings; `source/slang/slang-emit.cpp:2940-2951` writes the selected prelude string via `sourceWriter.emit`. The `#include "<prelude>"` description was wrong for the default path. | Replaced the sidecar-header/`#include` sentence in `## Preludes` with the embed-to-string flow, keeping a note that the headers are installed and a custom prelude string may include one. |

@@ -18,6 +18,10 @@ inputs:
     required: false
     description: "Optional suffix for artifact name (e.g., '-cuda')"
     default: ""
+  cpu-only:
+    required: false
+    description: "Whether this job is restricted to CPU/LLVM backends (no GPU APIs to check)"
+    default: "false"
 
 runs:
   using: "composite"
@@ -133,7 +137,7 @@ runs:
           echo "runner_name=${RUNNER_NAME:-unknown}"
           echo "os=macos"
           echo "ENV_INFO_END"
-        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+        elif [[ "${{ inputs.os }}" == "windows" && "${{ inputs.cpu-only }}" != "true" ]]; then
           check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
 
           echo "Printing CUDA compiler version: ..."

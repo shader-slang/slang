@@ -57,25 +57,38 @@ CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
 
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
+    if (auto declGroup = as<DeclGroup>(stmt->decl))
+    {
+        // The members of a group reach their declaration points in order, so
+        // that a later initializer can refer to an earlier member, as in
+        // `int a = 1, b = a;`.
+        for (auto decl : declGroup->decls)
+            checkDeclAtDeclarationPoint(decl);
+        return;
+    }
+
+    auto decl = as<Decl>(stmt->decl);
+    SLANG_RELEASE_ASSERT(decl);
+    checkDeclAtDeclarationPoint(decl);
+}
+
+void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
+{
     // When we encounter a declaration during statement checking,
-    // we expect that it hasn't been checked yet (because otherwise
-    // it would be referenced before its declaration point), but
-    // we will bottleneck through the `ensureDecl()` path anyway,
-    // to unify with the rest of semantic checking.
+    // it may already be partly checked, for example by a parser-time
+    // lookup that decides what `a <` means, so we bottleneck through
+    // the `ensureDecl()` path to unify with the rest of semantic checking.
     //
     // TODO: This logic might not suffice for something like a
     // local `struct` declaration, where it would have members
     // that need to be recursively checked.
     //
-    ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
-    if (auto decl = as<Decl>(stmt->decl))
+    ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
+    decl->hiddenFromLookup = false;
+    if (auto varDecl = as<VarDeclBase>(decl))
     {
-        decl->hiddenFromLookup = false;
-        if (auto varDecl = as<VarDeclBase>(decl))
-        {
-            if (varDecl->initExpr)
-                varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
-        }
+        if (varDecl->initExpr)
+            varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
     }
 }
 
@@ -87,6 +100,15 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
         for (auto aggDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<AggTypeDeclBase>())
         {
             ensureAllDeclsRec(aggDecl, DeclCheckState::DefinitionChecked);
+        }
+
+        // A local generic type is wrapped in a `GenericDecl`, which is not an
+        // `AggTypeDeclBase`, so the loop above does not reach it. Its inner type still
+        // needs the same conformance checking.
+        for (auto genericDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<GenericDecl>())
+        {
+            if (as<AggTypeDeclBase>(genericDecl->inner))
+                ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
         // Consider this code:
@@ -102,6 +124,7 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
         // `hiddenFromLookup` field is set to `true`.
         // See _lookUpDirectAndTransparentMembers().
         // This field will be set to false when we reach the decl through the DeclStmt.
+        // The members of a group are revealed one at a time, in order.
         //
         if (auto seqStmt = as<SeqStmt>(stmt->body))
         {
@@ -110,7 +133,14 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 if (auto declStmt = as<DeclStmt>(subStmt))
                 {
                     if (auto decl = as<Decl>(declStmt->decl))
+                    {
                         decl->hiddenFromLookup = true;
+                    }
+                    else if (auto declGroup = as<DeclGroup>(declStmt->decl))
+                    {
+                        for (auto dd : declGroup->decls)
+                            dd->hiddenFromLookup = true;
+                    }
                 }
             }
         }
@@ -403,8 +433,19 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     generateUniqueIDForStmt(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    // TODO(tfoley): need to coerce condition to an integral type...
     stmt->condition = CheckExpr(stmt->condition);
+
+    // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
+    // lowering; skip when the condition already failed to check to avoid a cascade.
+    auto conditionType = stmt->condition->type.type;
+    if (conditionType && !as<ErrorType>(conditionType) &&
+        !isValidCompileTimeConstantType(conditionType))
+    {
+        getSink()->diagnose(
+            Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
+        return;
+    }
+
     subContext.checkStmt(stmt->body);
 
     // check the case value exits within the switch
@@ -413,12 +454,11 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
 
 void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'case' statement must be directly enclosed by a 'switch' statement. If
+    // this is not the case, the parser has already diagnosed an error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
         return;
-    }
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
@@ -432,14 +472,11 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     stmt->expr = expr;
     stmt->exprVal = exprVal;
 
-    if (switchStmt)
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+    // We stash the ID of the target statement in the `case`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -518,19 +555,18 @@ void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
 
 void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'default' statement must be directly enclosed by a 'switch'
+    // statement. If this is not the case, the parser has already diagnosed an
+    // error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = stmt});
-    }
-    else
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+        return;
+
+    // We stash the ID of the target statement in the `default`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)

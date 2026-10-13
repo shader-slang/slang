@@ -23,8 +23,8 @@
 // and rely on the slices remaining valid after the source Strings
 // go out of scope.
 
-#include "../../source/compiler-core/slang-slice-allocator.h"
-#include "../../source/core/slang-string.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <string.h>
