@@ -87,13 +87,14 @@ public:
 
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
-        // A `ReadNone` function cannot read or modify mutable program state. We reject ordinary
-        // instructions that report a side effect or read resource contents, require every callee to
-        // be `ReadNone`, and reject any instruction that uses an address into global or otherwise
-        // unknown mutable storage. We preserve the existing conservative treatment of in-block
-        // debug instructions by leaving them to the ordinary side-effect test. Dead-code
-        // elimination treats `ReadNone` as permission to remove a call, but it has no separate rule
-        // for preserving the debug records associated with that call.
+        // We infer `ReadNone` by rejecting reported side effects, resource-content reads, and
+        // addresses into global or unknown mutable storage, and by requiring every callee to be
+        // `ReadNone`. The address classifier excludes roots owned by this function, including its
+        // parameters. Before an optimizer treats a call as pure, `areCallArgumentsSideEffectFree`
+        // must also check its pointer and resource arguments; this body analysis does not establish
+        // those call-site facts. We leave in-block debug instructions to the ordinary side-effect
+        // test because dead-code elimination has no separate rule for preserving the debug records
+        // associated with a removed call.
         bool preventsReadNone = false;
         for (auto block : f->getBlocks())
         {
@@ -274,13 +275,14 @@ public:
     }
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
-        // A `NoSideEffect` function may read program state but cannot modify state visible outside
-        // the function. We use the generic side-effect query for ordinary instructions. For the
-        // instructions that need custom handling, we require each call to target a `NoSideEffect`
-        // callee and retain the conservative rule that their operands cannot name global or
-        // otherwise unknown mutable storage. As in the `ReadNone` analysis, we preserve the
-        // existing conservative treatment of in-block debug instructions because dead-code
-        // elimination has no separate debug-liveness rule.
+        // We infer `NoSideEffect` using the generic side-effect query for ordinary instructions.
+        // For instructions with custom handling, we require each call to target a `NoSideEffect`
+        // callee and reject operands that name global or unknown mutable storage. The address
+        // classifier excludes roots owned by this function, including its parameters. Before an
+        // optimizer treats a call as side-effect-free, `areCallArgumentsSideEffectFree` must also
+        // check its pointer and resource arguments; this body analysis does not establish those
+        // call-site facts. We leave in-block debug instructions to the ordinary side-effect test
+        // because dead-code elimination has no separate debug-liveness rule.
         bool preventsNoSideEffect = false;
         for (auto block : f->getBlocks())
         {

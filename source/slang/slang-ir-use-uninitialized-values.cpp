@@ -464,10 +464,10 @@ static ModuleWideOperandUseClassification classifyModuleWideOperandUse(IRUse* us
 
     case kIROp_MakeExistential:
     case kIROp_MakeExistentialWithRTTI:
-        // Existential construction packages and therefore reads the tracked value. The legacy
-        // heuristic nevertheless records `PossibleWrite` for this opcode. We preserve that
-        // classification to avoid changing warning results as part of this refactor; because the
-        // heuristic stores only one category, it consequently omits the known read.
+        // Existential construction packages and therefore reads the tracked value. The module-wide
+        // heuristic uses `PossibleWrite` for this operation to preserve its warning-suppression
+        // policy for existential values. Because the heuristic records only one category, this
+        // choice omits the known read.
         return ModuleWideOperandUseClassification::PossibleWrite;
 
     case kIROp_ManagedPtrAttach:

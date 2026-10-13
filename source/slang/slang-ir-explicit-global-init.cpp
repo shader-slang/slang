@@ -10,7 +10,8 @@ namespace Slang
 
 // A global variable may contain both its storage declaration and the IR body that computes its
 // initial value. `MoveGlobalVarInitializationToEntryPointsPass` separates those two roles when
-// initialization must execute inside an entry point. For example, for C++ emission it changes:
+// initialization must execute inside an entry point. For example, for shader C++ emission it
+// changes:
 //
 //      static int counter = 1;
 //
@@ -98,9 +99,18 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// Return whether the target requires this initializer to execute inside an entry point.
     bool isInitializerRequiredByTarget(IRGlobalVar* globalVar)
     {
-        // Non-HLSL target pipelines express global initialization as ordinary calls at each entry
-        // point. HLSL emission can retain declaration initializers except for the cases below.
-        if (!isHLSLBasedTarget(m_targetProgram->getTargetReq()->getTarget()))
+        auto target = m_targetProgram->getTargetReq()->getTarget();
+
+        // Native host targets initialize namespace storage once, rather than at each shader
+        // invocation. For example, `generateDllImportFuncs` creates a null-initialized function
+        // pointer that caches a resolved symbol across calls. Moving that initializer into an
+        // entry point would reset the persistent cache each time the entry point is called.
+        if (!isKernelTarget(target))
+            return false;
+
+        // Kernel targets express global initialization as ordinary calls at each entry point.
+        // HLSL emission can retain declaration initializers except for the cases below.
+        if (!isHLSLBasedTarget(target))
             return true;
 
         auto valueType = getGlobalVarValueType(globalVar);

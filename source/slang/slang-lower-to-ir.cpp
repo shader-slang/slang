@@ -11643,11 +11643,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. If this shadow
-        // holds a resource value that supports per-invocation replacement, the resource-specific
-        // initializer pass moves the value into each entry point before replacing the global.
-        // Otherwise, the later general initializer pass follows the target's module-scope
-        // initialization policy.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`.
+        // `moveGlobalVarInitializationToEntryPoints` examines all global initializers before
+        // resource-global replacement. It moves the shadow's initializer into entry points when
+        // the shadow will be replaced or the target requires per-entry-point initialization.
+        // Otherwise, emission retains the initializer at module scope.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 

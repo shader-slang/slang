@@ -12,8 +12,9 @@ class TargetProgram;
 ///
 /// Selected globals retain their storage but no longer contain initializer bodies. `ActualGlobal`
 /// variables are excluded because their storage lifetime spans entry-point invocations.
+/// Native host targets retain module-scope initialization except for selected resource globals.
 /// HLSL retains declaration initializers except for arrays, cooperative vectors, and selected
-/// resource globals; other targets move every non-`ActualGlobal` initializer.
+/// resource globals; other kernel targets move every non-`ActualGlobal` initializer.
 ///
 /// Selected resource globals represent either programmer-declared mutable `static` resource
 /// variables at file or namespace scope, or mutable uniform-parameter shadows synthesized for

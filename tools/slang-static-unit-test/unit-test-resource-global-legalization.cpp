@@ -334,9 +334,9 @@ SLANG_UNIT_TEST(entryPointCallsiteFixDoesNotRewriteCallArguments)
     builder.emitLoad(resourceType, resourceGlobal);
     builder.emitReturn();
 
-    // `consume` gives the kernel reference a valid function-typed parameter. Its body does not
-    // invoke the parameter because this test needs only the call-argument use that the call-site
-    // pass previously mistook for a callee use.
+    // `consumer` gives the kernel reference a valid function-typed parameter. Its body does not
+    // invoke that parameter, so the call-site pass must preserve the kernel's argument use rather
+    // than interpret it as the callee operand.
     builder.setInsertInto(module.get());
     IRType* consumerParameterTypes[] = {voidFunctionType};
     auto consumerType = builder.getFuncType(1, consumerParameterTypes, builder.getVoidType());
@@ -372,10 +372,10 @@ SLANG_UNIT_TEST(entryPointCallsiteFixDoesNotRewriteCallArguments)
 
 // Slang permits an explicit cast to remove the read-only restriction from a `__constref` parameter.
 // After validation removes the temporary `AssumeAddress` instruction, the IR contains a store
-// directly through a `BorrowIn` parameter. `tests/bugs/13074-static-resource-constref-write.slang`
-// covers that producer path. We build the same IR shape directly to check the pass's
-// interprocedural effect classification: the caller needs an `inout` parameter so the write returns
-// to its caller.
+// directly through a `BorrowIn` parameter.
+// `tests/bugs/13074/13074-static-resource-constref-write.slang` covers that producer path. We build
+// the same IR shape directly to check the pass's interprocedural effect classification: the caller
+// needs an `inout` parameter so the write returns to its caller.
 SLANG_UNIT_TEST(resourceGlobalLegalizationAccountsForWritesThroughBorrowInParameters)
 {
     StaticUnitTestEnv env(unitTestContext);

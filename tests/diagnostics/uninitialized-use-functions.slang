@@ -120,17 +120,24 @@ interface IGenericWriter
     void writeRef(__ref int value, T tag);
 }
 
+// Exercise by-value reads and writable-argument warning suppression on generic interface calls.
+//
+// The first case diagnoses the uninitialized tag. The remaining cases exercise the heuristic's
+// possible-write classification without claiming that it proves definite initialization.
 __generic<TWriter : IGenericWriter>
 int useGenericInterfaceWriter(TWriter writer)
 {
     float initializedInput = 0.0;
 
+    // A by-value tag is read even when the other argument is an output destination.
     float uninitializedInput;
     int valueFromUninitializedInput;
     writer.writeOut(valueFromUninitializedInput, uninitializedInput);
 //CHK:             ^ use of uninitialized variable
 //CHK:             ^ use of uninitialized variable 'uninitializedInput'
 
+    // The single-category heuristic treats each writable first argument as a possible write,
+    // including `inout` and `__ref`; it does not separately record their incoming reads.
     int outValue;
     writer.writeOut(outValue, initializedInput);
 
@@ -140,6 +147,8 @@ int useGenericInterfaceWriter(TWriter writer)
     int refValue;
     writer.writeRef(refValue, initializedInput);
 
+    // Later reads do not produce warnings after these possible writes. This checks suppression,
+    // not a proof that the unresolved methods definitely initialize their arguments.
     return outValue + inOutValue + refValue;
 }
 

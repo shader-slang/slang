@@ -249,17 +249,30 @@ static bool isResourceArgumentForwardedFromCallerParameter(IRCall* call, IRInst*
 /// Return whether `call` is eligible for an inlining attempt that may eliminate an unsupported D3D
 /// resource argument.
 //
-// Consider this source-level shape after a mutable resource global is replaced with per-entry
-// storage:
+// Consider this example:
 //
-//     Texture2D selected = ResourceDescriptorHeap[index];
-//     return loadSelected(selected);
+//     uniform uint index;
+//     static Texture2D<float4> selected;
 //
+//     float4 loadSelected()
+//     {
+//         return selected.Load(int3(0));
+//     }
+//
+//     [shader("fragment")]
+//     float4 main() : SV_Target
+//     {
+//         selected = ResourceDescriptorHeap[index];
+//         return loadSelected();
+//     }
+//
+// AST-to-IR lowering creates an `IRGlobalVar` for `selected`. `legalizeResourceGlobalVars`
+// replaces it with an entry-point `IRVar` and adds a value parameter to the read-only helper.
+// The rewritten call can still load its argument from that local before SSA simplification.
 // HLSL can pass certain resource expressions directly, including global parameters, indexed
-// global resource arrays, and descriptor-heap conversions. Lowering represents the argument above
-// as an `IRLoad` from the generated entry-point `IRVar`, so it no longer has one of those
-// recognized forms. We inline `loadSelected` and let SSA simplification substitute the
-// descriptor-heap conversion at each use.
+// global resource arrays, and descriptor-heap conversions. An `IRLoad` from the generated local
+// does not have one of those recognized forms. When that form remains, we inline `loadSelected`
+// and let SSA simplification substitute the descriptor-heap conversion at each use.
 static bool isD3DCallEligibleForResourceInputInlining(
     CodeGenContext* codeGenContext,
     ResourceParameterSpecializationCondition& specializationCondition,
