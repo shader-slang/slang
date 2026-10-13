@@ -5,6 +5,7 @@
 // the various `slang-check-*` files that provide
 // the semantic checking infrastructure.
 
+#include "slang-check-structural-ray-tracing.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-visitor.h"
@@ -948,35 +949,6 @@ struct ConformanceCheckingContext : public RefObject
 
     /// Maps each encountered interface application to its declaration-context witness table.
     Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
-};
-
-/// Retains a use until its type's inheritance is ready for the ray-tracing checks.
-/// Variables keep their declaration so the check can use the normal checked initializer and
-/// scope. Other uses retain checked types, including arguments whose source syntax is replaced
-/// by generic application checking.
-struct StructuralRayTracingTypeUse
-{
-    enum class Kind
-    {
-        Value,
-        Variable,
-        Construction,
-        GenericArguments,
-    };
-
-    struct Argument
-    {
-        Type* type = nullptr;
-        SourceLoc location;
-    };
-
-    Kind kind = Kind::Value;
-    VarDeclBase* variable = nullptr;
-    Type* type = nullptr;
-    SourceLoc location;
-    /// A type application's result determines whether it owns structural generic arguments.
-    Type* genericApplicationType = nullptr;
-    ShortList<Argument, 4> genericArguments;
 };
 
 /// Shared state for a semantics-checking session.
