@@ -2,10 +2,10 @@
 //TEST:SIMPLE(filecheck=NOSHIFT):-target spirv-asm -entry main -stage fragment
 
 // shader-slang/slang#13096: a `SubpassInput` has a texture slot and an `InputAttachmentIndex` slot.
-// `-fvk-t-shift` lays the texture slot out as `ShaderResource` (`StorageBuffer`); SPIR-V
-// legalization must not treat the storage-class-less `InputAttachmentIndex` slot as a conflict
-// with it (that aborted with E99997). The image stays a `UniformConstant` input attachment. The
-// `NOSHIFT` run checks the unshifted layout, which takes the same skipped-slot path.
+// `-fvk-t-shift` lays the texture slot out as `ShaderResource` (`StorageBuffer`), and the
+// `InputAttachmentIndex` slot has no storage class, so it must not count as a conflicting use. The
+// image stays a `UniformConstant` input attachment. The `NOSHIFT` run checks the unshifted layout,
+// which also has that storage-class-less slot.
 
 [[vk::input_attachment_index(0)]]
 SubpassInput input;

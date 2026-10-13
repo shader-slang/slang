@@ -2,9 +2,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -fvk-u-shift 300 0
 
 // A `ParameterBlock` in space 1 gives each shifted member a register-space slot after its
-// `ShaderResource`/`UnorderedAccess` slot. SPIR-V legalization must not treat that
-// storage-class-less slot as a conflict (that aborted with E99997; same cause as
-// shader-slang/slang#13096). The bindings match the `-emit-spirv-via-glsl` output.
+// `ShaderResource`/`UnorderedAccess` slot. That slot has no storage class, so SPIR-V legalization
+// must not count it as a conflicting use (see shader-slang/slang#13096). The bindings match the
+// `-emit-spirv-via-glsl` output.
 
 struct P
 {
