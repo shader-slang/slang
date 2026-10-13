@@ -660,7 +660,8 @@ struct LoweredElementTypeContext
     /// `packedType` and returns it as `leafInfo.originalType`: the vector is first reshaped to
     /// the leaf's lowered type, then converted by the leaf's own conversion. For example, a
     /// `bool3` array element in a WGSL uniform buffer is stored as `vec4<u32>`, read back as
-    /// `vec3<u32>`, and then cast to `vec3<bool>`.
+    /// `vec3<u32>`, and then cast to `vec3<bool>`. The leaf conversion must be an opcode: the
+    /// only policy that widens std140 array elements (WGSL) converts leaves with `BuiltinCast`.
     IRFunc* createWidenedLeafUnpackFunc(IRType* packedType, LoweredElementTypeInfo leafInfo)
     {
         SLANG_RELEASE_ASSERT(
@@ -757,8 +758,13 @@ struct LoweredElementTypeContext
                 }
                 if (packedVectorType && packedVectorType != leafLoweredType)
                 {
-                    // If the leaf itself is stored as a different type (e.g. `bool3` as
-                    // `vector<uint,3>`), the widened element must go through both conversions.
+                    // Leaf conversions are always set in pairs. If the leaf is stored as a
+                    // different type (e.g. `bool3` as `vector<uint,3>`), the widened element
+                    // goes through both the reshape and the leaf conversion; otherwise only
+                    // the reshape is needed.
+                    SLANG_ASSERT(
+                        !loweredInnerTypeInfo.convertLoweredToOriginal ==
+                        !loweredInnerTypeInfo.convertOriginalToLowered);
                     if (loweredInnerTypeInfo.convertLoweredToOriginal)
                     {
                         loweredInnerTypeInfo.convertLoweredToOriginal =
@@ -2009,12 +2015,14 @@ struct LoweredElementTypeContext
         }
     }
 
-    /// Returns true if the storage-typed value at `src` can be copied to `dest` without
-    /// unpacking it to its logical type first. That holds when both have the same storage type,
-    /// or on targets that cannot declare locals of a storage type (SPIR-V), where `src` is a
-    /// logical-storage temporary and `copyLogical` emits a `CopyLogical`. Other targets have no
-    /// `CopyLogical`, so values in two different layouts (e.g. a std140 and a std430 copy of
-    /// `bool[2]`) must go through the logical type.
+    /// Returns true if the storage-typed value at `src` can be stored into `dest` with
+    /// `copyLogical`, and false if it must be unpacked to its logical type and packed again.
+    /// `copyLogical` is a plain store when both storage types match, and a `CopyLogical`
+    /// otherwise. Only SPIR-V lowers `CopyLogical`, and the Khronos policy (the only one that
+    /// cannot keep storage types in locals) never widens std140 array elements, so its two
+    /// storage types for one logical type pair up field by field and element by element. On
+    /// other targets two layouts can differ in shape (a std140 `float[2]` is stored as
+    /// `vec4<f32>` elements, a std430 one is not), so we only copy when the types match.
     bool canCopyStorageDirectly(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
@@ -2080,10 +2088,10 @@ struct LoweredElementTypeContext
                     getElementPtr->getBase()->getDataType())))
             {
                 // An array of scalars or vectors may be stored with a different element type:
-                // WGSL widens std140 array elements to 16-byte aligned vectors, and lowers
-                // `bool` elements to `uint`. In this case, we will run into a
-                // GetElementPtr where the result type is different from the element type of
-                // the base array.
+                // WGSL widens std140 array elements to 16-byte aligned vectors, and `bool`
+                // elements are stored as an integer on WGSL and SPIR-V. In this case, we will
+                // run into a GetElementPtr where the result type is different from the element
+                // type of the base array.
                 // We should setup loweredElementTypeInfo so the remaining logic can handle
                 // this case and insert proper packing/unpacking logic around it.
                 if (arrayType->getElementType() != originalElementType &&
@@ -2220,6 +2228,8 @@ struct LoweredElementTypeContext
                             }
                             else
                             {
+                                // `originalVal` is a logical value here; a storage value in
+                                // another layout is unpacked to one when its cast materializes.
                                 loweredElementTypeInfo.convertOriginalToLowered
                                     .applyDestinationDriven(builder, addr, originalVal);
                             }
@@ -3388,6 +3398,9 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
         // WGSL `bool` is not host-shareable, so it cannot appear in uniform or storage buffers.
+        // Every layout rule WGSL uses sizes `bool` at 4 bytes, so `u32` keeps offsets and
+        // reflection unchanged. Bool matrices reach this as arrays of bool vectors, because
+        // `legalizeMatrixTypes` runs first.
         if (isBoolOrBoolVectorType(type))
         {
             IRBuilder builder(type);
