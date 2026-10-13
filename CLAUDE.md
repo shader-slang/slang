@@ -275,32 +275,11 @@ change.)
 1. **Format your code**: Run `./extras/formatting.sh` before committing
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
-4. **Write the PR description in this required five-part format:**
-
-   1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
-   2. **Proposed solution** — the approach, and why it is the principled one.
-   3. **Change summary** — a table or list of the files/areas touched and what each does.
-   4. **Concepts and vocabulary** — a short glossary, placed between the change summary and the
-      process report. Restate only the _codebase-specific or subtle_ terms the report relies on, as
-      a reminder for the reviewer (e.g. witness / `getSub`, facet / `getInheritanceInfo`, the
-      fixpoint solver, or a non-obvious distinction the fix hinges on). Do **not** explain basic,
-      well-known concepts (e.g. interface, associated type) — assume them.
-   5. **Process report** — explain _every_ change with a logical reason. For a change that
-      addresses a **cascading** issue, describe the issue (with its motivating test case) and
-      justify why the fix is correct with a **code trace** (the exact functions/insts involved),
-      not just a description. State explicitly why each change is necessary and principled rather
-      than a workaround. For any change that handles, guards, or special-cases a particular input
-      shape, the report **must** answer the input-shape check from the methodology — _is that shape
-      correct and principled, or should its producer have been fixed instead?_ — so a reviewer can
-      confirm the fix sits at the right layer.
-
-   Write for a reviewer who does not have the full context in their head. Use the same
-   conversational style required for code comments: start from a concrete user-code example, include
-   the full relevant snippet instead of just naming a type or function, and explain the logical
-   steps in order. Say what the compiler builds, how that representation flows through named
-   functions or IR instructions, and why the chosen fix preserves the invariant. Avoid terse labels
-   such as "AST trace"; make the prose read like an explanation to a reviewer who is learning the
-   scenario for the first time.
+4. **Write the PR description** in the four-section format from `AGENTS.md` (Commit & Pull
+   Request Guidelines): Motivation, Approach, Key choices, Evidence; at most three lines each,
+   under 1,500 characters in total; `Fixes #N`; the process report (per-change reasoning, code
+   traces, the input-shape check) in one collapsed `<details>` block. `.github/PULL_REQUEST_TEMPLATE.md`
+   carries the headings and the `pr-text-lint` workflow checks the shape.
 
 ### Testing
 
