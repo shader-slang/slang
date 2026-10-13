@@ -447,6 +447,8 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     // Create the context type first (since the rest depend on it).
     auto minimalContextType = builder.createStructType();
     auto fullContextType = builder.createStructType();
+    // This adapter captures only original parameters, without a separate parameter context.
+    builder.addDecoration(fullContextType, kIROp_AutodiffParameterContextTypeDecoration);
 
     auto applyFunc = builder.createFunc();
     auto rematFunc = builder.createFunc();

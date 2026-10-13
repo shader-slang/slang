@@ -314,10 +314,11 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     // linkWithOptions produces, nothing above hashes that option set.
     //
     // This runs for every component kind. For a plain composite from link() the own set is empty,
-    // so it appends nothing. For a Module the own set is the linkage's session option set, which is
-    // therefore reached by three distinct hashing paths: getLinkage()->buildHash above (which also
-    // hashes the target option set), buildHash() above (Module::buildHash -> computeDigest also
-    // hashes the module's option set), and this call. For a specialized component the own set is
+    // so it appends nothing. For a Module the own set is a copy of the session option set without
+    // its DownstreamArgs, which is therefore reached by three distinct hashing paths:
+    // getLinkage()->buildHash above (which also hashes the target option set), buildHash() above
+    // (Module::buildHash -> computeDigest also hashes the module's option set and the session's
+    // DownstreamArgs), and this call. For a specialized component the own set is
     // the base's, copied via overrideWith. The extra hashing is deterministic and safe -- appending
     // more bytes can only turn a cache hit into a miss, never a miss into a false hit.
     getOptionSet().buildHash(builder);
@@ -530,7 +531,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto linked = fillRequirements(this);
         if (!linked)
@@ -539,6 +540,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
         *outLinkedComponentType = ComPtr<slang::IComponentType>(linked).detach();
         return SLANG_OK;
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -554,6 +556,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
         outputExceptionDiagnostic(sink, outDiagnostics);
         return SLANG_FAIL;
     }
+#endif
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
@@ -761,7 +764,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             return artifact.get();
         }
     }
-    try
+    SLANG_EXCEPTION_TRY
     {
         // If the user hasn't specified any entry points, then we should
         // discover all entrypoints that are defined in linked modules, and
@@ -828,6 +831,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
         }
         return artifact.get();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Exception& e)
     {
         if (outDiagnostics && !*outDiagnostics)
@@ -842,6 +846,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
         }
         return nullptr;
     }
+#endif
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL

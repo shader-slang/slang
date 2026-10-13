@@ -12,6 +12,6 @@ int doThing(int a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int x = (int)dispatchThreadID.x;
-    
+
     outputBuffer[x] = doThing(x);
 }

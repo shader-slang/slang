@@ -10,6 +10,48 @@
 namespace Slang
 {
 
+// Share the struct-field traversal while allowing callers to choose which field types disappear.
+// DCE's existing query ignores only void and nested empty structs. Payload boundaries also need
+// arrays of empty elements, but must preserve target-intrinsic types even when they have no fields.
+static bool isStructEmpty(IRType* type, bool (*isEmptyFieldType)(IRType*))
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return false;
+
+    for (auto field : structType->getFields())
+    {
+        if (!isEmptyFieldType(field->getFieldType()))
+            return false;
+    }
+    return true;
+}
+
+// Keep DCE's historical field classification independent of the broader payload query.
+static bool isVoidOrEmptyStruct(IRType* type)
+{
+    return as<IRVoidType>(type) || isStructEmpty(type);
+}
+
+bool isStructEmpty(IRType* type)
+{
+    return isStructEmpty(type, isVoidOrEmptyStruct);
+}
+
+bool isEmptyType(IRType* type)
+{
+    if (type->findDecoration<IRTargetIntrinsicDecoration>())
+        return false;
+    if (as<IRVoidType>(type))
+        return true;
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isEmptyType(arrayType->getElementType());
+
+    // Only ordinary structs and arrays recurse. Pointers, resources, and opaque work-graph
+    // record types carry their own representation even when their element type is empty.
+    return isStructEmpty(type, isEmptyType);
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -2586,6 +2628,21 @@ IRType* dropNormAttributes(IRType* const t)
         }
     }
     return t;
+}
+
+DerivativeGroupMode inferDerivativeGroupMode(IRFunc* entryPoint)
+{
+    if (auto decoration = entryPoint->findDecoration<IRDerivativeGroupDecoration>())
+        return decoration->getMode();
+
+    if (auto numThreads = entryPoint->findDecoration<IRNumThreadsDecoration>())
+    {
+        // Y selects the default grouping; the full thread-group shape is validated separately.
+        // Only inspect a literal Y; a specialization constant's default can be overridden.
+        if (auto y = numThreads->getY())
+            return y->getValue() == 1 ? DerivativeGroupMode::Linear : DerivativeGroupMode::Quad;
+    }
+    return DerivativeGroupMode::Quad;
 }
 
 /// Gets a literal thread count, unwrapping a specialization constant's default when needed.

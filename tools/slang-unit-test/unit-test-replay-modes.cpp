@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
@@ -572,3 +573,4 @@ SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
 
     checkReplayContextIsPristine();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

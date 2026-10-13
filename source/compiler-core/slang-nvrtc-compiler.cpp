@@ -1158,6 +1158,22 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
     return SLANG_OK;
 }
 
+// Return whether the caller supplied an NVRTC architecture option. Leave its value and any
+// conflicting user options for NVRTC to validate, including architectures unknown to Slang.
+static bool _hasExplicitNVRTCArchitecture(Slice<TerminatedCharSlice> arguments)
+{
+    for (auto argument : arguments)
+    {
+        auto text = asStringSlice(argument);
+        if (text == "-arch" || text.startsWith("-arch=") || text == "--gpu-architecture" ||
+            text.startsWith("--gpu-architecture="))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(
     const DownstreamCompileOptions& inOptions,
     IArtifact** outArtifact)
@@ -1302,6 +1318,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg("-w");
     }
 
+    // An explicit downstream architecture overrides the derived one. For example, a caller may
+    // pass `-arch=compute_120` before Slang has a corresponding capability. Passing both options
+    // would make NVRTC warn or fail, depending on its version, so only emit the caller's option.
+    if (!_hasExplicitNVRTCArchitecture(options.compilerSpecificArguments))
     {
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.

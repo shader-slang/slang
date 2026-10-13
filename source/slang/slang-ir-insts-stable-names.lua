@@ -463,8 +463,8 @@ return {
 	["Decoration.nvapiSlot"] = 464,
 	["Decoration.noInline"] = 465,
 	["Decoration.noRefInline"] = 466,
-	["Decoration.DerivativeGroupQuad"] = 467,
-	["Decoration.DerivativeGroupLinear"] = 468,
+	["Decoration.DerivativeGroupDecoration.DerivativeGroupQuad"] = 467,
+	["Decoration.DerivativeGroupDecoration.DerivativeGroupLinear"] = 468,
 	["Decoration.MaximallyReconverges"] = 469,
 	["Decoration.QuadDerivatives"] = 470,
 	["Decoration.RequireFullQuads"] = 471,
@@ -877,5 +877,8 @@ return {
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
 	["Attr.TypeAlignment"] = 901,
 	["reportOptiXIntersection"] = 902,
-	["Decoration.postDepthCoverage"] = 903
+	["Decoration.postDepthCoverage"] = 903,
+	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
+	["DebugLexicalBlock"] = 906,
+	["Decoration.fileOrNamespaceScopeStaticVar"] = 907
 }
