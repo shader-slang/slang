@@ -1,15 +1,15 @@
-// byte-address-buffer-chunked-widths-11545.slang
+// byte-address-buffer-grouped-widths-11545.slang
 
 // Feature test for https://github.com/shader-slang/slang/issues/11545 (point 5). It pins the
-// *width* of the chunked accesses the legalizer emits — the documented `half4` (2-byte scalar
+// *width* of the grouped accesses the legalizer emits — the documented `half4` (2-byte scalar
 // stride) example, the `float3` mixed-width remainder path, and the breaking-change per-component
 // lowering of the single-argument 3-component form — which the runtime COMPARE_COMPUTE tests do
 // not constrain.
 //
-// HLSL only: Slang's HLSL emit lowers each chunk to a literal `.Load<T>`, so the widths read
+// HLSL only: Slang's HLSL emit lowers each group to a literal `.Load<T>`, so the widths read
 // directly off the output. The SPIRV backend reuses overlapping loads across these same-address
 // accesses (it extracts the scalar cases out of the vector loads), which obscures the per-case
-// width; SPIRV chunk-width coverage lives in `byte-address-buffer-chunked.slang` (the `float4`
+// width; SPIRV group-width coverage lives in `byte-address-buffer-grouped.slang` (the `float4`
 // `OpLoad %v2float` checks) and `byte-address-buffer-aligned.slang` instead.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
@@ -23,7 +23,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     uint loc = tid.x * 16;
 
     // half4 (2-byte scalar stride) at alignment 4 covers a `half2` (4 bytes) but not the whole
-    // `half4` (8 bytes), so the load is two `half2` chunks.
+    // `half4` (8 bytes), so the load is two `half2` groups.
     // CHECK-COUNT-2: Load<vector<half,2> >
     half4 ha = buffer.LoadAligned<half4>(loc, 4);
 
@@ -32,7 +32,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     half4 hb = buffer.LoadAligned<half4>(loc, 2);
 
     // float3 at alignment 8 covers a `float2` (8 bytes) and leaves a 1-component remainder, so it
-    // is one `float2` plus one scalar `float` — the mixed-width chunk + remainder path.
+    // is one `float2` plus one scalar `float` — the mixed-width group + remainder path.
     // CHECK: Load<float2 >
     // CHECK: Load<float >
     float3 fc = buffer.LoadAligned<float3>(loc, 8);

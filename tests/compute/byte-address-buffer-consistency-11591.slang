@@ -19,7 +19,7 @@ RWByteAddressBuffer buffer;
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // Promise 8 covers a `float2` (8 bytes) but not the whole 16-byte `float4`, so the access is
-    // chunked into two `float2` loads — even though the constant location 16 is itself 16-aligned,
+    // grouped into two `float2` loads — even though the constant location 16 is itself 16-aligned,
     // it must not be widened to a single `float4` load on the strength of the offset.
     float4 a = buffer.LoadAligned<float4>(16, 8);
 
@@ -29,6 +29,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     buffer.Store<float4>(0, a + b, 16);
 }
 
-// Each promise-8 `float4` load chunks into two `float2` loads (four total across the two loads);
+// Each promise-8 `float4` load groups into two `float2` loads (four total across the two loads);
 // the constant-location load lowers identically to the runtime one, not to a single wide `float4`.
 // CHECK-COUNT-4: OpLoad %v2float

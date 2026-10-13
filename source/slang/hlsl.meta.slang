@@ -470,11 +470,12 @@ struct ByteAddressBuffer
     ///@remarks
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
-    /// for any remainder. This applies on most targets, including modern HLSL (e.g. two
-    /// `.Load<float2>` instead of one `.Load<float4>`); targets whose lowered load takes an
-    /// alignment operand are also given it. The exception is fxc / DX <= 5.0, which has no
-    /// templated `.Load<T>`: there a partially-covered access is scalarized to `uint` loads plus
-    /// `asfloat`/`asuint` bitcasts rather than chunked into typed sub-vector accesses.
+    /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`, because those profiles have no templated `Load<T>`.
+    /// - Other HLSL profiles, SPIR-V, GLSL, CUDA and C++: two `float2` loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -6957,11 +6958,12 @@ struct $(item.name)
     ///@remarks
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
-    /// for any remainder. This applies on most targets, including modern HLSL (e.g. two
-    /// `.Load<float2>` instead of one `.Load<float4>`); targets whose lowered load takes an
-    /// alignment operand are also given it. The exception is fxc / DX <= 5.0, which has no
-    /// templated `.Load<T>`: there a partially-covered access is scalarized to `uint` loads plus
-    /// `asfloat`/`asuint` bitcasts rather than chunked into typed sub-vector accesses.
+    /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
+    ///   `asfloat`, because those profiles have no templated `Load<T>`.
+    /// - Other HLSL profiles, SPIR-V, GLSL, CUDA and C++: two `float2` loads.
+    /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
+    ///   `alignment`.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]

@@ -1,8 +1,8 @@
-// byte-address-buffer-chunked.slang
+// byte-address-buffer-grouped.slang
 
 // Feature test for https://github.com/shader-slang/slang/issues/11545 (point 5): when the
 // promised `alignment` does not cover the whole vector, the access is emitted as the widest
-// power-of-two-width chunks the alignment permits, with per-component accesses for the remainder.
+// power-of-two-width groups the alignment permits, with per-component accesses for the remainder.
 // Also checks the consistency fix (point 3): two single-argument loads at different constant
 // locations lower identically.
 
@@ -18,7 +18,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     uint loc = tid.x * 16;
 
     // Alignment 8 covers a `float2` (8 bytes) but not the whole `float4` (16 bytes), so the load
-    // is split into two `float2` chunks.
+    // is split into two `float2` groups.
     // CHECK: Load<float2 >
     // CHECK: Load<float2 >
     float4 a = buffer.LoadAligned<float4>(loc, 8);
