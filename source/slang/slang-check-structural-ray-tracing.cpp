@@ -1498,14 +1498,22 @@ void SemanticsVisitor::diagnosePendingStructuralRayTracingTypeUses()
     shared->m_deferStructuralRayTracingTypeUses = false;
 }
 
-// Keeps the declaration for the stage/input storage check. Consider these two locals:
-//
-//     rt::MissInput<C> local = input;
-//     rt::MissInput<C> fresh;
-//
-// Both have the same type, but only the first receives an existing invocation view. Retaining the
-// VarDecl lets the deferred check read its checked initializer and scope instead of recording a
-// second classification that loses this distinction. Parameters use the same declaration path.
+/// Checks ray-tracing restrictions on parameters, local variables, globals, and fields.
+/// VarDeclBase represents all of these declarations, including ParamDecl. Consider this example:
+///
+///     void helper(in rt::MissInput<C> input)
+///     {
+///         rt::MissInput<C> copy = input;
+///         rt::MissInput<C> fresh;
+///     }
+///
+/// A stage input is allowed as a non-uniform `in` parameter or an initialized, non-static local
+/// copy. Here, input receives the view from its caller, and copy refers to that same view. Neither
+/// needs to create invocation state. The uninitialized fresh declaration is rejected, as are
+/// globals and fields of this type. Constructor expressions are checked separately.
+///
+/// Retain the VarDeclBase so deferred checking can inspect its parameter direction, scope,
+/// modifiers, and checked initializer instead of keeping only its type.
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
 {
     StructuralRayTracingTypeUse use;
