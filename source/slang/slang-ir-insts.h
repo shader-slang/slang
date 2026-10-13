@@ -151,6 +151,33 @@ struct IRGLSLOuterArrayDecoration : IRDecoration
     UnownedStringSlice getOuterArrayName() { return getOuterArrayNameOperand()->getStringSlice(); }
 };
 
+/// The grouping of compute shader invocations used to evaluate derivatives.
+enum class DerivativeGroupMode
+{
+    Quad,
+    Linear,
+};
+
+FIDDLE()
+struct IRDerivativeGroupDecoration : IRDecoration
+{
+    FIDDLE(baseInst())
+
+    /// Returns the grouping selected by this decoration.
+    DerivativeGroupMode getMode()
+    {
+        switch (getOp())
+        {
+        case kIROp_DerivativeGroupQuadDecoration:
+            return DerivativeGroupMode::Quad;
+        case kIROp_DerivativeGroupLinearDecoration:
+            return DerivativeGroupMode::Linear;
+        default:
+            SLANG_UNEXPECTED("unexpected derivative-group decoration");
+        }
+    }
+};
+
 enum class IRInterpolationMode
 {
     Linear,
