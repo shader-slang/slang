@@ -404,23 +404,8 @@ public:
     /// Allocates replay-owned arena storage from the module that owns the replay context.
     SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
 
-    /// Lock the context only when the record layer is active; otherwise return an
-    /// unlocked guard so the idle default path never touches the shared mutex.
-    ///
-    /// This runs ensureInitialized() first so that the very first call under
-    /// SLANG_RECORD_LAYER=1 has already resolved the env-requested Record mode
-    /// before the active check is read. Every wrapped API call goes through
-    /// RECORD_CALL/RECORD_STATIC_CALL, which hold this guard across the whole
-    /// call: when idle (the default, no recording), acquiring the process-wide
-    /// mutex would serialize all callers even though nothing is recorded, so we
-    /// skip it. When active, the guard holds m_mutex and serializes the
-    /// subsequent beginCall/record sequence.
-    ///
-    /// The atomic m_mode makes the unlocked read itself race-free; the resulting
-    /// lock decision stays valid for the rest of the call because the mode is
-    /// stable under the documented contract — fixed at startup (env or a single
-    /// enable before concurrent calls), never flipped mid-call (see
-    /// slang_enableRecordLayer in slang.h).
+    /// Lock the context if the record layer is active.
+    /// Returns an RAII guard that does not own the mutex when idle.
     SLANG_API std::unique_lock<std::recursive_mutex> lockIfActive()
     {
         ensureInitialized();
@@ -619,14 +604,9 @@ public:
     /// Call this from the proxy destructor to clean up the mappings.
     /// Accepts a pre-computed ISlangUnknown* identity (required because the
     /// destructor can't safely call queryInterface — ref count is already 0).
-    ///
-    /// Takes the mutex unconditionally, unlike the RECORD_* call macros: a proxy
-    /// can be released after the layer has been disabled, so registry teardown is
-    /// not covered by the active-path lock and must serialize itself. The mutex is
-    /// recursive, so a release() that arrives through RECORD_CALL (which already
-    /// holds it) re-locks safely.
     inline void unregisterProxy(ISlangUnknown* proxyIdentity)
     {
+        // Locks even when idle: a proxy can be released after the layer is disabled.
         std::lock_guard<std::recursive_mutex> guard(m_mutex);
         unregisterProxyImpl(proxyIdentity);
     }
@@ -849,8 +829,6 @@ private:
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     size_t m_replayArenaAllocationSize = 0;
-    // Atomic so the idle fast path in lockIfActive() can read isActive()/getMode()
-    // without holding the mutex, and so those reads don't race setMode()'s store.
     std::atomic<Mode> m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
@@ -879,8 +857,6 @@ private:
     // TTY logging
     bool m_ttyLogging = false; ///< Whether to log calls to stderr
 
-    // Serializes the one-time env->mode resolution in ensureInitialized(), which
-    // the idle fast path in lockIfActive() reaches without holding the mutex.
     std::once_flag m_initFlag;
 
     // Map from function signature to handler
