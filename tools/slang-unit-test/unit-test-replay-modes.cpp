@@ -2,6 +2,8 @@
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
+#include "core/slang-platform.h"
+#include "core/slang-process-util.h"
 #include "scoped-env-var.h"
 #include "slang-record-replay/proxy/proxy-macros.h"
 #include "slang-record-replay/proxy/proxy-mutable-file-system.h"
@@ -616,25 +618,92 @@ SLANG_UNIT_TEST(replayContextLockIfActiveOwnership)
     SLANG_CHECK(ctx().lockIfActive().owns_lock());
 }
 
+// Set in the child slang-test that replayContextLockIfActiveResolvesEnvOnFirstCall
+// launches, so the child runs the in-process check instead of spawning again.
+static const char* kResolvesEnvChildEnvVar = "SLANG_REPLAY_RESOLVES_ENV_CHILD";
+
 // lockIfActive() must resolve the env-requested mode on the very first call, or a
 // process launched with SLANG_RECORD_LAYER=1 would silently skip the lock (and
-// recording) on its first wrapped call. Force a fresh context so ensureInitialized()
-// has not yet run, then confirm the first lockIfActive() both engages the lock and
-// leaves the context in Record.
+// recording) on its first wrapped call.
+//
+// We run the in-process check in a child slang-test started with SLANG_RECORD_LAYER=1
+// already in its environment, because setting the variable from this test cannot
+// reach slang's reader on Windows. Windows builds use the static MSVC CRT, so each
+// DLL keeps its own CRT environment table, captured when it loads; a _putenv in this
+// unit-test DLL never shows up in slang's _dupenv_s. See "Potential Errors Passing
+// CRT Objects Across DLL Boundaries":
+// https://learn.microsoft.com/cpp/c-runtime-library/potential-errors-passing-crt-objects-across-dll-boundaries
+// A child launched with the variable set is also the scenario the product supports.
 SLANG_UNIT_TEST(replayContextLockIfActiveResolvesEnvOnFirstCall)
 {
-    SlangUnitTest::ScopedEnvVar recordLayer("SLANG_RECORD_LAYER", "1");
-    ReplayContext::destroySingleton();
+    StringBuilder childMarker;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice(kResolvesEnvChildEnvVar),
+            childMarker)) &&
+        childMarker == "1")
+    {
+        // Force a fresh context so ensureInitialized() has not yet run, then confirm
+        // the first lockIfActive() both engages the lock and leaves the context in
+        // Record.
+        ReplayContext::destroySingleton();
+        SLANG_CHECK(ctx().isIdle());
+        SLANG_CHECK(ctx().lockIfActive().owns_lock());
+        SLANG_CHECK(ctx().getMode() == Mode::Record);
 
-    SLANG_CHECK(ctx().isIdle());
-    SLANG_CHECK(ctx().lockIfActive().owns_lock());
-    SLANG_CHECK(ctx().getMode() == Mode::Record);
+        // destroySingleton() above took the default playback handlers with it, so put
+        // them back for any later test in this process.
+        ctx().reset();
+        ctx().registerDefaultHandlers();
+        return;
+    }
 
-    // Leave the singleton clean for the next test, independent of SLANG_RECORD_LAYER.
-    // destroySingleton() above took the default playback handlers with it, so put
-    // them back (same restore the orphaned-proxy playback test does).
-    ctx().reset();
-    ctx().registerDefaultHandlers();
+    const char* testName = "slang-unit-test-tool/replayContextLockIfActiveResolvesEnvOnFirstCall";
+    // A unique directory this invocation owns, so cleanup never touches anyone else's
+    // recordings.
+    String tempBase;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::generateTemporary(UnownedStringSlice("replay-env-child"), tempBase)));
+    SLANG_CHECK(SLANG_SUCCEEDED(File::remove(tempBase)));
+    const String recordPath = tempBase + ".d";
+
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(
+        ExecutableLocation(unitTestContext->executableDirectory, "slang-test"));
+    cmdLine.addArg(testName);
+
+    ExecuteResult res;
+    res.init();
+    SlangResult launchResult;
+    {
+        // The child inherits these at launch. They are restored as soon as the child
+        // exits, so no later test in this process sees them.
+        SlangUnitTest::ScopedEnvVar child(kResolvesEnvChildEnvVar, "1");
+        SlangUnitTest::ScopedEnvVar recordLayer("SLANG_RECORD_LAYER", "1");
+        SlangUnitTest::ScopedEnvVar recordPathVar("SLANG_RECORD_PATH", recordPath.getBuffer());
+        SlangUnitTest::ScopedEnvVar recordLog("SLANG_RECORD_LOG", "0");
+        launchResult = ProcessUtil::execute(cmdLine, res);
+    }
+    if (File::exists(recordPath))
+        SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(recordPath)));
+
+    // Require the child's own pass line, not just its exit code: a child that matched
+    // no test would also exit 0.
+    StringBuilder passedLine;
+    passedLine << "passed test: '" << testName;
+    const String output = res.standardOutput + res.standardError;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(launchResult));
+    const bool childPassed =
+        res.resultCode == 0 && output.indexOf(passedLine.getUnownedSlice()) >= 0;
+    if (!childPassed)
+    {
+        printf(
+            "\n--- child slang-test exited %d ---\n%s\n--- end child run ---\n",
+            int(res.resultCode),
+            output.getBuffer());
+        fflush(stdout);
+    }
+    SLANG_CHECK(res.resultCode == 0);
+    SLANG_CHECK(output.indexOf(passedLine.getUnownedSlice()) >= 0);
 }
 
 SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine)
