@@ -22680,13 +22680,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CandidateProceduralPrimitiveNonOpaque";
         case glsl: __intrinsic_asm "(!rayQueryGetIntersectionCandidateAABBOpaqueEXT($0))";
+        case metal: __intrinsic_asm "$0->is_candidate_non_opaque_bounding_box()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
