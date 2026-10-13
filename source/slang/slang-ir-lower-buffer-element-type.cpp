@@ -654,6 +654,68 @@ struct LoweredElementTypeContext
         return func;
     }
 
+    /// Create a function that reads an array element stored as the 16-byte-aligned vector
+    /// `packedType` and returns it as `leafInfo.originalType`: the vector is first reshaped to
+    /// the leaf's lowered type, then converted by the leaf's own conversion. For example, a
+    /// `bool3` array element in a WGSL uniform buffer is stored as `vec4<u32>`, read back as
+    /// `vec3<u32>`, and then cast to `vec3<bool>`.
+    IRFunc* createWidenedLeafUnpackFunc(IRType* packedType, LoweredElementTypeInfo leafInfo)
+    {
+        SLANG_RELEASE_ASSERT(
+            leafInfo.convertLoweredToOriginal.kind == ConversionMethodKind::Opcode);
+
+        IRBuilder builder(packedType);
+        builder.setInsertAfter(packedType);
+        auto func = builder.createFunc();
+        auto refPackedType = builder.getRefParamType(packedType, AddressSpace::Generic);
+        func->setFullType(builder.getFuncType(1, (IRType**)&refPackedType, leafInfo.originalType));
+        builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto packedParam = builder.emitParam(refPackedType);
+        auto leafLoweredVal =
+            builder.emitVectorReshape(leafInfo.loweredType, builder.emitLoad(packedParam));
+        auto originalVal = builder.emitIntrinsicInst(
+            leafInfo.originalType,
+            leafInfo.convertLoweredToOriginal.op,
+            1,
+            &leafLoweredVal);
+        builder.emitReturn(originalVal);
+        return func;
+    }
+
+    /// Create the inverse of `createWidenedLeafUnpackFunc`.
+    IRFunc* createWidenedLeafPackFunc(IRType* packedType, LoweredElementTypeInfo leafInfo)
+    {
+        SLANG_RELEASE_ASSERT(
+            leafInfo.convertOriginalToLowered.kind == ConversionMethodKind::Opcode);
+
+        IRBuilder builder(packedType);
+        builder.setInsertAfter(packedType);
+        auto func = builder.createFunc();
+        auto refPackedType = builder.getRefParamType(packedType, AddressSpace::Generic);
+        IRType* paramTypes[] = {refPackedType, leafInfo.originalType};
+        func->setFullType(builder.getFuncType(2, paramTypes, builder.getVoidType()));
+        builder.addNameHintDecoration(func, UnownedStringSlice("packStorage"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto outParam = builder.emitParam(refPackedType);
+        IRInst* originalParam = builder.emitParam(leafInfo.originalType);
+        auto leafLoweredVal = builder.emitIntrinsicInst(
+            leafInfo.loweredType,
+            leafInfo.convertOriginalToLowered.op,
+            1,
+            &originalParam);
+        auto packedVal = as<IRVectorType>(leafInfo.loweredType)
+                             ? builder.emitVectorReshape(packedType, leafLoweredVal)
+                             : builder.emitMakeVectorFromScalar(packedType, leafLoweredVal);
+        builder.emitStore(outParam, packedVal);
+        builder.emitReturn();
+        return func;
+    }
+
     LoweredElementTypeInfo getLoweredTypeInfoImpl(IRType* type, TypeLoweringConfig config)
     {
         IRBuilder builder(type);
@@ -674,8 +736,9 @@ struct LoweredElementTypeContext
                 // We only need to handle the case where the element type is a scalar or vector
                 // type here, because if the element type is a matrix type or struct type,
                 // the size promotion will be handled during lowering of the element type.
+                auto leafLoweredType = loweredInnerTypeInfo.loweredType;
                 IRType* packedVectorType = nullptr;
-                if (auto vectorType = as<IRVectorType>(loweredInnerTypeInfo.loweredType))
+                if (auto vectorType = as<IRVectorType>(leafLoweredType))
                 {
                     packedVectorType = builder.getVectorType(
                         vectorType->getElementType(),
@@ -683,19 +746,34 @@ struct LoweredElementTypeContext
                             target,
                             vectorType->getElementType(),
                             getIntVal(vectorType->getElementCount()))));
-                    if (packedVectorType != loweredInnerTypeInfo.originalType)
+                }
+                else if (auto scalarType = as<IRBasicType>(leafLoweredType))
+                {
+                    packedVectorType = builder.getVectorType(
+                        leafLoweredType,
+                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
+                }
+                if (packedVectorType && packedVectorType != leafLoweredType)
+                {
+                    // If the leaf itself is stored as a different type (e.g. `bool3` as
+                    // `vector<uint,3>`), the widened element must go through both conversions.
+                    if (loweredInnerTypeInfo.convertLoweredToOriginal)
+                    {
+                        loweredInnerTypeInfo.convertLoweredToOriginal =
+                            createWidenedLeafUnpackFunc(packedVectorType, loweredInnerTypeInfo);
+                        loweredInnerTypeInfo.convertOriginalToLowered =
+                            createWidenedLeafPackFunc(packedVectorType, loweredInnerTypeInfo);
+                    }
+                    else if (as<IRVectorType>(leafLoweredType))
                     {
                         loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
                         loweredInnerTypeInfo.convertOriginalToLowered = kIROp_VectorReshape;
                     }
-                }
-                else if (auto scalarType = as<IRBasicType>(loweredInnerTypeInfo.loweredType))
-                {
-                    packedVectorType = builder.getVectorType(
-                        loweredInnerTypeInfo.loweredType,
-                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
-                    loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
-                    loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
+                    else
+                    {
+                        loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
+                        loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
+                    }
                 }
                 if (packedVectorType)
                 {
