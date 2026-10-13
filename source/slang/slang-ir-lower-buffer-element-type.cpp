@@ -305,6 +305,12 @@ struct LoweredElementTypeInfo
     ConversionMethod convertLoweredToOriginal;
 };
 
+static bool isBoolOrBoolVectorType(IRType* type)
+{
+    return as<IRBoolType>(type) ||
+           (as<IRVectorType>(type) && as<IRBoolType>(getVectorElementType(type)));
+}
+
 /// Defines target-specific behavior of how to lower buffer element types.
 struct BufferElementTypeLoweringPolicy : public RefObject
 {
@@ -2610,6 +2616,26 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
     }
 
+    /// Lower `bool` or `vector<bool,N>` to `intType` or `vector<intType,N>`, for targets where
+    /// `bool` cannot be stored in a buffer. Loads and stores convert with `BuiltinCast`.
+    static LoweredElementTypeInfo lowerBoolToIntStorage(IRType* type, IRType* intType)
+    {
+        SLANG_RELEASE_ASSERT(isBoolOrBoolVectorType(type));
+
+        LoweredElementTypeInfo info = {};
+        info.originalType = type;
+        info.loweredType = intType;
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            info.loweredType = builder.getVectorType(intType, vectorType->getElementCount());
+        }
+        info.convertLoweredToOriginal = kIROp_BuiltinCast;
+        info.convertOriginalToLowered = kIROp_BuiltinCast;
+        return info;
+    }
+
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config)
     {
         if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
@@ -2896,52 +2922,36 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     {
         if (target->shouldEmitSPIRVDirectly())
         {
-            LoweredElementTypeInfo info = {};
-            info.originalType = type;
-
             switch (target->getTargetReq()->getTarget())
             {
             case CodeGenTarget::SPIRV:
             case CodeGenTarget::SPIRVAssembly:
+                if (isBoolOrBoolVectorType(type))
                 {
-                    auto scalarType = type;
-                    auto vectorType = as<IRVectorType>(scalarType);
-                    if (vectorType)
-                        scalarType = vectorType->getElementType();
+                    // Bool is an abstract type in SPIRV, so we need to lower them into an int.
                     IRBuilder builder(type);
                     builder.setInsertBefore(type);
 
-                    if (as<IRBoolType>(scalarType))
+                    // Find an integer type of the correct size for the current layout rule.
+                    IRType* intType = nullptr;
+                    IRSizeAndAlignment boolSizeAndAlignment;
+                    if (getSizeAndAlignment(
+                            target->getTargetReq(),
+                            config.getLayoutRule(),
+                            getVectorElementType(type),
+                            &boolSizeAndAlignment) == SLANG_OK)
                     {
-                        // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-
-                        // Find an integer type of the correct size for the current layout rule.
-                        IRSizeAndAlignment boolSizeAndAlignment;
-                        if (getSizeAndAlignment(
-                                target->getTargetReq(),
-                                config.getLayoutRule(),
-                                scalarType,
-                                &boolSizeAndAlignment) == SLANG_OK)
-                        {
-                            IntInfo ii;
-                            ii.width = boolSizeAndAlignment.size * 8;
-                            ii.isSigned = true;
-                            info.loweredType = builder.getType(getIntTypeOpFromInfo(ii));
-                        }
-                        else
-                        {
-                            // Just in case that fails for some reason, just use an int.
-                            info.loweredType = builder.getIntType();
-                        }
-
-                        if (vectorType)
-                            info.loweredType = builder.getVectorType(
-                                info.loweredType,
-                                vectorType->getElementCount());
-                        info.convertLoweredToOriginal = kIROp_BuiltinCast;
-                        info.convertOriginalToLowered = kIROp_BuiltinCast;
-                        return info;
+                        IntInfo ii;
+                        ii.width = boolSizeAndAlignment.size * 8;
+                        ii.isSigned = true;
+                        intType = builder.getType(getIntTypeOpFromInfo(ii));
                     }
+                    else
+                    {
+                        // Just in case that fails for some reason, just use an int.
+                        intType = builder.getIntType();
+                    }
+                    return lowerBoolToIntStorage(type, intType);
                 }
                 break;
             default:
