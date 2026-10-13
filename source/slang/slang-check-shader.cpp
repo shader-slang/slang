@@ -1652,21 +1652,12 @@ struct GenericStructTypeUse
 // `ConstantBuffer<Foo<int>>` are all found. Results are appended to `outUses` and
 // `visited` guards against cycles in the `Val` graph.
 //
-// This is needed because the general capability-inference walk
-// (`SemanticsDeclReferenceVisitor`) records a type's requirements only when its
-// decl-ref is a `DirectDeclRef`; a generic specialization uses a
-// `GenericAppDeclRef` and is skipped, so a `[require(...)]` on a generic struct
-// used in an entry-point signature is otherwise dropped. The non-generic spelling
-// `Foo` is already handled by that walk, so only the generic case is collected
-// here (to avoid duplicate reporting).
-//
-// This deliberately lives in entry-point validation rather than in the general
-// inference walk: inferring a generic struct type's requirements for *every*
-// function that names such a type would require many core-module library
-// functions (e.g. the cooperative vector/matrix/tensor `Load`/`Store` helpers,
-// which take `CoopVec<T,N>` etc.) to redeclare those capabilities. Restricting
-// the check to entry-point signatures matches the reported defect without
-// changing library-function inference.
+// General capability inference already contributes a struct named by a parameter's
+// own type, but a struct's requirements do not include those of its fields, so a
+// wrapper such as `struct Field<T> { Foo<T> f; }` used as `Field<int>` reaches
+// `Foo` only through this walk. Its provenance notes also follow a single chain,
+// so collecting every use here lets each contributing struct be reported at its
+// own use site.
 //
 // Only the struct decl itself is filtered for `MagicTypeModifier`/
 // `IntrinsicTypeModifier`: builtin generic types (e.g. `LineStream<T>`,
@@ -2492,15 +2483,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // Augment the entry point's inferred requirements with the capability
-    // requirements of the *generic* struct types in its signature (parameters and
-    // return type). The general inference walk records a type's requirements only
-    // when its decl-ref is a `DirectDeclRef`, so a non-generic struct such as
-    // `Foo a` is already covered there, but a generic one such as `Foo<int> a`
-    // (whose decl-ref is a `GenericAppDeclRef`) is not. We gather the missing
-    // generic-struct requirements here so a `[require(...)]` on `Foo` is enforced
-    // for both spellings. `signatureStructUses` keeps each contributing struct and
-    // its use location so we can point the diagnostic at the exact use site (the
-    // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
+    // requirements of the *generic* struct types reachable from its signature
+    // (parameters and return type), including those the general inference walk does
+    // not reach (see `collectGenericStructTypeUses`). `signatureStructUses` keeps
+    // each contributing struct and its use location so we can point a note at each
+    // use site.
     List<GenericStructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
