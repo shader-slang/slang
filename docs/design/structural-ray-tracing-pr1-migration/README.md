@@ -60,11 +60,21 @@ the full implementation's older `StructuralRayTracingProgramDescriptorType(stora
 wrapper and storage-field assumptions rather than keeping both representations. Target lowering
 creates Metal resources or erases the descriptor on native SBT targets.
 
-The module uses ordinary Slang module compilation. Its descriptor declaration uses the existing
-`__intrinsic_type(TraceProgramDescriptor)` modifier; normal generic lowering preserves both the
-schema and its conformance witness. Opaque-type checks read that same intrinsic modifier. There
-is no dedicated descriptor build option or descriptor AST type. Section 9 records the agreed
-builtin-module loading design, which still needs implementation.
+The module uses ordinary Slang module compilation. Its descriptor declaration now uses
+`__magic_type(TraceProgramDescriptorType)` for its dedicated AST type and retains
+`__intrinsic_type(TraceProgramDescriptor)` for its existing IR mapping. Opaque-type checks use
+`as<TraceProgramDescriptorType>` directly. Remove `isStructuralRayTracingOpaqueHandleType` and
+the shared intrinsic-op helper introduced for it; the original helper stays private to
+`slang-check-shader.cpp`, with no PR change to `slang-check-type.cpp`.
+
+The descriptor's checked declaration reference remains the source of its generic arguments.
+Normal intrinsic-type lowering preserves the schema and its conformance witness in IR; the
+dedicated AST class does not introduce a second schema representation or a target resource layout.
+`isUniformParameterType` also recognizes the class directly, preserving host-bound entry parameters
+without requiring an explicit `uniform` modifier. The new `BuiltinType` no longer uses the previous
+ordinary-struct fallback for that behavior.
+There is no dedicated descriptor build option. Section 9 records the agreed builtin-module loading
+design, which still needs implementation.
 
 ## 4. Share Metal tables across payload types
 
@@ -166,11 +176,17 @@ public interface IMissShader
 
 The checked type is a `MissShaderType`; the declaration remains an ordinary interface with normal
 conformance witnesses. Ordinary interface lowering emits its stage-specific IR interface opcode.
-Only the five executable stage interfaces have special AST classes. Context, primitive, input,
-list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations mark
+The five executable stage interfaces and the descriptor handle have dedicated AST classes.
+The descriptor uses `TraceProgramDescriptorType`; it is not a stage interface. Context, primitive,
+input, list, schema, and tracer declarations remain ordinary Slang types. `KnownBuiltin` annotations mark
 only compiler-consumed associated requirements, the five stage-input structs, the shader-list
 containers, and the two built-in primitive attribute models. Preserve these declaration annotations through ordinary serialization;
 do not introduce a special AST class for each supporting library type.
+
+`isRayTracingBuiltinTypeModifier` permits stage identities on interface declarations and the
+descriptor identity on struct declarations. Both use the existing `DeclRefType::create` construction
+path with one inherited declaration reference, so ordinary substitution and serialization preserve
+their generic arguments. No new AST constructor or IR lowering path is needed for the descriptor.
 
 The annotation constants now belong to the ray-tracing module as `rt::__RayTracingBuiltin`.
 The module's `compiler-intrinsics.slang` also declares the internal callable attribute

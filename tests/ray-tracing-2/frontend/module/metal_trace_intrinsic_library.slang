@@ -6,6 +6,7 @@ namespace traceir
 {
 public interface IProgramShape {}
 
+__magic_type(TraceProgramDescriptorType)
 __intrinsic_type(TraceProgramDescriptor)
 public struct ProgramHandle<Schema : IProgramShape>
 {

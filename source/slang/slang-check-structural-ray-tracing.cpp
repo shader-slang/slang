@@ -11,15 +11,20 @@
 namespace Slang
 {
 
-// Accepts ordinary-module magic annotations only for executable stage interfaces.
-// For example, `__magic_type(MissShaderType) interface IMissShader` has the same declaration
-// reference representation as an ordinary interface; arbitrary core magic classes may require
+// Allows the ray-tracing library to select its stage-interface and descriptor AST types.
+// For example, `__magic_type(MissShaderType) interface IMissShader` and
+// `__magic_type(TraceProgramDescriptorType) struct TraceProgramDescriptor<Schema>` both store
+// their checked declaration reference. Existing type construction can therefore preserve their
+// generic arguments without a custom representation. Other core magic classes may require
 // different operands and cannot safely be applied to an ordinary declaration.
-bool isRayTracingStageInterfaceModifier(MagicTypeModifier* modifier, Decl* decl)
+bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl)
 {
-    return as<InterfaceDecl>(decl) && modifier && modifier->magicNodeType &&
-           modifier->magicNodeType.getInfo()->createFunc &&
-           modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>();
+    if (!modifier || !modifier->magicNodeType || !modifier->magicNodeType.getInfo()->createFunc)
+        return false;
+    return (as<InterfaceDecl>(decl) &&
+            modifier->magicNodeType.isSubClassOf<RayTracingStageInterfaceType>()) ||
+           (as<StructDecl>(decl) &&
+            modifier->magicNodeType.isSubClassOf<TraceProgramDescriptorType>());
 }
 
 // This file owns the structural ray-tracing rules and their declaration identities.
@@ -1743,18 +1748,6 @@ RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
         outCapabilities->nonDestructiveJoin(primitiveDecl->inferredCapabilityRequirements);
     }
     return entryPoint;
-}
-
-// Classifies the descriptor as a host-bound opaque handle in ordinary type checking.
-//
-// Consider `rt::TraceProgramDescriptor<MySchema> program`. Its source declaration has no fields,
-// but that does not make it an empty value that can be put in a constant buffer. Its intrinsic
-// representation supplies resources at the shader boundary, so both type tags and handle
-// placement checks must use the same classification. The intrinsic modifier survives ordinary
-// source and serialized-module loading without a module-registration hook.
-bool isStructuralRayTracingOpaqueHandleType(Type* type)
-{
-    return isIntrinsicTypeWithOp(type, kIROp_TraceProgramDescriptorType);
 }
 
 // Prevents a logical structural stage signature from reaching native entry-point ABI passes.

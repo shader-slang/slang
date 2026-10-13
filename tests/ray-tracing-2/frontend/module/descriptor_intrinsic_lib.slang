@@ -6,11 +6,17 @@ namespace descriptors
 {
 public interface IProgramShape {}
 
-// Intrinsic types use the ordinary module compilation path. Neither the module name nor the
-// declaration name needs to match the standard raytracing library.
+// This library fixture uses the standard module's intrinsic annotations. Neither the module
+// name nor the declaration name needs to match the standard raytracing library.
+__magic_type(TraceProgramDescriptorType)
 __intrinsic_type(TraceProgramDescriptor)
 public struct ProgramHandle<Program : IProgramShape>
 {
     private __init(int unavailable) {}
+}
+
+public ProgramHandle<Program> identity<Program : IProgramShape>(ProgramHandle<Program> value)
+{
+    return value;
 }
 }

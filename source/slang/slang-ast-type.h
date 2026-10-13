@@ -183,6 +183,16 @@ class CallableShaderType : public RayTracingStageInterfaceType
     FIDDLE(...)
 };
 
+/// Identifies the host-bound TraceProgramDescriptor<Schema> as an opaque resource.
+/// For example, Optional<TraceProgramDescriptor<MySchema>> must be rejected like other resources,
+/// even though its source struct has no fields. The inherited declaration reference preserves
+/// Schema and its conformance witness through ordinary substitution and serialization.
+FIDDLE()
+class TraceProgramDescriptorType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
 FIDDLE(abstract)
 class DataLayoutType : public BuiltinType
 {

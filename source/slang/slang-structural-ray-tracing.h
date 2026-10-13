@@ -22,8 +22,9 @@ class TypePackSubtypeWitness;
 class GenericTypeParamDecl;
 class MagicTypeModifier;
 
-/// Allows only the executable-stage magic type family on ordinary interface declarations.
-bool isRayTracingStageInterfaceModifier(MagicTypeModifier* modifier, Decl* decl);
+/// Allows the ray-tracing stage-interface and descriptor AST types in imported library
+/// declarations.
+bool isRayTracingBuiltinTypeModifier(MagicTypeModifier* modifier, Decl* decl);
 
 /// Identifies one logical stage contract represented by a dedicated AST type.
 ///
@@ -205,9 +206,6 @@ RefPtr<EntryPoint> tryCreateStructuralRayTracingEntryPoint(
     FrontEndEntryPointRequest* entryPointReq,
     bool* outFoundStructuralStage,
     CapabilitySet* outCapabilities);
-
-/// Returns whether a type represents the opaque trace-program resource handle.
-bool isStructuralRayTracingOpaqueHandleType(Type* type);
 
 /// Rejects structural source representations that remain before native ABI legalization.
 SlangResult diagnoseUnloweredStructuralRayTracing(

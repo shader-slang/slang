@@ -970,6 +970,8 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
 // Is a entry pointer parmaeter of `type` always a uniform parameter?
 bool isUniformParameterType(Type* type)
 {
+    if (as<TraceProgramDescriptorType>(type))
+        return true;
     if (as<ResourceType>(type))
         return true;
     if (as<SubpassInputType>(type))
@@ -1094,6 +1096,29 @@ bool isBuiltinParameterType(Type* type)
     if (auto arrayType = as<ArrayExpressionType>(type))
         return isBuiltinParameterType(arrayType->getElementType());
     return true;
+}
+
+// Returns true if `type` is declared with `__intrinsic_type(op)` for the given
+// IR opcode. Used to detect intrinsic types such as `CoopMat` and `CoopVec`
+// which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
+static bool isIntrinsicTypeWithOp(Type* type, IROp op)
+{
+    SLANG_ASSERT(type);
+    type = as<Type>(type->resolve());
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto decl = declRefType->getDeclRef().getDecl();
+    if (!decl)
+        return false;
+
+    auto modifier = decl->findModifier<IntrinsicTypeModifier>();
+    if (!modifier)
+        return false;
+    return IROp(modifier->irOp) == op;
 }
 
 // Describes a rule for types that are invalid as entry-point varying parameters/return types.
