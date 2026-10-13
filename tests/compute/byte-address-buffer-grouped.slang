@@ -40,10 +40,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // `float2(` payload distinguishes the two cases where a bare store-count would not.
     // CHECK-COUNT-2: Store{{.*}}float2(
     buffer.Store<float4>(0, a + b + c + d, 8);
+
+    // Alignment 16 covers a `double2` (16 bytes) but not the whole `double4` (32 bytes), so the
+    // 64-bit load and store are each two `double2` groups.
+    // CHECK-COUNT-2: Load<vector<double,2> >
+    // CHECK-COUNT-2: Store{{.*}}vector<double,2>(
+    double4 e = buffer.LoadAligned<double4>(loc + 32, 16);
+    buffer.Store<double4>(64, e, 16);
 }
 
 // The `float4` at alignment 8 is two `float2` loads, the alignment-16 loads are single `float4`
-// loads, and the alignment-8 store is two `float2` stores.
+// loads, the alignment-8 store is two `float2` stores, and the `double4` load at alignment 16 is two
+// `double2` loads.
 // CHECK-SPV-COUNT-2: OpLoad %v2float
 // CHECK-SPV-NOT: OpLoad %v2float
 // CHECK-SPV-COUNT-2: OpLoad %v4float
@@ -51,3 +59,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-SPV-NEXT: OpStore
 // CHECK-SPV: OpAccessChain %_ptr_StorageBuffer_v2float %buffer %int_0 %uint_1
 // CHECK-SPV-NEXT: OpStore
+// CHECK-SPV-COUNT-2: OpLoad %v2double
+// CHECK-SPV-NOT: OpLoad %v4double

@@ -4,14 +4,15 @@
 // grouped byte-address accesses read and write, component by component, so a wrong group offset or
 // component order changes the output. Every input word is distinct. The cases cover a group that
 // follows a single component (the second `int3` of an array at offset 12, and an `int4` struct
-// field at offset 4), plain `Load<T>` at constant locations, `half4` groups, and grouped stores.
+// field at offset 4), plain `Load<T>` at constant locations, `half4` groups, and grouped stores with
+// and without an alignment.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 //TEST_INPUT:ubuffer(data=[10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 0x40003c00 0x44004200], stride=4):name=buffer
 RWByteAddressBuffer buffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 struct FieldAtOffset4
@@ -63,6 +64,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     buffer.Store<int4>(80, int4(104, 105, 106, 107), 8);
     for (uint i = 0; i < 8; ++i)
         output(buffer.Load<int>(64 + 4 * i));
+
+    // A plain `Store<T>` at a constant address: a single `int` at 4, an `int2` group at 8 and a
+    // single `int` at 16. Words 0 and 5 are left unchanged.
+    buffer.Store<int4>(4, int4(201, 202, 203, 204));
+    for (uint i = 0; i < 6; ++i)
+        output(buffer.Load<int>(4 * i));
 }
 
 // CHECK: 14
@@ -103,3 +110,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-NEXT: 105
 // CHECK-NEXT: 106
 // CHECK-NEXT: 107
+// CHECK-NEXT: 10
+// CHECK-NEXT: 201
+// CHECK-NEXT: 202
+// CHECK-NEXT: 203
+// CHECK-NEXT: 204
+// CHECK-NEXT: 15

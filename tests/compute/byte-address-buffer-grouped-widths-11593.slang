@@ -1,9 +1,9 @@
-// byte-address-buffer-grouped-widths-11545.slang
+// byte-address-buffer-grouped-widths-11593.slang
 
 // Feature test for https://github.com/shader-slang/slang/issues/11593. It pins the width and offset
 // of the grouped accesses the legalizer emits: the `half4` (2-byte scalar stride) case, the
 // `float3` group-plus-single-component case, the single-argument 3-component form, and plain
-// `Load<T>` at constant locations. `byte-address-buffer-grouped-values-11593.slang` checks the
+// `Load<T>`/`Store<T>` at constant locations. `byte-address-buffer-grouped-values-11593.slang` checks the
 // values those accesses produce.
 //
 // HLSL only: Slang's HLSL emit lowers each access to its own `.Load<T>`, so the widths read
@@ -51,7 +51,24 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK: Load<float >(16U)
     float4 pb = buffer.Load<float4>(4);
 
+    // A plain `float3` at 12 is a multiple of its 12-byte size, so it stays one access; at 16 it is
+    // a `float2` group and a single `float`.
+    // CHECK: Load<float3 >(12U)
+    // CHECK: Load<float2 >(16U)
+    // CHECK: Load<float >(24U)
+    float3 pc = buffer.Load<float3>(12);
+    float3 pd = buffer.Load<float3>(16);
+
     // Store at alignment 8 is two `float2` stores (not four scalar stores).
     // CHECK-COUNT-2: Store{{.*}}float2(
     buffer.Store<float4>(0, float4(ha) + float4(hb.x, hb.y, fc.z, fd.x) + pa + pb, 8);
+
+    // Plain `Store<T>` groups the same way as plain `Load<T>`.
+    // CHECK: Store(72U,float2(
+    // CHECK: Store(80U,float2(
+    buffer.Store<float4>(72, float4(pc, pd.x));
+    // CHECK: Store(100U,_S
+    // CHECK: Store(104U,float2(
+    // CHECK: Store(112U,_S
+    buffer.Store<float4>(100, float4(pd, pc.x));
 }
