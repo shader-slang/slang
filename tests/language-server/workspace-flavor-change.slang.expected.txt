@@ -9,7 +9,7 @@ content:
 {REDACTED}.slang(12)
 
 --------
-workspaceFlavor: vfx
+config: slang.workspaceFlavor="vfx"
 --------
 range: 16,12 - 16,18
 content:
@@ -21,7 +21,7 @@ content:
 {REDACTED}.slang(9)
 
 --------
-workspaceFlavor: unknownFlavor
+config: slang.workspaceFlavor="unknownFlavor"
 --------
 range: 16,12 - 16,18
 content:
@@ -33,7 +33,7 @@ content:
 {REDACTED}.slang(9)
 
 --------
-workspaceFlavor: standard
+config: slang.workspaceFlavor="standard"
 --------
 range: 16,12 - 16,18
 content:
@@ -45,7 +45,7 @@ content:
 {REDACTED}.slang(12)
 
 --------
-workspaceFlavor: vfx
+config: slang.workspaceFlavor="vfx"
 --------
 range: 16,12 - 16,18
 content:
@@ -57,7 +57,7 @@ content:
 {REDACTED}.slang(9)
 
 --------
-workspaceFlavor: 
+config: slang.workspaceFlavor=""
 --------
 range: 16,12 - 16,18
 content:

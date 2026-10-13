@@ -16,16 +16,16 @@ void test()
 {
     int v = marker;
 //HOVER:17,13
-//SET_WORKSPACE_FLAVOR:vfx
+//CONFIG:slang.workspaceFlavor="vfx"
 //HOVER:17,13
 // An unknown flavor value must keep the previous flavor (vfx), not reset it to standard.
-//SET_WORKSPACE_FLAVOR:unknownFlavor
+//CONFIG:slang.workspaceFlavor="unknownFlavor"
 //HOVER:17,13
-//SET_WORKSPACE_FLAVOR:standard
+//CONFIG:slang.workspaceFlavor="standard"
 //HOVER:17,13
-//SET_WORKSPACE_FLAVOR:vfx
+//CONFIG:slang.workspaceFlavor="vfx"
 //HOVER:17,13
 // An empty value selects the default flavor (standard), whatever the previous flavor was.
-//SET_WORKSPACE_FLAVOR:
+//CONFIG:slang.workspaceFlavor=""
 //HOVER:17,13
 }
