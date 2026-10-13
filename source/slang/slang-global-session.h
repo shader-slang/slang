@@ -172,6 +172,11 @@ public:
         slang::BuiltinModuleName moduleName,
         const void* coreModule,
         size_t coreModuleSizeInBytes) override;
+    /// Load an immutable builtin module blob, retaining its storage for lazy deserialization.
+    /// Serialized module blobs must be aligned to RIFF::Chunk::kChunkAlignment. Archive blobs
+    /// are also accepted, but their entries still need to be extracted and decompressed.
+    SlangResult loadBuiltinModule(slang::BuiltinModuleName moduleName, ISlangBlob* moduleBlob);
+
     SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
         slang::BuiltinModuleName moduleName,
         SlangArchiveType archiveType,
@@ -368,7 +373,7 @@ private:
     void _initCodeGenTransitionMap();
 
     SlangResult _readBuiltinModule(
-        ISlangFileSystem* fileSystem,
+        ISlangBlob* fileContents,
         Scope* scope,
         String moduleName,
         Module*& outModule);

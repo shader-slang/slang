@@ -131,10 +131,8 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     typedef ISlangBlob*(GetEmbeddedModuleFunc)();
     auto getEmbeddedModule = (GetEmbeddedModuleFunc*)emPtr;
     auto blob = getEmbeddedModule();
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)blob->getBufferPointer(),
-        blob->getBufferSize()));
+    SLANG_RETURN_ON_FAIL(
+        static_cast<Slang::Session*>(globalSession)->loadBuiltinModule(builtinModuleName, blob));
     return SLANG_OK;
 }
 
@@ -190,9 +188,9 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
     ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule();
     if (coreModuleBlob)
     {
-        SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(
-            coreModuleBlob->getBufferPointer(),
-            coreModuleBlob->getBufferSize()));
+        SLANG_RETURN_ON_FAIL(
+            static_cast<Slang::Session*>(globalSession.get())
+                ->loadBuiltinModule(slang::BuiltinModuleName::Core, coreModuleBlob));
     }
     else
     {

@@ -146,6 +146,12 @@ option(
     ON
 )
 
+option(
+    SLANG_EMBED_BUILTIN_MODULES_UNCOMPRESSED
+    "Embed aligned uncompressed builtin modules to avoid per-session copies and decompression"
+    ON
+)
+
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_VALIDATION_IR "Enable full IR validation (SLOW!)")

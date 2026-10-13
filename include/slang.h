@@ -1363,6 +1363,10 @@ typedef uint32_t SlangSizeT;
         // such as using uniform parameters as mutable temporaries. Has no effect on other dialects.
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
+        // Emit an uncompressed serialized builtin module as a C array, without an archive.
+        SaveCoreModuleRawBinSource = 164,
+        SaveGLSLModuleRawBinSource = 165,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -4294,7 +4298,8 @@ struct IGlobalSession : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     compileCoreModule(CompileCoreModuleFlags flags) = 0;
 
-    /** Load the core module. Currently loads modules from the file system.
+    /** Load the core module from a serialized module or an archive containing it.
+    The input bytes can be released after this call returns.
     @param coreModule Start address of the serialized core module
     @param coreModuleSizeInBytes The size in bytes of the serialized core module
 
@@ -4376,7 +4381,8 @@ struct IGlobalSession : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     compileBuiltinModule(BuiltinModuleName module, CompileCoreModuleFlags flags) = 0;
 
-    /** Load a builtin module. Currently loads modules from the file system.
+    /** Load a builtin module from a serialized module or an archive containing it.
+    The input bytes can be released after this call returns.
     @param module The builtin module name
     @param moduleData Start address of the serialized core module
     @param sizeInBytes The size in bytes of the serialized builtin module
@@ -6054,6 +6060,7 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     slang::IGlobalSession** outGlobalSession);
 
 /* Returns a blob that contains the serialized core module.
+The representation is build-dependent; pass its bytes to IGlobalSession::loadCoreModule.
 Returns nullptr if there isn't an embedded core module.
 
 NOTE! API is experimental and not ready for production code

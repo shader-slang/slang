@@ -1,9 +1,10 @@
 #include "core/slang-array-view.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "core/slang-riff.h"
 #include "slang-tag-version.h"
 
-static const uint8_t g_glslModule[] = {
+alignas(Slang::RIFF::Chunk::kChunkAlignment) static const uint8_t g_glslModule[] = {
 #include "slang-glsl-module-generated.h"
 };
 

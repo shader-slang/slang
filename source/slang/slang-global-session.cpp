@@ -482,8 +482,24 @@ SlangResult Session::loadBuiltinModule(
     const void* moduleData,
     size_t sizeInBytes)
 {
-    SLANG_PROFILE;
+    // The public raw-pointer API must not retain caller-owned storage.
+    auto root = RIFF::RootChunk::getFromBlob(moduleData, sizeInBytes);
+    ComPtr<ISlangBlob> moduleBlob;
+    if (root && root->getType() == SerialBinary::kModuleFourCC)
+    {
+        SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(moduleData, sizeInBytes, moduleBlob));
+    }
+    else
+    {
+        // Archive extraction below makes an independent copy before this call returns.
+        moduleBlob = UnownedRawBlob::create(moduleData, sizeInBytes);
+    }
+    return loadBuiltinModule(moduleName, moduleBlob);
+}
 
+SlangResult Session::loadBuiltinModule(slang::BuiltinModuleName moduleName, ISlangBlob* moduleBlob)
+{
+    SLANG_PROFILE;
 
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
@@ -495,14 +511,27 @@ SlangResult Session::loadBuiltinModule(
         return SLANG_FAIL;
     }
 
-    // Make a file system to read it from
-    ComPtr<ISlangFileSystemExt> fileSystem;
-    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(moduleData, sizeInBytes, fileSystem));
+    ComPtr<ISlangBlob> fileContents(moduleBlob);
+    auto root = RIFF::RootChunk::getFromBlob(moduleBlob);
+    if (!root || root->getType() != SerialBinary::kModuleFourCC)
+    {
+        ComPtr<ISlangFileSystemExt> fileSystem;
+        SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+            moduleBlob->getBufferPointer(),
+            moduleBlob->getBufferSize(),
+            fileSystem));
+        String fileName = String(builtinModuleInfo.name) + ".slang-module";
+        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(fileName.getBuffer(), fileContents.writeRef()));
+    }
+
+    // Fossil AST values are accessed in place and require the serialized module's alignment.
+    SLANG_RELEASE_ASSERT(
+        size_t(fileContents->getBufferPointer()) % RIFF::Chunk::kChunkAlignment == 0);
 
     // Let's try loading serialized modules and adding them
     Module* module = nullptr;
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(
-        fileSystem,
+        fileContents,
         builtinModuleInfo.languageScope,
         builtinModuleInfo.name,
         module));
@@ -629,19 +658,11 @@ SlangResult Session::saveBuiltinModule(
 }
 
 SlangResult Session::_readBuiltinModule(
-    ISlangFileSystem* fileSystem,
+    ISlangBlob* fileContents,
     Scope* scope,
     String moduleName,
     Module*& outModule)
 {
-    // Get the name of the module
-    StringBuilder moduleFilename;
-    moduleFilename << moduleName << ".slang-module";
-
-    // Load it
-    ComPtr<ISlangBlob> fileContents;
-    SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), fileContents.writeRef()));
-
     RIFF::RootChunk const* rootChunk = RIFF::RootChunk::getFromBlob(fileContents);
     if (!rootChunk)
     {
