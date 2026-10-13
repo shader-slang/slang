@@ -530,12 +530,9 @@ struct TypeTagContext
             return TypeTag((int(tags) & ~int(TypeTag::Unsized)) | int(TypeTag::Opaque));
         }
 
-        if (isStructuralRayTracingOpaqueHandleType(type))
-            return TypeTag::Opaque;
-
         // The compiler's resource type classes describe opaque values directly. Their builtin
         // declarations do not describe the fields that a compiled resource value would store.
-        if (as<UntypedBufferResourceType>(type))
+        if (isStructuralRayTracingOpaqueHandleType(type) || as<UntypedBufferResourceType>(type))
             return TypeTag::Opaque;
         if (as<ResourceType>(type))
             return TypeTag::Opaque;
