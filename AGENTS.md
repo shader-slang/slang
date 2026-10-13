@@ -268,7 +268,8 @@ commit message, so it is written for `git log`, not for the review thread.
    touched).
 4. **Evidence** — tests added and run, and what was not run and why.
 
-Then `Fixes #N`. No tables, logs or file-by-file notes. The process report — per-change
+Then `Fixes #N` and one `AI assistance:` line (`None`, `Editorial`, or `Substantive: <tool>, verified
+by <tests or checks>`; see CONTRIBUTING.md). No tables, logs or file-by-file notes. The process report — per-change
 reasoning, code traces, and the input-shape check from the Problem-Solving Methodology — goes in
 one collapsed `<details>` block at the end, where it is not counted. The title is
 `component: imperative summary`, under 72 characters. The `pr-text-lint` workflow checks the

@@ -24,6 +24,10 @@ commit message. No tables, logs or file-by-file notes. See AGENTS.md,
 
 Fixes #
 
+AI assistance: None
+
+<!-- None | Editorial | Substantive: <tool>, verified by <tests or checks>. See CONTRIBUTING.md. -->
+
 <details>
 <summary>Process report</summary>
 
