@@ -16,10 +16,6 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
-  upload-llvm:
-    description: "Allow inline LLVM publication on a master cache miss; requires GCS authentication"
-    default: "true"
-    required: false
   min-disk-gb:
     description: "Minimum required free disk space in GB"
     default: "3"
@@ -131,7 +127,6 @@ runs:
         platform: ${{ inputs.platform }}
         llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         build-if-missing: "true"
-        upload-if-missing: ${{ inputs.upload-llvm }}
         github-token: ${{ github.token }}
 
     - name: Set environment variable for CMake
