@@ -232,7 +232,7 @@ suppresses ref-count recording during these internal identity queries.
 ### Core Macros (proxy-macros.h)
 
 ```cpp
-RECORD_CALL()                    // Begin a method call (locks ctx, records signature + 'this')
+RECORD_CALL()                    // Begin a method call (locks ctx if active, records signature + 'this')
 RECORD_STATIC_CALL()             // Begin a free/static function call
 RECORD_INPUT(arg)                // Record input parameter
 RECORD_INPUT_ARRAY(arr, count)   // Record input array

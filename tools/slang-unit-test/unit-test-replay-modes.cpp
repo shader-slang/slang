@@ -593,8 +593,6 @@ SLANG_UNIT_TEST(replayContextRecordStaticCallSkipsLockWhenIdle)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Idle callers must not contend on the mutex; active callers must still be
-    // serialized by it.
     ctx().reset();
     SLANG_CHECK(ctx().isIdle());
     SLANG_CHECK(!recordStaticCallLocksMutex());
@@ -658,8 +656,6 @@ SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine)
     SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
     SLANG_CHECK(globalSession != nullptr);
 
-    // Idle path returns the raw session (no proxy) and must not have engaged any
-    // of the recording machinery the mutex used to guard.
     SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) == nullptr);
     checkReplayContextIsPristine();
 
