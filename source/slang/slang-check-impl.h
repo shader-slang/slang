@@ -3072,7 +3072,7 @@ public:
         Decl* satisfyingDecl);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
     void diagnosePendingStructuralRayTracingTypeUses();
-    void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
+    void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
     bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);

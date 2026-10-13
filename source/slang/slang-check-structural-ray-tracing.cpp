@@ -1522,17 +1522,18 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
     _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
 }
 
-// Prevents ordinary functions from returning a compiler-created stage or input view.
-// For example, `rt::MissInput<C> makeInput()` cannot produce the state supplied by a miss adapter.
-// Constructor results are handled at their actual construction use instead of their declaration.
-void SemanticsVisitor::diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl)
+/// Checks function and method return types for shader-stage or stage-input values.
+/// For example, `rt::MissInput<C> getInput();` is rejected because the current input-view rules
+/// allow inputs only as `in` parameters and initialized local copies. This checks the declared
+/// return type; it does not inspect the function body. Constructors are checked at their
+/// construction expressions instead of their declarations.
+void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl)
 {
-    if (as<ConstructorDecl>(callableDecl))
+    if (as<ConstructorDecl>(decl))
         return;
     StructuralRayTracingTypeUse use;
-    use.type = callableDecl->returnType.type;
-    use.location =
-        callableDecl->returnType.exp ? callableDecl->returnType.exp->loc : callableDecl->loc;
+    use.type = decl->returnType.type;
+    use.location = decl->returnType.exp ? decl->returnType.exp->loc : decl->loc;
     _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
 }
 
