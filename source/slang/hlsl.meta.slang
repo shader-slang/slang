@@ -474,9 +474,9 @@ struct ByteAddressBuffer
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
     /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
-    /// field, a 3-component vector is always split because its size is not a power of two, and a
-    /// partially covered `bool` vector is loaded per component. For example,
-    /// `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
     ///   `asfloat`.
     /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
@@ -6969,9 +6969,9 @@ struct $(item.name)
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
     /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
-    /// field, a 3-component vector is always split because its size is not a power of two, and a
-    /// partially covered `bool` vector is loaded per component. For example,
-    /// `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// field, a 3-component vector is always split because no power-of-two `alignment` is a
+    /// multiple of its size, and a partially covered `bool` vector is loaded per component. For
+    /// example, `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
     ///   `asfloat`.
     /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
