@@ -1,8 +1,8 @@
 // An entry point can also be called as an ordinary function. `legalizeRayTracingPayloads` first
-// gives the empty native payload physical storage. The pipeline then resolves varying references
-// before `fixEntryPointCallsites` clones the already-resolved function for ordinary callers. Later
-// entry-point legalization can therefore adapt the entry-point and callable roles independently
-// without making the clone refer to the entry point's obsolete payload representation.
+// gives the empty native payload physical storage before `fixEntryPointCallsites` clones the
+// function for ordinary callers. Varying references in both functions are resolved after resource
+// specialization. Later entry-point legalization can adapt the entry-point and callable roles
+// independently without making the clone refer to the entry point's obsolete payload representation.
 // Other helper parameters remain logical: the `Empty` parameter of `recordEvent` disappears
 // normally. The replacement argument needs storage, but its dummy field does not need an initial
 // value.

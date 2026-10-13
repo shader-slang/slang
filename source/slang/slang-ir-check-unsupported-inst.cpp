@@ -114,15 +114,17 @@ static IRType* findD3DUnsupportedLocalStorageType(IRType* type)
     return nullptr;
 }
 
-/// Find a resource or sampler type that Metal cannot place in mutable local storage.
+/// Find a texture, image, or sampler type that Metal cannot place in mutable local storage.
 //
-// Metal rejects a resource or sampler stored directly in `thread` storage. It permits a fixed-size
-// array with a resource or sampler as its immediate element. The `transformParamsToConstRef` pass
+// Metal rejects a texture, image, or sampler stored directly in `thread` storage. Structured and
+// byte-address buffers are represented by pointers and are not subject to this restriction. Metal
+// permits a fixed-size array with a texture, image, or sampler as its immediate element. The
+// `transformParamsToConstRef` pass
 // uses this allowed form when a caller cannot supply an immutable address for a by-value array
 // argument. It copies the argument into a local array and passes that array to the callee. An
 // unsized array has no fixed amount of local storage. The current Metal storage contract permits
 // exactly one fixed-size array layer and rejects nested arrays. For unsized and nested arrays, we
-// inspect the innermost element. A resource or sampler element makes the local storage invalid. We
+// inspect the innermost element. A texture, image, or sampler element makes the storage invalid. We
 // remove attributed-type wrappers because they do not change the storage representation.
 //
 // TODO: Compile generated nested-array locals with metallib, and permit that form if the backend

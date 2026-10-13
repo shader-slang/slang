@@ -44,11 +44,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 // CHECK: type: float
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}

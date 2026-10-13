@@ -1006,41 +1006,6 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
-/// Resolve varying references and redirect ordinary calls to non-entry-point clones.
-///
-/// Shader entry points and CUDA kernels remain launch targets; ordinary calls use their clones.
-static void resolveVaryingReferencesAndSplitEntryPointCallsites(
-    IRModule* irModule,
-    CodeGenContext* codeGenContext)
-{
-    // A shader entry point or CUDA kernel that is also called as an ordinary function needs a
-    // non-entry-point clone.
-    // We first translate global varying variables and resolve varying-input references so that
-    // the clone contains the references that emission expects. We then redirect ordinary calls
-    // to the clone. Each pass retains its own hooks for IR validation, dumps, and profiling.
-    auto& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
-    if (requiredLoweringPassSet.globalVaryingVar)
-        wrapPass(
-            codeGenContext,
-            "translateGlobalVaryingVar",
-            translateGlobalVaryingVar,
-            irModule,
-            codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        wrapPass(
-            codeGenContext,
-            "resolveVaryingInputRef",
-            [](IRModule* module) { resolveVaryingInputRef(module); },
-            irModule);
-
-    wrapPass(
-        codeGenContext,
-        "fixEntryPointCallsites",
-        [](IRModule* module) { fixEntryPointCallsites(module); },
-        irModule);
-}
-
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -2102,51 +2067,36 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
-    // Resource-global legalization requires the entry-point call-site split to happen before we
-    // move global initializers. We move that split and its prerequisite passes only for modules
-    // that contain a candidate. Other modules retain the established late ordering below.
-    const bool hasResourceGlobalCandidate = doesModuleContainResourceGlobalCandidate(irModule);
-    if (hasResourceGlobalCandidate)
-    {
-        // We split the launch and ordinary-call roles of shader entry points and CUDA kernels
-        // before moving entry-point initialization. Otherwise the ordinary clone would inherit
-        // initialization that must execute only when the original function is launched. Resource-
-        // global legalization can then add generated resource parameters to the ordinary clone and
-        // append matching arguments at its direct call sites.
-        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
+    // Global varying translation materializes input parameters and their assignments before
+    // cloning an entry point. The ordinary clone must contain that same input setup.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
-        // Any resource- or empty-type legalization selected for the target has now run.
-        // `isResourceGlobalCandidateForPerInvocationReplacement` accepts only resource values and
-        // homogeneous resource arrays that still have one global IR value. The initializer mover
-        // can therefore transfer each selected initializer without coordinating several legalized
-        // values.
-        //
-        // TODO: Consolidate this resource-initializer selection with
-        // `moveGlobalVarInitializationToEntryPoints` later in the pipeline. A combined policy must
-        // continue to move cooperative-vector and selected resource initializers for HLSL while
-        // leaving every other HLSL global initializer at module scope.
-        SLANG_PASS(
-            moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization,
-            codeGenContext->getTargetProgram(),
-            sink);
-        if (sink->getErrorCount() != 0)
-            return SLANG_FAIL;
+    // We separate launch functions from ordinary callees before injecting initialization. The
+    // ordinary clone must use its caller's globals rather than reinitialize them at each call.
+    // This ordering applies independently of the globals' types and also lets later CUDA active-
+    // mask synthesis distinguish a launch from a call inside divergent control flow.
+    SLANG_PASS(fixEntryPointCallsites);
 
-        // Each selected global still has one IR value and now has no initializer body. We can
-        // replace it with function-local storage and pass its value through generated parameters
-        // and call arguments. `specializeResourceUsage` later tries to rewrite or eliminate
-        // generated parameter forms that the target cannot emit. Uninitialized-value diagnostics
-        // are non-essential validation, so we pass the same option that controls the pre-link
-        // module-wide uninitialized-value check. The generated-local analysis must not reintroduce
-        // those diagnostics when the user has disabled them.
-        SLANG_PASS(
-            legalizeResourceGlobalVars,
-            targetRequest->getTargetCaps(),
-            targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
-            sink);
-        if (sink->getErrorCount() != 0)
-            return SLANG_FAIL;
-    }
+    // Resource- and empty-type legalization selected for the target has completed. We move all
+    // initializers required by the target or by resource-global replacement in one module-order
+    // traversal, before any pass replaces their storage. HLSL globals whose initializers can stay
+    // at module scope remain there; the initializer mover owns that target policy.
+    SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Selected resource globals still represent one IR value and now have no initializer bodies.
+    // We replace their storage with locals and generated parameters before resource specialization
+    // attempts to eliminate forms that the target cannot emit. The generated-local uninitialized-
+    // value check uses the same validation option as the pre-link module-wide check.
+    SLANG_PASS(
+        legalizeResourceGlobalVars,
+        targetRequest->getTargetCaps(),
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
+        sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     if (isCPUTargetViaLLVM(targetRequest))
     {
@@ -2415,13 +2365,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (!hasResourceGlobalCandidate)
-    {
-        // A module with no resource-global candidate does not need the earlier entry-point split.
-        // We leave these passes in their established position so that adding resource-global
-        // legalization does not reorder unrelated modules.
-        resolveVaryingReferencesAndSplitEntryPointCallsites(irModule, codeGenContext);
-    }
+    // Resource specialization can inline a helper containing interpolation operations into an
+    // entry point. We resolve varying-input references after those calls have been inlined, while
+    // varying parameters still have their original address representation. Ordinary entry-point
+    // clones can contain the same operations, so the resolver visits them as well as launch
+    // functions.
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        SLANG_PASS(resolveVaryingInputRef);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2547,15 +2497,9 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::WGSL:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
-        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
@@ -2580,7 +2524,6 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {

@@ -48,11 +48,11 @@ void computeMain()
 }
 
 // CHECK: type: float
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}

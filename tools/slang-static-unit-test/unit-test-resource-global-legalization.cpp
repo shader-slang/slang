@@ -546,16 +546,13 @@ SLANG_UNIT_TEST(resourceGlobalLegalizationAcceptsAttributedPointerStorageTransfe
     builder.emitReturn();
 
     auto targetModule = env.checkModuleFromSource("resourceGlobalInitializerTarget", "");
-    SLANG_CHECK(targetModule);
+    SLANG_CHECK_ABORT(targetModule);
     auto linkage = targetModule->getLinkage();
-    SLANG_CHECK(linkage->targets.getCount() == 1);
+    SLANG_CHECK_ABORT(linkage->targets.getCount() == 1);
     auto targetProgram = targetModule->getTargetProgram(linkage->targets[0]);
 
     DiagnosticSink sink;
-    moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization(
-        module.get(),
-        targetProgram,
-        &sink);
+    moveGlobalVarInitializationToEntryPoints(module.get(), targetProgram, &sink);
     legalizeResourceGlobalVars(module.get(), CapabilitySet::makeEmpty(), true, &sink);
 
     SLANG_CHECK(sink.getErrorCount() == 0);

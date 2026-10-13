@@ -9,13 +9,6 @@ class DiagnosticSink;
 struct CapabilitySet;
 struct IRModule;
 
-/// Return whether `module` contains an `IRGlobalVar` for which
-/// `isResourceGlobalCandidateForPerInvocationReplacement` returns true.
-///
-/// This query does not perform the legalizer's whole-module validation. A true result therefore
-/// means that the caller must prepare for the pass, not that the pass will necessarily succeed.
-bool doesModuleContainResourceGlobalCandidate(IRModule* module);
-
 /// Replace mutable resource state that has one value per entry-point invocation with
 /// function-local storage.
 ///
@@ -29,7 +22,7 @@ bool doesModuleContainResourceGlobalCandidate(IRModule* module);
 /// `checkForUsingUninitializedValues` must have run before linking. Linking,
 /// unreachable-control-flow elimination, and any resource- or empty-type legalization selected for
 /// the target must also have completed.
-/// `moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization` must have removed every
+/// `moveGlobalVarInitializationToEntryPoints` must have removed every
 /// selected global's initializer body and inserted the corresponding stores at defined entry
 /// points. `fixEntryPointCallsites` must have redirected every ordinary call to a shader entry
 /// point or CUDA kernel. This operation rejects an affected entry point when an invocation

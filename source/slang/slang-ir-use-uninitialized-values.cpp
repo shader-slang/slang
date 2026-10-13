@@ -635,9 +635,11 @@ static List<WaveElectionGuard> collectWaveElectionGuards(IRGlobalValueWithCode* 
     return guards;
 }
 
-// We collect the `WaveIsFirstLane()` guards and build the dominator tree once per function because
-// both are independent of the tracked value. The dominator tree lets the wave-election heuristic
-// require the guard's merge block to dominate the block containing a candidate read.
+/// A `WaveElectionContext` contains a function's wave-election guards and their dominator tree.
+///
+/// `dominatorTree` is non-null when `guards` is nonempty, and null otherwise. An empty context
+/// disables the wave-election heuristic. The tree tests whether a guard's merge block dominates a
+/// candidate read.
 struct WaveElectionContext
 {
     List<WaveElectionGuard> guards;
@@ -646,6 +648,8 @@ struct WaveElectionContext
 
 static WaveElectionContext collectWaveElectionContext(IRGlobalValueWithCode* func)
 {
+    // The guards and dominator tree depend on the function, not the tracked value. We compute
+    // them once and omit the tree when no guard can participate in the heuristic.
     WaveElectionContext context;
     context.guards = collectWaveElectionGuards(func);
     if (context.guards.getCount() != 0)
@@ -756,11 +760,11 @@ static bool isWaveReadLaneFirstUse(IRInst* readingInst)
 /// contains a propagation boundary.
 enum class LoopUninitializedPathPolicy
 {
-    /// Preserve every path that reaches the loop's break block without crossing a boundary.
-    PreservePathsWithoutPropagationBoundary,
+    /// Every path reaching the break block without crossing a boundary remains in the analysis.
+    AllPathsWithoutPropagationBoundary,
 
-    /// Stop propagation at the break block after any boundary in the loop body.
-    StopAtBreakAfterAnyBodyBoundary,
+    /// Propagation stops at the break block after any boundary in the loop body.
+    LoopBodyBoundaryHeuristic,
 };
 
 /// An `UninitializedStatePropagationBoundaryLocations` value maps propagation boundaries to the
@@ -909,7 +913,7 @@ static HashSet<IRBlock*> collectLoopBreakBlocksThatStopPropagation(
     // conditional write. Distinguishing those cases requires path and trip-count analysis that this
     // check does not perform.
     HashSet<IRBlock*> result;
-    if (policy == LoopUninitializedPathPolicy::PreservePathsWithoutPropagationBoundary)
+    if (policy == LoopUninitializedPathPolicy::AllPathsWithoutPropagationBoundary)
         return result;
 
     for (auto block : func->getBlocks())
@@ -1193,7 +1197,7 @@ static UninitializedReadSets getModuleWideUninitializedReads(
         possibleWrites,
         reads,
         waveElection,
-        LoopUninitializedPathPolicy::StopAtBreakAfterAnyBodyBoundary);
+        LoopUninitializedPathPolicy::LoopBodyBoundaryHeuristic);
 }
 
 /// Collect the exhaustive effects supplied for one generated entry-point resource local.
@@ -1736,7 +1740,7 @@ void checkForUsingUninitializedGeneratedResourceLocal(
         propagationBoundaries,
         reads,
         waveElection,
-        LoopUninitializedPathPolicy::PreservePathsWithoutPropagationBoundary);
+        LoopUninitializedPathPolicy::AllPathsWithoutPropagationBoundary);
 
     // Finally, we issue the same two diagnostic classes as the module-wide analysis.
     auto valueType = variable->getDataType()->getValueType();

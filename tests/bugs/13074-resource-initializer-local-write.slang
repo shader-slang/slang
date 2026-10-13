@@ -11,10 +11,10 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj -output-using-type
 
 // CHECK: type: float
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
 
 //TEST_INPUT: Texture2D(size=4, content = zero):name=firstTexture
 Texture2D<float4> firstTexture;

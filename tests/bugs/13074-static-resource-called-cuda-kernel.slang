@@ -41,7 +41,7 @@ void computeMain()
 // CUDA: readCachedTexture_{{[0-9]+}}(globalParams_{{[0-9]+}}->secondTexture_{{[0-9]+}});
 
 // CHECK: type: float
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 1.000000
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}

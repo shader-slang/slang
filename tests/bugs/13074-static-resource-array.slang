@@ -1,4 +1,4 @@
-// `unusedImage` proves that `legalizeResourceGlobalVars` removes a selected global with no uses.
+// `unusedImage` checks that an unused static resource does not remain in the emitted program.
 // The one-element `cachedTextures` array is initialized from the `textures` array; the pass must
 // replace that global and pass the array value through `loadCachedTexture`. The SPIR-V checks prove
 // that neither static resource remains and that the helper ultimately loads the original shader

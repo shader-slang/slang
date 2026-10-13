@@ -41,7 +41,7 @@
 //      }
 //
 // Immediately before this pass,
-// `moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization` moves each selected
+// `moveGlobalVarInitializationToEntryPoints` moves each selected
 // initializer body into a new zero-argument function, then inserts a store of its result at the
 // start of every defined entry point. The pipeline has already completed any resource- or
 // empty-type legalization selected for the target. Each selected `IRGlobalVar` therefore still
@@ -510,8 +510,9 @@ struct LegalizeResourceGlobalVarsPass
         // access summaries to reject a function whose invocations cannot all receive the value, or
         // whose emitted implementation can differ from the IR body. We then reject arrays with
         // subobject writes and a possible read before a whole-array assignment, uses that may
-        // retain an address or observe its storage identity, and calls that would receive two
-        // writable aliases for the same original global.
+        // retain an address or observe its storage identity, and calls that would receive aliases
+        // for the same original global when either argument may write. Two read-only aliases are
+        // permitted.
         //
         // TODO: Move the target-independent invocation and generic-assembly checks to an IR
         // validation pass after linking. Front-end checking cannot know callers from other modules.
@@ -2667,19 +2668,6 @@ static bool requiresModuleScopeStorage(IRGlobalVar* globalVar)
 }
 
 } // namespace
-
-bool doesModuleContainResourceGlobalCandidate(IRModule* module)
-{
-    // We use the same predicate as phase 1 of the legalizer so that pass ordering and candidate
-    // collection cannot disagree about whether the module needs resource-global replacement.
-    for (auto inst : module->getGlobalInsts())
-    {
-        auto globalVar = as<IRGlobalVar>(inst);
-        if (globalVar && isResourceGlobalCandidateForPerInvocationReplacement(globalVar))
-            return true;
-    }
-    return false;
-}
 
 void legalizeResourceGlobalVars(
     IRModule* module,

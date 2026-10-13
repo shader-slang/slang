@@ -9,8 +9,8 @@ namespace Slang
 {
 
 // A global variable may contain both its storage declaration and the IR body that computes its
-// initial value. `MoveGlobalVarInitializationToEntryPointsPass` separates those two roles. For
-// example, it changes:
+// initial value. `MoveGlobalVarInitializationToEntryPointsPass` separates those two roles when
+// initialization must execute inside an entry point. For example, for C++ emission it changes:
 //
 //      static int counter = 1;
 //
@@ -35,32 +35,20 @@ namespace Slang
 //
 // We perform that transformation in three steps. We first choose the globals whose initializer
 // bodies must move. We then move each selected body into a zero-argument function. Finally, we
-// insert equivalent initialization at the start of each module-scope entry point selected by the
-// caller's policy. A non-trivial body is evaluated by calling its new function; a body that only
+// insert equivalent initialization at the start of each defined module-scope shader entry point
+// and CUDA kernel. A non-trivial body is evaluated by calling its new function; a body that only
 // returns a module-scope value needs just a store.
 //
-// Two policies share these extraction and injection steps. `RequiredByTarget` selects initializer
-// bodies that the target cannot represent at module scope and injects them into shader entry
-// points. `RequiredByPerInvocationResourceReplacement` selects the marked resource globals that
-// `legalizeResourceGlobalVars` will replace. A marked global represents either a mutable resource
-// variable declared by the programmer at file or namespace scope, or a mutable uniform-parameter
-// shadow synthesized for `-Gec`. This policy also injects the selected initializers into CUDA
-// kernels. We move a resource initializer only after proving that the initializer and every
-// function it can call return normally for all possible inputs, that they have no externally
-// observable side effects, and that they do not read preexisting mutable storage, resource
-// contents, or non-resource data from an explicit parameter group. Those restrictions ensure that
-// evaluating the initializer at the start of each entry point cannot change observable behavior.
-
-/// A `GlobalInitializerSelection` identifies why an initializer body is selected for execution
-/// inside an entry point.
-enum class GlobalInitializerSelection
-{
-    /// Initializers that the current target cannot represent at module scope.
-    RequiredByTarget,
-
-    /// Resource initializers required by per-invocation resource replacement.
-    RequiredByPerInvocationResourceReplacement,
-};
+// We select initializer bodies that the target cannot represent at module scope and initializers
+// of the marked resource globals that `legalizeResourceGlobalVars` will replace. A marked global
+// represents either a mutable resource variable declared by the programmer at file or namespace
+// scope, or a mutable uniform-parameter shadow synthesized for `-Gec`. The selected initializers
+// execute in module order at shader and CUDA kernel launches. We move a resource initializer only
+// after proving that the initializer and every function it can call return normally for all
+// possible inputs. We also reject externally observable side effects and reads of preexisting
+// mutable storage, resource contents, or non-resource data from an explicit parameter group. Those
+// restrictions ensure that evaluating the initializer at each entry point cannot change observable
+// behavior.
 
 /// A `MoveGlobalVarInitializationToEntryPointsPass` extracts selected initializer bodies and
 /// inserts equivalent initialization into the selected module-scope entry-point definitions.
@@ -85,35 +73,23 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// The sink used to diagnose resource initializers that the analysis cannot prove safe to move.
     DiagnosticSink* m_sink = nullptr;
 
-    /// The policy that decides which initializer bodies to extract.
-    GlobalInitializerSelection m_selection = GlobalInitializerSelection::RequiredByTarget;
-
     /// The extracted initializers in their original module order.
     List<ExtractedInitializer> m_extractedInitializers;
 
     /// Move the selected initializer bodies and initialize their variables in selected entry
     /// points.
-    void processModule(
-        IRModule* module,
-        TargetProgram* targetProgram,
-        GlobalInitializerSelection selection,
-        DiagnosticSink* sink = nullptr)
+    void processModule(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
     {
-        // For `RequiredByPerInvocationResourceReplacement`, we validate every selected initializer
-        // before modifying the module, so a diagnostic cannot leave a partial transformation. We
-        // then extract all selected bodies before injecting any of them, which gives every selected
-        // entry point the same complete list in module order.
+        // We validate every selected resource initializer before modifying the module, so a
+        // diagnostic cannot leave a partial transformation. We then extract all selected bodies
+        // before injecting any of them, giving each entry point the complete list in module order.
         m_module = module;
         m_targetProgram = targetProgram;
         SLANG_RELEASE_ASSERT(m_targetProgram);
-        m_selection = selection;
         m_sink = sink;
 
-        if (m_selection == GlobalInitializerSelection::RequiredByPerInvocationResourceReplacement)
-        {
-            if (diagnoseResourceInitializersNotProvenSafeToMove())
-                return;
-        }
+        if (diagnoseResourceInitializersNotProvenSafeToMove())
+            return;
 
         extractSelectedInitializers();
         injectInitializersIntoEntryPoints();
@@ -146,14 +122,19 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// Return whether `globalVar` is eligible and selected for extraction.
     bool shouldExtractInitializer(IRGlobalVar* globalVar)
     {
-        // A declaration without an initializer body has no computation to move. `ActualGlobal`
-        // storage persists across entry-point invocations, so injecting its initializer into each
-        // entry point would reset shared state on every invocation.
-        if (!globalVar->getFirstBlock() || as<IRActualGlobalRate>(globalVar->getRate()))
+        // A declaration without an initializer body has no computation to move.
+        if (!globalVar->getFirstBlock())
             return false;
 
-        if (m_selection == GlobalInitializerSelection::RequiredByPerInvocationResourceReplacement)
-            return isResourceGlobalCandidateForPerInvocationReplacement(globalVar);
+        // `ActualGlobal` storage persists across invocations; reinitializing it on each launch
+        // would reset state shared by those invocations.
+        if (as<IRActualGlobalRate>(globalVar->getRate()))
+            return false;
+
+        // Resource-global replacement cannot preserve a module-scope initializer after removing
+        // the storage, even when the target would otherwise permit that initializer.
+        if (isResourceGlobalCandidateForPerInvocationReplacement(globalVar))
+            return true;
 
         return isInitializerRequiredByTarget(globalVar);
     }
@@ -603,18 +584,20 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// whether any diagnostic was emitted.
     bool diagnoseResourceInitializersNotProvenSafeToMove()
     {
-        // `RequiredByPerInvocationResourceReplacement` moves selected resource initializers to the
-        // start of each entry point while leaving every non-selected initializer at module scope.
-        // We accept a selected initializer only when that move, including the change in its order
+        // Selected resource initializers execute at the start of each entry point; some other
+        // initializers can remain at module scope under the target policy.
+        // We accept a selected resource initializer only when that move, including its order
         // relative to initializers left at module scope, cannot change observable behavior. We
-        // check every selected initializer before changing the module and report all violations
-        // together.
+        // check every selected resource initializer before changing the module and report
+        // violations together.
         SLANG_RELEASE_ASSERT(m_sink);
         bool diagnosed = false;
         for (auto inst : m_module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
             if (!globalVar || !shouldExtractInitializer(globalVar))
+                continue;
+            if (!isResourceGlobalCandidateForPerInvocationReplacement(globalVar))
                 continue;
             if (!mayResourceInitializerMovementChangeObservableBehavior(globalVar))
                 continue;
@@ -672,19 +655,16 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     /// Return whether `function` receives the initializers selected by this pass invocation.
     bool isSelectedEntryPoint(IRFunc* function)
     {
-        // Target-based selection injects initializers into shader entry points. Resource selection
-        // also includes CUDA kernels because `legalizeResourceGlobalVars` creates replacement
-        // locals in those kernels.
-        if (m_selection == GlobalInitializerSelection::RequiredByPerInvocationResourceReplacement)
-            return isShaderOrCudaKernelEntryPoint(function);
-        return function->findDecoration<IREntryPointDecoration>() != nullptr;
+        // Shader and CUDA launches both begin a new invocation. Ordinary calls use the clones
+        // created by `fixEntryPointCallsites`, so they do not repeat global initialization.
+        return isShaderOrCudaKernelEntryPoint(function);
     }
 
     /// Insert the extracted initializers into every selected module-scope entry-point definition.
     void injectInitializersIntoEntryPoints()
     {
         // We scan the linked module's direct children and inject the same ordered initializer list
-        // into each module-scope entry-point definition selected by the current policy. An
+        // into each module-scope shader entry point and CUDA kernel definition. An
         // entry-point declaration has no block in which we can insert initialization, so we skip
         // it.
         for (auto inst : m_module->getGlobalInsts())
@@ -745,23 +725,13 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     }
 };
 
-void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram)
-{
-    MoveGlobalVarInitializationToEntryPointsPass pass;
-    pass.processModule(module, targetProgram, GlobalInitializerSelection::RequiredByTarget);
-}
-
-void moveGlobalVarInitializationToEntryPointsForResourceGlobalLegalization(
+void moveGlobalVarInitializationToEntryPoints(
     IRModule* module,
     TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
     MoveGlobalVarInitializationToEntryPointsPass pass;
-    pass.processModule(
-        module,
-        targetProgram,
-        GlobalInitializerSelection::RequiredByPerInvocationResourceReplacement,
-        sink);
+    pass.processModule(module, targetProgram, sink);
 }
 
 } // namespace Slang

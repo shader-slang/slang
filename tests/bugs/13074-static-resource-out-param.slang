@@ -7,10 +7,10 @@
 // and the `out` update through the helper calls.
 
 //CHECK-LABEL: ; Function main
-//CHECK: %[[ADDRESS0:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_0
+//CHECK: %[[ADDRESS0:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_0{{$}}
 //CHECK: %[[TEXTURE0:[A-Za-z0-9_]+]] = OpLoad {{.*}} %[[ADDRESS0]]
 //CHECK: %[[BEFORE:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %[[TEXTURE0]]
-//CHECK: %[[ADDRESS1:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_1
+//CHECK: %[[ADDRESS1:[A-Za-z0-9_]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %uint_1{{$}}
 //CHECK: %[[TEXTURE1:[A-Za-z0-9_]+]] = OpLoad {{.*}} %[[ADDRESS1]]
 //CHECK: %[[AFTER:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %[[TEXTURE1]]
 //CHECK: OpFAdd %v4float %[[BEFORE]] %[[AFTER]]
