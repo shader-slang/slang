@@ -4640,11 +4640,16 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
+/// Find the node at the bottom of `decl`'s capability-provenance chain whose requirements
+/// do not provide `setToFind`, i.e. the use that introduced the missing capability.
+ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind);
+
+/// Report the use site of `provenance` and, when it is a declaration, its definition and
+/// `[require]` attribute.
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
-    Decl* decl,
-    CapabilitySet const& setToFind);
+    ProvenenceNodeWithLoc const& provenance);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

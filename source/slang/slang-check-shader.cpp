@@ -2571,16 +2571,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            diagnoseMissingCapabilityProvenance(
-                linkage->m_optionSet,
-                sink,
-                entryPointFuncDecl,
-                failedSet);
+            // The provenance chain reports a single use and cannot see a struct
+            // reached only through a field or the return type, so we also point at
+            // every signature struct whose requirement is itself incompatible with
+            // the target. When the chain ends at one of those structs, the loop below
+            // already reports it at its signature use site.
+            auto provenance = findMissingCapabilityProvenance(entryPointFuncDecl, failedSet);
+            bool isProvenanceSignatureStruct = false;
+            for (auto& use : signatureStructUses)
+                isProvenanceSignatureStruct |= use.structDecl == provenance.referencedNode;
+            if (!isProvenanceSignatureStruct)
+                diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
 
-            // The provenance walk above follows `capabilityRequirementProvenance`,
-            // which does not record generic struct signature types. Point at any
-            // such struct whose requirement is itself incompatible with the
-            // target, mirroring the notes emitted for non-generic structs.
             for (auto& use : signatureStructUses)
             {
                 if (!targetCaps.isIncompatibleWith(

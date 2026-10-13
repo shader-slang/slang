@@ -23069,11 +23069,7 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     }
 }
 
-void diagnoseMissingCapabilityProvenance(
-    CompilerOptionSet& optionSet,
-    DiagnosticSink* sink,
-    Decl* decl,
-    CapabilitySet const& setToFind)
+ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind)
 {
     HashSet<NodeBase*> checkedDecls;
     ProvenenceNodeWithLoc provNode;
@@ -23110,6 +23106,14 @@ void diagnoseMissingCapabilityProvenance(
         }
     }
 
+    return provNode;
+}
+
+void diagnoseMissingCapabilityProvenance(
+    CompilerOptionSet& optionSet,
+    DiagnosticSink* sink,
+    ProvenenceNodeWithLoc const& provNode)
+{
     if (!provNode.referencedNode)
         return;
 
