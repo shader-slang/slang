@@ -268,9 +268,10 @@ not for the review thread.
    touched).
 4. **Evidence** — tests added and run, and what was not run and why.
 
-Then `Fixes #N`. No tables, logs, file-by-file notes or `<details>` blocks: a collapsed block
-still lands in the squash commit. The process report — per-change reasoning, code traces, and
-the input-shape check from the Problem-Solving Methodology — goes in a PR comment (the
-coworkers' explain-diff comment is one), where reviewers read it and `git log` does not. The title is
+Then `Fixes #N` and one `AI assistance:` line (`None`, `Editorial`, or `Substantive: <tool>, verified
+by <tests or checks>`; see CONTRIBUTING.md). No tables, logs, file-by-file notes or `<details>` blocks: a
+collapsed block still lands in the squash commit. The process report — per-change reasoning, code traces,
+and the input-shape check from the Problem-Solving Methodology — goes in a PR comment (the coworkers'
+explain-diff comment is one), where reviewers read it and `git log` does not. The title is
 `component: imperative summary`, under 72 characters. The `pr-text-lint` workflow checks the
 shape and reports the exact fix.

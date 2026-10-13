@@ -24,3 +24,7 @@ PR comment, not here. See AGENTS.md, "Commit & Pull Request Guidelines".
 <!-- Tests added and run; what was not run and why. -->
 
 Fixes #
+
+AI assistance: None
+
+<!-- None | Editorial | Substantive: <tool>, verified by <tests or checks>. See CONTRIBUTING.md. -->
