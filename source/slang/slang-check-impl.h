@@ -58,6 +58,8 @@ ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode def
 
 bool isGlobalDecl(Decl* decl);
 
+bool isMagicOrIntrinsicTypeDecl(Decl* decl);
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);

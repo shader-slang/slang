@@ -1601,6 +1601,11 @@ bool isGlobalDecl(Decl* decl)
     return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
 }
 
+bool isMagicOrIntrinsicTypeDecl(Decl* decl)
+{
+    return decl->hasModifier<MagicTypeModifier>() || decl->hasModifier<IntrinsicTypeModifier>();
+}
+
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 {
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();

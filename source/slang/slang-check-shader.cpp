@@ -1699,8 +1699,7 @@ static void collectGenericStructTypeUses(
     {
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
         if (structDeclRef && as<GenericAppDeclRef>(declRefType->getDeclRefBase()) &&
-            !structDeclRef.getDecl()->findModifier<MagicTypeModifier>() &&
-            !structDeclRef.getDecl()->findModifier<IntrinsicTypeModifier>())
+            !isMagicOrIntrinsicTypeDecl(structDeclRef.getDecl()))
         {
             // Only contribute structs that actually carry a requirement; this keeps
             // both the aggregation and the diagnostic loop free of null/empty sets.
