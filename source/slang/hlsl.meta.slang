@@ -453,7 +453,10 @@ struct ByteAddressBuffer
     ///@return The value loaded from the buffer.
     ///@remarks
     /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// When `location` is a compile-time constant, its own alignment selects the access width as
+    /// `LoadAligned<T>` describes; for example, `Load<float4>(8)` is two `float2` loads on the
+    /// targets that group accesses. Use `LoadAligned<T>` when `location` has a stronger alignment
+    /// guarantee.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -470,9 +473,12 @@ struct ByteAddressBuffer
     ///@remarks
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
-    /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because its size is not a power of two, and a
+    /// partially covered `bool` vector is loaded per component. For example,
+    /// `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
-    ///   `asfloat`, because those profiles have no templated `Load<T>`.
+    ///   `asfloat`.
     /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
     ///   loads.
     /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
@@ -6942,7 +6948,10 @@ struct $(item.name)
     ///@return The value loaded from the buffer.
     ///@remarks
     /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
-    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
+    /// When `location` is a compile-time constant, its own alignment selects the access width as
+    /// `LoadAligned<T>` describes; for example, `Load<float4>(8)` is two `float2` loads on the
+    /// targets that group accesses. Use `LoadAligned<T>` when `location` has a stronger alignment
+    /// guarantee.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -6959,9 +6968,12 @@ struct $(item.name)
     ///@remarks
     /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
     /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
-    /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
+    /// for any remainder. The rule applies to each vector within `T`: a struct is loaded field by
+    /// field, a 3-component vector is always split because its size is not a power of two, and a
+    /// partially covered `bool` vector is loaded per component. For example,
+    /// `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
-    ///   `asfloat`, because those profiles have no templated `Load<T>`.
+    ///   `asfloat`.
     /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
     ///   loads.
     /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
@@ -7651,6 +7663,12 @@ $}
         }
     }
 
+    /// Store a value with type `T` to the buffer at the specified location.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of 4.
+    ///@param value The value to store.
+    ///@remarks
+    /// The access width is chosen as for `Load<T>(location)`.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value)
@@ -7658,6 +7676,13 @@ $}
         __byteAddressBufferStore(this, address, 0, value);
     }
 
+    /// Store a value with type `T` to the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to store.
+    ///@param address The output address in bytes, which must be a multiple of `alignment`.
+    ///@param value The value to store.
+    ///@param alignment The known alignment of `address` in bytes; a compile-time constant.
+    ///@remarks
+    /// `alignment` selects the access width as for `LoadAligned<T>(location, alignment)`.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value, constexpr uint alignment)

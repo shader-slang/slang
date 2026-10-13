@@ -245,8 +245,8 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Validate the explicit `alignment`/`location` contract of a `LoadAligned`/`StoreAligned` call
-    // (issue #11545). Checks, short-circuiting so one call reports at most one diagnostic:
+    // Validate the explicit `alignment`/`location` contract of a `LoadAligned`/`StoreAligned` call.
+    // Checks, short-circuiting so one call reports at most one diagnostic:
     //   - `alignment == 0`: the plain `Load`/`Store` "no promise" sentinel; nothing to validate.
     //   - `alignment` is a power of two, else E41301.
     //   - `alignment` is at least the access type's scalar-component alignment, else E41300.
@@ -311,12 +311,13 @@ struct ByteAddressBufferLegalizationContext
     //
     // `promisedAlignment` is the `alignment` argument of `LoadAligned`/`Store`, which is a
     // `constexpr` and therefore always an `IRIntLit`. A non-zero promise is the sole input to the
-    // wide-vs-scalarized decision, so a constant `location` and a runtime `location` carrying the
-    // same promise legalize identically (issue #11545's consistency goal). `promise == 0` is the
-    // "no promise" sentinel of the plain `Load`/`Store` forms; those fall back to a
-    // compile-time-constant base offset (a runtime no-promise access cannot be proven aligned and
-    // stays scalarized). This predicate is pure: it never diagnoses (the alignment contract is
-    // validated separately).
+    // access-width decision, so a constant `location` and a runtime `location` carrying the same
+    // promise legalize identically. `promise == 0` is the "no promise" sentinel of the plain
+    // `Load`/`Store` forms; those fall back to a compile-time-constant base offset (a runtime
+    // no-promise access cannot be proven aligned and stays per-component). Both the whole-access
+    // decision and the width of each group in `chooseGroupWidth` use this predicate, so on targets
+    // that group accesses a plain `Load<float4>(8)` is emitted as two `float2` loads. This
+    // predicate is pure: it never diagnoses (the alignment contract is validated separately).
     bool isWideAccessAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
@@ -342,49 +343,46 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Return the largest power of two that is not greater than `n` (for n >= 1).
-    static IRIntegerValue largestPow2AtMost(IRIntegerValue n)
-    {
-        IRIntegerValue p = 1;
-        while ((p * 2) <= n)
-            p *= 2;
-        return p;
-    }
-
-    // Choose the widest power-of-two group width whose byte size (`width * elementStride`) is
-    // aligned at `groupOffset`, capped at `kMaxByteAddressVectorWidth` (the widest single
-    // byte-address vector access). Width 1 is always valid, so the result is in
-    // `[1, min(largestPow2AtMost(remaining), 4)]`.
+    // A *group* is a run of adjacent components of a vector that is accessed as one sub-vector;
+    // its *width* is its component count. Return the widest group width in {4, 2} that fits in
+    // `remaining` components and whose byte size (`width * elementStride`) `isWideAccessAligned`
+    // accepts at `groupOffset` (it divides the promised alignment and `groupOffset`, or, with no
+    // promise, a constant base offset plus `groupOffset`), or 1 when none does, in which case the
+    // caller accesses a single component.
+    //
+    // A `bool` vector is never grouped. `bool` has no fixed in-buffer width: SPIR-V cannot place a
+    // `bool` vector in a storage buffer, and on CPU a `vector<bool, 2>` is 2 bytes wide while each
+    // `bool` in a byte-address buffer occupies 4 bytes. Its components are therefore accessed one
+    // at a time, which those targets already legalize.
     IRIntegerValue chooseGroupWidth(
         IRInst* baseOffset,
         IRIntegerValue groupOffset,
         IRInst* alignment,
+        IRType* elementType,
         IRIntegerValue elementStride,
         IRIntegerValue remaining)
     {
-        static const IRIntegerValue kMaxByteAddressVectorWidth = 4;
-        IRIntegerValue maxWidth =
-            remaining < kMaxByteAddressVectorWidth ? remaining : kMaxByteAddressVectorWidth;
-        for (IRIntegerValue cand = largestPow2AtMost(maxWidth); cand >= 2; cand /= 2)
+        if (as<IRBoolType>(elementType))
+            return 1;
+
+        for (IRIntegerValue width = 4; width >= 2; width /= 2)
         {
-            if (isWideAccessAligned(baseOffset, groupOffset, alignment, cand * elementStride))
-                return cand;
+            if (width <= remaining &&
+                isWideAccessAligned(baseOffset, groupOffset, alignment, width * elementStride))
+                return width;
         }
         return 1;
     }
 
-    // Load a vector of `elementCount` elements of `elementType` from `buffer` by emitting the
-    // widest power-of-two-width sub-vector load the alignment permits at each step, falling back
-    // to per-component loads for any remainder, then reassembling the full vector.
+    // Load a vector of `elementCount` elements of `elementType` from `buffer` as a sequence of
+    // groups chosen left to right by `chooseGroupWidth`, then reassemble the full vector. For
+    // example, a `half4` promised alignment 4 is loaded as two `half2` groups, and a `float3`
+    // promised alignment 8 as a `float2` group followed by a single `float`.
     //
-    // For example, a `half4` (scalar stride 2) promised alignment 4 can
-    // only do 4-byte-aligned accesses, so it is emitted as two `half2` loads; a `float3`
-    // promised alignment 8 is emitted as one `float2` plus one scalar `float`. The whole-vector
-    // single-load case is handled by the caller before reaching here, so each chosen `width` is
-    // strictly smaller than the whole-vector width the caller already rejected as unaligned. That
-    // bound gives two guarantees: progress (so this routine emits at least two accesses), and that
-    // the recursive `emitLegalLoad` on the sub-vector re-enters on an aligned group and so takes
-    // the single-access fast path rather than recursing back into this routine.
+    // The caller has already ruled out a single access of the whole vector. A group of width 2 or
+    // more passed `isWideAccessAligned` in `chooseGroupWidth`, so it is emitted directly as one
+    // access; a single component goes back through `emitLegalLoad` for the per-target scalar
+    // handling (such as splitting a misaligned 64-bit scalar).
     IRInst* emitLegalGroupedVectorLoad(
         IRType* vecType,
         IRInst* buffer,
@@ -396,13 +394,16 @@ struct ByteAddressBufferLegalizationContext
         IRIntegerValue elementCount)
     {
         List<IRInst*> components;
-        for (IRIntegerValue done = 0; done < elementCount;)
+        for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
         {
-            IRIntegerValue remaining = elementCount - done;
-            IRIntegerValue groupOffset = immediateOffset + done * elementStride;
-
-            IRIntegerValue width =
-                chooseGroupWidth(baseOffset, groupOffset, alignment, elementStride, remaining);
+            IRIntegerValue groupOffset = immediateOffset + firstComponent * elementStride;
+            IRIntegerValue width = chooseGroupWidth(
+                baseOffset,
+                groupOffset,
+                alignment,
+                elementType,
+                elementStride,
+                elementCount - firstComponent);
 
             if (width == 1)
             {
@@ -415,24 +416,21 @@ struct ByteAddressBufferLegalizationContext
             else
             {
                 auto groupType = m_builder.getVectorType(elementType, width);
-                auto groupVal =
-                    emitLegalLoad(groupType, buffer, baseOffset, groupOffset, alignment);
+                auto groupVal = emitSimpleLoad(groupType, buffer, baseOffset, groupOffset);
                 if (!groupVal)
                     return nullptr;
                 for (IRIntegerValue i = 0; i < width; ++i)
                     components.add(m_builder.emitElementExtract(groupVal, i));
             }
 
-            done += width;
+            firstComponent += width;
         }
 
         return m_builder.emitMakeVector(vecType, components);
     }
 
-    // Store a vector `value` by emitting the widest power-of-two-width sub-vector store the
-    // alignment permits at each step, falling back to per-component stores for any remainder.
-    // This is the store mirror of `emitLegalGroupedVectorLoad`; the whole-vector single-store
-    // case is handled by the caller before reaching here.
+    // Store a vector `value` of `elementCount` elements of `elementType` as the same sequence of
+    // groups that `emitLegalGroupedVectorLoad` would load, under the same precondition.
     Result emitLegalGroupedVectorStore(
         IRInst* buffer,
         IRInst* baseOffset,
@@ -443,17 +441,20 @@ struct ByteAddressBufferLegalizationContext
         IRIntegerValue elementStride,
         IRIntegerValue elementCount)
     {
-        for (IRIntegerValue done = 0; done < elementCount;)
+        for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
         {
-            IRIntegerValue remaining = elementCount - done;
-            IRIntegerValue groupOffset = immediateOffset + done * elementStride;
-
-            IRIntegerValue width =
-                chooseGroupWidth(baseOffset, groupOffset, alignment, elementStride, remaining);
+            IRIntegerValue groupOffset = immediateOffset + firstComponent * elementStride;
+            IRIntegerValue width = chooseGroupWidth(
+                baseOffset,
+                groupOffset,
+                alignment,
+                elementType,
+                elementStride,
+                elementCount - firstComponent);
 
             if (width == 1)
             {
-                auto elementVal = m_builder.emitElementExtract(value, done);
+                auto elementVal = m_builder.emitElementExtract(value, firstComponent);
                 SLANG_RETURN_ON_FAIL(emitLegalStore(
                     elementType,
                     buffer,
@@ -467,18 +468,13 @@ struct ByteAddressBufferLegalizationContext
                 auto groupType = m_builder.getVectorType(elementType, width);
                 List<IRInst*> groupComponents;
                 for (IRIntegerValue i = 0; i < width; ++i)
-                    groupComponents.add(m_builder.emitElementExtract(value, done + i));
+                    groupComponents.add(m_builder.emitElementExtract(value, firstComponent + i));
                 auto groupVal = m_builder.emitMakeVector(groupType, groupComponents);
-                SLANG_RETURN_ON_FAIL(emitLegalStore(
-                    groupType,
-                    buffer,
-                    baseOffset,
-                    groupOffset,
-                    alignment,
-                    groupVal));
+                SLANG_RETURN_ON_FAIL(
+                    emitSimpleStore(groupType, buffer, baseOffset, groupOffset, groupVal));
             }
 
-            done += width;
+            firstComponent += width;
         }
 
         return SLANG_OK;
@@ -753,8 +749,9 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector load operation when using a LoadAligned inst.
-                // Else, fallback to scalarizing the loads.
+                // A vector load is emitted per component on targets that scalarize vectors,
+                // as one access when the alignment covers the whole vector, per component
+                // on `useBitCastFromUInt` targets, and otherwise as aligned groups.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -778,10 +775,9 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
-                // Grouping emits typed sub-vector loads (e.g. a `float2` `Load<T>`). Targets
-                // flagged `useBitCastFromUInt` (fxc / DX <= 5.0) have no templated `Load<T>` for
-                // byte-address buffers, so scalarize instead: each element then routes through the
-                // uint-load + bitcast path below, which is the only fxc-compatible form.
+                // On `useBitCastFromUInt` targets (HLSL with a DX 5.0 or earlier profile; WGSL
+                // already scalarized above) every component of a partially covered vector is
+                // loaded as a `uint` and bit-cast, rather than grouped into typed sub-vector loads.
                 if (m_options.useBitCastFromUInt)
                 {
                     return emitLegalSequenceLoad(
@@ -794,10 +790,6 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                // The whole vector is not aligned for a single wide load, but a narrower
-                // power-of-two-width access may still be: emit the widest groups the alignment
-                // permits and fall back to per-component loads for the remainder (e.g. a `half4`
-                // at alignment 4 becomes two `half2` loads).
                 return emitLegalGroupedVectorLoad(
                     vecType,
                     buffer,
@@ -1739,8 +1731,8 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Emit an aligned vector store operation when using a StoreAligned inst.
-                // Else, fallback to scalarizing the stores.
+                // Vector stores follow the same four-way choice as vector loads in
+                // `emitLegalLoad`.
 
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
@@ -1769,9 +1761,6 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
-                // Mirror the load path: `useBitCastFromUInt` targets (fxc / DX <= 5.0) cannot
-                // express a typed sub-vector `Store<T>`, so scalarize rather than group; each
-                // element then routes through the uint-bitcast store path below.
                 if (m_options.useBitCastFromUInt)
                 {
                     return emitLegalSequenceStore(
@@ -1783,10 +1772,6 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                // The whole vector is not aligned for a single wide store, but a narrower
-                // power-of-two-width access may still be: store the widest groups the alignment
-                // permits and fall back to per-component stores for the remainder (the store
-                // mirror of `emitLegalGroupedVectorLoad`).
                 return emitLegalGroupedVectorStore(
                     buffer,
                     baseOffset,

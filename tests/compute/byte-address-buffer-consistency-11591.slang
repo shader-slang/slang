@@ -6,11 +6,11 @@
 // `location` and a runtime `location` carrying the same `alignment` must lower identically: a
 // constant-folded location must not be widened past the promise on the strength of its own offset.
 //
-// Tested on SPIR-V, where byte-address accesses lower to structured access and the alignment
-// promise drives codegen. (On HLSL the access stays a native `ByteAddressBuffer.Load`, so the
-// access-width distinction is not observable.)
+// Tested on SPIR-V, where each access is a separate `OpLoad` of its access type, and on HLSL,
+// where each access is a separate `Load<T>`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-HLSL):-target hlsl -entry computeMain -stage compute
 
 RWByteAddressBuffer buffer;
 
@@ -31,4 +31,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // Each promise-8 `float4` load groups into two `float2` loads (four total across the two loads);
 // the constant-location load lowers identically to the runtime one, not to a single wide `float4`.
+// CHECK-NOT: OpLoad %v4float
 // CHECK-COUNT-4: OpLoad %v2float
+// CHECK-NOT: OpLoad %v4float
+// CHECK-HLSL-NOT: Load<float4 >
+// CHECK-HLSL-COUNT-4: Load<float2 >

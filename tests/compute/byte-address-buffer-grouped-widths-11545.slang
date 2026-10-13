@@ -1,16 +1,14 @@
 // byte-address-buffer-grouped-widths-11545.slang
 
-// Feature test for https://github.com/shader-slang/slang/issues/11545 (point 5). It pins the
-// *width* of the grouped accesses the legalizer emits — the documented `half4` (2-byte scalar
-// stride) example, the `float3` mixed-width remainder path, and the breaking-change per-component
-// lowering of the single-argument 3-component form — which the runtime COMPARE_COMPUTE tests do
-// not constrain.
+// Feature test for https://github.com/shader-slang/slang/issues/11593. It pins the width and offset
+// of the grouped accesses the legalizer emits: the `half4` (2-byte scalar stride) case, the
+// `float3` group-plus-single-component case, the single-argument 3-component form, and plain
+// `Load<T>` at constant locations. `byte-address-buffer-grouped-values-11593.slang` checks the
+// values those accesses produce.
 //
-// HLSL only: Slang's HLSL emit lowers each group to a literal `.Load<T>`, so the widths read
-// directly off the output. The SPIRV backend reuses overlapping loads across these same-address
-// accesses (it extracts the scalar cases out of the vector loads), which obscures the per-case
-// width; SPIRV group-width coverage lives in `byte-address-buffer-grouped.slang` (the `float4`
-// `OpLoad %v2float` checks) and `byte-address-buffer-aligned.slang` instead.
+// HLSL only: Slang's HLSL emit lowers each access to its own `.Load<T>`, so the widths read
+// directly off the output. These cases load overlapping addresses, which the SPIR-V backend
+// reuses across cases; SPIR-V group widths are checked in `byte-address-buffer-grouped.slang`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 
@@ -37,14 +35,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK: Load<float >
     float3 fc = buffer.LoadAligned<float3>(loc, 8);
 
-    // Breaking change: the single-argument `float3` form forwards `__naturalAlignmentOf<float3>()`
-    // == 4 (a 3-component vector's natural stride of 12 is not a power of two), which only covers a
-    // scalar `float`, so it lowers to three per-component loads instead of a single wide
-    // 3-component access.
+    // The single-argument `float3` form forwards `__naturalAlignmentOf<float3>()` == 4 (a
+    // 3-component vector's natural stride of 12 is not a power of two), which only covers a scalar
+    // `float`, so it lowers to three per-component loads.
     // CHECK-COUNT-3: Load<float >
     float3 fd = buffer.LoadAligned<float3>(loc);
 
+    // Plain `Load<T>` has no promise, so a constant location's own alignment decides: 8 covers
+    // two `float2` groups, and 4 gives a single `float`, a `float2` at 8 and a single `float`.
+    // CHECK: Load<float2 >(8U)
+    // CHECK: Load<float2 >(16U)
+    float4 pa = buffer.Load<float4>(8);
+    // CHECK: Load<float >(4U)
+    // CHECK: Load<float2 >(8U)
+    // CHECK: Load<float >(16U)
+    float4 pb = buffer.Load<float4>(4);
+
     // Store at alignment 8 is two `float2` stores (not four scalar stores).
     // CHECK-COUNT-2: Store{{.*}}float2(
-    buffer.Store<float4>(0, float4(ha) + float4(hb.x, hb.y, fc.z, fd.x), 8);
+    buffer.Store<float4>(0, float4(ha) + float4(hb.x, hb.y, fc.z, fd.x) + pa + pb, 8);
 }

@@ -1,10 +1,9 @@
 // byte-address-buffer-grouped.slang
 
-// Feature test for https://github.com/shader-slang/slang/issues/11545 (point 5): when the
-// promised `alignment` does not cover the whole vector, the access is emitted as the widest
+// Feature test for https://github.com/shader-slang/slang/issues/11593: when the promised
+// `alignment` does not cover the whole vector, the access is emitted as the widest
 // power-of-two-width groups the alignment permits, with per-component accesses for the remainder.
-// Also checks the consistency fix (point 3): two single-argument loads at different constant
-// locations lower identically.
+// A promise that covers the whole vector still gives a single access.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv -entry computeMain -stage compute
@@ -30,8 +29,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK: Load<float >
     float4 b = buffer.LoadAligned<float4>(loc, 4);
 
-    // Consistency: two single-argument loads at different constant locations both satisfy the
-    // natural alignment (16) and lower to the same single wide `float4` load.
+    // The single-argument form promises the natural alignment (16), which covers the whole
+    // `float4`, so each load is a single `float4` access.
     // CHECK: Load<float4 >
     // CHECK: Load<float4 >
     float4 c = buffer.LoadAligned<float4>(0);
@@ -43,5 +42,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     buffer.Store<float4>(0, a + b + c + d, 8);
 }
 
-// CHECK-SPV-DAG: OpLoad %v2float
-// CHECK-SPV-DAG: OpLoad %v4float
+// The `float4` at alignment 8 is two `float2` loads, the alignment-16 loads are single `float4`
+// loads, and the alignment-8 store is two `float2` stores.
+// CHECK-SPV-COUNT-2: OpLoad %v2float
+// CHECK-SPV-NOT: OpLoad %v2float
+// CHECK-SPV-COUNT-2: OpLoad %v4float
+// CHECK-SPV: OpAccessChain %_ptr_StorageBuffer_v2float %buffer %int_0 %uint_0
+// CHECK-SPV-NEXT: OpStore
+// CHECK-SPV: OpAccessChain %_ptr_StorageBuffer_v2float %buffer %int_0 %uint_1
+// CHECK-SPV-NEXT: OpStore
