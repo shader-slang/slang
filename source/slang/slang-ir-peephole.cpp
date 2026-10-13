@@ -1554,7 +1554,8 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     UInt index = 0;
-                    auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
+                    auto newInst =
+                        builder.emitSwizzle(inst->getDataType(), inst->getOperand(0), 1, &index);
                     inst->replaceUsesWith(newInst);
                     maybeRemoveOldInst(inst);
                     changed = true;
