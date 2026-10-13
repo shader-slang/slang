@@ -18,7 +18,23 @@ namespace Slang
 {
 
 class ASTBuilder;
+class AbstractStorageAccessPath;
 struct SemanticsVisitor;
+
+/// Refers to the abstract-storage contract produced while checking an expression.
+///
+/// Null means that the expression has no storage-sensitive operand. A non-null pointer refers to a
+/// compact operation allocated by the checked expression's `ASTBuilder` or one of its ancestors.
+/// Each non-null path either reaches a property or subscript directly, or composes an operation
+/// that changes how a later use consumes underlying storage: a projection, fixed operand use,
+/// existential opening, evaluation sequence, or completed assignment. `checkAbstractStorageUse()`
+/// interprets the path after selected-expression finalization.
+/// `SelectedExpressionFinalizer::validateCallable()` also interprets a retained receiver path when
+/// consuming that callable. `ASTExprLowering` does not read this path; it derives the lowering plan
+/// from the checked property or subscript declaration and consumes the projection decisions stored
+/// on the checked expression. The builder arena owns every referenced operation for at least the
+/// expression's lifetime.
+using AbstractStorageAccess = const AbstractStorageAccessPath*;
 
 FIDDLE(abstract)
 class NodeBase
@@ -817,6 +833,12 @@ class Expr : public SyntaxNode
     FIDDLE(...)
 
     FIDDLE() QualType type;
+
+    // After semantic checking, this path describes any property, subscript, or opened existential
+    // that a use of the expression can reach. It remains null when the expression has no such
+    // access. `ASTCloneFieldAccess::cloneFields()` deliberately leaves the field null because an
+    // unchecked clone must derive its own path from its newly checked operands.
+    AbstractStorageAccess abstractStorageAccess = nullptr;
 
     bool checked = false;
 };

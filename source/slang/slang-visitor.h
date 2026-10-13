@@ -218,14 +218,6 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
 
-    // --- Expressions with arguments ---
-    Expr* visitExprWithArgsBase(ExprWithArgsBase* e)
-    {
-        for (auto& arg : e->arguments)
-            arg = dispatchIfNotNull(arg);
-        return e;
-    }
-
     // --- Call / generic application ---
     // AppExprBase is the common base for InvokeExpr, GenericAppExpr, TypeCastExpr,
     // OperatorExpr, etc. All share functionExpr + arguments.
@@ -250,11 +242,6 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
     Expr* visitMatrixSwizzleExpr(MatrixSwizzleExpr* e)
-    {
-        e->base = dispatchIfNotNull(e->base);
-        return e;
-    }
-    Expr* visitMakeRefExpr(MakeRefExpr* e)
     {
         e->base = dispatchIfNotNull(e->base);
         return e;

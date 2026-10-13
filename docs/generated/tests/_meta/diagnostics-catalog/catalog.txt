@@ -1,5 +1,5 @@
 # Slang diagnostic catalog (auto-extracted from source).
-# Total codes: 695; covered by tests-agentic: 82; uncovered: 613
+# Total codes: 708; covered by tests-agentic: 97; uncovered: 611
 # Columns: code	covered	severity	name	source	message
 #
 0	covered	err	token-name-expected-but-eof	slang-diagnostics.lua	unexpected end of file
@@ -144,6 +144,7 @@
 20019	UNCOVERED	err	volatile-not-allowed-on-type	slang-diagnostics.lua	invalid 'volatile' usage
 20101	UNCOVERED	warning	unintended-empty-statement	slang-diagnostics.lua	potentially unintended empty statement
 20102	UNCOVERED	err	unexpected-body-after-semicolon	slang-diagnostics.lua	unexpected function body after semicolon
+20105	covered	err	cpp-style-trailing-this-param-const-only-on-function	slang-diagnostics.lua	trailing `const` is not valid on this declaration
 29000	UNCOVERED	err	snippet-parsing-failed	slang-diagnostics.lua	snippet parsing failed
 29100	UNCOVERED	err	unrecognized-spirv-opcode	slang-diagnostics.lua	unrecognized SPIR-V opcode
 29101	UNCOVERED	err	misplaced-result-id-marker	slang-diagnostics.lua	misplaced result-id marker
@@ -247,13 +248,14 @@
 30117	UNCOVERED	err	forward-reference-in-generic-constraint	slang-diagnostics.lua	forward reference in generic constraint
 30118	UNCOVERED	err	cannot-mix-differentiable-value-and-ptr-outputs	slang-diagnostics.lua	cannot mix differentiable value types with differentiable pointer outputs
 30119	UNCOVERED	err	reading-from-write-only	slang-diagnostics.lua	cannot read from writeonly
-30120	UNCOVERED	err	static-ref-to-this	slang-diagnostics.lua	static function cannot refer to non-static member via `this`
 30121	UNCOVERED	err	differentiable-member-should-have-corresponding-field-in-diff-type	slang-diagnostics.lua	missing field in differential type
 30122	UNCOVERED	err	forward-reference-in-generic-default-initializer	slang-diagnostics.lua	forward reference in generic default initializer
 30123	UNCOVERED	warning	cannot-synthesize-dadd-dzero-for-custom-differential	slang-diagnostics.lua	cannot synthesize complete differential method
 30200	covered	err	redeclaration	slang-diagnostics.lua	conflicting declaration
 30201	covered	err	function-redefinition	slang-diagnostics.lua	function '~function' already has a body
 30202	covered	err	function-redeclaration-with-different-return-type	slang-diagnostics.lua	function return type mismatch
+30203	covered	err	function-redeclaration-with-different-this-parameter	slang-diagnostics.lua	function receiver mismatch
+30204	covered	err	function-redeclaration-with-different-receiver-presence	slang-diagnostics.lua	function receiver mismatch
 30300	UNCOVERED	err	is-operator-value-must-be-interface-type	slang-diagnostics.lua	'is'/'as' operator requires interface-typed expression
 30301	UNCOVERED	err	is-operator-cannot-use-interface-as-rhs	slang-diagnostics.lua	cannot use 'is' with interface on right-hand side
 30302	UNCOVERED	err	as-operator-cannot-use-interface-as-rhs	slang-diagnostics.lua	cannot use 'as' with interface on right-hand side
@@ -295,6 +297,15 @@
 30424	UNCOVERED	err	shape-pack-no-valid-axis	slang-diagnostics.lua	~opName has no valid axis
 30425	UNCOVERED	err	shape-concat-no-valid-axis	slang-diagnostics.lua	__shapeConcat has no valid axis
 30426	UNCOVERED	err	shape-permute-duplicate-equivalent-index	slang-diagnostics.lua	__shapePermute order contains a duplicate index
+30443	covered	err	cpp-style-trailing-this-param-const-requires-hlsl	slang-diagnostics.lua	trailing `const` is only allowed in the HLSL dialect
+30444	covered	err	conflicting-this-param-mode-specifiers	slang-diagnostics.lua	conflicting receiver-mode specifiers
+30445	covered	err	lambda-return-type-depends-on-runtime-existential	slang-diagnostics.lua	lambda return type depends on a runtime existential
+30446	covered	err	lambda-parameter-type-depends-on-runtime-existential	slang-diagnostics.lua	lambda parameter type depends on a runtime existential
+30447	covered	err	lambda-capture-type-depends-on-runtime-existential	slang-diagnostics.lua	lambda capture type depends on a runtime existential
+30448	covered	err	abstract-storage-cannot-be-read	slang-diagnostics.lua	property or subscript cannot be read
+30449	covered	err	abstract-storage-cannot-be-written	slang-diagnostics.lua	property or subscript cannot be written
+30450	covered	err	abstract-storage-has-no-address	slang-diagnostics.lua	property or subscript does not provide an address
+30451	covered	err	interface-value-has-no-address	slang-diagnostics.lua	interface value does not provide an address
 30499	UNCOVERED	note	use-let-for-generic-value-param	slang-diagnostics.lua	use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'
 30500	UNCOVERED	err	included-file-missing-implementing	slang-diagnostics.lua	missing 'implementing' declaration
 30501	UNCOVERED	err	included-file-missing-implementing-do-you-mean-import	slang-diagnostics.lua	missing 'implementing' declaration
@@ -455,7 +466,7 @@
 33072	UNCOVERED	err	cannot-have-generic-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot be generic
 33073	UNCOVERED	err	cannot-have-associated-type-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have associatedType members
 33074	UNCOVERED	err	cannot-have-generic-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have generic methods
-33075	UNCOVERED	err	cannot-have-mutating-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have [mutating] methods
+33075	covered	err	cannot-have-writable-receiver-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have methods with writable receivers
 33076	UNCOVERED	err	cannot-have-differentiable-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have [Differentiable] methods
 33077	UNCOVERED	err	dyn-interface-cannot-inherit-non-dyn-interface	slang-diagnostics.lua	dyn interface inheritance error
 33078	UNCOVERED	err	cannot-use-extension-to-make-type-conform-to-dyn-interface	slang-diagnostics.lua	extension cannot conform to dyn interface
@@ -520,6 +531,7 @@
 38052	UNCOVERED	warning	vertex-shader-missing-sv-position	slang-diagnostics.lua	vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic
 38100	UNCOVERED	err	type-doesnt-implement-interface-requirement	slang-diagnostics.lua	missing interface member
 38101	UNCOVERED	err	this-expression-outside-of-type-decl	slang-diagnostics.lua	'this' used outside aggregate type
+38102	covered	err	this-expression-in-callable-without-receiver	slang-diagnostics.lua	'this' used in callable without an instance receiver
 38103	UNCOVERED	err	this-type-outside-of-type-decl	slang-diagnostics.lua	'This' used outside aggregate type
 38104	UNCOVERED	err	return-val-not-available	slang-diagnostics.lua	'__return_val' not available
 38105	UNCOVERED	err	member-does-not-match-requirement-signature	slang-diagnostics.lua	interface requirement mismatch
@@ -575,6 +587,7 @@
 40015	UNCOVERED	note	more-overload-candidates	slang-diagnostics.lua	~count:Int more overload candidates
 40016	UNCOVERED	warning	integer-constant-overflow	slang-diagnostics.lua	integer constant overflow in conversion
 40020	UNCOVERED	err	cannot-unroll-loop	slang-diagnostics.lua	loop unrolling failed
+40026	covered	err	ref-accessor-return-must-be-l-value	slang-diagnostics.lua	a `ref` accessor must return an l-value
 40100	covered	warning	main-entry-point-renamed	slang-diagnostics.lua	entry point '~oldName' has been renamed to '~newName'
 41000	UNCOVERED	warning	unreachable-code	slang-diagnostics.lua	unreachable code detected
 41001	UNCOVERED	err	recursive-type	slang-diagnostics.lua	type contains cyclic reference

@@ -4724,10 +4724,14 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 //@public:
 /// Marks a method, property accessor, or subscript accessor as mutating. Applying `[mutating]` to
-/// the declaration gives its implicit `this` parameter writable access to the receiver.
+/// a method or accessor declaration selects the `inout` parameter-passing mode for its implicit
+/// `this` parameter.
 ///
 /// @remarks
-/// In Slang, methods declared on value types are non-mutating by default. For example:
+/// In the Slang dialect, methods declared on value types are non-mutating by default.
+/// This attribute applies only to a declaration with a configurable value-type receiver.
+/// `[mutating]` is invalid on a member of a Slang-style `class`, whose receiver is fixed to `in`.
+/// For example:
 /// ```slang
 /// struct S
 /// {
@@ -4759,12 +4763,16 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
 /// Marks a method, property accessor, or subscript accessor as non-mutating. Applying
-/// `[nonmutating]` to the declaration makes its implicit `this` parameter read-only. A copyable
-/// receiver uses `in`; a non-copyable receiver uses a read-only borrow because it cannot be copied
-/// into the declaration.
+/// `[nonmutating]` to a method or accessor declaration selects a read-only implicit `this`
+/// parameter. A copyable receiver uses `in`, while a non-copyable receiver uses the borrowing
+/// `constref` mode.
+///
 /// @remarks
-/// In Slang, methods declared on value types are non-mutating by default, so this attribute is
-/// usually most useful on a `set` accessor, which is mutating by default.
+/// In the Slang dialect, methods declared on value types are non-mutating by default, so
+/// this attribute is usually most useful on a `set` accessor, which is mutating by default.
+/// This attribute applies only to a declaration with a configurable value-type receiver.
+/// `[nonmutating]` is invalid on a member of a Slang-style `class`, whose receiver is fixed to
+/// `in`.
 /// For example:
 /// ```slang
 /// struct S
@@ -4815,12 +4823,14 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiscard] : NoDiscardAttribute;
 
 /// @internal
-/// Marks a member function to make `this` argument passed by const reference.
+/// Requests a `constref` implicit receiver for a method or accessor with a configurable value-type
+/// receiver.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [constref] : ConstRefAttribute;
 
 /// @internal
-/// Marks a member function to make `this` argument passed by reference.
+/// Requests a `ref` implicit receiver for a method or accessor with a configurable value-type
+/// receiver.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__ref] : RefAttribute;
 

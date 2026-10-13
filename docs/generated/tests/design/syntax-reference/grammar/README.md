@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: dac521695060d5dcbe6e1eda4f10eb6f8dcaff3a2d9144144f918cd86e5358ab
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 9f95bdb7aae50dd54be8762b6a13f4bbe82b24d2c4138ecc2883667ae89d7808
 source_doc: docs/generated/design/syntax-reference/grammar.md
-source_doc_digest: 1cb67c5630944b634b458a7ff7933e89371c959570aaa5c23dd6671df6ec1131
+source_doc_digest: 42640f04aebf02b38fa1c4cd11d982321be92a9e5dc65a2b095e74fbda44da49
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -95,8 +95,11 @@ the document's own headings. `D` names the source doc
 
 **`#function-style-declarations`**
 
-35. `FuncDecl ::= 'func' IDENT GenericParams? '(' ParamList? ')' ('throws' Type)? ('->' Type)? WhereClause? FuncBody`.
-36. `FuncDecl` also has the context-sensitive C-style header `Type IDENT GenericParams? '(' ParamList? ')' ...`, where the leading `Type` is the return type.
+35. `FuncDecl ::= 'func' IDENT GenericParams? '(' ParamList? ')' TrailingThisParamConst? ('throws' Type)? ('->' Type)? WhereClause? FuncBody`.
+36. `FuncDecl` also has the context-sensitive C-style header `Type IDENT GenericParams? '(' ParamList? ')' TrailingThisParamConst? ('throws' Type)? SemanticList? WhereClause? FuncBody`, where the leading `Type` is the return type.
+36a. `TrailingThisParamConst ::= 'const'+` occupies the suffix position before any `throws` clause, return semantic, result type, or `where` clause.
+36b. Outside HLSL, the suffix is diagnosed but remains on an ordinary function for semantic recovery; configurable value-type receivers use the requested read-only mode, while `ClassDecl` members reject receiver-mode specifiers and retain fixed `in`.
+36c. Constructors, accessors, and subscripts reject trailing `const` and resume parsing after the suffix.
 37. `ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')' WhereClause? FuncBody`.
 38. `SubscriptDecl ::= '__subscript' GenericParams? '(' ParamList? ')' '->' Type WhereClause? AccessorBlock`, routed through `parseOptGenericDecl` so it accepts inline generic params and a `where` clause.
 39. `PropertyDecl ::= 'property' IDENT ':' Type AccessorBlock` in the modern form.
@@ -279,6 +282,9 @@ the document's own headings. `D` names the source doc
 | `AccessorDecl` accepts an optional `'(' ParamList? ')'`, which is how a `set` accessor names the incoming value. | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | [`decl-property-set-accessor-param.slang`](decl-property-set-accessor-param.slang) |
 | `FuncDecl` accepts a `('throws' Type)?` clause between the parameter list and the `->` result type.                                         | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations)         | [`decl-func-throws-clause.slang`](decl-func-throws-clause.slang)                                             |
 | `FuncDecl` in `func` form takes its result type via `('->' Type)?` after the parameter list.                                                | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations)         | [`decl-func-arrow-return.slang`](decl-func-arrow-return.slang)                                               |
+| HLSL `TrailingThisParamConst` follows the parameter list before semantic, `throws`, result-type, and `where` clauses. | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | [`decl-func-hlsl-trailing-this-const.slang`](decl-func-hlsl-trailing-this-const.slang) |
+| Outside HLSL, trailing `const` is diagnosed but remains attached to an ordinary function for recovery. | negative | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | [`decl-trailing-this-const-requires-hlsl.slang`](decl-trailing-this-const-requires-hlsl.slang) |
+| Constructors, accessors, and subscripts reject trailing `const` and parsing resumes after the suffix. | negative | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | [`decl-trailing-this-const-invalid-callables.slang`](decl-trailing-this-const-invalid-callables.slang) |
 | `ParamList` accepts the C-compatibility spelling `'void'` as the sole content of the parentheses. | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | [`decl-param-list-void.slang`](decl-param-list-void.slang) |
 | `Param` accepts the modern name-first form `IDENT ':' Type ('=' Expr)?` with a default-value clause.                                        | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations)         | [`decl-func-modern-param-default.slang`](decl-func-modern-param-default.slang)                               |
 | `Param` parses with an optional `'=' Expr` default-value clause.                                                                            | functional | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations)         | [`decl-func-with-default-param.slang`](decl-func-with-default-param.slang)                                   |
@@ -371,6 +377,7 @@ the document's own headings. `D` names the source doc
 | Claim 32 — the legacy `Attribute*` slot inside `'struct'` reports `DeprecatedBracketAttributesPlacement` from language version 2025 and `InvalidBracketAttributesPlacement` from 2026. | needs-cli-test | [#type-defining-declarations](../../../../design/syntax-reference/grammar.md#type-defining-declarations) | The two diagnostics are selected by the language-version flag, so verifying both requires driving `slangc` twice with different versions rather than a single `//DIAGNOSTIC_TEST`. |
 | Claims 33, 34 — the `':'` bound, the `where` spelling and the standalone `__constraint` form all lower to the same `GenericTypeConstraintDecl`, and `__constraint` is valid only inside an interface or a generic. | needs-unit-test | [#type-defining-declarations](../../../../design/syntax-reference/grammar.md#type-defining-declarations) | The three spellings are individually covered, but "they lower to the same node" is an AST-identity claim with no CLI surface: all three compile and behave alike, which is consistent with, but does not prove, a shared representation. |
 | Claim 36 — `FuncDecl` also has the context-sensitive C-style header form in which the leading `Type` is the return type. | out-of-bundle | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | Every C-style function in the bundle (for example [`decl-struct-with-fields.slang`](decl-struct-with-fields.slang)) uses this form, and the type-vs-name disambiguation heuristic itself is `pipeline/02-parse-ast`'s subject, which the doc hands off to. |
+| Claim 36b (class exception) — a Slang `ClassDecl` member rejects trailing `const` as a receiver-mode specifier and retains its fixed `in` receiver. | out-of-bundle | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | This is a receiver-semantics rule rather than a grammar distinction, so the diagnostic is covered by [`design/ast-reference/modifiers/cpp-style-trailing-this-const-selects-read-only-receiver.slang`](../../ast-reference/modifiers/cpp-style-trailing-this-const-selects-read-only-receiver.slang). |
 | Claim 37 — `ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')' WhereClause? FuncBody`. | (unclassified) | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | A straightforward INTERPRET test constructing a struct through `__init`; not written because the bundle is over its file cap. |
 | Claim 41 — `FuncExtensionDecl` parses as `'__func_extension' GenericParams? KeywordExprHead '(' ParamList? ')' ...`, gated behind `-experimental-feature`. | (unclassified) | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | The doc names the production and the gate but shows no complete valid declaration, so a runnable expectation cannot be built without guessing. See the doc-gap row. |
 | Claim 45 (partial) — modern `Param` allows an omitted `':' Type`. | (unclassified) | [#function-style-declarations](../../../../design/syntax-reference/grammar.md#function-style-declarations) | The parse grammar admits an untyped named parameter but the doc does not say whether checked code accepts it, so a test cannot pick an expectation. See the doc-gap row. |

@@ -36,6 +36,11 @@ inheritance, and modifier checking.
    - "X produces IR I" — write an IR-dump test
      (`//TEST:SIMPLE(filecheck=CHECK): -target spirv -dump-ir -o -`).
 
+   The `dyn interface` receiver restriction must be exercised through
+   computed modes, not only the `[mutating]` spelling. Include an HLSL
+   method that is writable by dialect default and a setter, plus a
+   read-only control.
+
 3. Coverage per claim:
    - At least one positive test.
    - At least one negative / diagnostic test for any claim that

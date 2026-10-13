@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 2336e319fa15cdc524950d5da1d4ef153c1c96105f931dc9fee17d22569555fa
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: e1baa4f930080ac8d6695e2837ff1be6336fbfffddec12cf2a1f6f779614e211
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -182,15 +182,18 @@ begins, in
     injection.
 - `LookupResultItem`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1426-1503) — one found decl plus an optional breadcrumb
+  lines 1530-1549) — one found decl plus an optional breadcrumb
   chain (`DeclRef<Decl> declRef`,
   `RefPtr<LookupResultItem_Breadcrumb> breadcrumbs`). It exposes
   `Breadcrumb` as a nested typedef for the free-standing
   `LookupResultItem_Breadcrumb` class.
-- `LookupResultItem_Breadcrumb`
+- `LookupBreadcrumbStep`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1342-1422) — a navigation step recorded during lookup. Its
-  `Kind` enum (lines 1345-1370) has four values:
+  lines 1369-1493) — one typed navigation step recorded during lookup.
+  Its private representation is constructed through `makeMember`,
+  `makeDeref`, `makeSuperType`, `makeThisValue`, or `makeThisType` and
+  read through the corresponding kind-specific accessors.
+  Its `Kind` enum (lines 1371-1392) has five values:
   - `Member` — lookup saw a transparent in-scope decl and looked
     through it, so the final expression needs `obj.field`.
   - `Deref` — lookup auto-dereferenced a pointer-like type, so the
@@ -198,19 +201,29 @@ begins, in
   - `SuperType` — lookup walked from a sub-type to a super-type via
     a `subtypeWitness`, so the final expression must reflect that
     super-typing.
-  - `This` — lookup considered an in-scope member of an enclosing
-    type, so the final expression needs an implicit `this`/`This`.
+  - `ThisValue` — lookup crossed an enclosing type while a receiver
+    value was structurally available, so expression reconstruction
+    must check an implicit `this` value.
+  - `ThisType` — lookup crossed an enclosing type after a receiverless
+    boundary, so expression reconstruction must use the enclosing
+    `This` type.
 
-  Breadcrumb instances chain via
-  `RefPtr<LookupResultItem_Breadcrumb> next` and carry a
-  `ThisParameterMode` (lines 1379-1385) describing whether `this` is
-  `ImmutableValue`, `MutableValue`, or the `This` `Type`.
+  Each kind exposes only its valid payload through
+  `getMemberDeclRef`, `getSubtypeWitness`,
+  `getLookupOriginScope`, or `getThisTypeDeclRef`.
+  The step never stores the receiver's semantic type or mutability.
+- `LookupResultItem_Breadcrumb`
+  ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+  lines 1495-1519) — the persisted, reference-counted link that
+  inherits one `LookupBreadcrumbStep` and exposes `next` for the
+  following reconstruction step.
+  Its `create` factory is the only construction path.
 - `LookupResult`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1510-1556) — single-or-multi container for found items. A
+  lines 1555-1602) — single-or-multi container for found items. A
   result is *valid* when `item.declRef.getDecl()` is non-null, and
   *overloaded* when `items.getCount() > 1`. The invariant documented
-  at lines 1519-1520 is that when `items` is in use it holds *all* the
+  at lines 1564-1566 is that when `items` is in use it holds *all* the
   items and `item` duplicates one of them (in practice the first);
   `items` is left entirely empty in the single-result case so that no
   heap allocation happens. `begin()`/`end()` hide the distinction from
@@ -284,29 +297,40 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
    turned into a `DeclRef` by `createDefaultSubstitutionsIfNeeded`
    (lines 836-840). If the result is an `AggTypeDeclBase` — for
    example lookup happening *inside* a `struct`, `class`, `interface`,
-   `enum`, or `extension` — the request is rewritten to perform member lookup
-   against the corresponding `Type*`, with a
-   `Breadcrumb::Kind::This` breadcrumb that records the implicit
-   `this`/`This` of the enclosing decl
+   `enum`, or `extension` — `_lookUpInScopes` rewrites the request to
+   perform member lookup against the corresponding `Type*`.
+   It records either a
+   `Breadcrumb::Kind::ThisValue` step when a receiver value is
+   structurally available or a `Breadcrumb::Kind::ThisType` step
+   after lookup has crossed a receiverless boundary
    ([slang-lookup.cpp lines
-   851-930](../../../../source/slang/slang-lookup.cpp)). Otherwise the
+   865-936](../../../../source/slang/slang-lookup.cpp)). Otherwise the
    request falls through to
    `_lookUpDirectAndTransparentMembers`
    ([slang-lookup.cpp lines
-   931-945](../../../../source/slang/slang-lookup.cpp)).
-5. **Update `thisParameterMode`.** Before stepping to the parent
-   scope, the loop updates `thisParameterMode` based on the
-   container it just left: `ConstructorDecl` and `SetterDecl` give a
-   mutable `this`; a `FunctionDeclBase` consults
-   `isEffectivelyStatic`, `[mutating]`, and `[__ref]` — note the two
-   leading underscores, since the attribute is declared
-   `attribute_syntax [__ref] : RefAttribute;`
-   ([core.meta.slang](../../../../source/slang/core.meta.slang) line
-   4729, marked `@internal` and targeted at `FunctionDeclBase`), so a
-   bare `[ref]` is an unknown attribute; and stepping out
-   of a nested `AggTypeDeclBase` leaves only the `This` type
+   937-951](../../../../source/slang/slang-lookup.cpp)).
+5. **Track receiver availability structurally.** After all sibling
+   scopes at one lexical level have been searched,
+   `isReceiverlessDeclarationBoundary` determines whether moving to
+   the parent crosses a declaration that has no receiver value. Once
+   lookup crosses such a boundary, an outer scope cannot restore
+   `this`; later enclosing-type rewrites therefore use `ThisType`
+   instead of `ThisValue`
    ([slang-lookup.cpp lines
-   976-1049](../../../../source/slang/slang-lookup.cpp)).
+   981-992](../../../../source/slang/slang-lookup.cpp)). This query
+   deliberately does not compute an effective receiver mode or start
+   semantic checking.
+   For a method or accessor,
+   `checkAndAttachEffectiveThisParamInfo` computes and publishes a
+   `ThisParamInfoAttribute` during signature checking.
+   When `ConstructLookupResultExpr` replays a `ThisValue` step,
+   `checkThisExpr` reads that attribute to determine the reconstructed
+   receiver's type and value category.
+   A constructor has no effective receiver parameter, so
+   `checkThisExpr` instead supplies its constructor-local writable
+   `this` value
+   ([slang-check-expr.cpp lines
+   11830-11897](../../../../source/slang/slang-check-expr.cpp)).
 6. **Short-circuit on a non-overloadable hit.** After visiting one
    scope and its siblings, if the result is valid and is neither
    overloaded, nor overloadable per `_isDeclOverloadable`
@@ -351,8 +375,10 @@ builds a `LookupRequest`, and calls `_lookUpInScopes`
   43-54](../../../../source/slang/slang-lookup.cpp)).
 - After direct members, the function walks
   `ContainerDecl::getTransparentDirectMemberDecls` and recurses into
-  each transparent value via `_lookUpMembersInValue`, recording a
-  `Breadcrumb::Kind::Member` step. Transparent-member injection is
+  each transparent value via `_lookUpMembersInValue`.
+  It constructs the corresponding `Member` step with
+  `LookupBreadcrumbStep::makeMember`.
+  Transparent-member injection is
   skipped when the mask includes `Attribute` or when
   `IgnoreTransparentMembers` is set
   ([slang-lookup.cpp lines
@@ -461,8 +487,8 @@ the facet walk.
   ([slang-lookup.cpp lines
   473-489](../../../../source/slang/slang-lookup.cpp)).
 - For a non-`Self` facet of `Facet::Kind::Type`, prepends a
-  `Breadcrumb::Kind::SuperType` step carrying the `subtypeWitness`
-  (lines 493-500).
+  `SuperType` step with `LookupBreadcrumbStep::makeSuperType`, passing
+  the facet's `subtypeWitness` (lines 488-500).
 - Calls `_lookUpDirectAndTransparentMembers` on the facet's
   container, using `facet->declRefForMemberLookup` as the parent
   decl-ref (lines 502-509).
@@ -475,8 +501,10 @@ in the parent decl-ref. `FacetImpl::init`
 `_maybeSpecializeSuperTypeDeclRef` (lines 332-349) for every
 non-`Self` facet, which replaces an interface's plain decl-ref with a
 `LookupDeclRef` built from the interface's `ThisTypeDecl` and the
-facet's `subtypeWitness`. Members found through that facet therefore
-come back already specialized to the concrete conforming type. See
+facet's `subtypeWitness`.
+`_lookUpDirectAndTransparentMembers` then constructs each member result
+with that specialized parent decl-ref, so a requirement returning
+`This` names the concrete conforming type. See
 [../ast-reference/values.md#declref-family-and-the-four-shapes-a-decl-ref-can-take](../ast-reference/values.md#declref-family-and-the-four-shapes-a-decl-ref-can-take)
 for the four decl-ref shapes and
 [../ast-reference/values.md#witness-family](../ast-reference/values.md#witness-family)
@@ -493,21 +521,21 @@ short-circuits the rest of the dispatch. The `_lookUpInScopes`
 dispatcher forces `NoDeref` when the enclosing scope is an
 `ExtensionDecl`
 ([slang-lookup.cpp lines
-913-921](../../../../source/slang/slang-lookup.cpp)) so that the
+917-930](../../../../source/slang/slang-lookup.cpp)) so that the
 extension's `This` refers to the extension target itself, not the
 pointed-to type.
 
 **`ThisType` for interfaces.** When the enclosing scope is an
 `InterfaceDecl`, `_lookUpInScopes` rewrites the lookup to go through
 the interface's `ThisTypeDecl` (the abstract self-type of the
-interface). The `This` breadcrumb is suppressed in that case because
+interface). The enclosing-type breadcrumb is suppressed in that case because
 the rewritten decl-ref already encodes the navigation
 ([slang-lookup.cpp lines
-889-905](../../../../source/slang/slang-lookup.cpp)).
+899-912](../../../../source/slang/slang-lookup.cpp)).
 `InterfaceDefaultImplDecl` triggers a separate path that looks up in
 the explicit `This` parameter instead of the interface itself
 ([slang-lookup.cpp lines
-947-974](../../../../source/slang/slang-lookup.cpp)).
+953-977](../../../../source/slang/slang-lookup.cpp)).
 
 ### Transparent members
 
@@ -605,33 +633,70 @@ prepends a `Member` breadcrumb, and recurses via
 ### Breadcrumbs
 
 Each lookup result item carries a singly-linked list of
-`LookupResultItem_Breadcrumb` nodes. The checker walks the list to
-synthesize the canonical AST expression. For the `cbuffer` example
+`LookupResultItem_Breadcrumb` nodes.
+`ConstructLookupResultExpr` replays the list to synthesize the
+canonical AST expression. For the `cbuffer` example
 above, an unqualified `f` becomes the equivalent of `(*anon1).f`:
 
 - `Member` -> `Deref` -> (decl `f`).
 
-For an unqualified `g` defined on `Self` inside a method, the
-breadcrumb is just `This`, marking that the rewritten expression
-needs an implicit `this.g`. The `ThisParameterMode` field on the
-breadcrumb records whether `this` is `ImmutableValue`,
-`MutableValue`, or the `This` type — set per the enclosing
-function's `[mutating]` / `[ref]` / `static` modifiers as described
-in step 5 of "Unqualified lookup" above.
+For an unqualified `g` defined on `Self` inside a method,
+`_lookUpInScopes` records just a `ThisValue` step, marking that the
+rewritten expression normally needs an implicit `this.g`.
+The step stores the scope where lookup started.
+During ordinary expression reconstruction,
+`ConstructLookupResultExpr` uses that scope to create a `ThisExpr` and
+passes it through `checkThisExpr`.
+That operation determines the reconstructed receiver's type and value
+category; lookup does not
+([slang-check-expr.cpp lines
+1609-1627 and
+11830-11897](../../../../source/slang/slang-check-expr.cpp)).
 
-For lookup through an interface base via `subtypeWitness`, the
-breadcrumb is `SuperType` and carries the witness as its `val`. That
-field is also what
+Declaration-reference checking intentionally omits a leading
+`ThisValue` in one case.
+When `m_allowStaticReferenceToNonStaticMember` is set,
+`ConstructLookupResultExpr` omits that step only if
+`_canOmitImplicitReceiverValueForDeclarationReference` finds that the
+remaining breadcrumb chain is empty or contains only `SuperType`
+steps.
+Expression reconstruction then preserves the null base while applying
+each `SuperType` step, so the final `ConstructDeclRefExpr` call produces
+a base-less `VarExpr`.
+If a `Member` or `Deref` step follows, the helper returns false because
+that path traverses runtime storage.
+`ConstructLookupResultExpr` retains the implicit receiver so checking
+the reconstructed declaration reference can reject the attempted
+capture.
+See [slang-check-expr.cpp lines
+1510-1528 and
+1559-1649](../../../../source/slang/slang-check-expr.cpp).
+
+After a static function or another receiverless declaration boundary,
+`_lookUpInScopes` records `ThisType`.
+The step stores the enclosing aggregate or extension declaration
+reference, and `ConstructLookupResultExpr` passes that declaration to
+`calcThisType` to build the implicit type expression. Keeping
+`ThisValue` and `ThisType` distinct records the structural choice that
+lookup must make without putting receiver-mode semantics into a lookup
+result.
+
+For lookup through an interface base via `subtypeWitness`,
+`_lookupMembersInSuperTypeFacets` records a `SuperType` step with
+`LookupBreadcrumbStep::makeSuperType`.
+Consumers read its witness through `getSubtypeWitness`; the private
+representation is not a shared untyped payload.
+That witness is also what
 `SemanticsVisitor::filterLookupResultByCheckedOptional`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-lines 1361-1373) inspects: it walks each item's breadcrumb chain and
+lines 1947-1970) inspects: it walks each item's breadcrumb chain and
 drops the item when any `SubtypeWitness` on it comes from an
 `optional` constraint that the surrounding code has not yet checked.
 
 `CreateLookupResultItem`
 ([slang-lookup.cpp lines
-146-165](../../../../source/slang/slang-lookup.cpp)) reverses the
-on-stack `BreadcrumbInfo` chain (declared at lines 29-37) when
+150-165](../../../../source/slang/slang-lookup.cpp)) reverses the
+on-stack `StackLookupBreadcrumb` chain (declared at lines 28-41) when
 constructing the heap-allocated linked list, so the final order
 matches the navigation order from the user's source expression to the
 found decl.
@@ -782,7 +847,7 @@ performed from inside one, `_lookUpInScopes` looks up in the explicit
 scope up to and including the enclosing `InterfaceDecl` and breaks
 out of the sibling loop
 ([slang-lookup.cpp lines
-947-974](../../../../source/slang/slang-lookup.cpp)), so the
+953-977](../../../../source/slang/slang-lookup.cpp)), so the
 interface's own requirement declarations are never consulted and a
 witness override on a conforming type wins over the default.
 

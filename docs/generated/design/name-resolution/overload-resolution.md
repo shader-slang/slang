@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 3430e318c84850ecbd8583883611e931f19649c0511c6ba1b36f13c047335116
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 044fa21780d8b2ba29d3809dc19de2b92ad3a1f019ea6f2a619790305ca6a795
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -64,20 +64,26 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
 
 - `OverloadCandidate`
   ([slang-check-impl.h line
-  384](../../../../source/slang/slang-check-impl.h)) — one candidate the
+  403](../../../../source/slang/slang-check-impl.h)) — one candidate the
   resolver is evaluating. Key fields:
   - `Flavor flavor` — one of `Func`, `Generic`,
-    `UnspecializedGeneric`, `Expr` (lines 387-392).
+    `UnspecializedGeneric`, `Expr` (lines 405-411).
   - `Status status` — pipeline progress; one of
     `GenericArgumentInferenceFailed`, `Unchecked`, `ArityChecked`,
-    `FixityChecked`, `TypeChecked`, `DirectionChecked`,
-    `VisibilityChecked`, `Applicable` (lines 396-405).
+    `FixityChecked`, `TypeChecked`, `ConstraintsChecked`, or
+    `Applicable` (lines 414-428).
   - `Flags flags` — bitset; today only `IsPartiallyAppliedGeneric =
-    1 << 0` (lines 409-413).
+    1 << 0` (lines 431-435).
   - `LookupResultItem item` — the underlying `DeclRef` + breadcrumb
-    chain returned from lookup (line 417).
-  - `Expr* exprVal` — for `Flavor::Expr` candidates (e.g. a function
-    value passed as an argument).
+    chain returned from lookup (line 439).
+  - `Expr* retainedExpr` — the optional checked expression path from
+    which candidate construction derived the candidate.
+    Completion uses it directly for `Flavor::Expr`.
+    For `Flavor::Func` and a fully applied `Flavor::Generic`, completion
+    replaces the path's direct declaration-reference leaf and rebuilds
+    its transparent wrappers around the selected declaration.
+    A partial generic application instead wraps the retained path
+    without replacing that leaf (lines 443-447).
   - `FuncType* funcType` — function type when the candidate is a
     function value rather than a declared callable.
   - `Type* resultType` — the result type of the call if this
@@ -88,7 +94,7 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
   - `SubstitutionSet subst` — the inferred substitution; used by
     generic candidates to avoid re-running inference in
     `CompleteOverloadCandidate`.
-  - `Index explicitGenericArgCount` (line 449) — for a generic
+  - `Index explicitGenericArgCount` (line 473) — for a generic
     candidate, the number of leading ordinary generic arguments the
     caller supplied explicitly (the rest are filled from parameter
     defaults). Positional arguments make the explicit set a prefix.
@@ -138,8 +144,10 @@ rather than in `slang-check-overload.cpp`: the builtin-operator fast path
     visibility step (line 3366).
   - `Index argCount`, `List<Expr*>* args`, `Type** argTypes` — call-
     site arguments (lines 3369-3371), read through `getArgType` /
-    `getArgTypeForInference` and matched against a parameter list by
-    `matchArgumentsToParams` (lines 3375-3400).
+    `getArgTypeForInference`.
+    `TryCheckOverloadCandidateTypes` obtains the corresponding
+    parameter information and calls `matchOverloadArgument` for each
+    ordinary or pack argument.
   - `OverloadCandidate* bestCandidate`,
     `List<OverloadCandidate> bestCandidates` — the running winner
     plus the equally-best siblings if there is an ambiguity (lines
@@ -192,7 +200,7 @@ the AST node for the call.
 
 `SemanticsVisitor::TryCheckOverloadCandidate`
 ([slang-check-overload.cpp line
-1426](../../../../source/slang/slang-check-overload.cpp)) is the
+1617](../../../../source/slang/slang-check-overload.cpp)) is the
 inner driver. It advances `candidate.status` step-by-step, returning
 as soon as any step fails:
 
@@ -200,18 +208,16 @@ as soon as any step fails:
 flowchart TB
   arity["TryCheckOverloadCandidateArity"]
   fix["TryCheckOverloadCandidateFixity"]
-  types["TryCheckOverloadCandidateTypes (incl. generic inference)"]
-  dirs["TryCheckOverloadCandidateDirections"]
+  types["TryCheckOverloadCandidateTypes (types, modes, and generic inference)"]
   cstr["TryCheckOverloadCandidateConstraints"]
   vis["TryCheckOverloadCandidateVisibility"]
   applicable["Status = Applicable"]
-  arity --> fix --> types --> dirs --> cstr --> vis --> applicable
+  arity --> fix --> types --> cstr --> vis --> applicable
   arity -. fail .-> reject1["candidate rejected at Status = Unchecked"]
   fix -. fail .-> reject2["candidate rejected at Status = ArityChecked"]
   types -. fail .-> reject3["candidate rejected at Status = FixityChecked"]
-  dirs -. fail .-> reject4["candidate rejected at Status = TypeChecked"]
-  cstr -. fail .-> reject5["candidate rejected at Status = DirectionChecked"]
-  vis -. fail .-> reject6["candidate rejected at Status = VisibilityChecked"]
+  cstr -. fail .-> reject4["candidate rejected at Status = TypeChecked"]
+  vis -. fail .-> reject5["candidate rejected at Status = ConstraintsChecked"]
 ```
 
 The individual steps:
@@ -239,12 +245,13 @@ The individual steps:
    `Diagnostics::ExpectedPostfixOperator`.
 3. **`TryCheckOverloadCandidateTypes`**
    ([slang-check-overload.cpp line
-   807](../../../../source/slang/slang-check-overload.cpp)) — the
-   per-argument type/coercion check. Arguments are first paired with
-   parameters by `OverloadResolveContext::matchArgumentsToParams`,
-   which is also what lets a brace initializer such as `f({1, 2})`
-   be matched against a struct parameter instead of being rejected
-   outright.
+   1054](../../../../source/slang/slang-check-overload.cpp)) — the
+   per-argument type, passing-mode, and coercion check. The callable
+   declaration or function type supplies parallel lists of parameter
+   types and modes, and `matchOverloadArgument` matches each source
+   argument against both. Consequently, an ordinary `inout` parameter
+   rejects a value that cannot provide writable storage here; this is
+   part of candidate type checking, not a separate direction phase.
    - For `Flavor::Generic`, the step delegates to
      `TryCheckGenericOverloadCandidateTypes`
      ([slang-check-overload.cpp line
@@ -275,40 +282,38 @@ The individual steps:
      error.
      These are distinct from the `UnspecializedGeneric` failure
      diagnostics selected later by the reporting path.
-   - For every argument, the step calls `canCoerce(paramType,
-     argType, arg.argExpr, &cost)`
-     ([slang-check-overload.cpp line
-     907](../../../../source/slang/slang-check-overload.cpp)) and
-     accumulates the reported `cost` into
-     `candidate.conversionCostSum`. If `canCoerce` reports that no
-     coercion is possible, the local `recordArgMismatch` helper stores
-     the argument index and the expected / actual types on the
-     candidate (lines 903-911) and the candidate is dropped (silently
-     in `JustTrying`; in `ForReal` the re-check `coerce`s the argument
-     at `CoercionSite::Argument` and emits a conversion-error
-     diagnostic). Those recorded types are what a later "no applicable
-     overload" note prints per candidate.
+    - `TryCheckOverloadCandidateTypes` obtains each parameter's type,
+      mode, and declaration before it calls `matchOverloadArgument` for
+      the corresponding ordinary or pack argument.
+      That call is what lets an initializer list such as `f({1, 2})`
+      match and coerce to a struct parameter.
+    - In trial mode, `matchOverloadArgument` records conversion costs
+      and the first mismatch without constructing converted
+      expressions.
+      In `ForReal` mode, it calls
+      `commitOverloadArgumentConversion`, which creates the converted
+      expression before `CompleteOverloadCandidate` constructs the
+      selected callable expression.
+      For an ordinary call, the commit validates the selected
+      parameter's storage use immediately.
+      For a type cast or compiler-synthesized initializer invocation,
+      it records the selected argument use on the surrounding result
+      for that result's later consumer.
+      The type step then replaces the overload context's argument list
+      with the checked expressions
+      ([slang-check-overload.cpp lines
+      907-1200](../../../../source/slang/slang-check-overload.cpp)).
+     A failed type or mode match drops the candidate silently in
+     `JustTrying`; the `ForReal` re-check emits the corresponding
+     argument diagnostic. Recorded expected and actual types are what
+     a later "no applicable overload" note prints per candidate.
    - When `context.disallowNestedConversions` is set the step demands
      `paramType->equals(argType)` instead of calling `canCoerce`
      (line 901), which is how the checker forbids stacking one
      user-defined conversion on top of another.
-4. **`TryCheckOverloadCandidateDirections`**
+4. **`TryCheckOverloadCandidateConstraints`**
    ([slang-check-overload.cpp line
-   1083](../../../../source/slang/slang-check-overload.cpp)) — despite
-   its name, the source comment notes that general argument/parameter
-   l-value checking is currently done elsewhere; this step only checks
-   the mutability of the implicit `this` parameter. A `[mutating]`
-   method invoked on an immutable base expression is rejected here,
-   and in `ForReal` mode emits
-   `Diagnostics::MutatingMethodOnImmutableValue` (plus
-   `MutatingMethodOnFunctionInputParameterError` or
-   `MutatingMethodOnFunctionInputParameterWarning` for a mutating call
-   on a legacy-syntax function input parameter)
-   ([slang-check-overload.cpp lines
-   1109-1145](../../../../source/slang/slang-check-overload.cpp)).
-5. **`TryCheckOverloadCandidateConstraints`**
-   ([slang-check-overload.cpp line
-   1157](../../../../source/slang/slang-check-overload.cpp)) — for an
+   1348](../../../../source/slang/slang-check-overload.cpp)) — for an
    explicit generic application `G<A, B>`, this step validates the
    `where`-clauses on `G`'s parameters against the inferred
    substitutions and fills in any generic arguments left to defaults.
@@ -318,7 +323,7 @@ The individual steps:
    ([slang-check-impl.h line
    3239](../../../../source/slang/slang-check-impl.h), called at
    [slang-check-overload.cpp line
-   1233](../../../../source/slang/slang-check-overload.cpp)) — the same
+    1424](../../../../source/slang/slang-check-overload.cpp)) — the same
    fixpoint loop used for inferred generic arguments — rather than a
    per-constraint linear pass. It passes only the explicitly-provided
    ordinary prefix (`candidate.explicitGenericArgCount` arguments) via
@@ -339,7 +344,7 @@ The individual steps:
    `JustTrying` mode rejects the candidate. Nested generic
    applications (the parent chain contains a `GenericDecl`) keep the
    linear pass.
-6. **`TryCheckOverloadCandidateVisibility`**
+5. **`TryCheckOverloadCandidateVisibility`**
    ([slang-check-overload.cpp lines
    265-287](../../../../source/slang/slang-check-overload.cpp)) —
    delegates to
@@ -350,7 +355,7 @@ The individual steps:
    2335](../../../../source/slang/slang-diagnostics.lua)); in
    `JustTrying` mode it just returns false. See
    [visibility.md](visibility.md) for the rule.
-7. **`TryCheckOverloadCandidateClassNewMatchUp`**
+6. **`TryCheckOverloadCandidateClassNewMatchUp`**
    ([slang-check-overload.cpp lines
    107-143](../../../../source/slang/slang-check-overload.cpp)) —
    runs only in the finalize / `ForReal` re-check inside
@@ -417,7 +422,7 @@ in [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
   `flavor` is `Expr`. When there is an actual function-valued
   expression to carry, the sibling `AddFuncExprOverloadCandidate`
   (line 2654) is used instead, which additionally stores it in
-  `exprVal`; that is the path a function-typed `ParamDecl` takes
+  `retainedExpr`; that is the path a function-typed `ParamDecl` takes
   (line 3180). A parameter reaches that path only when its declared
   type is a `FuncType` (line 3179), which source spells with
   `functype`: the `Reduce(functype(T, T) -> T combineOp)` parameter at
@@ -441,13 +446,14 @@ specialized candidate (lines 3090-3110).
 Once the probe phase finishes with exactly one
 `context.bestCandidate`, `CompleteOverloadCandidate`
 ([slang-check-overload.cpp line
-1496](../../../../source/slang/slang-check-overload.cpp)) flips
+1688](../../../../source/slang/slang-check-overload.cpp)) flips
 `context.mode = ForReal` and re-runs the full pipeline starting from
 `TryCheckOverloadCandidateClassNewMatchUp`
 ([slang-check-overload.cpp lines
 107-143](../../../../source/slang/slang-check-overload.cpp), its only
-call site being line 1629), then arity, fixity, types, directions,
-constraints, and visibility in that order (lines 1632-1648), jumping to
+call site being line 1822), then arity, fixity, types and ordinary
+parameter modes, constraints, and visibility in that order (lines
+1842-1855), jumping to
 the shared error label on the first failure. The `ClassNewMatchUp` step
 is reached only here, and only in `ForReal` mode: it rejects a `new`
 expression whose candidate does not construct a `class`, and a plain
@@ -455,45 +461,128 @@ expression whose candidate does not construct a `class`, and a plain
 surface syntax always agree.
 
 The `ForReal` re-check is what produces user-visible diagnostics for
-the chosen candidate. If even the best candidate fails because its
+the chosen candidate and commits its argument conversions.
+`TryCheckOverloadCandidateTypes` completes that work before
+`CompleteOverloadCandidate` constructs the selected callable expression.
+If even the best candidate fails because its
 `Status` is `GenericArgumentInferenceFailed`, the switch at the top of
-`CompleteOverloadCandidate` (lines 1510-1610) turns the recorded
+`CompleteOverloadCandidate` (lines 1693-1818) turns the recorded
 `candidate.genericInferenceFailure` into a *focused* diagnostic —
 see [Edge cases](#edge-cases-and-failure-modes) for the per-`Kind`
 mapping — and only a `Kind::None` (nothing recorded) falls through to
 the blanket `Diagnostics::GenericArgumentInferenceFailed`
 ("could not specialize generic for arguments of type ...",
 [slang-diagnostics.lua line
-4030](../../../../source/slang/slang-diagnostics.lua)) at line 1641.
+4030](../../../../source/slang/slang-diagnostics.lua)) at lines
+1808-1811.
 Every arm also emits a `Diagnostics::GenericSignatureTried` note
 rendered by `ASTPrinter::getDeclSignatureString`.
 
-After `ForReal` succeeds, `CompleteOverloadCandidate` constructs the
-final AST node:
+After the `ForReal` checks and argument commits succeed,
+`CompleteOverloadCandidate` constructs the selected callable and final
+AST node:
 
-- `Flavor::Func` and `Flavor::Generic` first rebuild the callee with
-  `ConstructLookupResultExpr` (line 1656), which replays the item's
-  breadcrumb chain. `Flavor::Func` then reuses `context.originalExpr`
-  as the call node when it already is an `InvokeExpr`, and otherwise
-  creates a fresh one over the call-site arguments (line 1676).
-- `Flavor::Generic` -> wraps the result in a
-  `PartiallyAppliedGenericExpr` when the
-  `IsPartiallyAppliedGeneric` flag is set
+- For a `Flavor::Func` candidate with a non-null
+  `candidate.retainedExpr`, `CompleteOverloadCandidate` replaces that
+  expression's direct declaration-reference leaf with the selected
+  callable and rebuilds its transparent wrappers.
+  Rebuilding the wrappers preserves the receiver and qualifier
+  bindings that candidate construction recorded in the expression.
+  When `candidate.retainedExpr` is null,
+  `CompleteOverloadCandidate` calls `ConstructLookupResultExpr`, which
+  constructs the callee from the lookup item and replays its breadcrumb
+  chain.
+  See [slang-check-overload.cpp lines
+  1861-1891](../../../../source/slang/slang-check-overload.cpp).
+  For this flavor, `CompleteOverloadCandidate` then reuses
+  `context.originalExpr` when it already is an `InvokeExpr`, or creates
+  a fresh call over the call-site arguments (lines 1924-1938).
+- For a `Flavor::Generic` candidate,
+  `CompleteOverloadCandidate` uses `candidate.retainedExpr` when it is
+  non-null; otherwise it calls `ConstructLookupResultExpr` to
+  reconstruct the expression from the lookup item (lines 1892-1901).
+  When the `IsPartiallyAppliedGeneric` flag is set,
+  `CompleteOverloadCandidate` wraps that expression in a `PartiallyAppliedGenericExpr`
+  without replacing its generic leaf
   ([slang-check-overload.cpp lines
-  1764-1766](../../../../source/slang/slang-check-overload.cpp)),
-  otherwise a fully specialized generic decl-ref built by
-  `createGenericDeclRef` (line 1456, called at line 1781).
-- `Flavor::Expr` -> uses `candidate.exprVal` directly as the callee
-  (no `ConstructLookupResultExpr` step, since there is no
-  `LookupResultItem`), with the same reuse-or-create `InvokeExpr`
-  handling (line 1746).
+  2040-2059](../../../../source/slang/slang-check-overload.cpp)).
+  Otherwise, `createGenericDeclRef` replaces the direct generic leaf
+  with the fully specialized declaration reference and rebuilds the
+  transparent wrappers around it (line 2062).
+- For a `Flavor::Expr` candidate, `CompleteOverloadCandidate` uses
+  `candidate.retainedExpr` directly as the callee, without
+  reconstructing a lookup item, and applies the same reuse-or-create
+  `InvokeExpr` handling (lines 2017-2031).
 
-A `Flavor::UnspecializedGeneric` candidate (the recorded
-failed-inference candidate) never reaches this construction switch:
-its `Status::GenericArgumentInferenceFailed` is handled by the early
-error path at the top of `CompleteOverloadCandidate`
+Consider an interface-bounded call `s.kind(0)` where `s` has generic
+type `T : IShape` and `IShape` overloads `kind` for `int` and `float`.
+`_lookupMembersInSuperTypeFacets` records a `SuperType` breadcrumb and
+its subtype witness on each lookup item for `kind`.
+`createLookupResultExpr` represents that overloaded result as a raw
+`OverloadedExpr`, and `AddOverloadCandidates` creates each candidate
+from its lookup item without a `retainedExpr`.
+`CompleteOverloadCandidate` later calls `ConstructLookupResultExpr`,
+which replays the selected item's breadcrumb and creates the
+storage-preserving supertype cast used for witness dispatch.
+
+`CompleteOverloadCandidate` handles
+`Status::GenericArgumentInferenceFailed` on a
+`Flavor::UnspecializedGeneric` candidate before reaching this
+construction switch
 ([slang-check-overload.cpp lines
-1500-1625](../../../../source/slang/slang-check-overload.cpp)).
+1700-1818](../../../../source/slang/slang-check-overload.cpp)).
+
+### Selected receiver validation
+
+Receiver mutability is deliberately not an overload-applicability or
+ranking input. Consider this example:
+
+```slang
+struct Counter
+{
+    [mutating] void increment() {}
+    void inspect() { increment(); }
+}
+```
+
+`_lookUpInScopes` records only the structural `ThisValue` path to
+`increment`.
+When the single lookup result is materialized,
+`ConstructLookupResultExpr` replays that breadcrumb and calls
+`checkThisExpr` to determine the reconstructed receiver's type and
+value category before it constructs the member's base expression.
+For an instance callable, `checkThisExpr` reads the checked receiver
+information that `checkAndAttachEffectiveThisParamInfo` published
+during signature checking
+([slang-check-expr.cpp lines
+1530-1649 and
+11830-11897](../../../../source/slang/slang-check-expr.cpp)). This step
+determines the `ThisExpr` type and value category; it does not validate
+the receiver against a candidate callable.
+
+Overload resolution then selects `increment` using its ordinary
+arguments.
+`CompleteOverloadCandidate` rebuilds the selected callable leaf while
+preserving the already-constructed receiver path.
+After completion returns the selected call, when
+`SelectedExpressionFinalizer::visitInvokeExpr` finalizes that selected
+call, `validateCallable` finds the direct member and calls
+`validateCallableReceiver`
+([slang-check-expr.cpp lines
+7229-7263 and 7435-7443](../../../../source/slang/slang-check-expr.cpp)).
+That helper reads the selected callable's effective receiver mode and
+requires writable receiver storage when necessary
+([slang-check-overload.cpp lines
+1301-1347](../../../../source/slang/slang-check-overload.cpp)). In the
+example, ordinary checking has made the surrounding `this` immutable,
+so final selected-expression checking diagnoses
+`Diagnostics::MutatingMethodOnImmutableValue`.
+
+This ordering is important: receiver validation can reject the
+selected expression, but it does not remove a candidate during probing,
+change candidate ranking, or cause overload resolution to fall back to
+a different callable. Any future overload distinction based on receiver
+mode would require a separate design.
 
 ## Conversion costs
 
@@ -983,28 +1072,30 @@ the implicit `this` is not one of the call's arguments, so
 ([slang-check-overload.cpp lines
 145-183](../../../../source/slang/slang-check-overload.cpp)).
 
-The operators that *are* resolved by member lookup keep the implicit
-`this`. `visitInvokeExpr` looks `operator()` up on the callee's type
-when the callee is a value of `DeclRefType`
+The operators that *are* resolved by member lookup use an explicit
+receiver.
+When the callee is a value of `DeclRefType`, `visitInvokeExpr` looks
+`operator()` up on the callee's type and passes the callee value to
+`createLookupResultExpr` as the explicit base
 ([slang-check-expr.cpp lines
-5126-5145](../../../../source/slang/slang-check-expr.cpp); the
+6634-6671](../../../../source/slang/slang-check-expr.cpp); the
 requirement itself is declared on `IMutatingFunc` / `IFunc` at
 [core.meta.slang lines
-2027-2041](../../../../source/slang/core.meta.slang)), and
-`visitIndexExpr` looks `__subscript` up the same way for `a[i]`
+2027-2041](../../../../source/slang/core.meta.slang)).
+For `a[i]`, `visitIndexExpr` looks `__subscript` up on the indexed
+value's type and passes that value to `createLookupResultExpr` as the
+explicit base
 ([slang-check-expr.cpp lines
-3646-3654](../../../../source/slang/slang-check-expr.cpp)). For those,
-the lookup leaves a `Breadcrumb::Kind::This` step on the item
-(carrying a `ThisParameterMode` of `ImmutableValue`, `MutableValue`,
-or `Type` — see [lookup.md](lookup.md)), and
-`CompleteOverloadCandidate` replays that breadcrumb chain through
-`ConstructLookupResultExpr` when it builds the `InvokeExpr` callee
-(line 1668). Rejecting a `[mutating]` member operator applied to an
-immutable base is a separate concern, handled by
-`TryCheckOverloadCandidateDirections`: it tests
-`context.baseExpr->type.isLeftValue` for any callee that
-`isEffectivelyStatic` says is a member and `isEffectivelyMutating`
-says mutates (lines 1110-1113).
+4374-4415](../../../../source/slang/slang-check-expr.cpp)).
+These explicit bases mean that neither path needs a `ThisValue` or
+`ThisType` breadcrumb.
+Any breadcrumbs on the result describe only additional structural
+navigation, such as a supertype conversion, and never store a receiver
+mode.
+For a selected direct callable member such as `operator()`, final
+selected-expression checking then uses `validateCallableReceiver` to
+enforce the selected member's effective receiver mode, as described in
+[Selected receiver validation](#selected-receiver-validation).
 
 ## Edge cases and failure modes
 

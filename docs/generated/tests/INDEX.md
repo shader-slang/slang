@@ -9,15 +9,15 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 ## Suite totals
 
 - **Bundles:** 79
-- **Total `.slang` tests:** 4112
+- **Total `.slang` tests:** 4134
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 1938 |
-| `negative` | 797 |
+| `functional` | 1939 |
+| `negative` | 816 |
 | `boundary` | 776 |
 | `expansion` | 299 |
-| `characterization` | 215 |
+| `characterization` | 217 |
 | `stress` | 84 |
 | `regression` | 3 |
 
@@ -40,7 +40,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md) | 25 | [`docs/language-reference/expressions-operator-precedence.md`](../../language-reference/expressions-operator-precedence.md) |
 | [`conformance/expressions-operators`](conformance/expressions-operators/README.md) | 10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md) |
 | [`conformance/expressions-this`](conformance/expressions-this/README.md) | 6 | [`docs/language-reference/expressions-this.md`](../../language-reference/expressions-this.md) |
-| [`conformance/generics`](conformance/generics/README.md) | 60 | [`docs/language-reference/generics.md`](../../language-reference/generics.md) |
+| [`conformance/generics`](conformance/generics/README.md) | 64 | [`docs/language-reference/generics.md`](../../language-reference/generics.md) |
 | [`conformance/lexical-structure`](conformance/lexical-structure/README.md) | 8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md) |
 | [`conformance/statements`](conformance/statements/README.md) | 36 | [`docs/language-reference/statements.md`](../../language-reference/statements.md) |
 | [`conformance/types-array`](conformance/types-array/README.md) | 6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md) |
@@ -70,7 +70,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
-| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 98 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
+| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md) | 101 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
 | [`design/syntax-reference/keywords-and-builtins`](design/syntax-reference/keywords-and-builtins/README.md) | 60 | [`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../design/syntax-reference/keywords-and-builtins.md) |
 | [`design/syntax-reference/tokens`](design/syntax-reference/tokens/README.md) | 50 | [`docs/generated/design/syntax-reference/tokens.md`](../design/syntax-reference/tokens.md) |
 
@@ -80,7 +80,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | --- | ---: | --- |
 | [`design/cross-cutting/core-module`](design/cross-cutting/core-module/README.md) | 32 | [`docs/generated/design/cross-cutting/core-module.md`](../design/cross-cutting/core-module.md) |
 | [`design/cross-cutting/diagnostics`](design/cross-cutting/diagnostics/README.md) | 65 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
-| [`design/cross-cutting/diagnostics-catalog`](design/cross-cutting/diagnostics-catalog/README.md) | 339 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
+| [`design/cross-cutting/diagnostics-catalog`](design/cross-cutting/diagnostics-catalog/README.md) | 351 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
 | [`design/cross-cutting/ir-instructions`](design/cross-cutting/ir-instructions/README.md) | 52 | [`docs/generated/design/cross-cutting/ir-instructions.md`](../design/cross-cutting/ir-instructions.md) |
 | [`design/cross-cutting/serialization`](design/cross-cutting/serialization/README.md) | 13 | [`docs/generated/design/cross-cutting/serialization.md`](../design/cross-cutting/serialization.md) |
 | [`design/cross-cutting/targets`](design/cross-cutting/targets/README.md) | 42 | [`docs/generated/design/cross-cutting/targets.md`](../design/cross-cutting/targets.md) |
@@ -92,7 +92,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`design/ast-reference/base`](design/ast-reference/base/README.md) | 24 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md) |
 | [`design/ast-reference/declarations`](design/ast-reference/declarations/README.md) | 84 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
 | [`design/ast-reference/expressions`](design/ast-reference/expressions/README.md) | 144 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md) |
-| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 63 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
+| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md) | 64 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
 | [`design/ast-reference/statements`](design/ast-reference/statements/README.md) | 70 | [`docs/generated/design/ast-reference/statements.md`](../design/ast-reference/statements.md) |
 | [`design/ast-reference/types`](design/ast-reference/types/README.md) | 49 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md) |
 | [`design/ast-reference/values`](design/ast-reference/values/README.md) | 31 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md) |
@@ -136,9 +136,9 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | Bundle | Tests | Source doc |
 | --- | ---: | --- |
 | [`coverage/autodiff`](coverage/autodiff/README.md) | 9 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/check-decl`](coverage/check-decl/README.md) | 29 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/check-decl`](coverage/check-decl/README.md) | 30 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 | [`coverage/check-expr`](coverage/check-expr/README.md) | 22 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
-| [`coverage/cli-options`](coverage/cli-options/README.md) | 30 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
+| [`coverage/cli-options`](coverage/cli-options/README.md) | 31 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 | [`coverage/emit`](coverage/emit/README.md) | 13 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 | [`coverage/legalize`](coverage/legalize/README.md) | 23 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |
 | [`coverage/lower-to-ir`](coverage/lower-to-ir/README.md) | 19 | [`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md) |

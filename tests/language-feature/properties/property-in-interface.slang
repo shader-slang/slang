@@ -27,8 +27,9 @@ struct YourCell : ICell
 
 int helper<C : ICell>(C cell)
 {
-    cell.value = cell.value + 1;
-    return cell.value;
+    C mutableCell = cell;
+    mutableCell.value = mutableCell.value + 1;
+    return mutableCell.value;
 }
 
 int test(int value)

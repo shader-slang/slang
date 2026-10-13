@@ -33,10 +33,14 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
-/// Represents `const` written after a function parameter list.
+/// Represents `const` written after a function declaration's parameter list.
 ///
-/// This spelling requests a read-only effective `this` parameter. Keeping it distinct from
-/// `ConstModifier` prevents a trailing receiver qualifier from being mistaken for prefix `const`.
+/// On an HLSL instance method with a configurable value-type receiver, this spelling explicitly
+/// selects a read-only implicit `this` parameter. `SemanticsVisitor::checkModifier()` diagnoses the
+/// spelling outside HLSL, while `_checkThisParamModeSpecifiers()` retains its read-only meaning for
+/// recovery. `_selectEffectiveThisParamMode()` instead rejects every receiver-mode specifier on a
+/// `ClassDecl` method and uses the class receiver's fixed `In` mode. Keeping this syntax distinct
+/// from `ConstModifier` prevents a receiver qualifier from being treated like prefix `const`.
 FIDDLE()
 class CppStyleTrailingThisParamConstModifier : public Modifier
 {
@@ -1423,20 +1427,18 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
-// A `[mutating]` attribute, which indicates that a member
-// function is allowed to modify things through its `this`
-// argument.
-//
+/// A `[mutating]` attribute, which requests the `inout` parameter-passing mode for a declaration
+/// with a configurable value-type receiver.
 FIDDLE()
 class MutatingAttribute : public Attribute
 {
     FIDDLE(...)
 };
 
-// A `[nonmutating]` attribute, which indicates that a
-// `set` accessor does not need to modify anything through
-// its `this` parameter.
-//
+/// A `[nonmutating]` attribute, which requests a read-only parameter-passing mode for a declaration
+/// with a configurable value-type receiver.
+///
+/// A copyable receiver uses `in`, while a non-copyable receiver uses `constref`.
 FIDDLE()
 class NonmutatingAttribute : public Attribute
 {
@@ -1456,18 +1458,16 @@ class NoDiscardAttribute : public Attribute
     FIDDLE(...)
 };
 
-// A `[constref]` attribute, which indicates that the `this` parameter of
-// a member function should be passed by const reference.
-//
+/// A `[constref]` attribute, which requests the `constref` parameter-passing mode for a declaration
+/// with a configurable value-type receiver.
 FIDDLE()
 class ConstRefAttribute : public Attribute
 {
     FIDDLE(...)
 };
 
-// A `[ref]` attribute, which indicates that the `this` parameter of
-// a member function should be passed by reference.
-//
+/// A `[__ref]` attribute, which requests the `ref` parameter-passing mode for a declaration with a
+/// configurable value-type receiver.
 FIDDLE()
 class RefAttribute : public Attribute
 {
@@ -1476,14 +1476,20 @@ class RefAttribute : public Attribute
 
 /// Records the type and parameter-passing mode of a declaration's effective `this` parameter.
 ///
-/// Signature checking attaches this attribute if and only if the declaration has an effective
-/// `this` parameter. Later compiler stages consume this checked semantic information instead of
-/// deriving it again from syntax or compilation options.
+/// `checkAndAttachEffectiveThisParamInfo()` attaches this attribute if and only if the declaration
+/// has an effective `this` parameter. Downstream consumers query the checked attribute through
+/// `findEffectiveThisParamInfo()` instead of deriving the information again from syntax or
+/// compilation options.
 FIDDLE()
 class ThisParamInfoAttribute : public Attribute
 {
     FIDDLE(...)
     FIDDLE() ParamInfo info;
+
+    /// True when mangling appends the `m` receiver suffix because an implicit HLSL receiver used
+    /// its default `inout` mode. This is an ABI spelling choice, not a semantic distinction in
+    /// receiver mode.
+    FIDDLE() bool usesMutatingSuffixForImplicitHLSLReceiver = false;
 };
 
 // A `[__readNone]` attribute, which indicates that a function

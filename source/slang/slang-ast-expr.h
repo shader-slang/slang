@@ -319,6 +319,63 @@ class PostfixExpr : public OperatorExpr
     FIDDLE(...)
 };
 
+/// Represents the storage plan for lowering an l-value index operation over a checked base.
+class IndexExprStorageProjection
+{
+public:
+    /// Creates the ordinary case, where lowering needs the indexed base's direct address.
+    static IndexExprStorageProjection makeDirectAddress() { return {}; }
+
+    /// Creates a projection that selects one element already retained by a swizzled l-value.
+    static IndexExprStorageProjection makeRetainedSwizzleElement(Index elementIndex)
+    {
+        SLANG_RELEASE_ASSERT(elementIndex >= 0);
+        return IndexExprStorageProjection(Kind::RetainedSwizzleElement, elementIndex);
+    }
+
+    /// Creates a swizzle projection whose index was not constant during semantic checking.
+    static IndexExprStorageProjection makeNonConstantSwizzleElement()
+    {
+        return IndexExprStorageProjection(Kind::NonConstantSwizzleElement, -1);
+    }
+
+    /// Returns whether the projection selects an element of a retained swizzled l-value.
+    bool hasRetainedSwizzleElement() const { return m_kind == Kind::RetainedSwizzleElement; }
+
+    /// Returns whether the checked swizzle index was not a compile-time constant.
+    bool hasNonConstantSwizzleIndex() const
+    {
+        return m_kind == Kind::NonConstantSwizzleElement;
+    }
+
+    /// Returns the selected element index for a retained swizzled l-value.
+    Index getRetainedSwizzleElementIndex() const
+    {
+        SLANG_RELEASE_ASSERT(hasRetainedSwizzleElement());
+        SLANG_RELEASE_ASSERT(m_retainedSwizzleElementIndex >= 0);
+        return m_retainedSwizzleElementIndex;
+    }
+
+private:
+    enum class Kind : uint8_t
+    {
+        DirectAddress,
+        RetainedSwizzleElement,
+        NonConstantSwizzleElement,
+    };
+
+    IndexExprStorageProjection() = default;
+
+    IndexExprStorageProjection(Kind kind, Index retainedSwizzleElementIndex)
+        : m_kind(kind)
+        , m_retainedSwizzleElementIndex(retainedSwizzleElementIndex)
+    {
+    }
+
+    Kind m_kind = Kind::DirectAddress;
+    Index m_retainedSwizzleElementIndex = -1;
+};
+
 FIDDLE()
 class IndexExpr : public Expr
 {
@@ -326,17 +383,24 @@ class IndexExpr : public Expr
     FIDDLE() Expr* baseExpression;
     FIDDLE() List<Expr*> indexExprs;
 
+public:
+    // `CheckSimpleSubscriptExpr()` calls `_getSubscriptStorageProjection()` to record this decision
+    // after classifying the checked base and index. `ASTExprLowering::visitIndexExpr()` consumes the
+    // decision. An unchecked syntax clone must derive its own decision, so this field is not
+    // reflected or copied.
+    const IndexExprStorageProjection& getStorageProjection() const { return m_storageProjection; }
+    void setStorageProjection(const IndexExprStorageProjection& projection)
+    {
+        m_storageProjection = projection;
+    }
+
     // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
     // each argument expr. This info is used by language server.
     List<SourceLoc> argumentDelimeterLocs;
-};
 
-/// Tracks whether a selected callable still needs its receiver to be validated.
-enum class SelectedCallableReceiverCheckState
-{
-    None,
-    Pending,
-    Completed,
+private:
+    IndexExprStorageProjection m_storageProjection =
+        IndexExprStorageProjection::makeDirectAddress();
 };
 
 FIDDLE()
@@ -345,16 +409,6 @@ class MemberExpr : public DeclRefExpr
     FIDDLE(...)
     FIDDLE() Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
-
-    // These fields are transient semantic-checking state. Consider
-    // `value.mutatingMethod().staticField`. The inner method can be selected before lookup of the
-    // outer member determines that `staticField` discards its value qualifier. Selection marks the
-    // method's receiver check as pending. If the path is evaluated, finalization first rewrites any
-    // lambda capture and then advances the check to `Completed` before validating the receiver. If
-    // an outer static member discards the path, the visitor never reaches the pending check.
-    SelectedCallableReceiverCheckState selectedCallableReceiverCheckState =
-        SelectedCallableReceiverCheckState::None;
-    SourceLoc selectedCallableReceiverCheckLoc;
 };
 
 // Member expression that is dereferenced, e.g. `a->b`.
@@ -504,6 +558,13 @@ class CastToSuperTypeExpr : public Expr
 
     /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
     FIDDLE() Val* witnessArg = nullptr;
+
+    /// True when the cast preserves storage identity while changing only the static type.
+    ///
+    /// `updateCastToSuperTypeStorageInfo()` may preserve l-value and abstract-storage access through
+    /// such a cast. An ordinary conversion to an interface value leaves this false because it
+    /// materializes a new existential value instead.
+    FIDDLE() bool preservesStorageIdentity = false;
 };
 
 /// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
@@ -727,10 +788,27 @@ public:
 };
 
 
+enum class GenericArgumentCheckState : uint8_t
+{
+    /// The argument is a type and has no selected runtime expression to finalize.
+    Type,
+    /// The argument is a checked compile-time value.
+    Value,
+    /// The argument is a checked value that failed constant folding.
+    NonConstantValue,
+};
+
 FIDDLE()
 class GenericAppExpr : public AppExprBase
 {
     FIDDLE(...)
+
+    /// Records the remaining work for each candidate-specific checked argument.
+    ///
+    /// Generic overload resolution fills this list only on a completed candidate and keeps it
+    /// aligned with `arguments`. Once that candidate is selected, semantic finalization consumes
+    /// each value argument, reports a deferred constant-folding failure, and clears the list.
+    List<GenericArgumentCheckState> argumentCheckStates;
 };
 
 // An expression representing re-use of the syntax for a type in more
@@ -835,10 +913,12 @@ class HigherOrderInvokeExpr : public Expr
 
     // For an expression such as `__fwd_diff(Type.method)`, the transformed function type begins
     // with a parameter derived from the method receiver. Nested higher-order operators can add
-    // more than one such parameter. This count identifies the leading parameters that overload
-    // resolution normalizes in a temporary comparison type; the expression itself retains their
-    // actual modes.
-    FIDDLE() uint32_t receiverParameterPrefixCount = 0;
+    // more than one such parameter. `getHigherOrderOverloadComparisonType()` uses this count to
+    // build a comparison-only function type whose receiver-derived parameters use `in`, so receiver
+    // mode cannot change overload selection. `_checkHigherOrderInvokeExpr()` and
+    // `fillHigherOrderInvokeExpr()` preserve the actual modes in the expression's function type.
+    // The concrete higher-order visitors in `ASTExprLowering` consume that type.
+    FIDDLE() uint32_t receiverDerivedParameterCount = 0;
 };
 
 FIDDLE()

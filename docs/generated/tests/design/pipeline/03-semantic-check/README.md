@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: e83103ec54fcd5e744037c992bf474bc60b77b8f4a2be4b208dca62cbafafc89
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 9779a3c2083386f0d3c247aea24e9704ba0ada5ac04c623fcff2afbbed031a23
 source_doc: docs/generated/design/pipeline/03-semantic-check.md
-source_doc_digest: fab98eedc56fcfd300d17ce39b737ca6a061bdbd585935b889c3eb89dfc531b9
+source_doc_digest: 64cb8eeabfc429229ac4a0e2ffd9834d29b0c0a605b9cae8eb18d1330f3de3f4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -181,7 +181,7 @@ entry-point rules — is what the tests exercise.
 80. With the gate open the interface may not be generic (`E33072`).
 81. It may not declare an associated type (`E33073`).
 82. It may not declare a generic method (`E33074`).
-83. It may not declare a `[mutating]` method (`E33075`).
+83. It may not declare a callable whose computed receiver mode requires writable storage (`E33075`), including an explicitly `[mutating]` method, an HLSL method with the implicit writable default, or a setter.
 84. It may not declare a `[Differentiable]` method (`E33076`).
 85. It may not declare a non-`dyn` base interface (`E33077`).
 86. A conforming type may not acquire the conformance through an `extension` (`E33078`).
@@ -237,7 +237,7 @@ entry-point rules — is what the tests exercise.
 | The synthesized `fwd_diff` member is itself given the differentiable conformances, so `fwd_diff(fwd_diff(f))` resolves through ordinary lookup.                                                                        | boundary   | [#differentiability-as-interface-conformance](../../../../design/pipeline/03-semantic-check.md#differentiability-as-interface-conformance) | [`differentiable-higher-order-fwd-diff.slang`](differentiable-higher-order-fwd-diff.slang)                                                         |
 | A type conforming to a `dyn interface` may not acquire the conformance through an `extension` (E33078) nor be generic (E33082), and its fields may be neither unsized (E33079), opaque (E33080), nor non-copyable (E33081). | negative   | [#dyn-interface-restrictions](../../../../design/pipeline/03-semantic-check.md#dyn-interface-restrictions)                                 | [`dyn-interface-conformer-restrictions-rejected.slang`](dyn-interface-conformer-restrictions-rejected.slang)                                       |
 | The `dyn interface` validation is a no-op unless the module's language version is 2026 or later, so the same source that `-std 2026` rejects compiles under the default `-std`.                                        | functional | [#dyn-interface-restrictions](../../../../design/pipeline/03-semantic-check.md#dyn-interface-restrictions)                                 | [`dyn-interface-restrictions-inactive-under-default-std.slang`](dyn-interface-restrictions-inactive-under-default-std.slang)                       |
-| With the gate open, a `dyn interface` may not be generic (E33072) nor declare an associated type (E33073), a generic method (E33074), a `[mutating]` method (E33075), a `[Differentiable]` method (E33076), or a non-`dyn` base interface (E33077). | negative   | [#dyn-interface-restrictions](../../../../design/pipeline/03-semantic-check.md#dyn-interface-restrictions)                                 | [`dyn-interface-declaration-restrictions-rejected.slang`](dyn-interface-declaration-restrictions-rejected.slang)                                   |
+| With the gate open, a `dyn interface` may not be generic (E33072), declare an associated type (E33073), a generic method (E33074), a callable whose computed receiver mode requires writable storage (E33075), a `[Differentiable]` method (E33076), or inherit a non-`dyn` interface (E33077). | negative | [#dyn-interface-restrictions](../../../../design/pipeline/03-semantic-check.md#dyn-interface-restrictions) | [`dyn-interface-declaration-restrictions-rejected.slang`](dyn-interface-declaration-restrictions-rejected.slang) |
 | A bare discarded constructor call is deliberately excluded from the `[NoDiscard]` check, so only the discarded ordinary call in the same body is reported (E30059).                                                    | boundary   | [#failure-modes](../../../../design/pipeline/03-semantic-check.md#failure-modes)                                                           | [`nodiscard-bare-constructor-call-excluded.slang`](nodiscard-bare-constructor-call-excluded.slang)                                                 |
 | An undefined identifier that is one edit away from an in-scope name carries a conservative did-you-mean suggestion on the diagnostic.                                                                                  | negative   | [#failure-modes](../../../../design/pipeline/03-semantic-check.md#failure-modes)                                                           | [`undefined-identifier-did-you-mean.slang`](undefined-identifier-did-you-mean.slang)                                                               |
 | Check-level recovery substitutes an error type for an unresolved name, so a second, unrelated error in the next statement is still reported.                                                                           | negative   | [#failure-modes](../../../../design/pipeline/03-semantic-check.md#failure-modes)                                                           | [`recovery-error-type-does-not-cascade.slang`](recovery-error-type-does-not-cascade.slang)                                                         |

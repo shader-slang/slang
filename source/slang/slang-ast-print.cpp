@@ -7,6 +7,18 @@
 namespace Slang
 {
 
+/// Returns a reference to the declaration wrapped directly by `genericDeclRef`.
+///
+/// `getMemberDeclRef()` forms the inner reference and preserves the substitutions contributed by
+/// the generic wrapper.
+static DeclRef<Decl> _getInnerGenericDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericDecl> genericDeclRef)
+{
+    SLANG_RELEASE_ASSERT(genericDeclRef.getDecl()->inner);
+    return astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
+}
+
 ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 {
     typedef ASTPrinter::Part::Kind Kind;
@@ -1636,14 +1648,12 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
 
 void ASTPrinter::addDeclKindPrefix(Decl* decl)
 {
-    if (auto genericDecl = as<GenericDecl>(decl))
-    {
-        SLANG_RELEASE_ASSERT(genericDecl->inner);
-        decl = genericDecl->inner;
-    }
+    decl = maybeGetInner(decl);
     for (auto modifier : decl->modifiers)
     {
-        // `addDeclParams` prints the trailing modifier after the function parameter list.
+        // A C++-style trailing `const` is not printed with the other declaration modifiers because
+        // it belongs after the parameter list, not before the declaration. `addDeclParams()` prints
+        // it in that position.
         if (as<CppStyleTrailingThisParamConstModifier>(modifier))
             continue;
 
@@ -1757,13 +1767,9 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
 
 void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
 {
-    DeclRef<Decl> declRef = inDeclRef;
+    auto declRef = inDeclRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
-    {
-        SLANG_RELEASE_ASSERT(genericDeclRef.getDecl()->inner);
-        declRef =
-            m_astBuilder->getMemberDeclRef<Decl>(genericDeclRef, genericDeclRef.getDecl()->inner);
-    }
+        declRef = _getInnerGenericDeclRef(m_astBuilder, genericDeclRef);
 
     if (declRef.as<ConstructorDecl>())
     {
@@ -1791,22 +1797,20 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
 {
     addDeclKindPrefix(declRef.getDecl());
     addDeclPath(declRef);
-    addDeclParams(declRef);
 
-    // `addDeclParams` prints only the parameter list represented by its declaration. For
-    // `f<T>(T value) const`, language-server signature help calls it on the `GenericDecl` while the
-    // cursor is inside `<...>` and must receive only `<T>`. A complete declaration signature must
-    // instead include `<T>(T value) const`, so append the inner declaration's parameter list here.
-    // This call does nothing when the generic wraps a declaration other than a callable.
+    // A generic callable declaration is represented by a `GenericDecl` whose inner declaration
+    // owns the callable parameter list. `addDeclParams()` prints one declaration's clause because
+    // signature help also calls it for an individual clause. `addDeclSignature()` prints the outer
+    // generic clause first, then forms the substituted inner reference and prints its callable
+    // clause.
+    addDeclParams(declRef);
+    auto resultDeclRef = declRef;
     if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        SLANG_RELEASE_ASSERT(genericDeclRef.getDecl()->inner);
-        auto innerDeclRef = m_astBuilder->getMemberDeclRef<Decl>(
-            genericDeclRef,
-            genericDeclRef.getDecl()->inner);
-        addDeclParams(innerDeclRef);
+        resultDeclRef = _getInnerGenericDeclRef(m_astBuilder, genericDeclRef);
+        addDeclParams(resultDeclRef);
     }
-    addDeclResultType(declRef);
+    addDeclResultType(resultDeclRef);
 }
 
 /* static */ String ASTPrinter::getDeclSignatureString(

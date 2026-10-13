@@ -231,7 +231,10 @@ Val* SemanticsVisitor::ExtractGenericArgVal(
     {
         if (!exp->type.type)
         {
-            CheckExpr(exp);
+            // Integer extraction performs the contextual coercion and finalizes the selected
+            // expression afterward. `CheckExpr()` here would finalize before that coercion and
+            // consume the same selected receiver path twice.
+            exp = CheckTerm(exp);
         }
         return ExtractGenericArgInteger(
             exp,

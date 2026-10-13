@@ -1,21 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=gpt-6.1-sol
+//META: generated_at=2026-10-13T10:55:00Z
+//META: source_commit=32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=ce74e751abd83caf10326ac968c3af12829a5d0d24575d5595ca7f1148931ff5
-//META: purpose=When the scope walk reaches an enclosing aggregate type it rewrites the request into member lookup with an implicit This breadcrumb, and that rewrite still fires from several block scopes deep inside a method body.
+//META: doc_section_digest=43e51aa8f8900cb25c2253ee8c4a700f294af52f3a04c9121c8e46e771ee0e72
+//META: purpose=When the scope walk reaches an enclosing aggregate with a receiver available, _lookUpInScopes rewrites the request into member lookup and records ThisValue even from nested blocks.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the container-kind dispatch of the scope walk on its
-// deepest documented shape: the reference to the field `x` sits two
-// nested blocks inside the method, so the walk crosses both block
-// scopes before it recognizes the struct container and rewrites the
-// request into a member lookup carrying the implicit `this`. CHECK
-// asserts 50 + 3, which only comes out if `x` bound to the receiver's
-// field rather than failing to resolve.
+// The reference to `x` sits two nested blocks inside the method. `_lookUpInScopes` crosses both
+// block scopes before it reaches the struct, rewrites the request as member lookup, and records a
+// structural `ThisValue` step. `ConstructLookupResultExpr` replays that step, so `x` binds to the
+// receiver's field.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

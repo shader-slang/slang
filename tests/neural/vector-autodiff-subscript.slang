@@ -35,8 +35,9 @@ float readElement<Vector>(Vector value)
 Vector writeElement<Vector>(Vector value, float newValue)
     where Vector : IVector<float>
 {
-    value[1] = newValue;
-    return value;
+    var result = value;
+    result[1] = newValue;
+    return result;
 }
 
 bool[4] testVectorAutodiffSubscript<Vector>(

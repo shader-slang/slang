@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 671b9ed682adbf414a55ec67fa68b82abc91c2aea9c886087f23ead3285a7c2d
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 2ed1a75f24b0c2b2985c1b6c0789be6b1885d0d01c64b657d94958c278c76d13
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 

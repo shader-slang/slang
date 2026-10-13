@@ -27,6 +27,10 @@ concern, so `pipeline_stage=parse` dominates this bundle.
      `ConstructorDecl`, `PropertyDecl`, `SubscriptDecl`, `CBufferDecl`,
      `NamespaceDecl`, etc. — verify by exercising the smallest body
      that observes the production parses and links.
+     Cover the dedicated HLSL trailing-`const` function suffix in its
+     documented position between `)` and any `throws`, result, or
+     `where` clause. Also cover non-HLSL recovery and the targeted
+     rejection after constructors, accessors, and subscripts.
    - **expression-precedence and associativity claims** — the
      precedence ladder under `## Expressions`. Verify by computing a
      result that distinguishes one bracketing from another (e.g.

@@ -105,6 +105,13 @@ result`, `lower-to-IR`, `module` (in the compile sense), `prelude`,
 `syntax-decl`, `target`, `translation unit`, `two-stage parsing`,
 `witness table`.
 
+When the source defines `lookup breadcrumb`, describe the current
+`LookupBreadcrumbStep` abstraction: its five `Kind` values, typed
+`make*` factories and kind-specific `get*` accessors, and the separate
+linked `LookupResultItem_Breadcrumb` wrapper.
+Do not describe its private storage as public `.kind`, `.declRef`,
+`.val`, or `.thisValueScope` fields.
+
 General-theory floor:
 
 `abstract syntax tree`, `control-flow graph`, `dataflow analysis`,

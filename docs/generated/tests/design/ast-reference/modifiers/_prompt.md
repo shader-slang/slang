@@ -130,9 +130,10 @@ parser-time representation. These are unobservable through
 - That `MemoryQualifierSetModifier` aggregates a bitmask of
   GLSL memory qualifiers (only the resulting GLSL emit is
   observable, and SPIR-V emit through GLSL is GPU-bound).
-- That `SynthesizedModifier`, `IgnoreForLookupModifier`,
-  `VarReassignedModifier`, `ExistentialOpenedOnVarModifier` are
-  internal checker-only flags (no user spelling).
+- That `SynthesizedModifier`, `SynthesizedParamPassingModeModifier`,
+  `IgnoreForLookupModifier`, `VarReassignedModifier`, and
+  `ExistentialOpenedOnVarModifier` are internal compiler-only state
+  with no user spelling.
 - That `IntrinsicOpModifier`, `TargetIntrinsicModifier`,
   `BuiltinTypeModifier`, `MagicTypeModifier`, `BuiltinModifier`
   are core-module-only and not user-spellable.
@@ -224,6 +225,15 @@ Modifier/attribute claims split into two observation styles:
   assignment, `static` survives across calls). Use
   `//TEST:INTERPRET(filecheck=CHECK):` with a `printf` that
   observes the resulting value.
+- **Receiver suffix** — cover HLSL trailing `const` as a read-only
+  receiver request on a value-type method, and keep its behavioral
+  claim distinct from prefix `ConstModifier`. Also cover that a Slang
+  `ClassDecl` rejects the receiver-mode specifier and retains its fixed
+  `in` receiver. Treat duplicate and conflicting receiver-mode
+  spellings as one mutually-exclusive family whose invalid combinations
+  recover to the declaration's fallback. Record the checked
+  `ThisParamInfoAttribute` representation and its ABI-only mangling
+  provenance field as untestable internal AST facts.
 
 Per `_common.md`'s multi-backend rule, when the modifier's emit
 spelling is target-specific, prefer ONE target where the role is

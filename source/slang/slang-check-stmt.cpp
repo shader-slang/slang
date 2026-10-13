@@ -74,27 +74,16 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 
 void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
 {
-    // When we encounter a declaration during statement checking,
-    // it may already be partly checked, for example by a parser-time
-    // lookup that decides what `a <` means, so we bottleneck through
-    // the `ensureDecl()` path to unify with the rest of semantic checking.
-    //
-    // TODO: This logic might not suffice for something like a
-    // local `struct` declaration, where it would have members
-    // that need to be recursively checked.
-    //
+    // `ensureDecl()` preserves declaration-state ordering when a semantic dependency has already
+    // advanced the declaration to an earlier state. It resumes at the first unfinished state.
     ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
     decl->hiddenFromLookup = false;
-    if (auto varDecl = as<VarDeclBase>(decl))
-    {
-        if (varDecl->initExpr)
-            varDecl->initExpr = maybeFinalizeSelectedExpressionPath(varDecl->initExpr);
-    }
 }
 
 void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
 {
-    // Make sure to fully check all nested agg type decls first.
+    // `visitBlockStmt()` fully checks nested aggregate declarations before their surrounding
+    // statements.
     if (stmt->scopeDecl)
     {
         for (auto aggDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<AggTypeDeclBase>())
@@ -292,8 +281,12 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = maybeFinalizeSelectedExpressionPath(e);
-    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
+    e = coerceAndFinalizeForStorageUse(
+        CoercionSite::General,
+        m_astBuilder->getBoolType(),
+        e,
+        getSink(),
+        AbstractStorageUse::ReadValue);
     return e;
 }
 
@@ -324,7 +317,8 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         // Use special context for for-loop side effect to allow comma operators without warning
         SemanticsContext sideEffectContext = withInForLoopSideEffect();
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
-        stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+        stmt->sideEffectExpression =
+            subExprVisitor.checkExpressionForDiscard(stmt->sideEffectExpression);
 
         // A `for` loop's side-effect expression also discards its result.
         maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
@@ -341,12 +335,14 @@ Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(
     IntVal** outIntVal,
     ConstantFoldingKind kind)
 {
-    expr = CheckExpr(expr);
-    auto intVal = CheckIntegerConstantExpression(
+    expr = CheckTerm(expr);
+    auto intVal = checkAndFinalizeIntegerConstantExpression(
         expr,
         IntegerConstantExpressionCoercionType::AnyInteger,
         nullptr,
-        kind);
+        kind,
+        getSink(),
+        nullptr);
     if (outIntVal)
         *outIntVal = intVal;
     return expr;
@@ -460,14 +456,21 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     if (!switchStmt)
         return;
 
-    // Check that the type for the `case` is consistent with the type for the `switch`.
-    auto expr = CheckExpr(stmt->expr);
-    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr, getSink());
+    // `visitCaseStmt()` uses the switch condition type to select and coerce the case expression.
+    // Its `coerceAndFinalizeForStorageUse()` call is the only operation here that finalizes the
+    // selected expression and validates its abstract-storage access as `ReadValue`. Constant
+    // folding below only inspects the finalized result.
+    auto expr = CheckTerm(stmt->expr);
+    expr = coerceAndFinalizeForStorageUse(
+        CoercionSite::Argument,
+        switchStmt->condition->type,
+        expr,
+        getSink(),
+        AbstractStorageUse::ReadValue);
 
-    // coerce to type being switch on, and ensure that value is a compile-time constant
-    // The Vals in the AST are pointer-unique, making them easy to check for duplicates
-    // by addeing them to a HashSet.
-    auto exprVal = checkConstantIntVal(expr);
+    // Constant values are pointer-unique, so later validation can detect duplicate cases with a
+    // HashSet.
+    auto exprVal = checkConstantIntValFromFinalizedExpr(expr);
 
     stmt->expr = expr;
     stmt->exprVal = exprVal;
@@ -595,6 +598,7 @@ void SemanticsStmtVisitor::visitDiscardStmt(DiscardStmt*)
 void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
 {
     auto function = getParentFunc();
+    auto refAccessor = m_parentLambdaDecl ? nullptr : as<RefAccessorDecl>(function);
     Type* returnType = nullptr;
     Type* expectedReturnType = nullptr;
     if (m_parentLambdaDecl)
@@ -615,14 +619,45 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     }
     else
     {
-        stmt->expression = CheckExpr(stmt->expression);
+        const bool hasDeclaredReturnType =
+            m_parentLambdaExpr == nullptr && expectedReturnType != nullptr;
+        if (hasDeclaredReturnType)
+        {
+            // `coerceAndFinalizeForStorageUse()` can select an overload or bound method while
+            // coercing to the declared result type, and it is the only operation here that calls
+            // `finalizeSelectedExpression()`. Checking the expression as an untyped value first
+            // would finalize every evaluated child a second time.
+            stmt->expression = CheckTerm(stmt->expression);
+        }
+        else
+        {
+            stmt->expression = checkExpressionWithoutStorageUse(stmt->expression);
+        }
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
-            if (!m_parentLambdaExpr && expectedReturnType)
+            if (hasDeclaredReturnType)
+            {
+                auto returnUse = refAccessor ? AbstractStorageUse::RequireAddress
+                                             : AbstractStorageUse::ReadValue;
+                stmt->expression = coerceAndFinalizeForStorageUse(
+                    CoercionSite::Return,
+                    expectedReturnType,
+                    stmt->expression,
+                    getSink(),
+                    returnUse);
+            }
+            else
             {
                 stmt->expression =
-                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
+                    checkAbstractStorageUse(stmt->expression, AbstractStorageUse::ReadValue);
+            }
+
+            if (refAccessor && !IsErrorExpr(stmt->expression) &&
+                !stmt->expression->type.isLeftValue)
+            {
+                getSink()->diagnose(Diagnostics::RefAccessorReturnMustBeLValue{
+                    .expression = stmt->expression});
             }
         }
     }
@@ -713,7 +748,7 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
-    stmt->expression = CheckExpr(stmt->expression);
+    stmt->expression = checkExpressionForDiscard(stmt->expression);
     // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
     // comparison may be either a resolved `operator==` call or a builtin fast-path
     // `BuiltinOperatorExpr` (the common scalar case).

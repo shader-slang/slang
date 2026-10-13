@@ -47,6 +47,11 @@ overload resolution, or interface conformance.
    adds default conformance witnesses, generated members, etc.
 8. `## Failure modes` — diagnostics and recovery; link
    [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).
+9. Under the `dyn interface` restrictions, explain that `E33075`
+   rejects every callable member whose computed effective receiver
+   mode requires writable storage, including an explicit `[mutating]`
+   method, an HLSL-default method, and a setter. Do not describe the
+   rule as a check for one source spelling.
 
 ## Quality checklist (in addition to the universal one)
 

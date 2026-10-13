@@ -36,11 +36,12 @@ static const CoopMatMatrixLayout matrixLayout = CoopMatMatrixLayout::RowMajor;
 
 void squareCoopMatElements(CoopMatType mat)
 {
+    CoopMatType mutableMat = mat;
     for (int i = 0; i < 4; ++i)
     {
-        mat[i] = mat[i] * mat[i];
+        mutableMat[i] = mutableMat[i] * mutableMat[i];
     }
-    mat.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
+    mutableMat.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
 }
 
 [shader("compute")]

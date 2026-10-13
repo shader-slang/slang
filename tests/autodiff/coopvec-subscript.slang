@@ -21,8 +21,9 @@ CoopVec<T, VectorSize> writeElement<T : __BuiltinFloatingPointType>(
     CoopVec<T, VectorSize> value,
     T newValue)
 {
-    value[1] = newValue;
-    return value;
+    CoopVec<T, VectorSize> mutableValue = value;
+    mutableValue[1] = newValue;
+    return mutableValue;
 }
 
 [Differentiable]

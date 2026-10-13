@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: d62ed3d2d5e78332b69f58ddf07b9770380e9c7a11a3789d113d04ab3161c0de
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 89dce55401a010feaf742a3296995314b25cf48966219b2a6545753ab9643770
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -294,9 +294,11 @@ generic parameter's `where` / `<T : I>` bound).
 ### Function-style declarations
 
 ```
-FuncDecl        ::= 'func' IDENT GenericParams? '(' ParamList? ')' ('throws' Type)? ('->' Type)?
+FuncDecl        ::= 'func' IDENT GenericParams? '(' ParamList? ')' TrailingThisParamConst?
+                    ('throws' Type)? ('->' Type)?
                     WhereClause? FuncBody                      -- parseFuncDecl
-                  | Type IDENT GenericParams? '(' ParamList? ')' ('throws' Type)?
+                  | Type IDENT GenericParams? '(' ParamList? ')' TrailingThisParamConst?
+                    ('throws' Type)? SemanticList?
                     WhereClause? FuncBody                      -- C-style header (context-sensitive)
                                                               -- the leading Type is the return type;
                                                               -- type-vs-name disambiguation is heuristic;
@@ -336,6 +338,12 @@ Param           ::= ModifierList? Type IDENT ('=' ArgExpr)?    -- traditional, t
                                                               --   _peekModernStyleVarDecl succeeds; the
                                                               --   ':' Type is optional)
 
+TrailingThisParamConst
+                ::= 'const'+                                  -- HLSL-only receiver qualifier;
+                                                               -- parseCppStyleTrailingThisParamConstModifiers
+
+SemanticList    ::= (':' Semantic)+                            -- _parseOptSemantics; traditional form only
+
 WhereClause     ::= ('where' WhereTerm)+                       -- maybeParseGenericConstraints
 WhereTerm       ::= 'optional'? Type ':' Type (',' Type)*      -- conformance constraint(s)
                   | 'optional'? Type '==' Type                 -- equality constraint
@@ -361,6 +369,34 @@ AccessorDecl    ::= ModifierList? AccessorName ('(' ParamList? ')')? FuncBody
 AccessorName    ::= 'get' | 'set' | 'ref'        -- parseAccessorDecl; any other
                                                   -- accessor name is diagnosed (Unexpected)
 ```
+
+`TrailingThisParamConst` is a suffix of `FuncDecl`, not an ordinary
+prefix `const` modifier. The parser accepts one or more consecutive
+`const` tokens immediately after either function parameter-list form,
+before any `throws` clause, return semantic, arrow result, or `where`
+clause
+([slang-parser.cpp lines
+2426-2443, 2488-2494, and
+5575-5600](../../../../source/slang/slang-parser.cpp)). Each token
+becomes a dedicated `CppStyleTrailingThisParamConstModifier`, so later
+semantic checking can diagnose duplicate or conflicting receiver-mode
+specifiers.
+
+The spelling is valid only in the HLSL dialect. Outside HLSL, semantic
+checking reports `E30443` and suggests Slang's `[nonmutating]` or
+`[mutating]` attributes. For a declaration with a configurable
+value-type receiver, recovery retains the requested read-only mode so
+checking can continue. A Slang `ClassDecl` method instead rejects every
+receiver-mode specifier and retains its fixed `in` receiver.
+
+A trailing `const` after a constructor, accessor, or subscript
+parameter list is not part of that declaration's grammar. The parser
+consumes each misplaced token, reports `E20105`, and resumes at the
+body, result type, or `where` clause instead of producing unrelated
+recovery diagnostics
+([slang-parser.cpp lines
+2445-2455, 5161-5165, 5222-5228, and
+5286-5292](../../../../source/slang/slang-parser.cpp)).
 
 A `__func_extension` names the higher-order form it is defining and
 then gives that form's signature. Its parameters go through

@@ -67,8 +67,11 @@ check, so a single directive per claim is sufficient (the
      `f` resolves through `anon1.f` via a `Deref` + `Member`
      breadcrumb chain.
    - `#breadcrumbs` — the breadcrumb-walk produces canonical
-     navigation, observable through a `this.g` resolution inside a
-     method.
+     navigation, observable through an unqualified field resolution
+     inside an instance method. Lookup records a structural
+     `ThisValue` or `ThisType` step, never a receiver mode; ordinary
+     `this` checking determines the reconstructed receiver's exact
+     type and mutability.
    - `#block-local-shadowing` — `hiddenFromLookup`; a forward
      reference is rejected.
    - `#container-level-overload-accumulation` — same-name decls
@@ -116,6 +119,24 @@ check, so a single directive per claim is sufficient (the
      `ConstantBuffer<T>` member is reachable through unqualified
      name (transparent + deref breadcrumb pair) or through `cb.x`
      (deref breadcrumb).
+   - Any test that observes constructor, setter, or method `this`
+     behavior must describe the ownership boundary accurately.
+     `_lookUpInScopes` records `ThisValue`, and
+     `ConstructLookupResultExpr` replays that step. For a setter or
+     method, `checkAndAttachEffectiveThisParamInfo` publishes the
+     effective receiver information during signature checking, and
+     `checkThisExpr` reads it to determine the reconstructed receiver's
+     type and value category. A constructor has no effective receiver
+     parameter; `checkThisExpr` supplies its constructor-local writable
+     `this` value. Do not claim that lookup reads a receiver modifier or
+     stores mutability in the breadcrumb.
+   - Treat declaration-reference reconstruction separately.
+     `ConstructLookupResultExpr` may omit a leading `ThisValue` only
+     when the remaining chain is empty or contains only `SuperType`
+     steps, producing a base-less `VarExpr` declaration reference.
+     A following `Member` or `Deref` step requires the receiver because
+     that path traverses runtime storage, so reconstruction retains it
+     for capture validation.
 
 5. Naming: `<algorithm-aspect>-<axis>.slang`, e.g.
    `unqualified-walks-to-parent.slang`,

@@ -2,13 +2,11 @@
 
 // Regression test for https://github.com/shader-slang/slang/issues/13426
 //
-// A `<` after a value that does not check to a DeclRefExpr (a swizzle, a tuple
-// element, a member reached through a temporary) must parse as less-than, even when
-// a later `>` is followed by `(`. The file also guards two details of the fix:
-// - rows 8-9 (`p->y`, `p->x`): the checked base is reused, so the `DerefMemberExpr`
-//   is not checked a second time (which reported a false "cannot dereference");
-// - row 18 (`h.o.get<4>()`): a base of unknown kind is not reused, because generic
-//   application rejects the `LetExpr` it checks to.
+// An expression such as `(uv.y < a || uv.y > (a))` contains both angle brackets and a `(` after
+// the closing `>`, so its tokens can resemble a generic application. These cases require the
+// parser to preserve the comparisons after swizzles, tuple elements, dereferenced members, and
+// members reached through temporaries. The final two cases verify that genuine generic member
+// applications in the same expression positions still parse as generic applications.
 //
 // Inputs: uv = (0.25, 0.75), x = 0.75, a = 0.5 lies between uv.x and uv.y, and b = 0.75
 // equals uv.y and x, so a strict comparison of those against b never holds.

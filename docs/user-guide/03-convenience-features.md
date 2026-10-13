@@ -166,14 +166,27 @@ int rs = foo.staticMethod(a,b);
 
 ### Receiver mutability
 
-An instance method, or an accessor of an instance property or subscript, has an implicit `this` parameter for the receiver of the method or accessor call.
-A module-scope accessor, or an accessor of a `static` property or subscript, has no instance receiver.
+Each instance method and each accessor of an instance property or subscript
+has an implicit `this` parameter.
+This parameter represents the receiver of the method or accessor call.
+A module-scope accessor, or an accessor of a `static` property or subscript,
+has no instance receiver.
 
-For a method declared on a value type such as a `struct`, the `this` parameter is read-only by default, so the method body cannot modify the receiver.
-A copyable receiver uses the `in` parameter-passing mode; a non-copyable receiver instead uses a read-only borrow because it cannot be copied into the method.
-A property or subscript getter has the same read-only default, while a setter is mutating by default.
+For an instance method declared on a value type such as a `struct`,
+the implicit `this` parameter uses the `in` parameter-passing mode by default
+and is immutable in the method body.
+When the receiver type cannot be copied,
+the compiler adjusts this default to the borrowing `constref` mode,
+which is also immutable.
+For accessors declared on a value type,
+getters and `ref` accessors follow the same rule,
+while setters default to `inout`.
 
-You can apply the `[mutating]` attribute to a method or accessor declaration to change the mode of the `this` parameter to `inout`, which lets the method or accessor body modify the receiver:
+You can apply the `[mutating]` attribute to a declaration
+to change the mode of the `this` parameter to `inout`,
+which lets a method body mutate the receiver.
+The same attribute can be applied to an accessor declaration
+to let the accessor body mutate its receiver:
 
 ```slang
 struct Foo
@@ -183,29 +196,36 @@ struct Foo
     [mutating]
     void setCount(int x) { count = x; }
 
-    // This would fail to compile.
+    // Without `[mutating]`, assigning to `count` would be an error.
     // void setCount2(int x) { count = x; }
 }
 
 void test()
 {
     Foo f;
-    f.setCount(1); // Compiles.
+    f.setCount(1);
 }
 ```
 
-You can apply the `[nonmutating]` attribute to a method or accessor declaration to request a read-only `this` parameter, which prevents the method or accessor body from modifying the receiver.
-The compiler uses `in` for a copyable receiver and a read-only borrow for a non-copyable receiver.
-This attribute is useful on a setter declared on a value type because a setter is mutating by default.
+You can apply the `[nonmutating]` attribute to a method or accessor declaration
+to select a read-only `this` parameter explicitly.
+A copyable receiver then uses the `in` mode,
+while a non-copyable receiver uses the borrowing `constref` mode.
+Applying `[nonmutating]` to a setter declaration
+changes the setter's default writable receiver to the same read-only mode.
 
-A method or accessor declared on a Slang `class` always has an `in` `this` parameter.
-The compiler rejects receiver-mode specifiers on such declarations.
+A method or accessor declaration can have at most one receiver-mode specifier.
+Repeating one spelling or combining different receiver-mode spellings is an error.
+The receiver mode does not distinguish overloads.
+Declarations whose explicit parameter signatures are otherwise identical are redeclarations
+and must select the same effective receiver mode.
 
-The parameter-passing mode of `this` does not distinguish overloads.
-Declarations with otherwise identical signatures belong to the same redeclaration family regardless of that mode.
-Their effective `this` parameter modes must then agree: equivalent spellings are compatible, while different modes produce a receiver-mismatch diagnostic.
+An instance method or accessor declared on a Slang `class` always has an `in` `this` parameter.
+Receiver-mode attributes are not allowed on methods or accessors declared on a class.
 
-For the corresponding rules in the HLSL dialect, see [The HLSL-Flavored Dialect](a1-06-hlsl-dialect.md#member-function-receivers).
+These explicit receiver-mode attributes retain the same meanings in HLSL-dialect code.
+For the HLSL dialect's different default and its trailing-`const` syntax,
+see [The HLSL-Flavored Dialect](a1-06-hlsl-dialect.md#member-function-receivers).
 
 ## Properties
 

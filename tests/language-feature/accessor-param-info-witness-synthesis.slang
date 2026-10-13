@@ -42,6 +42,41 @@ struct BorrowingSubscriptImpl : IBorrowingSubscript
     }
 }
 
+// A nonmutating getter can satisfy a requirement with a writable receiver. Witness synthesis
+// adapts the requirement's receiver ABI to the implementation's by-value receiver ABI for both
+// properties and subscripts.
+interface IMutatingPropertyGetter
+{
+    property int item
+    {
+        [mutating] get;
+    }
+}
+
+struct NonmutatingPropertyGetterImpl : IMutatingPropertyGetter
+{
+    property int item
+    {
+        [nonmutating] get { return 0; }
+    }
+}
+
+interface IMutatingSubscriptGetter
+{
+    __subscript(int index) -> int
+    {
+        [mutating] get;
+    }
+}
+
+struct NonmutatingSubscriptGetterImpl : IMutatingSubscriptGetter
+{
+    __subscript(int index) -> int
+    {
+        [nonmutating] get { return index; }
+    }
+}
+
 // The synthesized property setter preserves the requirement's BorrowIn value parameter and loads
 // it before forwarding to the implementation's In parameter.
 // CHECK-LABEL: [nameHint("BorrowingPropertyImpl")]
@@ -57,3 +92,28 @@ struct BorrowingSubscriptImpl : IBorrowingSubscript
 // CHECK: param [[SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : BorrowInParam(Int,
 // CHECK: let [[LOADED_SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : Int = load([[SUBSCRIPT_INDEX]])
 // CHECK: call {{.*}}({{.*}}, [[LOADED_SUBSCRIPT_INDEX]])
+
+// The synthesized property witness receives the writable address required by the interface,
+// loads the implementation value, and passes that value to the nonmutating getter.
+// CHECK-LABEL: [nameHint("NonmutatingPropertyGetterImpl")]
+// CHECK: [nameHint("NonmutatingPropertyGetterImpl.item.get")]
+// CHECK-NEXT: func [[PROPERTY_GETTER:%[A-Za-z0-9_]+]] : Func(Int, %NonmutatingPropertyGetterImpl)
+// CHECK: func {{.*}} : Func(Int, BorrowInOutParam(%NonmutatingPropertyGetterImpl))
+// CHECK: param [[PROPERTY_THIS:%[A-Za-z0-9_]+]] : BorrowInOutParam(%NonmutatingPropertyGetterImpl)
+// CHECK: let [[LOADED_PROPERTY_THIS:%[A-Za-z0-9_]+]] : %NonmutatingPropertyGetterImpl =
+// CHECK-SAME: load([[PROPERTY_THIS]])
+// CHECK: call [[PROPERTY_GETTER]]([[LOADED_PROPERTY_THIS]])
+
+// The synthesized subscript witness performs the same receiver adaptation and forwards the
+// ordinary index parameter unchanged.
+// CHECK-LABEL: [nameHint("NonmutatingSubscriptGetterImpl")]
+// CHECK: [nameHint("NonmutatingSubscriptGetterImpl.operator[].get")]
+// CHECK-NEXT: func [[SUBSCRIPT_GETTER:%[A-Za-z0-9_]+]] :
+// CHECK-SAME: Func(Int, %NonmutatingSubscriptGetterImpl, Int)
+// CHECK: func {{.*}} : Func(Int, BorrowInOutParam(%NonmutatingSubscriptGetterImpl), Int)
+// CHECK: param [[SUBSCRIPT_THIS:%[A-Za-z0-9_]+]] :
+// CHECK-SAME: BorrowInOutParam(%NonmutatingSubscriptGetterImpl)
+// CHECK: param [[ORDINARY_SUBSCRIPT_INDEX:%[A-Za-z0-9_]+]] : Int
+// CHECK: let [[LOADED_SUBSCRIPT_THIS:%[A-Za-z0-9_]+]] : %NonmutatingSubscriptGetterImpl =
+// CHECK-SAME: load([[SUBSCRIPT_THIS]])
+// CHECK: call [[SUBSCRIPT_GETTER]]([[LOADED_SUBSCRIPT_THIS]], [[ORDINARY_SUBSCRIPT_INDEX]])

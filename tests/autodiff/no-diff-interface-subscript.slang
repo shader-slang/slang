@@ -62,8 +62,9 @@ float genericSubscriptTest<T : IIndexable>(T obj, float x)
 [ForwardDifferentiable]
 float genericSubscriptSetTest<T : IIndexableRW, U : IValue>(T obj, U src, float y)
 {
-    obj[0] = src.value;
-    return obj[0] * y;
+    T mutableObj = obj;
+    mutableObj[0] = src.value;
+    return mutableObj[0] * y;
 }
 
 [numthreads(1, 1, 1)]

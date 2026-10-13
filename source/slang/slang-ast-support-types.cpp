@@ -57,28 +57,63 @@ void removeModifier(ModifiableSyntaxNode* syntax, Modifier* toRemove)
     }
 }
 
+Expr* getCallableExprThroughTransparentWrappers(Expr* expr, List<Expr*>* outWrappers)
+{
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+        {
+            if (outWrappers)
+                outWrappers->add(parenExpr);
+            expr = parenExpr->base;
+            continue;
+        }
+        if (auto genericAppExpr = as<GenericAppExpr>(expr))
+        {
+            if (outWrappers)
+                outWrappers->add(genericAppExpr);
+            expr = genericAppExpr->functionExpr;
+            continue;
+        }
+        if (auto letExpr = as<LetExpr>(expr))
+        {
+            if (outWrappers)
+                outWrappers->add(letExpr);
+            expr = letExpr->body;
+            continue;
+        }
+        return expr;
+    }
+}
+
+bool isDirectAddressTupleElementSwizzle(SwizzleExpr* expr)
+{
+    return expr->elementIndices.getCount() == 1 &&
+           as<TupleType>(expr->base->type.type) != nullptr;
+}
+
 Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outLevel)
 {
     HashSet<Expr*> workListSet;
     outLevel = FunctionDifferentiableLevel::None;
-    while (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+    for (;;)
     {
-        if (as<BackwardDifferentiateExpr>(expr))
+        expr = getCallableExprThroughTransparentWrappers(expr);
+        auto higherOrder = as<HigherOrderInvokeExpr>(expr);
+        if (!higherOrder)
+            return expr;
+
+        if (as<BackwardDifferentiateExpr>(higherOrder))
             outLevel = FunctionDifferentiableLevel::Backward;
-        else if (
-            as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
-            outLevel = FunctionDifferentiableLevel::Forward;
-        if (workListSet.add(higherOrder))
+        else if (as<ForwardDifferentiateExpr>(higherOrder))
         {
-            expr = higherOrder->baseFunction;
+            if (outLevel == FunctionDifferentiableLevel::None)
+                outLevel = FunctionDifferentiableLevel::Forward;
         }
-        else
-        {
-            // Circularity, return null.
+        if (!workListSet.add(higherOrder))
             return nullptr;
-        }
+        expr = higherOrder->baseFunction;
     }
-    return expr;
 }
 
 UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)

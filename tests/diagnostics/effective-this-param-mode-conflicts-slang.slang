@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -no-codegen
 
 // Error recovery uses Slang's default `in` receiver after a repeated or conflicting mode
-// specifier. The attempted field mutations below therefore also diagnose.
+// specifier. The checker therefore also diagnoses the attempted field mutations below.
 
 struct Counter
 {
@@ -10,8 +10,8 @@ struct Counter
     [mutating]
     [nonmutating]
     /*CHECK:
-     ^^^^^^^^^^^ duplicate modifier
-     ^^^^^^^^^^^ modifier 'nonmutating' is redundant or conflicting with existing modifier 'mutating'
+     ^^^^^^^^^^^ conflicting receiver-mode specifiers
+     ^^^^^^^^^^^ receiver-mode specifier 'nonmutating' conflicts with earlier specifier 'mutating'
     */
     void conflictingAttributes()
     {

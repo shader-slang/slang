@@ -156,31 +156,6 @@ void emitParamPassingMode(ManglingContext* context, ParamPassingMode mode)
     }
 }
 
-/// Emits the symbol suffix for an ordinary callable's effective `this` parameter mode.
-/// `In` uses no suffix; `BorrowIn`, `BorrowInOut`, `Ref`, and `Out` use `c`, `m`, `r`, and `o`.
-static void emitThisParamMode(ManglingContext* context, ParamPassingMode mode)
-{
-    switch (mode)
-    {
-    case ParamPassingMode::In:
-        break;
-    case ParamPassingMode::Out:
-        emitRaw(context, "o");
-        break;
-    case ParamPassingMode::BorrowInOut:
-        emitRaw(context, "m");
-        break;
-    case ParamPassingMode::BorrowIn:
-        emitRaw(context, "c");
-        break;
-    case ParamPassingMode::Ref:
-        emitRaw(context, "r");
-        break;
-    default:
-        SLANG_UNEXPECTED("unhandled effective `this` parameter mode");
-    }
-}
-
 void emitSimpleIntVal(ManglingContext* context, Val* val)
 {
     if (auto constVal = as<ConstantIntVal>(val))
@@ -906,13 +881,22 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             emitType(context, resolvedFuncType);
         }
 
-        auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, callableDeclRef);
-        auto synthesizedThisMode =
-            thisParamInfo
-                ? callableDeclRef.getDecl()->findModifier<SynthesizedParamPassingModeModifier>()
-                : nullptr;
-        bool isNoDiffThis =
+        auto synthesizedModeModifier =
+            callableDeclRef.getDecl()->findModifier<SynthesizedParamPassingModeModifier>();
+        bool usesMutatingSuffix = false;
+        bool usesRefSuffix = false;
+        bool usesNoDiffThisSuffix =
             !hasDirectFuncType && callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>();
+        if (!hasDirectFuncType && !synthesizedModeModifier)
+        {
+            auto callableDecl = callableDeclRef.getDecl();
+            auto thisParamInfoAttribute = callableDecl->findModifier<ThisParamInfoAttribute>();
+            usesMutatingSuffix = callableDecl->hasModifier<MutatingAttribute>();
+            if (thisParamInfoAttribute &&
+                thisParamInfoAttribute->usesMutatingSuffixForImplicitHLSLReceiver)
+                usesMutatingSuffix = true;
+            usesRefSuffix = callableDecl->hasModifier<RefAttribute>();
+        }
 
         // Include other signature-relevant modifiers.
         bool isFwdDiff = false;
@@ -932,17 +916,33 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             }
         }
 
-        if (!hasDirectFuncType && thisParamInfo && !synthesizedThisMode)
-            emitThisParamMode(context, thisParamInfo->mode);
+        // `emitQualifiedName()` retains the established encoding for programmer-written
+        // declarations. Historically, it emitted `m` and `r` only for `[mutating]` and `[__ref]`;
+        // other spellings that produce the same effective mode emitted no receiver suffix. The
+        // HLSL default is the one new case: its implicit `inout` receiver must use `m` so that it
+        // matches an explicit `[mutating]` redeclaration of the same function.
+        // `checkAndAttachEffectiveThisParamInfo()` records that provenance in
+        // `ThisParamInfoAttribute` because the effective `ParamInfo` alone intentionally does not
+        // preserve written syntax.
+        //
+        // Synthesized witness wrappers are different. Their declaration-owned mode is an internal
+        // ABI fact, and wrappers with distinct modes must not be coalesced by the linker. They use
+        // the `t` marker followed by the general parameter-mode encoding below.
+        if (usesMutatingSuffix)
+            emitRaw(context, "m");
+        if (usesRefSuffix)
+            emitRaw(context, "r");
         if (isFwdDiff)
             emitRaw(context, "f");
         if (isBwdDiff)
             emitRaw(context, "b");
-        if (isNoDiffThis)
+        if (usesNoDiffThisSuffix)
             emitRaw(context, "n");
-        if (synthesizedThisMode)
+        if (synthesizedModeModifier)
         {
-            SLANG_ASSERT(synthesizedThisMode->mode == thisParamInfo->mode);
+            auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, callableDeclRef);
+            SLANG_RELEASE_ASSERT(thisParamInfo.has_value());
+            SLANG_RELEASE_ASSERT(synthesizedModeModifier->mode == thisParamInfo->mode);
             emitRaw(context, "t");
             emitParamPassingMode(context, thisParamInfo->mode);
         }

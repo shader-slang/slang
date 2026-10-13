@@ -82,10 +82,12 @@ __func_extension<T : IFloat> __apply(genericFoo<T>)(T x) -> T
 //CHECK: undefined identifier
 //CHECK: undefined identifier 'missingGenericFuncExtensionBody'.
 
+// A function extension requires a direct reference to its target function. Parentheses around the
+// target do not inherit the transparent-wrapper behavior of ordinary selected expressions.
 __func_extension fwd_diff((foo))(DifferentialPair<float> x) -> DifferentialPair<float>
 {
     return x;
 }
 
-//CHECK: expected a function
-//CHECK: expected a function, got '(DifferentialPair<float>) -> DifferentialPair<float>'
+//CHECK: could not resolve target function in __func_extension
+//CHECK: could not resolve target function in __func_extension.

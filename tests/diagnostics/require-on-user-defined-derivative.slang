@@ -13,6 +13,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry computeMainDiffBwd -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKFWD,non-exhaustive): -target hlsl -entry computeMainDiffFwd -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKGEN,non-exhaustive): -target hlsl -entry computeMainDiffGen -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKCYCLE,non-exhaustive): -target hlsl -entry computeMainDiffCycle -stage compute
 // #11859: plain (non-differentiated) primal calls compile for hlsl (no E36107).
 //TEST:SIMPLE(filecheck=CHECKPLAIN): -target hlsl -entry computeMainPlain -stage compute
 // Positive counter-test: differentiating on a target that DOES provide `spirv`
@@ -35,6 +36,25 @@ void testABwd(inout DifferentialPair<float> x, float result)
 
 [BackwardDerivative(testABwd)]
 float testA(float x)
+{
+    return x * 2;
+}
+
+// Checking this derivative's body reaches the synthesized `testCycle.bwd_diff` adapter before
+// `testCycleBwd` has finished capability checking. The recursive edge must not mark that adapter
+// complete with an empty capability set: the later entry-point use still needs the `spirv`
+// requirement declared here.
+[require(spirv)]
+void testCycleBwd(inout DifferentialPair<float> x, float dResult)
+//CHECKCYCLE: see using of 'testCycleBwd'
+{
+    if (false)
+        bwd_diff(testCycle)(x, dResult);
+    x = {x.p, 0};
+}
+
+[BackwardDerivative(testCycleBwd)]
+float testCycle(float x)
 {
     return x * 2;
 }
@@ -96,7 +116,11 @@ void computeMainDiffFwd(uint3 dispatchThreadID : SV_DispatchThreadID)
      ^^^^^^^^^^^^^^^^^^ error E36107
 */
 {
-    outputBuffer[0] = fwd_diff(testB)(diffPair(2.0, 1.0)).d;
+    // Storing the synthesized derivative as a function value inserts a `FunctionCopy`. Capability
+    // checking must preserve the derivative's `spirv` requirement through that copy even when the
+    // function value is not invoked.
+    let derivative = fwd_diff(testB);
+    outputBuffer[0] = 0.0;
 }
 
 [shader("compute")]
@@ -108,6 +132,18 @@ void computeMainDiffGen(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     var dp = diffPair(2.0, 0.0);
     bwd_diff(testC)(dp, 1.0);
+    outputBuffer[0] = dp.d;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainDiffCycle(uint3 dispatchThreadID : SV_DispatchThreadID)
+/*CHECKCYCLE:
+     ^^^^^^^^^^^^^^^^^^^^ error E36107
+*/
+{
+    var dp = diffPair(2.0, 0.0);
+    bwd_diff(testCycle)(dp, 1.0);
     outputBuffer[0] = dp.d;
 }
 

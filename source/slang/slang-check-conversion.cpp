@@ -735,7 +735,7 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
 
     SemanticsVisitor subVisitor(withSink(&tempSink));
-    Expr* checkedCtorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+    Expr* checkedCtorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
     if (tempSink.getErrorCount())
     {
@@ -941,7 +941,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     auto ctorInvokeExpr =
         _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
 
-    ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+    ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
     if (ctorInvokeExpr)
     {
@@ -1405,6 +1405,11 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                         auto detachedArg = m_astBuilder->create<DetachExpr>();
                         detachedArg->inner = arg;
                         detachedArg->type = arg->type;
+                        detachedArg->abstractStorageAccess =
+                            AbstractStorageAccessPath::makeFixedOperandUse(
+                                m_astBuilder,
+                                arg->abstractStorageAccess,
+                                AbstractStorageUse::ReadValue);
                         arg = detachedArg;
                     }
                 }
@@ -1720,8 +1725,7 @@ bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl
     // current translation unit is the HLSL-flavored dialect. The translation
     // unit request is absent on some paths (e.g. entry-point specialization and
     // reflection), which correctly reads as "not HLSL".
-    auto translationUnit = getShared()->getTranslationUnitRequest();
-    return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
+    return getShared()->isHLSLSourceLanguage();
 }
 
 bool SemanticsVisitor::_coerce(
@@ -1825,29 +1829,12 @@ bool SemanticsVisitor::_coerce(
     {
         if (outToExpr)
         {
-            auto materializedExpr = fromExpr;
-            if (sink && as<FuncType>(toType))
-            {
-                // Consider passing `value.method<int>` to a parameter whose type exactly matches
-                // that specialization. Explicit generic application retained the selected member
-                // expression for this coercion to consume, and exact type equality returns here
-                // without another overload-completion step. Finalize that selected path now.
-                // Conversion-cost probes do not request an output expression or a diagnostic sink,
-                // so they remain side-effect-free.
-                auto callableExpr = materializedExpr;
-                // Parentheses preserve the same callable selection. The marker belongs to the
-                // inner callable, while finalization still traverses the original expression.
-                while (auto parenExpr = as<ParenExpr>(callableExpr))
-                    callableExpr = parenExpr->base;
-
-                SemanticsVisitor materializingVisitor(withSink(sink));
-                materializingVisitor.markSelectedCallableReceiverCheck(
-                    callableExpr,
-                    callableExpr->loc);
-                materializedExpr =
-                    materializingVisitor.maybeFinalizeSelectedExpressionPath(materializedExpr);
-            }
-            *outToExpr = materializedExpr;
+            // Identity coercion returns the selected expression unchanged. `_coerce()` does not
+            // finalize the selected expression; its caller must finalize exactly once after the
+            // enclosing use is known, including callable consumption for a function-typed target.
+            // This separation also prevents cost probes and nested coercions from finalizing the
+            // same selected path more than once.
+            *outToExpr = fromExpr;
         }
         if (outCost)
             *outCost = kConversionCost_None;
@@ -2214,6 +2201,11 @@ bool SemanticsVisitor::_coerce(
                         castExpr->valueArg = fromExpr;
                         castExpr->innerVarDecl = innerVarDecl;
                         castExpr->innerCoercedExpr = innerCoercedExpr;
+                        castExpr->abstractStorageAccess =
+                            AbstractStorageAccessPath::makeFixedOperandUse(
+                                m_astBuilder,
+                                fromExpr->abstractStorageAccess,
+                                AbstractStorageUse::ReadValue);
                         *outToExpr = castExpr;
                     }
                     return true;
@@ -2238,6 +2230,10 @@ bool SemanticsVisitor::_coerce(
                 rsExpr->type = toType;
                 rsExpr->loc = fromExpr->loc;
                 rsExpr->base = fromExpr;
+                rsExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+                    m_astBuilder,
+                    fromExpr->abstractStorageAccess,
+                    AbstractStorageUse::ReadValue);
                 *outToExpr = rsExpr;
             }
             return true;
@@ -2262,6 +2258,11 @@ bool SemanticsVisitor::_coerce(
                 castToTag->type = tagType;
                 castToTag->loc = fromExpr->loc;
                 castToTag->base = fromExpr;
+                castToTag->abstractStorageAccess =
+                    AbstractStorageAccessPath::makeFixedOperandUse(
+                        m_astBuilder,
+                        fromExpr->abstractStorageAccess,
+                        AbstractStorageUse::ReadValue);
                 tagExpr = castToTag;
             }
 
@@ -2328,6 +2329,7 @@ bool SemanticsVisitor::_coerce(
                     if (fromExpr)
                         enumExpr->loc = fromExpr->loc;
                     enumExpr->base = tagExpr;
+                    enumExpr->abstractStorageAccess = tagExpr->abstractStorageAccess;
                     *outToExpr = enumExpr;
                 }
                 setWitnessOfConversionToBuiltinConversion();
@@ -2355,6 +2357,11 @@ bool SemanticsVisitor::_coerce(
                     castExpr->type = toType;
                     castExpr->loc = fromExpr->loc;
                     castExpr->base = fromExpr;
+                    castExpr->abstractStorageAccess =
+                        AbstractStorageAccessPath::makeFixedOperandUse(
+                            m_astBuilder,
+                            fromExpr->abstractStorageAccess,
+                            AbstractStorageUse::ReadValue);
                     *outToExpr = castExpr;
                 }
                 return true;
@@ -2389,35 +2396,13 @@ bool SemanticsVisitor::_coerce(
     //
     if (auto witness = tryGetSubtypeWitness(fromType, toType))
     {
-        // Interface-to-interface upcast may receive a compressed witness
-        // whose internal `DeclRef` is rooted in an intermediate interface
-        // rather than `fromType`.  Expand it into a transitive chain so
-        // IR lowering can walk the inheritance path mechanically without
-        // inspecting the inheritance graph itself.
+        // Facet lookup can compress an interface upcast through an intermediate interface.
+        // Restore the explicit witness chain before IR lowering consumes it.
         if (isInterfaceType(fromType) && isInterfaceType(toType))
-        {
             witness = normalizeSubtypeWitnessForInterfaceUpcast(fromType, witness);
-        }
 
         if (outToExpr)
-        {
             *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
-
-            // If the original expression was an l-value, then the result
-            // of the cast may be an l-value itself. We want to be able
-            // to invoke `[mutating]` methods on a value that is cast to
-            // an interface it conforms to, and we also expect to be able
-            // to pass a value of a derived `struct` type into methods that
-            // expect a value of its base type.
-            //
-            if (fromExpr && fromExpr->type.isLeftValue)
-            {
-                // If toType is an interface type, we need to wrap the original
-                // expression into a MakeExistential, and the result of
-                // MakeExistential is not an l-value.
-                (*outToExpr)->type.isLeftValue = !isInterfaceType(toType);
-            }
-        }
         if (outCost)
             *outCost = kConversionCost_CastToInterface;
         return true;
@@ -2440,14 +2425,10 @@ bool SemanticsVisitor::_coerce(
         if (isTypeEqualityWitness(fromIsToWitness))
         {
             if (outToExpr)
-            {
-                *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
-                // Type-equality casts preserve l-value status since the
-                // types are structurally equivalent (e.g., T.Differential == T
-                // via a where clause).
-                if (fromExpr)
-                    (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
-            }
+                *outToExpr = createCastToSuperTypeExpr(
+                    toType,
+                    fromExpr,
+                    fromIsToWitness);
             if (outCost)
                 *outCost = 0;
             return true;
@@ -2499,6 +2480,11 @@ bool SemanticsVisitor::_coerce(
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
+            derefExpr->abstractStorageAccess =
+                AbstractStorageAccessPath::makeFixedOperandUse(
+                    m_astBuilder,
+                    fromExpr->abstractStorageAccess,
+                    AbstractStorageUse::ReadValue);
             // The recursive coercion below diagnoses against this synthesized
             // dereference, so it must carry the operand's source location.
             derefExpr->loc = fromExpr->loc;
@@ -2570,6 +2556,10 @@ bool SemanticsVisitor::_coerce(
             refExpr->base = fromExpr;
             refExpr->type = qualRefType;
             refExpr->checked = true;
+            refExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+                m_astBuilder,
+                fromExpr->abstractStorageAccess,
+                getAbstractStorageUseForExplicitReference(qualRefType));
             *outToExpr = refExpr;
         }
 
@@ -3030,7 +3020,10 @@ bool SemanticsVisitor::_coerce(
             // expression and then complete the overload process.
             //
             overloadContext.originalExpr = castExpr;
-            *outToExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+            *outToExpr = CompleteOverloadCandidate(
+                overloadContext,
+                *overloadContext.bestCandidate,
+                OverloadCandidateUse::Invocation);
             //
             // However, the above isn't *quite* enough, because
             // the process of completing the overload candidate
@@ -3187,8 +3180,12 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
 
         auto invokeExpr = synth.emitInvokeExpr(operatorRefExpr, _Move(synArgs));
         invokeExpr = dispatchExpr(invokeExpr, *this);
-        auto resultValue =
-            coerce(CoercionSite::Return, toFuncType->getResultType(), invokeExpr, getSink());
+        auto resultValue = coerceAndFinalizeForStorageUse(
+            CoercionSite::Return,
+            toFuncType->getResultType(),
+            invokeExpr,
+            getSink(),
+            AbstractStorageUse::ReadValue);
         synth.emitReturnStmt(resultValue);
 
         lambdaStruct.getDecl()->addMember(synStaticFunc);
@@ -3310,78 +3307,181 @@ Expr* SemanticsVisitor::CreateImplicitCastExpr(Type* toType, Expr* fromExpr)
     castExpr->functionExpr = typeExpr;
     castExpr->type = QualType(toType);
     castExpr->arguments.add(fromExpr);
+    castExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+        m_astBuilder,
+        fromExpr->abstractStorageAccess,
+        AbstractStorageUse::ReadValue);
     return castExpr;
 }
 
-Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness)
+/// Represents the storage access and l-value classification of one super-type cast.
+struct CastToSuperTypeStorageInfo
 {
-    CastToSuperTypeExpr* expr = m_astBuilder->create<CastToSuperTypeExpr>();
+    AbstractStorageAccess access;
+    bool preservesLValue = false;
+};
+
+/// Classifies how a super-type cast carries its operand expression's storage identity.
+///
+/// `createStoragePreservingCastToSuperTypeExpr()` marks a lookup-breadcrumb cast because that cast
+/// changes only the static type used to find a member. A type-equality witness preserves the same
+/// identity. A base-struct cast is a writable projection of the complete operand value, so it
+/// remains an l-value and maps a write to read-modify-write of the operand. Every other subtype
+/// conversion materializes a value; in particular, an interface value contains a copy rather than
+/// an address into the operand.
+static CastToSuperTypeStorageInfo _getCastToSuperTypeStorageInfo(
+    ASTBuilder* astBuilder,
+    Type* toType,
+    Expr* fromExpr,
+    Val* witness,
+    bool preservesStorageIdentity)
+{
+    if (preservesStorageIdentity)
+        return {fromExpr->abstractStorageAccess, true};
+    if (isTypeEqualityWitness(witness))
+        return {fromExpr->abstractStorageAccess, true};
+    if (isDeclRefTypeOf<StructDecl>(toType))
+    {
+        return {
+            AbstractStorageAccessPath::makeProjection(
+                astBuilder,
+                fromExpr->abstractStorageAccess,
+                AbstractStorageProjectionMode::ReadModifyWrite),
+            true};
+    }
+    return {
+        AbstractStorageAccessPath::makeFixedOperandUse(
+            astBuilder,
+            fromExpr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue),
+        false};
+}
+
+void updateCastToSuperTypeStorageInfo(ASTBuilder* astBuilder, CastToSuperTypeExpr* expr)
+{
+    SLANG_RELEASE_ASSERT(expr->valueArg);
+
+    auto storageInfo = _getCastToSuperTypeStorageInfo(
+        astBuilder,
+        expr->type.type,
+        expr->valueArg,
+        expr->witnessArg,
+        expr->preservesStorageIdentity);
+    expr->abstractStorageAccess = storageInfo.access;
+
+    bool preservesLValue = storageInfo.preservesLValue;
+    if (!expr->valueArg->type.isLeftValue)
+        preservesLValue = false;
+    if (expr->type.hasReadOnlyOnTarget)
+        preservesLValue = false;
+    expr->type.isLeftValue = preservesLValue;
+}
+
+static Expr* _createCastToSuperTypeExpr(
+    ASTBuilder* astBuilder,
+    Type* toType,
+    Expr* fromExpr,
+    Val* witness,
+    bool preservesStorageIdentity)
+{
+    CastToSuperTypeExpr* expr = astBuilder->create<CastToSuperTypeExpr>();
     expr->loc = fromExpr->loc;
     expr->type = QualType(toType);
     expr->valueArg = fromExpr;
     expr->witnessArg = witness;
+    expr->preservesStorageIdentity = preservesStorageIdentity;
+    updateCastToSuperTypeStorageInfo(astBuilder, expr);
     return expr;
 }
 
+Expr* SemanticsVisitor::createCastToSuperTypeExpr(
+    Type* toType,
+    Expr* fromExpr,
+    Val* witness)
+{
+    return _createCastToSuperTypeExpr(m_astBuilder, toType, fromExpr, witness, false);
+}
+
+Expr* SemanticsVisitor::createStoragePreservingCastToSuperTypeExpr(
+    Type* toType,
+    Expr* fromExpr,
+    Val* witness)
+{
+    return _createCastToSuperTypeExpr(m_astBuilder, toType, fromExpr, witness, true);
+}
+
+namespace
+{
+/// Expands interface-upcast witnesses while rejecting an actual recurrence in the witness graph.
+struct InterfaceUpcastWitnessNormalizer
+{
+    SemanticsVisitor* semantics;
+    HashSet<SubtypeWitness*> activeWitnesses;
+
+    /// Returns an equivalent witness whose first subtype is `subType`.
+    SubtypeWitness* normalize(Type* subType, SubtypeWitness* witness)
+    {
+        SLANG_RELEASE_ASSERT(witness);
+
+        // Interface inheritance checking diagnoses source-level cycles before conversion. A
+        // witness that revisits the same node is therefore an internal invariant violation rather
+        // than a failed user conversion. Tracking actual recurrence avoids imposing an arbitrary
+        // depth limit on valid inheritance chains.
+        SLANG_RELEASE_ASSERT(activeWitnesses.add(witness));
+        SLANG_DEFER(activeWitnesses.remove(witness));
+
+        if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+        {
+            auto subToMid = normalize(subType, transitive->getSubToMid());
+            auto midToSup = normalize(subToMid->getSup(), transitive->getMidToSup());
+
+            if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
+                return witness;
+            return semantics->getASTBuilder()->getTransitiveSubtypeWitness(subToMid, midToSup);
+        }
+
+        if (auto declared = as<DeclaredSubtypeWitness>(witness))
+        {
+            // `getParentDeclRef()` preserves substitutions from the inheritance declaration. For
+            // `IDerived<float> : IBase<float>`, the parent must therefore remain
+            // `IDerived<float>` rather than the unspecialized `IDerived<T>`.
+            auto parentInterfaceDeclRef =
+                getParentDeclRef(declared->getDeclRef()).as<InterfaceDecl>();
+            if (!parentInterfaceDeclRef)
+                return witness;
+
+            auto astBuilder = semantics->getASTBuilder();
+            auto parentInterfaceType = DeclRefType::create(astBuilder, parentInterfaceDeclRef);
+            if (parentInterfaceType->equals(subType))
+                return witness;
+
+            // The declaration belongs to an intermediate interface rather than `subType`. Split
+            // the compressed step into `(subType : parentInterfaceType)` followed by
+            // `(parentInterfaceType : sup)` so IR lowering can follow the actual witness-table
+            // inheritance path.
+            auto subToParent = semantics->tryGetSubtypeWitness(subType, parentInterfaceType);
+            SLANG_RELEASE_ASSERT(subToParent);
+            subToParent = normalize(subType, subToParent);
+
+            auto parentToSup = astBuilder->getDeclaredSubtypeWitness(
+                parentInterfaceType,
+                declared->getSup(),
+                declared->getDeclRef());
+
+            return astBuilder->getTransitiveSubtypeWitness(subToParent, parentToSup);
+        }
+
+        return witness;
+    }
+};
+} // namespace
+
 SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
     Type* subType,
-    SubtypeWitness* witness,
-    int depth)
+    SubtypeWitness* witness)
 {
-    // Bound against a corrupt or cyclic inheritance graph.  Well-formed
-    // hierarchies are acyclic and extremely shallow in practice; 64 is a
-    // generous defensive limit.
-    static const int kMaxDepth = 64;
-    SLANG_RELEASE_ASSERT(depth < kMaxDepth);
-
-    if (!witness)
-        return witness;
-
-    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
-    {
-        auto subToMid = normalizeSubtypeWitnessForInterfaceUpcast(
-            subType,
-            transitive->getSubToMid(),
-            depth + 1);
-        auto midType = subToMid->getSup();
-        auto midToSup = normalizeSubtypeWitnessForInterfaceUpcast(
-            midType,
-            transitive->getMidToSup(),
-            depth + 1);
-        if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
-            return witness;
-        return m_astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
-    }
-
-    if (auto declared = as<DeclaredSubtypeWitness>(witness))
-    {
-        // Use `getParentDeclRef` so substitutions from the witness's DeclRef
-        // propagate to the parent (e.g. for `IDerived<float>: IBase<float>`
-        // we need the parent to be `IDerived<float>`, not the unspecialized
-        // `IDerived<T>`).
-        auto parentInterfaceDeclRef = getParentDeclRef(declared->getDeclRef()).as<InterfaceDecl>();
-        if (!parentInterfaceDeclRef)
-            return witness;
-
-        auto parentInterfaceType = DeclRefType::create(m_astBuilder, parentInterfaceDeclRef);
-        if (parentInterfaceType->equals(subType))
-            return witness;
-
-        // The declRef belongs to a different interface than `subType`.
-        // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
-        auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
-        SLANG_RELEASE_ASSERT(subToParent);
-        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent, depth + 1);
-
-        auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(
-            parentInterfaceType,
-            declared->getSup(),
-            declared->getDeclRef());
-
-        return m_astBuilder->getTransitiveSubtypeWitness(subToParent, parentToSup);
-    }
-
-    return witness;
+    InterfaceUpcastWitnessNormalizer normalizer = {this};
+    return normalizer.normalize(subType, witness);
 }
 
 Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
@@ -3390,6 +3490,7 @@ Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
     expr->loc = fromExpr->loc;
     expr->type = QualType(toType);
     expr->valueArg = fromExpr;
+    expr->abstractStorageAccess = fromExpr->abstractStorageAccess;
     return expr;
 }
 
@@ -3407,6 +3508,12 @@ Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* f
         detachExpr->loc = fromExpr->loc;
         detachExpr->inner = fromExpr;
         detachExpr->type.type = toType;
+        // Detaching materializes the recursively coerced value. Its operand is therefore read
+        // even when the enclosing parameter borrows or writes the detached result.
+        detachExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            fromExpr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
         return detachExpr;
     }
     else
@@ -3417,14 +3524,55 @@ Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* f
 }
 
 
-Expr* SemanticsVisitor::coerce(
+Expr* SemanticsVisitor::coerceAndFinalizeForStorageUse(
+    CoercionSite site,
+    Type* toType,
+    Expr* fromExpr,
+    DiagnosticSink* sink,
+    AbstractStorageUse enclosingUse)
+{
+    auto expr = coerceExpressionWithoutFinalization(site, toType, fromExpr, sink);
+    if (IsErrorExpr(expr))
+        return expr;
+
+    SemanticsVisitor finalizingVisitor(withSink(sink));
+    expr = finalizingVisitor.finalizeSelectedExpression(
+        expr,
+        getSelectedExpressionUseForType(toType),
+        expr->loc);
+
+    return finalizingVisitor.checkAbstractStorageUse(expr, enclosingUse);
+}
+
+Expr* SemanticsVisitor::coerceInitializerExpression(
+    Type* targetType,
+    Expr* checkedInitializer,
+    DiagnosticSink* sink)
+{
+    return coerceAndFinalizeForStorageUse(
+        CoercionSite::Initializer,
+        targetType,
+        checkedInitializer,
+        sink,
+        AbstractStorageUse::ReadValue);
+}
+
+Expr* SemanticsVisitor::coerceExpressionWithoutFinalization(
     CoercionSite site,
     Type* toType,
     Expr* fromExpr,
     DiagnosticSink* sink)
 {
     Expr* expr = nullptr;
-    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, sink, nullptr, nullptr))
+    if (!_coerce(
+            site,
+            toType,
+            &expr,
+            fromExpr->type,
+            fromExpr,
+            sink,
+            nullptr,
+            nullptr))
     {
         // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
         // clobber the type on `fromExpr`, and an invariant here is that coercion

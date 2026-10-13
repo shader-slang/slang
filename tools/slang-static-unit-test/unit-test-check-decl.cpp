@@ -63,7 +63,8 @@ bool isDirectMember(ContainerDecl* containerDecl, Decl* candidate)
     return false;
 }
 
-/// Checks one `Receiver.method` fixture in isolation and returns its mangled name.
+/// Checks one `Receiver.method` fixture in isolation, verifies its effective receiver mode, and
+/// returns its mangled name.
 String checkAndGetReceiverMethodMangledName(
     UnitTestContext* unitTestContext,
     const char* moduleName,
@@ -114,9 +115,10 @@ SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations)
 }
 
 // The parser creates a generic scope before it links the declaration wrapped by that generic.
-// That incomplete scope cannot carry a receiver value. Once linked, the wrapper follows its inner
-// declaration: an instance method preserves `this`, while a static method does not. A nested
-// `FuncDecl` establishes its own receiverless boundary.
+// That incomplete scope cannot carry a receiver value. Once linked,
+// `isReceiverlessDeclarationBoundary` classifies the wrapper from its inner declaration: it
+// preserves the enclosing receiver for an instance method, but treats a static method or nested
+// `FuncDecl` as a receiverless boundary.
 SLANG_UNIT_TEST(receiverlessBoundaryHandlesIncompleteGenericDecl)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -180,8 +182,212 @@ SLANG_UNIT_TEST(thisValueBreadcrumbPreservesLookupOriginScope)
 
     auto breadcrumb = lookupResult.item.breadcrumbs;
     SLANG_CHECK_ABORT(breadcrumb != nullptr);
-    SLANG_CHECK(breadcrumb->kind == LookupResultItem::Breadcrumb::Kind::ThisValue);
-    SLANG_CHECK(breadcrumb->getThisValueScope() == methodDecl->ownedScope);
+    SLANG_CHECK(breadcrumb->getKind() == LookupResultItem::Breadcrumb::Kind::ThisValue);
+    SLANG_CHECK(breadcrumb->getLookupOriginScope() == methodDecl->ownedScope);
+}
+
+// Lookup can be used without a semantic visitor after declarations have been checked. Crossing a
+// static method must still remove the receiver value while preserving the enclosing receiver type.
+SLANG_UNIT_TEST(nullSemanticsLookupClassifiesStaticMethodReceiverBoundary)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "nullSemanticsLookupClassifiesStaticMethodReceiverBoundary",
+        "struct Receiver { int field; static int read() { return 0; } }\n",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+
+    auto receiverDecl = findMemberDecl<StructDecl>(module->getModuleDecl(), "Receiver");
+    SLANG_CHECK_ABORT(receiverDecl != nullptr);
+    auto methodDecl = findMemberDecl<FuncDecl>(receiverDecl, "read");
+    SLANG_CHECK_ABORT(methodDecl != nullptr);
+    SLANG_CHECK_ABORT(methodDecl->ownedScope != nullptr);
+
+    auto astBuilder = env.getASTBuilder();
+    auto lookupResult = lookUp(
+        astBuilder,
+        nullptr,
+        astBuilder->getNamePool()->getName("field"),
+        methodDecl->ownedScope);
+    SLANG_CHECK_ABORT(lookupResult.isValid());
+    SLANG_CHECK(!lookupResult.isOverloaded());
+
+    auto breadcrumb = lookupResult.item.breadcrumbs;
+    SLANG_CHECK_ABORT(breadcrumb != nullptr);
+    SLANG_CHECK(breadcrumb->getKind() == LookupResultItem::Breadcrumb::Kind::ThisType);
+}
+
+// `checkGenericAppWithCheckedArgs()` calls `CompleteOverloadCandidate()` for each distributed
+// candidate of an overloaded generic static requirement. Each completion must build an independent
+// binding wrapper rather than repurpose one retained by `OverloadedExpr2`. The selected declaration
+// reference must retain the binding on which its semantic type depends, while each static-member
+// leaf retains only the qualifier's semantic type.
+SLANG_UNIT_TEST(selectedStaticMemberDoesNotRewriteSharedQualifierBindings)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "selectedStaticMemberDoesNotRewriteSharedQualifierBindings",
+        R"(
+            interface IFactoryResult
+            {
+                static int getValue<T>(T value);
+                static int getValue<T>(T first, T second);
+            }
+
+            IFactoryResult makeResult();
+
+            int useResult()
+            {
+                return makeResult().getValue<int>(1);
+            }
+        )",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+
+    auto useResultDecl = findMemberDecl<FuncDecl>(module->getModuleDecl(), "useResult");
+    SLANG_CHECK_ABORT(useResultDecl != nullptr);
+    auto body = as<BlockStmt>(useResultDecl->body);
+    SLANG_CHECK_ABORT(body != nullptr);
+    auto returnStmt = as<ReturnStmt>(body->body);
+    SLANG_CHECK_ABORT(returnStmt != nullptr);
+    auto invokeExpr = as<InvokeExpr>(returnStmt->expression);
+    SLANG_CHECK_ABORT(invokeExpr != nullptr);
+
+    List<Expr*> selectedWrappers;
+    auto selectedMemberExpr = as<StaticMemberExpr>(
+        getCallableExprThroughTransparentWrappers(invokeExpr->functionExpr, &selectedWrappers));
+    SLANG_CHECK_ABORT(selectedMemberExpr != nullptr);
+    LetExpr* selectedBindings = nullptr;
+    for (auto wrapper : selectedWrappers)
+    {
+        if (auto binding = as<LetExpr>(wrapper))
+        {
+            SLANG_CHECK_ABORT(selectedBindings == nullptr);
+            selectedBindings = binding;
+        }
+    }
+    SLANG_CHECK_ABORT(selectedBindings != nullptr);
+
+    auto dependencies =
+        selectedMemberExpr->declRef.declRefBase->collectSemanticDeclarationDependencies();
+    bool foundSelectedBinding = false;
+    for (const auto& dependency : dependencies)
+    {
+        if (dependency.getDeclaration() == selectedBindings->decl)
+        {
+            foundSelectedBinding = true;
+            break;
+        }
+    }
+    SLANG_CHECK(foundSelectedBinding);
+
+    auto originalOverloads = as<OverloadedExpr2>(invokeExpr->originalFunctionExpr);
+    SLANG_CHECK_ABORT(originalOverloads != nullptr);
+    SLANG_CHECK(originalOverloads->candidateExprs.getCount() == 2);
+
+    HashSet<LetExpr*> candidateBindings;
+    for (auto candidateExpr : originalOverloads->candidateExprs)
+    {
+        List<Expr*> candidateWrappers;
+        auto candidateMemberExpr = as<StaticMemberExpr>(
+            getCallableExprThroughTransparentWrappers(candidateExpr, &candidateWrappers));
+        SLANG_CHECK_ABORT(candidateMemberExpr != nullptr);
+
+        LetExpr* bindings = nullptr;
+        for (auto wrapper : candidateWrappers)
+        {
+            if (auto binding = as<LetExpr>(wrapper))
+            {
+                SLANG_CHECK_ABORT(bindings == nullptr);
+                bindings = binding;
+            }
+        }
+        SLANG_CHECK_ABORT(bindings != nullptr);
+        SLANG_CHECK(bindings != selectedBindings);
+        SLANG_CHECK(candidateBindings.add(bindings));
+        SLANG_CHECK(bindings->decl == selectedBindings->decl);
+        SLANG_CHECK(bindings->decl->initExpr == selectedBindings->decl->initExpr);
+
+        SLANG_CHECK(candidateMemberExpr != selectedMemberExpr);
+        auto semanticBaseExpr = as<SharedTypeExpr>(candidateMemberExpr->baseExpression);
+        SLANG_CHECK_ABORT(semanticBaseExpr != nullptr);
+        SLANG_CHECK(semanticBaseExpr->base.type != nullptr);
+        SLANG_CHECK(semanticBaseExpr->base.exp == nullptr);
+    }
+}
+
+// When lookup finds a single generic static requirement, `checkGenericAppWithCheckedArgs()`
+// receives an already-constructed expression instead of an overload-set item.
+// `_prepareSelectedDeclRefExpr()` must therefore retain the qualifier binding required by the
+// selected inner declaration in the unspecialized generic wrapper.
+SLANG_UNIT_TEST(selectedUniqueStaticGenericRetainsQualifierBinding)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "selectedUniqueStaticGenericRetainsQualifierBinding",
+        R"(
+            interface IFactoryResult
+            {
+                static int getValue<T>(T value);
+            }
+
+            IFactoryResult makeResult();
+
+            int useResult()
+            {
+                return makeResult().getValue<int>(1);
+            }
+        )",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK(diagnostics.getLength() == 0);
+
+    auto useResultDecl = findMemberDecl<FuncDecl>(module->getModuleDecl(), "useResult");
+    SLANG_CHECK_ABORT(useResultDecl != nullptr);
+    auto body = as<BlockStmt>(useResultDecl->body);
+    SLANG_CHECK_ABORT(body != nullptr);
+    auto returnStmt = as<ReturnStmt>(body->body);
+    SLANG_CHECK_ABORT(returnStmt != nullptr);
+    auto invokeExpr = as<InvokeExpr>(returnStmt->expression);
+    SLANG_CHECK_ABORT(invokeExpr != nullptr);
+
+    List<Expr*> selectedWrappers;
+    auto selectedMemberExpr = as<StaticMemberExpr>(
+        getCallableExprThroughTransparentWrappers(invokeExpr->functionExpr, &selectedWrappers));
+    SLANG_CHECK_ABORT(selectedMemberExpr != nullptr);
+
+    LetExpr* selectedBinding = nullptr;
+    for (auto wrapper : selectedWrappers)
+    {
+        if (auto binding = as<LetExpr>(wrapper))
+        {
+            SLANG_CHECK_ABORT(selectedBinding == nullptr);
+            selectedBinding = binding;
+        }
+    }
+    SLANG_CHECK_ABORT(selectedBinding != nullptr);
+
+    bool foundSelectedBinding = false;
+    for (const auto& dependency :
+         selectedMemberExpr->declRef.declRefBase->collectSemanticDeclarationDependencies())
+    {
+        if (dependency.getDeclaration() == selectedBinding->decl)
+        {
+            foundSelectedBinding = true;
+            break;
+        }
+    }
+    SLANG_CHECK(foundSelectedBinding);
+
+    auto semanticBaseExpr = as<SharedTypeExpr>(selectedMemberExpr->baseExpression);
+    SLANG_CHECK_ABORT(semanticBaseExpr != nullptr);
+    SLANG_CHECK(semanticBaseExpr->base.type != nullptr);
+    SLANG_CHECK(semanticBaseExpr->base.exp == nullptr);
 }
 
 // Struct fields keep their source order and each is resolved to a type. Field
@@ -418,21 +624,22 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
     SLANG_CHECK(sink.getErrorCount() == 0);
 }
 
-// Ordinary callable names encode the checked receiver mode, including modes selected by defaults
-// rather than explicit attributes.
-SLANG_UNIT_TEST(checkedThisParamManglingUsesEffectiveMode)
+// The HLSL-default change must not rename existing Slang declarations. Programmer-written
+// declarations retain the established `[mutating]` and `[__ref]` suffixes; setters, `[constref]`,
+// and a non-copyable receiver's borrowing default retain their suffix-free names.
+SLANG_UNIT_TEST(checkedThisParamManglingPreservesSlangNames)
 {
     StaticUnitTestEnv env(unitTestContext);
 
     String diagnostics;
     Module* module = env.checkModuleFromSource(
-        "checkedThisParamManglingUsesEffectiveMode",
+        "checkedThisParamManglingPreservesSlangNames",
         "struct Receiver\n"
         "{\n"
-        "    int ordinaryIn(int value) { return value; }\n"
-        "    [constref] int ordinaryBorrow(int value) { return value; }\n"
-        "    [mutating] int ordinaryMutating(int value) { return value; }\n"
-        "    [__ref] int ordinaryRef(int value) { return value; }\n"
+        "    int inMethod(int value) { return value; }\n"
+        "    [constref] int borrowMethod(int value) { return value; }\n"
+        "    [mutating] int mutatingMethod(int value) { return value; }\n"
+        "    [__ref] int refMethod(int value) { return value; }\n"
         "    property int item { get { return 0; } set {} }\n"
         "}\n"
         "[__NonCopyableType]\n"
@@ -450,16 +657,16 @@ SLANG_UNIT_TEST(checkedThisParamManglingUsesEffectiveMode)
     SLANG_CHECK_ABORT(receiverDecl != nullptr);
     SLANG_CHECK_ABORT(nonCopyableReceiverDecl != nullptr);
 
-    auto ordinaryIn = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryIn");
-    auto ordinaryBorrow = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryBorrow");
-    auto ordinaryMutating = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryMutating");
-    auto ordinaryRef = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryRef");
+    auto inMethod = findMemberDecl<FuncDecl>(receiverDecl, "inMethod");
+    auto borrowMethod = findMemberDecl<FuncDecl>(receiverDecl, "borrowMethod");
+    auto mutatingMethod = findMemberDecl<FuncDecl>(receiverDecl, "mutatingMethod");
+    auto refMethod = findMemberDecl<FuncDecl>(receiverDecl, "refMethod");
     auto propertyDecl = findMemberDecl<PropertyDecl>(receiverDecl, "item");
     auto defaultBorrow = findMemberDecl<FuncDecl>(nonCopyableReceiverDecl, "defaultBorrow");
-    SLANG_CHECK_ABORT(ordinaryIn != nullptr);
-    SLANG_CHECK_ABORT(ordinaryBorrow != nullptr);
-    SLANG_CHECK_ABORT(ordinaryMutating != nullptr);
-    SLANG_CHECK_ABORT(ordinaryRef != nullptr);
+    SLANG_CHECK_ABORT(inMethod != nullptr);
+    SLANG_CHECK_ABORT(borrowMethod != nullptr);
+    SLANG_CHECK_ABORT(mutatingMethod != nullptr);
+    SLANG_CHECK_ABORT(refMethod != nullptr);
     SLANG_CHECK_ABORT(propertyDecl != nullptr);
     SLANG_CHECK_ABORT(defaultBorrow != nullptr);
 
@@ -475,25 +682,27 @@ SLANG_UNIT_TEST(checkedThisParamManglingUsesEffectiveMode)
     SLANG_CHECK_ABORT(setterDecl != nullptr);
 
     auto astBuilder = env.getASTBuilder();
-    SLANG_CHECK(getMangledName(astBuilder, ordinaryIn).endsWith("ii"));
-    SLANG_CHECK(getMangledName(astBuilder, ordinaryBorrow).endsWith("c"));
-    SLANG_CHECK(getMangledName(astBuilder, ordinaryMutating).endsWith("m"));
-    SLANG_CHECK(getMangledName(astBuilder, ordinaryRef).endsWith("r"));
-    SLANG_CHECK(getMangledName(astBuilder, setterDecl).endsWith("m"));
-    SLANG_CHECK(getMangledName(astBuilder, defaultBorrow).endsWith("c"));
+    SLANG_CHECK(getMangledName(astBuilder, inMethod).endsWith("ii"));
+    SLANG_CHECK(getMangledName(astBuilder, borrowMethod).endsWith("ii"));
+    SLANG_CHECK(getMangledName(astBuilder, mutatingMethod).endsWith("m"));
+    SLANG_CHECK(getMangledName(astBuilder, refMethod).endsWith("r"));
+    SLANG_CHECK(!getMangledName(astBuilder, setterDecl).endsWith("m"));
+    SLANG_CHECK(!getMangledName(astBuilder, defaultBorrow).endsWith("c"));
 }
 
-// Equivalent HLSL receiver spellings must have one ABI name, while different effective receiver
-// modes must remain distinct regardless of which source spelling selected them.
-SLANG_UNIT_TEST(thisParamManglingDependsOnlyOnEffectiveMode)
+// The new implicit HLSL `inout` default must have the same ABI name as explicit `[mutating]`.
+// Existing Slang declarations retain their established names, including the shared suffix-free
+// spelling for `in`, `[constref]`, and the read-only form selected by HLSL trailing `const`.
+SLANG_UNIT_TEST(hlslDefaultThisManglingMatchesExplicitMutating)
 {
-    const char* moduleName = "thisParamManglingDependsOnlyOnEffectiveMode";
-    const char* hlslSourcePath = "thisParamManglingDependsOnlyOnEffectiveMode.hlsl";
-    const char* slangSourcePath = "thisParamManglingDependsOnlyOnEffectiveMode.slang";
+    const char* moduleName = "hlslDefaultThisManglingMatchesExplicitMutating";
+    const char* hlslSourcePath = "hlslDefaultThisManglingMatchesExplicitMutating.hlsl";
+    const char* slangSourcePath = "hlslDefaultThisManglingMatchesExplicitMutating.slang";
 
-    // The source-path extension selects the dialect for each in-memory source string. The helper's
-    // isolated environments let every spelling keep the same module, type, and method names, so
-    // each comparison measures only receiver semantics.
+    // The test helper selects the dialect for each in-memory program from the input path's
+    // extension. Because the helper uses an isolated environment for each fixture, every fixture
+    // can use the same module, type, and method names; each comparison therefore measures only
+    // receiver semantics.
     String implicitMutatingName = checkAndGetReceiverMethodMangledName(
         unitTestContext,
         moduleName,
@@ -546,8 +755,9 @@ SLANG_UNIT_TEST(thisParamManglingDependsOnlyOnEffectiveMode)
     SLANG_CHECK(implicitMutatingName == explicitMutatingName);
     SLANG_CHECK(trailingConstName == explicitNonmutatingName);
     SLANG_CHECK(trailingConstName == implicitInName);
+    SLANG_CHECK(borrowName == implicitInName);
 
-    String distinctNames[] = {implicitInName, borrowName, implicitMutatingName, refName};
+    String distinctNames[] = {implicitInName, implicitMutatingName, refName};
     for (Index i = 0; i < SLANG_COUNT_OF(distinctNames); ++i)
     {
         for (Index j = i + 1; j < SLANG_COUNT_OF(distinctNames); ++j)
@@ -570,7 +780,10 @@ SLANG_UNIT_TEST(thisParamManglingLeavesReceiverlessAndDirectFunctionTypesUnchang
         "}\n"
         "interface DirectRequirement\n"
         "{\n"
-        "    __associatedfunc functype(int) -> int directFunctionType;\n"
+        "    [nonmutating] __associatedfunc functype(int) -> int directIn;\n"
+        "    [mutating] __associatedfunc functype(int) -> int directInOut;\n"
+        "    [constref] __associatedfunc functype(int) -> int directBorrowIn;\n"
+        "    [__ref] __associatedfunc functype(int) -> int directRef;\n"
         "}\n"
         "[NoDiffThis] int freeNoDiffThis(int value) { return value; }\n",
         &diagnostics);
@@ -586,14 +799,39 @@ SLANG_UNIT_TEST(thisParamManglingLeavesReceiverlessAndDirectFunctionTypesUnchang
     SLANG_CHECK_ABORT(freeNoDiffThis != nullptr);
 
     auto staticNoDiffThis = findMemberDecl<FuncDecl>(receiverDecl, "staticNoDiffThis");
-    auto directFunctionType = findMemberDecl<FuncDecl>(interfaceDecl, "directFunctionType");
+    auto directIn = findMemberDecl<FuncDecl>(interfaceDecl, "directIn");
+    auto directInOut = findMemberDecl<FuncDecl>(interfaceDecl, "directInOut");
+    auto directBorrowIn = findMemberDecl<FuncDecl>(interfaceDecl, "directBorrowIn");
+    auto directRef = findMemberDecl<FuncDecl>(interfaceDecl, "directRef");
     SLANG_CHECK_ABORT(staticNoDiffThis != nullptr);
-    SLANG_CHECK_ABORT(directFunctionType != nullptr);
+    SLANG_CHECK_ABORT(directIn != nullptr);
+    SLANG_CHECK_ABORT(directInOut != nullptr);
+    SLANG_CHECK_ABORT(directBorrowIn != nullptr);
+    SLANG_CHECK_ABORT(directRef != nullptr);
 
     auto astBuilder = env.getASTBuilder();
+    struct DirectFunctionTypeCase
+    {
+        FuncDecl* decl;
+        ParamPassingMode receiverMode;
+    };
+    DirectFunctionTypeCase directFunctionTypeCases[] = {
+        {directIn, ParamPassingMode::In},
+        {directInOut, ParamPassingMode::BorrowInOut},
+        {directBorrowIn, ParamPassingMode::BorrowIn},
+        {directRef, ParamPassingMode::Ref},
+    };
+    for (const auto& directFunctionTypeCase : directFunctionTypeCases)
+    {
+        auto thisParamInfo = findEffectiveThisParamInfo(
+            astBuilder,
+            makeDeclRef(directFunctionTypeCase.decl));
+        SLANG_CHECK_ABORT(thisParamInfo.has_value());
+        SLANG_CHECK(thisParamInfo->mode == directFunctionTypeCase.receiverMode);
+        SLANG_CHECK(getMangledName(astBuilder, directFunctionTypeCase.decl).endsWith("B"));
+    }
     SLANG_CHECK(getMangledName(astBuilder, freeNoDiffThis).endsWith("n"));
     SLANG_CHECK(getMangledName(astBuilder, staticNoDiffThis).endsWith("n"));
-    SLANG_CHECK(getMangledName(astBuilder, directFunctionType).endsWith("B"));
 }
 
 // Synthesized witness wrappers use the checked effective `this` parameter mode as part of their
@@ -618,7 +856,7 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
     SLANG_CHECK_ABORT(thisParamInfo != nullptr);
 
     auto astBuilder = env.getASTBuilder();
-    auto ordinaryName = getMangledName(astBuilder, methodDecl);
+    auto unsynthesizedName = getMangledName(astBuilder, methodDecl);
     auto synthesizedMode = astBuilder->create<SynthesizedParamPassingModeModifier>();
     addModifier(methodDecl, synthesizedMode);
 
@@ -629,7 +867,6 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
     };
     ModeCase cases[] = {
         {ParamPassingMode::In, "ti_"},
-        {ParamPassingMode::Out, "to_"},
         {ParamPassingMode::BorrowInOut, "tio_"},
         {ParamPassingMode::BorrowIn, "tc_"},
         {ParamPassingMode::Ref, "tr_"},
@@ -642,7 +879,7 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
         thisParamInfo->info.mode = modeCase.mode;
         auto mangledName = getMangledName(astBuilder, methodDecl);
         SLANG_CHECK(mangledName.endsWith(modeCase.suffix));
-        SLANG_CHECK(mangledName != ordinaryName);
+        SLANG_CHECK(mangledName != unsynthesizedName);
         for (auto previousName : mangledNames)
             SLANG_CHECK(mangledName != previousName);
         mangledNames.add(mangledName);

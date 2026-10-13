@@ -34,9 +34,11 @@ though the narrative doc is also referenced for general framing.
 
 ## Inputs available to you
 
-- **`docs/generated/tests/_meta/diagnostics-catalog/catalog.txt`** — full
-  catalog snapshot (695 codes) with severity / name / source /
-  message columns. Authoritative.
+- **`docs/generated/tests/_meta/diagnostics-catalog/catalog.txt`** — committed
+  catalog snapshot (708 codes) with severity / name / source /
+  message columns. It is the digest authority for entries it contains;
+  the bundle README records known drift between this snapshot and the
+  live catalog sources.
 - **`docs/generated/tests/_meta/diagnostics-catalog/uncovered-bucket-<N>.txt`**
   — the subset of uncovered codes assigned to your generation
   bucket. Work only from this list; the operator will dispatch

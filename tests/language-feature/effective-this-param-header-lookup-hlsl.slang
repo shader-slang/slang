@@ -1,11 +1,11 @@
 //TEST:SIMPLE_EX: -lang hlsl tests/language-feature/effective-this-param-header-lookup-hlsl.slang -no-codegen
 
-// Consider `int[this.elementCount]` in `arrayParameter` below. Lookup runs while that method's
-// signature is still in progress and records only that the member base is a `this` value. When
-// expression construction rebuilds the member access, it asks the shared effective-receiver
-// routine for `this`'s type and HLSL-default `inout` mode. That routine can compute the answer
-// without recursively trying to finish the same signature. The signature check later publishes
-// the result and emits any receiver-mode modifier diagnostics.
+// Consider `int[this.elementCount]` in `arrayParameter` below. Signature checking publishes the
+// HLSL-default `inout` receiver before checking the array parameter, so semantic checking can
+// resolve the explicit `this` without recursively restarting the signature. The unqualified
+// `mutateAndReturn()` calls in default arguments exercise the same ordering through lookup:
+// `_lookUpInScopes()` appends a `ThisValue` breadcrumb, and `ConstructLookupResultExpr()` uses the
+// one receiver description already published for the method.
 
 struct HeaderLookup
 {

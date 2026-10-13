@@ -41,8 +41,9 @@ struct Empty<TT : IEmptyS> : IInterface
 
 void test<Obj : IInterface>(Obj obj)
 {
-    Obj.T v = obj.getT();
-    obj.setT(v);
+    Obj mutableObj = obj;
+    Obj.T v = mutableObj.getT();
+    mutableObj.setT(v);
 }
 
 [numthreads(4, 1, 1)]

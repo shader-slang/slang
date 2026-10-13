@@ -43,15 +43,17 @@ float genericTest<T : IValue>(T obj, float x)
 [ForwardDifferentiable]
 float directSetTest(ValueImplRW obj, ValueImpl src, float y)
 {
-    obj.value = src.value;
-    return obj.value * y;
+    ValueImplRW mutableObj = obj;
+    mutableObj.value = src.value;
+    return mutableObj.value * y;
 }
 
 [ForwardDifferentiable]
 float genericSetTest<T : IValueRW, U : IValue>(T obj, U src, float y)
 {
-    obj.value = src.value;
-    return obj.value * y;
+    T mutableObj = obj;
+    mutableObj.value = src.value;
+    return mutableObj.value * y;
 }
 
 [numthreads(1, 1, 1)]

@@ -38,8 +38,8 @@ struct Test
     {
         return try this.m(1);
 /*CHECK:
-                        ^ E30120
-                        ^ static function cannot refer to non-static member `m` via `this`
+                   ^^^^ E38102
+                   ^^^^ 'this' expression cannot be used in a callable that has no instance receiver
 */
     }
 

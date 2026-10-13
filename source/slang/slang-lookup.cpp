@@ -25,44 +25,20 @@ DeclRef<ExtensionDecl> applyExtensionToType(
 //
 
 
-/// Represents a stack-local breadcrumb used while recursive lookup explores one candidate path.
-///
-/// Each node points to the preceding lookup operation through `prev`. Once lookup finds a result,
-/// `CreateLookupResultItem` reverses this temporary chain into the persistent order in which
-/// expression reconstruction must apply the operations.
-struct BreadcrumbInfo
+/// Represents one stack-local lookup step linked to the preceding candidate-path step.
+struct StackLookupBreadcrumb : LookupBreadcrumbStep
 {
-    LookupResultItem::Breadcrumb::Kind kind;
-    DeclRef<Decl> declRef;
-    Val* val = nullptr;
-    Scope* thisValueScope = nullptr;
-    BreadcrumbInfo* prev = nullptr;
-};
-
-/// Creates the breadcrumb that starts a lookup path from an implicit `this` value or `This` type.
-///
-/// A value breadcrumb preserves the original lexical scope so that expression reconstruction can
-/// check `this` with the same containing callable that initiated lookup. A type breadcrumb does not
-/// reconstruct a value and therefore has no scope.
-static BreadcrumbInfo _makeThisBreadcrumbInfo(
-    LookupResultItem::Breadcrumb::Kind kind,
-    DeclRef<Decl> declRef,
-    Scope* lookupOriginScope)
-{
-    SLANG_RELEASE_ASSERT(
-        kind == LookupResultItem::Breadcrumb::Kind::ThisValue ||
-        kind == LookupResultItem::Breadcrumb::Kind::ThisType);
-
-    BreadcrumbInfo result;
-    result.kind = kind;
-    result.declRef = declRef;
-    if (kind == LookupResultItem::Breadcrumb::Kind::ThisValue)
+    StackLookupBreadcrumb(LookupBreadcrumbStep const& step, StackLookupBreadcrumb* previous)
+        : LookupBreadcrumbStep(step)
+        , m_previous(previous)
     {
-        SLANG_RELEASE_ASSERT(lookupOriginScope);
-        result.thisValueScope = lookupOriginScope;
     }
-    return result;
-}
+
+    StackLookupBreadcrumb* getPrevious() const { return m_previous; }
+
+private:
+    StackLookupBreadcrumb* const m_previous;
+};
 
 //
 
@@ -171,23 +147,19 @@ LookupResult refineLookup(LookupResult const& inResult, LookupMask mask)
     return result;
 }
 
-LookupResultItem CreateLookupResultItem(DeclRef<Decl> declRef, BreadcrumbInfo* breadcrumbInfos)
+LookupResultItem CreateLookupResultItem(
+    DeclRef<Decl> declRef,
+    StackLookupBreadcrumb* stackBreadcrumbs)
 {
     LookupResultItem item;
     item.declRef = declRef;
 
-    // breadcrumbs were constructed "backwards" on the stack, so we
-    // reverse them here by building a linked list the other way
+    // Lookup discovers deferred operations from the final declaration back toward the original
+    // base expression. The persistent list uses the opposite order so reconstruction can apply
+    // each operation from that base outward.
     RefPtr<LookupResultItem::Breadcrumb> breadcrumbs;
-    for (auto bb = breadcrumbInfos; bb; bb = bb->prev)
-    {
-        breadcrumbs = new LookupResultItem::Breadcrumb(
-            bb->kind,
-            bb->declRef,
-            bb->val,
-            bb->thisValueScope,
-            breadcrumbs);
-    }
+    for (auto bb = stackBreadcrumbs; bb; bb = bb->getPrevious())
+        breadcrumbs = LookupResultItem::Breadcrumb::create(*bb, breadcrumbs);
     item.breadcrumbs = breadcrumbs;
     return item;
 }
@@ -198,7 +170,7 @@ static void _lookUpMembersInValue(
     DeclRef<Decl> valueDeclRef,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* breadcrumbs);
+    StackLookupBreadcrumb* breadcrumbs);
 
 static bool _isUncheckedLocalVar(const Decl* decl)
 {
@@ -221,7 +193,7 @@ static void _lookUpDirectAndTransparentMembers(
     DeclRef<Decl> parentDeclRef,  // The parent of the resulting declref.
     LookupRequest const& request,
     LookupResult& result,
-    BreadcrumbInfo* inBreadcrumbs)
+    StackLookupBreadcrumb* inBreadcrumbs)
 {
     if (request.isCompletionRequest())
     {
@@ -295,10 +267,9 @@ static void _lookUpDirectAndTransparentMembers(
         // We need to leave a breadcrumb so that we know that the result
         // of lookup involves a member lookup step here
 
-        BreadcrumbInfo memberRefBreadcrumb;
-        memberRefBreadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Member;
-        memberRefBreadcrumb.declRef = transparentMemberDeclRef;
-        memberRefBreadcrumb.prev = inBreadcrumbs;
+        StackLookupBreadcrumb memberRefBreadcrumb(
+            LookupBreadcrumbStep::makeMember(transparentMemberDeclRef),
+            inBreadcrumbs);
 
         _lookUpMembersInValue(
             astBuilder,
@@ -408,7 +379,7 @@ static void _lookUpMembersInType(
     Type* type,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* breadcrumbs);
+    StackLookupBreadcrumb* breadcrumbs);
 
 static void _lookUpMembersInSuperTypeImpl(
     ASTBuilder* astBuilder,
@@ -416,7 +387,7 @@ static void _lookUpMembersInSuperTypeImpl(
     Type* superType,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* inBreadcrumbs);
+    StackLookupBreadcrumb* inBreadcrumbs);
 
 static void _lookupMembersInSuperTypeFacets(
     ASTBuilder* astBuilder,
@@ -425,7 +396,7 @@ static void _lookupMembersInSuperTypeFacets(
     InheritanceInfo const& inheritanceInfo,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* inBreadcrumbs)
+    StackLookupBreadcrumb* inBreadcrumbs)
 {
 
 
@@ -493,8 +464,6 @@ static void _lookupMembersInSuperTypeFacets(
 
         // We are now going to lookup in the facet.
 
-        BreadcrumbInfo* newBreadcrumbs = inBreadcrumbs;
-        BreadcrumbInfo subtypeInfo;
         auto parentDeclRef = facet->declRefForMemberLookup;
         if (facet->directness != Facet::Directness::Self)
         {
@@ -516,15 +485,20 @@ static void _lookupMembersInSuperTypeFacets(
                 continue;
             }
 
-            // If we are looking up in a base type, we also need to make sure
-            // to create a breadcrumb to track the sub to super indirection.
             if (facet->kind == Facet::Kind::Type)
             {
-                subtypeInfo.kind = LookupResultItem_Breadcrumb::Kind::SuperType;
-                subtypeInfo.val = facet->subtypeWitness;
-                subtypeInfo.prev = inBreadcrumbs;
-                subtypeInfo.declRef = facet->getDeclRef();
-                newBreadcrumbs = &subtypeInfo;
+                StackLookupBreadcrumb superTypeBreadcrumb(
+                    LookupBreadcrumbStep::makeSuperType(facet->subtypeWitness),
+                    inBreadcrumbs);
+                _lookUpDirectAndTransparentMembers(
+                    astBuilder,
+                    name,
+                    containerDeclRef.getDecl(),
+                    parentDeclRef,
+                    request,
+                    ioResult,
+                    &superTypeBreadcrumb);
+                continue;
             }
         }
         _lookUpDirectAndTransparentMembers(
@@ -534,7 +508,7 @@ static void _lookupMembersInSuperTypeFacets(
             parentDeclRef,
             request,
             ioResult,
-            newBreadcrumbs);
+            inBreadcrumbs);
     }
 }
 
@@ -544,7 +518,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     DeclRef<Decl> declRef,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* inBreadcrumbs)
+    StackLookupBreadcrumb* inBreadcrumbs)
 {
     auto semantics = request.semantics;
     if (!as<InterfaceDecl>(declRef.getDecl()) &&
@@ -609,7 +583,7 @@ static void _lookUpMembersInSuperTypeImpl(
     Type* superType,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* inBreadcrumbs)
+    StackLookupBreadcrumb* inBreadcrumbs)
 {
     // If the type was pointer-like, then dereference it
     // automatically here.
@@ -619,9 +593,9 @@ static void _lookUpMembersInSuperTypeImpl(
         {
             // Need to leave a breadcrumb to indicate that we
             // did an implicit dereference here
-            BreadcrumbInfo derefBreacrumb;
-            derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
-            derefBreacrumb.prev = inBreadcrumbs;
+            StackLookupBreadcrumb derefBreadcrumb(
+                LookupBreadcrumbStep::makeDeref(),
+                inBreadcrumbs);
 
             // Recursively perform lookup on the result of deref
             _lookUpMembersInType(
@@ -630,7 +604,7 @@ static void _lookUpMembersInSuperTypeImpl(
                 pointerElementType,
                 request,
                 ioResult,
-                &derefBreacrumb);
+                &derefBreadcrumb);
             if (ioResult.isValid())
                 return;
         }
@@ -668,7 +642,21 @@ static void _lookUpMembersInSuperTypeImpl(
     }
     else if (auto modifiedType = as<ModifiedType>(superType))
     {
-        // We can just look through modified types
+        // Modifiers do not change which members a type provides. Parser-time lookup has no
+        // semantic visitor, so it can look through the wrapper without requesting inheritance
+        // computation. Semantic lookup keeps the wrapper because inheritance facets preserve the
+        // complete type used to specialize the selected declaration.
+        if (!request.semantics)
+        {
+            _lookUpMembersInSuperTypeImpl(
+                astBuilder,
+                name,
+                modifiedType->getBase(),
+                request,
+                ioResult,
+                inBreadcrumbs);
+            return;
+        }
         InheritanceInfo inheritanceInfo =
             request.semantics->getShared()->getInheritanceInfo(modifiedType);
         _lookupMembersInSuperTypeFacets(
@@ -753,7 +741,7 @@ static void _lookUpMembersInType(
     Type* type,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* breadcrumbs)
+    StackLookupBreadcrumb* breadcrumbs)
 {
     if (!type)
     {
@@ -775,7 +763,7 @@ static void _lookUpMembersInValue(
     DeclRef<Decl> valueDeclRef,
     LookupRequest const& request,
     LookupResult& ioResult,
-    BreadcrumbInfo* breadcrumbs)
+    StackLookupBreadcrumb* breadcrumbs)
 {
     // Looking up `name` in the context of a value can
     // be reduced to the problem of looking up `name`
@@ -880,18 +868,15 @@ static void _lookUpInScopes(
             //
             if (auto aggTypeDeclBaseRef = containerDeclRef.as<AggTypeDeclBase>())
             {
-                // When reconstructing the final expression for a result
-                // looked up through the type or extension, we will need
-                // a `this` expression (or a `This` type expression) to
-                // mark the base of the member reference, so we create
-                // a "breadcrumb" here to track that fact.
-                //
-                auto breadcrumb = _makeThisBreadcrumbInfo(
-                    isThisValueAvailable ? LookupResultItem::Breadcrumb::Kind::ThisValue
-                                         : LookupResultItem::Breadcrumb::Kind::ThisType,
-                    aggTypeDeclBaseRef,
-                    request.scope);
-                BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
+                // `_lookUpInScopes()` defers the implicit base of a member selected through an
+                // enclosing type. It appends a `ThisValue` breadcrumb while an instance is
+                // available, or a `ThisType` breadcrumb after crossing a receiverless boundary.
+                StackLookupBreadcrumb breadcrumb(
+                    isThisValueAvailable
+                        ? LookupBreadcrumbStep::makeThisValue(request.scope)
+                        : LookupBreadcrumbStep::makeThisType(aggTypeDeclBaseRef),
+                    nullptr);
+                StackLookupBreadcrumb* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
                 if (auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
@@ -903,10 +888,7 @@ static void _lookUpInScopes(
                             DeclCheckState::CanUseExtensionTargetType);
                     }
 
-                    // If we are doing lookup from inside an `extension`
-                    // declaration, then the `this` expression will have
-                    // a type that uses the "target type" of the `extension`.
-                    //
+                    // An extension's implicit base has the extension target type.
                     type = getTargetType(astBuilder, extDeclRef);
                     if (name == astBuilder->getSharedASTBuilder()->getThisTypeName())
                     {
@@ -918,8 +900,7 @@ static void _lookUpInScopes(
                     SLANG_ASSERT(aggTypeDeclBaseRef.as<AggTypeDecl>());
                     if (auto interfaceBase = as<InterfaceDecl>(aggTypeDeclBaseRef.getDecl()))
                     {
-                        // When looking up inside an interface type, we are actually looking up
-                        // through ThisType.
+                        // An interface member is reached through its explicit `This` type.
                         if (name != interfaceBase->getThisTypeDecl()->getName())
                         {
                             type = DeclRefType::create(
@@ -940,9 +921,8 @@ static void _lookUpInScopes(
                     }
                 }
 
-                // When looking up in an extension declaration, we should not automatically
-                // dereference pointer types, as the 'This' type should refer to the
-                // extension target type itself, not the pointed-to type.
+                // An extension's `This` type denotes the target itself, not a pointer target that
+                // ordinary member lookup might reach through automatic dereference.
                 LookupRequest modifiedRequest = request;
                 if (aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
@@ -976,37 +956,41 @@ static void _lookUpInScopes(
 
             if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
             {
-                // If we are checking an interface default method implementation,
-                // we should look up members through `this`, whose type is the explicit `This`
-                // generic parameter, and skip looking up in the interface decl itself.
-
-                // Instead of looking up in the interface decl itself, we should
-                // look up in the `This` type instead.
+                // `_lookUpInScopes()` searches an interface default implementation through its
+                // explicit `This` parameter instead of through the interface declaration.
                 if (getText(name) != "This")
                 {
-                    auto breadcrumb = _makeThisBreadcrumbInfo(
-                        isThisValueAvailable ? LookupResultItem::Breadcrumb::Kind::ThisValue
-                                             : LookupResultItem::Breadcrumb::Kind::ThisType,
-                        DeclRef<Decl>(defaultImplDecl->thisTypeDecl),
-                        request.scope);
-                    Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
+                    auto thisTypeDeclRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
+                    StackLookupBreadcrumb breadcrumb(
+                        isThisValueAvailable
+                            ? LookupBreadcrumbStep::makeThisValue(request.scope)
+                            : LookupBreadcrumbStep::makeThisType(thisTypeDeclRef),
+                        nullptr);
+                    Type* type = DeclRefType::create(astBuilder, thisTypeDeclRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
                 }
 
-                // We need to skip looking up in the interface decl itself, since we are
-                // looking up in the effective `this` type.
-                for (; scope && !as<InterfaceDecl>(scope->containerDecl); scope = scope->parent)
-                {
-                    // We need to skip looking up in the interface decl itself, since we are
-                    // looking up in the effective `this` type.
-                }
+                // The `_lookUpInScopes()` search through the explicit `This` parameter above
+                // replaces a search in the interface declaration, so the next iteration resumes
+                // outside that interface.
+                auto interfaceScope = scope;
+                while (interfaceScope && !as<InterfaceDecl>(interfaceScope->containerDecl))
+                    interfaceScope = interfaceScope->parent;
+                SLANG_RELEASE_ASSERT(interfaceScope);
+                scope = interfaceScope;
                 break;
             }
 
         }
 
-        // Sibling scopes are peers in one lookup step. Receiver availability changes only after
-        // all peers have been searched, when lookup moves to the lexical parent scope.
+        // The scope chain represents lexical nesting through its head and parent links;
+        // `nextSibling` links imported or coalesced lookup peers rather than enclosing
+        // declarations. Receiver availability therefore changes only after `_lookUpInScopes()` has
+        // searched every peer and moves from the head to its lexical parent. Once `_lookUpInScopes()`
+        // crosses a known receiverless boundary, an outer lexical scope cannot restore a `this`
+        // value. This structural query is independent of `request.semantics`: later expression
+        // reconstruction and candidate completion still inspect breadcrumbs from lookup results
+        // produced without a semantic visitor.
         auto lexicalContainerDecl = lexicalScope->containerDecl;
         if (isReceiverlessDeclarationBoundary(lexicalContainerDecl))
         {

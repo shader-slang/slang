@@ -18,18 +18,18 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     InterlockedAdd(mutable_uint_buffer[threadId.x], 1);
 
-    // Constant pointers arent a thing in slang
+    // Slang does not support pointers to constant storage.
     float* ptr1 = &constant_float_buffer[threadId.x];
-//diag:                                 ^ cannot take address of immutable object
-//diag:                                 ^ Not allowed to take the address of an immutable object
-//diag:                                 ^ argument must be l-value
-//diag:                                 ^ argument passed to parameter '0' must be l-value.
+//diag:                                 ^ property or subscript does not provide an address
+//diag:                                 ^ cannot take a direct reference to this subscript because it has no `ref` accessor
 
     float* ptr2 = __getAddress(constant_float_buffer[threadId.x]);
 //diag:           ^^^^^^^^^^^^ invalid __getAddress usage
 //diag:           ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
+//diag:                                             ^ property or subscript does not provide an address
+//diag:                                             ^ cannot take a direct reference to this subscript because it has no `ref` accessor
 
     InterlockedAdd(constant_uint_buffer[0], 1);
-//diag:                                ^ argument must be l-value
-//diag:                                ^ argument passed to parameter '0' must be l-value.
+//diag:                                ^ property or subscript does not provide an address
+//diag:                                ^ cannot take a direct reference to this subscript because it has no `ref` accessor
 }

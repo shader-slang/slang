@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 26c05154a110122a39a294dc2a0648428fe004995143e86fc2c091a60bc719c7
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 6cb9e9eed01e0d107597afdd187ebf0692d9531cbdddb66512091922c25257dc
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -66,6 +66,7 @@ flowchart TD
   Modifier --> InModifier
   Modifier --> OutModifier
   Modifier --> ConstModifier
+  Modifier --> CppStyleTrailingThisParamConstModifier
   Modifier --> InlineModifier
   Modifier --> BuiltinModifier
   Modifier --> AttributeBase
@@ -90,6 +91,7 @@ flowchart TD
   Attribute --> DifferentiableAttribute
   Attribute --> InheritanceControlAttribute
   Attribute --> GLSLSimpleIntegerLayoutAttribute
+  Attribute --> ThisParamInfoAttribute
   Attribute --> OtherAttr["UnrollAttribute, NumThreadsAttribute, EntryPointAttribute, ..."]
   DifferentiableAttribute --> UserDefinedDerivativeAttribute
   DifferentiableAttribute --> DerivativeOfAttribute
@@ -146,6 +148,7 @@ no data at all.
 | `RefModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `__ref` parameter passing mode; the un-prefixed `ref` is not a parameter modifier (it spells a `ref` property accessor instead). |
 | `BorrowModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `__constref` parameter passing mode; there is no `borrow` surface spelling. |
 | `ConstModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `const`. |
+| `CppStyleTrailingThisParamConstModifier` | `Modifier` | (no additional state) | [function suffix](../syntax-reference/grammar.md#function-style-declarations) | Records `const` after a function parameter list. On an HLSL method with a configurable value-type receiver it explicitly selects a read-only implicit receiver; outside HLSL the checker diagnoses the spelling but retains that requested mode for recovery. A `ClassDecl` method instead rejects every receiver-mode specifier and keeps its fixed `in` receiver. The suffix node is distinct from prefix `ConstModifier`. |
 | `InlineModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `inline`. |
 | `ParamModifier` | `Modifier` | (no additional state) | (none) | Internal marker on synthesized parameters. |
 | `ConstExprModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `constexpr`. |
@@ -291,6 +294,7 @@ inversion is observable today.
 | --- | --- | --- | --- | --- |
 | `ToBeSynthesizedModifier` | `Modifier` | (no additional state) | (none) | Placeholder marking a decl that the checker should synthesize. |
 | `SynthesizedModifier` | `Modifier` | `op: uint32_t`, `operands: List<Val*>` | (none) | Marks decls produced by checker synthesis. |
+| `SynthesizedParamPassingModeModifier` | `Modifier` | `mode: ParamPassingMode` | (none) | Stores a declaration-owned effective parameter-passing mode copied during requirement-witness synthesis, so a substituted value type cannot cause later signature, lowering, or mangling logic to recompute a different ABI. It appears on synthesized parameters and on synthesized callables for their implicit receivers. |
 | `SynthesizedStaticLambdaFuncModifier` | `Modifier` | (no additional state) | (none) | Marks the static-lambda function synthesized for `LambdaDecl`. |
 | `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | `declaredCapabilityRequirements: CapabilitySetVal*` | (none) | Marks capability sets that were written by the user. |
 | `LocalTempVarModifier` | `Modifier` | (no additional state) | (none) | Marks compiler-introduced local temporaries. |
@@ -490,12 +494,24 @@ rather than in `core.meta.slang`.
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]`. |
-| `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]`. |
+| `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]` selects an `inout` implicit receiver on a method or accessor with a configurable value-type receiver. |
+| `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]` selects a read-only implicit receiver on a method or accessor with a configurable value-type receiver: `in` for a copyable receiver, or borrowing `constref` for a non-copyable receiver. |
 | `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded — a call used as a bare expression statement is error `30059`, "result of `[NoDiscard]` function is discarded", while binding the result is accepted. |
-| `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[constref]`. |
-| `RefAttribute` | `Attribute` | (no additional state) | (none) | `[__ref]`. |
+| `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[constref]` explicitly selects the borrowing `constref` mode on a method or accessor with a configurable value-type receiver. |
+| `RefAttribute` | `Attribute` | (no additional state) | (none) | `[__ref]` explicitly selects the writable `ref` mode on a method or accessor with a configurable value-type receiver. |
+| `ThisParamInfoAttribute` | `Attribute` | `info: ParamInfo`, `usesMutatingSuffixForImplicitHLSLReceiver: bool` | (none) | Checked semantic record of a declaration's effective implicit receiver. `info` stores its type and parameter-passing mode. The Boolean records whether the implicit HLSL default requires the ABI's `m` suffix; it affects mangling only and does not represent a different receiver mode. |
 | `AnyValueSizeAttribute` | `Attribute` | `size: int32_t` | (none) | `[anyValueSize(size)]`. |
+
+A Slang `ClassDecl` member is the exception to all four receiver-mode
+attributes above: it rejects the specifier and retains its fixed `in`
+receiver.
+
+For a configurable receiver, the four attributes and a trailing
+`const` are mutually exclusive. Exactly one spelling selects its
+documented mode. Repeating one spelling reports `E31202`; combining
+different spellings reports `E30444`. In either invalid case, checking
+recovers with the declaration-kind and dialect fallback instead of
+letting the first spelling silently win.
 
 ### Differentiability attributes
 
@@ -553,6 +569,18 @@ looking up an `AttributeDecl` (see
 [declarations.md](declarations.md)). Both ultimately end up linked
 off `ModifiableSyntaxNode::modifiers`, so most consumer code does
 not need to distinguish.
+
+`CppStyleTrailingThisParamConstModifier` is an intentional exception
+to the usual prefix placement of keyword modifiers. It records the
+HLSL-compatible suffix in `void inspect() const`; it is not the
+`ConstModifier` produced by prefix `const`. Keeping the two nodes
+distinct lets receiver-mode checking interpret the suffix without
+giving prefix `const` a receiver meaning. In HLSL the suffix selects a
+read-only implicit `this` parameter on a method with a configurable
+value-type receiver. Outside HLSL the checker diagnoses the spelling
+and still uses that requested mode while recovering. A `ClassDecl`
+method instead rejects every receiver-mode specifier and keeps its
+fixed `in` receiver.
 
 `ParseSquareBracketAttributes` accepts a few surface spellings that are
 easy to miss. A group may be written either `[a]` or `[[a]]`, several

@@ -105,11 +105,15 @@ struct SubscriptInfo : ExtendedValueInfo
 // so we forward declare them here and fill
 // them in later.
 //
-struct BoundStorageInfo;
-struct BoundMemberInfo;
+class BoundStorageInfo;
+struct DeferredStorageArgumentsInfo;
+class BoundMemberStorageInfo;
+class BoundCallableInfo;
+struct StabilizedLValueInfo;
+struct PendingWriteBackInfo;
+struct AssignmentResultInfo;
 struct SwizzledLValueInfo;
 struct SwizzledMatrixLValueInfo;
-struct CopiedValInfo;
 struct ExtractedExistentialValInfo;
 struct ImplicitCastLValueInfo;
 
@@ -134,8 +138,11 @@ struct LoweredValInfo
         // pointer to the value
         Ptr,
 
-        // A member declaration bound to a particular `this` value
-        BoundMember,
+        // A field or inherited base projected from a deferred storage value.
+        BoundMemberStorage,
+
+        // A callable selected from a receiver whose evaluation effects must be preserved.
+        BoundCallable,
 
         // A reference to an AST-level subscript operation
         Subscript,
@@ -143,6 +150,15 @@ struct LoweredValInfo
         // An AST-level subscript operation bound to a particular
         // object and arguments.
         BoundStorage,
+
+        // One cached read of an l-value together with the original write-back destination.
+        StabilizedLValue,
+
+        // A lowered value followed by ordered enclosing-storage write-backs after its next use.
+        PendingWriteBack,
+
+        // An l-value returned by a completed assignment. Discarding this result must not read it.
+        AssignmentResult,
 
         // The result of applying swizzling to an l-value
         SwizzledLValue,
@@ -205,12 +221,20 @@ struct LoweredValInfo
         return info;
     }
 
-    static LoweredValInfo boundMember(BoundMemberInfo* boundMemberInfo);
+    static LoweredValInfo boundMemberStorage(BoundMemberStorageInfo* storageInfo);
 
-    BoundMemberInfo* getBoundMemberInfo()
+    BoundMemberStorageInfo* getBoundMemberStorageInfo()
     {
-        SLANG_ASSERT(flavor == Flavor::BoundMember);
-        return (BoundMemberInfo*)ext;
+        SLANG_ASSERT(flavor == Flavor::BoundMemberStorage);
+        return (BoundMemberStorageInfo*)ext;
+    }
+
+    static LoweredValInfo boundCallable(BoundCallableInfo* callableInfo);
+
+    BoundCallableInfo* getBoundCallableInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::BoundCallable);
+        return (BoundCallableInfo*)ext;
     }
 
     static LoweredValInfo subscript(SubscriptInfo* subscriptInfo);
@@ -227,6 +251,30 @@ struct LoweredValInfo
     {
         SLANG_ASSERT(flavor == Flavor::BoundStorage);
         return (BoundStorageInfo*)ext;
+    }
+
+    static LoweredValInfo stabilizedLValue(StabilizedLValueInfo* stabilizedLValueInfo);
+
+    StabilizedLValueInfo* getStabilizedLValueInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::StabilizedLValue);
+        return (StabilizedLValueInfo*)ext;
+    }
+
+    static LoweredValInfo pendingWriteBack(PendingWriteBackInfo* pendingWriteBackInfo);
+
+    PendingWriteBackInfo* getPendingWriteBackInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::PendingWriteBack);
+        return (PendingWriteBackInfo*)ext;
+    }
+
+    static LoweredValInfo assignmentResult(AssignmentResultInfo* assignmentResultInfo);
+
+    AssignmentResultInfo* getAssignmentResultInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::AssignmentResult);
+        return (AssignmentResultInfo*)ext;
     }
 
     static LoweredValInfo swizzledLValue(SwizzledLValueInfo* extInfo);
@@ -262,68 +310,451 @@ struct LoweredValInfo
     }
 };
 
-// This case is used to indicate a reference to an AST-level
-// operation that accesses abstract storage.
-//
-// This could be an invocation of a `subscript` declaration,
-// with argument representing an index or indices:
-//
-//     RWStructuredBuffer<Foo> gBuffer;
-//     ... gBuffer[someIndex] ...
-//
-// the expression `gBuffer[someIndex]` will be lowered to
-// a value that references `RWStructureBuffer<Foo>::operator[]`
-// with arguments `(gBuffer, someIndex)`.
-//
-// This could also be an reference to a `property` declaration,
-// with no arguments:
-//
-//      struct Sphere { property radius : int { get { ... } } }
-//      Sphere sphere;
-//      ... sphere.radius ...
-//
-// the expression `sphere.radius` will be lowered to a value
-// that references `Sphere::radius` with arguments `(sphere)`.
-//
-// Such a value can be an l-value, and depending on the context
-// where it is used, can lower into a call to either the getter
-// or setter operations of the storage.
-//
-struct BoundStorageInfo : ExtendedValueInfo
+/// Represents a property or subscript reference whose accessor depends on its use.
+///
+/// Consider `buffer[index]` when the subscript declares both `get` and `set` accessors.
+/// `lowerStorageReference()` cannot choose an accessor from that expression alone: a read calls
+/// `get`, while an assignment calls `set`. `BoundStorageInfo` stores the declaration reference and
+/// receiver together with exactly one argument form: either existing IR values or checked
+/// expressions that must be lowered after the receiver is prepared. `materialize()`,
+/// `tryGetAddress()`, and `assign()` later receive the concrete `AbstractStorageUse` and select its
+/// `AbstractStorageAccessPlan`. A property uses the lowered-value form with no arguments.
+class BoundStorageInfo : public ExtendedValueInfo
 {
-    /// The declaration of the abstract storage (subscript or property)
-    DeclRef<ContainerDecl> declRef;
+public:
+    enum class ArgumentForm
+    {
+        LoweredValues,
+        DeferredExpressions,
+    };
 
-    /// The IR-level type of the stored value
-    IRType* type;
+    static BoundStorageInfo* createWithLoweredArguments(
+        DeclRef<ContainerDecl> storageDeclRef,
+        IRType* valueType,
+        LoweredValInfo base,
+        UInt argumentCount,
+        IRInst* const* arguments);
 
-    /// The base value/object on which storage is being accessed
-    LoweredValInfo base;
+    static BoundStorageInfo* createWithDeferredArguments(
+        DeclRef<ContainerDecl> storageDeclRef,
+        IRType* valueType,
+        LoweredValInfo base,
+        DeferredStorageArgumentsInfo* arguments);
 
-    /// Additional arguments required to reify a reference to the storage
-    List<IRInst*> additionalArgs;
+    BoundStorageInfo* cloneWithBase(LoweredValInfo base) const;
+
+    DeclRef<ContainerDecl> getStorageDeclRef() const { return m_storageDeclRef; }
+    IRType* getValueType() const { return m_valueType; }
+    LoweredValInfo getBase() const { return m_base; }
+    ArgumentForm getArgumentForm() const { return m_argumentForm; }
+
+    List<IRInst*> const& getLoweredArguments() const
+    {
+        SLANG_RELEASE_ASSERT(m_argumentForm == ArgumentForm::LoweredValues);
+        return m_loweredArguments;
+    }
+
+    DeferredStorageArgumentsInfo* getDeferredArguments() const
+    {
+        SLANG_RELEASE_ASSERT(m_argumentForm == ArgumentForm::DeferredExpressions);
+        SLANG_RELEASE_ASSERT(m_deferredArguments);
+        return m_deferredArguments;
+    }
+
+private:
+    BoundStorageInfo(
+        DeclRef<ContainerDecl> storageDeclRef,
+        IRType* valueType,
+        LoweredValInfo base,
+        ArgumentForm argumentForm)
+        : m_storageDeclRef(storageDeclRef)
+        , m_valueType(valueType)
+        , m_base(base)
+        , m_argumentForm(argumentForm)
+    {
+    }
+
+    DeclRef<ContainerDecl> m_storageDeclRef;
+    IRType* m_valueType = nullptr;
+    LoweredValInfo m_base;
+    ArgumentForm m_argumentForm;
+    List<IRInst*> m_loweredArguments;
+    RefPtr<DeferredStorageArgumentsInfo> m_deferredArguments;
 };
 
-
-// Represents some declaration bound to a particular
-// object. For example, if we had `obj.f` where `f`
-// is a member function, we'd use a `BoundMemberInfo`
-// to represnet this.
-//
-// Note: This case is largely avoided by special-casing
-// in the handling of calls (like `obj.f(arg)`), but
-// it is being left here as an example of what we might
-// need/want to do in the long term.
-struct BoundMemberInfo : ExtendedValueInfo
+/// Represents one checked argument expression retained for a deferred subscript accessor call.
+struct DeferredStorageArgument
 {
-    // The base object
-    LoweredValInfo base;
+    Expr* expression = nullptr;
+    ParamPassingMode passingMode = ParamPassingMode::In;
 
-    // The (AST-level) declaration reference.
-    DeclRef<Decl> declRef;
+    /// Whether `expression` is a parameter's default argument rather than written at the call.
+    bool isDefaultArgument = false;
 
-    // The type of this value
-    IRType* type;
+    /// Substitutions applied while lowering a default argument in the caller's environment.
+    DeclRefBase* defaultArgumentSubstitutions = nullptr;
+};
+
+/// Represents a subscript's checked arguments pending their eventual accessor call.
+///
+/// Consider `outer.item[getIndex()]`, where `item` is a property and the subscript accessor takes
+/// a mutating receiver. `prepareBoundStorageAccessorCall()` must prepare `outer.item` before
+/// `lowerDeferredStorageArguments()` evaluates `getIndex()`. `DeferredStorageArgumentsInfo`
+/// therefore retains the checked argument expressions until the eventual storage use selects an
+/// accessor. `lowerDeferredStorageArguments()` then lowers and caches those expressions once, after
+/// the prepared receiver, for any matching getter/setter write-back.
+struct DeferredStorageArgumentsInfo : RefObject
+{
+    List<DeferredStorageArgument> arguments;
+    List<IRInst*> loweredArguments;
+
+    /// `lowerDeferredSubscriptReference()` initializes this pending write-back with receiver and
+    /// enclosing actions; `lowerDeferredStorageArguments()` prepends argument actions after it
+    /// evaluates the deferred arguments.
+    PendingWriteBackInfo* pendingWriteBack = nullptr;
+
+    bool areLowered = false;
+    bool areBeingLowered = false;
+};
+
+/// Constructs a property or subscript reference from arguments that already have IR values.
+BoundStorageInfo* BoundStorageInfo::createWithLoweredArguments(
+    DeclRef<ContainerDecl> storageDeclRef,
+    IRType* valueType,
+    LoweredValInfo base,
+    UInt argumentCount,
+    IRInst* const* arguments)
+{
+    SLANG_RELEASE_ASSERT(!argumentCount || arguments);
+    auto result =
+        new BoundStorageInfo(storageDeclRef, valueType, base, ArgumentForm::LoweredValues);
+    result->m_loweredArguments.addRange(arguments, argumentCount);
+    return result;
+}
+
+/// Constructs a subscript reference whose checked arguments await receiver preparation.
+BoundStorageInfo* BoundStorageInfo::createWithDeferredArguments(
+    DeclRef<ContainerDecl> storageDeclRef,
+    IRType* valueType,
+    LoweredValInfo base,
+    DeferredStorageArgumentsInfo* arguments)
+{
+    SLANG_RELEASE_ASSERT(arguments);
+    auto result =
+        new BoundStorageInfo(storageDeclRef, valueType, base, ArgumentForm::DeferredExpressions);
+    result->m_deferredArguments = arguments;
+    return result;
+}
+
+/// Copies this property or subscript reference with a replacement receiver.
+BoundStorageInfo* BoundStorageInfo::cloneWithBase(LoweredValInfo base) const
+{
+    switch (m_argumentForm)
+    {
+    case ArgumentForm::LoweredValues:
+        return createWithLoweredArguments(
+            m_storageDeclRef,
+            m_valueType,
+            base,
+            m_loweredArguments.getCount(),
+            m_loweredArguments.getBuffer());
+
+    case ArgumentForm::DeferredExpressions:
+        return createWithDeferredArguments(
+            m_storageDeclRef,
+            m_valueType,
+            base,
+            m_deferredArguments);
+    }
+
+    SLANG_UNEXPECTED("unknown bound-storage argument form");
+    UNREACHABLE_RETURN(nullptr);
+}
+
+struct IRGenContext;
+
+/// Represents one deferred write-back operation attached to a lowered value.
+///
+/// An assignment writes a temporary back to the l-value from which it was materialized. For a
+/// stabilized binding, `assign()` updates the binding's local value and marks it dirty;
+/// `applyStabilizedBindingCommit()` then writes a dirty binding back to its original l-value and
+/// conditionally reapplies its canonical enclosing path. A `PendingWriteBackInfo` owns a one-use
+/// list that its consumer clears, while a `StabilizedLValueInfo` retains a reusable enclosing list
+/// and records whether that list needs another application. These are the two ways a lowered
+/// storage operation can require work after its eventual read, write, borrow, or call finishes.
+class DeferredWriteBackAction
+{
+public:
+    enum class Kind
+    {
+        None,
+        Assignment,
+        StabilizedBindingCommit,
+    };
+
+    /// Constructs the empty element required by `List` storage.
+    ///
+    /// `forAssignment()` and `forStabilizedBinding()` replace this state before
+    /// `applyDeferredWriteBackActions()` reads the action.
+    DeferredWriteBackAction() = default;
+
+    static DeferredWriteBackAction forAssignment(
+        LoweredValInfo destination,
+        LoweredValInfo source)
+    {
+        DeferredWriteBackAction result(Kind::Assignment);
+        result.m_destination = destination;
+        result.m_source = source;
+        return result;
+    }
+
+    static DeferredWriteBackAction forStabilizedBinding(
+        StabilizedLValueInfo* stabilizedBinding)
+    {
+        SLANG_RELEASE_ASSERT(stabilizedBinding);
+        DeferredWriteBackAction result(Kind::StabilizedBindingCommit);
+        result.m_stabilizedBinding = stabilizedBinding;
+        return result;
+    }
+
+    Kind getKind() const { return m_kind; }
+
+    LoweredValInfo getDestination() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::Assignment);
+        return m_destination;
+    }
+
+    LoweredValInfo getSource() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::Assignment);
+        return m_source;
+    }
+
+    StabilizedLValueInfo* getStabilizedBinding() const
+    {
+        SLANG_RELEASE_ASSERT(m_kind == Kind::StabilizedBindingCommit);
+        return m_stabilizedBinding;
+    }
+
+private:
+    explicit DeferredWriteBackAction(Kind kind)
+        : m_kind(kind)
+    {
+    }
+
+    Kind m_kind = Kind::None;
+    LoweredValInfo m_destination;
+    LoweredValInfo m_source;
+    StabilizedLValueInfo* m_stabilizedBinding = nullptr;
+};
+
+static void applyDeferredWriteBackActions(
+    IRGenContext* context,
+    List<DeferredWriteBackAction> const& actions);
+static void applyAndClearDeferredWriteBackActions(
+    IRGenContext* context,
+    List<DeferredWriteBackAction>& actions);
+
+/// Represents one stable value and pending commit for an expression-local binding.
+///
+/// Existential lowering may consume the same initializer as a value, a concrete type, and a
+/// witness. When `lowerLocalBindingInitializer()` lowers a binding marked `LocalTempVarModifier`,
+/// it snapshots that initializer once. A mutable snapshot lives in `localValue`; every assignment
+/// updates that same storage and marks `needsWriteBack`. The binding commit writes the final local
+/// value to `writeBackTarget` only when it is dirty. `applyStabilizedBindingCommit()` applies the
+/// ordered enclosing actions after that first use, and reapplies them after each later dirty write.
+/// A snapshot stored as `LoweredValInfo::Flavor::Simple` has no original l-value to update, but can
+/// still retain enclosing actions until the selected operation completes.
+struct StabilizedLValueInfo : ExtendedValueInfo
+{
+    /// The SSA value or mutable temporary shared by every use of the local binding.
+    LoweredValInfo localValue;
+
+    /// The original l-value updated by a dirty binding commit, or `None` for an r-value
+    /// initializer.
+    LoweredValInfo writeBackTarget;
+
+    /// Whether `assign()` updated `localValue` after taking the initial snapshot.
+    bool needsWriteBack = false;
+
+    /// Whether the initializer's enclosing actions still need their first application.
+    ///
+    /// Later mutations can reuse the same stabilized binding. Once the first use has completed,
+    /// its enclosing actions run again only after `localValue` has been modified.
+    bool hasPendingInitialEnclosingActions = true;
+
+    /// Ordered enclosing operations that follow this binding's immediate write-back.
+    List<DeferredWriteBackAction> enclosingActions;
+};
+
+/// Represents a lowered value with enclosing-storage write-backs pending until its use.
+///
+/// An expression-local binding can return an l-value whose eventual assignment occurs outside the
+/// `LetExpr` node that introduced the binding. `finishDeferredWriteBackUse()` wraps that result
+/// with its pending write-backs. `materialize()`, `assign()`, or `addArg()` then applies them after
+/// the next read, assignment, or call-argument use. Nested bindings append their write-backs from
+/// inner to outer so that one consumer can commit the complete sequence.
+struct PendingWriteBackInfo : ExtendedValueInfo
+{
+    LoweredValInfo value;
+    List<DeferredWriteBackAction> actions;
+};
+
+/// Retains the l-value denoted by an assignment expression after its write has completed.
+///
+/// Consider `storage.item = replacement;` when `item` has only a setter. The assignment performs
+/// the setter call before it produces this result. An expression statement must therefore discard
+/// the result without trying to read `storage.item`, while a consuming expression such as
+/// `(value = replacement).field` must still be able to project from the assigned l-value.
+///
+/// A destination can also depend on a stabilized receiver. For example, the inner assignment in
+/// `(value.item = 7) = 9` commits its first write before returning, but the outer assignment must
+/// reapply the same receiver write-back after writing `9`. `writeBacksAfterMutation` retains the
+/// destination's canonical receiver-stabilization actions and stabilized-binding commits. Those
+/// actions share their stable temporaries with `lValue`. The list excludes accessor-call-local
+/// receiver write-backs created while invoking the completed assignment's setter, because reusing
+/// `lValue` prepares that accessor again. `AssignmentResultInfo` therefore stores no action that
+/// can replay the already-completed inner assignment.
+struct AssignmentResultInfo : ExtendedValueInfo
+{
+    LoweredValInfo lValue;
+    List<DeferredWriteBackAction> writeBacksAfterMutation;
+};
+
+/// Places newly discovered inner write-backs before an existing pending write-back.
+static void prependDeferredWriteBackActions(
+    PendingWriteBackInfo* pendingWriteBack,
+    List<DeferredWriteBackAction>& innerActions)
+{
+    SLANG_RELEASE_ASSERT(pendingWriteBack);
+    if (!innerActions.getCount())
+        return;
+
+    List<DeferredWriteBackAction> enclosingActions;
+    enclosingActions.addRange(pendingWriteBack->actions);
+    pendingWriteBack->actions.clear();
+    pendingWriteBack->actions.addRange(innerActions);
+    pendingWriteBack->actions.addRange(enclosingActions);
+    innerActions.clear();
+}
+
+/// Exposes the live value carried by a pending write-back while a projection is formed.
+///
+/// `beginPendingWriteBackProjection()` exposes a receiver without consuming its pending write-back.
+/// For example, lowering the `x` selection in `outer.item.value.x` must keep the write-back for
+/// `outer.item` pending until the eventual read or mutation of `x`.
+/// `finishPendingWriteBackProjection()` replaces the pending value with the new projection while
+/// retaining its ordered actions.
+static LoweredValInfo beginPendingWriteBackProjection(
+    LoweredValInfo value,
+    PendingWriteBackInfo** outPending)
+{
+    SLANG_RELEASE_ASSERT(outPending);
+    *outPending = nullptr;
+    if (value.flavor != LoweredValInfo::Flavor::PendingWriteBack)
+        return value;
+
+    auto pending = value.getPendingWriteBackInfo();
+    *outPending = pending;
+    return pending->value;
+}
+
+static LoweredValInfo finishPendingWriteBackProjection(
+    PendingWriteBackInfo* pending,
+    LoweredValInfo projection)
+{
+    if (!pending)
+        return projection;
+
+    pending->value = projection;
+    return LoweredValInfo::pendingWriteBack(pending);
+}
+
+/// Represents a field or inherited-base projection from deferred storage.
+///
+/// Consider `storage.item.baseField = 1` when `item` is a property with getter and setter
+/// accessors. `extractField()` retains both the `baseField` projection and any inserted
+/// inherited-base projection until `stabilizeDeferredStorageInProjection()` or `materialize()`
+/// consumes `storage.item`. The member declaration here is therefore always a `VarDecl` or
+/// `InheritanceDecl`. `BoundMemberStorageInfo` keeps callable selections in a separate
+/// representation so storage stabilization, address formation, and assignment can operate on this
+/// type without repeatedly classifying the declaration.
+class BoundMemberStorageInfo : public ExtendedValueInfo
+{
+public:
+    /// Constructs a projection of a data field or inherited subobject.
+    static BoundMemberStorageInfo* create(
+        LoweredValInfo base,
+        DeclRef<Decl> memberDeclRef,
+        IRType* memberType)
+    {
+        const bool isDataMember = memberDeclRef.as<VarDecl>() != nullptr;
+        const bool isInheritedBase = memberDeclRef.as<InheritanceDecl>() != nullptr;
+        SLANG_RELEASE_ASSERT(isDataMember || isInheritedBase);
+        SLANG_RELEASE_ASSERT(memberType);
+        return new BoundMemberStorageInfo(base, memberDeclRef, memberType);
+    }
+
+    BoundMemberStorageInfo* cloneWithBase(LoweredValInfo base) const
+    {
+        return new BoundMemberStorageInfo(base, m_memberDeclRef, m_memberType);
+    }
+
+    LoweredValInfo getBase() const { return m_base; }
+    IRType* getMemberType() const { return m_memberType; }
+    DeclRef<Decl> getMemberDeclRef() const { return m_memberDeclRef; }
+
+private:
+    BoundMemberStorageInfo(LoweredValInfo base, DeclRef<Decl> memberDeclRef, IRType* memberType)
+        : m_base(base), m_memberType(memberType), m_memberDeclRef(memberDeclRef)
+    {
+    }
+
+    LoweredValInfo m_base;
+    IRType* m_memberType = nullptr;
+    DeclRef<Decl> m_memberDeclRef;
+};
+
+/// Represents a selected callable member whose receiver still requires evaluation.
+///
+/// Consider `let callable = holder.receiver.read;`. The callable value is a declaration reference,
+/// not a closure, so it does not bind `holder.receiver` as an argument. `visitMemberExpr()` creates
+/// a `BoundCallableInfo` for this non-direct selection so that `materialize()` or
+/// `discardLoweredValue()` evaluates the retained receiver exactly once before emitting or
+/// discarding the callable value. `visitInvokeExprImpl()` evaluates the receiver directly and
+/// bypasses this representation.
+class BoundCallableInfo : public ExtendedValueInfo
+{
+public:
+    /// Constructs a selected callable whose receiver no longer carries a pending write-back.
+    static BoundCallableInfo* create(
+        LoweredValInfo base,
+        DeclRef<CallableDecl> callableDeclRef,
+        IRType* callableType)
+    {
+        SLANG_RELEASE_ASSERT(base.flavor != LoweredValInfo::Flavor::PendingWriteBack);
+        SLANG_RELEASE_ASSERT(callableDeclRef.getDecl());
+        SLANG_RELEASE_ASSERT(callableType);
+        return new BoundCallableInfo(base, callableDeclRef, callableType);
+    }
+
+    LoweredValInfo getBase() const { return m_base; }
+    DeclRef<CallableDecl> getCallableDeclRef() const { return m_callableDeclRef; }
+    IRType* getCallableType() const { return m_callableType; }
+
+private:
+    BoundCallableInfo(
+        LoweredValInfo base,
+        DeclRef<CallableDecl> callableDeclRef,
+        IRType* callableType)
+        : m_base(base), m_callableDeclRef(callableDeclRef), m_callableType(callableType)
+    {
+    }
+
+    LoweredValInfo m_base;
+    DeclRef<CallableDecl> m_callableDeclRef;
+    IRType* m_callableType = nullptr;
 };
 
 // Represents the result of a swizzle operation in
@@ -394,11 +825,19 @@ struct ImplicitCastLValueInfo : ExtendedValueInfo
     ParamPassingMode lValueType;
 };
 
-LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
+LoweredValInfo LoweredValInfo::boundMemberStorage(BoundMemberStorageInfo* storageInfo)
 {
     LoweredValInfo info;
-    info.flavor = Flavor::BoundMember;
-    info.ext = boundMemberInfo;
+    info.flavor = Flavor::BoundMemberStorage;
+    info.ext = storageInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::boundCallable(BoundCallableInfo* callableInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::BoundCallable;
+    info.ext = callableInfo;
     return info;
 }
 
@@ -415,6 +854,30 @@ LoweredValInfo LoweredValInfo::boundStorage(BoundStorageInfo* boundStorageInfo)
     LoweredValInfo info;
     info.flavor = Flavor::BoundStorage;
     info.ext = boundStorageInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::stabilizedLValue(StabilizedLValueInfo* stabilizedLValueInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::StabilizedLValue;
+    info.ext = stabilizedLValueInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::pendingWriteBack(PendingWriteBackInfo* pendingWriteBackInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::PendingWriteBack;
+    info.ext = pendingWriteBackInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::assignmentResult(AssignmentResultInfo* assignmentResultInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::AssignmentResult;
+    info.ext = assignmentResultInfo;
     return info;
 }
 
@@ -877,6 +1340,15 @@ LoweredValInfo emitCallToVal(
     IRInst* const* args,
     const TryClauseEnvironment& tryEnv)
 {
+    if (funcVal.flavor == LoweredValInfo::Flavor::PendingWriteBack)
+    {
+        auto pending = funcVal.getPendingWriteBackInfo();
+        auto result =
+            emitCallToVal(context, type, pending->value, argCount, args, tryEnv);
+        applyAndClearDeferredWriteBackActions(context, pending->actions);
+        return result;
+    }
+
     auto builder = context->irBuilder;
     switch (funcVal.flavor)
     {
@@ -891,14 +1363,19 @@ LoweredValInfo emitCallToVal(
                 if (auto dispatchKernel = as<IRDispatchKernel>(callee))
                 {
                     // If callee is a dispatch kernel expr, don't emit call(dispatchKernel,
-                    // ...), instead emit a dispatchKernel(high_order_args, actual_args).
+                    // ...), instead emit a dispatchKernel(captured_args, actual_args).
+                    List<IRInst*> dispatchArgs;
+                    for (auto capturedArg : dispatchKernel->getArgsList())
+                        dispatchArgs.add(capturedArg);
+                    dispatchArgs.addRange(args, argCount);
+
                     auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
                         type,
                         dispatchKernel->getBaseFn(),
                         dispatchKernel->getThreadGroupSize(),
                         dispatchKernel->getDispatchSize(),
-                        argCount,
-                        args));
+                        dispatchArgs.getCount(),
+                        dispatchArgs.getBuffer()));
                     SLANG_ASSERT(!dispatchKernel->hasUses());
                     dispatchKernel->removeAndDeallocate();
                     return result;
@@ -1061,36 +1538,29 @@ static LoweredValInfo _emitCallToAccessor(
     UInt argCount,
     IRInst* const* args);
 
-static LoweredValInfo _emitCallToAccessor(
+static LoweredValInfo _emitCallToBoundStorageAccessor(
     IRGenContext* context,
     IRType* type,
     DeclRef<AccessorDecl> accessorDeclRef,
-    LoweredValInfo base,
-    List<IRInst*> const& args)
-{
-    return _emitCallToAccessor(
-        context,
-        type,
-        accessorDeclRef,
-        base,
-        args.getCount(),
-        args.getBuffer());
-}
+    BoundStorageInfo* storageInfo);
 
-/// Lower a reference to abstract storage (a property or subscript).
+/// Returns the IR argument values for `storageInfo`.
 ///
-/// The given `storageDeclRef` is being accessed on some `base` value,
-/// to yield a value of some expected `type`. The additional `args`
-/// are only needed in the case of a subscript declaration (for
-/// a property, `argCount` should be zero).
+/// The lowered form returns its stored values. The deferred form lowers and caches its checked
+/// expressions after `prepareAccessorCall()` has prepared the selected accessor's receiver.
+static List<IRInst*> const& getBoundStorageArguments(
+    IRGenContext* context,
+    BoundStorageInfo* storageInfo);
+
+/// Lowers an expression that refers to a property or subscript.
 ///
-/// In the case where there is only a `get` accessor, this function
-/// will go ahead and invoke it to produce a value here and now.
-/// Otherwise, it will produce an abstract `LoweredValInfo` that
-/// encapsulates the reference to the storage so that downstream
-/// code can decide which accessor(s) to invoke.
+/// `storageDeclRef` is selected from `base` and stores values of `type`. The `args` are the
+/// subscript arguments; a property supplies no arguments.
 ///
-[[maybe_unused]] static LoweredValInfo lowerStorageReference(
+/// When the declaration can only be read through a getter, this function emits the getter call
+/// immediately. If the declaration supports another use, the function returns `BoundStorageInfo`
+/// so that the eventual read, write, borrow, or address operation can select the correct accessor.
+static LoweredValInfo lowerStorageReference(
     IRGenContext* context,
     IRType* type,
     DeclRef<ContainerDecl> storageDeclRef,
@@ -1098,60 +1568,123 @@ static LoweredValInfo _emitCallToAccessor(
     UInt argCount,
     IRInst* const* args)
 {
-    DeclRef<GetterDecl> getterDeclRef;
-    bool justAGetter = true;
-    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(
-             context->astBuilder,
-             storageDeclRef,
-             MemberFilterStyle::Instance))
+    auto readPlan = getAbstractStorageAccessPlan(
+        context->astBuilder,
+        storageDeclRef,
+        AbstractStorageUse::ReadValue);
+    auto writePlan = getAbstractStorageAccessPlan(
+        context->astBuilder,
+        storageDeclRef,
+        AbstractStorageUse::WriteValue);
+    bool isGetterOnlyStorage = readPlan.getKind() == AbstractStorageAccessPlanKind::ReadValue;
+    if (isGetterOnlyStorage)
+        isGetterOnlyStorage = readPlan.getReadAccessor().as<GetterDecl>() != nullptr;
+    if (isGetterOnlyStorage)
+        isGetterOnlyStorage = writePlan.getKind() == AbstractStorageAccessPlanKind::Invalid;
+    if (!isGetterOnlyStorage)
     {
-        // We want to track whether this storage has any accessors other than
-        // `get` (assuming that everything except `get` can be used for setting...).
+        // `materialize()`, `tryGetAddress()`, and `assign()` interpret the later
+        // `AbstractStorageUse` to decide whether to emit a getter, setter, `ref` accessor, or a read
+        // followed by setter write-back. This branch preserves every input those operations need
+        // and calls `beginPendingWriteBackProjection()` because constructing deferred storage does
+        // not consume a pending receiver write-back.
+        PendingWriteBackInfo* pendingBase = nullptr;
+        base = beginPendingWriteBackProjection(base, &pendingBase);
 
-        if (auto foundGetterDeclRef = accessorDeclRef.as<GetterDecl>())
-        {
-            // We found a getter.
-            getterDeclRef = foundGetterDeclRef;
-        }
-        else
-        {
-            // There was something other than a getter, so we can't
-            // invoke an accessor just now.
-            justAGetter = false;
-        }
+        RefPtr<BoundStorageInfo> storageInfo = BoundStorageInfo::createWithLoweredArguments(
+            storageDeclRef,
+            type,
+            base,
+            argCount,
+            args);
+
+        context->shared->extValues.add(storageInfo);
+
+        auto result = LoweredValInfo::boundStorage(storageInfo);
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 
-    if (!justAGetter || !getterDeclRef)
+    return _emitCallToAccessor(context, type, readPlan.getReadAccessor(), base, argCount, args);
+}
+
+/// Records a subscript reference whose argument expressions must follow receiver preparation.
+///
+/// The selected accessor is not known while an l-value subscript is lowered.
+/// `lowerDeferredSubscriptReference()` therefore keeps its receiver and written or defaulted
+/// argument expressions in one pending write-back.
+/// `getAbstractStorageAccessPlan()` selects an accessor when an enclosing read, write, borrow, or
+/// address operation is lowered. The corresponding path calls `prepareBoundStorageAccessorCall()`,
+/// emits the selected accessor call, then calls `applyAndClearDeferredWriteBackActions()` to apply
+/// the accumulated inner-to-outer write-backs.
+static LoweredValInfo lowerDeferredSubscriptReference(
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<SubscriptDecl> subscriptDeclRef,
+    LoweredValInfo base,
+    DeferredStorageArgumentsInfo* deferredArguments,
+    List<DeferredWriteBackAction>& enclosingActions)
+{
+    SLANG_RELEASE_ASSERT(deferredArguments);
+    SLANG_RELEASE_ASSERT(!deferredArguments->pendingWriteBack);
+
+    PendingWriteBackInfo* basePendingWriteBack = nullptr;
+    base = beginPendingWriteBackProjection(base, &basePendingWriteBack);
+
+    RefPtr<BoundStorageInfo> storageInfo = BoundStorageInfo::createWithDeferredArguments(
+        subscriptDeclRef,
+        type,
+        base,
+        deferredArguments);
+    context->shared->extValues.add(storageInfo);
+
+    RefPtr<PendingWriteBackInfo> pendingWriteBack = new PendingWriteBackInfo();
+    pendingWriteBack->value = LoweredValInfo::boundStorage(storageInfo);
+    if (basePendingWriteBack)
     {
-        // We can't perform an actual call right now, because
-        // this expression might appear in an r-value or l-value
-        // position (or *both* if it is being passed as an argument
-        // for an `in out` parameter!).
-        //
-        // Instead, we will construct a special-case value to
-        // represent the latent access operation (abstractly
-        // this is a reference to a storage location).
-
-        // The abstract storage location will need to include
-        // all the arguments being passed in the case of a subscript operation.
-
-        RefPtr<BoundStorageInfo> boundStorage = new BoundStorageInfo();
-        boundStorage->declRef = storageDeclRef;
-        boundStorage->type = type;
-        boundStorage->base = base;
-        boundStorage->additionalArgs.addRange(args, argCount);
-
-        context->shared->extValues.add(boundStorage);
-
-        return LoweredValInfo::boundStorage(boundStorage);
+        pendingWriteBack->actions.addRange(basePendingWriteBack->actions);
+        basePendingWriteBack->actions.clear();
     }
+    pendingWriteBack->actions.addRange(enclosingActions);
+    enclosingActions.clear();
+    context->shared->extValues.add(pendingWriteBack);
 
-    return _emitCallToAccessor(context, type, getterDeclRef, base, argCount, args);
+    deferredArguments->pendingWriteBack = pendingWriteBack;
+    return LoweredValInfo::pendingWriteBack(pendingWriteBack);
 }
 
 IRInst* getFieldKey(IRGenContext* context, DeclRef<Decl> field)
 {
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
+}
+
+/// Marks an l-value as the result of a write that has already completed.
+static LoweredValInfo makeAssignmentResult(
+    IRGenContext* context,
+    LoweredValInfo lValue,
+    List<DeferredWriteBackAction> const& writeBacksAfterMutation)
+{
+    SLANG_RELEASE_ASSERT(lValue.flavor != LoweredValInfo::Flavor::PendingWriteBack);
+    if (
+        lValue.flavor == LoweredValInfo::Flavor::AssignmentResult &&
+        !writeBacksAfterMutation.getCount())
+    {
+        return lValue;
+    }
+
+    RefPtr<AssignmentResultInfo> resultInfo = new AssignmentResultInfo();
+    if (lValue.flavor == LoweredValInfo::Flavor::AssignmentResult)
+    {
+        auto existingResult = lValue.getAssignmentResultInfo();
+        resultInfo->lValue = existingResult->lValue;
+        resultInfo->writeBacksAfterMutation.addRange(existingResult->writeBacksAfterMutation);
+    }
+    else
+    {
+        resultInfo->lValue = lValue;
+    }
+    resultInfo->writeBacksAfterMutation.addRange(writeBacksAfterMutation);
+    context->shared->extValues.add(resultInfo);
+    return LoweredValInfo::assignmentResult(resultInfo);
 }
 
 LoweredValInfo extractField(
@@ -1160,31 +1693,48 @@ LoweredValInfo extractField(
     LoweredValInfo base,
     DeclRef<Decl> field)
 {
+    if (base.flavor == LoweredValInfo::Flavor::AssignmentResult)
+    {
+        auto assignmentResult = base.getAssignmentResultInfo();
+        auto projectedLValue = extractField(
+            context,
+            fieldType,
+            assignmentResult->lValue,
+            field);
+        return makeAssignmentResult(
+            context,
+            projectedLValue,
+            assignmentResult->writeBacksAfterMutation);
+    }
+
     IRBuilder* builder = context->irBuilder;
+
+    PendingWriteBackInfo* pending = nullptr;
+    base = beginPendingWriteBackProjection(base, &pending);
+
+    LoweredValInfo result;
 
     switch (base.flavor)
     {
     default:
         {
             IRInst* irBase = getSimpleVal(context, base);
-            return LoweredValInfo::simple(
+            result = LoweredValInfo::simple(
                 builder->emitFieldExtract(fieldType, irBase, getFieldKey(context, field)));
         }
         break;
 
-    case LoweredValInfo::Flavor::BoundMember:
+    case LoweredValInfo::Flavor::BoundMemberStorage:
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            // The base value is one that is trying to defer a get-vs-set
-            // decision, so we will need to do the same.
+            // `extractField()` cannot form an IR field projection until it knows the receiver's
+            // abstract-storage access. It records the member projection so the eventual read or
+            // write can stabilize the complete storage path once.
+            RefPtr<BoundMemberStorageInfo> storageInfo =
+                BoundMemberStorageInfo::create(base, field, fieldType);
 
-            RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type = fieldType;
-            boundMemberInfo->base = base;
-            boundMemberInfo->declRef = field;
-
-            context->shared->extValues.add(boundMemberInfo);
-            return LoweredValInfo::boundMember(boundMemberInfo);
+            context->shared->extValues.add(storageInfo);
+            result = LoweredValInfo::boundMemberStorage(storageInfo);
         }
         break;
 
@@ -1194,13 +1744,154 @@ LoweredValInfo extractField(
             // which means we should just compute an lvalue
             // representing the field address.
             IRInst* irBasePtr = base.val;
-            return LoweredValInfo::ptr(builder->emitFieldAddress(
+            result = LoweredValInfo::ptr(builder->emitFieldAddress(
                 builder->getPtrType(fieldType),
                 irBasePtr,
                 getFieldKey(context, field)));
         }
         break;
     }
+
+    return finishPendingWriteBackProjection(pending, result);
+}
+
+/// Lowers the immutable binding that identifies one opened existential value.
+///
+/// Consider a lambda that captures an interface value and calls one of its requirements:
+///
+///     interface IValue { int getValue(); }
+///     int useValue(IValue value)
+///     {
+///         let getValue = () => value.getValue();
+///         return getValue();
+///     }
+///
+/// `openExistential()` normally gives the opened value a local declaration. When a lambda captures
+/// the opened value, `openExistential()` and `maybeMoveTemp()` instead reuse a provisional capture
+/// field. `SelectedExpressionFinalizer::attachCaptureField()` attaches that field to the
+/// `LambdaDecl` only after `finalizeSelectedExpression()` commits an access path that needs it.
+///
+/// `lowerExistentialOpeningValue()` therefore extracts the already-selected field from the
+/// closure's `this` value. `visitExtractExistentialValueExpr()`,
+/// `ValLoweringVisitor::visitExtractExistentialType()`, and
+/// `ValLoweringVisitor::visitExtractExistentialSubtypeWitness()` all call this function so that the
+/// opened value, its concrete type, and its witness table share one captured existential binding
+/// rather than looking for a nonexistent local IR mapping.
+static LoweredValInfo lowerExistentialOpeningValue(
+    IRGenContext* context,
+    DeclRef<VarDeclBase> declRef,
+    IRType* existentialType)
+{
+    auto openingDecl = declRef.getDecl();
+    if (auto lambdaDecl = as<LambdaDecl>(openingDecl->parentDecl))
+    {
+        SLANG_RELEASE_ASSERT(context->funcDecl == lambdaDecl->funcDecl);
+        SLANG_RELEASE_ASSERT(context->thisVal.flavor != LoweredValInfo::Flavor::None);
+        return extractField(context, existentialType, context->thisVal, declRef);
+    }
+
+    return emitDeclRef(context, declRef, existentialType);
+}
+
+static void discardLoweredValue(IRGenContext* context, LoweredValInfo value);
+
+/// Returns whether materializing `value` can modify an abstract-storage receiver.
+///
+/// An assignment result retains the enclosing receiver path needed by a later mutation. Reading
+/// that result must apply the path only when a selected getter or `ref` accessor can mutate one of
+/// its receivers. `canMaterializationMutateStorage()` follows the same named projection
+/// representations that `materialize()` consumes. For each `BoundStorage`, it asks
+/// `getAbstractStorageAccessPlan()` for the same `ReadValue` plan and inspects the selected
+/// accessor's effective receiver mode.
+static bool canMaterializationMutateStorage(
+    IRGenContext* context,
+    LoweredValInfo value)
+{
+    switch (value.flavor)
+    {
+    case LoweredValInfo::Flavor::BoundStorage:
+        {
+            auto storageInfo = value.getBoundStorageInfo();
+            auto readPlan = getAbstractStorageAccessPlan(
+                context->astBuilder,
+                storageInfo->getStorageDeclRef(),
+                AbstractStorageUse::ReadValue);
+
+            DeclRef<AccessorDecl> accessorDeclRef;
+            switch (readPlan.getKind())
+            {
+            case AbstractStorageAccessPlanKind::ReadValue:
+                accessorDeclRef = readPlan.getReadAccessor();
+                break;
+
+            case AbstractStorageAccessPlanKind::UseAddress:
+                accessorDeclRef = readPlan.getAddressAccessor().as<AccessorDecl>();
+                break;
+
+            case AbstractStorageAccessPlanKind::Invalid:
+                SLANG_UNEXPECTED("abstract storage had no readable accessor");
+                UNREACHABLE_RETURN(false);
+
+            default:
+                SLANG_UNEXPECTED("invalid read plan for abstract storage");
+                UNREACHABLE_RETURN(false);
+            }
+
+            auto thisParamInfo = findEffectiveThisParamInfo(
+                context->astBuilder,
+                DeclRef<Decl>(accessorDeclRef));
+            if (thisParamInfo)
+            {
+                if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+                    return true;
+            }
+            return canMaterializationMutateStorage(context, storageInfo->getBase());
+        }
+
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+        return canMaterializationMutateStorage(
+            context,
+            value.getBoundMemberStorageInfo()->getBase());
+
+    case LoweredValInfo::Flavor::SwizzledLValue:
+        return canMaterializationMutateStorage(
+            context,
+            value.getSwizzledLValueInfo()->base);
+
+    case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+        return canMaterializationMutateStorage(
+            context,
+            value.getSwizzledMatrixLValueInfo()->base);
+
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        return canMaterializationMutateStorage(
+            context,
+            value.getImplicitCastedLValue()->base);
+
+    case LoweredValInfo::Flavor::AssignmentResult:
+        return canMaterializationMutateStorage(
+            context,
+            value.getAssignmentResultInfo()->lValue);
+
+    case LoweredValInfo::Flavor::None:
+    case LoweredValInfo::Flavor::Simple:
+    case LoweredValInfo::Flavor::Ptr:
+    case LoweredValInfo::Flavor::BoundCallable:
+    case LoweredValInfo::Flavor::StabilizedLValue:
+    case LoweredValInfo::Flavor::ExtractedExistential:
+        return false;
+
+    case LoweredValInfo::Flavor::PendingWriteBack:
+        SLANG_UNEXPECTED("pending write-back nested in an assignment result");
+        UNREACHABLE_RETURN(false);
+
+    case LoweredValInfo::Flavor::Subscript:
+        SLANG_UNEXPECTED("unbound subscript nested in an assignment result");
+        UNREACHABLE_RETURN(false);
+    }
+
+    SLANG_UNEXPECTED("unknown lowered-value flavor");
+    UNREACHABLE_RETURN(false);
 }
 
 LoweredValInfo materialize(IRGenContext* context, LoweredValInfo lowered)
@@ -1215,93 +1906,124 @@ top:
     case LoweredValInfo::Flavor::Ptr:
         return lowered;
 
+    case LoweredValInfo::Flavor::AssignmentResult:
+        {
+            auto assignmentResult = lowered.getAssignmentResultInfo();
+            if (assignmentResult->writeBacksAfterMutation.getCount())
+            {
+                bool readCanMutateStorage =
+                    canMaterializationMutateStorage(context, assignmentResult->lValue);
+                if (readCanMutateStorage)
+                {
+                    // Consider `int x = (outer.item = 7)` when `item` has a mutating getter. The
+                    // inner assignment has already committed `7`, but reading its result invokes
+                    // the getter and can modify the stabilized receiver. A one-use
+                    // `PendingWriteBackInfo` performs the read before it reapplies the retained
+                    // receiver path. The assignment result keeps its own copy because an `inout`
+                    // consumer can read and then mutate it.
+                    RefPtr<PendingWriteBackInfo> pendingRead = new PendingWriteBackInfo();
+                    pendingRead->value = assignmentResult->lValue;
+                    pendingRead->actions.addRange(assignmentResult->writeBacksAfterMutation);
+                    context->shared->extValues.add(pendingRead);
+                    lowered = LoweredValInfo::pendingWriteBack(pendingRead);
+                    goto top;
+                }
+            }
+
+            lowered = assignmentResult->lValue;
+        }
+        goto top;
+
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            auto boundStorageInfo = lowered.getBoundStorageInfo();
+            auto storageInfo = lowered.getBoundStorageInfo();
 
-            // We are being asked to extract a value from a subscript call
-            // (e.g., `base[index]`). We will first check if the subscript
-            // declared a getter and use that if possible, and then fall
-            // back to a `ref` accessor if one is defined.
-            //
-            // (Picking the `get` over the `ref` accessor simplifies things
-            // in case the `get` operation has a natural translation for
-            // a target, while the general `ref` case does not...)
-
-            auto getters = getMembersOfType<GetterDecl>(
+            // Materialization reads the property or subscript. `_checkAbstractStorageAccessPlan()`
+            // and `materialize()` both call `getAbstractStorageAccessPlan()`, so the validated read
+            // and emitted accessor use the same plan.
+            auto readPlan = getAbstractStorageAccessPlan(
                 context->astBuilder,
-                boundStorageInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (getters.getCount())
+                storageInfo->getStorageDeclRef(),
+                AbstractStorageUse::ReadValue);
+            switch (readPlan.getKind())
             {
-                auto getter = *getters.begin();
-                lowered = _emitCallToAccessor(
+            case AbstractStorageAccessPlanKind::ReadValue:
+                lowered = _emitCallToBoundStorageAccessor(
                     context,
-                    boundStorageInfo->type,
-                    getter,
-                    boundStorageInfo->base,
-                    boundStorageInfo->additionalArgs);
+                    storageInfo->getValueType(),
+                    readPlan.getReadAccessor(),
+                    storageInfo);
                 goto top;
-            }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
-                context->astBuilder,
-                boundStorageInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.getCount())
-            {
-                auto refAccessor = *refAccessors.begin();
+            case AbstractStorageAccessPlanKind::UseAddress:
+                {
+                    auto addressAccessor = readPlan.getAddressAccessor();
+                    lowered = _emitCallToBoundStorageAccessor(
+                        context,
+                        context->irBuilder->getPtrType(storageInfo->getValueType()),
+                        addressAccessor.as<AccessorDecl>(),
+                        storageInfo);
+                    lowered = LoweredValInfo::ptr(getSimpleVal(context, lowered));
+                    goto top;
+                }
 
-                // The `ref` accessor will return a pointer to the value, so
-                // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(boundStorageInfo->type);
+            case AbstractStorageAccessPlanKind::Invalid:
+                SLANG_UNEXPECTED("abstract storage had no readable accessor");
+                UNREACHABLE_RETURN(LoweredValInfo());
 
-                LoweredValInfo refVal = _emitCallToAccessor(
-                    context,
-                    ptrType,
-                    refAccessor,
-                    boundStorageInfo->base,
-                    boundStorageInfo->additionalArgs);
-
-                // The result from the call needs to be implicitly dereferenced,
-                // so that it can work as an l-value of the desired result type.
-                lowered = LoweredValInfo::ptr(getSimpleVal(context, refVal));
-
-                goto top;
-            }
-
-            // TODO: Ellie, Is this really unreachable? User code input can get here
-            SLANG_UNEXPECTED("subscript had no getter");
-            UNREACHABLE_RETURN(LoweredValInfo());
-        }
-        break;
-
-    case LoweredValInfo::Flavor::BoundMember:
-        {
-            auto boundMemberInfo = lowered.getBoundMemberInfo();
-            auto base = materialize(context, boundMemberInfo->base);
-
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
-            {
-                lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
-                goto top;
-            }
-            else if (auto methodDeclRef = declRef.as<CallableDecl>())
-            {
-                auto funcVal = emitDeclRef(context, declRef, boundMemberInfo->type);
-                SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
-                lowered = funcVal;
-                goto top;
-            }
-            else
-            {
-
-                SLANG_UNEXPECTED("unexpected member flavor");
+            default:
+                SLANG_UNEXPECTED("invalid read plan for abstract storage");
                 UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
         break;
+
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+        {
+            auto storageInfo = lowered.getBoundMemberStorageInfo();
+            auto materializedBase = materialize(context, storageInfo->getBase());
+            lowered = extractField(
+                context,
+                storageInfo->getMemberType(),
+                materializedBase,
+                storageInfo->getMemberDeclRef());
+            goto top;
+        }
+        break;
+
+    case LoweredValInfo::Flavor::BoundCallable:
+        {
+            auto callableInfo = lowered.getBoundCallableInfo();
+
+            // When `materialize()` emits a selected member declaration reference, it evaluates the
+            // receiver expression without consuming the receiver as a value.
+            // `discardLoweredValue()` preserves those effects without reading its final l-value.
+            // If selection began from a pending write-back, `visitMemberExpr()` left that write-back
+            // outside this representation so its actions run after materialization returns.
+            discardLoweredValue(context, callableInfo->getBase());
+            lowered = emitDeclRef(
+                context,
+                callableInfo->getCallableDeclRef(),
+                callableInfo->getCallableType());
+            SLANG_RELEASE_ASSERT(lowered.flavor == LoweredValInfo::Flavor::Simple);
+            goto top;
+        }
+        break;
+
+    case LoweredValInfo::Flavor::StabilizedLValue:
+        return materialize(context, lowered.getStabilizedLValueInfo()->localValue);
+
+    case LoweredValInfo::Flavor::PendingWriteBack:
+        {
+            auto pending = lowered.getPendingWriteBackInfo();
+
+            // Non-consuming projections preserve this wrapper, so reaching materialization is an
+            // actual r-value use. `getSimpleVal()` performs any required pointer load before the
+            // enclosing receiver write-backs can affect the selected value.
+            auto result = getSimpleVal(context, pending->value);
+            applyAndClearDeferredWriteBackActions(context, pending->actions);
+            return LoweredValInfo::simple(result);
+        }
 
     case LoweredValInfo::Flavor::SwizzledLValue:
         {
@@ -1386,6 +2108,77 @@ IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
     }
 }
 
+/// Discards a lowered expression result after completing the evaluation represented by its
+/// deferred form.
+///
+/// Consider `holder.receiver.read;`, where `receiver` is a property and `read` is an instance
+/// method. Selecting `read` must invoke the property's getter even though the resulting callable
+/// is unused. Conversely, discarding an ordinary location such as `local;` must not emit a load.
+/// `discardLoweredValue()` therefore skips loads from concrete l-value pointers, but it still
+/// materializes `BoundStorage` when invoking its selected accessor is part of evaluating the
+/// expression. It also evaluates any receiver, argument, and write-back work retained by composite
+/// representations without materializing an unused callable value.
+static void discardLoweredValue(IRGenContext* context, LoweredValInfo value)
+{
+    switch (value.flavor)
+    {
+    case LoweredValInfo::Flavor::None:
+    case LoweredValInfo::Flavor::Simple:
+    case LoweredValInfo::Flavor::Ptr:
+    case LoweredValInfo::Flavor::ExtractedExistential:
+    case LoweredValInfo::Flavor::AssignmentResult:
+        return;
+
+    case LoweredValInfo::Flavor::StabilizedLValue:
+        // `finishLocalBindingUse()` puts the binding commit in an enclosing `PendingWriteBack`.
+        // Direct-call and dispatch preparation instead retain the binding explicitly and commit it
+        // after the operation. Discarding the binding's live value must not perform either owner's
+        // commit early.
+        return;
+
+    case LoweredValInfo::Flavor::BoundCallable:
+        {
+            auto callableInfo = value.getBoundCallableInfo();
+            discardLoweredValue(context, callableInfo->getBase());
+            return;
+        }
+
+    case LoweredValInfo::Flavor::BoundStorage:
+        materialize(context, value);
+        return;
+
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+        discardLoweredValue(context, value.getBoundMemberStorageInfo()->getBase());
+        return;
+
+    case LoweredValInfo::Flavor::PendingWriteBack:
+        {
+            auto pending = value.getPendingWriteBackInfo();
+            discardLoweredValue(context, pending->value);
+            applyAndClearDeferredWriteBackActions(context, pending->actions);
+            return;
+        }
+
+    case LoweredValInfo::Flavor::SwizzledLValue:
+        discardLoweredValue(context, value.getSwizzledLValueInfo()->base);
+        return;
+
+    case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+        discardLoweredValue(context, value.getSwizzledMatrixLValueInfo()->base);
+        return;
+
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        discardLoweredValue(context, value.getImplicitCastedLValue()->base);
+        return;
+
+    case LoweredValInfo::Flavor::Subscript:
+        SLANG_UNEXPECTED("unbound subscript result reached expression discard");
+        return;
+    }
+
+    SLANG_UNEXPECTED("unhandled lowered value flavor");
+}
+
 LoweredValInfo lowerVal(IRGenContext* context, Val* val);
 
 IRInst* lowerSimpleVal(IRGenContext* context, Val* val)
@@ -1396,13 +2189,24 @@ IRInst* lowerSimpleVal(IRGenContext* context, Val* val)
 
 LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr);
 
+LoweredValInfo lowerLValueExpr(
+    IRGenContext* context,
+    Expr* expr,
+    AbstractStorageUse storageUse);
+
 void assign(IRGenContext* context, LoweredValInfo const& left, LoweredValInfo const& right);
 
+/// Assigns `rightExpr` to `inLeft` without prematurely discarding the expression's l-value form.
+///
+/// In particular, a setter's implicit `newValue` parameter can use an effective `BorrowIn` mode.
+/// `assignExpr()` retains `rightExpr` until it reads that parameter's effective mode; `addArg()`
+/// then passes either the expression value or its address.
 void assignExpr(
     IRGenContext* context,
     const LoweredValInfo& inLeft,
     Expr* rightExpr,
-    SourceLoc assignmentLoc);
+    SourceLoc assignmentLoc,
+    LoweredValInfo* outAssignmentResult = nullptr);
 
 IRInst* getAddress(
     IRGenContext* context,
@@ -2958,8 +3762,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto declRef = type->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
-        IRInst* existentialVal =
-            getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        IRInst* existentialVal = getSimpleVal(
+            context,
+            lowerExistentialOpeningValue(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
 
@@ -2967,8 +3772,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto declRef = witness->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
-        IRInst* existentialVal =
-            getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        IRInst* existentialVal = getSimpleVal(
+            context,
+            lowerExistentialOpeningValue(context, declRef, existentialType));
         return LoweredValInfo::simple(
             getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
@@ -3379,39 +4185,41 @@ LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullp
     return LoweredValInfo::ptr(irAlloc);
 }
 
-// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
-// we can either do it "aggressively" or not (what we'll call the "default" behavior,
-// although it isn't strictly more common).
-//
-// The case that this is mostly there to address is when somebody writes an operation
-// like:
-//
-//      foo[a] = b;
-//
-// In that case, we might as well just use the `set` accessor if there is one, rather
-// than complicate things. However, in more complex cases like:
-//
-//      foo[a].x = b;
-//
-// there is no way to satisfy the semantics of the code the user wrote (in terms of
-// only writing one vector component, and not a full vector) by using the `set`
-// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
-// an address.
-//
-// TODO: realistically IR lowering is too early to be binding to this choice,
-// because different accessors might be supported on different targets.
-//
-enum class TryGetAddressMode
-{
-    Default,
-    Aggressive,
-};
-
-/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
+/// Tries to expose a direct address while preserving the abstract-storage operation described by
+/// `use`.
+///
+/// `tryGetAddress()` recursively refines projections such as fields, swizzles, and implicit l-value
+/// casts. It invokes a `ref` accessor only when `getAbstractStorageAccessPlan()` returns a plan that
+/// uses that accessor. If the complete value still has no direct address, `tryGetAddress()`
+/// preserves the deferred representation so `materialize()` or `assign()` can create a temporary
+/// and perform setter write-back when required.
 LoweredValInfo tryGetAddress(
     IRGenContext* context,
     LoweredValInfo const& inVal,
-    TryGetAddressMode mode);
+    AbstractStorageUse use);
+
+/// Tries to expose a direct address and consumes the pending write-back used to select it.
+///
+/// Consider returning `storage[getIndex()]` from a `ref` accessor. The selected subscript `ref`
+/// accessor must first produce the stable address, and only then can `tryConsumeAddress()` apply
+/// the deferred argument and enclosing-storage actions. If the value has no direct address, its
+/// pending write-back remains attached so the caller can use another representation. A call
+/// argument whose original storage must remain live through the callee instead has `addArg()` peel
+/// its pending write-back before calling `tryConsumeAddress()`.
+static LoweredValInfo tryConsumeAddress(IRGenContext* context, LoweredValInfo value)
+{
+    PendingWriteBackInfo* pending = nullptr;
+    value = beginPendingWriteBackProjection(value, &pending);
+
+    auto address = tryGetAddress(context, value, AbstractStorageUse::RequireAddress);
+    if (!pending)
+        return address;
+    if (address.flavor != LoweredValInfo::Flavor::Ptr)
+        return finishPendingWriteBackProjection(pending, address);
+
+    applyAndClearDeferredWriteBackActions(context, pending->actions);
+    return address;
+}
 
 /// Add a single simple argument value to a list of arguments
 ///
@@ -3430,7 +4238,11 @@ void addSimpleArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo a
     case LoweredValInfo::Flavor::SwizzledLValue:
     case LoweredValInfo::Flavor::SwizzledMatrixLValue:
     case LoweredValInfo::Flavor::BoundStorage:
-    case LoweredValInfo::Flavor::BoundMember:
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+    case LoweredValInfo::Flavor::BoundCallable:
+    case LoweredValInfo::Flavor::StabilizedLValue:
+    case LoweredValInfo::Flavor::PendingWriteBack:
+    case LoweredValInfo::Flavor::AssignmentResult:
     case LoweredValInfo::Flavor::ExtractedExistential:
         args.add(getSimpleVal(context, argVal));
         break;
@@ -3441,46 +4253,279 @@ void addSimpleArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo a
     }
 }
 
-// After a call to a function with `out` or `in out`
-// parameters, we may need to copy data back into
-// the l-value locations used for output arguments.
-//
-// During lowering of the argument list, we build
-// up a list of these "fixup" assignments that need
-// to be performed.
-struct OutArgumentFixup
-{
-    LoweredValInfo dst;
-    LoweredValInfo src;
-};
+/// Stabilizes deferred abstract storage in a projected value according to its access mode.
+///
+/// The returned value and its ordered actions form one pending write-back. The caller must perform
+/// the selected read or write through that stable value before applying the actions from inner to
+/// outer. For output-only projections, `stabilizeDeferredStorageInProjection()` retains
+/// setter-backed storage without reading it. For read-write projections, it instead snapshots the
+/// old value and schedules its write-back.
+static LoweredValInfo stabilizeDeferredStorageInProjection(
+    IRGenContext* context,
+    LoweredValInfo value,
+    AbstractStorageUse use,
+    bool shouldStabilizeCurrentValue,
+    List<DeferredWriteBackAction>* outActionsAfterValueWriteBack);
 
-/// Apply any fixups that have been created for `out` and `inout` arguments.
-static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup> const& fixups)
+/// Stabilizes deferred storage nested under `value` according to the consumer's `use`.
+///
+/// The outer value remains intact for the operation represented by `use`.
+/// `stabilizeDeferredStorageReceiversForUse()` prepares only the receiver path that must remain
+/// stable across that operation and its ordered write-backs.
+static LoweredValInfo stabilizeDeferredStorageReceiversForUse(
+    IRGenContext* context,
+    LoweredValInfo value,
+    AbstractStorageUse use,
+    List<DeferredWriteBackAction>* outActionsAfterValueWriteBack);
+
+static void lowerSubstitutionArgument(
+    IRGenContext* context,
+    GenericAppDeclRef* substitution,
+    Decl* parameterDecl,
+    Index argumentIndex)
 {
-    for (auto fixup : fixups)
+    SLANG_ASSERT(argumentIndex < substitution->getArgs().getCount());
+    auto argument = lowerVal(context, substitution->getArgs()[argumentIndex]);
+    context->setValue(parameterDecl, argument);
+}
+
+/// Binds a default argument's specialized generic environment at its call site.
+///
+/// Consider `void f<T, let N : int = sizeof(T)>(int value = N)`. When a call to `f<float, 4>()`
+/// omits `value`, the copied initializer still refers to `T` and `N` through the selected callee's
+/// substitution chain. `lowerSubstitutionEnvironment()` visits that chain from outermost
+/// application to innermost and binds each application's type and value parameters before its
+/// constraint witnesses. Lowering the parameter arguments first lets a later constraint argument
+/// refer to the specialized parameter values through the child environment used for the
+/// initializer.
+static void lowerSubstitutionEnvironment(IRGenContext* context, DeclRefBase* substitution)
+{
+    if (!substitution)
+        return;
+    lowerSubstitutionEnvironment(context, substitution->getBase());
+
+    auto genericApplication = as<GenericAppDeclRef>(substitution);
+    if (!genericApplication)
+        return;
+
+    auto genericDecl = genericApplication->getGenericDecl();
+    Index argumentIndex = 0;
+    for (auto memberDecl : genericDecl->getDirectMemberDecls())
     {
-        assign(context, fixup.dst, fixup.src);
+        if (isGenericParam(memberDecl))
+        {
+            lowerSubstitutionArgument(
+                context,
+                genericApplication,
+                memberDecl,
+                argumentIndex++);
+        }
+    }
+    for (auto memberDecl : genericDecl->getDirectMemberDecls())
+    {
+        if (!isGenericConstraintParameterDecl(memberDecl))
+            continue;
+
+        lowerSubstitutionArgument(
+            context,
+            genericApplication,
+            memberDecl,
+            argumentIndex++);
     }
 }
 
-/// Add one argument value to the argument list for a call being constructed
-void addArg(
+/// Commits one stabilized binding and conditionally reapplies its enclosing write-back path.
+///
+/// The first consumer must complete the initializer's enclosing operations even when it only reads
+/// the stabilized value. Later consumers reuse the same path, but they reapply it only after
+/// `assign()` has marked the local value dirty. Keeping that condition with the binding lets an
+/// assignment result retain the canonical nested path without flattening or duplicating it.
+static void applyStabilizedBindingCommit(
     IRGenContext* context,
-    List<IRInst*>* ioArgs,             //< The argument list being built
-    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo argVal,             //< The lowered value of the argument to add
-    ParamPassingMode paramPassingMode, //< The mode of the parameter (`in`, `out`, etc.)
-    Type* argType,                     //< The AST-level type of the argument
-    SourceLoc loc)                     //< A location to use if we need to report an error
+    StabilizedLValueInfo* stabilizedBinding)
 {
+    SLANG_RELEASE_ASSERT(stabilizedBinding);
+
+    bool shouldApplyEnclosingActions = stabilizedBinding->hasPendingInitialEnclosingActions;
+    if (stabilizedBinding->needsWriteBack)
+    {
+        shouldApplyEnclosingActions = true;
+        SLANG_RELEASE_ASSERT(
+            stabilizedBinding->writeBackTarget.flavor != LoweredValInfo::Flavor::None);
+        assign(
+            context,
+            stabilizedBinding->writeBackTarget,
+            stabilizedBinding->localValue);
+        stabilizedBinding->needsWriteBack = false;
+    }
+
+    if (shouldApplyEnclosingActions)
+    {
+        stabilizedBinding->hasPendingInitialEnclosingActions = false;
+        applyDeferredWriteBackActions(context, stabilizedBinding->enclosingActions);
+    }
+}
+
+/// Applies deferred write-back actions from innermost to outermost.
+static void applyDeferredWriteBackActions(
+    IRGenContext* context,
+    List<DeferredWriteBackAction> const& actions)
+{
+    for (auto action : actions)
+    {
+        switch (action.getKind())
+        {
+        case DeferredWriteBackAction::Kind::None:
+            SLANG_UNEXPECTED("empty deferred write-back action was consumed");
+            break;
+
+        case DeferredWriteBackAction::Kind::Assignment:
+            assign(context, action.getDestination(), action.getSource());
+            break;
+
+        case DeferredWriteBackAction::Kind::StabilizedBindingCommit:
+            applyStabilizedBindingCommit(context, action.getStabilizedBinding());
+            break;
+        }
+    }
+}
+
+/// Applies and clears stored deferred write-back actions so they cannot be applied a second time.
+static void applyAndClearDeferredWriteBackActions(
+    IRGenContext* context,
+    List<DeferredWriteBackAction>& actions)
+{
+    applyDeferredWriteBackActions(context, actions);
+    actions.clear();
+}
+
+/// Commits stabilized bindings from the innermost projection outward.
+///
+/// `stabilizedBindings` is ordered outermost-to-innermost.
+/// `applyStabilizedBindingCommits()` calls `applyStabilizedBindingCommit()` in reverse order. Each
+/// call assigns the modified inner local value to its enclosing destination before the next call
+/// commits that destination.
+static void applyStabilizedBindingCommits(
+    IRGenContext* context,
+    List<StabilizedLValueInfo*> const& stabilizedBindings)
+{
+    Index index = stabilizedBindings.getCount();
+    while (index)
+        applyStabilizedBindingCommit(context, stabilizedBindings[--index]);
+}
+
+/// Appends binding commits from the innermost retained binding outward.
+static void appendStabilizedBindingCommits(
+    List<StabilizedLValueInfo*> const& stabilizedBindings,
+    List<DeferredWriteBackAction>* outActions)
+{
+    Index index = stabilizedBindings.getCount();
+    while (index)
+    {
+        auto stabilizedBinding = stabilizedBindings[--index];
+        outActions->add(DeferredWriteBackAction::forStabilizedBinding(stabilizedBinding));
+    }
+}
+
+/// Attaches deferred write-backs to `result` for its next consumer to apply.
+///
+/// The representation of a result does not determine whether its enclosing operation has consumed
+/// it. In particular, a selected witness method has `LoweredValInfo::Flavor::Simple`, but its
+/// retained receiver must remain alive through the call. `finishDeferredWriteBackUse()` wraps every
+/// non-absent result in `PendingWriteBackInfo`, or appends to its existing wrapper, so the read,
+/// assignment, or call that consumes it applies the actions. An absent result has no later consumer,
+/// so `finishDeferredWriteBackUse()` applies its actions immediately. Existing actions belong to an
+/// inner expression and remain before appended outer actions.
+static LoweredValInfo finishDeferredWriteBackUse(
+    IRGenContext* context,
+    LoweredValInfo result,
+    List<DeferredWriteBackAction>& actions)
+{
+    if (actions.getCount() == 0)
+        return result;
+
+    if (result.flavor == LoweredValInfo::Flavor::None)
+    {
+        applyAndClearDeferredWriteBackActions(context, actions);
+        return result;
+    }
+
+    PendingWriteBackInfo* pending = nullptr;
+    if (result.flavor == LoweredValInfo::Flavor::PendingWriteBack)
+    {
+        pending = result.getPendingWriteBackInfo();
+    }
+    else
+    {
+        RefPtr<PendingWriteBackInfo> newPending = new PendingWriteBackInfo();
+        newPending->value = result;
+        context->shared->extValues.add(newPending);
+        pending = newPending;
+        result = LoweredValInfo::pendingWriteBack(pending);
+    }
+
+    pending->actions.addRange(actions);
+    actions.clear();
+    return result;
+}
+
+/// Identifies how long a call argument's original storage must remain live.
+///
+/// An ordinary `in` argument is consumed as soon as its value is appended, before the next
+/// argument is evaluated. An implicit receiver remains in use until the selected call returns,
+/// even when its ABI passing mode is `in`.
+enum class CallArgumentStorageLifetime
+{
+    ThroughValueEvaluation,
+    ThroughCall,
+};
+
+/// Adds one argument value and reports when its original storage is no longer needed.
+CallArgumentStorageLifetime addArg(
+    IRGenContext* context,
+    List<IRInst*>* ioArgs,
+    List<DeferredWriteBackAction>* ioActions,
+    LoweredValInfo argVal,
+    ParamPassingMode paramPassingMode,
+    AbstractStorageUse storageUse,
+    Type* argType,
+    SourceLoc loc,
+    CallArgumentStorageLifetime requiredStorageLifetime)
+{
+    if (argVal.flavor == LoweredValInfo::Flavor::PendingWriteBack)
+    {
+        auto pending = argVal.getPendingWriteBackInfo();
+        List<DeferredWriteBackAction> valueActions;
+        // The ABI mode alone does not determine the original storage's lifetime. A `BorrowIn`
+        // argument backed by a direct address remains live through the call, while one copied into
+        // a temporary is consumed by that copy before the next argument is evaluated.
+        auto actualStorageLifetime = addArg(
+            context,
+            ioArgs,
+            &valueActions,
+            pending->value,
+            paramPassingMode,
+            storageUse,
+            argType,
+            loc,
+            requiredStorageLifetime);
+
+        valueActions.addRange(pending->actions);
+        pending->actions.clear();
+
+        if (actualStorageLifetime == CallArgumentStorageLifetime::ThroughValueEvaluation)
+            applyDeferredWriteBackActions(context, valueActions);
+        else
+            ioActions->addRange(valueActions);
+        return actualStorageLifetime;
+    }
+
     switch (paramPassingMode)
     {
     case ParamPassingMode::In:
-        // Default `in` parameters are the easiest case: we can
-        // pretty much just add them to the argument list.
-        //
+        // An `in` parameter consumes the argument value directly.
         addSimpleArg(context, ioArgs, argVal);
-        break;
+        return requiredStorageLifetime;
 
     case ParamPassingMode::Ref:
         {
@@ -3498,6 +4543,7 @@ void addArg(
             if (IRInst* argPtr = getAddress(context, argVal, loc))
             {
                 addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+                return CallArgumentStorageLifetime::ThroughCall;
             }
             else
             {
@@ -3515,9 +4561,9 @@ void addArg(
                 auto placeholderArg =
                     LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue());
                 addSimpleArg(context, ioArgs, placeholderArg);
+                return CallArgumentStorageLifetime::ThroughCall;
             }
         }
-        break;
 
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
@@ -3526,20 +4572,43 @@ void addArg(
             // The remaining parameter-passing modes are the ones that
             // have the most complicated rules.
             //
-            // First, if we are able to easily get an address for the
-            // `argVal`, then we will simply use that and be done.
-            //
-            // Note that by passing `TryGetAddressMode::Default` here we
-            // are ensuring that the operation will not diagnose an error
-            // if it fails to get a simple address, but as a consequence
-            // it might actually fail to yield an address in some of the
-            // cases where it would have been able to for a `ref` parameter.
-            //
-            LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
-            if (argPtr.flavor == LoweredValInfo::Flavor::Ptr)
+            // A direct address is valid only when it agrees with the access plan for this use.
+            // Otherwise `addArg()` uses the temporary below to perform the required read and
+            // write-back.
+            LoweredValInfo refinedArg = tryGetAddress(context, argVal, storageUse);
+            if (refinedArg.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
-                return;
+                addSimpleArg(context, ioArgs, LoweredValInfo::simple(refinedArg.val));
+                return CallArgumentStorageLifetime::ThroughCall;
+            }
+
+            // `tryGetAddress()` can refine the base of a compound l-value without producing one
+            // pointer for the complete argument. `addArg()` keeps that refined
+            // representation so temporary initialization and write-back do not evaluate the
+            // original abstract storage through another accessor.
+            argVal = refinedArg;
+
+            List<DeferredWriteBackAction> actionsAfterValueWriteBack;
+            if (
+                paramPassingMode == ParamPassingMode::Out ||
+                paramPassingMode == ParamPassingMode::BorrowInOut)
+            {
+                argVal = stabilizeDeferredStorageReceiversForUse(
+                    context,
+                    argVal,
+                    storageUse,
+                    &actionsAfterValueWriteBack);
+            }
+
+            if (
+                paramPassingMode == ParamPassingMode::Out &&
+                argVal.flavor == LoweredValInfo::Flavor::BoundStorage)
+            {
+                // An output-only whole-storage argument does not read through its getter. Its
+                // receiver and subscript arguments are still evaluated before the call, while
+                // the selected setter remains deferred until the output temporary is written
+                // back.
+                getBoundStorageArguments(context, argVal.getBoundStorageInfo());
             }
 
             // At this point we know that the `argVal` is not a simple
@@ -3605,48 +4674,36 @@ void addArg(
             // argument (which must be an l-value in this case, so should
             // be a valid destination for `assign()`.
             //
-            // Currently the write-backs are handled by putting a request
-            // for the transfer to be executed into the `ioFixups` array,
-            // which will be flushed after the `call` instruction is
-            // emitted.
+            // The action is appended to `ioActions`. `visitInvokeExprImpl()`,
+            // `emitPreparedAccessorCall()`, `assignExpr()`, or `assign()` applies the list after the
+            // corresponding call; `lowerDeferredStorageArguments()` instead moves the list into
+            // the storage's pending write-back.
             //
-            // TODO(tfoley): The way we've currently structured the
-            // handling of temporaries for arguments is kind of backwards.
-            // We should really have an operation like `getAddress()` that
-            // takes a desired kind of access as input (read, write, read/write,
-            // or `ref`) and always either produces a pointer or diagnoses
-            // an (internal) error. Rather than only returning a `LoweredValInfo`
-            // representing a pointer, it should also return a representation
-            // of any required "fixup" logic as a more flexible object than
-            // the simple `OutArgumentFixup` currently being used (the representation
-            // might even be as general as a `std::function` closure).
-            //
-            // The allocation of a temporary variable would then be an internal
-            // implementation detail of `getAddress()`, and the logic here
-            // in `addArg()` wouldn't need do this song-and-dance of *trying* to
-            // get an address and then falling back to a temporary if we fail.
-            //
-            // Passing in the desired access mode(s) would also ensure that the
-            // `getAddress()` operation has sufficient information to do things
-            // like pick between `get`/`set` and `ref` accessors on properties.
-            //
+            // `tryGetAddress()` returns only a refined value. This call-argument path must also
+            // retain the deferred write-backs and say whether they apply after value evaluation or
+            // after the call, so it owns the fallback temporary and its complete lifetime.
             if (paramPassingMode != ParamPassingMode::BorrowIn)
             {
-                OutArgumentFixup fixup;
-                fixup.src = tempVar;
-                fixup.dst = argVal;
-
-                (*ioFixups).add(fixup);
+                ioActions->add(DeferredWriteBackAction::forAssignment(argVal, tempVar));
+                // Append the assignment action before `actionsAfterValueWriteBack`, so
+                // `applyDeferredWriteBackActions()` writes the modified inner value to its
+                // stabilized receiver before writing that receiver to enclosing abstract storage.
+                ioActions->addRange(actionsAfterValueWriteBack);
+                return CallArgumentStorageLifetime::ThroughCall;
             }
+
+            // A `BorrowIn` temporary owns an independent copy. The original argument's
+            // abstract-storage write-back is complete once that copy is initialized, even when
+            // the temporary itself remains live through the call as an implicit receiver.
+            return CallArgumentStorageLifetime::ThroughValueEvaluation;
         }
-        break;
 
     default:
         SLANG_DIAGNOSE_UNEXPECTED(
             context->getSink(),
             loc,
             "unhandled parameter-passing mode in `addArg()`");
-        break;
+        return requiredStorageLifetime;
     }
 }
 
@@ -3657,16 +4714,17 @@ void addArg(
 /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
 /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
 /// argument expression.
-/// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
-/// call completes (e.g., to move from a scratch variable used for an `inout` argument back
-/// into the original location).
+/// `ioActions` receives the ordered write-backs that run after the call completes, such as moving
+/// an `inout` scratch variable back into its original location.
 ///
 void addCallArgsForParam(
     IRGenContext* context,
     ParamPassingMode paramPassingMode,
+    AbstractStorageUse storageUse,
     Expr* argExpr,
     List<IRInst*>* ioArgs,
-    List<OutArgumentFixup>* ioFixups)
+    List<DeferredWriteBackAction>* ioActions,
+    CallArgumentStorageLifetime requiredStorageLifetime)
 {
     switch (paramPassingMode)
     {
@@ -3675,25 +4733,110 @@ void addCallArgsForParam(
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
         {
-            LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+            LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr, storageUse);
             addArg(
                 context,
                 ioArgs,
-                ioFixups,
+                ioActions,
                 loweredArg,
                 paramPassingMode,
+                storageUse,
                 argExpr->type,
-                argExpr->loc);
+                argExpr->loc,
+                requiredStorageLifetime);
         }
         break;
 
-    default:
+    case ParamPassingMode::In:
         {
             LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
-            addSimpleArg(context, ioArgs, loweredArg);
+            addArg(
+                context,
+                ioArgs,
+                ioActions,
+                loweredArg,
+                paramPassingMode,
+                storageUse,
+                argExpr->type,
+                argExpr->loc,
+                requiredStorageLifetime);
         }
         break;
     }
+}
+
+/// Lowers a deferred subscript's arguments once `prepareBoundStorageAccessorCall()` has prepared
+/// the selected accessor's receiver.
+static List<IRInst*> const& lowerDeferredStorageArguments(
+    IRGenContext* context,
+    DeferredStorageArgumentsInfo* argumentsInfo)
+{
+    SLANG_RELEASE_ASSERT(argumentsInfo);
+    if (argumentsInfo->areLowered)
+        return argumentsInfo->loweredArguments;
+
+    SLANG_RELEASE_ASSERT(!argumentsInfo->areBeingLowered);
+    SLANG_RELEASE_ASSERT(argumentsInfo->pendingWriteBack);
+    argumentsInfo->areBeingLowered = true;
+    SLANG_DEFER(argumentsInfo->areBeingLowered = false);
+
+    List<DeferredWriteBackAction> argumentWriteBacks;
+    for (auto const& argument : argumentsInfo->arguments)
+    {
+        SLANG_RELEASE_ASSERT(argument.expression);
+        if (!argument.isDefaultArgument)
+        {
+            addCallArgsForParam(
+                context,
+                argument.passingMode,
+                getAbstractStorageUseForParameter(argument.passingMode),
+                argument.expression,
+                &argumentsInfo->loweredArguments,
+                &argumentWriteBacks,
+                CallArgumentStorageLifetime::ThroughValueEvaluation);
+            continue;
+        }
+
+        IRGenEnv argumentEnvironment;
+        argumentEnvironment.outer = context->env;
+
+        IRGenContext argumentContext = *context;
+        argumentContext.env = &argumentEnvironment;
+        lowerSubstitutionEnvironment(&argumentContext, argument.defaultArgumentSubstitutions);
+        addCallArgsForParam(
+            &argumentContext,
+            argument.passingMode,
+            getAbstractStorageUseForParameter(argument.passingMode),
+            argument.expression,
+            &argumentsInfo->loweredArguments,
+            &argumentWriteBacks,
+            CallArgumentStorageLifetime::ThroughValueEvaluation);
+    }
+
+    // Argument write-backs are nested inside the receiver and retained-binding write-backs that
+    // `lowerDeferredSubscriptReference()` already attached.
+    prependDeferredWriteBackActions(argumentsInfo->pendingWriteBack, argumentWriteBacks);
+    argumentsInfo->arguments.clear();
+    argumentsInfo->areLowered = true;
+    return argumentsInfo->loweredArguments;
+}
+
+static List<IRInst*> const& getBoundStorageArguments(
+    IRGenContext* context,
+    BoundStorageInfo* storageInfo)
+{
+    SLANG_RELEASE_ASSERT(storageInfo);
+    switch (storageInfo->getArgumentForm())
+    {
+    case BoundStorageInfo::ArgumentForm::LoweredValues:
+        return storageInfo->getLoweredArguments();
+
+    case BoundStorageInfo::ArgumentForm::DeferredExpressions:
+        return lowerDeferredStorageArguments(context, storageInfo->getDeferredArguments());
+    }
+
+    SLANG_UNEXPECTED("unknown bound-storage argument form");
+    UNREACHABLE_RETURN(storageInfo->getLoweredArguments());
 }
 
 
@@ -3948,10 +5091,25 @@ void addThisParameter(const ParamInfo& paramInfo, ParameterLists* ioParameterLis
     ioParameterLists->params.add(info);
 }
 
-/// If the `resultType` of a function needs to be returned via an `out` parameter, then add it.
+/// If `declRef` uses the callable ABI and its result is noncopyable, add an `out` result parameter.
 ///
-void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
+/// A `ref` accessor returns a pointer as its ordinary result, and lowering emits an ordinary
+/// intrinsic callable directly as an IR operation with an SSA result. Neither kind uses the
+/// callable ABI's return destination. A noncopyable intrinsic constructor is different:
+/// operations such as `allocateOpaqueHandle` initialize caller-provided storage and therefore
+/// retain the return destination used by other noncopyable constructors.
+void maybeAddReturnDestinationParam(
+    ParameterLists* ioParameterLists,
+    DeclRef<FunctionDeclBase> declRef,
+    Type* resultType)
 {
+    if (declRef.as<RefAccessorDecl>())
+        return;
+
+    if (declRef.getDecl()->hasModifier<IntrinsicOpModifier>() &&
+        !declRef.as<ConstructorDecl>())
+        return;
+
     if (isNonCopyableType(resultType))
     {
         auto paramPassingMode = ParamPassingMode::Out;
@@ -4028,9 +5186,6 @@ void collectParameterLists(
         }
     }
 
-    maybeAddReturnDestinationParam(
-        ioParameterLists,
-        getResultType(context->astBuilder, callableDeclRef));
 }
 
 bool isConstExprVar(Decl* decl)
@@ -4128,21 +5283,21 @@ void _lowerInfoFromFuncType(
     return;
 }
 
-void _lowerInfoFromFuncParameters(
+/// Lowers an already-collected semantic parameter list and result into one IR function type.
+///
+/// Declaration-driven function lowering and selected-call lowering differ only in where their
+/// ordinary parameter and result types come from. Both paths use
+/// `lowerFunctionTypeFromParameterLists()` for ABI wrappers, parameter attributes, accessor result
+/// conventions, and the implicit return destination.
+void lowerFunctionTypeFromParameterLists(
     IRGenContext* context,
     DeclRef<FunctionDeclBase> declRef,
+    Type* resultType,
+    Type* errorType,
     FuncDeclBaseTypeInfo& outInfo)
 {
-    auto builder = context->irBuilder;
-
-    // Collect the parameter lists we will use for our new function.
     auto& parameterLists = outInfo.parameterLists;
-    if (auto thisParamInfo =
-            findEffectiveThisParamInfo(context->astBuilder, DeclRef<Decl>(declRef)))
-    {
-        addThisParameter(*thisParamInfo, &parameterLists);
-    }
-    collectParameterLists(context, declRef, &parameterLists, kParameterListCollectMode_Default);
+    auto builder = context->irBuilder;
 
     auto& paramTypes = outInfo.paramTypes;
 
@@ -4210,7 +5365,7 @@ void _lowerInfoFromFuncParameters(
     }
     else
     {
-        irResultType = lowerType(context, getResultType(context->astBuilder, declRef));
+        irResultType = lowerType(context, resultType);
 
         if (auto setterDeclRef = declRef.as<SetterDecl>())
         {
@@ -4231,10 +5386,9 @@ void _lowerInfoFromFuncParameters(
         }
     }
 
-    if (!getErrorCodeType(context->astBuilder, declRef)
-             ->equals(context->astBuilder->getBottomType()))
+    if (!errorType->equals(context->astBuilder->getBottomType()))
     {
-        auto irErrorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        auto irErrorType = lowerType(context, errorType);
         IRInst* operands[] = {irErrorType};
         IRAttr* throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, operands);
         outInfo.type = builder->getFuncType(
@@ -4248,6 +5402,79 @@ void _lowerInfoFromFuncParameters(
         outInfo.type =
             builder->getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), irResultType);
     }
+}
+
+void _lowerInfoFromFuncParameters(
+    IRGenContext* context,
+    DeclRef<FunctionDeclBase> declRef,
+    FuncDeclBaseTypeInfo& outInfo)
+{
+    auto& parameterLists = outInfo.parameterLists;
+    if (auto thisParamInfo =
+            findEffectiveThisParamInfo(context->astBuilder, DeclRef<Decl>(declRef)))
+    {
+        addThisParameter(*thisParamInfo, &parameterLists);
+    }
+    collectParameterLists(context, declRef, &parameterLists, kParameterListCollectMode_Default);
+
+    auto resultType = getResultType(context->astBuilder, declRef);
+    maybeAddReturnDestinationParam(&parameterLists, declRef, resultType);
+
+    lowerFunctionTypeFromParameterLists(
+        context,
+        declRef,
+        resultType,
+        getErrorCodeType(context->astBuilder, declRef),
+        outInfo);
+}
+
+/// Lowers the selected function type of a direct call to its callable IR signature.
+///
+/// The checked expression type is the source of truth for ordinary parameter types, modes,
+/// substitutions, and the result and error types. The declaration contributes only information
+/// that is not represented by `FuncType`: an implicit receiver, parameter attributes, accessor
+/// ABI conventions, and declarations for omitted default arguments.
+void _lowerSelectedCallableTypeInfo(
+    IRGenContext* context,
+    DeclRef<FunctionDeclBase> declRef,
+    FuncType* callableType,
+    FuncDeclBaseTypeInfo& outInfo)
+{
+    SLANG_RELEASE_ASSERT(callableType);
+
+    auto& parameterLists = outInfo.parameterLists;
+    if (auto thisParamInfo =
+            findEffectiveThisParamInfo(context->astBuilder, DeclRef<Decl>(declRef)))
+    {
+        addThisParameter(*thisParamInfo, &parameterLists);
+    }
+
+    auto parameterDecls =
+        getParametersForCallableSignature(context->astBuilder, declRef.as<CallableDecl>());
+    for (Index i = 0; i < callableType->getParamCount(); ++i)
+    {
+        auto checkedParamInfo = callableType->getParamInfo(i);
+
+        IRLoweringParameterInfo loweringParamInfo;
+        loweringParamInfo.type = checkedParamInfo.type;
+        loweringParamInfo.intendedParamPassingMode = checkedParamInfo.mode;
+        loweringParamInfo.actualParamPassingModeToUse = checkedParamInfo.mode;
+        if (i < parameterDecls.getCount())
+            loweringParamInfo.decl = parameterDecls[i].getDecl();
+        parameterLists.params.add(loweringParamInfo);
+    }
+
+    maybeAddReturnDestinationParam(
+        &parameterLists,
+        declRef,
+        callableType->getResultType());
+
+    lowerFunctionTypeFromParameterLists(
+        context,
+        declRef,
+        callableType->getResultType(),
+        callableType->getErrorType(),
+        outInfo);
 }
 
 void _lowerFuncDeclBaseTypeInfo(
@@ -4268,6 +5495,99 @@ void _lowerFuncDeclBaseTypeInfo(
     }
 }
 
+/// Represents the declaration, signature, arguments, and write-backs prepared for an accessor call.
+struct PreparedAccessorCall
+{
+    DeclRef<AccessorDecl> accessorDeclRef;
+    FuncDeclBaseTypeInfo info;
+    List<IRInst*> arguments;
+    List<DeferredWriteBackAction> receiverWriteBacks;
+};
+
+/// Prepares an accessor receiver before any written subscript or setter arguments.
+static void prepareAccessorCall(
+    IRGenContext* context,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo base,
+    PreparedAccessorCall* outCall)
+{
+    SLANG_RELEASE_ASSERT(outCall);
+    outCall->accessorDeclRef = accessorDeclRef;
+    _lowerFuncDeclBaseTypeInfo(context, accessorDeclRef, outCall->info);
+
+    if (base.flavor != LoweredValInfo::Flavor::None)
+    {
+        SLANG_ASSERT(outCall->info.parameterLists.params.getCount() >= 1);
+        SLANG_ASSERT(outCall->info.parameterLists.params[0].isThisParam);
+
+        auto thisParam = outCall->info.parameterLists.params[0];
+
+        auto receiverUse = getAbstractStorageUseForAccessorReceiver(
+            accessorDeclRef,
+            thisParam.actualParamPassingModeToUse);
+        if (receiverUse == AbstractStorageUse::RequireAddress)
+        {
+            base = tryGetAddress(context, base, receiverUse);
+            SLANG_RELEASE_ASSERT(base.flavor == LoweredValInfo::Flavor::Ptr);
+        }
+
+        addArg(
+            context,
+            &outCall->arguments,
+            &outCall->receiverWriteBacks,
+            base,
+            thisParam.actualParamPassingModeToUse,
+            receiverUse,
+            thisParam.type,
+            SourceLoc(),
+            CallArgumentStorageLifetime::ThroughCall);
+
+        if (receiverUse == AbstractStorageUse::RequireAddress)
+            SLANG_RELEASE_ASSERT(outCall->receiverWriteBacks.getCount() == 0);
+    }
+}
+
+/// Emits an accessor whose receiver and ordinary arguments have already been evaluated.
+static LoweredValInfo emitPreparedAccessorCall(
+    IRGenContext* context,
+    IRType* type,
+    PreparedAccessorCall* call)
+{
+    SLANG_RELEASE_ASSERT(call);
+
+    LoweredValInfo result;
+    auto callResultType = type;
+    if (call->info.returnViaLastRefParam)
+    {
+        SLANG_RELEASE_ASSERT(call->info.paramTypes.getCount());
+        auto resultType = tryGetPointedToType(
+            context->irBuilder,
+            call->info.paramTypes.getLast());
+        SLANG_RELEASE_ASSERT(resultType);
+
+        auto resultVariable = context->irBuilder->emitVar(resultType);
+        call->arguments.add(resultVariable);
+        callResultType = context->irBuilder->getVoidType();
+        result = LoweredValInfo::ptr(resultVariable);
+    }
+
+    auto directResult = emitCallToDeclRef(
+        context,
+        callResultType,
+        call->accessorDeclRef,
+        call->info.type,
+        call->arguments.getCount(),
+        call->arguments.getBuffer(),
+        TryClauseEnvironment());
+
+    if (!call->info.returnViaLastRefParam)
+        result = directResult;
+
+    applyAndClearDeferredWriteBackActions(context, call->receiverWriteBacks);
+
+    return result;
+}
+
 static LoweredValInfo _emitCallToAccessor(
     IRGenContext* context,
     IRType* type,
@@ -4276,43 +5596,43 @@ static LoweredValInfo _emitCallToAccessor(
     UInt argCount,
     IRInst* const* args)
 {
-    FuncDeclBaseTypeInfo info;
-    _lowerFuncDeclBaseTypeInfo(context, accessorDeclRef, info);
+    PreparedAccessorCall call;
+    prepareAccessorCall(context, accessorDeclRef, base, &call);
+    call.arguments.addRange(args, argCount);
+    return emitPreparedAccessorCall(context, type, &call);
+}
 
-    List<IRInst*> allArgs;
+/// Prepares a call to `accessorDeclRef` on `storageInfo` in source evaluation order.
+///
+/// Preparing the receiver can select and call an enclosing property's getter or `ref` accessor.
+/// `prepareBoundStorageAccessorCall()` therefore prepares the receiver before it lowers and appends
+/// the storage's deferred written or defaulted subscript arguments.
+static void prepareBoundStorageAccessorCall(
+    IRGenContext* context,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    BoundStorageInfo* storageInfo,
+    PreparedAccessorCall* outCall)
+{
+    SLANG_RELEASE_ASSERT(storageInfo);
+    prepareAccessorCall(context, accessorDeclRef, storageInfo->getBase(), outCall);
 
-    List<OutArgumentFixup> fixups;
-    if (base.flavor != LoweredValInfo::Flavor::None)
-    {
-        SLANG_ASSERT(info.parameterLists.params.getCount() >= 1);
-        SLANG_ASSERT(info.parameterLists.params[0].isThisParam);
+    auto const& storageArguments = getBoundStorageArguments(context, storageInfo);
+    outCall->arguments.addRange(storageArguments);
+}
 
-        auto thisParam = info.parameterLists.params[0];
-
-        addArg(
-            context,
-            &allArgs,
-            &fixups,
-            base,
-            thisParam.actualParamPassingModeToUse,
-            thisParam.type,
-            SourceLoc());
-    }
-
-    allArgs.addRange(args, argCount);
-
-    LoweredValInfo result = emitCallToDeclRef(
+static LoweredValInfo _emitCallToBoundStorageAccessor(
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    BoundStorageInfo* storageInfo)
+{
+    PreparedAccessorCall call;
+    prepareBoundStorageAccessorCall(
         context,
-        type,
         accessorDeclRef,
-        info.type,
-        allArgs.getCount(),
-        allArgs.getBuffer(),
-        TryClauseEnvironment());
-
-    applyOutArgumentFixups(context, fixups);
-
-    return result;
+        storageInfo,
+        &call);
+    return emitPreparedAccessorCall(context, type, &call);
 }
 
 
@@ -4433,15 +5753,172 @@ struct ExprLoweringContext
 
     IRGenContext* context;
 
+    // This context carries the enclosing operation's storage use unchanged through syntax wrappers
+    // and nested l-value nodes. `getAbstractStorageAccessPlan()` interprets that use to decide
+    // whether each projection must preserve an address. R-value visitors ignore this field.
+    AbstractStorageUse lValueStorageUse = AbstractStorageUse::RequireAddress;
+
+    /// Returns the storage use that the current visitor applies to a nested expression.
+    AbstractStorageUse getSubExprStorageUse()
+    {
+        return isLValueContext() ? lValueStorageUse : AbstractStorageUse::ReadValue;
+    }
+
     IRBuilder* getBuilder() { return context->irBuilder; }
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
 
 
+    /// Represents the selected declaration, receiver expression, callable type, and retained
+    /// bindings for one direct call.
     struct ResolvedCallInfo
     {
         DeclRef<Decl> funcDeclRef;
+        FuncType* callableType = nullptr;
         Expr* baseExpr = nullptr;
+        List<LetExpr*> localBindings;
     };
+
+    /// Lowers one expression-local binding for the use of its result.
+    ///
+    /// `SemanticsVisitor::moveTemp()` attaches `LocalTempVarModifier` when an initializer's value
+    /// must be evaluated once and reused. A writing `bindingResultUse` requires a mutable snapshot
+    /// and retains the initializer as its eventual write-back destination. A non-writing use keeps
+    /// the same stable snapshot but must not make an enclosing property receiver writable merely
+    /// because that property has a setter. For example, `storage.value.item.read()` reads the
+    /// property once without calling its setter, while replacing `read()` with a mutating method
+    /// retains `storage.value` for the eventual write-back. A simple IR value needs a binding object
+    /// only when it carries enclosing write-backs through the selected operation. An unmarked
+    /// binding intentionally remains an alias for its initializer.
+    LoweredValInfo lowerLocalBindingInitializer(
+        LetExpr* binding,
+        AbstractStorageUse bindingResultUse)
+    {
+        SLANG_RELEASE_ASSERT(binding);
+        SLANG_RELEASE_ASSERT(binding->decl);
+        SLANG_RELEASE_ASSERT(binding->decl->initExpr);
+
+        const bool resultMayWrite =
+            getProjectedAbstractStorageUse(bindingResultUse) ==
+            AbstractStorageUse::ModifyProjectedValue;
+        const auto initializerUse = resultMayWrite ? AbstractStorageUse::ReadWriteValue
+                                                   : AbstractStorageUse::ReadValue;
+        auto initializer =
+            lowerLValueExpr(context, binding->decl->initExpr, initializerUse);
+        if (binding->decl->findModifier<LocalTempVarModifier>())
+        {
+            List<DeferredWriteBackAction> inheritedActions;
+            if (initializer.flavor == LoweredValInfo::Flavor::PendingWriteBack)
+            {
+                auto pending = initializer.getPendingWriteBackInfo();
+                initializer = pending->value;
+                inheritedActions.addRange(pending->actions);
+                pending->actions.clear();
+            }
+
+            bool needsStabilizedBinding = initializer.flavor != LoweredValInfo::Flavor::Simple;
+            if (inheritedActions.getCount())
+                needsStabilizedBinding = true;
+
+            if (needsStabilizedBinding)
+            {
+                RefPtr<StabilizedLValueInfo> stabilizedValue = new StabilizedLValueInfo();
+                if (initializer.flavor == LoweredValInfo::Flavor::Simple)
+                {
+                    stabilizedValue->localValue = initializer;
+                }
+                else
+                {
+                    List<DeferredWriteBackAction> receiverActions;
+                    if (resultMayWrite)
+                    {
+                        initializer = stabilizeDeferredStorageReceiversForUse(
+                            context,
+                            initializer,
+                            initializerUse,
+                            &receiverActions);
+                    }
+
+                    auto initialValue = getSimpleVal(context, initializer);
+                    auto localStorage = createVar(context, initialValue->getDataType());
+                    assign(context, localStorage, LoweredValInfo::simple(initialValue));
+
+                    stabilizedValue->localValue = localStorage;
+                    if (resultMayWrite)
+                        stabilizedValue->writeBackTarget = initializer;
+                    stabilizedValue->enclosingActions.addRange(receiverActions);
+                }
+                stabilizedValue->enclosingActions.addRange(inheritedActions);
+                context->shared->extValues.add(stabilizedValue);
+                initializer = LoweredValInfo::stabilizedLValue(stabilizedValue);
+            }
+        }
+        return initializer;
+    }
+
+    /// Attaches one binding's unconsumed receiver write-backs to its result.
+    ///
+    /// The result carries the write-backs until its enclosing read, assignment, or call consumes
+    /// it. This rule also applies to a callable result with
+    /// `LoweredValInfo::Flavor::Simple` because selecting the function does not consume the
+    /// retained receiver. Existing pending write-backs belong to an inner binding and therefore
+    /// stay before the enclosing binding's entries.
+    LoweredValInfo finishLocalBindingUse(
+        LoweredValInfo result,
+        LoweredValInfo initializer)
+    {
+        if (initializer.flavor != LoweredValInfo::Flavor::StabilizedLValue)
+            return result;
+
+        auto stabilized = initializer.getStabilizedLValueInfo();
+        List<DeferredWriteBackAction> bindingCommit;
+        bindingCommit.add(DeferredWriteBackAction::forStabilizedBinding(stabilized));
+        return finishDeferredWriteBackUse(
+            context,
+            result,
+            bindingCommit);
+    }
+
+    /// Returns the selected callable inside transparent wrappers and records retained bindings.
+    ///
+    /// Parentheses and checked generic applications have no run-time work.
+    /// `lowerRetainedCallBindings()` emits each `LetExpr` initializer before
+    /// `visitInvokeExprImpl()` emits or uses the already-selected callable, while keeping the
+    /// stabilized receiver alive until the call completes.
+    /// `getCallableExprThroughTransparentWrappers()` returns wrappers outermost to innermost, which
+    /// is also the required binding-evaluation order.
+    Expr* getCallableExprAndLocalBindings(
+        Expr* funcExpr,
+        List<LetExpr*>* outLocalBindings)
+    {
+        List<Expr*> wrappers;
+        auto callableExpr = getCallableExprThroughTransparentWrappers(funcExpr, &wrappers);
+        for (auto wrapper : wrappers)
+        {
+            if (auto letExpr = as<LetExpr>(wrapper))
+            {
+                SLANG_RELEASE_ASSERT(letExpr->decl);
+                SLANG_RELEASE_ASSERT(letExpr->decl->initExpr);
+                SLANG_RELEASE_ASSERT(letExpr->body);
+                outLocalBindings->add(letExpr);
+            }
+        }
+        return callableExpr;
+    }
+
+    /// Lowers retained callable bindings and records the bindings that need a post-call commit.
+    void lowerRetainedCallBindings(
+        List<LetExpr*> const& localBindings,
+        AbstractStorageUse bindingResultUse,
+        List<StabilizedLValueInfo*>* outStabilizedBindings)
+    {
+        for (auto localBinding : localBindings)
+        {
+            auto initializer = lowerLocalBindingInitializer(localBinding, bindingResultUse);
+            context->setGlobalValue(localBinding->decl, initializer);
+            if (initializer.flavor == LoweredValInfo::Flavor::StabilizedLValue)
+                outStabilizedBindings->add(initializer.getStabilizedLValueInfo());
+        }
+    }
 
 
     DeclRef<Decl> resolveAliases(DeclRef<Decl> declRef)
@@ -4460,69 +5937,68 @@ struct ExprLoweringContext
         return declRef;
     }
 
-    // Try to resolve a the function expression for a call
-    // into a reference to a specific declaration, along
-    // with some contextual information about the declaration
-    // we are calling.
-    bool tryResolveDeclRefForCall(Expr* funcExpr, ResolvedCallInfo* outInfo)
+    /// Finds the declaration, receiver, and retained bindings in a selected direct callable.
+    ///
+    /// Selection can preserve parentheses, generic-application syntax, and local bindings around
+    /// the direct declaration reference. For example, `(value.method)()` still calls `method` with
+    /// `value` as its receiver, while a static interface requirement can retain a `LetExpr` that
+    /// opens the run-time witness used by its specialized declaration reference. This search only
+    /// records those bindings. `tryPrepareDirectCall()` invokes this search without evaluating the
+    /// bindings; its successful callers then invoke `lowerRetainedCallBindings()`. A failed search
+    /// therefore cannot evaluate a prefix twice.
+    bool tryFindDirectCall(Expr* funcExpr, ResolvedCallInfo* outInfo)
     {
-        // TODO: unwrap any "identity" expressions that might
-        // be wrapping the callee.
+        auto callableExpr =
+            getCallableExprAndLocalBindings(funcExpr, &outInfo->localBindings);
 
-        // First look to see if the expression references a
-        // declaration at all.
-        auto declRefExpr = as<DeclRefExpr>(funcExpr);
-        if (!declRefExpr)
+        auto callableDeclRefExpr = as<DeclRefExpr>(callableExpr);
+        if (!callableDeclRefExpr)
+            return false;
+        if (!callableDeclRefExpr->declRef.as<CallableDecl>())
             return false;
 
-        // A little bit of future proofing here: if we ever
-        // allow higher-order functions, then we might be
-        // calling through a variable/field that has a function
-        // type, but is not itself a function.
-        // In such a case we should be careful to not statically
-        // resolve things.
-        //
-        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()); callableDecl)
-        {
-            // Okay, the declaration is directly callable, so we can continue.
-
-            // unless the return type is unspecified (then the callable is declared using a function
-            // type)
-            //
-            // if (!callableDecl->returnType.type)
-            //    return false;
-        }
-        else
-        {
-            // The callee declaration isn't itself a callable (it must have
-            // a function type, though).
-            return false;
-        }
-
-        // Now we can look at the specific kinds of declaration references,
-        // and try to tease them apart.
-        if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
+        if (auto memberFuncExpr = as<MemberExpr>(callableExpr))
         {
             outInfo->funcDeclRef = resolveAliases(memberFuncExpr->declRef);
             outInfo->baseExpr = memberFuncExpr->baseExpression;
-            return true;
         }
-        else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
+        else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(callableExpr))
         {
             outInfo->funcDeclRef = resolveAliases(staticMemberFuncExpr->declRef);
-            return true;
         }
-        else if (auto varExpr = as<VarExpr>(funcExpr))
+        else if (auto varExpr = as<VarExpr>(callableExpr))
         {
             outInfo->funcDeclRef = resolveAliases(varExpr->declRef);
-            return true;
         }
         else
         {
-            // Seems to be a case of declaration-reference we don't know about.
-            SLANG_UNEXPECTED("unknown declaration reference kind");
-            // return false;
+            SLANG_UNEXPECTED(
+                "direct callable used an unsupported declaration-reference expression");
         }
+
+        return true;
+    }
+
+    /// Prepares a selected callable expression for direct-call lowering.
+    ///
+    /// The outer checked expression owns the specialized `FuncType`, including any substitutions
+    /// represented by a transparent `GenericAppExpr`, `ParenExpr`, or `LetExpr`. The terminal
+    /// declaration reference supplies declaration-only information such as default arguments and
+    /// the implicit receiver. `tryPrepareDirectCall()` retains both sources without reconstructing
+    /// the checked callable type from the declaration.
+    bool tryPrepareDirectCall(Expr* funcExpr, ResolvedCallInfo* outInfo)
+    {
+        auto callableType = as<FuncType>(funcExpr->type.type);
+        if (!callableType)
+            return false;
+
+        ResolvedCallInfo resolvedInfo;
+        if (!tryFindDirectCall(funcExpr, &resolvedInfo))
+            return false;
+
+        resolvedInfo.callableType = callableType;
+        *outInfo = _Move(resolvedInfo);
+        return true;
     }
 
     /// Return `expr` with any outer casts to interface types stripped away
@@ -4556,6 +6032,70 @@ struct ExprLoweringContext
         return e;
     }
 
+    /// Returns the implicit receiver selected by a direct callable expression.
+    ///
+    /// `tryFindDirectCall()` can pair a transformed function-extension declaration with the
+    /// original callable `MemberExpr` retained in `baseExpr`. In that case the original member's
+    /// base is the receiver; the method value itself is not. Static members contribute no receiver.
+    Expr* getDirectCallableReceiverExpr(Expr* baseExpr)
+    {
+        if (!baseExpr)
+            return nullptr;
+
+        // An upcast to an interface affects member selection, but the call still operates on the
+        // operand value that was cast.
+        baseExpr = maybeIgnoreCastToInterface(baseExpr);
+
+        // When `baseExpr` retains the original callable `MemberExpr`, the receiver is that member's
+        // base rather than the method value itself.
+        if (auto memberExpr = as<MemberExpr>(baseExpr))
+        {
+            if (memberExpr->declRef.template as<CallableDecl>())
+                baseExpr = memberExpr->baseExpression;
+        }
+        else if (auto staticMemberExpr = as<StaticMemberExpr>(baseExpr))
+        {
+            if (staticMemberExpr->declRef.template as<CallableDecl>())
+                baseExpr = nullptr;
+        }
+
+        return baseExpr;
+    }
+
+    /// Returns the storage use imposed by a direct callable's implicit receiver.
+    AbstractStorageUse getDirectCallableReceiverUse(
+        DeclRef<Decl> funcDeclRef,
+        Expr* baseExpr)
+    {
+        auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, funcDeclRef);
+        if (!thisParamInfo || !getDirectCallableReceiverExpr(baseExpr))
+            return AbstractStorageUse::ReadValue;
+
+        return getAbstractStorageUseForParameter(thisParamInfo->mode);
+    }
+
+    /// Adds the implicit receiver selected by a direct callable expression.
+    void addDirectCallableReceiverArgument(
+        DeclRef<Decl> funcDeclRef,
+        Expr* baseExpr,
+        List<IRInst*>* outArguments,
+        List<DeferredWriteBackAction>* outWriteBacks)
+    {
+        auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, funcDeclRef);
+        baseExpr = getDirectCallableReceiverExpr(baseExpr);
+
+        if (!thisParamInfo || !baseExpr)
+            return;
+
+        addCallArgsForParam(
+            context,
+            thisParamInfo->mode,
+            getAbstractStorageUseForParameter(thisParamInfo->mode),
+            baseExpr,
+            outArguments,
+            outWriteBacks,
+            CallArgumentStorageLifetime::ThroughCall);
+    }
 
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
@@ -4563,48 +6103,86 @@ struct ExprLoweringContext
     {
         IRBuilderSourceLocRAII sourceLocInfo(getBuilder(), expr->loc);
         if (isLValueContext())
-            return lowerLValueExpr(context, expr);
+            return lowerLValueExpr(context, expr, lValueStorageUse);
         return lowerRValueExpr(context, expr);
     }
 
-    /// Create IR instructions for an argument at a call site, based on
-    /// AST-level expressions plus function signature information.
-    ///
-    /// The `funcType` parameter is always required, and specifies the types
-    /// of all the parameters. The `funcDeclRef` parameter is only required
-    /// if there are parameter positions for which the matching argument is
-    /// absent.
-    ///
+    /// Collects direct subscript arguments so `visitInvokeExprImpl()` can attach them to the returned
+    /// `BoundStorageInfo`. A later `materialize()`, `tryGetAddress()`, or `assign()` path receives the
+    /// enclosing operation's `AbstractStorageUse`, prepares the selected accessor's receiver, and
+    /// then lowers these retained arguments.
+    RefPtr<DeferredStorageArgumentsInfo> collectDeferredSubscriptArguments(
+        InvokeExpr* expr,
+        FuncType* callableType,
+        DeclRef<SubscriptDecl> subscriptDeclRef)
+    {
+        SLANG_RELEASE_ASSERT(expr);
+        SLANG_RELEASE_ASSERT(callableType);
+        SLANG_RELEASE_ASSERT(subscriptDeclRef);
+
+        auto parameterDecls = getParametersForCallableSignature(
+            getASTBuilder(),
+            subscriptDeclRef.as<CallableDecl>());
+
+        RefPtr<DeferredStorageArgumentsInfo> result = new DeferredStorageArgumentsInfo();
+        for (Index argumentIndex = 0;
+             argumentIndex < callableType->getParamCount();
+             ++argumentIndex)
+        {
+            DeferredStorageArgument argument;
+            argument.passingMode = callableType->getParamInfo(argumentIndex).mode;
+            if (argumentIndex < expr->arguments.getCount())
+            {
+                argument.expression = expr->arguments[argumentIndex];
+            }
+            else
+            {
+                SLANG_RELEASE_ASSERT(argumentIndex < parameterDecls.getCount());
+                auto defaultArgument = getInitExpr(
+                    getASTBuilder(),
+                    parameterDecls[argumentIndex]);
+                SLANG_RELEASE_ASSERT(defaultArgument);
+                argument.expression = defaultArgument.getExpr();
+                argument.isDefaultArgument = true;
+                argument.defaultArgumentSubstitutions =
+                    defaultArgument.getSubsts()
+                        ? defaultArgument.getSubsts().declRef
+                        : nullptr;
+            }
+            result->arguments.add(argument);
+        }
+        return result;
+    }
+
+    /// Lowers one supplied or defaulted call argument according to its parameter mode.
     void addDirectCallArgs(
         InvokeExpr* expr,
         Index argIndex,
         ParamPassingMode actualParamPassingMode,
         DeclRef<ParamDecl> paramDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups)
+        List<DeferredWriteBackAction>* ioActions)
     {
         Count argCount = expr->arguments.getCount();
         if (argIndex < argCount)
         {
             auto argExpr = expr->arguments[argIndex];
-            addCallArgsForParam(context, actualParamPassingMode, argExpr, ioArgs, ioFixups);
+            addCallArgsForParam(
+                context,
+                actualParamPassingMode,
+                getAbstractStorageUseForParameter(actualParamPassingMode),
+                argExpr,
+                ioArgs,
+                ioActions,
+                CallArgumentStorageLifetime::ThroughValueEvaluation);
         }
         else
         {
-            // We have run out of arguments supplied at the call site,
-            // but there are still parameters remaining. This must mean
-            // that these parameters have default argument expressions
-            // associated with them.
-            //
-            // Currently we simply extract the initial-value expression
-            // from the parameter declaration and then lower it in
-            // the context of the caller.
-            //
-            // Note that the expression could involve subsitutions because
-            // in the general case it could depend on the generic parameters
-            // used the specialize the callee. For now we do not handle that
-            // case, and simply ignore generic arguments.
-            //
+            // When the call omits an argument, `addDirectCallArgs()` uses the parameter's
+            // initializer. `getInitExpr()` preserves the substitutions carried by `paramDeclRef`,
+            // including the generic arguments that specialize the selected callee.
+            // `addDirectCallArgs()` then lowers the initializer in a child environment that binds
+            // those substitutions while retaining the caller's outer environment.
             SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
             SLANG_ASSERT(argExpr);
 
@@ -4616,16 +6194,18 @@ struct ExprLoweringContext
             IRGenContext* subContext = &subContextStorage;
             subContext->env = subEnv;
 
-            _lowerSubstitutionEnv(
+            lowerSubstitutionEnvironment(
                 subContext,
                 argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
 
             addCallArgsForParam(
                 subContext,
                 actualParamPassingMode,
+                getAbstractStorageUseForParameter(actualParamPassingMode),
                 argExpr.getExpr(),
                 ioArgs,
-                ioFixups);
+                ioActions,
+                CallArgumentStorageLifetime::ThroughValueEvaluation);
 
             // TODO: The approach we are taking here to default arguments
             // is simplistic, and has consequences for the front-end as
@@ -4641,8 +6221,32 @@ struct ExprLoweringContext
             //
             // Each of these options involves trade-offs, and we need to
             // make a conscious decision at some point.
+        }
+    }
 
-            // Assert that such an expression must have been present.
+    void addDirectCallArgs(
+        InvokeExpr* expr,
+        FuncType* funcType,
+        DeclRef<CallableDecl> callableDeclRef,
+        List<IRInst*>* ioArgs,
+        List<DeferredWriteBackAction>* ioActions)
+    {
+        List<DeclRef<ParamDecl>> parameterDecls;
+        if (callableDeclRef)
+            parameterDecls = getParametersForCallableSignature(getASTBuilder(), callableDeclRef);
+
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto parameterDecl = i < parameterDecls.getCount() ? parameterDecls[i]
+                                                                : DeclRef<ParamDecl>();
+            addDirectCallArgs(
+                expr,
+                i,
+                paramInfo.mode,
+                parameterDecl,
+                ioArgs,
+                ioActions);
         }
     }
 
@@ -4650,23 +6254,22 @@ struct ExprLoweringContext
         InvokeExpr* expr,
         FuncType* funcType,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups)
+        List<DeferredWriteBackAction>* ioActions)
     {
-        Count argCount = expr->arguments.getCount();
-        SLANG_ASSERT(argCount == funcType->getParamCount());
-
-        for (Index i = 0; i < argCount; ++i)
-        {
-            auto paramInfo = funcType->getParamInfo(i);
-            addDirectCallArgs(expr, i, paramInfo.mode, DeclRef<ParamDecl>(), ioArgs, ioFixups);
-        }
+        SLANG_RELEASE_ASSERT(expr->arguments.getCount() == funcType->getParamCount());
+        addDirectCallArgs(
+            expr,
+            funcType,
+            DeclRef<CallableDecl>(),
+            ioArgs,
+            ioActions);
     }
 
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<CallableDecl> funcDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups)
+        List<DeferredWriteBackAction>* ioActions)
     {
         Count argCounter = 0;
         for (auto paramDeclRef : getParametersForCallableSignature(getASTBuilder(), funcDeclRef))
@@ -4674,7 +6277,7 @@ struct ExprLoweringContext
             auto paramDirection = getParamInfo(getASTBuilder(), paramDeclRef).mode;
 
             Index argIndex = argCounter++;
-            addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
+            addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioActions);
         }
     }
 
@@ -4684,11 +6287,11 @@ struct ExprLoweringContext
         InvokeExpr* expr,
         DeclRef<Decl> funcDeclRef,
         List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups)
+        List<DeferredWriteBackAction>* ioActions)
     {
         if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
         {
-            addDirectCallArgs(expr, callableDeclRef, ioArgs, ioFixups);
+            addDirectCallArgs(expr, callableDeclRef, ioArgs, ioActions);
         }
         else
         {
@@ -4705,98 +6308,6 @@ struct ExprLoweringContext
         }
     }
 
-
-    void _lowerSubstitutionArg(
-        IRGenContext* subContext,
-        GenericAppDeclRef* subst,
-        Decl* paramDecl,
-        Index argIndex)
-    {
-        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
-        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
-        subContext->setValue(paramDecl, argVal);
-    }
-
-    void _lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
-    {
-        if (!subst)
-            return;
-        _lowerSubstitutionEnv(subContext, subst->getBase());
-
-        if (auto genSubst = as<GenericAppDeclRef>(subst))
-        {
-            auto genDecl = genSubst->getGenericDecl();
-
-            Index argCounter = 0;
-            for (auto memberDecl : genDecl->getDirectMemberDecls())
-            {
-                if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, typeParamDecl, argCounter++);
-                }
-                else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, typePackParamDecl, argCounter++);
-                }
-                else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, valPackParamDecl, argCounter++);
-                }
-                else if (auto valParamDecl = as<GenericValueParamDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
-                }
-            }
-            for (auto memberDecl : genDecl->getDirectMemberDecls())
-            {
-                if (!isGenericConstraintParameterDecl(memberDecl))
-                    continue;
-
-                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
-                }
-                else if (
-                    auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(
-                        subContext,
-                        genSubst,
-                        typeCoercionConstraintDecl,
-                        argCounter++);
-                }
-                else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(
-                        subContext,
-                        genSubst,
-                        nonEmptyConstraintDecl,
-                        argCounter++);
-                }
-                else if (
-                    auto packCountConstraintDecl =
-                        as<GenericVariadicPackCountConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(
-                        subContext,
-                        genSubst,
-                        packCountConstraintDecl,
-                        argCounter++);
-                }
-                else if (
-                    auto hasDiffTypeInfoConstraintDecl =
-                        as<HasDiffTypeInfoConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(
-                        subContext,
-                        genSubst,
-                        hasDiffTypeInfoConstraintDecl,
-                        argCounter++);
-                }
-            }
-        }
-        // TODO: also need to handle this-type substitution here?
-    }
 
     void validateInvokeExprArgsWithFunctionModifiers(
         InvokeExpr* expr,
@@ -4838,7 +6349,7 @@ struct ExprLoweringContext
         for (Index i = 0; i < argCount; ++i)
             args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
 
-        // Selects FRem vs IRem for `%`, resolved by `convertToBuiltinArithmeticOp` at check time
+        // Selects FRem vs IRem for `%`, resolved by `convertToBuiltinArithmeticOp()` at check time
         // and stored on the node rather than re-derived here: the operand element type can still
         // be an abstract, unspecialized generic parameter at this point (see
         // `elementTypeIsFloatingPoint`'s declaration comment), which carries no concrete
@@ -4909,7 +6420,7 @@ struct ExprLoweringContext
         case BuiltinOperationKind::And:
         case BuiltinOperationKind::Or:
         case BuiltinOperationKind::Unknown:
-            // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for `?:`,
+            // `convertToBuiltinArithmeticOp()` never produces a `BuiltinOperatorExpr` for `?:`,
             // `&&`, `||` (short-circuit/ternary, not fast-pathed) or for an unrecognized
             // operator, so a node with these kinds should not exist.
             SLANG_UNEXPECTED("BuiltinOperatorExpr with non-fast-path operation kind");
@@ -4962,166 +6473,79 @@ struct ExprLoweringContext
         // arguments that will be part of the call.
         List<IRInst*> irArgs;
 
-        // We will also collect "fixup" actions that need
-        // to be performed after the call, in order to
-        // copy the final values for `out` parameters
-        // back to their arguments.
-        List<OutArgumentFixup> argFixups;
+        // These actions have a lifetime that extends through the call: output arguments copy back
+        // after the callee returns, and callable receivers retain their enclosing storage
+        // write-back through the selected call. Value-only argument actions are consumed inside
+        // `addArg()` before the next argument is evaluated.
+        List<DeferredWriteBackAction> argumentWriteBacks;
 
         auto funcExpr = expr->functionExpr;
         ResolvedCallInfo resolvedInfo;
-        if (tryResolveDeclRefForCall(funcExpr, &resolvedInfo))
+        if (tryPrepareDirectCall(funcExpr, &resolvedInfo))
         {
-            // In this case we know exactly what declaration we
-            // are going to call, and so we can resolve things
-            // appropriately.
+            // `tryPrepareDirectCall()` preserves the selected declaration for ABI and default-
+            // argument information, while the checked expression provides the callable type.
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
             auto baseExpr = resolvedInfo.baseExpr;
-            if (baseExpr)
-            {
-                // The base expression might be an "upcast" to a base interface, in
-                // which case we don't want to emit the result of the cast, but instead
-                // the source.
-                //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
-            }
+            auto subscriptDeclRef = funcDeclRef.template as<SubscriptDecl>();
 
-            // If the thing being invoked is a subscript operation,
-            // then we need to handle multiple extra details
-            // that don't arise for other kinds of calls.
-            //
-            // TODO: subscript operations probably deserve to
-            // be handled on their own path for this reason...
-            //
-            if (auto subscriptDeclRef = funcDeclRef.template as<SubscriptDecl>())
+            List<StabilizedLValueInfo*> stabilizedBindings;
+            lowerRetainedCallBindings(
+                resolvedInfo.localBindings,
+                subscriptDeclRef ? getSubExprStorageUse()
+                                 : getDirectCallableReceiverUse(funcDeclRef, baseExpr),
+                &stabilizedBindings);
+
+            // A subscript declaration denotes deferred storage rather than a function that can be
+            // called directly. `visitInvokeExprImpl()` therefore keeps its arguments and retained
+            // bindings attached until an eventual read, write, borrow, or address use asks the
+            // access-plan logic to select an accessor.
+            if (subscriptDeclRef)
             {
-                // A reference to a subscript declaration is a special case,
-                // because it is not possible to call a subscript directly;
-                // we must call one of its accessors.
-                //
+                if (baseExpr)
+                    baseExpr = maybeIgnoreCastToInterface(baseExpr);
                 auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-                auto result = lowerStorageReference(
+                auto deferredArguments = collectDeferredSubscriptArguments(
+                    expr,
+                    resolvedInfo.callableType,
+                    subscriptDeclRef);
+
+                List<DeferredWriteBackAction> enclosingActions;
+                appendStabilizedBindingCommits(stabilizedBindings, &enclosingActions);
+                return lowerDeferredSubscriptReference(
                     context,
                     type,
                     subscriptDeclRef,
                     loweredBase,
-                    irArgs.getCount(),
-                    irArgs.getBuffer());
-
-                // TODO: Applying the fixups for arguments to the subscript at this point
-                // won't technically be correct, since the call to the subscript may
-                // not have occured at this point.
-                //
-                // It seems like we need to either:
-                //
-                // * Capture the arguments to the subscript as `LoweredValInfo` instead of `IRInst*`
-                //   so that we can deal with everything related to fixups around the actual call
-                //   site.
-                //
-                // OR
-                //
-                // * Handle everything to do with "fixups" differently, by treating them as deferred
-                // actions that gert queued up on the context itself and then flushed at certain
-                // well-defined points, so that we don't have to be as careful around them.
-                //
-                // OR
-                //
-                // * Switch to a more "destination-driven" approach to code generation, where we
-                // can determine on entry to the lowering of a sub-expression whether it will be
-                // used for read, write, or read/write, and resolve things like the choice of
-                // accessor at that point instead.
-                //
-                applyOutArgumentFixups(context, argFixups);
-                return result;
+                    deferredArguments,
+                    enclosingActions);
             }
 
-            auto thisParamInfo = findEffectiveThisParamInfo(context->astBuilder, funcDeclRef);
+            // A member call contributes its effective receiver before its written arguments.
+            addDirectCallableReceiverArgument(
+                funcDeclRef,
+                baseExpr,
+                &irArgs,
+                &argumentWriteBacks);
 
-            // First comes the `this` argument if we are calling
-            // a member function:
-            if (baseExpr && thisParamInfo)
-            {
-                // For when the invoke expr is a member of a _function_,
-                // we want to use the base expression for that function,
-                // instead of function itself.
-                //
-                if (auto memberExpr = as<MemberExpr>(baseExpr))
-                {
-                    if (memberExpr->declRef.template as<CallableDecl>())
-                    {
-                        baseExpr = memberExpr->baseExpression;
-                    }
-                }
-                else if (auto staticMemberExpr = as<StaticMemberExpr>(baseExpr))
-                {
-                    // TODO: We really shouldn't hit this case.. for some reason
-                    // it's possible to see a regular member expr of static member expr of
-                    // something
-                    //
-                    if (staticMemberExpr->declRef.template as<CallableDecl>())
-                    {
-                        baseExpr = nullptr;
-                    }
-                }
-
-                if (baseExpr)
-                {
-                    addCallArgsForParam(
-                        context,
-                        thisParamInfo->mode,
-                        baseExpr,
-                        &irArgs,
-                        &argFixups);
-                }
-            }
-
-            // Then we have the "direct" arguments to the call.
-            // These may include `out` and `inout` arguments that
-            // require "fixup" work on the other side.
-            //
+            // The checked callable type owns the specialized ordinary parameter modes and types.
+            // The selected declaration supplies the receiver and ABI-only attributes that the
+            // checked expression's `FuncType` does not encode.
             FuncDeclBaseTypeInfo funcTypeInfo;
-
-            if (as<CallableDecl>(funcDeclRef.getDecl()) &&
-                funcDeclRef.as<CallableDecl>().getDecl()->funcType.type &&
-                as<FuncType>(expr->functionExpr->type))
-            {
-                // Calculate args by func-type
-                auto resolvedFuncType = as<FuncType>(expr->functionExpr->type);
-                funcTypeInfo.type = lowerType(context, resolvedFuncType);
-                // Insert a this type to the front of the param types
-
-                if (baseExpr && thisParamInfo)
-                {
-                    auto thisParamType = getParamTypeWithModeWrapper(
-                        context->astBuilder,
-                        thisParamInfo->type,
-                        thisParamInfo->mode);
-                    auto irThisParamType = lowerType(context, thisParamType);
-
-                    List<IRType*> paramTypes;
-                    paramTypes.add(irThisParamType);
-                    for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
-                        paramTypes.add(paramType);
-
-                    funcTypeInfo.type = context->irBuilder->getFuncType(
-                        paramTypes.getCount(),
-                        paramTypes.getBuffer(),
-                        cast<IRFuncType>(funcTypeInfo.type)->getResultType());
-                }
-
-                addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
-            }
-            else
-            {
-                _lowerFuncDeclBaseTypeInfo(
-                    context,
-                    funcDeclRef.template as<FunctionDeclBase>(),
-                    funcTypeInfo);
-                // Calculate args by inspecting the decl-ref.
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-            }
+            auto functionDeclRef = funcDeclRef.template as<FunctionDeclBase>();
+            SLANG_RELEASE_ASSERT(functionDeclRef);
+            _lowerSelectedCallableTypeInfo(
+                context,
+                functionDeclRef,
+                resolvedInfo.callableType,
+                funcTypeInfo);
+            addDirectCallArgs(
+                expr,
+                resolvedInfo.callableType,
+                functionDeclRef.as<CallableDecl>(),
+                &irArgs,
+                &argumentWriteBacks);
 
             validateInvokeExprArgsWithFunctionModifiers(
                 expr,
@@ -5160,7 +6584,8 @@ struct ExprLoweringContext
 
             auto callResult =
                 emitCallToDeclRef(context, type, funcDeclRef, funcTypeInfo.type, irArgs, tryEnv);
-            applyOutArgumentFixups(context, argFixups);
+            applyDeferredWriteBackActions(context, argumentWriteBacks);
+            applyStabilizedBindingCommits(context, stabilizedBindings);
 
             if (funcTypeInfo.returnViaLastRefParam)
                 return result;
@@ -5168,8 +6593,17 @@ struct ExprLoweringContext
         }
         else if (auto funcType = as<FuncType>(expr->functionExpr->type))
         {
-            auto funcVal = lowerRValueExpr(context, expr->functionExpr);
-            addDirectCallArgs(expr, funcType, &irArgs, &argFixups);
+            List<LetExpr*> localBindings;
+            auto callableExpr =
+                getCallableExprAndLocalBindings(expr->functionExpr, &localBindings);
+            List<StabilizedLValueInfo*> stabilizedBindings;
+            lowerRetainedCallBindings(
+                localBindings,
+                AbstractStorageUse::ReadValue,
+                &stabilizedBindings);
+
+            auto funcVal = lowerRValueExpr(context, callableExpr);
+            addDirectCallArgs(expr, funcType, &irArgs, &argumentWriteBacks);
 
             auto result = emitCallToVal(
                 context,
@@ -5179,24 +6613,14 @@ struct ExprLoweringContext
                 irArgs.getBuffer(),
                 tryEnv);
 
-            applyOutArgumentFixups(context, argFixups);
+            applyDeferredWriteBackActions(context, argumentWriteBacks);
+            applyStabilizedBindingCommits(context, stabilizedBindings);
             return result;
         }
 
 
-        // TODO: In this case we should be emitting code for the callee as
-        // an ordinary expression, then emitting the arguments according
-        // to the type information on the callee (e.g., which parameters
-        // are `out` or `inout`, and then finally emitting the `call`
-        // instruction.
-        //
-        // We don't currently have the case of emitting arguments according
-        // to function type info (instead of declaration info), and really
-        // this case can't occur unless we start adding first-class functions
-        // to the source language.
-        //
-        // For now we just bail out with an error.
-        //
+        // A checked invocation must either name a direct callable declaration or carry the
+        // function type used by the indirect-call path above.
         SLANG_UNEXPECTED("could not resolve target declaration for call");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
@@ -5220,11 +6644,23 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
     LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
 
+    /// Lowers a fixed array's checked element count without lowering its element type.
+    ///
+    /// Consider `countof(value.Element[4])`. Both that query and `GetArrayLengthExpr` depend only
+    /// on the `4`; lowering the complete array type would needlessly require the runtime
+    /// existential opening in `value.Element`.
+    LoweredValInfo lowerFixedArrayElementCount(ArrayExpressionType* arrayType)
+    {
+        SLANG_RELEASE_ASSERT(arrayType);
+        SLANG_RELEASE_ASSERT(!arrayType->isUnsized());
+        return LoweredValInfo::simple(lowerSimpleVal(context, arrayType->getElementCount()));
+    }
+
     LoweredValInfo visitAddressOfExpr(AddressOfExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
         auto baseVal = lowerLValueExpr(context, expr->arg);
-        auto ptr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+        auto ptr = tryConsumeAddress(context, baseVal);
 
         switch (ptr.flavor)
         {
@@ -5320,27 +6756,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             if (!isLValueContext())
             {
-                auto materializedVal = materialize(context, baseVal);
+                innerInst = getSimpleVal(context, baseVal);
 
-                // TODO(Sai): We might be missing the case where a single materialize could create
-                // multiple calls (multiple index operations?). Not quite sure what the right way
-                // to handle that case might be.
+                // TODO(Sai): One expression can emit multiple calls, such as through nested index
+                // operations. This decoration currently identifies only the resulting call.
                 //
-                if (as<IRCall>(materializedVal.val))
+                if (as<IRCall>(innerInst))
                 {
                     if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
                         getBuilder()->addDecoration(
-                            materializedVal.val,
+                            innerInst,
                             kIROp_TreatCallAsDifferentiableDecoration);
                     else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
                         getBuilder()->addDecoration(
-                            materializedVal.val,
+                            innerInst,
                             kIROp_DifferentiableCallDecoration);
                     else
                         SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
                 }
-
-                innerInst = getSimpleVal(context, materializedVal);
 
                 // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to
                 // be used on array index operations. (This is to avoid a discrepancy between using
@@ -5395,38 +6828,50 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
     {
-        auto baseVal = lowerSubExpr(expr->baseFunction);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-        auto threadSize = lowerRValueExpr(context, expr->threadGroupSize);
-        auto groupSize = lowerRValueExpr(context, expr->dispatchSize);
-        // Actual arguments to be filled in when we lower the actual call expr.
-        // This is handled in `emitCallToVal`.
+        auto baseVal = getSimpleVal(
+            context,
+            lowerRValueExpr(context, expr->baseFunction));
+
+        // Source syntax lists `dispatchSize` before `threadGroupSize`, while `IRDispatchKernel`
+        // stores those operands in the reverse order. Materialize both expressions in source order
+        // before emitting the instruction.
+        auto dispatchSize = getSimpleVal(
+            context,
+            lowerRValueExpr(context, expr->dispatchSize));
+        auto threadGroupSize = getSimpleVal(
+            context,
+            lowerRValueExpr(context, expr->threadGroupSize));
+
+        // This expression returns a dispatch callable. `emitCallToVal()` adds the kernel arguments
+        // when that callable is invoked.
         return LoweredValInfo::simple(getBuilder()->emitDispatchKernelInst(
             lowerType(context, expr->type),
-            baseVal.val,
-            getSimpleVal(context, threadSize),
-            getSimpleVal(context, groupSize),
+            baseVal,
+            threadGroupSize,
+            dispatchSize,
             0,
             nullptr));
     }
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
-        auto type = lowerType(context, expr->arrayExpr->type);
-        auto arrayType = as<IRArrayType>(type);
-        SLANG_ASSERT(arrayType);
-        return LoweredValInfo::simple(arrayType->getElementCount());
+        auto arrayType = as<ArrayExpressionType>(expr->arrayExpr->type.type);
+        return lowerFixedArrayElementCount(arrayType);
     }
 
     LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
+        if (as<CountOfExpr>(sizeOfLikeExpr))
+        {
+            if (auto arrayType = as<ArrayExpressionType>(sizeOfLikeExpr->sizedType))
+                return lowerFixedArrayElementCount(arrayType);
+        }
 
         NaturalSize size{0, NaturalSize::kInvalidAlignment};
-        // `countof` asks for an element count, which is unrelated to the byte
-        // size/alignment that `NaturalSize` computes, so it must never take the
-        // `calcSize` shortcut: for `countof(int[5])` that shortcut would fold to
-        // `size.alignment` (4) below instead of the element count (5). Always
-        // emit `kIROp_CountOf` and let `maybeSpecializeCountOf` fold it.
+        // The fixed-array branch above returned the checked element count. Every remaining
+        // `countof` operand asks for a tuple or pack count, which is unrelated to the byte size or
+        // alignment that `NaturalSize` computes. `visitSizeOfLikeExpr()` therefore emits
+        // `kIROp_CountOf` for those operands, and `maybeSpecializeCountOf` folds it.
         if (!as<CountOfExpr>(sizeOfLikeExpr) &&
             (!sizeOfLikeExpr->dataLayoutType ||
              as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType)))
@@ -5657,10 +7102,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     {
                         IRBuilderInsertLocScope insertScope(builder);
                         builder->setInsertBefore(spirvAsmInst);
-                        const auto addr = tryGetAddress(
+                        const auto addr = tryConsumeAddress(
                             context,
-                            lowerLValueExpr(context, operand.expr),
-                            TryGetAddressMode::Default);
+                            lowerLValueExpr(context, operand.expr));
                         if (addr.flavor == LoweredValInfo::Flavor::Ptr)
                             i = addr.val;
                         else
@@ -5781,11 +7225,73 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto type = lowerType(context, expr->type);
         auto baseVal = lowerSubExpr(expr->baseExpression);
 
+        if (
+            isLValueContext() &&
+            sharedLoweringContext.lValueStorageUse == AbstractStorageUse::DiscardResult)
+        {
+            // A discarded index expression still evaluates its base before its index.
+            // `visitIndexExpr()` calls `discardLoweredValue()` on the base so a required getter runs
+            // without loading an ordinary l-value or asking a run-time swizzle index for an
+            // address.
+            discardLoweredValue(context, baseVal);
+
+            SLANG_RELEASE_ASSERT(expr->indexExprs.getCount() == 1);
+            getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
+            return LoweredValInfo();
+        }
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        if (isLValueContext())
+        {
+            baseVal = beginPendingWriteBackProjection(baseVal, &pendingBase);
+
+            auto storageProjection = expr->getStorageProjection();
+            auto projectedUse = getProjectedAbstractStorageUse(
+                sharedLoweringContext.lValueStorageUse);
+            const bool materializesProjectedValue =
+                projectedUse == AbstractStorageUse::ReadValue ||
+                projectedUse == AbstractStorageUse::BorrowProjectedValue;
+            if (
+                storageProjection.hasNonConstantSwizzleIndex() &&
+                materializesProjectedValue)
+            {
+                // A run-time index cannot identify one swizzled component's address. A read-only
+                // reference or borrow can instead copy the selected value into a temporary.
+                // `materialize()` performs that read before `visitIndexExpr()` lowers the index.
+                baseVal = materialize(context, baseVal);
+            }
+            else if (!storageProjection.hasRetainedSwizzleElement())
+            {
+                // `subscriptValue()` reduces a retained swizzle element before this visitor
+                // requests the needed access. Every other writable or addressable l-value
+                // subscript requires its base's direct address.
+                baseVal = tryGetAddress(
+                    context,
+                    baseVal,
+                    AbstractStorageUse::RequireAddress);
+            }
+        }
+        else
+        {
+            // `visitIndexExpr()` consumes the base before evaluating the index expression.
+            // `materialize()` selects any deferred getter or `ref` accessor before the visitor
+            // lowers the index.
+            baseVal = materialize(context, baseVal);
+        }
+
         SLANG_RELEASE_ASSERT(expr->indexExprs.getCount() == 1);
 
         auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
-        return subscriptValue(type, baseVal, indexVal, expr->indexExprs[0]->loc);
+        auto result = subscriptValue(
+            type,
+            baseVal,
+            indexVal,
+            expr->indexExprs[0]->loc,
+            expr->getStorageProjection());
+        if (pendingBase)
+            return finishPendingWriteBackProjection(pendingBase, result);
+        return result;
     }
 
     LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
@@ -5800,22 +7306,30 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
+        // `visitMemberExpr()` does not complete a pending receiver write-back. For example, the
+        // pending write-back for `outer.inner.item.read` must remain associated with the projection
+        // until `read` returns. The visitor replaces the pending live value with the selected field,
+        // callable, or property and preserves its ordered write-backs until an enclosing read,
+        // assignment, or call consumes it.
+        PendingWriteBackInfo* pendingReceiver = nullptr;
+        loweredBase = beginPendingWriteBackProjection(loweredBase, &pendingReceiver);
+
         auto declRef = expr->declRef;
+        LoweredValInfo result;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
         {
             // Okay, easy enough: we have a reference to a field of a struct type...
-            return extractField(loweredType, loweredBase, fieldDeclRef);
+            result = extractField(loweredType, loweredBase, fieldDeclRef);
         }
         else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
-            RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type =
-                lowerType(context, getResultType(context->astBuilder, callableDeclRef));
-            boundMemberInfo->base = loweredBase;
-            boundMemberInfo->declRef = callableDeclRef;
+            RefPtr<BoundCallableInfo> callableInfo = BoundCallableInfo::create(
+                loweredBase,
+                callableDeclRef,
+                loweredType);
 
-            context->shared->extValues.add(boundMemberInfo);
-            return LoweredValInfo::boundMember(boundMemberInfo);
+            context->shared->extValues.add(callableInfo);
+            result = LoweredValInfo::boundCallable(callableInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
         {
@@ -5823,7 +7337,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // we must translate the reference to the property
             // into a reference to one of its accessors.
             //
-            return lowerStorageReference(
+            result = lowerStorageReference(
                 context,
                 loweredType,
                 propertyDeclRef,
@@ -5831,9 +7345,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 0,
                 nullptr);
         }
+        else
+        {
+            SLANG_UNIMPLEMENTED_X("codegen for member expression");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
 
-        SLANG_UNIMPLEMENTED_X("codegen for member expression");
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return finishPendingWriteBackProjection(pendingReceiver, result);
     }
 
     // We will always lower a dereference expression (`*ptr`)
@@ -5874,7 +7392,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitMakeRefExpr(MakeRefExpr* expr)
     {
-        auto loweredBase = lowerLValueExpr(context, expr->base);
+        auto referenceUse = getAbstractStorageUseForExplicitReference(expr->type);
+        auto loweredBase = lowerLValueExpr(context, expr->base, referenceUse);
+        if (referenceUse == AbstractStorageUse::RequireAddress)
+        {
+            // `_checkAbstractStorageAccess()` has already validated the access plan for this
+            // property or subscript. `visitMakeRefExpr()` keeps the storage deferred until this
+            // explicit-reference use requires an address, then `tryConsumeAddress()` invokes the
+            // prevalidated `ref` accessor.
+            loweredBase = tryConsumeAddress(context, loweredBase);
+        }
 
         if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
         {
@@ -5929,6 +7456,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         //
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
+    }
+
+    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
+    {
+        // An explicit `Ref` is represented as a pointer value in IR. Its source expression can be
+        // an SSA value or an l-value such as a local variable that stores the pointer, so obtain the
+        // pointer value before reinterpreting it as the address of the referenced object.
+        auto referenceValue = getSimpleVal(context, lowerRValueExpr(context, expr->innerExpr));
+        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(referenceValue->getDataType()));
+        return LoweredValInfo::ptr(referenceValue);
     }
 
     LoweredValInfo visitFuncAsTypeExpr(FuncAsTypeExpr*)
@@ -6822,19 +8359,23 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // a where clause), and the cast is a no-op.
         if (isTypeEqualityWitness(expr->witnessArg))
         {
-            // For l-value type-equality casts, lower as an l-value so that
-            // out/inout parameters work correctly through the cast.
+            // The equality cast is a transparent l-value wrapper. `visitCastToSuperTypeExpr()`
+            // calls `lowerSubExpr()` for its operand so the enclosing operation's abstract-storage
+            // use reaches any property or projection beneath the cast.
             if (expr->type.isLeftValue)
             {
-                auto lval = lowerLValueExpr(context, expr->valueArg);
-                return lval;
+                return lowerSubExpr(expr->valueArg);
             }
             auto value = lowerRValueExpr(context, expr->valueArg);
             return LoweredValInfo::simple(
                 getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
         }
 
-        auto value = lowerRValueExpr(context, expr->valueArg);
+        // A checked l-value super-type cast is a storage projection. Lower its operand with the
+        // enclosing storage use so that an operation on the projected base subobject selects the
+        // same property or subscript accessor that `_checkAbstractStorageAccessPlan()` validated.
+        auto value = expr->type.isLeftValue ? lowerSubExpr(expr->valueArg)
+                                            : lowerRValueExpr(context, expr->valueArg);
 
         // The actual operation that we need to perform here
         // depends on the kind of subtype relationship we
@@ -7020,74 +8561,97 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IRType* type,
         LoweredValInfo baseVal,
         IRInst* indexVal,
-        SourceLoc indexLoc)
+        SourceLoc indexLoc,
+        IndexExprStorageProjection projection =
+            IndexExprStorageProjection::makeDirectAddress())
     {
         auto builder = getBuilder();
 
-        // The `tryGetAddress` operation will take a complex value representation
-        // and try to turn it into a single pointer, if possible.
-        //
-        baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
-
-        if (auto indexLit = as<IRIntLit>(indexVal))
+        // `visitIndexExpr()` has already applied the enclosing storage use while preparing
+        // `baseVal`. For a retained constant swizzle component, `subscriptValue()` now reduces that
+        // prepared swizzle to the corresponding one-element l-value.
+        if (isLValueContext() && projection.hasRetainedSwizzleElement())
         {
-            const auto indexValue = indexLit->getValue();
-            if (indexValue >= 0)
+            auto retainedSwizzleElementIndex = projection.getRetainedSwizzleElementIndex();
+            SLANG_RELEASE_ASSERT(
+                baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
+                baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue);
+            switch (baseVal.flavor)
             {
-                switch (baseVal.flavor)
+            case LoweredValInfo::Flavor::SwizzledLValue:
                 {
-                case LoweredValInfo::Flavor::SwizzledLValue:
-                    {
-                        auto baseSwizzleInfo = baseVal.getSwizzledLValueInfo();
-                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementIndices.getCount())
-                        {
-                            const auto index = (Index)indexValue;
-                            RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
-                            context->shared->extValues.add(swizzledLValue);
+                    auto baseSwizzleInfo = baseVal.getSwizzledLValueInfo();
+                    SLANG_RELEASE_ASSERT(
+                        retainedSwizzleElementIndex < baseSwizzleInfo->elementIndices.getCount());
+                    RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
+                    context->shared->extValues.add(swizzledLValue);
 
-                            swizzledLValue->type = type;
-                            swizzledLValue->base = baseSwizzleInfo->base;
-                            swizzledLValue->elementIndices.add(
-                                baseSwizzleInfo->elementIndices[index]);
-                            return LoweredValInfo::swizzledLValue(swizzledLValue);
-                        }
-                    }
-                    break;
-
-                case LoweredValInfo::Flavor::SwizzledMatrixLValue:
-                    {
-                        auto baseSwizzleInfo = baseVal.getSwizzledMatrixLValueInfo();
-                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementCount)
-                        {
-                            const auto index = (Index)indexValue;
-                            RefPtr<SwizzledMatrixLValueInfo> swizzledLValue =
-                                new SwizzledMatrixLValueInfo();
-                            context->shared->extValues.add(swizzledLValue);
-
-                            swizzledLValue->type = type;
-                            swizzledLValue->base = baseSwizzleInfo->base;
-                            swizzledLValue->elementCount = 1;
-                            swizzledLValue->elementCoords[0] =
-                                baseSwizzleInfo->elementCoords[index];
-                            return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
-                        }
-                    }
-                    break;
-
-                default:
-                    break;
+                    swizzledLValue->type = type;
+                    swizzledLValue->base = baseSwizzleInfo->base;
+                    swizzledLValue->elementIndices.add(
+                        baseSwizzleInfo->elementIndices[retainedSwizzleElementIndex]);
+                    return LoweredValInfo::swizzledLValue(swizzledLValue);
                 }
+
+            case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+                {
+                    auto baseSwizzleInfo = baseVal.getSwizzledMatrixLValueInfo();
+                    SLANG_RELEASE_ASSERT(
+                        retainedSwizzleElementIndex < (Index)baseSwizzleInfo->elementCount);
+                    RefPtr<SwizzledMatrixLValueInfo> swizzledLValue =
+                        new SwizzledMatrixLValueInfo();
+                    context->shared->extValues.add(swizzledLValue);
+
+                    swizzledLValue->type = type;
+                    swizzledLValue->base = baseSwizzleInfo->base;
+                    swizzledLValue->elementCount = 1;
+                    swizzledLValue->elementCoords[0] =
+                        baseSwizzleInfo->elementCoords[retainedSwizzleElementIndex];
+                    return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+                }
+
+            default:
+                SLANG_UNREACHABLE("retained swizzle index had no swizzled l-value base");
+                UNREACHABLE_RETURN(LoweredValInfo());
             }
         }
 
-        if (!as<IRIntLit>(indexVal) && isLValueContext() &&
-            (baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
-             baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue))
+        if (isLValueContext())
         {
-            context->getSink()->diagnose(Diagnostics::NeedCompileTimeConstant{
-                .location = indexLoc,
-            });
-            return LoweredValInfo::ptr(builder->emitVar(type));
+            baseVal = tryGetAddress(
+                context,
+                baseVal,
+                AbstractStorageUse::RequireAddress);
+
+            // `_getProjectionBaseUse()` makes an ordinary writable index require the base's direct
+            // address. `_checkAbstractStorageAccess()` therefore rejects an assignment result whose
+            // retained receiver path cannot provide that address. A `ref`-backed assignment result
+            // has no retained path and `tryGetAddress()` unwraps it to `Ptr` above.
+            SLANG_RELEASE_ASSERT(baseVal.flavor != LoweredValInfo::Flavor::AssignmentResult);
+        }
+        else
+        {
+            // An r-value index operation consumes the base value immediately and needs no
+            // write-back path.
+            baseVal = materialize(context, baseVal);
+        }
+
+        if (projection.hasNonConstantSwizzleIndex())
+        {
+            if (isLValueContext())
+            {
+                bool baseIsSwizzled =
+                    baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue;
+                if (baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue)
+                    baseIsSwizzled = true;
+                if (baseIsSwizzled)
+                {
+                    context->getSink()->diagnose(Diagnostics::NeedCompileTimeConstant{
+                        .location = indexLoc,
+                    });
+                    return LoweredValInfo::ptr(builder->emitVar(type));
+                }
+            }
         }
 
         // The `materialize` operation should ensure that we only have to deal
@@ -7188,42 +8752,31 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
     {
-        // Because our representation of lowered "values"
-        // can encompass l-values explicitly, we can
-        // lower assignment easily. We just lower the left-
-        // and right-hand sides, and then perform an assignment
-        // based on the resulting values.
-        //
-        auto leftVal = lowerLValueExpr(context, expr->left);
-        assignExpr(context, leftVal, expr->right, expr->loc);
-
-        // The result value of the assignment expression is
-        // the value of the left-hand side (and it is expected
-        // to be an l-value).
-        return leftVal;
+        // `visitAssignExpr()` retains the left side because Slang assignment expressions produce
+        // l-values. Semantic checking has already validated the destination for `WriteValue`, so
+        // lowering carries that same use through any retained `LetExpr` or storage projection.
+        // `assignExpr()` completes the write and every immediate write-back, then returns an
+        // `AssignmentResultInfo` that retains the destination and any receiver path required by a
+        // later mutation. An expression statement can discard that result without reading the
+        // newly written location or replaying the completed assignment.
+        auto leftVal = lowerLValueExpr(context, expr->left, AbstractStorageUse::WriteValue);
+        LoweredValInfo result;
+        assignExpr(context, leftVal, expr->right, expr->loc, &result);
+        return result;
     }
 
     LoweredValInfo visitLetExpr(LetExpr* expr)
     {
-        // Note: The semantics here are annoyingly subtle.
-        //
-        // If `expr->decl->initExpr` is an l-value, then we will set things up
-        // so that `expr->decl` is bound as an *alias* for that l-value.
-        //
-        // Otherwise, `expr->decl` will simply be bound to the r-value.
-        //
-        // The first case is necessary to make `maybeMoveTemp` operations that
-        // produce l-value results work correctly, but seems slippery.
-        //
-        // TODO: We should probably have two AST node types to cover the two
-        // different use cases of `LetExpr`: the definitely-immutable case that
-        // actually behaves like a `let`, and this other mutable-alias case that
-        // feels kind of messy and gross.
-
-        auto initVal = lowerLValueExpr(context, expr->decl->initExpr);
+        // `LocalTempVarModifier` identifies a binding whose initializer must be evaluated once. A
+        // writing use also retains its original write-back destination. Other local bindings remain
+        // aliases of their lowered initializer. `lowerLocalBindingInitializer()` owns that
+        // distinction for both ordinary `LetExpr` lowering and retained direct-call prefixes.
+        auto initVal = sharedLoweringContext.lowerLocalBindingInitializer(
+            expr,
+            sharedLoweringContext.getSubExprStorageUse());
         context->setGlobalValue(expr->decl, initVal);
         auto bodyVal = lowerSubExpr(expr->body);
-        return bodyVal;
+        return sharedLoweringContext.finishLocalBindingUse(bodyVal, initVal);
     }
 
     LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
@@ -7235,7 +8788,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // value to be written back.
 
         auto existentialType = lowerType(context, getType(getASTBuilder(), expr->declRef));
-        auto existentialVal = emitDeclRef(context, expr->declRef, existentialType);
+        auto existentialVal =
+            lowerExistentialOpeningValue(context, expr->declRef, existentialType);
+
+        // Consider `storage.inner.item.read()`, where `inner` is a getter/setter property and
+        // `item` has interface type. Opening `item` selects the concrete value and witness needed
+        // by `read()`, but it does not consume that value. We keep `inner`'s setter pending on the
+        // extracted result so the selected call or load happens before the write-back.
+        PendingWriteBackInfo* pendingOpeningWriteBack = nullptr;
+        existentialVal =
+            beginPendingWriteBackProjection(existentialVal, &pendingOpeningWriteBack);
 
         // Note that we make a *copy* of the existential value that is definitely
         // a simple r-value. This ensures that all the `extractExistential*()` operations
@@ -7253,7 +8815,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // If we are in an r-value context, we can directly use the `extractExistentialValue`
             // instruction as the result, and life is simple.
             //
-            return LoweredValInfo::simple(extractedVal);
+            return finishPendingWriteBackProjection(
+                pendingOpeningWriteBack,
+                LoweredValInfo::simple(extractedVal));
         }
 
         // In an l-value context, we need to track the information necessary so that
@@ -7266,10 +8830,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // would implicitly encode the concrete type via its IR type) while the second
         // is the witness table for the conformance to the existential.
         //
-        // Note: We are assuming/requiring here that any value "written back" must have
-        // the exact same concrete type as `extractedVal`, so taht it can use the same
-        // IR witness table. The front-end should be enforcing that constraint, and we
-        // have no way to check or enforce it at this point.
+        // A value written back through this projection must have the same concrete type as
+        // `extractedVal`, allowing it to reuse the extracted witness table. Semantic checking
+        // enforces that constraint before lowering reaches this point.
 
         auto witnessTable = getBuilder()->emitExtractExistentialWitnessTable(existentialValCopy);
 
@@ -7280,17 +8843,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         info->witnessTable = witnessTable;
 
         context->shared->extValues.add(info);
-        return LoweredValInfo::extractedExistential(info);
+        return finishPendingWriteBackProjection(
+            pendingOpeningWriteBack,
+            LoweredValInfo::extractedExistential(info));
     }
 
-    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
-    {
-        auto info = lowerRValueExpr(context, expr->innerExpr);
-        SLANG_RELEASE_ASSERT(as<IRPtrTypeBase>(info.val->getFullType()));
-        SLANG_RELEASE_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
-        info.flavor = LoweredValInfo::Flavor::Ptr;
-        return info;
-    }
 };
 
 struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVisitor>
@@ -7300,7 +8857,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     LoweredValInfo visitLValueImplicitCastExpr(LValueImplicitCastExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto loweredArg = lowerLValueExpr(context, expr->arguments[0]);
+        auto loweredArg = lowerSubExpr(expr->arguments[0]);
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        loweredArg = beginPendingWriteBackProjection(loweredArg, &pendingBase);
 
         RefPtr<ImplicitCastLValueInfo> lValueInfo = new ImplicitCastLValueInfo();
         lValueInfo->type = irType;
@@ -7309,7 +8869,8 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         if (as<OutImplicitCastExpr>(expr))
             lValueInfo->lValueType = ParamPassingMode::Out;
         context->shared->extValues.add(lValueInfo);
-        return LoweredValInfo::implicitCastedLValue(lValueInfo);
+        auto result = LoweredValInfo::implicitCastedLValue(lValueInfo);
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 
     // When visiting a swizzle expression in an l-value context,
@@ -7317,7 +8878,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto loweredBase = lowerLValueExpr(context, expr->base);
+        auto loweredBase = lowerSubExpr(expr->base);
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        loweredBase = beginPendingWriteBackProjection(loweredBase, &pendingBase);
 
         RefPtr<SwizzledMatrixLValueInfo> swizzledLValue = new SwizzledMatrixLValueInfo();
         swizzledLValue->type = irType;
@@ -7336,7 +8900,8 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         }
 
         context->shared->extValues.add(swizzledLValue);
-        return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+        auto result = LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 
     // When visiting a swizzle expression in an l-value context,
@@ -7344,7 +8909,10 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto loweredBase = lowerLValueExpr(context, expr->base);
+        auto loweredBase = lowerSubExpr(expr->base);
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        loweredBase = beginPendingWriteBackProjection(loweredBase, &pendingBase);
         UInt elementCount = (UInt)expr->elementIndices.getCount();
 
         // Assign to `resultElements` the elements from `sourceElements` according to the first `n`
@@ -7429,17 +8997,13 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             result = LoweredValInfo::swizzledLValue(swizzledLValue);
         }
 
-        // For a one-element swizzle on a tuple, we can just return the pointer to the member
-        // instead of a SwizzledLValue because they can't follow the same folding logic as
-        // vectors and matrices.
-        //
-        bool shouldUseSimpleLVal = elementCount == 1 && as<TupleType>(expr->base->type) != nullptr;
-        if (shouldUseSimpleLVal)
+        // A one-element tuple swizzle preserves the selected field's direct address.
+        if (isDirectAddressTupleElementSwizzle(expr))
         {
             auto addr = getAddress(context, result, expr->loc);
-            return LoweredValInfo::ptr(addr);
+            result = LoweredValInfo::ptr(addr);
         }
-        return result;
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 };
 
@@ -7451,6 +9015,15 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     {
         auto resultType = lowerType(context, expr->type);
         auto base = lowerSubExpr(expr->base);
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        base = beginPendingWriteBackProjection(base, &pendingBase);
+
+        // A multi-element swizzle projects every component from one evaluation of its matrix
+        // operand. Materializing before the component loop makes a deferred property getter run
+        // once, rather than once for each selected component.
+        base = materialize(context, base);
+
         auto matType = as<MatrixExpressionType>(expr->base->type.type);
         if (!matType)
             SLANG_UNEXPECTED("Expected a matrix type in matrix swizzle");
@@ -7476,11 +9049,13 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
                 getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2, expr->loc));
         }
 
+        LoweredValInfo result;
         if (elementCount > 1)
-            return LoweredValInfo::simple(
+            result = LoweredValInfo::simple(
                 builder->emitMakeVector(resultType, elementCount, irExtracts));
         else
-            return LoweredValInfo::simple(irExtracts[0]);
+            result = LoweredValInfo::simple(irExtracts[0]);
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 
     // A swizzle in an r-value context can save time by just
@@ -7488,7 +9063,11 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto irBase = getSimpleVal(context, lowerRValueExpr(context, expr->base));
+        auto loweredBase = lowerRValueExpr(context, expr->base);
+
+        PendingWriteBackInfo* pendingBase = nullptr;
+        loweredBase = beginPendingWriteBackProjection(loweredBase, &pendingBase);
+        auto irBase = getSimpleVal(context, loweredBase);
 
         auto builder = getBuilder();
 
@@ -7508,14 +9087,10 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
             (UInt)irElementIndices.getCount(),
             &irElementIndices[0]);
 
-        return LoweredValInfo::simple(irSwizzle);
+        auto result = LoweredValInfo::simple(irSwizzle);
+        return finishPendingWriteBackProjection(pendingBase, result);
     }
 
-    LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
-    {
-        auto inner = lowerLValueExpr(context, expr->innerExpr);
-        return LoweredValInfo::ptr(inner.val);
-    }
 };
 
 // ExprLoweringVisitor that fuses the destination assignment.
@@ -7588,14 +9163,23 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 };
 
-LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr)
+LoweredValInfo lowerLValueExpr(
+    IRGenContext* context,
+    Expr* expr,
+    AbstractStorageUse storageUse)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
 
     LValueExprLoweringVisitor visitor;
     visitor.context = context;
+    visitor.sharedLoweringContext.lValueStorageUse = storageUse;
     auto info = visitor.dispatch(expr);
     return info;
+}
+
+LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr)
+{
+    return lowerLValueExpr(context, expr, AbstractStorageUse::RequireAddress);
 }
 
 LoweredValInfo lowerRValueExpr(IRGenContext* context, Expr* expr)
@@ -8076,7 +9660,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (auto incrExpr = stmt->sideEffectExpression)
         {
             maybeEmitDebugLine(context, this, stmt, incrExpr->loc);
-            lowerRValueExpr(context, incrExpr);
+            discardLoweredValue(
+                context,
+                lowerLValueExpr(context, incrExpr, AbstractStorageUse::DiscardResult));
         }
 
         // At the end of the body we need to jump back to the top.
@@ -8327,17 +9913,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         startBlockIfNeeded(stmt);
 
-        // The statement evaluates an expression
-        // (for side effects, one assumes) and then
-        // discards the result. As such, we simply
-        // lower the expression, and don't use
-        // the result.
-        //
-        // Note that we lower using the l-value path,
-        // so that an expression statement that names
-        // a location (but doesn't load from it)
-        // will not actually emit a load.
-        lowerLValueExpr(context, stmt->expression);
+        // The discard use avoids loading an ordinary location whose value is unused while still
+        // completing any receiver evaluation or deferred write-back represented by the result.
+        discardLoweredValue(
+            context,
+            lowerLValueExpr(context, stmt->expression, AbstractStorageUse::DiscardResult));
     }
 
     void visitDeclStmt(DeclStmt* stmt)
@@ -8391,6 +9971,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         //
         if (auto expr = stmt->expression)
         {
+            // `SemanticsStmtVisitor::visitReturnStmt()` requires a `ref` accessor to return an
+            // l-value. Lowering returns that l-value's address because the accessor's IR result
+            // type is a pointer to the stored value.
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                auto address = getAddress(context, lowerLValueExpr(context, expr), expr->loc);
+                SLANG_RELEASE_ASSERT(address);
+                getBuilder()->emitReturn(address);
+                return;
+            }
+
             if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
             {
                 // If this function should return via a __ref parameter, do that and return void.
@@ -8495,6 +10086,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
+        // A `throw` performs one complete-value read before choosing whether control transfers to
+        // a local handler or escapes the function. `visitThrowStmt()` retains that materialized
+        // value in `loweredVal` so it can reuse the value in both branches, preserve the
+        // expression's evaluation effects, and consume any pending storage write-back exactly
+        // once.
         auto loweredExpr = lowerRValueExpr(context, stmt->expression);
         auto loweredVal = getSimpleVal(context, loweredExpr);
         auto throwType = lowerType(context, stmt->expression->type);
@@ -8511,7 +10107,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         else
         {
-            builder->emitThrow(getSimpleVal(context, loweredExpr));
+            builder->emitThrow(loweredVal);
         }
     }
 
@@ -9735,96 +11331,325 @@ static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo 
     return var;
 }
 
+/// Returns the base of a lowered storage projection, if the value has one.
+///
+/// `BoundStorage`, `BoundMemberStorage`, swizzles, and l-value casts retain a base that assignment
+/// can eventually update. `None`, `Simple`, `Ptr`, `BoundCallable`, and `AssignmentResult` are
+/// terminal representations. `ExtractedExistential` is also terminal because
+/// `visitExtractExistentialValueExpr()` has already materialized the one existential value used for
+/// both its extracted value and witness; its retained existential location is used only for the
+/// eventual write-back. `StabilizedLValue` similarly owns a cached read and a separate write-back
+/// destination. An unbound `Subscript` cannot be the checked l-value passed to this
+/// read-modify-write path.
+static bool tryGetStorageProjectionBase(LoweredValInfo value, LoweredValInfo* outBase)
+{
+    switch (value.flavor)
+    {
+    case LoweredValInfo::Flavor::None:
+    case LoweredValInfo::Flavor::Simple:
+    case LoweredValInfo::Flavor::Ptr:
+    case LoweredValInfo::Flavor::BoundCallable:
+    case LoweredValInfo::Flavor::ExtractedExistential:
+    case LoweredValInfo::Flavor::StabilizedLValue:
+    case LoweredValInfo::Flavor::AssignmentResult:
+        return false;
+
+    case LoweredValInfo::Flavor::PendingWriteBack:
+        SLANG_UNEXPECTED("pending write-back reached storage-projection stabilization");
+        UNREACHABLE_RETURN(false);
+
+    case LoweredValInfo::Flavor::BoundStorage:
+        *outBase = value.getBoundStorageInfo()->getBase();
+        return true;
+
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+        *outBase = value.getBoundMemberStorageInfo()->getBase();
+        return true;
+
+    case LoweredValInfo::Flavor::SwizzledLValue:
+        *outBase = value.getSwizzledLValueInfo()->base;
+        return true;
+
+    case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+        *outBase = value.getSwizzledMatrixLValueInfo()->base;
+        return true;
+
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        *outBase = value.getImplicitCastedLValue()->base;
+        return true;
+
+    case LoweredValInfo::Flavor::Subscript:
+        SLANG_UNEXPECTED("unbound subscript used as a read-modify-write argument");
+        UNREACHABLE_RETURN(false);
+    }
+
+    SLANG_UNEXPECTED("unknown lowered-value flavor");
+    UNREACHABLE_RETURN(false);
+}
+
+/// Rebuilds one lowered storage projection with `base` as its replacement base.
+///
+/// The retained declaration, value type, indices, and conversion mode are immutable after lowering.
+/// `replaceStorageProjectionBase()` copies that projection metadata while replacing only the base,
+/// so its read and write-back share one stabilized base.
+static LoweredValInfo replaceStorageProjectionBase(
+    IRGenContext* context,
+    LoweredValInfo value,
+    LoweredValInfo base)
+{
+    switch (value.flavor)
+    {
+    case LoweredValInfo::Flavor::BoundStorage:
+        {
+            RefPtr<BoundStorageInfo> result = value.getBoundStorageInfo()->cloneWithBase(base);
+            context->shared->extValues.add(result);
+            return LoweredValInfo::boundStorage(result);
+        }
+
+    case LoweredValInfo::Flavor::BoundMemberStorage:
+        {
+            RefPtr<BoundMemberStorageInfo> result =
+                value.getBoundMemberStorageInfo()->cloneWithBase(base);
+            context->shared->extValues.add(result);
+            return LoweredValInfo::boundMemberStorage(result);
+        }
+
+    case LoweredValInfo::Flavor::SwizzledLValue:
+        {
+            RefPtr<SwizzledLValueInfo> result =
+                new SwizzledLValueInfo(*value.getSwizzledLValueInfo());
+            result->base = base;
+            context->shared->extValues.add(result);
+            return LoweredValInfo::swizzledLValue(result);
+        }
+
+    case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+        {
+            RefPtr<SwizzledMatrixLValueInfo> result =
+                new SwizzledMatrixLValueInfo(*value.getSwizzledMatrixLValueInfo());
+            result->base = base;
+            context->shared->extValues.add(result);
+            return LoweredValInfo::swizzledMatrixLValue(result);
+        }
+
+    case LoweredValInfo::Flavor::ImplicitCastedLValue:
+        {
+            RefPtr<ImplicitCastLValueInfo> result =
+                new ImplicitCastLValueInfo(*value.getImplicitCastedLValue());
+            result->base = base;
+            context->shared->extValues.add(result);
+            return LoweredValInfo::implicitCastedLValue(result);
+        }
+
+    default:
+        SLANG_UNEXPECTED("lowered value is not a storage projection");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+}
+
+/// Stabilizes deferred storage in a projection while preserving the consumer's access mode.
+///
+/// Consider passing `storage[index]` to an `out uint` parameter when the setter-only subscript
+/// stores `int`. The implicit conversion projects through the subscript but overwrites its whole
+/// value, so `stabilizeDeferredStorageInProjection()` evaluates `storage` and `index` before the
+/// call without requesting a getter. An `inout` conversion of the same expression must instead read
+/// the old value and retain the matching setter write-back. `use` carries that distinction through
+/// every projection.
+///
+/// `stabilizeDeferredStorageReceiversForUse()` passes `false` for
+/// `shouldStabilizeCurrentValue` because the enclosing operation consumes `value` directly.
+/// Recursive calls pass `true` because each recursive value is part of the receiver path that must
+/// remain stable until the enclosing operation and its inner-to-outer write-backs finish.
+static LoweredValInfo stabilizeDeferredStorageInProjection(
+    IRGenContext* context,
+    LoweredValInfo value,
+    AbstractStorageUse use,
+    bool shouldStabilizeCurrentValue,
+    List<DeferredWriteBackAction>* outActionsAfterValueWriteBack)
+{
+    if (shouldStabilizeCurrentValue)
+    {
+        if (value.flavor == LoweredValInfo::Flavor::ExtractedExistential)
+        {
+            auto receiverTemp = moveIntoMutableTemp(context, value);
+            outActionsAfterValueWriteBack->add(
+                DeferredWriteBackAction::forAssignment(value, receiverTemp));
+            return receiverTemp;
+        }
+
+        if (value.flavor == LoweredValInfo::Flavor::AssignmentResult)
+        {
+            // Consider `(storage.item = initialValue).vector.y = replacement`, where `item` has
+            // getter and setter accessors. The assignment result is the receiver of the vector
+            // projection. Stabilizing its retained l-value snapshots the complete property before
+            // selecting `vector`, so the swizzle modifies that same snapshot and the deferred
+            // property write-back does not invoke the getter again.
+            // `stabilizeDeferredStorageInProjection()` appends `writeBacksAfterMutation` after the
+            // recursively produced property write-back. For
+            // `writeUint((storage.item = Value(...)).field)`, `WriteProjectedValue` still reads the
+            // containing property once to preserve its sibling fields. When the retained l-value
+            // is itself whole setter-backed storage, the same use preserves its no-read plan.
+            SLANG_RELEASE_ASSERT(
+                use == AbstractStorageUse::WriteProjectedValue ||
+                use == AbstractStorageUse::ModifyProjectedValue);
+            auto assignmentResult = value.getAssignmentResultInfo();
+            auto stableLValue = stabilizeDeferredStorageInProjection(
+                context,
+                assignmentResult->lValue,
+                use,
+                true,
+                outActionsAfterValueWriteBack);
+            outActionsAfterValueWriteBack->addRange(
+                assignmentResult->writeBacksAfterMutation);
+            return stableLValue;
+        }
+    }
+
+    LoweredValInfo base;
+    if (!tryGetStorageProjectionBase(value, &base))
+        return value;
+
+    auto baseUse = getProjectedAbstractStorageUse(use);
+    if (value.flavor == LoweredValInfo::Flavor::ImplicitCastedLValue)
+    {
+        // A reversible cast owns the use of its operand. In particular, an `out` cast replaces
+        // the converted value without reading it, even when the cast itself is nested beneath
+        // another projection.
+        baseUse = getAbstractStorageUseForImplicitCastOperand(
+            value.getImplicitCastedLValue()->lValueType);
+    }
+
+    List<DeferredWriteBackAction> baseActions;
+    auto stableBase = stabilizeDeferredStorageInProjection(
+        context,
+        base,
+        baseUse,
+        true,
+        &baseActions);
+    auto stableValue = base == stableBase
+                           ? value
+                           : replaceStorageProjectionBase(context, value, stableBase);
+
+    if (shouldStabilizeCurrentValue)
+    {
+        if (stableValue.flavor == LoweredValInfo::Flavor::BoundStorage)
+        {
+            auto addressedValue = tryGetAddress(
+                context,
+                stableValue,
+                use);
+            if (addressedValue.flavor == LoweredValInfo::Flavor::Ptr)
+            {
+                outActionsAfterValueWriteBack->addRange(baseActions);
+                return addressedValue;
+            }
+
+            SLANG_RELEASE_ASSERT(addressedValue.flavor == LoweredValInfo::Flavor::BoundStorage);
+
+            if (use == AbstractStorageUse::WriteProjectedValue)
+            {
+                auto storageInfo = addressedValue.getBoundStorageInfo();
+                auto accessPlan = getAbstractStorageAccessPlan(
+                    context->astBuilder,
+                    storageInfo->getStorageDeclRef(),
+                    use);
+                SLANG_RELEASE_ASSERT(
+                    accessPlan.getKind() == AbstractStorageAccessPlanKind::WriteValue);
+
+                // An output-only conversion overwrites the complete projected value, so its
+                // setter does not need an old value. Deferred subscript arguments still run before
+                // the call, while the setter remains deferred until the callee has initialized the
+                // temporary.
+                getBoundStorageArguments(context, storageInfo);
+                outActionsAfterValueWriteBack->addRange(baseActions);
+                return addressedValue;
+            }
+
+            SLANG_RELEASE_ASSERT(use == AbstractStorageUse::ModifyProjectedValue);
+            auto receiverTemp = moveIntoMutableTemp(context, addressedValue);
+
+            // Write-backs execute in semantic nesting order: the modified inner value first
+            // updates this receiver, and only then can an enclosing deferred receiver be written
+            // back.
+            outActionsAfterValueWriteBack->add(
+                DeferredWriteBackAction::forAssignment(addressedValue, receiverTemp));
+            outActionsAfterValueWriteBack->addRange(baseActions);
+            return receiverTemp;
+        }
+    }
+
+    outActionsAfterValueWriteBack->addRange(baseActions);
+    return stableValue;
+}
+
+static LoweredValInfo stabilizeDeferredStorageReceiversForUse(
+    IRGenContext* context,
+    LoweredValInfo value,
+    AbstractStorageUse use,
+    List<DeferredWriteBackAction>* outActionsAfterValueWriteBack)
+{
+    return stabilizeDeferredStorageInProjection(
+        context,
+        value,
+        use,
+        false,
+        outActionsAfterValueWriteBack);
+}
+
 LoweredValInfo tryGetAddress(
     IRGenContext* context,
     LoweredValInfo const& inVal,
-    TryGetAddressMode mode)
+    AbstractStorageUse use)
 {
     LoweredValInfo val = inVal;
 
     switch (val.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
-        // The `Ptr` case means that we already have an IR value with
-        // the address of our value. Easy!
+        // A `Ptr` already provides a direct address, so `tryGetAddress()` returns it unchanged.
         return val;
 
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            // If we are are trying to turn a subscript operation like `buffer[index]`
-            // into a pointer, then we need to find a `ref` accessor declared
-            // as part of the subscript operation being referenced.
-            //
-            auto subscriptInfo = val.getBoundStorageInfo();
+            auto storageInfo = val.getBoundStorageInfo();
 
-            // We don't want to immediately bind to a `ref` accessor if there is
-            // a `set` accessor available, unless we are in an "aggressive" mode
-            // where we really want/need a pointer to be able to make progress.
-            //
-            if (mode != TryGetAddressMode::Aggressive && getMembersOfType<SetterDecl>(
-                                                             context->astBuilder,
-                                                             subscriptInfo->declRef,
-                                                             MemberFilterStyle::Instance)
-                                                             .isNonEmpty())
-            {
-                // There is a setter that we should consider using,
-                // so don't go and aggressively collapse things just yet.
-                return val;
-            }
-
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
+            // `_checkAbstractStorageAccess()` has already validated this use. `tryGetAddress()` now
+            // calls the shared planner and returns a direct address only when the resulting plan
+            // selects `ref`. Getter and setter plans remain deferred for `materialize()` or
+            // `assign()`.
+            auto accessPlan = getAbstractStorageAccessPlan(
                 context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.isNonEmpty())
+                storageInfo->getStorageDeclRef(),
+                use);
+
+            if (accessPlan.getKind() == AbstractStorageAccessPlanKind::UseAddress)
             {
-                auto refAccessor = *refAccessors.begin();
+                auto addressAccessor = accessPlan.getAddressAccessor();
+                IRType* ptrType = context->irBuilder->getPtrType(storageInfo->getValueType());
 
-                // The `ref` accessor will return a pointer to the value, so
-                // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
-
-                LoweredValInfo refVal = _emitCallToAccessor(
+                LoweredValInfo address = _emitCallToBoundStorageAccessor(
                     context,
                     ptrType,
-                    refAccessor,
-                    subscriptInfo->base,
-                    subscriptInfo->additionalArgs);
+                    addressAccessor.as<AccessorDecl>(),
+                    storageInfo);
 
-                // The result from the call should be a pointer, and it
-                // is the address that we wanted in the first place.
-                return LoweredValInfo::ptr(getSimpleVal(context, refVal));
+                return LoweredValInfo::ptr(getSimpleVal(context, address));
             }
 
-            // Otherwise, there was no `ref` accessor, and so it is not possible
-            // to materialize this location into a pointer for whatever purpose
-            // we have in mind (e.g., passing it to an atomic operation).
+            return val;
         }
-        break;
 
-    case LoweredValInfo::Flavor::BoundMember:
+    case LoweredValInfo::Flavor::BoundMemberStorage:
         {
-            auto boundMemberInfo = val.getBoundMemberInfo();
-
-            // If we hit this case, then it means that we have a reference
-            // to a single field in something, but for whatever reason the
-            // higher-level logic was not able to turn it into a pointer
-            // already (maybe the base value for the field reference is
-            // a `BoundStorage`, etc.).
-            //
-            // We need to read the entire base value out, modify the field
-            // we care about, and then write it back.
-
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
-            {
-                auto baseVal = boundMemberInfo->base;
-                auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
-
-                return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
-            }
+            auto storageInfo = val.getBoundMemberStorageInfo();
+            auto refinedBase =
+                tryGetAddress(context, storageInfo->getBase(), getProjectedAbstractStorageUse(use));
+            return extractField(
+                context,
+                storageInfo->getMemberType(),
+                refinedBase,
+                storageInfo->getMemberDeclRef());
         }
-        break;
 
     case LoweredValInfo::Flavor::SwizzledLValue:
         {
@@ -9833,21 +11658,24 @@ LoweredValInfo tryGetAddress(
 
             UInt elementCount = (UInt)originalSwizzleInfo->elementIndices.getCount();
 
-            auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
-            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            auto refinedBase =
+                tryGetAddress(context, originalBase, getProjectedAbstractStorageUse(use));
+            if (refinedBase.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                // A special case is when we have a single element swizzle,
-                // we can just emit an element address.
-                auto elementPtr = context->irBuilder->emitElementAddress(
-                    newBase.val,
-                    originalSwizzleInfo->elementIndices[0]);
-                return LoweredValInfo::ptr(elementPtr);
+                if (elementCount == 1)
+                {
+                    // A one-element swizzle over an address is itself directly addressable.
+                    auto elementPtr = context->irBuilder->emitElementAddress(
+                        refinedBase.val,
+                        originalSwizzleInfo->elementIndices[0]);
+                    return LoweredValInfo::ptr(elementPtr);
+                }
             }
 
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
-            newSwizzleInfo->base = newBase;
+            newSwizzleInfo->base = refinedBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
             newSwizzleInfo->elementIndices.setCount(elementCount);
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -9855,7 +11683,6 @@ LoweredValInfo tryGetAddress(
 
             return LoweredValInfo::swizzledLValue(newSwizzleInfo);
         }
-        break;
 
     // TODO(Ellie): There's an uncomfortable level of duplication here...
     case LoweredValInfo::Flavor::SwizzledMatrixLValue:
@@ -9865,19 +11692,24 @@ LoweredValInfo tryGetAddress(
 
             UInt elementCount = originalSwizzleInfo->elementCount;
 
-            auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
-            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            auto refinedBase =
+                tryGetAddress(context, originalBase, getProjectedAbstractStorageUse(use));
+            if (refinedBase.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                auto coord = originalSwizzleInfo->elementCoords[0];
-                auto rowPtr = context->irBuilder->emitElementAddress(newBase.val, coord.row);
-                auto elementPtr = context->irBuilder->emitElementAddress(rowPtr, coord.col);
-                return LoweredValInfo::ptr(elementPtr);
+                if (elementCount == 1)
+                {
+                    auto coord = originalSwizzleInfo->elementCoords[0];
+                    auto rowPtr =
+                        context->irBuilder->emitElementAddress(refinedBase.val, coord.row);
+                    auto elementPtr = context->irBuilder->emitElementAddress(rowPtr, coord.col);
+                    return LoweredValInfo::ptr(elementPtr);
+                }
             }
 
             RefPtr<SwizzledMatrixLValueInfo> newSwizzleInfo = new SwizzledMatrixLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
-            newSwizzleInfo->base = newBase;
+            newSwizzleInfo->base = refinedBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
             newSwizzleInfo->elementCount = elementCount;
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -9887,40 +11719,70 @@ LoweredValInfo tryGetAddress(
 
             return LoweredValInfo::swizzledMatrixLValue(newSwizzleInfo);
         }
-        break;
     case LoweredValInfo::Flavor::ImplicitCastedLValue:
         {
             auto info = val.getImplicitCastedLValue();
-            auto baseAddr = tryGetAddress(context, info->base, TryGetAddressMode::Aggressive);
-            if (baseAddr.flavor == LoweredValInfo::Flavor::Ptr)
+
+            // `visitInOutImplicitCastExpr()` and `visitOutImplicitCastExpr()` record the cast
+            // operand-use contract in `lValueType`. An `out` cast writes the projected storage
+            // without reading it, while an `inout` cast must read and write the projected storage.
+            // The outer `use` applies to the cast result and must not replace that operand contract.
+            auto operandUse = getAbstractStorageUseForImplicitCastOperand(info->lValueType);
+            auto refinedBase = tryGetAddress(context, info->base, operandUse);
+            if (refinedBase.flavor == LoweredValInfo::Flavor::Ptr)
             {
                 IRInst* result = nullptr;
                 if (info->lValueType == ParamPassingMode::BorrowInOut)
                     result = context->irBuilder->emitInOutImplicitCast(
                         context->irBuilder->getPtrType(info->type),
-                        baseAddr.val);
+                        refinedBase.val);
                 else
                     result = context->irBuilder->emitOutImplicitCast(
                         context->irBuilder->getPtrType(info->type),
-                        baseAddr.val);
+                        refinedBase.val);
                 return LoweredValInfo::ptr(result);
             }
-        }
-        break;
-        // TODO: are there other cases we need to handled here?
 
-    default:
+            RefPtr<ImplicitCastLValueInfo> addressedInfo = new ImplicitCastLValueInfo();
+            addressedInfo->type = info->type;
+            addressedInfo->base = refinedBase;
+            addressedInfo->lValueType = info->lValueType;
+            context->shared->extValues.add(addressedInfo);
+            return LoweredValInfo::implicitCastedLValue(addressedInfo);
+        }
+
+    case LoweredValInfo::Flavor::AssignmentResult:
+        {
+            auto assignmentResult = val.getAssignmentResultInfo();
+            if (assignmentResult->writeBacksAfterMutation.getCount())
+            {
+                // Exposing the underlying address would let a later mutation bypass the receiver
+                // path retained by the assignment result. Keep the wrapper so `assign()` or the
+                // temporary-backed call-argument path can apply that path after the mutation.
+                return val;
+            }
+            return tryGetAddress(context, assignmentResult->lValue, use);
+        }
+
+    case LoweredValInfo::Flavor::None:
+    case LoweredValInfo::Flavor::Simple:
+    case LoweredValInfo::Flavor::BoundCallable:
+    case LoweredValInfo::Flavor::Subscript:
+    case LoweredValInfo::Flavor::StabilizedLValue:
+    case LoweredValInfo::Flavor::PendingWriteBack:
+    case LoweredValInfo::Flavor::ExtractedExistential:
         break;
     }
 
-    // If none of the special cases above applied, then we werent' able to make
-    // this value into a pointer, and we should just return it as-is.
+    // The remaining flavors have no direct address to expose. `tryGetAddress()` returns the
+    // representation unchanged so a caller that permits a temporary or deferred write-back can
+    // handle it.
     return val;
 }
 
 IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc diagnosticLocation)
 {
-    LoweredValInfo val = tryGetAddress(context, inVal, TryGetAddressMode::Aggressive);
+    LoweredValInfo val = tryConsumeAddress(context, inVal);
 
     if (val.flavor == LoweredValInfo::Flavor::Ptr)
     {
@@ -9932,25 +11794,157 @@ IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc
     return nullptr;
 }
 
+/// Copies the destination's reusable write-back path before `finishAssignmentDestinationUse()`
+/// applies the immediate actions and clears the enclosing pending actions.
+static void captureAssignmentResultWriteBacks(
+    List<DeferredWriteBackAction> const& destinationWriteBacks,
+    PendingWriteBackInfo* enclosingPendingWriteBack,
+    List<DeferredWriteBackAction>* outReusableWriteBacks)
+{
+    SLANG_RELEASE_ASSERT(outReusableWriteBacks);
+    outReusableWriteBacks->addRange(destinationWriteBacks);
+    if (enclosingPendingWriteBack)
+        outReusableWriteBacks->addRange(enclosingPendingWriteBack->actions);
+}
+
+/// Applies an assignment destination's immediate write-backs and returns its reusable result.
+///
+/// Consider `(value.item = 7) = 9` when selecting `item` stabilizes `value`. For the inner
+/// assignment, `assignExpr()` performs the setter before `finishAssignmentDestinationUse()` applies
+/// the immediate receiver write-backs and clears its one-use pending actions. Before applying those
+/// actions, `finishAssignmentDestinationUse()` retains the canonical receiver-stabilization path
+/// that a later mutation of the result must reapply. The assigned l-value and retained actions
+/// share the same stable temporaries. Accessor-call-local receiver write-backs are not part of
+/// `destinationWriteBacks`; each later accessor invocation prepares those actions anew.
+static void finishAssignmentDestinationUse(
+    IRGenContext* context,
+    LoweredValInfo destination,
+    List<DeferredWriteBackAction> const& destinationWriteBacks,
+    PendingWriteBackInfo* enclosingPendingWriteBack,
+    LoweredValInfo* outAssignmentResult)
+{
+    List<DeferredWriteBackAction> reusableWriteBacks;
+    if (outAssignmentResult)
+    {
+        captureAssignmentResultWriteBacks(
+            destinationWriteBacks,
+            enclosingPendingWriteBack,
+            &reusableWriteBacks);
+    }
+
+    applyDeferredWriteBackActions(context, destinationWriteBacks);
+    if (enclosingPendingWriteBack)
+    {
+        applyAndClearDeferredWriteBackActions(
+            context,
+            enclosingPendingWriteBack->actions);
+    }
+
+    if (outAssignmentResult)
+    {
+        *outAssignmentResult =
+            makeAssignmentResult(context, destination, reusableWriteBacks);
+    }
+}
+
 void assignExpr(
     IRGenContext* context,
     const LoweredValInfo& inLeft,
     Expr* rightExpr,
-    SourceLoc assignmentLoc)
+    SourceLoc assignmentLoc,
+    LoweredValInfo* outAssignmentResult)
 {
-    auto left = tryGetAddress(context, inLeft, TryGetAddressMode::Default);
     IRBuilderSourceLocRAII locRAII(context->irBuilder, assignmentLoc);
+
+    PendingWriteBackInfo* pendingLeft = nullptr;
+    auto left = beginPendingWriteBackProjection(inLeft, &pendingLeft);
+    left = tryGetAddress(context, left, AbstractStorageUse::WriteValue);
+
+    List<DeferredWriteBackAction> receiverWriteBacks;
+    left = stabilizeDeferredStorageReceiversForUse(
+        context,
+        left,
+        AbstractStorageUse::WriteValue,
+        &receiverWriteBacks);
+
+    if (left.flavor == LoweredValInfo::Flavor::BoundStorage)
+    {
+        auto storageInfo = left.getBoundStorageInfo();
+        auto writePlan = getAbstractStorageAccessPlan(
+            context->astBuilder,
+            storageInfo->getStorageDeclRef(),
+            AbstractStorageUse::WriteValue);
+        if (writePlan.getKind() == AbstractStorageAccessPlanKind::WriteValue)
+        {
+            auto setter = writePlan.getWriteAccessor();
+            PreparedAccessorCall setterCall;
+            prepareBoundStorageAccessorCall(
+                context,
+                setter,
+                storageInfo,
+                &setterCall);
+
+            auto newValueParam = getSetterNewValueParamInfo(context->astBuilder, setter);
+            List<DeferredWriteBackAction> argumentWriteBacks;
+            addCallArgsForParam(
+                context,
+                newValueParam.mode,
+                getAbstractStorageUseForSetterNewValue(newValueParam),
+                rightExpr,
+                &setterCall.arguments,
+                &argumentWriteBacks,
+                CallArgumentStorageLifetime::ThroughValueEvaluation);
+
+            List<DeferredWriteBackAction> reusableWriteBacks;
+            if (outAssignmentResult)
+            {
+                // Receiver stabilization has already rebuilt `left` over the canonical receiver
+                // temp. `captureAssignmentResultWriteBacks()` retains `receiverWriteBacks` and
+                // `pendingLeft` over that temp, so a later use does not prepare another receiver
+                // from the pre-assignment value.
+                captureAssignmentResultWriteBacks(
+                    receiverWriteBacks,
+                    pendingLeft,
+                    &reusableWriteBacks);
+            }
+
+            emitPreparedAccessorCall(
+                context,
+                context->irBuilder->getVoidType(),
+                &setterCall);
+            applyDeferredWriteBackActions(context, argumentWriteBacks);
+            applyDeferredWriteBackActions(context, receiverWriteBacks);
+            if (pendingLeft)
+                applyAndClearDeferredWriteBackActions(context, pendingLeft->actions);
+            if (outAssignmentResult)
+                *outAssignmentResult = makeAssignmentResult(context, left, reusableWriteBacks);
+            return;
+        }
+    }
+
     switch (left.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
         {
             lowerRValueExprWithDestination(context, left, rightExpr);
+            finishAssignmentDestinationUse(
+                context,
+                left,
+                receiverWriteBacks,
+                pendingLeft,
+                outAssignmentResult);
         }
         break;
     default:
         {
             auto right = lowerRValueExpr(context, rightExpr);
-            assign(context, inLeft, right);
+            assign(context, left, right);
+            finishAssignmentDestinationUse(
+                context,
+                left,
+                receiverWriteBacks,
+                pendingLeft,
+                outAssignmentResult);
         }
         break;
     }
@@ -9961,12 +11955,10 @@ void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo 
     LoweredValInfo left = inLeft;
     LoweredValInfo right = inRight;
 
-    // Before doing the case analysis on the shape of the `left` value,
-    // we might as well go ahead and see if we can coerce it into
-    // a simple pointer, since that would make our life a lot easier
-    // when handling complex cases.
-    //
-    left = tryGetAddress(context, left, TryGetAddressMode::Default);
+    // `assign()` first requests the direct-address representation allowed for a complete-value
+    // write. A direct pointer uses the ordinary store path, while compound and abstract-storage
+    // l-values remain available to the case analysis below.
+    left = tryGetAddress(context, left, AbstractStorageUse::WriteValue);
 
     auto builder = context->irBuilder;
 
@@ -10011,7 +12003,7 @@ top:
             auto swizzleInfo = left.getSwizzledLValueInfo();
             auto loweredBase = swizzleInfo->base;
 
-            // Note that the call to `tryGetAddress` at the start should
+            // Note that the call to `tryGetAddress()` at the start should
             // ensure that `loweredBase` has been simplified as much as
             // possible (e.g., if it is possible to turn it into a
             // `LoweredValInfo::ptr()` then that will have been done).
@@ -10160,128 +12152,106 @@ top:
 
     case LoweredValInfo::Flavor::BoundStorage:
         {
-            // The `left` value refers to a subscript operation on
-            // a resource type, bound to particular arguments, e.g.:
-            // `someStructuredBuffer[index]`.
-            //
-            // When storing to such a value, we need to emit a call
-            // to the appropriate builtin "setter" accessor, if there
-            // is one, and then fall back to a `ref` accessor if
-            // there is no setter.
-            //
-            auto subscriptInfo = left.getBoundStorageInfo();
+            auto storageInfo = left.getBoundStorageInfo();
 
-            // Search for an appropriate "setter" declaration
-            auto setters = getMembersOfType<SetterDecl>(
+            // A complete-value write uses the accessor selected by the shared plan. A setter
+            // consumes the right-hand value as its implicit `newValue` argument; a `ref` accessor
+            // yields a pointer and lets the ordinary pointer case perform the store.
+            auto writePlan = getAbstractStorageAccessPlan(
                 context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (setters.isNonEmpty())
+                storageInfo->getStorageDeclRef(),
+                AbstractStorageUse::WriteValue);
+            if (writePlan.getKind() == AbstractStorageAccessPlanKind::WriteValue)
             {
-                auto setter = *setters.begin();
+                auto setter = writePlan.getWriteAccessor();
+                PreparedAccessorCall setterCall;
+                prepareBoundStorageAccessorCall(
+                    context,
+                    setter,
+                    storageInfo,
+                    &setterCall);
 
-                auto allArgs = subscriptInfo->additionalArgs;
+                // A setter owns exactly one new-value parameter. `assign()` passes that value
+                // through the same mode-aware path as an ordinary call argument so that an
+                // effective `BorrowIn` parameter receives an address rather than a copied value.
+                auto newValueParam = getSetterNewValueParamInfo(context->astBuilder, setter);
 
-                // A setter owns exactly one new-value parameter. Lower that value through the
-                // same mode-aware path as an ordinary call argument so that an effective
-                // `BorrowIn` parameter receives an address rather than a copied value.
-                auto setterParams = getParameters(context->astBuilder, setter);
-                SLANG_RELEASE_ASSERT(setterParams.getCount() == 1);
-                auto newValueParamInfo = getParamInfo(context->astBuilder, setterParams[0]);
-                SLANG_RELEASE_ASSERT(
-                    newValueParamInfo.mode == ParamPassingMode::In ||
-                    newValueParamInfo.mode == ParamPassingMode::BorrowIn);
-
-                List<OutArgumentFixup> newValueFixups;
+                List<DeferredWriteBackAction> argumentWriteBacks;
                 addArg(
                     context,
-                    &allArgs,
-                    &newValueFixups,
+                    &setterCall.arguments,
+                    &argumentWriteBacks,
                     right,
-                    newValueParamInfo.mode,
-                    newValueParamInfo.type,
-                    setter.getDecl()->loc);
+                    newValueParam.mode,
+                    getAbstractStorageUseForSetterNewValue(newValueParam),
+                    newValueParam.type,
+                    setter.getDecl()->loc,
+                    CallArgumentStorageLifetime::ThroughValueEvaluation);
 
-                _emitCallToAccessor(
-                    context,
-                    builder->getVoidType(),
-                    setter,
-                    subscriptInfo->base,
-                    allArgs);
-                applyOutArgumentFixups(context, newValueFixups);
+                emitPreparedAccessorCall(context, context->irBuilder->getVoidType(), &setterCall);
+                applyDeferredWriteBackActions(context, argumentWriteBacks);
                 return;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(
-                context->astBuilder,
-                subscriptInfo->declRef,
-                MemberFilterStyle::Instance);
-            if (refAccessors.isNonEmpty())
+            if (writePlan.getKind() == AbstractStorageAccessPlanKind::UseAddress)
             {
-                auto refAccessor = *refAccessors.begin();
+                auto addressAccessor = writePlan.getAddressAccessor();
+                IRType* ptrType = context->irBuilder->getPtrType(storageInfo->getValueType());
 
-                // The `ref` accessor will return a pointer to the value, so
-                // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
-
-                LoweredValInfo refVal = _emitCallToAccessor(
+                LoweredValInfo address = _emitCallToBoundStorageAccessor(
                     context,
                     ptrType,
-                    refAccessor,
-                    subscriptInfo->base,
-                    subscriptInfo->additionalArgs);
+                    addressAccessor.as<AccessorDecl>(),
+                    storageInfo);
 
-                // The result from the call needs to be implicitly dereferenced,
-                // so that it can work as an l-value of the desired result type.
-                left = LoweredValInfo::ptr(getSimpleVal(context, refVal));
+                left = LoweredValInfo::ptr(getSimpleVal(context, address));
 
-                // Tail-recursively attempt assignment again on the new l-value.
+                // The next iteration reaches the ordinary pointer store.
                 goto top;
             }
 
-            // No setter found? Then we have an error!
-            SLANG_UNEXPECTED("no setter found");
+            SLANG_RELEASE_ASSERT(writePlan.getKind() == AbstractStorageAccessPlanKind::Invalid);
+            SLANG_UNEXPECTED("abstract storage had no writable accessor");
             break;
         }
         break;
 
-    case LoweredValInfo::Flavor::BoundMember:
+    case LoweredValInfo::Flavor::BoundMemberStorage:
         {
-            auto boundMemberInfo = left.getBoundMemberInfo();
-
-            // If we hit this case, then it means that we are trying to set
-            // a single field in someting that is not atomically set-able.
-            // (e.g., an element of a value where the `subscript` operation
-            // has `get` and `set` but not a `ref` accessor).
-            //
-            // We need to read the entire base value out, modify the field
-            // we care about, and then write it back.
-
-            auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            // A chain such as `storage.item.baseField` must read `storage` exactly once.
+            // `extractField()` records one projection in each `BoundMemberStorage`; `assign()`
+            // gathers the complete chain before materializing its non-member root, addresses the
+            // projected fields in that one temporary, then writes the complete root value back once.
+            ShortList<BoundMemberStorageInfo*, 4> projectionPath;
+            auto projectedValue = left;
+            while (projectedValue.flavor == LoweredValInfo::Flavor::BoundMemberStorage)
             {
-                // materialize the base value and move it into
-                // a mutable temporary if needed
-                auto baseVal = boundMemberInfo->base;
-                auto tempVal = moveIntoMutableTemp(context, baseVal);
-
-                // extract the field l-value out of the temporary
-                auto tempFieldVal =
-                    extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
-
-                // assign to the field of the temporary l-value
-                assign(context, tempFieldVal, right);
-
-                // write back the modified temporary to the base l-value
-                assign(context, baseVal, tempVal);
-
-                return;
+                auto projection = projectedValue.getBoundMemberStorageInfo();
+                projectionPath.add(projection);
+                projectedValue = projection->getBase();
             }
-            else
+
+            auto mutableRoot = moveIntoMutableTemp(context, projectedValue);
+            auto mutableProjection = mutableRoot;
+            Index projectionIndex = projectionPath.getCount();
+            while (projectionIndex)
             {
-                SLANG_UNEXPECTED("handled member flavor");
+                auto projection = projectionPath[--projectionIndex];
+                mutableProjection = extractField(
+                    context,
+                    projection->getMemberType(),
+                    mutableProjection,
+                    projection->getMemberDeclRef());
             }
+
+            assign(context, mutableProjection, right);
+            assign(context, projectedValue, mutableRoot);
+            return;
         }
+        break;
+
+    case LoweredValInfo::Flavor::BoundCallable:
+        SLANG_UNEXPECTED("callable member selection used as an assignment target");
         break;
 
     case LoweredValInfo::Flavor::ExtractedExistential:
@@ -10309,6 +12279,36 @@ top:
             goto top;
         }
         break;
+
+    case LoweredValInfo::Flavor::StabilizedLValue:
+        {
+            auto stabilizedValue = left.getStabilizedLValueInfo();
+            SLANG_RELEASE_ASSERT(
+                stabilizedValue->localValue.flavor == LoweredValInfo::Flavor::Ptr);
+            assign(context, stabilizedValue->localValue, right);
+            stabilizedValue->needsWriteBack = true;
+            return;
+        }
+        break;
+
+    case LoweredValInfo::Flavor::PendingWriteBack:
+        {
+            auto pending = left.getPendingWriteBackInfo();
+            assign(context, pending->value, right);
+            applyAndClearDeferredWriteBackActions(context, pending->actions);
+            return;
+        }
+        break;
+
+    case LoweredValInfo::Flavor::AssignmentResult:
+        {
+            auto assignmentResult = left.getAssignmentResultInfo();
+            assign(context, assignmentResult->lValue, right);
+            applyDeferredWriteBackActions(
+                context,
+                assignmentResult->writeBacksAfterMutation);
+            return;
+        }
 
     case LoweredValInfo::Flavor::ImplicitCastedLValue:
         {
@@ -11217,33 +13217,37 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitStorageDeclCommon(ContainerDecl* decl)
+    /// Lowers the callable accessors that implement a property or subscript declaration.
+    ///
+    /// The containing property or subscript has no standalone IR declaration. Each non-intrinsic
+    /// accessor lowers as a function that reads, writes, or returns the address of the stored
+    /// value.
+    LoweredValInfo lowerStorageDeclAccessors(ContainerDecl* decl)
     {
-        // A subscript operation may encompass one or more
-        // accessors, and these are what should actually
-        // get lowered (they are effectively functions).
-
         for (auto accessor : decl->getMembersOfType<AccessorDecl>())
         {
             if (accessor->hasModifier<IntrinsicOpModifier>())
+            {
+                // `emitCallToDeclRef()` lowers an intrinsic accessor call directly to its IR
+                // operation, so no standalone IR function is needed.
                 continue;
+            }
 
             ensureDecl(context, accessor);
         }
 
-        // The subscript declaration itself won't correspond
-        // to anything in the lowered program, so we don't
-        // bother creating a representation here.
-        //
-        // Note: We may want to have a specific lowered value
-        // that can represent the combination of callables
-        // that make up the subscript operation.
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl) { return visitStorageDeclCommon(decl); }
+    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
+    {
+        return lowerStorageDeclAccessors(decl);
+    }
 
-    LoweredValInfo visitPropertyDecl(PropertyDecl* decl) { return visitStorageDeclCommon(decl); }
+    LoweredValInfo visitPropertyDecl(PropertyDecl* decl)
+    {
+        return lowerStorageDeclAccessors(decl);
+    }
 
     bool isGlobalVarDecl(VarDecl* decl)
     {
@@ -14246,17 +16250,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // The IR value that stands for `this` inside the initializer body: either a
                 // caller-provided return-destination out-parameter (for a non-copyable result
-                // type, see `maybeAddReturnDestinationParam`) or, in the common by-value case, a
+                // type, see `maybeAddReturnDestinationParam()`) or, in the common by-value case, a
                 // fresh local holding the value the initializer constructs and returns.
                 IRInst* thisStorage = nullptr;
                 if (subContext->returnDestination.flavor != LoweredValInfo::Flavor::None)
                 {
                     subContext->thisVal = subContext->returnDestination;
-                    // The return destination is always an l-value pointer:
-                    // maybeAddReturnDestinationParam lowers it as an `Out` parameter, which
-                    // becomes `LoweredValInfo::ptr(...)`. Assert that invariant and read `.val`
-                    // (the `LoweredValInfo` union holds an `IRInst*` in `val` only for
-                    // Ptr/Simple) — that pointer is the object under construction.
+                    // The return destination is always an l-value pointer.
+                    // `maybeAddReturnDestinationParam()` marks it as an `Out` return-destination
+                    // parameter. `lowerFuncDeclInContext()` then creates `paramVal` as a
+                    // `LoweredValInfo::Flavor::Ptr` and stores it in `returnDestination`. Assert
+                    // that invariant and use the pointer as the object under construction.
                     SLANG_ASSERT(
                         subContext->returnDestination.flavor == LoweredValInfo::Flavor::Ptr);
                     thisStorage = subContext->returnDestination.val;

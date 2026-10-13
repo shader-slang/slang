@@ -57,7 +57,8 @@ Walk the algorithm step by step:
    inheritance chain, and any active extensions.
 5. Inject transparent members (see below).
 6. Apply the `LookupMask` filter.
-7. Deduplicate by `DeclRef`.
+7. Preserve distinct lookup paths, even when they reach the same declaration;
+   explain where later caller-specific narrowing compares or collapses them.
 8. Return a `LookupResult` that is empty / single / overloaded.
 
 Cite the controlling function for each step (the name in `slang-lookup.cpp`).
@@ -65,7 +66,7 @@ Cite the controlling function for each step (the name in `slang-lookup.cpp`).
 Include a mermaid flowchart of the pipeline. Suggested shape:
 
 ```
-identifier+startScope -> walkScopeChain -> directMembers -> inheritance -> extensions -> transparentMembers -> maskFilter -> dedupe -> LookupResult
+identifier+startScope -> walkScopeChain -> directMembers -> inheritance -> extensions -> transparentMembers -> maskFilter -> LookupResult
 ```
 
 ### Member lookup
@@ -90,10 +91,34 @@ the injection. Mention `IgnoreTransparentMembers` as the opt-out path.
 ### Breadcrumbs
 
 Explain how breadcrumbs reconstruct the canonical expression. For an
-unqualified `f` that turns out to be a member of `this`, the breadcrumb
-chain records `Member` + `Deref`; the checker uses this to materialize
-`(*this).f` as the rewritten expression. List the
-`Breadcrumb::Kind` (or equivalent) values present at `source_commit`.
+unqualified field `f` inside an instance method, `_lookUpInScopes`
+records a structural `ThisValue` step;
+`ConstructLookupResultExpr` replays it, and `checkThisExpr` determines
+the reconstructed receiver's type and value category before the
+checker forms `this.f`. After a receiverless declaration boundary,
+`_lookUpInScopes` records `ThisType` instead.
+Use a separate transparent-member example, such as a field injected by
+a `cbuffer`, to explain a `Member` + `Deref` chain.
+
+List every `Breadcrumb::Kind` (or equivalent) value present at
+`source_commit`. Make the ownership boundary explicit: lookup records
+only structural navigation and receiver availability. It must not
+query or store the effective receiver type or mutability. When
+`ConstructLookupResultExpr` reconstructs a `ThisValue` step, the
+ordinary `this` checker, `checkThisExpr`, reads the
+`ThisParamInfoAttribute` that
+`checkAndAttachEffectiveThisParamInfo` published during signature
+checking. Treat a constructor separately: it has no effective receiver
+parameter, and `checkThisExpr` supplies its local writable `this`
+value.
+Also explain the declaration-reference omission rule:
+`ConstructLookupResultExpr` may omit a leading `ThisValue` only when
+the remaining chain is empty or contains only `SuperType` steps.
+That omission produces a base-less `VarExpr` declaration reference.
+A following `Member` or `Deref` step instead requires the receiver
+because that path traverses runtime storage, so reconstruction retains
+it and the later declaration-reference check can reject the attempted
+capture.
 
 ## Shadowing rules
 
@@ -134,8 +159,9 @@ The `## Edge cases and failure modes` section must cover:
   `Diagnostics::ambiguousReference` (or its actual identifier at
   `source_commit`) from
   [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
-- Transparent-member chains creating multiple paths to the same decl;
-  how `LookupResult` dedupes.
+- Transparent-member chains creating multiple paths to the same declaration;
+  why `LookupResult` preserves those paths and where a later consumer may
+  compare or collapse them.
 - Forward reference inside a `BlockStmt` (`hiddenFromLookup` is set
   -> diagnostic `useOfUndeclaredIdentifier`).
 - Member lookup on `ErrorType` is silently empty.

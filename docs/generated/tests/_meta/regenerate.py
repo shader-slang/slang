@@ -2783,6 +2783,16 @@ def cmd_mark_fresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def _index_doc_link(source_doc: str) -> str:
+    """Return a URL-style relative link from the generated-test suite index."""
+    return os.path.relpath(source_doc, "docs/generated/tests").replace(os.sep, "/")
+
+
+def _write_index(target: Path, text: str) -> None:
+    """Write the generated-test suite index as UTF-8."""
+    target.write_text(text, encoding="utf-8")
+
+
 def cmd_index(args: argparse.Namespace) -> int:
     """Emit docs/generated/tests/INDEX.md content to stdout (or --write to file)."""
     from collections import Counter
@@ -2896,9 +2906,7 @@ def cmd_index(args: argparse.Namespace) -> int:
                 # source_doc (workspace-relative). Handles both source roots:
                 #   docs/generated/design/<...>  -> ../design/<...>
                 #   docs/language-reference/<...> -> ../../language-reference/<...>
-                doc_link = os.path.relpath(
-                    spec.source_doc, "docs/generated/tests"
-                )
+                doc_link = _index_doc_link(spec.source_doc)
                 anchor = f"[`{spec.source_doc}`]({doc_link})"
             out.append(
                 f"| [`{spec.key}`]({spec.key}/README.md) | {count} | {anchor} |"
@@ -2937,7 +2945,7 @@ def cmd_index(args: argparse.Namespace) -> int:
     text = "\n".join(out)
     if args.write:
         target = REPO_ROOT / "docs/generated/tests" / "INDEX.md"
-        target.write_text(text)
+        _write_index(target, text)
         print(f"wrote: {target}")
     else:
         print(text)
@@ -4454,6 +4462,19 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     def check(what: str, got, want) -> None:
         if got != want:
             failures.append(f"{what}: got {got!r}, want {want!r}")
+
+    # Markdown links always use URL separators, even when the generator runs on
+    # Windows, and an index write must preserve non-ASCII punctuation as UTF-8.
+    check(
+        "index source-doc link uses URL separators",
+        _index_doc_link("docs/generated/design/example.md"),
+        "../design/example.md",
+    )
+    with tempfile.TemporaryDirectory() as td:
+        index = Path(td) / "INDEX.md"
+        text = "Generated tests \N{EM DASH} bundle index"
+        _write_index(index, text)
+        check("index write uses UTF-8", index.read_bytes(), text.encode("utf-8"))
 
     # Punctuation is deleted, not replaced, so each surrounding space
     # still yields a hyphen. This is the rule the old `_gh_slug`

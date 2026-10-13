@@ -28,11 +28,11 @@
       "watched_paths_digest": "415a50cb05f7c62902b743f24a4fc8a5a1e26f0059d645d4973f127e8f110ee4"
     },
     "coverage/check-decl": {
-      "generated_at": "2026-09-12T14:58:31+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "generated_at": "2026-10-13T11:13:48+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
       "source_doc_digest": null,
-      "watched_paths_digest": "bb3d06948eb92c185b03440d72bc47a77e041fa540154d9face90aa0a6ed460c"
+      "watched_paths_digest": "b5acbdf8f3862261338be63d70a9f9174d752ccdc8976868ab4fae8e1b67a3c5"
     },
     "coverage/check-expr": {
       "generated_at": "2026-09-12T14:58:32+00:00",
@@ -119,11 +119,11 @@
       "watched_paths_digest": "ee0de491cefb7403cccd35b8744368a75da1a4b081050512e7d5cd200ac34f05"
     },
     "design/ast-reference/modifiers": {
-      "generated_at": "2026-09-11T14:31:15+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "65aa45f4d0a183fc676545a2ce05237a7d5f6bd345ec82148b6106bbf2ccd3ba",
-      "watched_paths_digest": "68732f60bcf24cb631b4035a021877fdae9c748b1c6f1c2bc1e02dd17a2a2f93"
+      "generated_at": "2026-10-13T11:13:46+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "4cef4e3fe1973338c692e59cad46e955cbd6e1ed6b368b53d0f5624ee31b890a",
+      "watched_paths_digest": "df877042b2de1100a33e2546d2db6339e7bf4607ef283bf82c03b40402b8d41d"
     },
     "design/ast-reference/statements": {
       "generated_at": "2026-09-11T14:31:16+00:00",
@@ -161,11 +161,11 @@
       "watched_paths_digest": "bea88f5e61f4f4d37c0b2ad0dfe1ef28de94f2d7ec1ef1449cae3c3e679effed"
     },
     "design/cross-cutting/diagnostics-catalog": {
-      "generated_at": "2026-09-11T14:06:27+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
-      "source_doc_digest": "d77cb30baa7984b4cb40efb57319b48e09948fd03be20855b6a239edd43490b8",
-      "watched_paths_digest": "8ae65a7d42371c083dbecc0f3b34d3f20235db2d56b987bb5a3a0a261186802b"
+      "generated_at": "2026-10-13T11:13:48+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "272022be2d104532157c4b046f580647b466733a094ed65e23c2fd6abb1f90a9",
+      "watched_paths_digest": "c93c2ee764106bbff1bbf2b0aecb1f27e7abc63c030d78985c0ad62fe16d0123"
     },
     "design/cross-cutting/ir-instructions": {
       "generated_at": "2026-09-11T14:06:28+00:00",
@@ -259,18 +259,18 @@
       "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/name-resolution/lookup": {
-      "generated_at": "2026-09-11T14:31:17+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "2e7c61642aa963c1eab83e3b5f078378672249e689a4505d7f9ae670dde8982a",
-      "watched_paths_digest": "fd7f3e4358dd53ce98e2c638a15ac2260c44e0636c6b24e6e6acf97a02b1aa44"
+      "generated_at": "2026-10-13T11:13:47+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "396010413c1706cb6eda3bc5f25fbcf74d6ab0fbc221314d42fe079dd91b7e3a",
+      "watched_paths_digest": "28b212cc6a79ac6353d7068b997939f1b094eadfca525558e08692f75b363290"
     },
     "design/name-resolution/overload-resolution": {
-      "generated_at": "2026-09-11T14:31:17+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "ad0a750862e3c4522d0aa08b167f46265a6e0cf241fc5bc8bc85eedea0e7b56c",
-      "watched_paths_digest": "a91f3be6da31fc87c70ca6a66c1d67dcbbb2aaf74e3f4a40026000841c682498"
+      "generated_at": "2026-10-13T11:13:47+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "413fcfcb30238531133b8c6137b2cb1566e489882280d16422d44f214d60c54b",
+      "watched_paths_digest": "e83f366957850f4a689e6c59e3bfaa7dba198455385ec0b9dd855f149941f49a"
     },
     "design/name-resolution/scopes": {
       "generated_at": "2026-09-11T14:31:18+00:00",
@@ -301,11 +301,11 @@
       "watched_paths_digest": "038e61bb9edebc9b97b6731d3af12b502c0b2005954b85e6b50888bcf0187062"
     },
     "design/pipeline/03-semantic-check": {
-      "generated_at": "2026-09-11T14:31:18+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "88faf24674e206b87e28f8016f3aee496ca4853d7bc7812ed89d335365a6deaf",
-      "watched_paths_digest": "11a3b2a74f48f90d98486c8f57f25f6c463d92e3001af62701cc8e774eb46911"
+      "generated_at": "2026-10-13T11:13:47+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "660a928c29ab96b45aa9df4eaeaa256da6cc878f097be927c4c142e469b5cf7d",
+      "watched_paths_digest": "e682959c072b88b28caa098c815470771612848ca7d6e31a5c2f18b95d9ed277"
     },
     "design/pipeline/04-ast-to-ir": {
       "generated_at": "2026-09-11T14:31:18+00:00",
@@ -350,11 +350,11 @@
       "watched_paths_digest": "dd09620b5d063076c1114b0c1aa11fd1e30d216a2ba4522874620c4a948833dd"
     },
     "design/syntax-reference/grammar": {
-      "generated_at": "2026-09-11T14:31:19+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
-      "source_doc_digest": "7ebbe68e70b751fa489c4cafe47bb5331bca97b439c755d8563711c03abc577c",
-      "watched_paths_digest": "99f735ed159c3bb33f963d427f90829e59a3e91bd5f749fb08b638b728e54347"
+      "generated_at": "2026-10-13T11:13:47+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "source_doc_digest": "42640f04aebf02b38fa1c4cd11d982321be92a9e5dc65a2b095e74fbda44da49",
+      "watched_paths_digest": "9f95bdb7aae50dd54be8762b6a13f4bbe82b24d2c4138ecc2883667ae89d7808"
     },
     "design/syntax-reference/keywords-and-builtins": {
       "generated_at": "2026-09-11T14:31:19+00:00",

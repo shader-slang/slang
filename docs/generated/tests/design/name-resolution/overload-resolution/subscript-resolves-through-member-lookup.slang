@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+//META: model=gpt-6.1-sol
+//META: generated_at=2026-10-13T10:55:00Z
+//META: source_commit=32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-general-path
-//META: doc_section_digest=436f56a9b4722c5976d165afb6d558aed7529f2fc5194e02488c5753bf733c25
-//META: purpose=__subscript is resolved by member lookup on the indexed value's type, so a[i] dispatches to the type's subscript getter with the implicit this.
+//META: doc_section_digest=eea2bfede346e737fa7d2e2da728c31f2fe2d0f31fe7abb55e6567711bbf3361
+//META: purpose=visitIndexExpr looks __subscript up on the indexed value's type and passes that value to createLookupResultExpr as its explicit base, so a[i] dispatches to the type's getter.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the second member-lookup operator form. Indexing a struct value
-// resolves __subscript on its type and replays the this breadcrumb, so the
-// getter can read the receiver's field; CHECK asserts a result that combines
-// the stored base with the index.
+// `visitIndexExpr` resolves `__subscript` on the indexed value's type and passes that value to
+// `createLookupResultExpr` as the explicit base. The getter can therefore read the receiver's
+// field. The result combines the stored base with the index, confirming that the getter used the
+// indexed `Grid` value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

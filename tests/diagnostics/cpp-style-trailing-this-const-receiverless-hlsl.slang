@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/cpp-style-trailing-this-const-receiverless-hlsl.slang -no-codegen
 
-// Parsing preserves trailing `const` on every `FuncDecl`. Receiver validation then rejects it on a
-// free function and on a static method wrapped in a `GenericDecl` because neither has an instance
-// receiver.
+// The parser records trailing `const` on every `FuncDecl`. Effective-receiver computation during
+// signature checking then rejects it on a free function and on a static method wrapped in a
+// `GenericDecl` because neither has an instance receiver.
 
 void freeFunction() const
 /*CHECK:

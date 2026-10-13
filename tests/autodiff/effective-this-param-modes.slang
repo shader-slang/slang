@@ -2,9 +2,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -no-codegen -dump-ir -Wno-38109
 
 // Resolve both derivative function types for methods whose effective `this` parameter uses
-// BorrowIn or Ref mode. The receiver is not differentiable, so NoDiffThis keeps its value type
-// unchanged while the ordinary parameter is transformed. The established derivative ABI maps a
-// BorrowIn receiver to In and a Ref receiver to BorrowInOut. The primal method itself retains Ref.
+// `BorrowIn` or `Ref` mode. Because the receiver is not differentiable, derivative generation
+// leaves its value type unchanged while transforming the ordinary parameter. The established
+// derivative ABI maps a `BorrowIn` receiver to `In` and a `Ref` receiver to `BorrowInOut`, while
+// preserving `Ref` for the primal method's entry point.
 
 struct Receiver
 {
@@ -35,6 +36,14 @@ struct Receiver
         let evaluate = (float value) => this.scale * value;
         return no_diff(evaluate(x)) + x;
     }
+
+    [constref]
+    [NoDiffThis]
+    [ForwardDifferentiable]
+    float genericEval<T>(float x)
+    {
+        return scale * x;
+    }
 }
 
 void exerciseDerivativeTypes()
@@ -51,6 +60,11 @@ void exerciseDerivativeTypes()
 
     let lambdaResult = receiver.lambdaEval(2.0);
     let lambdaForward = fwd_diff(Receiver::lambdaEval)(receiver, diffPair(2.0, 1.0));
+
+    // The checked specialization type, including its unbound receiver, survives both generic
+    // application and parentheses around the higher-order operand.
+    let genericForward =
+        fwd_diff((Receiver::genericEval<int>))(receiver, diffPair(2.0, 1.0));
 }
 
 // A non-copyable differentiable receiver adjusts its declaration's ordinary by-value default to
@@ -95,6 +109,12 @@ void exerciseAdjustedBorrowIn()
 // CHECK: func {{.*}} : Func(Float, BorrowInParam(
 // CHECK-LABEL: [nameHint("Receiver.refEval")]
 // CHECK: func {{.*}} : Func(Float, RefParam(
+
+// Differentiation specialization preserves the generic method's unbound receiver in the derivative
+// function type.
+// CHECK-LABEL: [nameHint("Receiver.genericEval.fwd_diff")]
+// CHECK-NEXT: let {{.*}} : Func(DiffPair(Float, {{.*}}), Attributed(%Receiver,
+// CHECK-NEXT: DiffPair(Float, {{.*}})) = ForwardDifferentiate(specialize(
 
 // The `no_diff` modifier is part of the effective parameter value type, but the lambda capture
 // pass still identifies the underlying Receiver declaration and stores the receiver in its closure.

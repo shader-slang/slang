@@ -19,8 +19,6 @@ void test()
             return 3.0;
 //diag:     ^^^^^^ lambda return type mismatch
 //diag:     ^^^^^^ returned values must have the same type among all 'return' statements inside a lambda expression: returned 'float' here, but 'int' previously.
-//diag:            ^^^ implicit conversion not recommended
-//diag:            ^^^ implicit conversion from 'float' to 'int' is not recommended
     };
     RayQuery q;
     let lam2 = (int a) => {

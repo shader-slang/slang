@@ -82,8 +82,9 @@ float readGrid(Grid value, int row, int column)
 [Differentiable]
 Grid writeGrid(Grid value, int row, int column, float newValue)
 {
-    value[row, column] = newValue;
-    return value;
+    Grid mutableValue = value;
+    mutableValue[row, column] = newValue;
+    return mutableValue;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer

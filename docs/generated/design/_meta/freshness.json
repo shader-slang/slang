@@ -43,10 +43,10 @@
       "watched_paths_digest": "bf6a564cf3ff2a00c0ba247932fc6b33c25fb97626b60eb1172039b5096ca398"
     },
     "ast-reference/modifiers.md": {
-      "generated_at": "2026-09-11T12:15:20+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "26c05154a110122a39a294dc2a0648428fe004995143e86fc2c091a60bc719c7"
+      "generated_at": "2026-10-13T11:13:45+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "6cb9e9eed01e0d107597afdd187ebf0692d9531cbdddb66512091922c25257dc"
     },
     "ast-reference/statements.md": {
       "generated_at": "2026-09-11T12:16:35+00:00",
@@ -73,10 +73,10 @@
       "watched_paths_digest": "30d60dd4d9a5201bc16e2b11e8d9ec4bd7288d4f807c3352249f9fdeb6f843d7"
     },
     "cross-cutting/diagnostics.md": {
-      "generated_at": "2026-09-11T11:57:39+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "671b9ed682adbf414a55ec67fa68b82abc91c2aea9c886087f23ead3285a7c2d"
+      "generated_at": "2026-10-13T11:13:46+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "2ed1a75f24b0c2b2985c1b6c0789be6b1885d0d01c64b657d94958c278c76d13"
     },
     "cross-cutting/ir-instructions.md": {
       "generated_at": "2026-09-11T11:58:44+00:00",
@@ -175,16 +175,16 @@
       "watched_paths_digest": "72a044750f16ee568ed10e5ff69b61b5ea6375face99fa3b5ef2ad7f032543fd"
     },
     "name-resolution/lookup.md": {
-      "generated_at": "2026-09-11T12:40:09+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "2336e319fa15cdc524950d5da1d4ef153c1c96105f931dc9fee17d22569555fa"
+      "generated_at": "2026-10-13T11:13:45+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "0d8e98346974e8f283834847d1249401a8818aac4df9011be7342c6fca783b32"
     },
     "name-resolution/overload-resolution.md": {
-      "generated_at": "2026-09-11T12:42:01+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "3430e318c84850ecbd8583883611e931f19649c0511c6ba1b36f13c047335116"
+      "generated_at": "2026-10-13T11:13:46+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "7717717ea153cf9e9134a2733f4f8cb0d13b712ffa3ff464f8adff2889a738ad"
     },
     "name-resolution/scopes.md": {
       "generated_at": "2026-09-11T12:37:50+00:00",
@@ -211,10 +211,10 @@
       "watched_paths_digest": "2e66ea46f1511d1d5d8abf21d419092bccefbb93c2bb3964dff4fe6e121dfb2a"
     },
     "pipeline/03-semantic-check.md": {
-      "generated_at": "2026-09-11T12:14:01+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "4d4dfc0a23d4b9278059883fb251ba8d4b24f87bccc211329ce352870e7f9718"
+      "generated_at": "2026-10-13T11:13:46+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "e15b038f29220d7aca4425e1eada7d0d061b9093673dc202cbe11a8b0bf48b6f"
     },
     "pipeline/04-ast-to-ir.md": {
       "generated_at": "2026-09-11T12:20:09+00:00",
@@ -253,10 +253,10 @@
       "watched_paths_digest": "f30d49ef0d87069e0353fa37a8bf5dc081d64322bb28e6a8a343c0f548e06e32"
     },
     "syntax-reference/grammar.md": {
-      "generated_at": "2026-09-11T12:07:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "d62ed3d2d5e78332b69f58ddf07b9770380e9c7a11a3789d113d04ab3161c0de"
+      "generated_at": "2026-10-13T11:13:45+00:00",
+      "model": "gpt-6.1-sol",
+      "source_commit": "32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90",
+      "watched_paths_digest": "89dce55401a010feaf742a3296995314b25cf48966219b2a6545753ab9643770"
     },
     "syntax-reference/keywords-and-builtins.md": {
       "generated_at": "2026-09-11T12:02:22+00:00",

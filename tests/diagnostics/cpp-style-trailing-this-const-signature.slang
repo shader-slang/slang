@@ -1,6 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/cpp-style-trailing-this-const-signature.slang -no-codegen
 
-// Candidate diagnostics print trailing `const` after both ordinary and generic parameter lists.
+// Candidate diagnostics print trailing `const` after the callable parameter list in both ordinary
+// and generic function signatures.
 
 struct Argument
 {};

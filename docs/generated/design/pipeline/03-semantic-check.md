@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 4d4dfc0a23d4b9278059883fb251ba8d4b24f87bccc211329ce352870e7f9718
+model: gpt-6.1-sol
+generated_at: 2026-10-13T11:02:59Z
+source_commit: 32438d70ef57a4f2bb4a98c8a1e3b7fcc9f47d90
+watched_paths_digest: 2f857b734f4d5ac2c801a2f174f543ec145e6814f3f52e0c28ee5fd24e255516
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -410,17 +410,23 @@ interface requirement — is rejected up front with `E30603`.
 `validateDynInterfaceUsage` and
 `validateDynInterfaceUseWithInheritanceDecl`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
-lines 372 and 442) constrain what a `dyn interface` may declare and
+lines 383 and 448) constrain what a `dyn interface` may declare and
 what may conform to one. Both are gated on
-`allowExperimentalDynamicDispatch` (line 364) and are a no-op unless
+`allowExperimentalDynamicDispatch` (line 375) and are a no-op unless
 the module's language version is 2026 or later (`-std 2026`) *and*
 `-enable-experimental-dynamic-dispatch` was **not** passed — so the
 same source compiles differently under the default `-std`.
 
 When the gate is open, the interface may not be generic (`E33072`)
 and may not declare an associated type (`E33073`), a generic method
-(`E33074`), a `[mutating]` method (`E33075`), a `[Differentiable]`
-method (`E33076`), or a non-`dyn` base interface (`E33077`). A
+(`E33074`), a method or accessor whose computed receiver mode requires
+writable storage (`E33075`), a `[Differentiable]` method (`E33076`),
+or a non-`dyn` base interface (`E33077`). The writable-receiver rule is
+based on the effective mode computed during signature checking, so it
+covers an explicit `[mutating]` method, a setter, and an HLSL method
+whose dialect default is writable
+([slang-check-decl.cpp lines
+18141-18175](../../../../source/slang/slang-check-decl.cpp)). A
 conforming type may not acquire the conformance through an `extension`
 (`E33078`) and may not be generic (`E33082`), and its fields may be
 neither unsized (`E33079`), opaque (`E33080`), nor non-copyable

@@ -1,8 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain
 
 // Regression test for https://github.com/shader-slang/slang/issues/7160
-// Assigning to an indexed element of an array-returning property should
-// produce a diagnostic instead of crashing with an internal error.
+// Assigning to an indexed element of an array-returning property requires the property's direct
+// address. A property without a `ref` accessor must be rejected during semantic checking instead
+// of reaching unsupported lowering.
 
 struct Foo
 {
@@ -28,7 +29,9 @@ void computeMain()
 {
     Foo c;
     c.b[0] = 1.0;
-//CHECK:   ^ assignment target is not supported
-//CHECK:   ^ this form of assignment is not currently supported; consider assigning to the whole value instead of an individual element
+/*CHECK:
+      ^ property or subscript does not provide an address
+      ^ cannot take a direct reference to this property because it has no `ref` accessor
+*/
     output[0] = c.b[0];
 }

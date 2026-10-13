@@ -976,13 +976,15 @@ std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, Decl
     {
         if (auto callableDeclRef = isDeclRefTypeOf<CallableDecl>(lookupDeclRef->getLookupSource()))
         {
-            // Consider `apply_bwd`, an interface requirement looked up through a function-as-type.
-            // Its declaration's receiver is the interface `This`, but its callable ABI follows the
-            // function used as the lookup source: a free function has no effective `this`
-            // parameter, while a method has the same one as its primal declaration. Delegate to
-            // that callable's checked information so this query preserves both possibilities. A
-            // receiverless requirement has no attribute and remains receiverless regardless of
-            // the callable used as its lookup source.
+            // Consider `apply_bwd`, an interface requirement already selected through a
+            // function-as-type. Its declaration's receiver is the interface `This`, but its
+            // callable ABI follows the primal callable returned by
+            // `LookupDeclRef::getLookupSource()`: a free function has no effective `this`
+            // parameter, while a method has the same one as its primal declaration.
+            // `findEffectiveThisParamInfo()` derives the selected requirement's ABI from that
+            // callable's checked `ThisParamInfoAttribute`.
+            // This post-selection query does not participate in candidate lookup. A receiverless
+            // requirement has no attribute and remains receiverless regardless of that callable.
             SLANG_RELEASE_ASSERT(
                 callableDeclRef.getDecl()->isChecked(DeclCheckState::SignatureChecked));
             if (attribute)

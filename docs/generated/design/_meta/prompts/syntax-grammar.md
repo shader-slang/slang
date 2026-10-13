@@ -43,6 +43,15 @@ recognizes.
 5. `## Declarations` — productions for `var-decl`, `func-decl`,
    `struct-decl`, `class-decl`, `enum-decl`, `interface-decl`,
    `extension-decl`, `typedef-decl`, generic-parameter syntax.
+   The function production must include the HLSL-only trailing
+   `const` suffix between the parameter list and any `throws`, result,
+   or `where` clause. Explain that the parser preserves this suffix as
+   a dedicated receiver-mode modifier, diagnoses it outside HLSL while
+   retaining read-only recovery semantics for configurable value-type
+   receivers, and consumes it with a targeted diagnostic after
+   constructors, accessors, and subscripts. State that a Slang
+   `ClassDecl` member rejects every receiver-mode specifier and retains
+   its fixed `in` receiver.
 6. `## Statements` — productions for the structured statements
    (`block`, `if`, `for`, `while`, `do-while`, `switch`, `return`,
    `break`, `continue`, `discard`, `defer` if present).

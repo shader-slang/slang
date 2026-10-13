@@ -11,13 +11,18 @@ This appendix documents how that dialect differs from both the Slang language an
 ## Selecting the HLSL Dialect
 
 The `slangc` command selects the HLSL dialect for source files whose names end in `.hlsl` or `.fx`.
-To compile a file as HLSL when it has another filename extension, use the `-lang hlsl` option to explicitly request the HLSL dialect.
-For the complete rules that assign source files to translation units, see [Source Files and Translation Units](08-compiling.md#source-files-and-translation-units).
+To compile a file as HLSL, even if it has another file extension,
+use the `-lang hlsl` option to explicitly request the HLSL dialect.
+For the complete rules that assign source files to translation units,
+see [Source Files and Translation Units](08-compiling.md#source-files-and-translation-units).
 
 ## Member Function Receivers
 
-A non-static HLSL member function has an implicit `this` parameter for the receiver of the member-function call.
-By default, the `this` parameter uses the `inout` parameter-passing mode, so the member function can modify the receiver:
+Non-static methods on HLSL value types and non-static HLSL interface requirements
+have an implicit `this` parameter for the receiver of a call.
+In the HLSL dialect,
+this parameter uses the `inout` parameter-passing mode by default,
+so the member function can modify its receiver:
 
 ```hlsl
 struct Counter
@@ -31,7 +36,17 @@ struct Counter
 };
 ```
 
-Write `const` after the parameter list to make the `this` parameter read-only in the member-function body:
+This mutating default applies to both value-type methods and interface requirements
+whenever the HLSL dialect is selected.
+There is no compatibility option that restores the read-only default used by the Slang dialect.
+
+The HLSL dialect accepts a trailing `const`
+on both value-type methods and interface requirements.
+It appears immediately after the parameter list and before any `where` clause.
+Trailing `const` selects a read-only `this` parameter,
+which prevents the member function from modifying its receiver.
+A copyable receiver uses the `in` parameter-passing mode,
+while a non-copyable receiver uses the borrowing `constref` mode:
 
 ```hlsl
 struct Counter
@@ -45,15 +60,8 @@ struct Counter
 };
 ```
 
-A copyable receiver then uses the `in` parameter-passing mode.
-A non-copyable receiver instead uses a read-only borrow because it cannot be copied into the member function.
-
-The mutating default applies whenever the HLSL dialect is selected; there is no compatibility option that restores a read-only default.
-
-The parameter-passing mode of `this` does not distinguish overloads.
-Declarations with otherwise identical signatures belong to the same redeclaration family even when that mode differs.
-The compiler then compares their effective `this` parameter modes: equivalent spellings are compatible, while different modes produce a receiver-mismatch diagnostic.
-For example, these declarations conflict instead of defining two overloads:
+Receiver mode is not part of overload identity.
+Consequently, `f()` and `f() const` are conflicting redeclarations rather than two overloads:
 
 ```hlsl
 struct Counter
@@ -62,3 +70,10 @@ struct Counter
     int getValue() const; // Error: redeclaration with a different receiver mode.
 };
 ```
+
+Outside the HLSL dialect, trailing `const` is diagnosed as an error.
+For a method whose receiver mode is configurable,
+the compiler still treats the receiver as read-only while recovering from that error.
+Methods declared on a Slang `class` instead retain their fixed `in` receiver mode
+and reject trailing `const` along with the other receiver-mode specifiers.
+See [Receiver mutability](03-convenience-features.md#receiver-mutability).

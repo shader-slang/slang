@@ -10,6 +10,8 @@ void test()
 {
     MyType t;
     t.prop.x += 1.0;
-//CHECK:   ^ argument must be l-value
-//CHECK:   ^ argument passed to parameter '0' must be l-value.
+/*CHECK:
+      ^^^^ property or subscript cannot be written
+      ^^^^ cannot write this property because it has no `set` or `ref` accessor
+*/
 }

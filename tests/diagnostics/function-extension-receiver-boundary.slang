@@ -1,7 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -no-codegen -experimental-feature
 
 // An explicit `this` expression stops at the nearest callable boundary. Free functions, static
-// methods, and extensions of free functions have no instance receiver to supply.
+// methods, and extensions of free functions have no instance receiver to supply, so receiver-mode
+// modifiers are also invalid on those function extensions.
 
 void ordinaryFreeFunction()
 {
@@ -34,6 +35,11 @@ struct BackwardContext
     }
 };
 
+[mutating]
+/*CHECK:
+ ^^^^^^^^ receiver-mode specifier requires an instance receiver
+ ^^^^^^^^ receiver-mode specifier 'mutating' is only allowed on an instance member
+*/
 __func_extension __apply(square)(float value) -> Tuple<float, BackwardContext>
 {
     let invalidReceiver = this;

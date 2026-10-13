@@ -50,10 +50,15 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
-/// Returns whether `decl` ends the lexical scope of a surrounding receiver value. Lookup may
-/// still carry the enclosing `This` type across such a boundary. For example, a static method may
-/// refer to `This`, but not `this`. A generic wrapper follows its inner declaration once that
-/// declaration exists; while parsing the generic parameters, it has no receiver.
+/// Returns whether `decl` ends the lexical scope of a surrounding receiver value.
+///
+/// `_lookUpInScopes()` may still carry the enclosing `This` type across such a boundary with a
+/// `ThisType` breadcrumb. For example, a static method may refer to `This`, but not `this`. The
+/// classifier follows a generic wrapper's inner declaration once that declaration exists; while
+/// parsing the generic parameters, the wrapper has no receiver. For an unchecked extension target,
+/// this classifier conservatively returns `false` rather than starting semantic checking from
+/// lookup. When `_lookUpInScopes()` records a `ThisValue` breadcrumb, `checkThisExpr()` later
+/// determines the reconstructed receiver's exact type and mutability.
 bool isReceiverlessDeclarationBoundary(Decl* decl);
 
 bool isGlobalDecl(Decl* decl);
@@ -388,6 +393,16 @@ static_assert(
 
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
 
+/// Rebuilds the callable-transparent wrappers from `wrappedExpr` around `replacement`.
+///
+/// The rebuilt wrappers preserve the programmer-written wrapper structure while giving the
+/// selected candidate independent wrapper nodes and recomputing each wrapper's result type and
+/// abstract-storage access.
+Expr* rebuildCallableTransparentWrappers(
+    ASTBuilder* astBuilder,
+    Expr* wrappedExpr,
+    Expr* replacement);
+
 struct OverloadCandidate
 {
     enum class Flavor
@@ -426,8 +441,12 @@ struct OverloadCandidate
     // Reference to the declaration being applied
     LookupResultItem item;
 
-    // The expression when flavor is Expr.
-    Expr* exprVal = nullptr;
+    // The checked expression path from which candidate construction derived this candidate, when
+    // one exists. Candidate completion consumes it according to the candidate flavor: an `Expr`
+    // uses the path directly, a `Func` replaces its direct declaration-reference leaf while
+    // preserving transparent wrappers, and a `Generic` uses it as the base of the completed full or
+    // partial generic application.
+    Expr* retainedExpr = nullptr;
 
     // Type of function being applied (for cases where `item` is not used)
     FuncType* funcType = nullptr;
@@ -449,6 +468,13 @@ struct OverloadCandidate
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
+
+    // Completing a generic candidate retains its candidate-specific checked argument expressions
+    // until that candidate is selected. The parallel states distinguish type arguments from value
+    // arguments and carry a deferred constant-folding failure without duplicating `subst`'s
+    // semantic values.
+    List<Expr*> checkedGenericArgs;
+    List<GenericArgumentCheckState> genericArgCheckStates;
 
     // For a generic candidate, the number of leading ordinary generic arguments
     // that were supplied explicitly (as opposed to filled from a parameter's
@@ -474,17 +500,24 @@ struct OverloadCandidate
     Type* argMismatchActualType = nullptr;
 };
 
-/// Controls whether candidate completion publishes an evaluated callable path or a declaration
-/// that still needs a consuming operation to select it.
-///
-/// An explicit generic application selects a specialization, not an evaluated call, even when only
-/// one declaration is viable. An ambiguous application can retain several such declarations for a
-/// later call to resolve. Retained completion does not mark a candidate for receiver validation,
-/// and ambiguous retained candidate paths remain unvisited until selection.
-enum class OverloadCandidateCompletionMode
+/// Identifies whether candidate completion produces an invocation or retains a generic application
+/// for a later consuming operation.
+enum class OverloadCandidateUse
 {
-    Selected,
-    RetainedForFurtherResolution,
+    /// The candidate supplies the callee for an invocation now.
+    Invocation,
+    /// The candidate remains a declaration or specialization for a later consuming operation.
+    GenericApplication,
+};
+
+/// Identifies how finalization consumes a selected expression.
+enum class SelectedExpressionUse
+{
+    Value,
+    /// The selected callable is retained as a function value.
+    CallableValue,
+    /// The selected callable is invoked immediately.
+    CallableInvocation,
 };
 
 struct ResolvedOperatorOverload
@@ -515,6 +548,23 @@ enum class CoercionSite
     Return,
     Initializer,
     ExplicitCoercion
+};
+
+/// Recomputes the value category and storage flow of a checked super-type cast.
+///
+/// Storage-preserving lookup casts and type-equality casts keep the operand path unchanged. A cast
+/// to a base struct projects a use into the operand. Every other super-type cast reads a value from
+/// the operand. Creation and semantic rechecking both use `updateCastToSuperTypeStorageInfo()` so
+/// that an l-value cast and its abstract-storage path always follow the same classification.
+void updateCastToSuperTypeStorageInfo(ASTBuilder* astBuilder, CastToSuperTypeExpr* expr);
+
+/// Identifies why an implicit cast is supported or rejected for temporary-and-writeback argument
+/// lowering.
+enum class WritableImplicitCastKind
+{
+    ReversibleIntrinsic,
+    UnsupportedTypePair,
+    UnsupportedConversion,
 };
 
 struct FacetImpl;
@@ -973,6 +1023,20 @@ struct ConformanceCheckingContext : public RefObject
     Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
 };
 
+/// Represents the provisional closure-field state for one lambda check.
+///
+/// `_getOrCreateLambdaCaptureReference()` creates a provisional field when it encounters a
+/// reference to an outer declaration, before overload and member selection determine whether the
+/// consuming expression remains. `SelectedExpressionFinalizer` attaches the field only when
+/// compilation will evaluate a reference to it in the selected expression tree or selected
+/// declaration reference. These inverse maps give every captured declaration one provisional field
+/// and let finalization distinguish those fields from ordinary members.
+struct LambdaCaptureContext
+{
+    Dictionary<Decl*, VarDeclBase*> capturedDeclToField;
+    Dictionary<VarDeclBase*, Decl*> fieldToCapturedDecl;
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -1061,6 +1125,16 @@ struct SharedSemanticsContext : public RefObject
     bool m_hasImportedGLSLModule = false;
 
 public:
+    /// Whether the translation unit being checked uses the HLSL source language.
+    ///
+    /// A checking context that is not associated with a translation unit is not HLSL source.
+    bool isHLSLSourceLanguage()
+    {
+        if (!m_translationUnitRequest)
+            return false;
+        return m_translationUnitRequest->sourceLanguage == SourceLanguage::HLSL;
+    }
+
     /// Whether the translation unit being checked uses the GLSL source language.
     ///
     /// A null translation-unit request denotes a module/reflection checking context that has no
@@ -1458,16 +1532,12 @@ private:
     UInt m_nextInheritanceInfoCacheGeneration = 1;
 };
 
-/// Local/scoped state of the semantic-checking system
+/// Local/scoped state of the semantic-checking system.
 ///
-/// This type is kept distinct from `SharedSemanticsContext` so that we
-/// can avoid unncessary mutable state being propagated through the
-/// checking process.
-///
-/// Semantic-checking code should make a new local `SemanticsContext`
-/// in cases where it want to check a sub-entity (expression, statement,
-/// declaration, etc.) in a modified or extended context.
-///
+/// Keeping this type distinct from `SharedSemanticsContext` avoids propagating unnecessary mutable
+/// state through the checking process. Semantic-checking code creates a
+/// local `SemanticsContext` when it needs to check an expression, statement, declaration, or other
+/// sub-entity in a modified or extended context.
 struct SemanticsContext
 {
 public:
@@ -1502,6 +1572,10 @@ public:
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }
     SourceManager* getSourceManager() { return getLinkage()->getSourceManager(); }
 
+    LambdaExpr* getParentLambdaExpr() { return m_parentLambdaExpr; }
+    LambdaDecl* getParentLambdaDecl() { return m_parentLambdaDecl; }
+    LambdaCaptureContext* getLambdaCaptureContext() { return m_lambdaCaptureContext; }
+
     SemanticsContext withSink(DiagnosticSink* sink)
     {
         SemanticsContext result(*this);
@@ -1531,38 +1605,43 @@ public:
         return result;
     }
 
+    /// Returns a context for checking one lambda and recording its provisional capture fields.
+    ///
+    /// `expr` and `decl` identify the lambda syntax and synthesized closure declaration.
+    /// `captureContext` belongs to this invocation of `visitLambdaExpr`; nested lambdas receive
+    /// distinct contexts.
     SemanticsContext withParentLambdaExpr(
         LambdaExpr* expr,
         LambdaDecl* decl,
-        Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedLambdaDecl)
+        LambdaCaptureContext* captureContext)
     {
         SemanticsContext result(*this);
         result.m_parentLambdaExpr = expr;
-        result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
         result.m_parentLambdaDecl = decl;
+        result.m_lambdaCaptureContext = captureContext;
 
         // A lambda body is evaluated separately from the expression that contains the lambda
-        // literal, so an unresolved member lookup outside the lambda cannot defer finalization
-        // inside the body.
-        result.m_isMemberBaseFinalizationDeferred = false;
+        // literal. Whether an enclosing member lookup evaluates its written base therefore has no
+        // bearing on the body.
+        result.m_isCheckingPotentiallyUnevaluatedTerm = false;
         return result;
     }
 
-    /// Returns a context that delays selected-path finalization while checking the base of one
-    /// unresolved member lookup.
+    /// Returns a context for checking a term that might not be evaluated.
     ///
-    /// The outer lookup determines whether that base remains on the evaluated expression path or
-    /// is discarded by a static-member selection.
-    SemanticsContext withDeferredMemberBaseFinalization()
+    /// `checkBaseForMemberExpr()` and `checkGenericAppWithCheckedArgs()` can check a written base
+    /// before the selected declaration determines whether it is evaluated. This context delays
+    /// capture attachment and receiver validation until that choice has been made.
+    SemanticsContext withPotentiallyUnevaluatedTerm()
     {
         SemanticsContext result(*this);
-        result.m_isMemberBaseFinalizationDeferred = true;
+        result.m_isCheckingPotentiallyUnevaluatedTerm = true;
         return result;
     }
 
-    bool isMemberBaseFinalizationDeferred() const
+    bool isCheckingPotentiallyUnevaluatedTerm() const
     {
-        return m_isMemberBaseFinalizationDeferred;
+        return m_isCheckingPotentiallyUnevaluatedTerm;
     }
 
     UInt getDefaultCtorRecursionDepth() const { return m_defaultCtorRecursionDepth; }
@@ -1813,16 +1892,14 @@ protected:
 
     OrderedHashSet<Val*>* m_capturedPacks = nullptr;
 
-    // If we are checking inside a lambda expression, we need
-    // to track the referenced variables that should be captured
-    // by the lambda.
+    // Lambda checking prepares stable closure fields for referenced locals and `this`. The fields
+    // remain provisional while lookup or overload resolution retains multiple expressions;
+    // finalization attaches only the fields referenced by the expression that will be evaluated.
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
-    Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+    LambdaCaptureContext* m_lambdaCaptureContext = nullptr;
 
-    // This flag is true only in the recursive context that checks the base of the current
-    // unresolved member lookup.
-    bool m_isMemberBaseFinalizationDeferred = false;
+    bool m_isCheckingPotentiallyUnevaluatedTerm = false;
     AssumedNonEmptyPackInfo* m_assumedNonEmptyPack = nullptr;
 };
 
@@ -2253,14 +2330,39 @@ public:
     TypeExp CheckUsableType(TypeExp typeExp, Decl* decl);
 
     Expr* CheckTerm(Expr* term);
+    /// Checks a term before semantic checking has determined whether evaluating the selected
+    /// declaration requires evaluating the written term.
+    Expr* checkPotentiallyUnevaluatedTerm(Expr* term);
 
     Expr* _CheckTerm(Expr* term);
 
-    /// Rewrites captures and validates pending receiver checks on one selected, evaluated path.
-    Expr* maybeFinalizeSelectedExpressionPath(Expr* exprIn);
+    /// Finalizes one semantically selected expression path.
+    ///
+    /// Exactly one call to `finalizeSelectedExpression()` attaches selected lambda captures,
+    /// validates a selected callable's receiver, and validates the abstract-storage uses implied by
+    /// evaluating the selected path. Invoking it before selection is final can attach captures or
+    /// validate a path that is later discarded; invoking it twice can diagnose the same receiver
+    /// twice.
+    Expr* finalizeSelectedExpression(
+        Expr* expr,
+        SelectedExpressionUse use,
+        SourceLoc callableLocation);
 
-    /// Checks `this` without rewriting it as a lambda capture.
-    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
+    /// Finalizes the explicit value arguments of one selected generic application.
+    ///
+    /// Unlike `finalizeSelectedExpression()`, this operation is valid while the generic
+    /// application's result is being checked as a potentially unevaluated callable: selecting the
+    /// generic itself makes its compile-time value arguments semantically consumed.
+    void finalizeSelectedGenericArguments(GenericAppExpr* genericAppExpr);
+
+    /// Returns how a conversion or parameter consumes a value of `type`.
+    ///
+    /// Finalization treats a conversion or parameter with a function-typed target as callable
+    /// consumption; every other target consumes an ordinary value.
+    SelectedExpressionUse getSelectedExpressionUseForType(Type* type);
+
+    /// Checks `this` and creates its lambda capture reference if needed.
+    Expr* checkThisExpr(ThisExpr* expr);
 
     Expr* CreateErrorExpr(Expr* expr);
 
@@ -2268,6 +2370,26 @@ public:
 
     // Capture the "base" expression in case this is a member reference
     Expr* GetBaseExpr(Expr* expr);
+
+    /// Returns the callable declaration directly named by `expr`, ignoring result-preserving
+    /// wrappers.
+    ///
+    /// Parentheses, a generic application, and an expression-local binding chain preserve one
+    /// selected result. `getDirectCallableDeclRefExpr()` follows only that result path; it does not
+    /// search evaluated operands for an unrelated callable reference.
+    DeclRefExpr* getDirectCallableDeclRefExpr(Expr* expr);
+
+    /// Replaces the selected callable inside result-preserving wrappers.
+    ///
+    /// The replacement must be the checked selection for the same written callable. Parentheses
+    /// and retained local bindings preserve that result directly. When rebuilding a checked generic
+    /// application, `replaceSelectedCallableThroughTransparentWrappers()` keeps the
+    /// programmer-written generic arguments for diagnostics; the replacement already carries the
+    /// selected specialization and its resulting type. The same function recomposes each wrapper's
+    /// type and abstract-storage path from the replacement outward.
+    void replaceSelectedCallableThroughTransparentWrappers(
+        Expr*& expr,
+        Expr* replacement);
 
     /// Validate a declaration to ensure that it doesn't introduce a circularly-defined constant
     ///
@@ -2487,8 +2609,35 @@ public:
     ///
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
+    /// Coerces `fromExpr`, finalizes its selected path, and validates its storage use.
+    ///
+    /// `coerceAndFinalizeForStorageUse()` finalizes the selected path exactly once and then
+    /// validates the conversion's recorded storage access for `enclosingUse`. Code that is still
+    /// assembling a larger expression must use `coerceExpressionWithoutFinalization` instead.
+    Expr* coerceAndFinalizeForStorageUse(
+        CoercionSite site,
+        Type* toType,
+        Expr* fromExpr,
+        DiagnosticSink* sink,
+        AbstractStorageUse enclosingUse);
+
+    /// Coerces and finalizes a semantically checked initializer after its target type is known.
+    Expr* coerceInitializerExpression(
+        Type* targetType,
+        Expr* checkedInitializer,
+        DiagnosticSink* sink);
+
+    /// Materializes a coercion without finalizing or validating its selected expression path.
+    ///
+    /// `_coerce()` records the abstract-storage path on each conversion expression that
+    /// `coerceExpressionWithoutFinalization()` produces. That function deliberately calls neither
+    /// `finalizeSelectedExpression` nor `checkAbstractStorageUse`; `coerceAndFinalizeForStorageUse`
+    /// or another routine that completes the enclosing expression must call both exactly once.
+    Expr* coerceExpressionWithoutFinalization(
+        CoercionSite site,
+        Type* toType,
+        Expr* fromExpr,
+        DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -2498,6 +2647,13 @@ public:
     IntVal* checkLinkTimeConstantIntVal(Expr* expr);
 
     ConstantIntVal* checkConstantIntVal(Expr* expr);
+
+    /// Requires an already checked and finalized expression to be a literal compile-time integer.
+    ///
+    /// `checkConstantIntValFromFinalizedExpr()` only folds and diagnoses. It does not perform
+    /// semantic checking, selected-expression finalization, coercion, or abstract-storage
+    /// validation.
+    ConstantIntVal* checkConstantIntValFromFinalizedExpr(Expr* expr);
 
     ConstantIntVal* checkConstantEnumVal(Expr* expr);
 
@@ -2998,8 +3154,9 @@ public:
     ///
     /// `Found` guarantees that `outType` is populated. `Unavailable` means the endpoint remains a
     /// valid symbolic projection, and `Failed` means its concrete conformance could not be
-    /// satisfied. This operation never returns `Recursive`: recursive projection resolution is
-    /// represented as an unchanged endpoint and therefore maps to `Unavailable` here.
+    /// satisfied. `ensureConcreteConformanceEndpoint()` never returns `Recursive`: recursive
+    /// projection resolution is represented as an unchanged endpoint and therefore maps to
+    /// `Unavailable` here.
     RequirementLookupStatus ensureConcreteConformanceEndpoint(Type* type, Type*& outType);
 
     /// Resolves ordinary aliases and then forcefully resolves one remaining concrete requirement
@@ -3103,9 +3260,15 @@ public:
         GenericDecl* right,
         DeclRef<Decl>* outSpecializedRightInner);
 
-    // Check if two functions have the same signature for the purposes
-    // of overload resolution.
-    bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
+    /// Returns whether two functions have the same explicit parameter signature for overload
+    /// identity.
+    ///
+    /// This comparison excludes the return type and effective receiver. A call cannot select an
+    /// overload from either property, so `checkFuncRedeclaration` validates them after the
+    /// parameter signatures match.
+    bool doFunctionSignaturesMatch(
+        DeclRef<FuncDecl> firstDeclRef,
+        DeclRef<FuncDecl> secondDeclRef);
 
     Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
     Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
@@ -3191,6 +3354,18 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Folds an already checked and finalized integer expression.
+    ///
+    /// Semantic checking, contextual coercion, selected-expression finalization, and
+    /// abstract-storage validation must already be complete.
+    /// `foldIntegerConstantExpressionFromFinalizedExpr()` only folds the checked expression and
+    /// diagnoses a non-constant expression through `sink`.
+    IntVal* foldIntegerConstantExpressionFromFinalizedExpr(
+        Expr* expr,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo = nullptr);
+
     IntVal* tryFoldIndexExpr(
         SubstExpr<IndexExpr> expr,
         ConstantFoldingKind kind,
@@ -3202,6 +3377,9 @@ public:
         SpecificType,
         AnyInteger
     };
+
+    /// Coerces an unfinalized checked term to the requested integer type, finalizes and validates
+    /// that selected value once, and then folds it as an integer constant expression.
     IntVal* CheckIntegerConstantExpression(
         Expr* inExpr,
         IntegerConstantExpressionCoercionType coercionType,
@@ -3215,6 +3393,18 @@ public:
         DiagnosticSink* sink);
     IntVal* CheckIntegerConstantExpression(
         Expr* inExpr,
+        IntegerConstantExpressionCoercionType coercionType,
+        Type* expectedType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Checks an integer constant expression and replaces `ioExpr` with its finalized coercion.
+    ///
+    /// Callers that retain the expression in the AST use this overload. Callers that need only the
+    /// folded value use the ordinary overloads above.
+    IntVal* checkAndFinalizeIntegerConstantExpression(
+        Expr*& ioExpr,
         IntegerConstantExpressionCoercionType coercionType,
         Type* expectedType,
         ConstantFoldingKind kind,
@@ -3255,21 +3445,11 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
-    /// Compute the effective `this` parameter information for `decl`, if it has one.
-    ///
-    /// This operation is only used while advancing a declaration to
-    /// `DeclCheckState::SignatureChecked`. Other semantic-checking code should use the queries
-    /// below so that it reads the information attached to the declaration. A `this` expression in
-    /// the declaration's own signature is the exception: it needs this computation before the
-    /// transition can finish, but leaves diagnostics to the final call that publishes the result.
-    std::optional<ParamInfo> checkEffectiveThisParamInfo(
-        Decl* decl,
-        bool shouldDiagnoseModeSpecifiers);
-
-    /// Compute and attach the effective `this` parameter information owned by `decl`.
+    /// Computes, diagnoses, and attaches the effective `this` parameter information owned by
+    /// `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);
 
-    /// Return the effective `this` parameter information for `decl`, if it has one.
+    /// Returns the effective `this` parameter information for `decl`, if it has one.
     ///
     /// These wrappers first ensure that the declaration has completed signature checking. The
     /// underlying passive queries assert that precondition themselves.
@@ -3655,28 +3835,36 @@ public:
     ///
     SubtypeWitness* tryGetInterfaceConformanceWitness(Type* type, Type* interfaceType);
 
+    /// Creates an ordinary subtype conversion and classifies how it consumes operand storage.
+    ///
+    /// Type equality and a base-struct projection preserve an l-value. A value-materializing
+    /// conversion, including a concrete-to-interface conversion, reads the operand value instead.
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    /// Expand a compressed interface-to-interface subtype witness into a
-    /// transitive chain rooted at `subType`.
+    /// Reconstructs a subtype step recorded by lookup without changing the selected storage.
     ///
-    /// The facet merger (see `_specializeInterfaceInheritanceWitness`) may
-    /// produce a `DeclaredSubtypeWitness(sub, sup, declRef)` where
-    /// `declRef.parent` is an interface *different* from `sub` — i.e. the
-    /// witness is conceptually a composition of (sub : declRef.parent) and
-    /// (declRef.parent : sup) but stored as a single node.  That shape is
-    /// fine for facet-based lookup but malformed for IR lowering, because
-    /// `declRef`'s inheritance key only resolves against the witness table
-    /// of its declaring interface.
+    /// A lookup breadcrumb changes only the static type through which a member was found. The
+    /// reconstructed cast must therefore preserve the exact operand l-value and abstract-storage
+    /// path rather than applying the value-conversion rules used by `createCastToSuperTypeExpr`.
+    Expr* createStoragePreservingCastToSuperTypeExpr(
+        Type* toType,
+        Expr* fromExpr,
+        Val* witness);
+
+    /// Expands a compressed interface upcast witness into a chain rooted at `subType`.
     ///
-    /// This helper walks the witness tree and splits any such compressed
-    /// step back into a `TransitiveSubtypeWitness`, so downstream lowering
-    /// can mechanically chain `lookupWitnessMethod` calls without doing
-    /// any inheritance-graph discovery itself.
+    /// Consider `interface I2 : I1 {}` and `interface I1 : I0 {}`. Facet merging can represent
+    /// the `I2`-to-`I0` relationship with a declared witness whose inheritance declaration belongs
+    /// to `I1`. That compact representation is sufficient for lookup, but IR lowering must first
+    /// enter the `I1` witness table before it can use an inheritance key declared there.
+    ///
+    /// This routine splits each compressed step into explicit transitive witnesses, allowing IR
+    /// lowering to follow the chain with ordinary `lookupWitnessMethod` instructions. Semantic
+    /// inheritance checking has already rejected source-level cycles, so malformed witness graphs
+    /// are internal invariant violations rather than failed user conversions.
     SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
         Type* subType,
-        SubtypeWitness* witness,
-        int depth = 0);
+        SubtypeWitness* witness);
 
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
@@ -3775,6 +3963,8 @@ public:
         {
             Expr* argExpr = nullptr;
             Type* argType = nullptr;
+            Index firstSourceArgIndex = -1;
+            Index sourceArgCount = 0;
         };
         bool matchArgumentsToParams(
             SemanticsVisitor* semantics,
@@ -3841,14 +4031,11 @@ public:
         OverloadResolveContext& context,
         OverloadCandidate& candidate);
 
-    /// Check if the given `expr` refers to an `in` function
-    /// parameter, or part of one (through field reference, etc.).
+    /// Returns the by-value `in` parameter whose local storage contains `expr`, if any.
     ///
-    /// If the expression refers into a parameter, returns
-    /// the declaration of the parameter. Otherwise returns
-    /// null.
-    ///
-    ParamDecl* isReferenceIntoFunctionInputParameter(Expr* expr);
+    /// Parentheses and aggregate projections remain within the parameter's local copy. Explicit
+    /// dereference stops the traversal because the resulting storage belongs to the pointee.
+    ParamDecl* findReferencedFunctionInputParameter(Expr* expr);
 
     // Create a witness that attests to the fact that `type`
     // is equal to itself.
@@ -3875,37 +4062,33 @@ public:
 
     /// Completes a previously checked candidate and produces its expression.
     ///
-    /// Selected completion marks and finalizes the evaluated callable path. Retained completion
-    /// produces a declaration or specialization without publishing a receiver check; a later
-    /// consuming operation selects the evaluated path. Candidate failures become diagnostics
-    /// during this non-speculative pass. A call with an invalid callee is returned as an error, so
-    /// consumers can assume that every non-error call has a `FuncType`-typed callee.
+    /// Candidate completion restores the actual checked function type for a selected higher-order
+    /// callable use. For a generic application, it leaves the declaration or specialization for a
+    /// later call or function conversion to select. Finalization of the consuming expression then
+    /// performs capture attachment and receiver validation. Candidate failures become diagnostics
+    /// during this non-speculative pass. A call with an invalid callee is returned as an error.
+    /// Every non-error call result therefore has a `FuncType`-typed callee.
     Expr* CompleteOverloadCandidate(
         OverloadResolveContext& context,
         OverloadCandidate& candidate,
-        OverloadCandidateCompletionMode completionMode = OverloadCandidateCompletionMode::Selected);
+        OverloadCandidateUse candidateUse);
 
     /// Checks the selected callable's receiver against its effective parameter mode.
     ///
-    /// Returns `false` after diagnosing a receiver that cannot satisfy a writable mode. Warnings
-    /// about mutating a copy of an input parameter do not make the selected call invalid.
-    bool checkCallableReceiverAfterSelection(
+    /// Returns `false` when the selected receiver lacks required writable storage.
+    /// `SelectedExpressionFinalizer::validateCallable()` rejects the selected callable, while
+    /// `_checkAbstractStorageAccessor()` rejects the selected storage-access path. A by-value
+    /// input-parameter diagnostic returns `true` so recovery can retain the selected expression.
+    bool validateCallableReceiver(
         Expr* receiverExpr,
         DeclRef<CallableDecl> callableDeclRef,
         SourceLoc location);
-
-    /// Marks a reconstructed selected callable for one receiver check.
-    ///
-    /// The callable's `MemberExpr` owns the idempotent state. Selected-path finalization consumes a
-    /// pending check after capture rewriting, while a static-member selection discards the marked
-    /// base without visiting it.
-    void markSelectedCallableReceiverCheck(Expr* callableExpr, SourceLoc location);
 
     // Implement a comparison operation between overload candidates,
     // so that the better candidate compares as less-than the other
     int CompareOverloadCandidates(OverloadCandidate* left, OverloadCandidate* right);
 
-    /// Applies the pre-202c generic-parameter-count tie-breaker after all ordinary ranking rules.
+    /// Applies the pre-2026 generic-parameter-count tie-breaker after all ordinary ranking rules.
     /// On success, copies the unique selected candidate into `context.bestCandidateStorage`, points
     /// `context.bestCandidate` at that storage, clears `context.bestCandidates`, and returns true.
     /// When `warningSink` is non-null, also emits the deprecation warning at `warningLocation`.
@@ -3943,19 +4126,24 @@ public:
 
     /// Adds candidates for invoking a checked higher-order expression.
     ///
-    /// Each expression retains its actual function type. Candidate construction normalizes only a
-    /// temporary view of receiver-derived parameters so receiver mode cannot affect selection.
+    /// `_checkHigherOrderInvokeExpr()` and `fillHigherOrderInvokeExpr()` store each expression's
+    /// actual function type and receiver-derived parameter count.
+    /// `AddHigherOrderOverloadCandidates()` calls
+    /// `getHigherOrderOverloadComparisonType()` to derive a comparison-only function type in which
+    /// the leading receiver-derived parameters use `in`, so receiver mode cannot affect selection.
     void AddHigherOrderOverloadCandidates(
-        Expr* funcExpr,
+        HigherOrderInvokeExpr* funcExpr,
         OverloadResolveContext& context,
         ConversionCost baseCost);
 
-    /// Returns a temporary overload-resolution view of `funcType` with its receiver-derived
-    /// parameter prefix normalized to `in` mode.
+    /// Returns an overload-comparison type derived from `funcType` with its leading
+    /// receiver-derived parameters changed to `in`.
     ///
-    /// `HigherOrderInvokeExpr::receiverParameterPrefixCount` identifies exactly which leading
-    /// parameters to normalize. The expression itself retains its actual function type.
-    FuncType* getReceiverModeNeutralHigherOrderFunctionType(
+    /// `HigherOrderInvokeExpr::receiverDerivedParameterCount` identifies the leading parameters
+    /// that the comparison changes to `in`. `_checkHigherOrderInvokeExpr()` and
+    /// `fillHigherOrderInvokeExpr()` preserve the actual function type on the expression;
+    /// `AddHigherOrderOverloadCandidates()` derives only this comparison view.
+    FuncType* getHigherOrderOverloadComparisonType(
         HigherOrderInvokeExpr* expr,
         FuncType* funcType);
 
@@ -3963,12 +4151,8 @@ public:
         LookupResultItem item,
         DeclRef<CallableDecl> funcDeclRef,
         OverloadResolveContext& context,
-        ConversionCost baseCost);
-
-    void AddFuncOverloadCandidate(
-        FuncType* /*funcType*/,
-        OverloadResolveContext& /*context*/,
-        ConversionCost baseCost);
+        ConversionCost baseCost,
+        Expr* retainedCallableExpr = nullptr);
 
     void AddFuncExprOverloadCandidate(
         FuncType* funcType,
@@ -4137,7 +4321,8 @@ public:
     void AddDeclRefOverloadCandidates(
         LookupResultItem item,
         OverloadResolveContext& context,
-        ConversionCost baseCost);
+        ConversionCost baseCost,
+        Expr* retainedCallableExpr = nullptr);
 
     void AddOverloadCandidates(LookupResult const& result, OverloadResolveContext& context);
 
@@ -4147,7 +4332,10 @@ public:
 
     Expr* ResolveInvoke(InvokeExpr* expr);
 
-    void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
+    void AddGenericOverloadCandidate(
+        LookupResultItem baseItem,
+        OverloadResolveContext& context,
+        Expr* retainedExpr = nullptr);
 
     void AddGenericOverloadCandidates(Expr* baseExpr, OverloadResolveContext& context);
 
@@ -4171,13 +4359,46 @@ public:
     void addOverloadCandidatesForCallToGeneric(
         LookupResultItem genericItem,
         OverloadResolveContext& context,
-        ArrayView<Val*> providedOrdinaryArgs);
+        ArrayView<Val*> providedOrdinaryArgs,
+        Expr* retainedCallableExpr = nullptr);
 
     /// Check a generic application where the operands have already been checked.
     Expr* checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);
 
     Expr* CheckExpr(Expr* expr);
 
+    /// Calls `CheckTerm` and resolves overloads without finalizing the selected expression.
+    ///
+    /// Code that assembles an enclosing expression may use the checked result, but the
+    /// enclosing-expression checker must call `finalizeSelectedExpression` exactly once, usually
+    /// through `checkExpressionWithoutStorageUse` or `coerceAndFinalizeForStorageUse`.
+    /// `checkAndResolveExpressionWithoutFinalization()` performs neither selected-expression
+    /// finalization nor abstract-storage validation.
+    Expr* checkAndResolveExpressionWithoutFinalization(Expr* expr);
+
+    /// Checks, disambiguates, and finalizes an expression without consuming its resulting storage.
+    ///
+    /// A function-typed result is finalized as a selected callable, including receiver validation.
+    /// A caller of `checkExpressionWithoutStorageUse()` must pass the result directly to
+    /// `checkAbstractStorageUse()`. If the expression still needs coercion, start with `CheckTerm`
+    /// because `coerceAndFinalizeForStorageUse` must be the only operation that calls
+    /// `finalizeSelectedExpression` for that path.
+    Expr* checkExpressionWithoutStorageUse(Expr* expr);
+
+    /// Checks and finalizes an expression whose result is discarded after evaluation.
+    Expr* checkExpressionForDiscard(Expr* expr);
+
+    /// Validates how a finalized expression result is consumed as abstract storage.
+    ///
+    /// `CheckTerm` and its expression visitors record an abstract-storage access path on the
+    /// checked expression. `checkAbstractStorageUse` interprets that path to select the property or
+    /// subscript accessors required for `use`. A failed access is diagnosed and replaced with an
+    /// error expression. `checkAbstractStorageUse()` does not revisit selected-expression
+    /// finalization.
+    Expr* checkAbstractStorageUse(Expr* expr, AbstractStorageUse use);
+
+    /// Classifies the one implicit-cast form that can be represented as out/inout writeback.
+    WritableImplicitCastKind classifyImplicitCastForWritableArgument(ImplicitCastExpr* castExpr);
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
     void _checkAliasedOutArguments(
@@ -4237,6 +4458,11 @@ public:
         Member,
         Subscript,
     };
+    /// Checks a member or subscript base in its own expression-local scope.
+    ///
+    /// A temporary introduced while opening an existential belongs to the base expression. The
+    /// returned expression includes those bindings. `checkBaseForMemberExpr()` retains them for an
+    /// instance member and can discard the complete base for a static member.
     Expr* checkBaseForMemberExpr(
         Expr* baseExpr,
         CheckBaseContext checkBaseContext,

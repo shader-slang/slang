@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -Wno-38109
+//TEST:SIMPLE: -no-codegen -Wno-38109 -Wno-41016
 
 // Translating the receiver witness for a second forward derivative must form the nested pair from
 // the receiver's value type. Its effective BorrowIn wrapper controls parameter passing only; it is
@@ -44,19 +44,28 @@ struct NoDiffBorrowReceiver
 
 void exerciseHigherOrderAdjustedBorrowIn()
 {
+    DifferentialPair<float> firstOrderArgument;
     DifferentialPair<NonCopyableReceiver> firstOrderReceiver;
     DifferentialPair<DifferentialPair<NonCopyableReceiver>> nestedReceiver;
     DifferentialPair<DifferentialPair<float>> argument;
+
+    // Parentheses are transparent to receiver discovery on a higher-order operand.
+    let parenthesizedResult = __fwd_diff((NonCopyableReceiver::evaluate))(
+        firstOrderReceiver,
+        firstOrderArgument);
+
     let result = __fwd_diff(__fwd_diff(NonCopyableReceiver::evaluate))(
         firstOrderReceiver,
         nestedReceiver,
         argument);
 
-    deliberateHigherOrderStop;
-/*CHECK:
-    ^^^^^^^^^^^^^^^^^^^^^^^^^ undefined identifier
-    ^^^^^^^^^^^^^^^^^^^^^^^^^ undefined identifier 'deliberateHigherOrderStop'.
-*/
+    // Higher-order receiver-mode normalization peels each layer's transparent wrappers before
+    // propagating the inner layer's receiver-derived parameters.
+    let parenthesizedNestedResult = __fwd_diff((__fwd_diff((NonCopyableReceiver::evaluate))))(
+        firstOrderReceiver,
+        nestedReceiver,
+        argument);
+
 }
 
 // A NoDiff receiver has no differential witness, but its mode still needs translation when the

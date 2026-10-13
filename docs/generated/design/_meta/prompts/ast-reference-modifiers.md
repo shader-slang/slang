@@ -32,6 +32,23 @@ Cover at least the following:
   list — `in`, `out`, `inout`, `const`, `uniform`, `static`,
   `volatile`) and **attributes** (`[attr(args)]` syntax that subclass
   `Attribute`).
+- `CppStyleTrailingThisParamConstModifier` — how it records the
+  HLSL-only `const` suffix after a function parameter list, explicitly
+  selects a read-only configurable value-type receiver, remains
+  effective for recovery after a non-HLSL diagnostic, and differs from
+  prefix `ConstModifier`. State that a Slang `ClassDecl` member rejects
+  every receiver-mode specifier and retains its fixed `in` receiver.
+- `ThisParamInfoAttribute` — the checked semantic source of truth for
+  a declaration's effective receiver type and parameter-passing mode,
+  including the ABI-only flag that selects the implicit HLSL receiver's
+  mutating mangling suffix.
+- The precise receiver modes selected by `[mutating]`,
+  `[nonmutating]`, `[constref]`, and `[__ref]`, and their applicability
+  to configurable value-type methods and accessors. Explain that a
+  configurable receiver accepts at most one receiver-mode specifier,
+  and that duplicate or conflicting spellings are diagnosed before
+  recovery uses the declaration's fallback mode. Include the Slang
+  `ClassDecl` exception.
 - The attribute hierarchy — `AttributeBase`, the checked `Attribute`
   subclass, and the `UncheckedAttribute` /
   `UncheckedGLSLLayoutAttribute` families that precede checking.

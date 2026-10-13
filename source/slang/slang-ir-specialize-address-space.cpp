@@ -663,9 +663,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         if (sink)
             reconcilePointerSlots();
 
-        HashSet<IRFunc*> newWorkList;
+        // When `processFunction()` changes a function's pointer result type, the pass must revisit
+        // its direct callers so their call results can carry the new concrete address space. Each
+        // iteration therefore queues only callers of functions whose result type changed during
+        // that iteration. Retaining a caller from an earlier iteration would reprocess it after
+        // the dataflow has converged.
         while (workList.getCount())
         {
+            HashSet<IRFunc*> callersToReprocess;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];
@@ -676,14 +681,14 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                         if (auto callInst = as<IRCall>(use->getUser()))
                         {
-                            newWorkList.add(getParentFunc(callInst));
+                            callersToReprocess.add(getParentFunc(callInst));
                         }
                     }
                 }
             }
             workList.clear();
-            for (auto f : newWorkList)
-                workList.add(f);
+            for (auto caller : callersToReprocess)
+                workList.add(caller);
         }
 
         applyAddressSpaceToInstType();

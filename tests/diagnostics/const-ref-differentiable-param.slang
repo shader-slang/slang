@@ -25,6 +25,8 @@ struct MyType : IDifferentiable
     [mutating]
     [constref] float computeWithOverlappingAttributes(float x) { return 0; }
 /*CHECK:
+     ^^^^^^^^ conflicting receiver-mode specifiers
+     ^^^^^^^^ receiver-mode specifier 'constref' conflicts with earlier specifier 'mutating'
      ^^^^^^^^ '[constref]' on differentiable member method
      ^^^^^^^^ cannot use '[constref]' on a differentiable member method of a differentiable type.
 */

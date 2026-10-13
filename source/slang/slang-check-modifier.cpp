@@ -13,9 +13,27 @@
 
 namespace Slang
 {
+/// Requires a folded integer value to be a literal compile-time constant.
+static ConstantIntVal* _requireLiteralIntegerConstant(
+    SemanticsVisitor* semantics,
+    Expr* expression,
+    IntVal* value)
+{
+    if (!value)
+        return nullptr;
+
+    auto literalValue = as<ConstantIntVal>(value);
+    if (!literalValue)
+    {
+        semantics->getSink()->diagnose(
+            Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expression->loc});
+    }
+    return literalValue;
+}
+
 IntVal* SemanticsVisitor::checkLinkTimeConstantIntVal(Expr* expr)
 {
-    expr = CheckExpr(expr);
+    expr = CheckTerm(expr);
     return CheckIntegerConstantExpression(
         expr,
         IntegerConstantExpressionCoercionType::AnyInteger,
@@ -25,8 +43,7 @@ IntVal* SemanticsVisitor::checkLinkTimeConstantIntVal(Expr* expr)
 
 ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
 {
-    // First type-check the expression as normal
-    expr = CheckExpr(expr);
+    expr = CheckTerm(expr);
 
     auto intVal = CheckIntegerConstantExpression(
         expr,
@@ -34,16 +51,16 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
         nullptr,
         ConstantFoldingKind::CompileTime);
 
-    if (!intVal)
-        return nullptr;
+    return _requireLiteralIntegerConstant(this, expr, intVal);
+}
 
-    auto constIntVal = as<ConstantIntVal>(intVal);
-    if (!constIntVal)
-    {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
-        return nullptr;
-    }
-    return constIntVal;
+ConstantIntVal* SemanticsVisitor::checkConstantIntValFromFinalizedExpr(Expr* expr)
+{
+    auto intVal = foldIntegerConstantExpressionFromFinalizedExpr(
+        expr,
+        ConstantFoldingKind::CompileTime,
+        getSink());
+    return _requireLiteralIntegerConstant(this, expr, intVal);
 }
 
 ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
@@ -1020,7 +1037,12 @@ Modifier* SemanticsVisitor::validateAttribute(
                 if (!typeChecked)
                 {
                     arg = CheckTerm(arg);
-                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg, getSink());
+                    arg = coerceAndFinalizeForStorageUse(
+                        CoercionSite::Argument,
+                        paramDecl->getType(),
+                        arg,
+                        getSink(),
+                        AbstractStorageUse::ReadValue);
                 }
             }
             paramIndex++;
@@ -2019,11 +2041,11 @@ Modifier* SemanticsVisitor::checkModifier(
     }
     if (as<CppStyleTrailingThisParamConstModifier>(m))
     {
-        // We keep the modifier after diagnosing a dialect mismatch. Receiver validation can then
-        // reject a declaration without an instance receiver, while an instance method still uses
-        // the modifier's read-only meaning during body checking.
-        auto translationUnit = getShared()->getTranslationUnitRequest();
-        if (!translationUnit || translationUnit->sourceLanguage != SourceLanguage::HLSL)
+        // The modifier remains attached after a dialect mismatch. Receiver-context validation may
+        // also reject the declaration. For recovery, receiver-mode resolution uses the modifier's
+        // read-only meaning for a configurable value-type receiver and the fixed `In` mode for a
+        // receiver from a Slang `ClassDecl`.
+        if (!getShared()->isHLSLSourceLanguage())
         {
             getSink()->diagnose(
                 Diagnostics::CppStyleTrailingThisParamConstRequiresHlsl{.modifier = m});

@@ -1,11 +1,8 @@
-
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir -O0
 
-// Test: lambda capture of outer-scope variables when the lambda body contains
-// a generic method call. The two-phase parsing's generic disambiguation
-// (tryParseGenericApp) can pre-check expressions before the lambda capture
-// context is established, causing outer-scope variable references to not be
-// captured. This test ensures the capture is applied retroactively.
+// The parser classifies the generic member-access base below with read-only lexical and member
+// lookup. It must not check or rewrite the expression while deciding whether `<` starts generic
+// arguments. The definitive semantic check creates exactly one capture field for `pLocal`.
 
 interface IPackedVal
 {
@@ -34,11 +31,8 @@ void computeMain<TBias: IPackedVal>(
     Params<TBias> pLocal = params;
     let lambda = (uint x, float value) =>
     {
-        // pLocal.bias[0].unpack<float>() involves a generic method call that
-        // triggers tryParseGenericApp during parsing. This pre-checks the
-        // expression chain containing pLocal before the lambda capture context
-        // exists. Semantic checking must revisit the selected expression path
-        // once the lambda capture context is available.
+        // Both member accesses refer to the same local outside the lambda. The parser's read-only
+        // generic-application probe leaves capture attachment to this definitive semantic check.
         pLocal.output[x] = pLocal.bias[0].unpack<float>();
         return value;
     };
@@ -51,15 +45,16 @@ void invoke(IFunc<float, uint, float> f, uint x, float value)
     f(x, value);
 }
 
-// Verify the lambda struct captures pLocal as a member.
+// Semantic checking adds exactly one `pLocal` capture field to the lambda struct.
 // CHECK: OpName %[[LAMBDA_STRUCT:[A-Za-z0-9_]+]] "computeMain._slang_Lambda_computeMain_1"
-// CHECK: OpMemberName %[[LAMBDA_STRUCT]] 0 "pLocal"
+// CHECK: OpMemberName %[[LAMBDA_STRUCT]] [[PLOCAL_MEMBER:[0-9]+]] "pLocal"
+// CHECK-NOT: OpMemberName %[[LAMBDA_STRUCT]] {{[0-9]+}} "pLocal"
 
-// Verify the lambda's operator() takes the lambda struct as its first parameter (`this`).
+// The lambda's `operator()` takes the lambda struct as its first parameter (`this`).
 // CHECK: OpName %[[LAMBDA_FUNC:[A-Za-z0-9_]+]] "computeMain._slang_Lambda_computeMain_1.()"
+// CHECK: %[[PLOCAL_INDEX:[A-Za-z0-9_]+]] = OpConstant %int [[PLOCAL_MEMBER]]
 // CHECK: %[[LAMBDA_FUNC]] = OpFunction
 
-// Inside the lambda body, verify we access pLocal through the lambda struct (this),
-// not directly from the parent function. The access chain should go through
-// the lambda struct's `this` parameter to reach pLocal's fields.
-// CHECK: OpAccessChain %{{.*}} %this_0 %int_0
+// The lambda body accesses the captured local through the lambda struct (`this`) rather than
+// directly through its parent function.
+// CHECK: OpAccessChain %{{.*}} %this_0 %[[PLOCAL_INDEX]]

@@ -15,6 +15,8 @@ struct RefOnly
     __subscript(int index) -> float
     {
         ref { return value; }
+//CHECK:             ^^^^^ a `ref` accessor must return an l-value
+//CHECK:             ^^^^^ this expression does not identify storage that the accessor can return by reference
     }
 }
 

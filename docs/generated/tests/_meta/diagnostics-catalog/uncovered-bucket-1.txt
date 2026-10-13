@@ -1,5 +1,5 @@
 # Uncovered diagnostic codes — bucket 1 of 5
-# 123 codes in this bucket. Range 29000..30502.
+# 122 codes in this bucket. Range 29000..30502.
 # code	severity	name	message
 29000	err	snippet-parsing-failed	snippet parsing failed
 29100	err	unrecognized-spirv-opcode	unrecognized SPIR-V opcode
@@ -77,7 +77,6 @@
 30117	err	forward-reference-in-generic-constraint	forward reference in generic constraint
 30118	err	cannot-mix-differentiable-value-and-ptr-outputs	cannot mix differentiable value types with differentiable pointer outputs
 30119	err	reading-from-write-only	cannot read from writeonly
-30120	err	static-ref-to-this	static function cannot refer to non-static member via `this`
 30121	err	differentiable-member-should-have-corresponding-field-in-diff-type	missing field in differential type
 30122	err	forward-reference-in-generic-default-initializer	forward reference in generic default initializer
 30123	warning	cannot-synthesize-dadd-dzero-for-custom-differential	cannot synthesize complete differential method

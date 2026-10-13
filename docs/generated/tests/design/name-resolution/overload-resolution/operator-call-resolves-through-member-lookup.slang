@@ -4,15 +4,15 @@
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-general-path
 //META: doc_section_digest=436f56a9b4722c5976d165afb6d558aed7529f2fc5194e02488c5753bf733c25
-//META: purpose=operator() is resolved by member lookup on the callee's type, so calling a struct value like a function dispatches to its operator() member.
+//META: purpose=visitInvokeExpr looks operator() up on the callee's type and passes the callee value to createLookupResultExpr as its explicit base, so calling a struct value dispatches to its operator() member.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the member-lookup half of operator dispatch. Unlike infix
-// operators, the call form looks operator() up on the callee value's type and
-// keeps the implicit this, so the member sees the receiver's field; CHECK
-// asserts a result that combines the stored base with the call argument.
+// Unlike infix operators, `visitInvokeExpr` looks `operator()` up on the callee value's type and
+// passes that value to `createLookupResultExpr` as the member expression's explicit base.
+// `CompleteOverloadCandidate` preserves that base while rebuilding the selected callable
+// expression. The result combines the stored field with the call argument.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

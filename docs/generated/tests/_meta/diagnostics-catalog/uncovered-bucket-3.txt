@@ -1,5 +1,5 @@
 # Uncovered diagnostic codes — bucket 3 of 5
-# 123 codes in this bucket. Range 31225..40012.
+# 122 codes in this bucket. Range 31225..40012.
 # code	severity	name	message
 31225	err	static-const-variable-requires-initializer	missing initializer for static const
 31226	err	static-const-global-non-constant-init	static const global initializer must be a compile-time constant
@@ -13,7 +13,6 @@
 33072	err	cannot-have-generic-dyn-interface	dyn interfaces cannot be generic
 33073	err	cannot-have-associated-type-in-dyn-interface	dyn interfaces cannot have associatedType members
 33074	err	cannot-have-generic-method-in-dyn-interface	dyn interfaces cannot have generic methods
-33075	err	cannot-have-mutating-method-in-dyn-interface	dyn interfaces cannot have [mutating] methods
 33076	err	cannot-have-differentiable-method-in-dyn-interface	dyn interfaces cannot have [Differentiable] methods
 33077	err	dyn-interface-cannot-inherit-non-dyn-interface	dyn interface inheritance error
 33078	err	cannot-use-extension-to-make-type-conform-to-dyn-interface	extension cannot conform to dyn interface

@@ -11,11 +11,12 @@ RWStructuredBuffer<float> outputBuffer;
 
 void squareCoopVecElements(CoopVec<float, 4> vec)
 {
+    CoopVec<float, 4> squaredVector = vec;
     for (int i = 0; i < 4; ++i)
     {
-        vec[i] = vec[i] * vec[i];
+        squaredVector[i] = squaredVector[i] * squaredVector[i];
     }
-    vec.store(outputBuffer, 0);
+    squaredVector.store(outputBuffer, 0);
 }
 
 [numthreads(1, 1, 1)]

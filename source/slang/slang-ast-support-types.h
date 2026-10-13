@@ -40,6 +40,7 @@ FIDDLE() namespace Slang
     class Type;
     struct TypeExp;
     class Val;
+    class SubtypeWitness;
 
     class DeclRefBase;
     struct SubstitutionCache;
@@ -1341,153 +1342,199 @@ FIDDLE() namespace Slang
                                (std::underlying_type_t<LookupOptions>)b);
     }
 
-    /// Records one implicit operation that lookup deferred until expression reconstruction.
+    /// Describes one implicit operation that lookup defers until expression reconstruction.
     ///
-    /// The linked list is stored in the order that `ConstructLookupResultExpr` applies its
-    /// operations to the evolving base expression.
-    class LookupResultItem_Breadcrumb : public RefObject
+    /// When persisted in a lookup result, the steps are linked in the order that
+    /// `ConstructLookupResultExpr()` applies them to the evolving base expression.
+    ///
+    /// Consider this HLSL declaration:
+    ///
+    /// ```hlsl
+    /// cbuffer C { float4 color; }
+    /// ```
+    ///
+    /// The front end represents that declaration with the same essential shape as this Slang
+    /// code:
+    ///
+    /// ```slang
+    /// struct CContents { float4 color; }
+    /// __transparent ConstantBuffer<CContents> buffer;
+    /// ```
+    ///
+    /// `_lookUpDirectAndTransparentMembers()` finds `color` through `buffer` and records `Member`
+    /// and `Deref` breadcrumbs instead of building `(*buffer).color` for every candidate.
+    /// `ConstructLookupResultExpr()` later replays those breadcrumbs for the selected declaration:
+    /// it forms the reference to `buffer`, dereferences that value, and then adds the `.color`
+    /// access.
+    struct LookupBreadcrumbStep
     {
-    public:
         enum class Kind : uint8_t
         {
-            /// Lookup crossed an in-scope declaration to reach one of its members, so expression
+            /// Represents crossing an in-scope declaration to reach one of its members. Expression
             /// reconstruction must form a member expression such as `object.member`.
             Member,
 
-            /// Lookup dereferenced a pointer-like value, so expression reconstruction must form an
-            /// implicit dereference such as `*object`.
+            /// Represents reaching a member through an implicit dereference of a pointer-like
+            /// value. Expression reconstruction must form a dereference such as `*object`.
             Deref,
 
-            /// Lookup used a subtype witness to find a member through a supertype of the original
-            /// base expression.
+            /// Represents reaching a member through a subtype witness and a supertype of the
+            /// original base expression.
             SuperType,
 
-            /// Lookup crossed an enclosing type while a current instance was available, so the
+            /// Represents crossing an enclosing type while a current instance was available. The
             /// reconstructed reference needs a `this` value as its base.
             ThisValue,
 
-            /// Lookup crossed an enclosing type without a current instance, so the reconstructed
+            /// Represents crossing an enclosing type without a current instance. The reconstructed
             /// reference needs the `This` type as its base.
             ThisType,
         };
 
-        /// Identifies the implicit operation that expression reconstruction must apply.
-        Kind kind;
+        static LookupBreadcrumbStep makeMember(DeclRef<Decl> memberDeclRef)
+        {
+            SLANG_RELEASE_ASSERT(memberDeclRef);
+            return LookupBreadcrumbStep(Kind::Member, memberDeclRef, nullptr, nullptr);
+        }
+
+        static LookupBreadcrumbStep makeDeref()
+        {
+            return LookupBreadcrumbStep(Kind::Deref, DeclRef<Decl>(), nullptr, nullptr);
+        }
+
+        static LookupBreadcrumbStep makeSuperType(SubtypeWitness* subtypeWitness)
+        {
+            SLANG_RELEASE_ASSERT(subtypeWitness);
+            return LookupBreadcrumbStep(
+                Kind::SuperType,
+                DeclRef<Decl>(),
+                subtypeWitness,
+                nullptr);
+        }
+
+        static LookupBreadcrumbStep makeThisValue(Scope* lookupOriginScope)
+        {
+            SLANG_RELEASE_ASSERT(lookupOriginScope);
+            return LookupBreadcrumbStep(
+                Kind::ThisValue,
+                DeclRef<Decl>(),
+                nullptr,
+                lookupOriginScope);
+        }
+
+        static LookupBreadcrumbStep makeThisType(DeclRef<Decl> thisTypeDeclRef)
+        {
+            SLANG_RELEASE_ASSERT(thisTypeDeclRef);
+            return LookupBreadcrumbStep(Kind::ThisType, thisTypeDeclRef, nullptr, nullptr);
+        }
+
+        Kind getKind() const { return m_kind; }
+
+        Scope* getLookupOriginScope() const
+        {
+            SLANG_RELEASE_ASSERT(m_kind == Kind::ThisValue);
+            SLANG_RELEASE_ASSERT(m_lookupOriginScope);
+            return m_lookupOriginScope;
+        }
+
+        DeclRef<Decl> getMemberDeclRef() const
+        {
+            SLANG_RELEASE_ASSERT(m_kind == Kind::Member);
+            SLANG_RELEASE_ASSERT(m_declRef);
+            return m_declRef;
+        }
+
+        SubtypeWitness* getSubtypeWitness() const
+        {
+            SLANG_RELEASE_ASSERT(m_kind == Kind::SuperType);
+            SLANG_RELEASE_ASSERT(m_subtypeWitness);
+            return m_subtypeWitness;
+        }
+
+        DeclRef<Decl> getThisTypeDeclRef() const
+        {
+            SLANG_RELEASE_ASSERT(m_kind == Kind::ThisType);
+            SLANG_RELEASE_ASSERT(m_declRef);
+            return m_declRef;
+        }
+
+    private:
+        Kind m_kind;
 
         /// Stores the declaration involved in the lookup step, when its kind requires one.
         ///
         /// A `Member` step stores the declaration whose members were brought into scope. A
-        /// `SuperType` step stores the declaration through which lookup found the subtype relation.
-        /// A `ThisValue` or `ThisType` step stores the aggregate or extension crossed by lookup, or
-        /// the explicit `This` type declaration used inside an interface default implementation.
-        DeclRef<Decl> declRef;
+        /// `ThisType` step stores the aggregate or extension crossed by lookup, or the explicit
+        /// `This` type declaration used inside an interface default implementation. Every other
+        /// kind leaves this null.
+        DeclRef<Decl> m_declRef;
 
         /// Stores the subtype witness for a `SuperType` step. Other kinds leave this null.
-        Val* val = nullptr;
+        SubtypeWitness* m_subtypeWitness = nullptr;
 
-        /// Stores the lexical scope used to reconstruct a `this` expression.
+        /// Stores the lexical scope where the lookup operation began.
         ///
-        /// This field is non-null exactly for `Kind::ThisValue`; every other kind leaves it null.
-        Scope* thisValueScope = nullptr;
+        /// Expression reconstruction uses this scope to check the implicit `this` base in the same
+        /// lexical context as the programmer-written reference. This field is non-null exactly for
+        /// `Kind::ThisValue`; every other kind leaves it null.
+        Scope* m_lookupOriginScope = nullptr;
+
+        LookupBreadcrumbStep(
+            Kind kind,
+            DeclRef<Decl> declRef,
+            SubtypeWitness* subtypeWitness,
+            Scope* lookupOriginScope)
+            : m_kind(kind)
+            , m_declRef(declRef)
+            , m_subtypeWitness(subtypeWitness)
+            , m_lookupOriginScope(lookupOriginScope)
+        {
+        }
+    };
+
+    /// Represents one persisted deferred lookup step linked to the next reconstruction step.
+    class LookupResultItem_Breadcrumb : public RefObject, public LookupBreadcrumbStep
+    {
+    public:
+        using Kind = LookupBreadcrumbStep::Kind;
 
         /// Links to the next implicit operation that expression reconstruction applies.
         RefPtr<LookupResultItem_Breadcrumb> next;
 
-        LookupResultItem_Breadcrumb(
-            Kind kind,
-            DeclRef<Decl> declRef,
-            Val* val,
-            Scope* thisValueScope,
+        static RefPtr<LookupResultItem_Breadcrumb> create(
+            LookupBreadcrumbStep const& step,
             RefPtr<LookupResultItem_Breadcrumb> next)
-            : kind(kind)
-            , declRef(declRef)
-            , val(val)
-            , thisValueScope(thisValueScope)
+        {
+            return new LookupResultItem_Breadcrumb(step, next);
+        }
+
+    private:
+        LookupResultItem_Breadcrumb(
+            LookupBreadcrumbStep const& step,
+            RefPtr<LookupResultItem_Breadcrumb> next)
+            : LookupBreadcrumbStep(step)
             , next(next)
         {
-            SLANG_RELEASE_ASSERT((kind == Kind::ThisValue) == (thisValueScope != nullptr));
         }
-
-        Scope* getThisValueScope() const
-        {
-            SLANG_RELEASE_ASSERT(kind == Kind::ThisValue);
-            SLANG_RELEASE_ASSERT(thisValueScope);
-            return thisValueScope;
-        }
-
-    protected:
-        // Serialization constructs an empty breadcrumb before filling its fields.
-        LookupResultItem_Breadcrumb() = default;
     };
 
-    // Represents one item found during lookup
+    /// Represents a declaration found by lookup and the implicit operations needed to reference it.
+    ///
+    /// Most results need no breadcrumbs. `CreateLookupResultItem()` records only the operations
+    /// needed when lookup crosses an implicit receiver, transparent member, pointer-like value, or
+    /// supertype. `ConstructLookupResultExpr()` replays them when constructing a result.
+    /// `CompleteOverloadCandidate()` replays breadcrumbs only when a candidate has no retained
+    /// expression path. For a retained `Func`, it replaces the direct callable leaf while
+    /// rebuilding transparent wrappers. A retained `Generic` path becomes the base of the completed
+    /// full or partial generic application, and a retained `Expr` is used directly.
     struct LookupResultItem
     {
         typedef LookupResultItem_Breadcrumb Breadcrumb;
 
-        // Sometimes lookup finds an item, but there were additional
-        // "hops" taken to reach it. We need to remember these steps
-        // so that if/when we consturct a full expression we generate
-        // appropriate AST nodes for all the steps.
-        //
-        // We build up a list of these "breadcrumbs" while doing
-        // lookup, and store them alongside each item found.
-        //
-        // As an example, suppose we have an HLSL `cbuffer` declaration:
-        //
-        //     cbuffer C { float4 f; }
-        //
-        // This is syntax sugar for a global-scope variable of
-        // type `ConstantBuffer<T>` where `T` is a `struct` containing
-        // all the members:
-        //
-        //     struct Anon0 { float4 f; };
-        //     __transparent ConstantBuffer<Anon0> anon1;
-        //
-        // The `__transparent` modifier there captures the fact that
-        // when somebody writes `f` in their code, they expect it to
-        // "see through" the `cbuffer` declaration (or the global variable,
-        // in this case) and find the member inside.
-        //
-        // But when the user writes `f` we can't just create a simple
-        // `VarExpr` that refers directly to that field, because that
-        // doesn't actually reflect the required steps in a way that
-        // code generation can use.
-        //
-        // Instead we need to construct an expression like `(*anon1).f`,
-        // where there is are two additional steps in the process:
-        //
-        // 1. We needed to dereference the pointer-like type `ConstantBuffer<Anon0>`
-        //    to get at a value of type `Anon0`
-        // 2. We needed to access a sub-field of the aggregate type `Anon0`
-        //
-        // We *could* just create these full-formed expressions during
-        // lookup, but this might mean creating a large number of
-        // AST nodes in cases where the user calls an overloaded function.
-        // At the very least we'd rather not heap-allocate in the common
-        // case where no "extra" steps need to be performed to get to
-        // the declarations.
-        //
-        // This is where "breadcrumbs" come in. A breadcrumb represents
-        // an extra "step" that must be performed to turn a declaration
-        // found by lookup into a valid expression to splice into the
-        // AST. Most of the time lookup result items don't have any
-        // breadcrumbs, so that no extra heap allocation takes place.
-        // When an item does have breadcrumbs, and it is chosen as
-        // the unique result (perhaps by overload resolution), then
-        // we can walk the list of breadcrumbs to create a full
-        // expression.
-
-
-        // A properly-specialized reference to the declaration that was found.
+        /// A properly specialized reference to the declaration that was found.
         DeclRef<Decl> declRef;
 
-        // Any breadcrumbs needed in order to turn that declaration
-        // reference into a well-formed expression.
-        //
-        // This is unused in the simple case where a declaration
-        // is being referenced directly (rather than through
-        // transparent members).
+        /// The implicit operations needed to turn `declRef` into a well-formed expression.
         RefPtr<LookupResultItem_Breadcrumb> breadcrumbs;
 
         LookupResultItem() = default;
@@ -2016,8 +2063,44 @@ FIDDLE() namespace Slang
         MarkupVisibility m_visibility = MarkupVisibility::Public; ///< How visible this decl is
     };
 
-    /// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s
-    /// inner most expr is `f`.
+    /// Returns the selected callable inside parentheses, a generic application, or retained local
+    /// bindings.
+    ///
+    /// `getCallableExprThroughTransparentWrappers()` applies only to checked wrappers on a
+    /// callable-selection path.
+    /// `checkGenericAppWithCheckedArgs()` retains the programmer-written arguments on
+    /// `GenericAppExpr` so diagnostics and AST printing can reproduce the written application,
+    /// while storing the selected callable inside `functionExpr`. Callers use
+    /// `getCallableExprThroughTransparentWrappers()` to inspect that inner callable without
+    /// discarding the wrappers.
+    /// `replaceSelectedCallableThroughTransparentWrappers()` installs a completed selection back
+    /// into the same wrapper chain. Callers must not use either operation to bypass
+    /// generic-argument checking.
+    ///
+    /// When `outWrappers` is provided, `getCallableExprThroughTransparentWrappers()` appends each
+    /// wrapper from outermost to innermost without clearing existing entries. This order is also
+    /// the evaluation order of retained `LetExpr` initializers.
+    Expr* getCallableExprThroughTransparentWrappers(
+        Expr* expr,
+        List<Expr*>* outWrappers = nullptr);
+
+    /// Returns whether a one-element tuple swizzle lowers as a direct-address field projection.
+    ///
+    /// Tuple member selection uses `SwizzleExpr` syntax. `CheckSimpleSubscriptExpr()` uses this
+    /// classification when it records a one-element tuple selection as a direct field-address
+    /// projection; it records vector and matrix selections as retained swizzle operations.
+    /// `ASTExprLowering::visitIndexExpr()` consumes that recorded projection together with the
+    /// enclosing operation's `AbstractStorageUse` to decide whether the base needs a direct address
+    /// or can preserve its projected-storage representation.
+    bool isDirectAddressTupleElementSwizzle(SwizzleExpr* expr);
+
+    /// Returns the innermost callable from a higher-order expression chain.
+    ///
+    /// Transparent callable wrappers can surround every layer. For example, the innermost callable
+    /// of `__fwd_diff((__fwd_diff((f))))` is `f`. If
+    /// `getInnerMostExprFromHigherOrderExpr()` encounters a malformed cycle in the higher-order
+    /// chain, it returns null. In that case, `outDiffLevel` describes only the prefix traversed
+    /// before the repeated expression was found.
     Expr* getInnerMostExprFromHigherOrderExpr(
         Expr * expr,
         FunctionDifferentiableLevel & outDiffLevel);

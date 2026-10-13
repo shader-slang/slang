@@ -4,17 +4,16 @@
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
 //META: doc_section_digest=8db1d44af39131b43cc8258b2bec4dad2a4381ae619907da2e2b6a9de2021028
-//META: purpose=A member found through an interface facet comes back already specialized to the concrete conforming type, so a requirement returning This yields the conformer type at the call site.
+//META: purpose=FacetImpl::init specializes an interface facet's parent decl-ref with _maybeSpecializeSuperTypeDeclRef, so member lookup gives a requirement returning This the concrete conforming type.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that the interface facet's parent decl-ref carries the
-// conformance witness, so members found through it are specialized.
-// `clone()` is declared on ICloneable returning `This`; calling it on
-// an S receiver must yield S, not the abstract self type. CHECK
-// asserts the result's `v` field is readable and equals 41 + 1, which
-// requires the returned type to be the concrete struct.
+// `FacetImpl::init` calls `_maybeSpecializeSuperTypeDeclRef` to build the interface facet's parent
+// decl-ref from `ICloneable`'s `ThisTypeDecl` and the conformance witness.
+// `_lookUpDirectAndTransparentMembers` uses that parent when it constructs the `clone` result.
+// Because `clone` returns `This`, calling it on `S` must therefore yield `S`, not the abstract self
+// type. CHECK confirms that the returned value has `S.v == 42`.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

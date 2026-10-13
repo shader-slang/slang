@@ -118,6 +118,13 @@ public:
     ASTBuilder* astBuilder;
     SemanticsVisitor* semanticsVisitor = nullptr;
 
+    /// Retains syntax created while probing ambiguous generic applications.
+    ///
+    /// The builder is created lazily because most `<` tokens can be classified without a probe. One
+    /// child builder is reused to avoid allocating its 2 MiB arena block for every ambiguous token,
+    /// while still releasing all unreachable probe syntax when this parser is destroyed.
+    RefPtr<ASTBuilder> genericApplicationProbeASTBuilder;
+
     NamePool* getNamePool() { return namePool; }
 
     /// Returns the single effective source language used for every dialect-specific parse rule.
@@ -338,7 +345,7 @@ static void parseModernParamList(Parser* parser, CallableDecl* decl);
 
 static TokenType peekTokenType(Parser* parser);
 
-static Expr* _parseGenericArg(Parser* parser);
+static Expr* _parseGenericArg(Parser* parser, bool* outUsedTypeOnlySyntax = nullptr);
 
 static Expr* parsePrefixExpr(Parser* parser);
 
@@ -2416,21 +2423,36 @@ static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
     }
 }
 
-/// Parses an optional `const` after a `FuncDecl` parameter list.
+/// Parses consecutive `const` tokens after a `FuncDecl` parameter list.
 ///
-/// The dedicated modifier preserves the trailing spelling for semantic checking. The traditional
-/// and modern function parsers call this only after creating a `FuncDecl`, so constructors,
-/// accessors, and subscripts do not accept this syntax.
-static void parseOptionalCppStyleTrailingThisParamConstModifier(Parser* parser, FuncDecl* decl)
+/// `parseCppStyleTrailingThisParamConstModifiers()` creates one dedicated modifier for each token
+/// so semantic checking can diagnose a repeated trailing `const` like any other duplicate
+/// receiver-mode specifier. Both function-declaration parsers call this immediately after the
+/// parameter list. Function-extension signatures, constructors, accessors, and subscripts call
+/// `parseAndDiagnoseInvalidTrailingThisParamConst` instead, because those declarations cannot have
+/// a trailing `const`.
+static void parseCppStyleTrailingThisParamConstModifiers(Parser* parser, FuncDecl* decl)
 {
     Token constToken;
-    if (!AdvanceIf(parser, "const", &constToken))
-        return;
+    while (AdvanceIf(parser, "const", &constToken))
+    {
+        auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
+        modifier->keywordName = constToken.getName();
+        modifier->loc = constToken.getLoc();
+        addModifier(decl, modifier);
+    }
+}
 
-    auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
-    modifier->keywordName = constToken.getName();
-    modifier->loc = constToken.getLoc();
-    addModifier(decl, modifier);
+/// Consumes a misplaced trailing `const` so the enclosing declaration can recover at its next
+/// grammar element without producing unrelated follow-up diagnostics.
+static void parseAndDiagnoseInvalidTrailingThisParamConst(Parser* parser)
+{
+    Token constToken;
+    while (AdvanceIf(parser, "const", &constToken))
+    {
+        parser->diagnose(Diagnostics::CppStyleTrailingThisParamConstOnlyOnFunction{
+            .location = constToken.getLoc()});
+    }
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -2465,7 +2487,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
-            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
+            parseCppStyleTrailingThisParamConstModifiers(parser, decl);
 
             if (AdvanceIf(parser, "throws"))
             {
@@ -2995,8 +3017,20 @@ struct TypeSpec
     Expr* expr = nullptr;
 };
 
-static Expr* parseGenericApp(Parser* parser, Expr* base)
+/// Parses the complete generic application whose callee is `base`.
+///
+/// The returned expression contains every parsed generic argument. When requested,
+/// `outHasTypeOnlyArgumentSyntax` reports whether any argument used syntax that is valid only in
+/// the type grammar; speculative parsing uses that evidence to distinguish a generic application
+/// from a comparison expression.
+static Expr* parseGenericApp(
+    Parser* parser,
+    Expr* base,
+    bool* outHasTypeOnlyArgumentSyntax = nullptr)
 {
+    if (outHasTypeOnlyArgumentSyntax)
+        *outHasTypeOnlyArgumentSyntax = false;
+
     GenericAppExpr* genericApp = parser->astBuilder->create<GenericAppExpr>();
 
     genericApp->loc = base->loc;
@@ -3010,7 +3044,10 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
         if (parser->LookAheadToken(TokenType::OpGreater) ||
             parser->LookAheadToken(TokenType::OpRsh))
             break;
-        genericApp->arguments.add(_parseGenericArg(parser));
+        bool usedTypeOnlySyntax = false;
+        genericApp->arguments.add(_parseGenericArg(parser, &usedTypeOnlySyntax));
+        if (outHasTypeOnlyArgumentSyntax)
+            *outHasTypeOnlyArgumentSyntax |= usedTypeOnlySyntax;
         if (parser->LookAheadToken(TokenType::Comma))
         {
             auto commaToken = parser->ReadToken(TokenType::Comma);
@@ -3039,153 +3076,392 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
     return genericApp;
 }
 
-static bool isGenericName(Parser* parser, Name* name)
+/// Represents the conclusion available from read-only declaration lookup before token probing.
+enum class GenericApplicationParseDecision
 {
-    auto lookupResult = lookUp(
-        parser->astBuilder,
-        nullptr, // no semantics visitor available yet
-        name,
-        parser->currentScope);
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
-        return false;
-
-    return lookupResult.item.declRef.is<GenericDecl>();
-}
-
-enum class BaseGenericKind
-{
-    Unknown,
-    Generic,
-    NonGeneric,
+    Undetermined,
+    GenericApplication,
+    LessThanOperator,
 };
 
+/// Returns whether `decl` names a type, including through a generic declaration wrapper.
+static bool doesDeclarationNameType(Decl* decl)
+{
+    while (auto genericDecl = as<GenericDecl>(decl))
+        decl = genericDecl->inner;
+    return as<SimpleTypeDecl>(decl) || as<AggTypeDeclBase>(decl);
+}
+
+/// Returns whether `declRef` makes `<` unambiguously start a generic application.
+///
+/// Generic declarations accept generic arguments. Functions and types do not form a valid
+/// comparison expression before `<`, so parsing a generic application also produces the most
+/// relevant diagnostic when a non-generic function or type receives generic arguments.
+static bool doesDeclRefRequireGenericApplicationParse(DeclRef<Decl> declRef)
+{
+    if (declRef.is<GenericDecl>())
+        return true;
+    if (declRef.is<FunctionDeclBase>())
+        return true;
+    return doesDeclarationNameType(declRef.getDecl());
+}
+
+/// Classifies a declaration lookup without checking or rewriting the parsed expression.
+///
+/// A missing declaration leaves the syntax undecided. If lookup finds any generic, function, or
+/// type declaration, `<` starts a generic application; the expression before `<` cannot instead be
+/// a comparison operand. A lookup with none of those declaration kinds selects comparison parsing.
+static GenericApplicationParseDecision getGenericApplicationParseDecision(
+    LookupResult const& lookupResult)
+{
+    if (!lookupResult.isValid())
+        return GenericApplicationParseDecision::Undetermined;
+
+    if (!lookupResult.isOverloaded())
+    {
+        return doesDeclRefRequireGenericApplicationParse(lookupResult.item.declRef)
+                   ? GenericApplicationParseDecision::GenericApplication
+                   : GenericApplicationParseDecision::LessThanOperator;
+    }
+
+    for (auto candidate : lookupResult)
+    {
+        if (doesDeclRefRequireGenericApplicationParse(candidate.declRef))
+            return GenericApplicationParseDecision::GenericApplication;
+    }
+    return GenericApplicationParseDecision::LessThanOperator;
+}
+
+/// Returns declarations named directly by `expr` without checking that expression.
+///
+/// Parentheses do not change the referenced declaration. An existing `declRef` is already
+/// conclusive; otherwise, only a lexical `VarExpr` supplies enough information for parser-time
+/// lookup. Resolving a member expression would require checking its receiver and is intentionally
+/// left to the syntax probe.
+static LookupResult lookUpDirectExpressionName(Parser* parser, Expr* expr)
+{
+    while (auto parenExpr = as<ParenExpr>(expr))
+        expr = parenExpr->base;
+
+    if (auto declRefExpr = as<DeclRefExpr>(expr); declRefExpr && declRefExpr->declRef)
+    {
+        LookupResult result;
+        AddToLookupResult(result, LookupResultItem(declRefExpr->declRef));
+        return result;
+    }
+
+    auto varExpr = as<VarExpr>(expr);
+    if (!varExpr || !varExpr->name)
+        return {};
+
+    return lookUp(
+        parser->astBuilder,
+        nullptr,
+        varExpr->name,
+        varExpr->scope ? varExpr->scope : parser->currentScope);
+}
+
+/// Classifies `<` only when `base` already identifies a declaration directly.
+///
+/// A lexical name can be looked up without checking an expression. A member expression generally
+/// cannot: discovering its declaration would require determining the receiver type and repeating
+/// part of semantic checking inside the parser. Such expressions remain `Undetermined` unless a
+/// previous operation has already populated their `declRef`; the syntax-only probe below handles
+/// the remaining cases.
+static GenericApplicationParseDecision getGenericApplicationParseDecision(
+    Parser* parser,
+    Expr* base)
+{
+    return getGenericApplicationParseDecision(lookUpDirectExpressionName(parser, base));
+}
+
+/// Returns whether every declaration in `lookupResult` names a type.
+///
+/// A name shared by a type and a value is not conclusive: either grammar could still apply.
+static bool doesLookupUnambiguouslyNameType(LookupResult const& lookupResult)
+{
+    if (!lookupResult.isValid())
+        return false;
+    if (!lookupResult.isOverloaded())
+        return doesDeclarationNameType(lookupResult.item.declRef.getDecl());
+
+    for (auto candidate : lookupResult)
+    {
+        if (!doesDeclarationNameType(candidate.declRef.getDecl()))
+            return false;
+    }
+    return true;
+}
+
+static Decl* tryResolveLexicalOrScopeQualifiedDeclaration(Parser* parser, Expr* expr);
+
+/// Returns whether a parsed generic argument is known to denote a type.
+///
+/// Dedicated type-expression nodes are unambiguous by construction. An `IndexExpr` is shared by
+/// array-type and value-index syntax, so it denotes a type only when its base does. For example,
+/// the `int[4]` in `value.member < int[4] > (array)` follows this path, while the `values[4]` in a
+/// comparison remains a value expression. A generic application denotes a type only when its base
+/// unambiguously names one; type-only syntax in its arguments does not prove that a generic
+/// function specialization returns a type.
+static bool doesGenericArgumentUnambiguouslyNameType(Parser* parser, Expr* argument)
+{
+    while (auto parenExpr = as<ParenExpr>(argument))
+        argument = parenExpr->base;
+
+    if (as<HLSLUnsignedTypeExpr>(argument))
+        return true;
+    if (as<ModifiedTypeExpr>(argument))
+        return true;
+    if (as<PointerTypeExpr>(argument))
+        return true;
+    if (as<FuncTypeExpr>(argument))
+        return true;
+    if (as<PackBranchTypeExpr>(argument))
+        return true;
+    if (as<AndTypeExpr>(argument))
+        return true;
+    if (as<FuncAsTypeExpr>(argument))
+        return true;
+
+    if (auto indexExpr = as<IndexExpr>(argument))
+        return doesGenericArgumentUnambiguouslyNameType(parser, indexExpr->baseExpression);
+
+    Expr* nameExpression = argument;
+    if (auto genericAppExpr = as<GenericAppExpr>(argument))
+        nameExpression = genericAppExpr->functionExpr;
+
+    if (doesLookupUnambiguouslyNameType(lookUpDirectExpressionName(parser, nameExpression)))
+        return true;
+
+    // `parseStaticMemberType()` produces a `StaticMemberExpr` for a name such as
+    // `Types::Value`. The callee of the surrounding application can still be unclassified, so
+    // spaces around `< Types::Value >` would otherwise preserve comparison parsing. Directly
+    // resolving a namespace- or type-qualified declaration supplies the missing type evidence
+    // without checking either the generic-application callee or a value receiver.
+    return doesDeclarationNameType(
+        tryResolveLexicalOrScopeQualifiedDeclaration(parser, nameExpression));
+}
+
+Precedence GetOpLevel(Parser* parser, const Token& token);
+
+/// Returns whether the current token can continue or terminate an expression whose left operand
+/// is a generic application.
+static bool canCurrentTokenFollowGenericApplication(Parser* parser)
+{
+    auto token = parser->tokenReader.peekToken();
+    if (GetOpLevel(parser, token) != Precedence::Invalid)
+        return true;
+
+    switch (token.type)
+    {
+    case TokenType::Scope:
+    case TokenType::Dot:
+    case TokenType::RightArrow:
+    case TokenType::LParent:
+    case TokenType::LBracket:
+    case TokenType::OpInc:
+    case TokenType::OpDec:
+    case TokenType::RParent:
+    case TokenType::RBracket:
+    case TokenType::RBrace:
+    case TokenType::Colon:
+    case TokenType::Semicolon:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+    case TokenType::EndOfFile:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+/// Returns whether the token after a speculative `>` can continue a comparison expression.
+///
+/// A prefix-expression starter can be the right operand of `>` in `a < b > c`. The generic
+/// argument parser may instead split the `>>` in `a < b >> c` and leave either `>` or `>>`, so
+/// those tokens are comparison evidence as well.
+static bool canTokenContinueWhitespaceDelimitedComparison(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+    case TokenType::Identifier:
+    case TokenType::IntegerLiteral:
+    case TokenType::FloatingPointLiteral:
+    case TokenType::StringLiteral:
+    case TokenType::CharLiteral:
+    case TokenType::LBrace:
+    case TokenType::LParent:
+    case TokenType::Scope:
+    case TokenType::CompletionRequest:
+    case TokenType::OpNot:
+    case TokenType::OpInc:
+    case TokenType::OpDec:
+    case TokenType::OpMul:
+    case TokenType::OpBitAnd:
+    case TokenType::OpBitNot:
+    case TokenType::OpAdd:
+    case TokenType::OpSub:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+/// Represents the result and disambiguating evidence from a speculative generic parse.
+struct GenericApplicationProbeResult
+{
+    /// Whether the generic-application grammar accepted the speculative token sequence.
+    bool succeeded = false;
+
+    /// Whether an argument contains type-only syntax or unambiguously denotes a type.
+    bool hasTypeArgumentEvidence = false;
+
+    /// Whether a pre-2026 empty call suffix proves that the preceding `>` closed an application.
+    bool hasUnambiguousEmptyCallSuffix = false;
+
+    /// The first token after the speculative generic application.
+    Token followingToken = {};
+};
+
+/// Applies the real generic-argument grammar without changing the program being parsed.
+///
+/// Consider `makeValue().member<int>()`. Read-only lookup cannot classify this member expression
+/// without checking `makeValue()`, while a token scan cannot recognize the full generic-argument
+/// grammar reliably. The probe also records evidence that cannot be a comparison: an argument
+/// known to denote a type, type-only modifier syntax, or—before Slang 2026—an empty call
+/// immediately after `>`.
+static GenericApplicationProbeResult probeGenericApplication(Parser* parser, Expr* base)
+{
+    GenericApplicationProbeResult result;
+    DiagnosticSink sink(parser->sink->getSourceManager(), nullptr);
+
+    // Consider `makeValue().member<const struct Probe {}>()`. Parsing the argument creates the
+    // declaration for `Probe`. A dedicated child builder owns such speculative nodes, and the
+    // private scope below keeps speculative declarations out of the surrounding scope. Nested
+    // probes reuse that builder. The descendant relationship lets their syntax refer to `base`,
+    // which belongs to the real parser or an enclosing probe.
+    if (!parser->genericApplicationProbeASTBuilder)
+    {
+        parser->genericApplicationProbeASTBuilder =
+            new ASTBuilder(parser->astBuilder, "Parser::generic-application-probe");
+    }
+    auto speculativeASTBuilder = parser->genericApplicationProbeASTBuilder;
+    SLANG_RELEASE_ASSERT(speculativeASTBuilder->isDescendentOf(parser->astBuilder));
+    SLANG_AST_BUILDER_RAII(speculativeASTBuilder);
+
+    Parser speculativeParser(*parser);
+    speculativeParser.astBuilder = speculativeASTBuilder;
+    speculativeParser.sink = &sink;
+
+    // The probe applies parser grammar only. It must not check declarations or expressions, and a
+    // modifier parsed speculatively must not join the enclosing declaration's pending modifiers.
+    speculativeParser.semanticsVisitor = nullptr;
+    speculativeParser.pendingModifiers = nullptr;
+
+    auto speculativeScopeDecl = speculativeParser.astBuilder->create<ScopeDecl>();
+    if (parser->currentScope)
+        speculativeScopeDecl->parentDecl = parser->currentScope->containerDecl;
+    speculativeParser.PushScope(speculativeScopeDecl);
+
+    bool hasTypeOnlyArgumentSyntax = false;
+    auto genericApp = as<GenericAppExpr>(
+        parseGenericApp(&speculativeParser, base, &hasTypeOnlyArgumentSyntax));
+    SLANG_RELEASE_ASSERT(genericApp);
+
+    result.followingToken = speculativeParser.tokenReader.peekToken();
+    if (sink.getErrorCount() != 0 ||
+        !canCurrentTokenFollowGenericApplication(&speculativeParser))
+        return result;
+
+    result.succeeded = true;
+    result.hasTypeArgumentEvidence = hasTypeOnlyArgumentSyntax;
+    if (!result.hasTypeArgumentEvidence)
+    {
+        for (auto argument : genericApp->arguments)
+        {
+            if (doesGenericArgumentUnambiguouslyNameType(&speculativeParser, argument))
+            {
+                result.hasTypeArgumentEvidence = true;
+                break;
+            }
+        }
+    }
+
+    // Before Slang 2026, `()` cannot be an expression and therefore proves that it is the empty
+    // argument list of a call. Slang 2026 added the empty-tuple expression, so the same tokens can
+    // instead be the right operand of `>` in a comparison.
+    if (parser->currentModule &&
+        parser->currentModule->languageVersion < SLANG_LANGUAGE_VERSION_2026)
+    {
+        if (speculativeParser.LookAheadToken(TokenType::LParent) &&
+            speculativeParser.LookAheadToken(TokenType::RParent, 1))
+        {
+            result.hasUnambiguousEmptyCallSuffix = true;
+        }
+    }
+    return result;
+}
+
+/// Returns whether spacing preserves the comparison interpretation after a successful generic
+/// application probe.
+///
+/// The parser keeps the historical comparison parse only when the `<...>` sequence is separated
+/// from both neighboring tokens, the token after `>` can continue a comparison, and the probe
+/// found no syntax that requires a generic application.
+static bool shouldPreserveWhitespaceDelimitedComparison(
+    Token const& lessToken,
+    GenericApplicationProbeResult const& probeResult)
+{
+    if (!(lessToken.flags & TokenFlag::AfterWhitespace))
+        return false;
+    if (!(probeResult.followingToken.flags & TokenFlag::AfterWhitespace))
+        return false;
+    if (!canTokenContinueWhitespaceDelimitedComparison(probeResult.followingToken.type))
+        return false;
+    if (probeResult.hasTypeArgumentEvidence)
+        return false;
+    if (probeResult.hasUnambiguousEmptyCallSuffix)
+        return false;
+    return true;
+}
+
+/// Parses a generic application when lookup or token evidence selects that interpretation.
+///
+/// Direct declaration lookup decides the unambiguous cases without semantic expression checking.
+/// Otherwise, an isolated grammar probe verifies the token sequence and collects type evidence.
+/// Spacing preserves the historical comparison interpretation only when both parses remain valid.
 static Expr* tryParseGenericApp(Parser* parser, Expr* base)
 {
-    Name* baseName = nullptr;
-    BaseGenericKind baseKind = BaseGenericKind::Unknown;
-    if (parser->semanticsVisitor)
-    {
-        // If we have access to a semantic visitor, we can check the base
-        // and see if it refers to a generic.
-        auto checkedBase = parser->semanticsVisitor->CheckTerm(base);
-        if (auto declRefExpr = as<DeclRefExpr>(checkedBase))
-        {
-            if (declRefExpr->declRef.is<GenericDecl>())
-            {
-                baseKind = BaseGenericKind::Generic;
-            }
-            else if (
-                declRefExpr->declRef.is<FunctionDeclBase>() ||
-                declRefExpr->declRef.is<AggTypeDeclBase>())
-            {
-                // If declref is a function or type, even if it is not a generic,
-                // we should parse the `<` as a generic application for better error
-                // messages. This is because functions or types can never precede a
-                // `<` in valid Slang code, and it is more likely that the user assumed
-                // the function or type is generic by mistake.
-                //
-                baseKind = BaseGenericKind::Generic;
-            }
-            else
-            {
-                baseKind = BaseGenericKind::NonGeneric;
-            }
-        }
-        else if (auto overloadedExpr = as<OverloadedExpr>(checkedBase))
-        {
-            baseKind = BaseGenericKind::NonGeneric;
-            for (auto candidate : overloadedExpr->lookupResult2)
-            {
-                if (candidate.declRef.is<GenericDecl>() ||
-                    candidate.declRef.is<FunctionDeclBase>() ||
-                    candidate.declRef.is<AggTypeDeclBase>())
-                {
-                    baseKind = BaseGenericKind::Generic;
-                    break;
-                }
-            }
-        }
-        else if (as<DeclRefType>(checkedBase->type.type))
-        {
-            // An expression whose checked type is a `DeclRefType` is a value, such as a swizzle
-            // (`uv.y`) or tuple element (`t._0`), and a value takes no generic arguments. An
-            // expression that names a type, namespace, function, generic or overload set has a
-            // kind-like type that is not a `DeclRefType`, and a wrapper such as the `LetExpr`
-            // that `_CheckTerm` adds for temporaries takes the type of its body.
-            baseKind = BaseGenericKind::NonGeneric;
-        }
+    auto decision = getGenericApplicationParseDecision(parser, base);
 
-        // Checking a `MemberExpr` stores its dereferenced or opened base back into the node,
-        // so checking the unchecked node again can apply `->` to a non-pointer (`p->y` with
-        // `float2* p` would report that `vector<float,2>` cannot be dereferenced). We reuse the
-        // checked node once the kind is decided: `Generic` is only set for a `DeclRefExpr` or
-        // `OverloadedExpr`, which `AddGenericOverloadCandidates` accepts, while an `Unknown`
-        // node may be a `LetExpr` that it rejects, as in `h.o.get<4>()` with an interface `o`.
-        if (as<MemberExpr>(base) && baseKind != BaseGenericKind::Unknown)
-        {
-            base = checkedBase;
-        }
-    }
-    else
-    {
-        // Without a semantic visitor, we fallback to a more simplistic lookup
-        // and guessing.
-        if (auto varExpr = as<VarExpr>(base))
-            baseName = varExpr->name;
-        // if base is a known generics, parse as generics
-        if (baseName && isGenericName(parser, baseName))
-            baseKind = BaseGenericKind::Generic;
-    }
-
-    // If base is known to be a generic, just parse as generic app.
-    if (baseKind == BaseGenericKind::Generic)
+    if (decision == GenericApplicationParseDecision::GenericApplication)
         return parseGenericApp(parser, base);
 
-    // If base is known to be non-generic, just return base.
-    if (baseKind == BaseGenericKind::NonGeneric)
+    if (decision == GenericApplicationParseDecision::LessThanOperator)
         return base;
 
-    // otherwise, we speculate as generics, and fallback to comparison when parsing failed
-    TokenSpan tokenSpan;
-    tokenSpan.m_begin = parser->tokenReader.m_cursor;
-    tokenSpan.m_end = parser->tokenReader.m_end;
+    auto probeResult = probeGenericApplication(parser, base);
+    if (!probeResult.succeeded)
+        return base;
 
-    // Setup without diagnostic lexer, or SourceLocationLine output
-    // as this sink is just to *try* generic application
-    DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
+    // With no declaration evidence, whitespace can make the same tokens spell either a generic
+    // call or two comparisons. Type-only syntax makes the generic interpretation conclusive. In
+    // language versions before Slang 2026, an empty `()` suffix is conclusive as well because it
+    // cannot be the right operand of `>`. For a value argument followed by a possible expression,
+    // such as `receiver.member < 4 > (x)`, the parser preserves the historical comparison
+    // interpretation. Supporting that spaced generic spelling on an unclassified base would
+    // require carrying both parses into semantic checking.
+    auto lessToken = peekToken(parser);
+    if (shouldPreserveWhitespaceDelimitedComparison(lessToken, probeResult))
+        return base;
 
-    Parser newParser(*parser);
-    newParser.sink = &newSink;
-
-    /* auto speculateParseRs = */ parseGenericApp(&newParser, base);
-
-    if (newSink.getErrorCount() == 0)
-    {
-        // disambiguate based on FOLLOW set
-        switch (peekTokenType(&newParser))
-        {
-        case TokenType::Scope:
-        case TokenType::Dot:
-        case TokenType::LParent:
-        case TokenType::RParent:
-        case TokenType::LBracket:
-        case TokenType::RBracket:
-        case TokenType::Colon:
-        case TokenType::Comma:
-        case TokenType::QuestionMark:
-        case TokenType::Semicolon:
-        case TokenType::OpEql:
-        case TokenType::OpNeq:
-        case TokenType::OpGreater:
-        case TokenType::OpRsh:
-        case TokenType::EndOfFile:
-            {
-                return parseGenericApp(parser, base);
-            }
-        }
-    }
-    return base;
+    return parseGenericApp(parser, base);
 }
+
 static Expr* parseMemberType(Parser* parser, Expr* base, SourceLoc opLoc)
 {
     // When called the :: or . have been consumed, so don't need to consume here.
@@ -4503,6 +4779,7 @@ static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
 
             parser->PushScope(innerFunc);
             parseModernParamList(parser, innerFunc);
+            parseAndDiagnoseInvalidTrailingThisParamConst(parser);
             auto funcScope = parser->currentScope;
             parser->PopScope();
 
@@ -4916,6 +5193,7 @@ static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
             decl->nameAndLoc.name = getName(parser, "$init");
 
             parseParameterList(parser, decl);
+            parseAndDiagnoseInvalidTrailingThisParamConst(parser);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
@@ -4979,6 +5257,7 @@ static AccessorDecl* parseAccessorDecl(Parser* parser)
     {
         parseModernParamList(parser, decl);
     }
+    parseAndDiagnoseInvalidTrailingThisParamConst(parser);
 
     if (parser->tokenReader.peekTokenType() == TokenType::LBrace)
     {
@@ -5039,6 +5318,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             decl->nameAndLoc.name = getSubscriptOperatorName(parser->astBuilder);
 
             parseParameterList(parser, decl);
+            parseAndDiagnoseInvalidTrailingThisParamConst(parser);
 
             if (AdvanceIf(parser, TokenType::RightArrow))
             {
@@ -5339,7 +5619,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
-            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
+            parseCppStyleTrailingThisParamConstModifiers(parser, decl);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             if (AdvanceIf(parser, "throws"))
@@ -7092,48 +7372,42 @@ static bool _isType(Decl* decl)
     return decl && (as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl));
 }
 
-// TODO(JS):
-// This only handles StaticMemberExpr, and VarExpr lookup scenarios!
-static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
+/// Resolves a lexical name or a `::`-qualified declaration without checking an expression.
+///
+/// Each qualifier after the first must be a namespace or aggregate type. This restriction lets
+/// parser disambiguation inspect `Namespace::Type::Member` without trying to discover the type of a
+/// value receiver, which belongs to semantic checking.
+static Decl* tryResolveLexicalOrScopeQualifiedDeclaration(Parser* parser, Expr* expr)
 {
     if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
     {
-        Decl* baseTypeDecl = _tryResolveDecl(parser, staticMemberExpr->baseExpression);
-        if (!baseTypeDecl)
-        {
+        Decl* qualifierDecl =
+            tryResolveLexicalOrScopeQualifiedDeclaration(parser, staticMemberExpr->baseExpression);
+        auto qualifierContainer = as<ContainerDecl>(qualifierDecl);
+        if (!qualifierContainer ||
+            !(as<NamespaceDeclBase>(qualifierDecl) || as<AggTypeDecl>(qualifierDecl)))
             return nullptr;
-        }
-        if (AggTypeDecl* aggTypeDecl = as<AggTypeDecl>(baseTypeDecl))
-        {
-            // TODO(JS):
-            // Is it valid to always have empty substitution set here?
-            DeclRef<ContainerDecl> declRef(aggTypeDecl);
 
-            auto lookupResult = lookUpDirectAndTransparentMembers(
-                parser->astBuilder,
-                parser->semanticsVisitor,
-                staticMemberExpr->name,
-                aggTypeDecl,
-                declRef);
+        DeclRef<ContainerDecl> qualifierDeclRef(qualifierContainer);
+        auto lookupResult = lookUpDirectAndTransparentMembers(
+            parser->astBuilder,
+            parser->semanticsVisitor,
+            staticMemberExpr->name,
+            qualifierContainer,
+            qualifierDeclRef);
+        if (!lookupResult.isValid() || lookupResult.isOverloaded())
+            return nullptr;
 
-            if (!lookupResult.isValid() || lookupResult.isOverloaded())
-                return nullptr;
-
-            return lookupResult.item.declRef.getDecl();
-        }
-
-        // Didn't find it
-        return nullptr;
+        return lookupResult.item.declRef.getDecl();
     }
 
     if (auto varExpr = as<VarExpr>(expr))
     {
-        // Do the lookup in the current scope
         auto lookupResult = lookUp(
             parser->astBuilder,
             parser->semanticsVisitor,
             varExpr->name,
-            parser->currentScope);
+            varExpr->scope ? varExpr->scope : parser->currentScope);
         if (!lookupResult.isValid() || lookupResult.isOverloaded())
             return nullptr;
 
@@ -7668,10 +7942,8 @@ Stmt* Parser::parseIfLetStatement()
 
     ReadToken(TokenType::RParent);
 
-    // Create scope for the positive statement containing the unwrapped variable.
-    // The variable must be added to scope BEFORE parsing the body, because during
-    // deferred parsing tryParseGenericApp may call CheckTerm which needs to find
-    // the variable.
+    // The positive statement's scope contains the unwrapped variable before its body is parsed,
+    // so ordinary lookup within the body can resolve that variable.
     ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
     pushScopeAndSetParent(positiveScopeDecl);
 
@@ -8693,7 +8965,7 @@ static bool _isCast(Parser* parser, Expr* expr)
             // defined. A future out of order declaration, will not be correctly found here.
             //
             // This means the semantics change depending on the order of definition (!)
-            Decl* decl = _tryResolveDecl(parser, expr);
+            Decl* decl = tryResolveLexicalOrScopeQualifiedDeclaration(parser, expr);
             // If we can find the decl-> we can resolve unambiguously
             if (decl)
             {
@@ -10011,22 +10283,28 @@ static Expr* parseEachExpr(Parser* parser, SourceLoc loc)
     return eachExpr;
 }
 
-// Check if a specific contextual keyword is available and not shadowed by user-defined decls.
+/// Returns whether a contextual keyword is not shadowed by a user declaration.
 static bool isKeywordAvailable(Parser* parser, const char* keyword)
 {
-    if (!parser->semanticsVisitor || !parser->currentLookupScope)
+    if (!parser->currentLookupScope)
         return true;
+
+    // Parser-only lookup is sufficient to determine whether a lexical declaration shadows a
+    // contextual keyword. In particular, generic-application probes deliberately have no semantic
+    // visitor, but they must still recognize local declarations named `expand` or `each`.
+    auto keywordName = parser->semanticsVisitor ? parser->semanticsVisitor->getName(keyword)
+                                                : getName(parser, keyword);
     if (lookUp(
             parser->astBuilder,
             parser->semanticsVisitor,
-            parser->semanticsVisitor->getName(keyword),
+            keywordName,
             parser->currentLookupScope)
             .isValid())
         return false;
     return true;
 }
 
-// Advance the token reader if the next token is a keyword and the keyword is not shadowed.
+/// Consumes an unshadowed contextual keyword and reports whether it was present.
 static bool advanceIfAvailableKeyword(Parser* parser, const char* keyword)
 {
     if (parser->LookAheadToken(keyword) && isKeywordAvailable(parser, keyword))
@@ -10252,9 +10530,16 @@ Expr* Parser::ParseLeafExpression()
     return parsePrefixExpr(this);
 }
 
-/// Parse an argument to an application of a generic
-static Expr* _parseGenericArg(Parser* parser)
+/// Parses one generic argument and reports whether it required type-only syntax.
+///
+/// A leading modifier forces the argument through the type grammar and sets
+/// `outUsedTypeOnlySyntax`. Speculative parsing uses that evidence to distinguish a generic
+/// application from a comparison expression.
+static Expr* _parseGenericArg(Parser* parser, bool* outUsedTypeOnlySyntax)
 {
+    if (outUsedTypeOnlySyntax)
+        *outUsedTypeOnlySyntax = false;
+
     // The grammar for generic arguments needs to be a superset of the
     // grammar for types and for expressions, because we do not know
     // which to expect at each argument position during parsing.
@@ -10275,6 +10560,9 @@ static Expr* _parseGenericArg(Parser* parser)
     Modifiers modifiers = ParseModifiers(parser);
     if (modifiers.first)
     {
+        if (outUsedTypeOnlySyntax)
+            *outUsedTypeOnlySyntax = true;
+
         // If there are any modifiers, then we know that we are actually
         // in the type case.
         //

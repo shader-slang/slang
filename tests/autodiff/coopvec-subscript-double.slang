@@ -12,8 +12,9 @@ double readElement(CoopVec<double, 3> value)
 [Differentiable]
 CoopVec<double, 3> writeElement(CoopVec<double, 3> value, double newValue)
 {
-    value[1] = newValue;
-    return value;
+    CoopVec<double, 3> mutableValue = value;
+    mutableValue[1] = newValue;
+    return mutableValue;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

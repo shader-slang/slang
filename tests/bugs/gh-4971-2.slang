@@ -18,7 +18,7 @@ void computeMain()
     // only callable when `test` itself is l-value.
 
     test[0,0] = 1;
-//CHECK:      ^ left of '=' is not an l-value
-//CHECK:      ^ left of '=' is not an l-value.
+//CHECK:^ mutating method cannot be called on immutable value
+//CHECK:^ mutating method 'set' cannot be called on an immutable value
 
 }

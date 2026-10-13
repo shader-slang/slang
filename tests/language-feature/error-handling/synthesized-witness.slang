@@ -40,7 +40,8 @@ int helper<T: IFoo>(T t)
 {
     do
     {
-        return try t.dosomething<int>();
+        var localValue = t;
+        return try localValue.dosomething<int>();
     }
     catch
     {

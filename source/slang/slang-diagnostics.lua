@@ -1170,6 +1170,13 @@ err(
 )
 
 err(
+    "cpp-style-trailing-this-param-const-only-on-function",
+    20105,
+    "trailing `const` is not valid on this declaration",
+    span { loc = "location", message = "trailing `const` is only valid on an ordinary function declaration" }
+)
+
+err(
     "decl-not-allowed",
     30102,
     "declaration not allowed here",
@@ -1779,13 +1786,6 @@ err(
 )
 
 err(
-    "static-ref-to-this",
-    30120,
-    "static function cannot refer to non-static member via `this`",
-    span { loc = "location", message = "static function cannot refer to non-static member `~member:Name` via `this`" }
-)
-
-err(
     "redeclaration",
     30200,
     "conflicting declaration",
@@ -1902,10 +1902,10 @@ err(
 )
 
 err(
-    "cannot-have-mutating-method-in-dyn-interface",
+    "cannot-have-writable-receiver-in-dyn-interface",
     33075,
-    "dyn interfaces cannot have [mutating] methods",
-    span { loc = "member:Decl", message = "dyn interfaces cannot have [mutating] methods." }
+    "dyn interfaces cannot have methods with writable receivers",
+    span { loc = "member:Decl", message = "`dyn` interface member '~member' has a writable receiver; use `[nonmutating]` to make it read-only." }
 )
 
 err(
@@ -2298,7 +2298,56 @@ err(
     "cpp-style-trailing-this-param-const-requires-hlsl",
     30443,
     "trailing `const` is only allowed in the HLSL dialect",
-    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL dialect (use a `.hlsl` file or pass `-lang hlsl`); in Slang, use `[nonmutating]` or `[mutating]` to state receiver mutability." }
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
+)
+
+standalone_note(
+    "use-slang-this-param-mode-attribute",
+    -1,
+    "use Slang's `[nonmutating]` or `[mutating]` receiver-mode attribute instead",
+    span { loc = "modifier:Modifier" }
+)
+
+err(
+    "conflicting-this-param-mode-specifiers",
+    30444,
+    "conflicting receiver-mode specifiers",
+    span { loc = "specifier:Modifier", message = "receiver-mode specifier '~specifier' conflicts with earlier specifier '~existingSpecifier:Modifier'" }
+)
+
+err(
+    "non-static-member-function-not-allowed-as-dispatch-kernel-operand",
+    30445,
+    "non-static function reference not allowed",
+    span { loc = "expr:Expr", message = "non-static function reference '~func:Decl' is not allowed here." }
+)
+
+err(
+    "abstract-storage-cannot-be-read",
+    30448,
+    "property or subscript cannot be read",
+    span { loc = "location", message = "cannot read this ~storageKind:Name because it has no `get` or `ref` accessor" }
+)
+
+err(
+    "abstract-storage-cannot-be-written",
+    30449,
+    "property or subscript cannot be written",
+    span { loc = "location", message = "cannot write this ~storageKind:Name because it has no `set` or `ref` accessor" }
+)
+
+err(
+    "abstract-storage-has-no-address",
+    30450,
+    "property or subscript does not provide an address",
+    span { loc = "location", message = "cannot take a direct reference to this ~storageKind:Name because it has no `ref` accessor" }
+)
+
+err(
+    "interface-value-has-no-address",
+    30451,
+    "interface value does not provide an address",
+    span { loc = "expression:Expr", message = "the concrete value stored in this interface value cannot be used where a direct address is required" }
 )
 
 -- Float bit cast diagnostics
@@ -5235,6 +5284,13 @@ err(
     40024,
     "Conditional hasValue is not a compile-time constant",
     span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
+)
+
+err(
+    "ref-accessor-return-must-be-l-value",
+    40026,
+    "a `ref` accessor must return an l-value",
+    span { loc = "expression:Expr", message = "this expression does not identify storage that the accessor can return by reference" }
 )
 
 fatal(

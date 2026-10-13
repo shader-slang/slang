@@ -163,14 +163,14 @@ struct ContainerNestedRef
 
 // --- Positive tests: these should NOT produce error 52012 ---
 
-// Positive 1: ref accessor on a concrete (non-interface) type is fine.
+// Positive 1: A mutating ref accessor on a concrete (non-interface) type is fine.
 struct ContainerConcreteRef
 {
     float stored;
     property float val
     {
         get { return stored; }
-        ref { return stored; }
+        [mutating] ref { return stored; }
     }
 }
 
@@ -195,7 +195,8 @@ struct ContainerSetOnly
     }
 }
 
-// Positive 4: COM interface with ref accessor is fine (COM uses vtable, not AnyValue).
+// Positive 4: A mutating ref accessor returning a COM interface is fine because COM uses a vtable,
+// not AnyValue.
 [COM("BE18F5D2-4522-4AB0-A6EE-1D157FA2B084")]
 interface ICom
 {
@@ -208,7 +209,7 @@ struct ContainerComRef
     property ICom val
     {
         get { return stored; }
-        ref { return stored; }
+        [mutating] ref { return stored; }
     }
 }
 

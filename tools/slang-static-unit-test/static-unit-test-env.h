@@ -81,8 +81,9 @@ public:
         String* outDiagnostics = nullptr);
 
     /// Parses and semantically checks `source`, using `sourcePath` for source locations and
-    /// source-language selection. This otherwise has the same contract as
-    /// `checkModuleFromSource`.
+    /// source-language selection.
+    ///
+    /// This otherwise has the same contract as `checkModuleFromSource`.
     Module* checkModuleFromSourceAtPath(
         const char* moduleName,
         const char* sourcePath,

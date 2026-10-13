@@ -28,8 +28,9 @@ struct ValueHolder : IDifferentiable
 [Differentiable]
 ValueHolder scaleAndStore(ValueHolder valueHolder, float factor)
 {
-    valueHolder.Value = valueHolder.Value * factor;
-    return valueHolder;
+    ValueHolder mutableValueHolder = valueHolder;
+    mutableValueHolder.Value = mutableValueHolder.Value * factor;
+    return mutableValueHolder;
 }
 
 [numthreads(1, 1, 1)]

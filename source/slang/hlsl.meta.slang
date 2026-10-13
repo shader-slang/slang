@@ -33515,6 +33515,9 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cooperative_vector)]
 CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 {
+    // `CoopVec`'s HLSL-style subscript has a writable receiver, while `lhs` is an `in` parameter.
+    // Each element-wise branch therefore copies `lhs` into mutable local storage before updating
+    // its elements. The intrinsic branches do not need that copy.
     __target_switch
     {
     case spirv:
@@ -33527,20 +33530,22 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
         }
         else
         {
+            var result = lhs;
             for (int i = 0; i < N; ++i)
             {
-                lhs[i] *= rhs;
+                result[i] *= rhs;
             }
-            return lhs;
+            return result;
         }
     case hlsl:
         __intrinsic_asm "$0 * $1";
     default:
+        var result = lhs;
         for (int i = 0; i < N; ++i)
         {
-            lhs[i] *= rhs;
+            result[i] *= rhs;
         }
-        return lhs;
+        return result;
     }
 }
 

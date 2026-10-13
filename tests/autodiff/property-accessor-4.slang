@@ -32,8 +32,9 @@ ValueHolder<T, Scale> scaleAndStore<T : IDifferentiable & IFloat, let Scale : in
     T factor)
     where T.Differential == T
 {
-    valueHolder.Value = valueHolder.Value * factor * T(Scale);
-    return valueHolder;
+    ValueHolder<T, Scale> mutableValueHolder = valueHolder;
+    mutableValueHolder.Value = mutableValueHolder.Value * factor * T(Scale);
+    return mutableValueHolder;
 }
 
 [numthreads(1, 1, 1)]

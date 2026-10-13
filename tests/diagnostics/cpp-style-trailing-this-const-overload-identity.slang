@@ -7,7 +7,7 @@
 
 struct Value
 {
-    // HLSL's fallback and trailing `const` select different receiver modes.
+    // Receiver-mode computation gives HLSL's fallback and trailing `const` different modes.
     void modeMismatch();
     /*CHECK:
          ^^^^^^^^^^^^ see previous declaration of 'modeMismatch'
@@ -19,7 +19,7 @@ struct Value
          ^^^^^^^^^^^^ function 'modeMismatch' has receiver type 'Value' with parameter-passing mode 'in', but its previous declaration has receiver type 'Value' with parameter-passing mode 'inout'
     */
 
-    // Static and instance declarations disagree on whether the function has a receiver.
+    // Redeclaration checking sees different receiver presence on the static and instance forms.
     static void receiverPresenceMismatch();
     /*CHECK:
                 ^^^^^^^^^^^^^^^^^^^^^^^^ see previous declaration of 'receiverPresenceMismatch'
@@ -31,7 +31,7 @@ struct Value
          ^^^^^^^^^^^^^^^^^^^^^^^^ function 'receiverPresenceMismatch' and its previous declaration disagree on whether they have an instance receiver
     */
 
-    // `[nonmutating]` and trailing `const` both select the `in` receiver mode.
+    // Receiver-mode computation gives both `[nonmutating]` and trailing `const` the `in` mode.
     [nonmutating]
     void equivalentMode();
 

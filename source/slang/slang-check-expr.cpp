@@ -26,6 +26,205 @@
 
 namespace Slang
 {
+/// Returns whether `referencedDecl` belongs outside the lambda's own scope and needs a closure
+/// field.
+///
+/// Generic parameter references and globals remain directly referenceable, while a `this`
+/// expression whose receiver type is a generic parameter still denotes a value that must be
+/// captured. The synthesized lambda declaration never captures itself.
+static bool _isDeclCapturedByLambda(
+    LambdaExpr* lambdaExpr,
+    LambdaDecl* lambdaDecl,
+    Expr* referencedExpr,
+    Decl* referencedDecl);
+static VarDeclBase* _findLambdaCaptureField(SemanticsVisitor* semantics, Expr* expr);
+static bool _doesSizeOfLikeExprEvaluateValue(SizeOfLikeExpr* expr);
+static bool _doesIsTypeExprEvaluateValue(IsTypeExpr* expr);
+
+/// Records the initializer and result portions of a completed local-binding chain.
+///
+/// Lowering evaluates each `LetExpr` initializer before its body.
+/// `_setLocalBindingStorageAccess()` builds the access path from the innermost binding outward so
+/// each `Sequence` node refers to the complete path of its body.
+static void _setLocalBindingStorageAccess(LetExpr* binding)
+{
+    SLANG_RELEASE_ASSERT(binding);
+    SLANG_RELEASE_ASSERT(binding->decl);
+    SLANG_RELEASE_ASSERT(binding->decl->initExpr);
+    SLANG_RELEASE_ASSERT(binding->body);
+    if (auto innerBinding = as<LetExpr>(binding->body))
+        _setLocalBindingStorageAccess(innerBinding);
+
+    binding->abstractStorageAccess = AbstractStorageAccessPath::makeSequence(
+        binding->getASTBuilder(),
+        binding->decl->initExpr->abstractStorageAccess,
+        binding->body->abstractStorageAccess,
+        AbstractStorageSequenceResult::SecondAccess);
+}
+
+/// Attaches `expression` as the result of a detached local-binding chain.
+///
+/// The bindings are already linked from outermost to innermost, and the innermost body must still
+/// be empty. `_wrapExpressionInLocalBindings()` attaches that body, gives every binding the result
+/// type, and records the ordered storage use of each initializer followed by the result.
+static Expr* _wrapExpressionInLocalBindings(
+    Expr* expression,
+    LetExpr* outermostBinding)
+{
+    if (!outermostBinding)
+        return expression;
+
+    auto binding = outermostBinding;
+    auto type = expression->type;
+    for (;;)
+    {
+        binding->type = type;
+        if (auto nextBinding = as<LetExpr>(binding->body))
+        {
+            binding = nextBinding;
+            continue;
+        }
+
+        SLANG_RELEASE_ASSERT(!binding->body);
+        binding->body = expression;
+        _setLocalBindingStorageAccess(outermostBinding);
+        return outermostBinding;
+    }
+}
+
+/// Clones the prefix of an expression-local binding chain required by `referencedDecls`.
+///
+/// `checkBaseForMemberExpr()` represents temporaries introduced while checking a member qualifier
+/// as a chain of `LetExpr` nodes. When the selected declaration is a static member of an
+/// existential's opened type, the value qualifier is otherwise unevaluated, but the selected
+/// declaration reference can still depend on one of those binding declarations.
+/// `_prepareSelectedDeclRefExpr()` retains the chain through the deepest such declaration before
+/// attaching the selected reference as its body.
+///
+/// `_cloneRequiredExprLocalBindingPrefix()` gives each clone the original binding declaration and
+/// initializer. Canonical semantic values name the declarations by identity.
+/// `_cloneRequiredExprLocalBindingPrefix()` clones only the binding-chain topology so candidate
+/// expressions do not share mutable wrappers; canonical semantic values continue to identify the
+/// original declarations.
+static LetExpr* _cloneRequiredExprLocalBindingPrefix(
+    ASTBuilder* astBuilder,
+    LetExpr* outermostBinding,
+    const HashSet<Decl*>& referencedDecls)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(outermostBinding);
+
+    LetExpr* deepestRequiredBinding = nullptr;
+    auto binding = outermostBinding;
+    for (;;)
+    {
+        SLANG_RELEASE_ASSERT(binding->decl);
+        if (referencedDecls.contains(binding->decl))
+            deepestRequiredBinding = binding;
+
+        if (auto nextBinding = as<LetExpr>(binding->body))
+        {
+            binding = nextBinding;
+            continue;
+        }
+        break;
+    }
+
+    if (!deepestRequiredBinding)
+        return nullptr;
+
+    LetExpr* retainedOutermostBinding = nullptr;
+    LetExpr* retainedInnermostBinding = nullptr;
+    for (binding = outermostBinding;;)
+    {
+        auto retainedBinding = astBuilder->create<LetExpr>(*binding);
+        retainedBinding->body = nullptr;
+        retainedBinding->type = QualType();
+        retainedBinding->abstractStorageAccess = nullptr;
+        if (retainedInnermostBinding)
+            retainedInnermostBinding->body = retainedBinding;
+        else
+            retainedOutermostBinding = retainedBinding;
+        retainedInnermostBinding = retainedBinding;
+
+        if (binding == deepestRequiredBinding)
+            break;
+        binding = as<LetExpr>(binding->body);
+        SLANG_RELEASE_ASSERT(binding);
+    }
+
+    SLANG_RELEASE_ASSERT(retainedOutermostBinding);
+    SLANG_RELEASE_ASSERT(retainedInnermostBinding);
+    return retainedOutermostBinding;
+}
+
+/// Gives a selected static-member reference the qualifier bindings required by its declaration.
+///
+/// Consider `makeExistential().StaticRequirement()`. Checking the qualifier opens its existential
+/// value under a `LetExpr` chain. Selecting a static requirement does not evaluate the value merely
+/// as a receiver, but the requirement's declaration reference can name the opened type or witness.
+/// `qualifierBindings` is the expression-local binding prefix captured before
+/// `ConstructLookupResultExpr()` replays the lookup breadcrumbs around the qualifier.
+/// `_prepareSelectedDeclRefExpr()` clones that prefix through the last binding named by the selected
+/// declaration reference. The resulting `StaticMemberExpr` contains only the qualifier's semantic
+/// type; `_prepareSelectedDeclRefExpr()` does not retain the unevaluated value expression as hidden
+/// provenance on that leaf.
+static Expr* _prepareSelectedDeclRefExpr(
+    SemanticsVisitor* semantics,
+    DeclRefExpr* selectedExpr,
+    LetExpr* qualifierBindings)
+{
+    SLANG_RELEASE_ASSERT(semantics);
+    auto astBuilder = semantics->getASTBuilder();
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(selectedExpr);
+
+    auto staticMemberExpr = as<StaticMemberExpr>(selectedExpr);
+    if (!staticMemberExpr)
+        return selectedExpr;
+
+    auto originalBaseExpr = staticMemberExpr->baseExpression;
+    SLANG_RELEASE_ASSERT(originalBaseExpr);
+
+    LetExpr* selectedBindings = nullptr;
+    if (qualifierBindings)
+    {
+        auto dependencySource = selectedExpr->declRef.declRefBase;
+        if (auto genericDeclRef = selectedExpr->declRef.as<GenericDecl>())
+        {
+            // A `GenericDecl` contains only the parameter list;
+            // `checkGenericAppWithCheckedArgs()` later selects its inner callable.
+            // `_prepareSelectedDeclRefExpr` inspects the inner declaration reference here because
+            // `getMemberDeclRef()` applies the enclosing member substitutions, which can contain an
+            // existential type or witness derived from the qualifier. Later argument checking can
+            // add dependencies, but every dependency on the qualifier's expression-local bindings
+            // remains reachable through those enclosing member substitutions.
+            auto innerDecl = getInner(genericDeclRef);
+            SLANG_RELEASE_ASSERT(innerDecl);
+            dependencySource =
+                astBuilder->getMemberDeclRef(genericDeclRef, innerDecl).declRefBase;
+        }
+        HashSet<Decl*> referencedDecls;
+        collectReferencedDecls(semantics, dependencySource, referencedDecls);
+        selectedBindings = _cloneRequiredExprLocalBindingPrefix(
+            astBuilder,
+            qualifierBindings,
+            referencedDecls);
+    }
+
+    auto typeType = as<TypeType>(originalBaseExpr->type->getCanonicalType());
+    SLANG_RELEASE_ASSERT(typeType);
+
+    auto semanticBaseExpr = astBuilder->create<SharedTypeExpr>();
+    semanticBaseExpr->base.type = typeType->getType();
+    semanticBaseExpr->type = originalBaseExpr->type;
+    semanticBaseExpr->loc = originalBaseExpr->loc;
+    semanticBaseExpr->checked = true;
+    staticMemberExpr->baseExpression = semanticBaseExpr;
+
+    return _wrapExpressionInLocalBindings(staticMemberExpr, selectedBindings);
+}
+
 DeclRefType* SemanticsVisitor::getExprDeclRefType(Expr* expr)
 {
     if (auto typetype = as<TypeType>(expr->type))
@@ -103,35 +302,35 @@ Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
         //
         letExpr->body = body;
         letExpr->type = body->type;
+        _setLocalBindingStorageAccess(letExpr);
 
         result = letExpr;
     }
     return result;
 }
 
-/// Execute `func` on a variable with the value of `expr`.
+/// Calls `func` with a stable variable that contains the value of `expr`.
 ///
-/// If `expr` is just a reference to an immutable (or effectively immutable)
-/// variable then this will use the existing variable. Otherwise it will
-/// create a new variable to hold `expr`, using `moveTemp()`.
-///
-/// For `LetDecl` (immutable binding), we always reuse directly.
-///
-/// For `VarDecl` (mutable binding), we reuse directly only if the variable
-/// has not been reassigned since its declaration (single-assignment `var`).
-/// This ensures that existential openings on the same variable always produce
-/// the same `ExtractExistentialType` instance, so that associated types like
-/// `obj.Element` resolve consistently across multiple accesses.
+/// An immutable local, or a mutable local that has not been reassigned, already provides the
+/// stable identity needed when an existential is opened more than once. Reusing that declaration
+/// ensures that associated types such as `obj.Element` use the same `ExtractExistentialType`.
+/// When `maybeMoveTemp` reuses a mutable local, it records `ExistentialOpenedOnVarModifier`.
+/// `checkAssignWithCheckedOperands` records `VarReassignedModifier` after a later assignment, so
+/// subsequent openings create a temporary with `moveTemp()` instead.
 /// See https://github.com/shader-slang/slang/issues/10004.
 ///
-/// When we reuse a `VarDecl` directly, we mark it with
-/// `ExistentialOpenedOnVarModifier` to track that it has been opened.
-/// If the variable is later reassigned, `VarReassignedModifier` is added,
-/// and subsequent calls to `maybeMoveTemp` will fall through to `moveTemp`.
+/// When `openExistential()` calls `maybeMoveTemp()` for a lambda capture,
+/// `_findLambdaCaptureField()` returns the closure field already assigned to `expr`. Without
+/// reusing that field, each selected use of the same captured interface value would open through a
+/// distinct temporary declaration and produce incompatible associated types. Every other
+/// expression is evaluated once into a new temporary with `moveTemp()`.
 ///
 template<typename F>
 Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
 {
+    if (auto captureField = _findLambdaCaptureField(this, expr))
+        return func(makeDeclRef(captureField));
+
     if (auto varExpr = as<VarExpr>(expr))
     {
         auto declRef = varExpr->declRef;
@@ -206,6 +405,8 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             openedValue->type = QualType(openedType);
             openedValue->originalExpr = expr;
             openedValue->checked = true;
+            openedValue->abstractStorageAccess =
+                AbstractStorageAccessPath::makeOpenedExistential(m_astBuilder, expr);
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
             //
@@ -286,6 +487,10 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
 
         openRef->checked = true;
         openRef->loc = expr->loc;
+        openRef->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            expr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
         return openRef;
     }
     return expr;
@@ -472,38 +677,387 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     return true;
 }
 
-/// Returns whether a property reference can be used as writable storage through `baseExpr`.
+/// Chooses the accessor operation needed for one semantic use of abstract storage.
 ///
-/// Consider a property with an ordinary setter followed by a `[nonmutating] ref` accessor. An
-/// immutable base cannot call the setter, but the later `ref` accessor can still provide writable
-/// storage because its `this` parameter uses `in`. Every setter and `ref` accessor must therefore
-/// be considered before the property is classified as read-only.
+/// Complete-value operations prefer value-oriented accessors, while projections prefer a stable
+/// `ref` address. When no valid accessor plan exists, the returned failure identifies the missing
+/// capability that `_checkAbstractStorageAccessPlan()` diagnoses.
+AbstractStorageAccessPlan getAbstractStorageAccessPlan(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> storageDeclRef,
+    AbstractStorageUse use)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(storageDeclRef);
+
+    DeclRef<GetterDecl> getter;
+    DeclRef<SetterDecl> setter;
+    DeclRef<RefAccessorDecl> refAccessor;
+    for (auto accessor : getMembersOfType<AccessorDecl>(
+             astBuilder,
+             storageDeclRef,
+             MemberFilterStyle::Instance))
+    {
+        if (auto getterCandidate = accessor.as<GetterDecl>())
+        {
+            if (!getter)
+                getter = getterCandidate;
+            continue;
+        }
+        if (auto setterCandidate = accessor.as<SetterDecl>())
+        {
+            if (!setter)
+                setter = setterCandidate;
+            continue;
+        }
+        if (auto refCandidate = accessor.as<RefAccessorDecl>())
+        {
+            if (!refAccessor)
+                refAccessor = refCandidate;
+        }
+    }
+
+    DeclRef<AccessorDecl> valueReader =
+        getter ? getter.as<AccessorDecl>() : refAccessor.as<AccessorDecl>();
+
+    // Accessor preference is part of the observable storage semantics: a getter and a `ref`
+    // accessor are allowed to produce different values. Complete-value operations prefer the
+    // value-oriented getter or setter, while operations on a projection prefer a stable address.
+    // The read/write cases preserve the setter as the authoritative complete-value writer, using
+    // the getter (or `ref` as its fallback) to obtain the value that will be written back.
+    //
+    // Storage use                 Preferred plan                 Fallback
+    // Complete-value read        getter                         ref
+    // Complete-value borrow      getter                         ref
+    // Complete-value write       setter                         ref
+    // Complete read/write        value reader + setter          ref, when there is no setter
+    // Stable address             ref                            none
+    // Projected write            ref                            setter
+    // Projected read/write       ref                            value reader + setter
+    // Projected borrow           ref                            getter
+    switch (use)
+    {
+    case AbstractStorageUse::ReadValue:
+        if (getter)
+            return AbstractStorageAccessPlan::makeReadValue(getter.as<AccessorDecl>());
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        break;
+
+    case AbstractStorageUse::WriteValue:
+        if (setter)
+            return AbstractStorageAccessPlan::makeWriteValue(setter);
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        break;
+
+    case AbstractStorageUse::BorrowValue:
+        if (getter)
+            return AbstractStorageAccessPlan::makeReadValue(getter.as<AccessorDecl>());
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        break;
+
+    case AbstractStorageUse::ReadWriteValue:
+        if (setter)
+        {
+            if (valueReader)
+                return AbstractStorageAccessPlan::makeReadThenWriteBack(valueReader, setter);
+        }
+        else if (refAccessor)
+        {
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        }
+        break;
+
+    case AbstractStorageUse::RequireAddress:
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        break;
+
+    case AbstractStorageUse::WriteProjectedValue:
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        if (setter)
+            return AbstractStorageAccessPlan::makeWriteValue(setter);
+        break;
+
+    case AbstractStorageUse::ModifyProjectedValue:
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        if (setter)
+        {
+            if (valueReader)
+                return AbstractStorageAccessPlan::makeReadThenWriteBack(valueReader, setter);
+        }
+        break;
+
+    case AbstractStorageUse::BorrowProjectedValue:
+        if (refAccessor)
+            return AbstractStorageAccessPlan::makeUseAddress(refAccessor);
+        if (getter)
+            return AbstractStorageAccessPlan::makeReadValue(getter.as<AccessorDecl>());
+        break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage use");
+    }
+
+    switch (use)
+    {
+    case AbstractStorageUse::ReadValue:
+    case AbstractStorageUse::BorrowValue:
+    case AbstractStorageUse::BorrowProjectedValue:
+        return AbstractStorageAccessPlan::makeInvalid(
+            AbstractStorageAccessFailure::CannotRead);
+
+    case AbstractStorageUse::WriteValue:
+    case AbstractStorageUse::WriteProjectedValue:
+        return AbstractStorageAccessPlan::makeInvalid(
+            AbstractStorageAccessFailure::CannotWrite);
+
+    case AbstractStorageUse::RequireAddress:
+        return AbstractStorageAccessPlan::makeInvalid(
+            AbstractStorageAccessFailure::CannotProvideAddress);
+
+    case AbstractStorageUse::ReadWriteValue:
+    case AbstractStorageUse::ModifyProjectedValue:
+        return AbstractStorageAccessPlan::makeInvalid(
+            valueReader ? AbstractStorageAccessFailure::CannotWrite
+                        : AbstractStorageAccessFailure::CannotRead);
+
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage use");
+        UNREACHABLE_RETURN(AbstractStorageAccessPlan::makeInvalid(
+            AbstractStorageAccessFailure::CannotRead));
+    }
+}
+
+/// Returns the semantic ABI of a setter's single new-value parameter.
+ParamInfo getSetterNewValueParamInfo(
+    ASTBuilder* astBuilder,
+    DeclRef<SetterDecl> setterDeclRef)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    SLANG_RELEASE_ASSERT(setterDeclRef);
+    auto parameters = getParameters(astBuilder, setterDeclRef);
+    SLANG_RELEASE_ASSERT(parameters.getCount() == 1);
+    auto result = getParamInfo(astBuilder, parameters[0]);
+    if (result.mode != ParamPassingMode::In)
+        SLANG_RELEASE_ASSERT(result.mode == ParamPassingMode::BorrowIn);
+    return result;
+}
+
+/// Returns whether a property declaration provides a way to write its value.
+///
+/// `_isPropertyReferenceLValue()` determines the property expression's value category; it does not
+/// decide whether the selected accessor can use this particular receiver. Keeping those questions
+/// separate lets `validateCallableReceiver()` diagnose a mutating setter or `ref` accessor
+/// precisely instead of reducing the property to a generic non-l-value first.
 static bool _isPropertyReferenceLValue(
     SemanticsVisitor* semantics,
     DeclRef<PropertyDecl> propertyDeclRef,
     Expr* baseExpr,
     QualType propertyReferenceType)
 {
-    SLANG_RELEASE_ASSERT(semantics && propertyDeclRef && baseExpr);
+    SLANG_RELEASE_ASSERT(semantics);
+    SLANG_RELEASE_ASSERT(propertyDeclRef);
+    SLANG_RELEASE_ASSERT(baseExpr);
 
-    if (isMutableGLSLBufferBlockVarExpr(baseExpr) && !propertyReferenceType.hasReadOnlyOnTarget)
-        return true;
-
-    for (auto accessorDecl : propertyDeclRef.getDecl()->getDirectMemberDeclsOfType<AccessorDecl>())
+    if (isMutableGLSLBufferBlockVarExpr(baseExpr))
     {
-        if (!as<SetterDecl>(accessorDecl) && !as<RefAccessorDecl>(accessorDecl))
-            continue;
-
-        if (baseExpr->type.isLeftValue)
-            return true;
-
-        auto accessorDeclRef =
-            semantics->getASTBuilder()->getMemberDeclRef(propertyDeclRef, accessorDecl);
-        auto thisParamInfo = semantics->findEffectiveThisParamInfo(accessorDeclRef);
-        if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+        if (!propertyReferenceType.hasReadOnlyOnTarget)
             return true;
     }
-    return false;
+
+    auto writePlan = getAbstractStorageAccessPlan(
+        semantics->getASTBuilder(),
+        propertyDeclRef.as<ContainerDecl>(),
+        AbstractStorageUse::WriteValue);
+    switch (writePlan.getKind())
+    {
+    case AbstractStorageAccessPlanKind::WriteValue:
+    case AbstractStorageAccessPlanKind::UseAddress:
+        return true;
+    case AbstractStorageAccessPlanKind::Invalid:
+        return false;
+    default:
+        SLANG_UNEXPECTED("invalid write plan for abstract storage");
+    }
+
+    UNREACHABLE_RETURN(false);
+}
+
+/// Determines whether a checked member reference names writable storage.
+///
+/// Ordinary members inherit the value category of their base, while properties and mutable GLSL
+/// buffer blocks use their own storage rules.
+static bool _isMemberReferenceLValue(SemanticsVisitor* semantics, MemberExpr* expr)
+{
+    SLANG_RELEASE_ASSERT(semantics);
+    SLANG_RELEASE_ASSERT(expr);
+    SLANG_RELEASE_ASSERT(expr->baseExpression);
+
+    if (auto propertyDeclRef = expr->declRef.as<PropertyDecl>())
+    {
+        return _isPropertyReferenceLValue(
+            semantics,
+            propertyDeclRef,
+            expr->baseExpression,
+            expr->type);
+    }
+
+    if (as<DerefMemberExpr>(expr))
+        return expr->type.isLeftValue;
+    if (expr->baseExpression->type.isLeftValue)
+        return expr->type.isLeftValue;
+
+    if (!isMutableGLSLBufferBlockVarExpr(expr->baseExpression))
+        return false;
+    return !expr->type.hasReadOnlyOnTarget;
+}
+
+static bool _isDeclCapturedByLambda(
+    LambdaExpr* lambdaExpr,
+    LambdaDecl* lambdaDecl,
+    Expr* referencedExpr,
+    Decl* referencedDecl)
+{
+    if (!lambdaExpr)
+        return false;
+    if (!referencedDecl)
+        return false;
+    if (referencedDecl == lambdaDecl)
+        return false;
+
+    if (isGenericParam(referencedDecl) && !as<ThisExpr>(referencedExpr))
+        return false;
+
+    if (as<VarDeclBase>(referencedDecl))
+    {
+        if (isGlobalDecl(referencedDecl))
+            return false;
+    }
+
+    auto lambdaScope = lambdaExpr->paramScopeDecl;
+    SLANG_RELEASE_ASSERT(lambdaScope);
+    return !referencedDecl->isChildOf(lambdaScope);
+}
+
+/// Returns the outer declaration that identifies a captured local or `this` reference.
+///
+/// For `this`, modifiers on the receiver value type are removed before selecting its type
+/// declaration.
+static Decl* _getLambdaCapturedDecl(Expr* expr)
+{
+    if (auto varExpr = as<VarExpr>(expr))
+        return as<VarDeclBase>(varExpr->declRef.getDecl());
+
+    if (auto thisExpr = as<ThisExpr>(expr))
+    {
+        auto thisTypeDecl = isDeclRefTypeOf<Decl>(unwrapModifiedType(thisExpr->type.type));
+        return thisTypeDecl.getDecl();
+    }
+
+    return nullptr;
+}
+
+/// Finds the current lambda's capture field in `closureThis.field`, including through parentheses.
+///
+/// `_findLambdaCaptureField()` looks through parentheses so that repeated existential openings
+/// reuse the capture field rather than introducing expression-local temporaries with distinct
+/// opened types.
+static VarDeclBase* _findLambdaCaptureField(SemanticsVisitor* semantics, Expr* expr)
+{
+    auto captureContext = semantics->getLambdaCaptureContext();
+    if (!captureContext)
+        return nullptr;
+
+    while (auto parenExpr = as<ParenExpr>(expr))
+        expr = parenExpr->base;
+
+    auto memberExpr = as<MemberExpr>(expr);
+    if (!memberExpr)
+        return nullptr;
+    if (!as<ThisExpr>(memberExpr->baseExpression))
+        return nullptr;
+
+    auto field = as<VarDeclBase>(memberExpr->declRef.getDecl());
+    if (!field)
+        return nullptr;
+    if (captureContext->fieldToCapturedDecl.containsKey(field))
+        return field;
+
+    return nullptr;
+}
+
+/// Returns the expression that a lambda uses to refer to an outer declaration.
+///
+/// Consider `let read = () => object.method().field`. `SelectedExpressionFinalizer` determines
+/// whether evaluation reaches the provisional capture: selecting a static `field` leaves
+/// `method()` and its qualifier unevaluated and must not capture `object`. Captured values are
+/// immutable in the closure, so `_getOrCreateLambdaCaptureReference()` makes the provisional
+/// reference an r-value immediately. `SelectedExpressionFinalizer::attachCaptureField` adds its
+/// field to the closure only if evaluation reaches the reference.
+static Expr* _getOrCreateLambdaCaptureReference(
+    ASTBuilder* astBuilder,
+    LambdaExpr* lambdaExpr,
+    LambdaDecl* lambdaDecl,
+    LambdaCaptureContext* captureContext,
+    Expr* expr,
+    Decl* referencedDecl)
+{
+    if (!_isDeclCapturedByLambda(lambdaExpr, lambdaDecl, expr, referencedDecl))
+        return expr;
+
+    SLANG_RELEASE_ASSERT(lambdaDecl);
+    SLANG_RELEASE_ASSERT(captureContext);
+    expr->type.isLeftValue = false;
+
+    VarDeclBase* captureField = nullptr;
+    if (!captureContext->capturedDeclToField.tryGetValue(referencedDecl, captureField))
+    {
+        captureField = astBuilder->create<VarDecl>();
+        if (as<VarDeclBase>(referencedDecl))
+        {
+            captureField->nameAndLoc = referencedDecl->nameAndLoc;
+        }
+        else
+        {
+            SLANG_RELEASE_ASSERT(as<ThisExpr>(expr));
+            captureField->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
+            captureField->nameAndLoc.loc = expr->loc;
+        }
+        SLANG_RELEASE_ASSERT(expr->type.type);
+        captureField->type.type = expr->type.type;
+        captureContext->capturedDeclToField.add(referencedDecl, captureField);
+        captureContext->fieldToCapturedDecl.add(captureField, referencedDecl);
+    }
+
+    auto closureThisExpr = astBuilder->create<ThisExpr>();
+    closureThisExpr->scope = lambdaDecl->ownedScope;
+    closureThisExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
+    closureThisExpr->checked = true;
+
+    auto resultExpr = astBuilder->create<MemberExpr>();
+    resultExpr->declRef = captureField;
+    resultExpr->baseExpression = closureThisExpr;
+    resultExpr->type = expr->type;
+    resultExpr->loc = expr->loc;
+    resultExpr->type.isLeftValue = false;
+    resultExpr->checked = true;
+    return resultExpr;
+}
+
+static Expr* _captureThisForLambdaIfNeeded(SemanticsVisitor* semantics, ThisExpr* expr)
+{
+    return _getOrCreateLambdaCaptureReference(
+        semantics->getASTBuilder(),
+        semantics->getParentLambdaExpr(),
+        semantics->getParentLambdaDecl(),
+        semantics->getLambdaCaptureContext(),
+        expr,
+        _getLambdaCapturedDecl(expr));
 }
 
 DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
@@ -553,6 +1107,12 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     if (getSink())
         diagnoseDeprecatedAndRemovedDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
 
+    // A `GenericDecl` is a parameter-list wrapper. Modifiers that determine instance or static
+    // membership belong to its inner declaration, so expression construction classifies that
+    // declaration instead of treating the wrapper itself as an instance member.
+    auto declarationForStaticClassification = maybeGetInner(declRef.getDecl());
+    SLANG_RELEASE_ASSERT(declarationForStaticClassification);
+
     // We now choose the expression kind. A reference without a base becomes a `VarExpr`.
     // With a base, we distinguish static member references from instance member accesses.
     if (baseExpr)
@@ -592,9 +1152,17 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->name = name;
             expr->declRef = declRef;
             expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
+            if (auto propertyDeclRef = declRef.as<PropertyDecl>())
+            {
+                expr->abstractStorageAccess = AbstractStorageAccessPath::makeDirectStorage(
+                    m_astBuilder,
+                    nullptr,
+                    propertyDeclRef.as<ContainerDecl>(),
+                    loc);
+            }
             return expr;
         }
-        else if (isEffectivelyStatic(declRef.getDecl()))
+        else if (isEffectivelyStatic(declarationForStaticClassification))
         {
             // A static declaration can also be accessed through a value, as in `value.member`.
             // We represent its base by the value's type so the resulting `StaticMemberExpr`
@@ -611,6 +1179,14 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->name = name;
             expr->declRef = declRef;
             expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
+            if (auto propertyDeclRef = declRef.as<PropertyDecl>())
+            {
+                expr->abstractStorageAccess = AbstractStorageAccessPath::makeDirectStorage(
+                    m_astBuilder,
+                    nullptr,
+                    propertyDeclRef.as<ContainerDecl>(),
+                    loc);
+            }
             return expr;
         }
         else
@@ -629,27 +1205,21 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // propagate the base's write-only restriction to the resulting member expression.
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
-            // It's not valid to reference a non-static member with a static
-            // func using 'this'.
-            if (getSink() && m_parentFunc && m_parentFunc->hasModifier<HLSLStaticModifier>() &&
-                !isDeclUsableAsStaticMember(declRef.getDecl()) && as<ThisExpr>(baseExpr))
-            {
-                getSink()->diagnose(
-                    Diagnostics::StaticRefToThis{.member = declRef.getName(), .location = loc});
-                expr->type = m_astBuilder->getErrorType();
-            }
-
-            // An ordinary instance member is writable only through an l-value base. Properties and
-            // mutable GLSL buffer blocks have their own storage rules.
+            expr->type.isLeftValue = _isMemberReferenceLValue(this, expr);
             if (auto propertyDeclRef = declRef.as<PropertyDecl>())
             {
-                expr->type.isLeftValue =
-                    _isPropertyReferenceLValue(this, propertyDeclRef, baseExpr, expr->type);
+                expr->abstractStorageAccess = AbstractStorageAccessPath::makeDirectStorage(
+                    m_astBuilder,
+                    baseExpr,
+                    propertyDeclRef.as<ContainerDecl>(),
+                    loc);
             }
-            else if (!baseExpr->type.isLeftValue)
+            else if (declRef.as<VarDeclBase>())
             {
-                expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) &&
-                                         !expr->type.hasReadOnlyOnTarget;
+                expr->abstractStorageAccess = AbstractStorageAccessPath::makeProjection(
+                    m_astBuilder,
+                    baseExpr->abstractStorageAccess,
+                    AbstractStorageProjectionMode::ReadModifyWrite);
             }
             return expr;
         }
@@ -662,6 +1232,14 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         expr->name = name;
         expr->type = type;
         expr->declRef = declRef;
+        if (auto propertyDeclRef = declRef.as<PropertyDecl>())
+        {
+            expr->abstractStorageAccess = AbstractStorageAccessPath::makeDirectStorage(
+                m_astBuilder,
+                nullptr,
+                propertyDeclRef.as<ContainerDecl>(),
+                loc);
+        }
         // Generic applications and member expressions include tokens that are absent from
         // the resulting `VarExpr`. We retain `originalExpr` for the language server to locate
         // those tokens in the expression written by the programmer.
@@ -670,7 +1248,16 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         {
             expr->originalExpr = originalExpr;
         }
-        return expr;
+        auto preparedExpr = _getOrCreateLambdaCaptureReference(
+            m_astBuilder,
+            m_parentLambdaExpr,
+            m_parentLambdaDecl,
+            m_lambdaCaptureContext,
+            expr,
+            as<VarDeclBase>(declRef.getDecl()));
+        auto preparedDeclRefExpr = as<DeclRefExpr>(preparedExpr);
+        SLANG_RELEASE_ASSERT(preparedDeclRefExpr);
+        return preparedDeclRefExpr;
     }
 }
 
@@ -678,7 +1265,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
 {
     if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
-        return coerce(
+        return coerceExpressionWithoutFinalization(
             CoercionSite::ExplicitCoercion,
             resPtrType->getElementType(),
             base,
@@ -708,8 +1295,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // however, and so the code here might need updating sooner or
         // later.
         //
-        bool baseIsLVal = QualType(base->type.type).isLeftValue;
-        derefExpr->type.isLeftValue = baseIsLVal;
+        derefExpr->type.isLeftValue = QualType(base->type.type).isLeftValue;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -719,10 +1305,14 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     else
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
-        derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
+
+    derefExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+        m_astBuilder,
+        base->abstractStorageAccess,
+        AbstractStorageUse::ReadValue);
 
     return derefExpr;
 }
@@ -793,11 +1383,11 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
     // Check if we are reaching the associated type decl through inheritance from a concrete type.
     for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
     {
-        switch (breadcrumb->kind)
+        switch (breadcrumb->getKind())
         {
         case LookupResultItem::Breadcrumb::Kind::SuperType:
             {
-                auto witness = as<SubtypeWitness>(breadcrumb->val);
+                auto witness = breadcrumb->getSubtypeWitness();
                 if (auto subDeclRefType = as<DeclRefType>(witness->getSub()))
                 {
                     if (!as<InterfaceDecl>(subDeclRefType->getDeclRef().getDecl()))
@@ -917,6 +1507,26 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
         originalExpr);
 }
 
+/// Returns whether `ConstructLookupResultExpr()` can omit an implicit receiver value before
+/// replaying `followingBreadcrumb` for a declaration reference.
+///
+/// Consider `[BackwardDerivativeOf(method)]` inside the type that declares `method`. The attribute
+/// needs the base-less declaration identity; an implicit `this` would instead bind a runtime
+/// receiver. A following super-type step changes only the specialized declaration reference, so it
+/// also needs no value. In contrast, a member or dereference step traverses runtime storage such as
+/// `this.transparentField`; `ConstructLookupResultExpr()` must retain that receiver so checking the
+/// reconstructed declaration reference can reject the capture.
+static bool _canOmitImplicitReceiverValueForDeclarationReference(
+    LookupResultItem::Breadcrumb* followingBreadcrumb)
+{
+    for (auto breadcrumb = followingBreadcrumb; breadcrumb; breadcrumb = breadcrumb->next)
+    {
+        if (breadcrumb->getKind() != LookupResultItem::Breadcrumb::Kind::SuperType)
+            return false;
+    }
+    return true;
+}
+
 Expr* SemanticsVisitor::ConstructLookupResultExpr(
     LookupResultItem const& item,
     Expr* baseExpr,
@@ -935,6 +1545,13 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
     if (auto lookupResultExpr = maybeUseSynthesizedDeclForLookupResult(item, originalExpr))
         return lookupResultExpr;
 
+    // Capture the expression-local bindings before replaying breadcrumbs.
+    // `ConstructLookupResultExpr()` turns a super-type breadcrumb into a storage-preserving cast,
+    // but the selected declaration reference can still name a temporary declared by this prefix.
+    LetExpr* qualifierBindings = as<LetExpr>(baseExpr);
+    if (auto sharedTypeExpr = as<SharedTypeExpr>(baseExpr))
+        qualifierBindings = as<LetExpr>(sharedTypeExpr->base.exp);
+
     // If we collected any breadcrumbs, then these represent
     // additional segments of the lookup path that we need
     // to expand here.
@@ -942,10 +1559,11 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
     for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
     {
         auto baseBeforeBreadcrumb = bb;
-        switch (breadcrumb->kind)
+        switch (breadcrumb->getKind())
         {
         case LookupResultItem::Breadcrumb::Kind::Member:
-            bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, name, loc, originalExpr);
+            bb = ConstructDeclRefExpr(
+                breadcrumb->getMemberDeclRef(), bb, name, loc, originalExpr);
             break;
 
         case LookupResultItem::Breadcrumb::Kind::Deref:
@@ -954,38 +1572,21 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
 
         case LookupResultItem::Breadcrumb::Kind::SuperType:
             {
-                // Note: a lookup through a super-type can
-                // occur even in the case of a `static` member,
-                // so we only modify the base expression here
-                // if there is one.
-                //
+                // A `SuperType` step can precede a static member. In that case the selected
+                // declaration reference already carries the specialization and there is no value
+                // base to convert.
                 if (bb)
                 {
-                    // We know that the breadcrumb reprsents a
-                    // cast of the base expression to a super type,
-                    // so we construct that cast explicitly here.
-                    //
-                    auto witness = as<SubtypeWitness>(breadcrumb->val);
-                    SLANG_ASSERT(witness);
-                    auto expr = createCastToSuperTypeExpr(witness->getSup(), bb, witness);
-
-                    // Note that we allow a cast of an l-value to
-                    // be used as an l-value here because it enables
-                    // `[mutating]` methods to be called, and
-                    // mutable properties to be modified, but this
-                    // is probably not *technically* correct, since
-                    // treating an l-value of type `Derived` as
-                    // an l-value of type `Base` implies that we
-                    // can assign an arbitrary value of type `Base`
-                    // to that l-value (which would be an error).
-                    //
-                    // TODO: make sure we believe there are no
-                    // issues here.
-                    //
-                    if (bb && bb->type.isLeftValue)
-                    {
-                        expr->type.isLeftValue = true;
-                    }
+                    // `_lookUpDirectAndTransparentMembers()` recorded the subtype witness;
+                    // `ConstructLookupResultExpr()` uses it to perform the deferred value
+                    // conversion.
+                    auto witness = breadcrumb->getSubtypeWitness();
+                    auto expr = as<CastToSuperTypeExpr>(
+                        createStoragePreservingCastToSuperTypeExpr(
+                            witness->getSup(),
+                            bb,
+                            witness));
+                    SLANG_RELEASE_ASSERT(expr);
 
                     bb = expr;
                 }
@@ -995,9 +1596,9 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         case LookupResultItem::Breadcrumb::Kind::ThisType:
             {
                 // An implicit `This` base can only start a lookup path.
-                SLANG_ASSERT(bb == nullptr);
+                SLANG_RELEASE_ASSERT(bb == nullptr);
 
-                auto thisType = calcThisType(breadcrumb->declRef);
+                auto thisType = calcThisType(breadcrumb->getThisTypeDeclRef());
                 auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
                 typeExpr->type.type = m_astBuilder->getTypeType(thisType);
                 typeExpr->base.type = thisType;
@@ -1008,16 +1609,22 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         case LookupResultItem::Breadcrumb::Kind::ThisValue:
             {
                 // An implicit `this` base can only start a lookup path.
-                SLANG_ASSERT(bb == nullptr);
+                SLANG_RELEASE_ASSERT(bb == nullptr);
 
-                auto thisExpr = m_astBuilder->create<ThisExpr>();
-                thisExpr->loc = loc;
-                thisExpr->scope = breadcrumb->getThisValueScope();
+                bool omitReceiverValue =
+                    m_allowStaticReferenceToNonStaticMember &&
+                    _canOmitImplicitReceiverValueForDeclarationReference(breadcrumb->next);
+                if (!omitReceiverValue)
+                {
+                    auto thisExpr = m_astBuilder->create<ThisExpr>();
+                    thisExpr->loc = loc;
+                    thisExpr->scope = breadcrumb->getLookupOriginScope();
 
-                // Lookup records only whether a receiver value is available. The ordinary `this`
-                // checker determines the reconstructed value's type and mutability.
-                bb = checkThisExprWithoutCapturing(thisExpr);
-                bb->checked = true;
+                    // `_lookUpInScopes()` records only whether a receiver value is available.
+                    // `checkThisExpr()` determines the reconstructed value's type and mutability.
+                    bb = checkThisExpr(thisExpr);
+                    bb->checked = true;
+                }
             }
             break;
 
@@ -1026,7 +1633,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
         if (getShared()->isInLanguageServer())
         {
-            // Clear locations only on the implicit expressions created for breadcrumbs. A
+            // Only implicit breadcrumb expressions have their locations cleared. Replaying a
             // transparent `SuperType` breadcrumb can leave `bb` pointing at the programmer-written
             // base expression, whose location language-server AST lookup must retain.
             if (bb && bb != baseBeforeBreadcrumb)
@@ -1036,10 +1643,13 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
     }
 
-    auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
-    // A property reference does not produce an `InvokeExpr` during semantic checking. Register
-    // its accessors here so that lowering can later select the getter or setter without losing
-    // the derivative associations needed by the enclosing differentiable function.
+    auto resultExpr = _prepareSelectedDeclRefExpr(
+        this,
+        ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr),
+        qualifierBindings);
+    // `ConstructLookupResultExpr()` does not produce an `InvokeExpr` for a property reference.
+    // Register its accessors here so that lowering can later select the getter or setter without
+    // losing the derivative associations needed by the enclosing differentiable function.
     if (m_parentDifferentiableAttr && item.declRef.as<PropertyDecl>())
     {
         registerAssociatedMethods(this, item.declRef);
@@ -1341,12 +1951,12 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptional(const LookupR
     {
         bool optionalConstraintsChecked = true;
 
-        for (auto bb = item.breadcrumbs; bb; bb = bb->next)
+        for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
         {
-            auto witness = as<SubtypeWitness>(bb->val);
-            if (!witness)
+            if (breadcrumb->getKind() != LookupResultItem::Breadcrumb::Kind::SuperType)
                 continue;
 
+            auto witness = breadcrumb->getSubtypeWitness();
             if (isWitnessUncheckedOptional(witness))
             {
                 optionalConstraintsChecked = false;
@@ -2237,6 +2847,20 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     return checkedTerm;
 }
 
+Expr* SemanticsVisitor::checkPotentiallyUnevaluatedTerm(Expr* term)
+{
+    SemanticsVisitor visitor(withPotentiallyUnevaluatedTerm());
+    return visitor.CheckTerm(term);
+}
+
+/// Wraps `expression` in the temporary bindings accumulated in `localScope`.
+static Expr* _wrapExpressionInLocalBindings(
+    Expr* expression,
+    SemanticsContext::ExprLocalScope& localScope)
+{
+    return _wrapExpressionInLocalBindings(expression, localScope.getOuterMostBinding());
+}
+
 Expr* SemanticsVisitor::_CheckTerm(Expr* term)
 {
     if (!term)
@@ -2260,32 +2884,7 @@ Expr* SemanticsVisitor::_CheckTerm(Expr* term)
     if (IsErrorExpr(checkedTerm))
         return checkedTerm;
 
-    LetExpr* outerMostBinding = exprLocalScope.getOuterMostBinding();
-    if (!outerMostBinding)
-    {
-        return checkedTerm;
-    }
-
-    LetExpr* binding = outerMostBinding;
-    auto type = checkedTerm->type;
-    while (binding)
-    {
-        binding->type = type;
-
-        if (const auto body = binding->body)
-        {
-            binding = as<LetExpr>(body);
-            SLANG_ASSERT(binding);
-            continue;
-        }
-        else
-        {
-            binding->body = checkedTerm;
-            break;
-        }
-    }
-
-    return outerMostBinding;
+    return _wrapExpressionInLocalBindings(checkedTerm, exprLocalScope);
 }
 
 Expr* SemanticsVisitor::CreateErrorExpr(Expr* expr)
@@ -2310,7 +2909,11 @@ bool SemanticsVisitor::IsErrorExpr(Expr* expr)
 
 Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
 {
-    if (auto memberExpr = as<MemberExpr>(expr))
+    if (auto parenExpr = as<ParenExpr>(expr))
+    {
+        return GetBaseExpr(parenExpr->base);
+    }
+    else if (auto memberExpr = as<MemberExpr>(expr))
     {
         return memberExpr->baseExpression;
     }
@@ -2335,6 +2938,76 @@ Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
         return GetBaseExpr(partiallyApplied->baseExpr);
     }
     return nullptr;
+}
+
+DeclRefExpr* SemanticsVisitor::getDirectCallableDeclRefExpr(Expr* expr)
+{
+    auto declRefExpr =
+        as<DeclRefExpr>(getCallableExprThroughTransparentWrappers(expr));
+    if (!declRefExpr)
+        return nullptr;
+    if (!declRefExpr->declRef.as<CallableDecl>())
+        return nullptr;
+    return declRefExpr;
+}
+
+void SemanticsVisitor::replaceSelectedCallableThroughTransparentWrappers(
+    Expr*& expr,
+    Expr* replacement)
+{
+    SLANG_RELEASE_ASSERT(expr);
+    SLANG_RELEASE_ASSERT(replacement);
+
+    List<Expr*> wrappers;
+    getCallableExprThroughTransparentWrappers(expr, &wrappers);
+    if (wrappers.getCount() == 0)
+    {
+        expr = replacement;
+        return;
+    }
+
+    auto innerWrapper = wrappers.getLast();
+    if (auto parenExpr = as<ParenExpr>(innerWrapper))
+    {
+        parenExpr->base = replacement;
+    }
+    else if (auto genericAppExpr = as<GenericAppExpr>(innerWrapper))
+    {
+        genericAppExpr->functionExpr = replacement;
+    }
+    else
+    {
+        auto letExpr = as<LetExpr>(innerWrapper);
+        SLANG_RELEASE_ASSERT(letExpr);
+        letExpr->body = replacement;
+    }
+
+    Expr* selectedResult = replacement;
+    Index wrapperIndex = wrappers.getCount();
+    while (wrapperIndex)
+    {
+        auto wrapper = wrappers[--wrapperIndex];
+        wrapper->type = selectedResult->type;
+        if (auto parenExpr = as<ParenExpr>(wrapper))
+        {
+            SLANG_RELEASE_ASSERT(parenExpr->base == selectedResult);
+            parenExpr->abstractStorageAccess = selectedResult->abstractStorageAccess;
+        }
+        else if (auto genericAppExpr = as<GenericAppExpr>(wrapper))
+        {
+            SLANG_RELEASE_ASSERT(genericAppExpr->functionExpr == selectedResult);
+            genericAppExpr->abstractStorageAccess = selectedResult->abstractStorageAccess;
+        }
+        else
+        {
+            auto letExpr = as<LetExpr>(wrapper);
+            SLANG_RELEASE_ASSERT(letExpr);
+            SLANG_RELEASE_ASSERT(letExpr->body == selectedResult);
+            _setLocalBindingStorageAccess(letExpr);
+        }
+        selectedResult = wrapper;
+    }
+    expr = selectedResult;
 }
 
 Expr* SemanticsExprVisitor::visitIncompleteExpr(IncompleteExpr* expr)
@@ -3326,6 +3999,23 @@ IntVal* SemanticsVisitor::tryFoldIntegerConstantExpression(
     return tryConstantFoldExpr(expr, kind, circularityInfo);
 }
 
+IntVal* SemanticsVisitor::foldIntegerConstantExpressionFromFinalizedExpr(
+    Expr* expr,
+    ConstantFoldingKind kind,
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    SLANG_RELEASE_ASSERT(expr);
+
+    if (IsErrorExpr(expr))
+        return nullptr;
+
+    auto result = tryFoldIntegerConstantExpression(expr, kind, circularityInfo);
+    if (!result && sink)
+        sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
+    return result;
+}
+
 IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     Expr* inExpr,
     IntegerConstantExpressionCoercionType coercionType,
@@ -3344,39 +4034,60 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     DiagnosticSink* sink,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
+    auto finalizedExpr = inExpr;
+    return checkAndFinalizeIntegerConstantExpression(
+        finalizedExpr,
+        coercionType,
+        expectedType,
+        kind,
+        sink,
+        circularityInfo);
+}
+
+IntVal* SemanticsVisitor::checkAndFinalizeIntegerConstantExpression(
+    Expr*& ioExpr,
+    IntegerConstantExpressionCoercionType coercionType,
+    Type* expectedType,
+    ConstantFoldingKind kind,
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
     // No need to issue further errors if the expression didn't even type-check.
-    if (IsErrorExpr(inExpr))
+    if (IsErrorExpr(ioExpr))
         return nullptr;
 
-    // First coerce the expression to the expected type
-    Expr* expr = nullptr;
+    Type* targetType = nullptr;
     switch (coercionType)
     {
     case IntegerConstantExpressionCoercionType::SpecificType:
-        expr = coerce(CoercionSite::General, expectedType, inExpr, sink);
+        SLANG_RELEASE_ASSERT(expectedType);
+        targetType = expectedType;
         break;
     case IntegerConstantExpressionCoercionType::AnyInteger:
-        if (isScalarIntegerType(inExpr->type))
-            expr = inExpr;
-        else if (isEnumType(inExpr->type))
-            expr = inExpr;
+        if (isScalarIntegerType(ioExpr->type) || isEnumType(ioExpr->type))
+            targetType = ioExpr->type.type;
         else
-            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr, sink);
+            targetType = m_astBuilder->getIntType();
         break;
     default:
-        break;
+        SLANG_UNEXPECTED("unhandled integer constant coercion mode");
     }
+
+    // This call is the only operation here that finalizes the selected expression and records its
+    // `ReadValue` use. Contextual coercion can first select an overload; finalization then commits
+    // that selected path exactly once.
+    ioExpr = coerceAndFinalizeForStorageUse(
+        CoercionSite::General,
+        targetType,
+        ioExpr,
+        sink,
+        AbstractStorageUse::ReadValue);
 
     // No need to issue further errors if the type coercion failed.
-    if (IsErrorExpr(expr))
+    if (IsErrorExpr(ioExpr))
         return nullptr;
 
-    auto result = tryFoldIntegerConstantExpression(expr, kind, circularityInfo);
-    if (!result && sink)
-    {
-        sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
-    }
-    return result;
+    return foldIntegerConstantExpressionFromFinalizedExpr(ioExpr, kind, sink, circularityInfo);
 }
 
 IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
@@ -3406,6 +4117,72 @@ IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr, ConstantFoldin
     return result;
 }
 
+/// Returns the expression beneath any parentheses around an index's storage projection base.
+///
+/// Parentheses preserve the l-value and storage denoted by their operand. For example,
+/// `(storage.item.xy)[1]` projects the same swizzled property storage as `storage.item.xy[1]`.
+/// `_getSubscriptStorageProjection()` therefore classifies the underlying swizzle instead of
+/// treating parentheses as a request for a direct address.
+static Expr* _getStorageProjectionBaseExpr(Expr* expr)
+{
+    while (auto parenExpr = as<ParenExpr>(expr))
+    {
+        expr = parenExpr->base;
+    }
+    return expr;
+}
+
+/// Returns the storage-projection facts for a checked subscript.
+///
+/// Consider `value.xy[1]`. A constant in-range index selects `value.y`, so `visitIndexExpr()` can
+/// preserve the selected component inside a deferred property value and then use getter/setter
+/// writeback. For a dynamic index into `value.xy`, `_getSubscriptStorageProjection()` records that
+/// the index was not constant. `visitIndexExpr()` can copy the selected value for
+/// `BorrowProjectedValue`, but it diagnoses a nonconstant index when an `out`, `inout`, `ref`, or
+/// other use requires one component's address. An ordinary subscript requires its base's direct
+/// address because lowering does not retain an arbitrary indexed write-back operation.
+static IndexExprStorageProjection _getSubscriptStorageProjection(
+    SemanticsVisitor* semantics,
+    IndexExpr* subscriptExpr)
+{
+    SLANG_RELEASE_ASSERT(subscriptExpr->indexExprs.getCount() == 1);
+
+    auto projectionBase = _getStorageProjectionBaseExpr(subscriptExpr->baseExpression);
+    Index elementCount = 0;
+    if (auto swizzleExpr = as<SwizzleExpr>(projectionBase))
+    {
+        if (isDirectAddressTupleElementSwizzle(swizzleExpr))
+            return IndexExprStorageProjection::makeDirectAddress();
+        elementCount = swizzleExpr->elementIndices.getCount();
+    }
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(projectionBase))
+        elementCount = matrixSwizzleExpr->elementCount;
+    else
+        return IndexExprStorageProjection::makeDirectAddress();
+
+    auto indexValue = as<ConstantIntVal>(semantics->tryConstantFoldExpr(
+        SubstExpr<Expr>(subscriptExpr->indexExprs[0]),
+        SemanticsVisitor::ConstantFoldingKind::CompileTime,
+        nullptr));
+    if (!indexValue)
+        return IndexExprStorageProjection::makeNonConstantSwizzleElement();
+    if (indexValue->getValue() < 0)
+        return IndexExprStorageProjection::makeDirectAddress();
+    if (indexValue->getValue() >= elementCount)
+        return IndexExprStorageProjection::makeDirectAddress();
+
+    return IndexExprStorageProjection::makeRetainedSwizzleElement(Index(indexValue->getValue()));
+}
+
+/// Returns how a checked index projection maps writes to abstract storage behind its base.
+static AbstractStorageProjectionMode _getAbstractStorageProjectionMode(
+    const IndexExprStorageProjection& projection)
+{
+    if (projection.hasRetainedSwizzleElement())
+        return AbstractStorageProjectionMode::ReadModifyWrite;
+    return AbstractStorageProjectionMode::RequireAddressForWrite;
+}
+
 Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type* elementType)
 {
     auto baseExpr = subscriptExpr->baseExpression;
@@ -3428,17 +4205,49 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     for (auto& expr : subscriptExpr->indexExprs)
     {
-        expr = CheckExpr(expr);
+        expr = CheckTerm(expr);
     }
     auto& indexExpr = subscriptExpr->indexExprs[0];
 
     auto intTargetType = getMatchingIntType(indexExpr->type.type);
-    indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
+    indexExpr = coerceExpressionWithoutFinalization(
+        CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
+
+    if (as<PtrTypeBase>(baseExpr->type.type))
+    {
+        auto baseAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            baseExpr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
+        auto indexAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            indexExpr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
+        subscriptExpr->abstractStorageAccess = AbstractStorageAccessPath::makeSequence(
+            m_astBuilder,
+            baseAccess,
+            indexAccess,
+            AbstractStorageSequenceResult::SecondAccess);
+    }
+    else
+    {
+        subscriptExpr->setStorageProjection(
+            _getSubscriptStorageProjection(this, subscriptExpr));
+        auto baseAccess = AbstractStorageAccessPath::makeProjection(
+            m_astBuilder,
+            baseExpr->abstractStorageAccess,
+            _getAbstractStorageProjectionMode(subscriptExpr->getStorageProjection()));
+        subscriptExpr->abstractStorageAccess = AbstractStorageAccessPath::makeSequence(
+            m_astBuilder,
+            baseAccess,
+            indexExpr->abstractStorageAccess,
+            AbstractStorageSequenceResult::FirstAccess);
+    }
 
     return subscriptExpr;
 }
@@ -3548,10 +4357,27 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
     }
 }
 
+/// Registers derivative associations when `callableExpr` directly selects a declaration.
+///
+/// Callable selection may preserve parentheses, a generic application, or qualifier-local
+/// bindings around the selected declaration reference. Calls through other function-valued
+/// expressions have no declaration whose derivative associations can be registered here.
+static void registerAssociatedMethodsForSelectedCallable(
+    SemanticsVisitor* context,
+    Expr* callableExpr)
+{
+    auto declRefExpr =
+        as<DeclRefExpr>(getCallableExprThroughTransparentWrappers(callableExpr));
+    if (!declRefExpr || !declRefExpr->declRef)
+        return;
+    registerAssociatedMethods(context, getDeclRef(context->getASTBuilder(), declRefExpr));
+}
+
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
+    SemanticsExprVisitor baseVisitor(withPotentiallyUnevaluatedTerm());
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
+    auto baseExpr = baseVisitor.checkBaseForMemberExpr(
         subscriptExpr->baseExpression,
         CheckBaseContext::Subscript,
         needDeref);
@@ -3559,7 +4385,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // If the base expression is a type, it means that this is an array declaration,
     // then we should disable short-circuit in case there is logical expression in
     // the subscript
-    auto baseType = baseExpr->type.Ptr();
+    // A semantic modifier changes how later passes consume a value, but it does not change the
+    // declarations or built-in indexing operations provided by the value's base type. Member
+    // lookup applies the same rule in `visitMemberExpr`.
+    auto baseType = unwrapModifiedType(baseExpr->type.Ptr());
     auto baseTypeType = as<TypeType>(baseType);
     auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
                           ? SemanticsVisitor(disableShortCircuitLogicalExpr())
@@ -3684,10 +4513,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             for (auto& arg : checkedInvokeExpr->arguments)
                 maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
 
-            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
-            {
-                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
-            }
+            registerAssociatedMethodsForSelectedCallable(this, checkedInvokeExpr->functionExpr);
         }
     }
 
@@ -3701,6 +4527,7 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
 
     expr->base = base;
     expr->type = base->type;
+    expr->abstractStorageAccess = base->abstractStorageAccess;
     return expr;
 }
 
@@ -3765,11 +4592,17 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
     }
 }
 
+static AbstractStorageUse _getDirectAssignmentValueUse(
+    ASTBuilder* astBuilder,
+    Expr* destination);
+
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
     if (expr->right->type.isWriteOnly)
         getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
 
+    auto assignedValueUse = _getDirectAssignmentValueUse(m_astBuilder, expr->left);
+    expr->left = checkAbstractStorageUse(expr->left, AbstractStorageUse::WriteValue);
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
     if (auto atomicType = as<AtomicType>(type))
@@ -3777,7 +4610,12 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         type = atomicType->getElementType();
     }
     auto right = maybeOpenRef(expr->right);
-    expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
+    expr->right = coerceAndFinalizeForStorageUse(
+        CoercionSite::Assignment,
+        type,
+        right,
+        getSink(),
+        assignedValueUse);
 
     // Track reassignment of `VarDecl`s for single-assignment detection.
     // After reassignment, `maybeMoveTemp` will fall through to `moveTemp`
@@ -3789,10 +4627,13 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             // Skip module-level vars: they can be shared across compilations
             // (e.g. glsl.meta.slang builtins) and must not be mutated with
             // per-compile-arena modifiers.
-            if (!as<LetDecl>(varDecl) && !as<ModuleDecl>(varDecl->parentDecl))
+            if (!as<LetDecl>(varDecl))
             {
-                if (!varDecl->hasModifier<VarReassignedModifier>())
-                    addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
+                if (!as<ModuleDecl>(varDecl->parentDecl))
+                {
+                    if (!varDecl->hasModifier<VarReassignedModifier>())
+                        addModifier(varDecl, m_astBuilder->create<VarReassignedModifier>());
+                }
             }
         }
     }
@@ -3812,87 +4653,652 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         }
     }
     expr->type = type;
+    expr->abstractStorageAccess = AbstractStorageAccessPath::makeAssignmentResult(
+        m_astBuilder,
+        expr->left->abstractStorageAccess);
     return expr;
+}
+
+AbstractStorageUse getAbstractStorageUseForParameter(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        return AbstractStorageUse::ReadValue;
+    case ParamPassingMode::Out:
+        return AbstractStorageUse::WriteValue;
+    case ParamPassingMode::BorrowIn:
+        return AbstractStorageUse::BorrowValue;
+    case ParamPassingMode::BorrowInOut:
+        return AbstractStorageUse::ReadWriteValue;
+    case ParamPassingMode::Ref:
+        return AbstractStorageUse::RequireAddress;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(AbstractStorageUse::ReadValue);
+    }
+}
+
+AbstractStorageUse getAbstractStorageUseForSetterNewValue(ParamInfo const& paramInfo)
+{
+    if (paramInfo.mode == ParamPassingMode::BorrowIn)
+    {
+        if (isNonCopyableType(paramInfo.type))
+            return AbstractStorageUse::RequireAddress;
+    }
+    return getAbstractStorageUseForParameter(paramInfo.mode);
+}
+
+AbstractStorageUse getAbstractStorageUseForAccessorReceiver(
+    DeclRef<AccessorDecl> accessorDeclRef,
+    ParamPassingMode mode)
+{
+    SLANG_RELEASE_ASSERT(accessorDeclRef);
+    if (accessorDeclRef.as<RefAccessorDecl>())
+    {
+        if (mode == ParamPassingMode::BorrowInOut)
+            return AbstractStorageUse::RequireAddress;
+    }
+    return getAbstractStorageUseForParameter(mode);
+}
+
+AbstractStorageUse getAbstractStorageUseForImplicitCastOperand(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::Out:
+        return AbstractStorageUse::WriteProjectedValue;
+    case ParamPassingMode::BorrowInOut:
+        return AbstractStorageUse::ModifyProjectedValue;
+    default:
+        SLANG_UNEXPECTED("parameter mode does not support implicit-cast writeback");
+        UNREACHABLE_RETURN(AbstractStorageUse::ReadValue);
+    }
+}
+
+AbstractStorageUse getAbstractStorageUseForExplicitReference(QualType referenceType)
+{
+    SLANG_RELEASE_ASSERT(as<ExplicitRefType>(referenceType.type));
+    return referenceType.isLeftValue ? AbstractStorageUse::RequireAddress
+                                     : AbstractStorageUse::ReadValue;
+}
+
+AbstractStorageAccessPath* AbstractStorageAccessPath::_allocate(ASTBuilder* astBuilder)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    auto memory = astBuilder->getArena().allocate(sizeof(AbstractStorageAccessPath));
+    return new (memory) AbstractStorageAccessPath();
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeDirectStorage(
+    ASTBuilder* astBuilder,
+    Expr* receiver,
+    DeclRef<ContainerDecl> storageDeclRef,
+    SourceLoc location)
+{
+    SLANG_RELEASE_ASSERT(storageDeclRef);
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::DirectStorage;
+    path->m_expression = receiver;
+    path->m_storageDeclRef = storageDeclRef;
+    path->m_location = location;
+    return path;
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeProjection(
+    ASTBuilder* astBuilder,
+    AbstractStorageAccess baseAccess,
+    AbstractStorageProjectionMode mode)
+{
+    if (!baseAccess)
+        return nullptr;
+
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::Projection;
+    path->m_firstAccess = baseAccess;
+    path->m_projectionMode = mode;
+    return path;
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeFixedOperandUse(
+    ASTBuilder* astBuilder,
+    AbstractStorageAccess operandAccess,
+    AbstractStorageUse operandUse)
+{
+    if (!operandAccess)
+        return nullptr;
+
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::FixedOperandUse;
+    path->m_firstAccess = operandAccess;
+    path->m_fixedOperandUse = operandUse;
+    return path;
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeOpenedExistential(
+    ASTBuilder* astBuilder,
+    Expr* originalExpression)
+{
+    SLANG_RELEASE_ASSERT(originalExpression);
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::OpenedExistential;
+    path->m_expression = originalExpression;
+    return path;
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeSequence(
+    ASTBuilder* astBuilder,
+    AbstractStorageAccess firstAccess,
+    AbstractStorageAccess secondAccess,
+    AbstractStorageSequenceResult result)
+{
+    if (!firstAccess)
+    {
+        if (result == AbstractStorageSequenceResult::SecondAccess)
+            return secondAccess;
+        return makeFixedOperandUse(astBuilder, secondAccess, AbstractStorageUse::ReadValue);
+    }
+    if (!secondAccess)
+    {
+        if (result == AbstractStorageSequenceResult::FirstAccess)
+            return firstAccess;
+        return makeFixedOperandUse(astBuilder, firstAccess, AbstractStorageUse::ReadValue);
+    }
+
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::Sequence;
+    path->m_firstAccess = firstAccess;
+    path->m_secondAccess = secondAccess;
+    path->m_sequenceResult = result;
+    return path;
+}
+
+AbstractStorageAccess AbstractStorageAccessPath::makeAssignmentResult(
+    ASTBuilder* astBuilder,
+    AbstractStorageAccess destinationAccess)
+{
+    if (!destinationAccess)
+        return nullptr;
+
+    auto path = _allocate(astBuilder);
+    path->m_kind = AbstractStorageAccessPathKind::AssignmentResult;
+    path->m_firstAccess = destinationAccess;
+    return path;
+}
+
+AbstractStorageUse getProjectedAbstractStorageUse(AbstractStorageUse use)
+{
+    switch (use)
+    {
+    case AbstractStorageUse::DiscardResult:
+        return AbstractStorageUse::DiscardResult;
+    case AbstractStorageUse::ReadValue:
+        return AbstractStorageUse::ReadValue;
+    case AbstractStorageUse::WriteValue:
+    case AbstractStorageUse::ReadWriteValue:
+    case AbstractStorageUse::WriteProjectedValue:
+    case AbstractStorageUse::ModifyProjectedValue:
+        return AbstractStorageUse::ModifyProjectedValue;
+    case AbstractStorageUse::BorrowValue:
+    case AbstractStorageUse::BorrowProjectedValue:
+        return AbstractStorageUse::BorrowProjectedValue;
+    case AbstractStorageUse::RequireAddress:
+        return AbstractStorageUse::RequireAddress;
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage use");
+        UNREACHABLE_RETURN(AbstractStorageUse::ReadValue);
+    }
+}
+
+/// Returns whether `use` can replace all or part of the abstract-storage value.
+static bool _useWritesAbstractStorage(AbstractStorageUse use)
+{
+    switch (use)
+    {
+    case AbstractStorageUse::WriteValue:
+    case AbstractStorageUse::WriteProjectedValue:
+    case AbstractStorageUse::ReadWriteValue:
+    case AbstractStorageUse::ModifyProjectedValue:
+        return true;
+
+    case AbstractStorageUse::DiscardResult:
+    case AbstractStorageUse::ReadValue:
+    case AbstractStorageUse::BorrowValue:
+    case AbstractStorageUse::RequireAddress:
+    case AbstractStorageUse::BorrowProjectedValue:
+        return false;
+
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage use");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
+/// Returns the use imposed on a projection's base.
+///
+/// Fields and fixed swizzles can update abstract storage by reading the complete value and writing
+/// it back. A projection that lowering cannot retain in that representation instead requires a
+/// direct address. Reads and borrows do not need that distinction.
+static AbstractStorageUse _getProjectionBaseUse(
+    AbstractStorageUse use,
+    bool requiresDirectAddress)
+{
+    if (requiresDirectAddress)
+    {
+        if (_useWritesAbstractStorage(use))
+            return AbstractStorageUse::RequireAddress;
+    }
+    return getProjectedAbstractStorageUse(use);
+}
+
+static bool _checkAbstractStorageAccess(
+    SemanticsVisitor* semantics,
+    AbstractStorageAccess access,
+    AbstractStorageUse use);
+
+/// Checks one accessor call and the access path that supplies its receiver.
+///
+/// `_checkAbstractStorageAccessor()` interprets the accessor's effective receiver mode to decide
+/// how the call consumes `receiverExpr`. It validates that use first and then applies the same
+/// abstract-storage rules recursively to any property or subscript reference inside `receiverExpr`.
+static bool _checkAbstractStorageAccessor(
+    SemanticsVisitor* semantics,
+    Expr* receiverExpr,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    SourceLoc location)
+{
+    SLANG_RELEASE_ASSERT(accessorDeclRef);
+
+    auto thisParamInfo = semantics->findEffectiveThisParamInfo(accessorDeclRef);
+    if (!thisParamInfo)
+        return true;
+
+    if (!semantics->validateCallableReceiver(
+            receiverExpr,
+            accessorDeclRef,
+            location))
+    {
+        return false;
+    }
+
+    return _checkAbstractStorageAccess(
+        semantics,
+        receiverExpr->abstractStorageAccess,
+        getAbstractStorageUseForAccessorReceiver(accessorDeclRef, thisParamInfo->mode));
+}
+
+/// Checks every accessor call in the plan used to consume one property or subscript reference.
+static bool _checkAbstractStorageAccessPlan(
+    SemanticsVisitor* semantics,
+    Expr* receiverExpr,
+    DeclRef<ContainerDecl> storageDeclRef,
+    AbstractStorageUse use,
+    SourceLoc location)
+{
+    auto plan = getAbstractStorageAccessPlan(
+        semantics->getASTBuilder(),
+        storageDeclRef,
+        use);
+    auto checkAccessorReceiver = [&](DeclRef<AccessorDecl> accessorDeclRef)
+    {
+        return _checkAbstractStorageAccessor(
+            semantics,
+            receiverExpr,
+            accessorDeclRef,
+            location);
+    };
+
+    switch (plan.getKind())
+    {
+    case AbstractStorageAccessPlanKind::Invalid:
+        {
+            auto storageDecl = storageDeclRef.getDecl();
+            if (!as<PropertyDecl>(storageDecl))
+                SLANG_RELEASE_ASSERT(as<SubscriptDecl>(storageDecl));
+            auto storageKind = semantics->getASTBuilder()->getNamePool()->getName(
+                as<PropertyDecl>(storageDecl) ? "property" : "subscript");
+            switch (plan.getFailure())
+            {
+            case AbstractStorageAccessFailure::CannotRead:
+                semantics->getSink()->diagnose(Diagnostics::AbstractStorageCannotBeRead{
+                    .storageKind = storageKind,
+                    .location = location});
+                break;
+
+            case AbstractStorageAccessFailure::CannotWrite:
+                semantics->getSink()->diagnose(Diagnostics::AbstractStorageCannotBeWritten{
+                    .storageKind = storageKind,
+                    .location = location});
+                break;
+
+            case AbstractStorageAccessFailure::CannotProvideAddress:
+                semantics->getSink()->diagnose(Diagnostics::AbstractStorageHasNoAddress{
+                    .storageKind = storageKind,
+                    .location = location});
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unhandled abstract-storage access failure");
+            }
+            return false;
+        }
+
+    case AbstractStorageAccessPlanKind::ReadValue:
+        return checkAccessorReceiver(plan.getReadAccessor());
+
+    case AbstractStorageAccessPlanKind::WriteValue:
+        return checkAccessorReceiver(plan.getWriteAccessor().as<AccessorDecl>());
+
+    case AbstractStorageAccessPlanKind::UseAddress:
+        return checkAccessorReceiver(plan.getAddressAccessor().as<AccessorDecl>());
+
+    case AbstractStorageAccessPlanKind::ReadThenWriteBack:
+        if (!checkAccessorReceiver(plan.getReadAccessor()))
+            return false;
+        return checkAccessorReceiver(plan.getWriteAccessor().as<AccessorDecl>());
+
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage access plan");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
+/// Validates the abstract-storage path carried by a checked expression.
+///
+/// For each node, this interpreter either selects accessor calls or maps the enclosing use to one
+/// or two earlier path segments. The exhaustive switch is the only semantic interpreter for this
+/// representation. The expression-checking routine for each path node calls the corresponding
+/// `AbstractStorageAccessPath::make*()` factory to record that operation, so this interpreter does
+/// not need to rediscover expression kinds.
+static bool _checkAbstractStorageAccess(
+    SemanticsVisitor* semantics,
+    AbstractStorageAccess access,
+    AbstractStorageUse use)
+{
+    if (!access)
+        return true;
+
+    auto path = access;
+    switch (path->getKind())
+    {
+    case AbstractStorageAccessPathKind::DirectStorage:
+        return _checkAbstractStorageAccessPlan(
+            semantics,
+            path->getStorageReceiver(),
+            path->getStorageDeclRef(),
+            use == AbstractStorageUse::DiscardResult ? AbstractStorageUse::ReadValue : use,
+            path->getStorageLocation());
+
+    case AbstractStorageAccessPathKind::Projection:
+        {
+            const bool requiresDirectAddress =
+                path->getProjectionMode() ==
+                AbstractStorageProjectionMode::RequireAddressForWrite;
+            return _checkAbstractStorageAccess(
+                semantics,
+                path->getOperandAccess(),
+                _getProjectionBaseUse(use, requiresDirectAddress));
+        }
+
+    case AbstractStorageAccessPathKind::FixedOperandUse:
+        return _checkAbstractStorageAccess(
+            semantics,
+            path->getOperandAccess(),
+            path->getFixedOperandUse());
+
+    case AbstractStorageAccessPathKind::OpenedExistential:
+        if (use == AbstractStorageUse::RequireAddress)
+        {
+            semantics->getSink()->diagnose(Diagnostics::InterfaceValueHasNoAddress{
+                .expression = path->getOpenedExistentialOriginalExpression()});
+            return false;
+        }
+
+        // The `LetExpr` that stabilizes an opened existential owns the read from its initializer.
+        // `originalExpr` names only the destination used when lowering writes a modified concrete
+        // value back into the existential. Validating it for a read here would check the same
+        // getter twice; a non-writing use has no additional access to validate.
+        if (!_useWritesAbstractStorage(use))
+            return true;
+        return _checkAbstractStorageAccess(
+            semantics,
+            path->getOpenedExistentialOriginalExpression()->abstractStorageAccess,
+            AbstractStorageUse::WriteValue);
+
+    case AbstractStorageAccessPathKind::Sequence:
+        {
+            const bool firstIsResult =
+                path->getSequenceResult() == AbstractStorageSequenceResult::FirstAccess;
+            bool firstIsValid = _checkAbstractStorageAccess(
+                semantics,
+                path->getFirstAccess(),
+                firstIsResult ? use : AbstractStorageUse::ReadValue);
+            bool secondIsValid = _checkAbstractStorageAccess(
+                semantics,
+                path->getSecondAccess(),
+                firstIsResult ? AbstractStorageUse::ReadValue : use);
+            if (!firstIsValid)
+                return false;
+            return secondIsValid;
+        }
+
+    case AbstractStorageAccessPathKind::AssignmentResult:
+        // Assignment has already written the destination. Its l-value result delegates any later
+        // use to that destination, while discarding the result requires no additional access.
+        if (use == AbstractStorageUse::DiscardResult)
+            return true;
+        return _checkAbstractStorageAccess(
+            semantics,
+            path->getOperandAccess(),
+            use);
+
+    default:
+        SLANG_UNEXPECTED("unhandled abstract-storage access path");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
+Expr* SemanticsVisitor::checkAbstractStorageUse(Expr* expr, AbstractStorageUse use)
+{
+    if (!expr)
+        return expr;
+    if (IsErrorExpr(expr))
+        return expr;
+
+    if (!_checkAbstractStorageAccess(this, expr->abstractStorageAccess, use))
+        return CreateErrorExpr(expr);
+    return expr;
+}
+
+Expr* SemanticsVisitor::checkAndResolveExpressionWithoutFinalization(Expr* uncheckedExpr)
+{
+    auto checkedTerm = CheckTerm(uncheckedExpr);
+
+    // Expression checking requires one selected value rather than an unresolved overload set.
+    return maybeResolveOverloadedExpr(
+        checkedTerm,
+        LookupMask::Default,
+        getSink());
+}
+
+Expr* SemanticsVisitor::checkExpressionWithoutStorageUse(Expr* uncheckedExpr)
+{
+    auto checkedExpr = checkAndResolveExpressionWithoutFinalization(uncheckedExpr);
+
+    // Overload resolution has now selected one expression path.
+    // `checkExpressionWithoutStorageUse()` performs its sole finalization. It finalizes a
+    // function-typed result as a selected callable even when
+    // its use is delayed, as in `let f = value.method`; finalizing it as an ordinary value would
+    // lose the receiver validation that belongs to that selection.
+    checkedExpr = finalizeSelectedExpression(
+        checkedExpr,
+        getSelectedExpressionUseForType(checkedExpr->type.type),
+        checkedExpr->loc);
+
+    // `checkExpressionWithoutStorageUse()` leaves abstract-storage validation to the invoking
+    // context. `CheckExpr` consumes the result as a value; assignment, return, and argument
+    // checking can instead apply their required storage use.
+    return checkedExpr;
+}
+
+Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
+{
+    auto checkedExpr = checkExpressionWithoutStorageUse(uncheckedExpr);
+    return checkAbstractStorageUse(checkedExpr, AbstractStorageUse::ReadValue);
+}
+
+Expr* SemanticsVisitor::checkExpressionForDiscard(Expr* uncheckedExpr)
+{
+    auto checkedExpr = checkExpressionWithoutStorageUse(uncheckedExpr);
+    return checkAbstractStorageUse(checkedExpr, AbstractStorageUse::DiscardResult);
+}
+
+/// Returns the storage use required for the value assigned directly to `destination`.
+///
+/// When a setter's `newValue` parameter uses `BorrowIn`, `_getDirectAssignmentValueUse()` returns
+/// the use that preserves any addressable `ref` path on the assigned expression. A sequence
+/// delegates to the access designated as its result. Every other path kind assigns through a
+/// projection or ordinary storage and consumes an r-value.
+static AbstractStorageUse _getDirectAssignmentValueUse(
+    ASTBuilder* astBuilder,
+    AbstractStorageAccess access)
+{
+    SLANG_RELEASE_ASSERT(astBuilder);
+    if (!access)
+        return AbstractStorageUse::ReadValue;
+
+    auto path = access;
+    switch (path->getKind())
+    {
+    case AbstractStorageAccessPathKind::DirectStorage:
+        {
+            auto writePlan = getAbstractStorageAccessPlan(
+                astBuilder,
+                path->getStorageDeclRef(),
+                AbstractStorageUse::WriteValue);
+            if (writePlan.getKind() != AbstractStorageAccessPlanKind::WriteValue)
+                return AbstractStorageUse::ReadValue;
+
+            auto newValueParam =
+                getSetterNewValueParamInfo(astBuilder, writePlan.getWriteAccessor());
+            return getAbstractStorageUseForSetterNewValue(newValueParam);
+        }
+
+    case AbstractStorageAccessPathKind::Sequence:
+        return _getDirectAssignmentValueUse(
+            astBuilder,
+            path->getSequenceResult() == AbstractStorageSequenceResult::FirstAccess
+                ? path->getFirstAccess()
+                : path->getSecondAccess());
+
+    case AbstractStorageAccessPathKind::AssignmentResult:
+        return _getDirectAssignmentValueUse(astBuilder, path->getOperandAccess());
+
+    default:
+        return AbstractStorageUse::ReadValue;
+    }
+}
+
+static AbstractStorageUse _getDirectAssignmentValueUse(
+    ASTBuilder* astBuilder,
+    Expr* destination)
+{
+    SLANG_RELEASE_ASSERT(destination);
+    return _getDirectAssignmentValueUse(astBuilder, destination->abstractStorageAccess);
 }
 
 Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
 {
-    expr->left = CheckExpr(expr->left);
+    // A function-typed assignment destination names writable storage rather than a callable to
+    // select. `finalizeSelectedExpression()` therefore resolves it as a value while leaving its
+    // storage use to assignment.
+    expr->left = checkAndResolveExpressionWithoutFinalization(expr->left);
+    expr->left =
+        finalizeSelectedExpression(expr->left, SelectedExpressionUse::Value, SourceLoc());
     expr->right = CheckTerm(expr->right);
 
     return checkAssignWithCheckedOperands(expr);
 }
 
-Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
+/// Returns whether a writable implicit conversion can translate between two scalar types.
+static bool _canLValueCoerceScalarType(Type* fromType, Type* toType)
 {
-    auto checkedTerm = CheckTerm(uncheckedExpr);
+    auto fromBasicType = as<BasicExpressionType>(fromType);
+    auto toBasicType = as<BasicExpressionType>(toType);
 
-    // First, we want to do any disambiguation that is needed in order
-    // to turn the `term` into an expression that names a single
-    // value (and not something overloaded).
-    //
-    auto checkedExpr = maybeResolveOverloadedExpr(checkedTerm, LookupMask::Default, getSink());
+    if (!fromBasicType)
+        return false;
+    if (!toBasicType)
+        return false;
 
-    // Generic disambiguation can check a term before entering its surrounding lambda. Resolving the
-    // term first ensures that capture rewriting visits only the selected expression path.
-    checkedExpr = maybeFinalizeSelectedExpressionPath(checkedExpr);
+    const auto& fromTypeInfo = BaseTypeInfo::getInfo(fromBasicType->getBaseType());
+    const auto& toTypeInfo = BaseTypeInfo::getInfo(toBasicType->getBaseType());
 
-    // Next, we want to ensure that the `expr` actually has a type
-    // that is allowable in an expression context (e.g., make sure
-    // that `expr` names a value and not a type).
-    //
-    // TODO: Implement this step.
-
-    return checkedExpr;
+    // Writable implicit casts preserve storage size so writeback can reinterpret the same bytes.
+    // The current representation supports only same-size integer casts; different sizes would
+    // require a separate temporary and a conversion in each direction.
+    if (fromTypeInfo.sizeInBytes != toTypeInfo.sizeInBytes)
+        return false;
+    return (fromTypeInfo.flags & toTypeInfo.flags & BaseTypeInfo::Flag::Integer) != 0;
 }
 
-static bool _canLValueCoerceScalarType(Type* a, Type* b)
+/// Returns whether writable-argument conversion supports this scalar, vector, or matrix type pair.
+static bool _canUseImplicitCastTypePairForWritableArgument(Type* fromType, Type* toType)
 {
-    auto basicTypeA = as<BasicExpressionType>(a);
-    auto basicTypeB = as<BasicExpressionType>(b);
-
-    if (basicTypeA && basicTypeB)
+    // By the time `classifyImplicitCastForWritableArgument()` receives `castExpr`, `_coerce()` has
+    // selected a valid implicit-conversion overload, so its vector or matrix dimensions are
+    // compatible. `_canUseImplicitCastTypePairForWritableArgument()` therefore compares only the
+    // scalar representations.
+    SLANG_ASSERT(fromType != toType);
+    if (fromType->astNodeType == toType->astNodeType)
     {
-        const auto& infoA = BaseTypeInfo::getInfo(basicTypeA->getBaseType());
-        const auto& infoB = BaseTypeInfo::getInfo(basicTypeB->getBaseType());
-
-        // TODO(JS): Initially this tries to limit where LValueImplict casts happen.
-        // We could in principal allow different sizes, as long as we converted to a temprorary
-        // and back again.
-        //
-        // For now we just stick with the simple case.
-        // // We only allow on integer types for now. In effect just allowing any size uint/int
-        // conversions
-        if (infoA.sizeInBytes == infoB.sizeInBytes &&
-            (infoA.flags & infoB.flags & BaseTypeInfo::Flag::Integer))
+        if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
         {
-            return true;
+            return _canLValueCoerceScalarType(
+                fromMatrixType->getElementType(),
+                static_cast<MatrixExpressionType*>(toType)->getElementType());
+        }
+        else if (auto fromVectorType = as<VectorExpressionType>(fromType))
+        {
+            return _canLValueCoerceScalarType(
+                fromVectorType->getScalarType(),
+                static_cast<VectorExpressionType*>(toType)->getScalarType());
         }
     }
-    return false;
+    return _canLValueCoerceScalarType(fromType, toType);
 }
 
-static bool _canLValueCoerce(Type* a, Type* b)
+WritableImplicitCastKind SemanticsVisitor::classifyImplicitCastForWritableArgument(
+    ImplicitCastExpr* castExpr)
 {
-    // We can *assume* here that if they are coercable, that dimensions of vectors
-    // and matrices match. We might want to assert to be sure...
-    SLANG_ASSERT(a != b);
-    if (a->astNodeType == b->astNodeType)
+    SLANG_RELEASE_ASSERT(castExpr);
+    SLANG_RELEASE_ASSERT(castExpr->arguments.getCount() == 1);
+
+    auto fromType = castExpr->arguments[0]->type.type;
+    auto toType = castExpr->type.type;
+    if (fromType->equals(toType))
+        return WritableImplicitCastKind::UnsupportedTypePair;
+    if (!_canUseImplicitCastTypePairForWritableArgument(fromType, toType))
+        return WritableImplicitCastKind::UnsupportedTypePair;
+
+    auto functionExpr = castExpr->functionExpr;
+    while (auto genericAppExpr = as<GenericAppExpr>(functionExpr))
+        functionExpr = genericAppExpr->functionExpr;
+
+    auto declRefExpr = as<DeclRefExpr>(functionExpr);
+    auto intrinsicModifier =
+        declRefExpr ? declRefExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>() : nullptr;
+    if (!intrinsicModifier)
+        return WritableImplicitCastKind::UnsupportedConversion;
+
+    switch (intrinsicModifier->op)
     {
-        if (auto matA = as<MatrixExpressionType>(a))
-        {
-            return _canLValueCoerceScalarType(
-                matA->getElementType(),
-                static_cast<MatrixExpressionType*>(b)->getElementType());
-        }
-        else if (auto vecA = as<VectorExpressionType>(a))
-        {
-            return _canLValueCoerceScalarType(
-                vecA->getScalarType(),
-                static_cast<VectorExpressionType*>(b)->getScalarType());
-        }
+    case kIROp_IntCast:
+    case kIROp_BuiltinCast:
+        return WritableImplicitCastKind::ReversibleIntrinsic;
+    default:
+        return WritableImplicitCastKind::UnsupportedConversion;
     }
-    return _canLValueCoerceScalarType(a, b);
 }
 
 
@@ -3939,9 +5345,9 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
-DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
+/// Returns the callable reached by recursively resolving function aliases.
+static DeclRef<CallableDecl> _resolveCallableAliases(DeclRef<CallableDecl> declRef)
 {
-    // Resolve aliases
     if (auto funcAliasDecl = as<FuncAliasDecl>(declRef.getDecl()))
     {
         auto target = substituteDeclRef(
@@ -3949,15 +5355,67 @@ DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
                           getCurrentASTBuilder(),
                           funcAliasDecl->targetDeclRef)
                           .as<CallableDecl>();
-        return getResolvedFunc(target);
+        return _resolveCallableAliases(target);
     }
 
     return declRef;
 }
 
-// Convert an expression of the form "hof(fn)" where "hof" is a higher-order function like
-// "fwd_diff" or "bwd_diff", into a lookup of the form "fn.fwd_diff" or "fn.bwd_diff"
-//
+/// Returns the bound instance method transformed by a selected differentiation expression.
+///
+/// Differentiation IR names a function declaration and does not represent a captured receiver.
+/// For example, `__fwd_diff(value.method)` ultimately contains a `MemberExpr` for `value.method`,
+/// which lowering would otherwise turn into a `BoundCallable`. In contrast, the unbound spelling
+/// `__fwd_diff(Type::method)` contains a `StaticMemberExpr`; its receiver is an explicit parameter
+/// of the transformed function and is supported.
+static MemberExpr* _getBoundInstanceMethodDifferentiationOperand(
+    DifferentiateExpr* expr,
+    CallableDecl** outCallableDecl)
+{
+    SLANG_RELEASE_ASSERT(expr);
+    SLANG_RELEASE_ASSERT(outCallableDecl);
+    *outCallableDecl = nullptr;
+
+    auto operand = getInnerMostExprFromHigherOrderExpr(expr);
+    auto memberExpr = as<MemberExpr>(operand);
+    if (!memberExpr)
+        return nullptr;
+
+    auto referencedDecl = memberExpr->declRef.getDecl();
+    if (auto genericDecl = as<GenericDecl>(referencedDecl))
+        referencedDecl = genericDecl->inner;
+
+    auto callableDecl = as<CallableDecl>(referencedDecl);
+    if (!callableDecl || isEffectivelyStatic(callableDecl))
+        return nullptr;
+
+    *outCallableDecl = callableDecl;
+    return memberExpr;
+}
+
+/// Diagnoses a selected differentiation operand that captures an instance receiver.
+static bool _diagnoseBoundInstanceMethodDifferentiationOperand(
+    SemanticsVisitor* semantics,
+    DifferentiateExpr* expr)
+{
+    CallableDecl* callableDecl = nullptr;
+    auto memberExpr =
+        _getBoundInstanceMethodDifferentiationOperand(expr, &callableDecl);
+    if (!memberExpr)
+        return false;
+
+    semantics->getSink()->diagnose(
+        Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
+            .func = callableDecl,
+            .expr = memberExpr});
+    return true;
+}
+
+/// Converts `hof(fn)` into the corresponding `fn.hof` lookup.
+///
+/// Parentheses, checked generic applications, and retained local bindings are transparent to
+/// callable selection. The conversion preserves those wrappers, including the evaluation of any
+/// retained binding initializers, while replacing their selected callable.
 static Expr* convertHigherOrderExprToLookup(
     SemanticsVisitor* visitor,
     HigherOrderInvokeExpr* resultExpr)
@@ -3981,21 +5439,26 @@ static Expr* convertHigherOrderExprToLookup(
             Diagnostics::InternalCompilerError{.location = resultExpr->loc});
         return resultExpr;
     }
-
-
-    if (auto hofExpr = as<HigherOrderInvokeExpr>(resultExpr->baseFunction))
+    auto selectedBaseFunction =
+        getCallableExprThroughTransparentWrappers(resultExpr->baseFunction);
+    if (auto hofExpr = as<HigherOrderInvokeExpr>(selectedBaseFunction))
     {
-        resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
+        auto convertedBaseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
+        visitor->replaceSelectedCallableThroughTransparentWrappers(
+            resultExpr->baseFunction,
+            convertedBaseFunction);
+        selectedBaseFunction =
+            getCallableExprThroughTransparentWrappers(convertedBaseFunction);
     }
 
     if (visitor->IsErrorExpr(resultExpr->baseFunction))
         return visitor->CreateErrorExpr(resultExpr);
 
-    if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
+    if (auto declRefExpr = as<DeclRefExpr>(selectedBaseFunction))
     {
-        auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
-                                   ? getResolvedFunc(declRefExpr->declRef.as<CallableDecl>())
-                                   : declRefExpr->declRef;
+        DeclRef<Decl> callableDeclRef = declRefExpr->declRef;
+        if (auto callableRef = callableDeclRef.as<CallableDecl>())
+            callableDeclRef = _resolveCallableAliases(callableRef);
 
         auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), callableDeclRef);
 
@@ -4027,15 +5490,20 @@ static Expr* convertHigherOrderExprToLookup(
                                           .as<CallableDecl>();
             }
 
-            // Return the lookup result.
             auto lookupResultExpr = visitor->createLookupResultExpr(
                 lookupName,
                 result,
-                resultExpr->baseFunction,
+                declRefExpr,
                 resultExpr->loc,
                 resultExpr);
 
-            return lookupResultExpr;
+            if (selectedBaseFunction == resultExpr->baseFunction)
+                return lookupResultExpr;
+
+            visitor->replaceSelectedCallableThroughTransparentWrappers(
+                resultExpr->baseFunction,
+                lookupResultExpr);
+            return resultExpr->baseFunction;
         }
         else if (result.isOverloaded())
         {
@@ -4064,6 +5532,55 @@ static Expr* convertHigherOrderExprToLookup(
     }
 }
 
+/// Rebuilds the callable-transparent wrappers around one distributed overload candidate.
+///
+/// Consider `__fwd_diff((Type::method))` when `method` is overloaded. The parentheses belong to
+/// every distributed candidate, but each candidate needs its own wrapper nodes because overload
+/// checking later updates their selected types independently. Wrapper rebuilding reuses a retained
+/// `LetExpr`'s initializer and declaration, then recomposes its access path with the new candidate
+/// body.
+Expr* rebuildCallableTransparentWrappers(
+    ASTBuilder* astBuilder,
+    Expr* wrappedExpr,
+    Expr* replacement)
+{
+    List<Expr*> wrappers;
+    getCallableExprThroughTransparentWrappers(wrappedExpr, &wrappers);
+
+    Expr* result = replacement;
+    for (Index i = wrappers.getCount() - 1; i >= 0; --i)
+    {
+        auto wrapper = wrappers[i];
+        if (auto parenExpr = as<ParenExpr>(wrapper))
+        {
+            auto rebuiltExpr = astBuilder->create<ParenExpr>(*parenExpr);
+            rebuiltExpr->base = result;
+            rebuiltExpr->type = result->type;
+            rebuiltExpr->abstractStorageAccess = result->abstractStorageAccess;
+            result = rebuiltExpr;
+        }
+        else if (auto genericAppExpr = as<GenericAppExpr>(wrapper))
+        {
+            auto rebuiltExpr = astBuilder->create<GenericAppExpr>(*genericAppExpr);
+            rebuiltExpr->functionExpr = result;
+            rebuiltExpr->type = result->type;
+            rebuiltExpr->abstractStorageAccess = result->abstractStorageAccess;
+            result = rebuiltExpr;
+        }
+        else
+        {
+            auto letExpr = as<LetExpr>(wrapper);
+            SLANG_RELEASE_ASSERT(letExpr);
+            auto rebuiltExpr = astBuilder->create<LetExpr>(*letExpr);
+            rebuiltExpr->body = result;
+            rebuiltExpr->type = result->type;
+            _setLocalBindingStorageAccess(rebuiltExpr);
+            result = rebuiltExpr;
+        }
+    }
+    return result;
+}
+
 // Peel implicit casts and parentheses from an expression.
 static Expr* _peelCastsAndParens(Expr* expr)
 {
@@ -4071,10 +5588,6 @@ static Expr* _peelCastsAndParens(Expr* expr)
     {
         if (!expr)
             return nullptr;
-        // Peel any single-argument TypeCastExpr: this covers
-        // ImplicitCastExpr, OutImplicitCastExpr, InOutImplicitCastExpr,
-        // and LValueImplicitCastExpr which wrap the original argument
-        // during overload resolution for out/inout coercion.
         if (auto castExpr = as<TypeCastExpr>(expr))
         {
             if (castExpr->arguments.getCount() == 1)
@@ -4234,7 +5747,8 @@ void SemanticsVisitor::_checkAliasedOutArguments(
                 .direction2 = _getDirectionString(funcType, second),
                 .param2 = paramNameSecond,
                 .firstArg = invoke->arguments[first]});
-            break; // One warning per outer index i is enough.
+            // One diagnostic per outer argument avoids redundant pairwise warnings.
+            break;
         }
     }
 }
@@ -4297,71 +5811,69 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
-                    // `out`, `inout`, and `ref` parameters currently require
-                    // an *exact* match on the type of the argument.
-                    //
-                    // TODO: relax this requirement by allowing an argument
-                    // for an `inout` parameter to be converted in both
-                    // directions.
-                    //
+                    // A writable parameter ordinarily requires an l-value of its exact type. The
+                    // branch below also accepts a reversible, same-size integer conversion for an
+                    // `out` or `inout` parameter. A `ref` parameter keeps the exact-type rule
+                    // because it must preserve the caller's original address.
                     if (argExpr)
                     {
                         if (!argExpr->type.isLeftValue)
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
-
-                            // NOTE:
-                            // This is currently only enabled for in/inout based scenarios. Ie
-                            // NOT ref.
-                            //
-                            // Depending on the target there can be an issue around atomics.
-                            // The fall back transformation with InOut/OutImplicitCast is to
-                            // introduce a temporary, and do the work on that and copy back.
-                            //
-                            // This doesn't work with an atomic. So the work around is to not
-                            // enable the transformation with ref types, which atomics are
-                            // defined on.
-                            //
-                            // An argument can be made that transformation shouldn't apply to
-                            // the ref scenario in general.
-                            // Only fall back to the implicit-cast-as-lvalue
-                            // mechanism if the inner expression is itself an
-                            // l-value: writing back the result of the call only
-                            // makes sense if we have somewhere to write back to.
-                            // Without this check, passing a literal (e.g.
-                            // `foo(0)` for `inout uint`) would survive the
-                            // front end and ICE during IR lowering.
-                            if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
-                                as<OutParamTypeBase>(paramType) &&
-                                implicitCastExpr->arguments[0]->type.isLeftValue &&
-                                _canLValueCoerce(
-                                    implicitCastExpr->arguments[0]->type,
-                                    implicitCastExpr->type))
+                            auto writableCastKind = WritableImplicitCastKind::UnsupportedConversion;
+                            if (implicitCastExpr)
                             {
-                                // This is to work around issues like
+                                writableCastKind =
+                                    classifyImplicitCastForWritableArgument(implicitCastExpr);
+                            }
+
+                            // A reversible implicit cast can adapt an `out` or `inout` argument by
+                            // writing the call's result back through the cast. A `ref` argument
+                            // cannot use this adaptation because it must preserve the original
+                            // address, including for atomic operations. The cast operand must also
+                            // be an l-value so that the write-back has a destination.
+                            bool canUseImplicitCastAsWritableArgument = implicitCastExpr != nullptr;
+                            if (canUseImplicitCastAsWritableArgument)
+                            {
+                                canUseImplicitCastAsWritableArgument =
+                                    implicitCastExpr->arguments.getCount() == 1;
+                            }
+                            if (canUseImplicitCastAsWritableArgument)
+                            {
+                                canUseImplicitCastAsWritableArgument =
+                                    as<OutParamTypeBase>(paramType) != nullptr;
+                            }
+                            if (canUseImplicitCastAsWritableArgument)
+                            {
+                                canUseImplicitCastAsWritableArgument =
+                                    implicitCastExpr->arguments[0]->type.isLeftValue;
+                            }
+                            if (canUseImplicitCastAsWritableArgument)
+                            {
+                                canUseImplicitCastAsWritableArgument =
+                                    writableCastKind ==
+                                    WritableImplicitCastKind::ReversibleIntrinsic;
+                            }
+
+                            if (canUseImplicitCastAsWritableArgument)
+                            {
+                                // Consider this example:
                                 //
+                                // ```slang
+                                // void update(inout int value);
+                                // uint value;
+                                // update(value);
                                 // ```
-                                // int a = 0;
-                                // uint b = 1;
-                                // a += b;
-                                // ```
-                                // That strictly speaking it's not allowed, but we are going to
-                                // allow it for now for situations were the types are uint/int
-                                // and vector/matrix varieties of those types
                                 //
-                                // Then in lowering we are going to insert code to do something
-                                // like
-                                // ```
-                                // var OutType: tmp = arg;
-                                // f(... tmp);
-                                // arg = tmp;
-                                // ```
+                                // `CheckInvokeExprWithCheckedOperands()` records an
+                                // `InOutImplicitCastExpr`. Lowering initializes an `int` temporary
+                                // from `value`, calls `update` with that temporary, converts the
+                                // result back to `uint`, and writes it to `value`.
 
                                 TypeCastExpr* lValueImplicitCast;
 
-                                // We want to record if the cast is being used for `out` or
-                                // `inout`/`ref` as if it's just `out` we won't need to convert
-                                // before passing in.
+                                // An `out` argument does not need an input conversion, while an
+                                // `inout` argument does.
                                 if (as<OutType>(paramType))
                                 {
                                     lValueImplicitCast =
@@ -4375,14 +5887,15 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                             *implicitCastExpr);
                                 }
 
-                                // Replace the expression. This should make this situation
-                                // easier to detect.
+                                // `CheckInvokeExprWithCheckedOperands()` records on the wrapper how
+                                // lowering must initialize and write back the temporary used for
+                                // this writable conversion.
                                 invoke->arguments[pp] = lValueImplicitCast;
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
-                                // Emit additional diagnostic for invalid pointer taking
-                                // operations
+                                // An address-of intrinsic gets a more specific diagnostic before
+                                // the general writable-argument error.
                                 auto funcDeclRef = funcDeclRefExpr
                                                        ? getDeclRef(m_astBuilder, funcDeclRefExpr)
                                                        : DeclRef<Decl>();
@@ -4414,24 +5927,22 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
-                                    // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
                                     {
-                                        // Ref types are not allowed to use this mechanism
-                                        // because it breaks atomics
+                                        // A converted `ref` argument would not preserve the
+                                        // original storage identity required by atomic operations.
                                         getSink()->diagnose(
                                             Diagnostics::ImplicitCastUsedAsLvalueRef{
                                                 .from = implicitCastExpr->arguments[0]->type.type,
                                                 .to = implicitCastExpr->type.type,
                                                 .expr = argExpr});
                                     }
-                                    else if (!_canLValueCoerce(
-                                                 implicitCastExpr->arguments[0]->type,
-                                                 implicitCastExpr->type))
+                                    else if (
+                                        writableCastKind ==
+                                        WritableImplicitCastKind::UnsupportedTypePair)
                                     {
-                                        // We restict what types can use this mechanism -
-                                        // currently int/uint and same sized matrix/vectors of
-                                        // those types.
+                                        // Writable conversion currently supports same-size integer
+                                        // scalars and same-size vectors or matrices of integers.
                                         getSink()->diagnose(
                                             Diagnostics::ImplicitCastUsedAsLvalueType{
                                                 .from = implicitCastExpr->arguments[0]->type.type,
@@ -4440,7 +5951,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     }
                                     else
                                     {
-                                        // Fall back, in case there are other reasons...
+                                        // Every other rejected conversion uses the general
+                                        // diagnostic.
                                         getSink()->diagnose(Diagnostics::ImplicitCastUsedAsLvalue{
                                             .from = implicitCastExpr->arguments[0]->type.type,
                                             .to = implicitCastExpr->type.type,
@@ -4477,16 +5989,24 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Check for potentially aliased out/inout/ref arguments.
-            // If two arguments refer to the same root variable and at
-            // least one of them is out/inout/ref, the behavior is
-            // undefined (issue #10699).
+            // Calls with provably aliased writable arguments have undefined behavior (issue
+            // #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
+                    // The overload-distribution path retained every viable candidate. Overload
+                    // resolution has now selected one transformed function, so this is the first
+                    // point where a bound instance method can be rejected without changing
+                    // overload ranking.
+                    if (_diagnoseBoundInstanceMethodDifferentiationOperand(
+                            this,
+                            higherOrderInvoke))
+                    {
+                        return CreateErrorExpr(invoke);
+                    }
                     invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
                 }
             }
@@ -4588,7 +6108,7 @@ static Type* _isBuiltinFloatingPointBitwiseOperands(Type* left, Type* right)
     return nullptr;
 }
 
-// Compute the common element base type for `a OP b`, following the "usual arithmetic
+// Computes the common element base type for `a OP b`, following the "usual arithmetic
 // conversions": float beats int; among floats the larger size wins; among ints the larger
 // size wins and on a size tie the unsigned type wins; bool promotes to the other operand.
 static BaseType unifyBaseType(BaseType a, BaseType b)
@@ -4667,14 +6187,22 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     Type* rightTarget = substituteElementOfCompositeType(rightArg->type.type, commonElementType);
     if (!leftArg->type.type->equals(leftTarget))
     {
-        auto c = coerce(CoercionSite::Argument, leftTarget, leftArg, getSink());
+        auto c = coerceExpressionWithoutFinalization(
+            CoercionSite::Argument,
+            leftTarget,
+            leftArg,
+            getSink());
         if (IsErrorExpr(c))
             return nullptr;
         outLeftArg = c;
     }
     if (!rightArg->type.type->equals(rightTarget))
     {
-        auto c = coerce(CoercionSite::Argument, rightTarget, rightArg, getSink());
+        auto c = coerceExpressionWithoutFinalization(
+            CoercionSite::Argument,
+            rightTarget,
+            rightArg,
+            getSink());
         if (IsErrorExpr(c))
             return nullptr;
         outRightArg = c;
@@ -4738,6 +6266,32 @@ SemanticsExprVisitor::BuiltinArithmeticElementFamily SemanticsExprVisitor::
         family.isLogical =
             isProvenConformance(tryGetInterfaceConformanceWitness(elementType, logicalInterface));
     return family;
+}
+
+/// Builds the storage path for operator operands that are consumed as values in source order.
+///
+/// Consider `left && right`: validation visits `left` before `right`, and each operand is a value
+/// read regardless of how the resulting `bool` is consumed. `_makeReadValueOperandSequence()`
+/// constructs a path that represents that static validation order; it does not claim that
+/// short-circuit evaluation executes `right` at runtime.
+static AbstractStorageAccess _makeReadValueOperandSequence(
+    ASTBuilder* astBuilder,
+    List<Expr*> const& operands)
+{
+    AbstractStorageAccess result = nullptr;
+    for (auto operand : operands)
+    {
+        auto operandRead = AbstractStorageAccessPath::makeFixedOperandUse(
+            astBuilder,
+            operand->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
+        result = AbstractStorageAccessPath::makeSequence(
+            astBuilder,
+            result,
+            operandRead,
+            AbstractStorageSequenceResult::SecondAccess);
+    }
+    return result;
 }
 
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
@@ -4821,6 +6375,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         node->arguments.add(arg);
         node->type = QualType(uOperandType);
         node->loc = expr->loc;
+        node->abstractStorageAccess =
+            _makeReadValueOperandSequence(m_astBuilder, node->arguments);
         // Register the operand/result types in a differentiable scope regardless of the operator
         // (matching the breadth of the pre-fast-path `visitInvokeExpr`): the operand of a `!`/`~`
         // is not itself differentiable, but `maybeRegisterDifferentiableType` is a no-op for
@@ -4883,10 +6439,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     }
 
     // A bitwise/shift operator with a builtin floating-point operand has no integer interpretation.
-    // Reject it here -- before the mixed-shift early return and common-type coercion below -- so
-    // mixed-type shifts (`float << int`, `int << float`), which skip common-type promotion, are
-    // caught too rather than falling through to a confusing "ambiguous"/"no overload" error
-    // (issue #11648). The both-builtin predicate leaves user `operator OP` and generics untouched.
+    // This check precedes the mixed-shift early return and common-type coercion below, so it also
+    // diagnoses mixed-type shifts (`float << int`, `int << float`) that skip common-type promotion
+    // instead of letting them fall through to a confusing "ambiguous"/"no overload" error (issue
+    // #11648). The both-builtin predicate leaves user `operator OP` and generics untouched.
     if (isBitwise)
     {
         if (Type* floatOperandType =
@@ -5003,6 +6559,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     node->arguments.add(rightArg);
     node->type = resultType;
     node->loc = expr->loc;
+    node->abstractStorageAccess = _makeReadValueOperandSequence(m_astBuilder, node->arguments);
     // Only `Mod` reads this (to choose `FRem` over `IRem`), but it is resolved here regardless of
     // `kind`: `elementType` may be an abstract generic parameter by the time IR lowering runs,
     // which no longer carries a concrete `BaseType` to classify.
@@ -5056,7 +6613,7 @@ Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* rig
     bool leftIsMatrix = (leftCols != nullptr);
     bool rightIsMatrix = (rightCols != nullptr);
 
-    // Resolve the common shape, broadcasting scalars against vectors/matrices.
+    // Scalars broadcast to the vector or matrix shape of the other operand.
     if (leftIsScalar && rightIsScalar)
     {
         return commonElementType;
@@ -5127,7 +6684,11 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             // to handle if this expression doesn't support short-circuiting.
             for (auto& arg : expr->arguments)
             {
-                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg, getSink());
+                arg = coerceExpressionWithoutFinalization(
+                    CoercionSite::Argument,
+                    m_astBuilder->getBoolType(),
+                    arg,
+                    getSink());
             }
 
             expr->functionExpr = CheckTerm(expr->functionExpr);
@@ -5144,6 +6705,8 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             newExpr->functionExpr = expr->functionExpr;
             newExpr->type = m_astBuilder->getBoolType();
             newExpr->arguments = expr->arguments;
+            newExpr->abstractStorageAccess =
+                _makeReadValueOperandSequence(m_astBuilder, newExpr->arguments);
         }
     }
 
@@ -5159,31 +6722,36 @@ Expr* SemanticsExprVisitor::visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
 
 Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 {
-    // check the base expression first
+    // Expression checking rewrites `functionExpr`, while language-server queries need the callee
+    // as written. Capture that syntax before checking any part of the invocation.
     if (!expr->originalFunctionExpr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
-    // Next check the argument expressions
+    // `visitInvokeExpr()` checks each written argument without finalizing its selected path before
+    // `ResolveInvoke()` selects the callable. `finalizeSelectedExpression()` later commits only the
+    // selected invocation path, so capture attachment and callable-receiver validation remain
+    // deferred until selection.
+    SemanticsVisitor operandVisitor(withPotentiallyUnevaluatedTerm());
     for (auto& arg : expr->arguments)
     {
-        arg = CheckExpr(arg);
+        arg = operandVisitor.checkAndResolveExpressionWithoutFinalization(arg);
     }
 
     // if the expression is '&&' or '||', we will convert it
     // to use short-circuit evaluation.
-    if (auto newExpr = convertToLogicOperatorExpr(expr))
-        return newExpr;
+    if (auto convertedExpr = convertToLogicOperatorExpr(expr))
+        return convertedExpr;
 
     // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
     // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
     // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
     // overload resolution.
-    if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
-        return builtinOp;
+    if (auto convertedExpr = convertToBuiltinArithmeticOp(expr))
+        return convertedExpr;
 
-    // Check for comma operator usage and emit warning if not in for-loop side effect context
-    // Skip warning in Slang 2026+ mode where parentheses create tuples
+    // Before Slang 2026, a comma outside a for-loop side-effect expression is likely an accidental
+    // comma operator. In Slang 2026 and later, the same syntax can construct a tuple.
     if (!isSlang2026OrLater(this))
     {
         bool exprIsInfixExpr = false;
@@ -5207,8 +6775,6 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 
         if (functionExprIsVarExpr && varExpr->name && varExpr->name->text == ",")
         {
-            // Allow comma operators in for-loop side effects and expand expressions without
-            // warning
             if (!getInForLoopSideEffect() && !m_parentExpandExpr)
             {
                 getSink()->diagnose(Diagnostics::CommaOperatorUsedInExpression{.expr = infixExpr});
@@ -5216,13 +6782,12 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
-    expr->functionExpr = CheckTerm(expr->functionExpr);
+    expr->functionExpr = checkPotentiallyUnevaluatedTerm(expr->functionExpr);
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
-        // If callee is a value of DeclRefType, then it is a functor.
-        // We need to look for `operator()` member within the type and
-        // call that instead.
+        // A callee with a `DeclRefType` is a functor. `visitInvokeExpr()` looks up its `operator()`
+        // member and replaces `functionExpr` with that selected callable.
         auto operatorName = getName("()");
 
         bool needDeref = false;
@@ -5285,18 +6850,14 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                 maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             }
 
-            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
-            {
-                if (fnExpr->declRef)
-                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
-            }
+            registerAssociatedMethodsForSelectedCallable(this, checkedInvokeExpr->functionExpr);
         }
         maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type, checkedExpr->loc);
     }
     return checkedExpr;
 }
 
-// Find the in-scope identifier whose spelling is closest to `name`, to power a
+// Finds the in-scope identifier whose spelling is closest to `name`, to power a
 // "did you mean ...?" suggestion when `name` failed to resolve. Walks the scope
 // chain (and each scope's sibling chain) collecting the names of direct members,
 // computes the case-insensitive Levenshtein distance to each, and returns the
@@ -5409,7 +6970,9 @@ static Name* findClosestInScopeName(
     // Offer a suggestion only when there is a single, unambiguous closest name.
     // Multiple distinct names at the best distance would make the chosen one
     // depend on import/scope-walk order, so suppress the suggestion instead.
-    if (bestDistance > maxDistance || bestNames.getCount() != 1)
+    if (bestDistance > maxDistance)
+        return nullptr;
+    if (bestNames.getCount() != 1)
         return nullptr;
     Name* best = nullptr;
     for (auto n : bestNames)
@@ -5424,7 +6987,13 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     {
         if (!expr->type)
             expr->type = GetTypeForDeclRef(expr->declRef, expr->loc);
-        return expr;
+        return _getOrCreateLambdaCaptureReference(
+            m_astBuilder,
+            m_parentLambdaExpr,
+            m_parentLambdaDecl,
+            m_lambdaCaptureContext,
+            expr,
+            as<VarDeclBase>(expr->declRef.getDecl()));
     }
     expr->type = QualType(m_astBuilder->getErrorType());
     auto lookupResult = lookUp(
@@ -5453,9 +7022,7 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
 
     if (lookupResult.isValid())
     {
-        auto lookupResultExpr =
-            createLookupResultExpr(expr->name, lookupResult, nullptr, expr->loc, expr);
-        return maybeFinalizeSelectedExpressionPath(lookupResultExpr);
+        return createLookupResultExpr(expr->name, lookupResult, nullptr, expr->loc, expr);
     }
 
     if (!diagnosed)
@@ -5476,281 +7043,726 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     return resultExpr;
 }
 
-/// Finalizes semantics that must follow selection of one evaluated expression path.
+/// Returns whether a size-like expression evaluates its operand at runtime.
 ///
-/// Within a lambda, the visitor first rewrites references to captured values. A selected
-/// `MemberExpr` can also defer its receiver check while it remains below an unresolved member
-/// lookup; visiting that node validates the receiver after any capture rewrite.
-struct SelectedExpressionPathVisitor : ModifyingExprVisitor<SelectedExpressionPathVisitor>
+/// Only `countof` on a value pack consumes the value. Ordinary `sizeof`, `alignof`, and array
+/// `countof` expressions use only the checked type.
+static bool _doesSizeOfLikeExprEvaluateValue(SizeOfLikeExpr* expr)
+{
+    if (!as<CountOfExpr>(expr))
+        return false;
+    return as<ValuePackType>(expr->sizedType) != nullptr;
+}
+
+/// Returns whether an `is` expression evaluates its operand at runtime.
+///
+/// Without a witness, lowering compares the checked operand and target types without evaluating
+/// the operand. An optional declared witness likewise makes the result depend only on the witness;
+/// every other witness performs a runtime check of the value.
+static bool _doesIsTypeExprEvaluateValue(IsTypeExpr* expr)
+{
+    if (!expr->witnessArg)
+        return false;
+
+    auto declaredWitness = as<DeclaredSubtypeWitness>(expr->witnessArg);
+    if (!declaredWitness)
+        return true;
+    return !declaredWitness->isOptional();
+}
+
+static DeclRef<CallableDecl> _getHigherOrderBaseFunctionDeclRef(
+    SemanticsVisitor* semantics,
+    Expr* funcExpr);
+
+/// Implements `finalizeSelectedExpression()` for one selected expression path.
+///
+/// Consider a lambda that calls one overload of `value.method()`.
+/// `ConstructLookupResultExpr()` and `AddOverloadCandidates()` can provisionally build paths for
+/// several overload candidates, including capture references and bound receivers. After overload
+/// resolution selects one candidate, this visitor walks only that expression path and leaves
+/// discarded candidates, generic arguments, and unevaluated static qualifiers untouched. During
+/// that walk, `attachCaptureField()` commits provisional lambda captures, `validateCallable()`
+/// validates the effective receiver of the selected callable, and `finalizeConsumedValue()`
+/// validates the abstract-storage uses implied by evaluating the selected path.
+struct SelectedExpressionFinalizer : ExprVisitor<SelectedExpressionFinalizer, Expr*>
 {
     SemanticsVisitor* semantics;
-    LambdaExpr* lambdaExpr;
     LambdaDecl* lambdaDecl;
-    Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedDecl;
+    LambdaCaptureContext* captureContext;
     ASTBuilder* astBuilder;
     DiagnosticSink* sink;
 
-    SelectedExpressionPathVisitor(
-        SemanticsVisitor* inSemantics,
-        LambdaExpr* inLambdaExpr,
-        LambdaDecl* inLambdaDecl,
-        Dictionary<Decl*, VarDeclBase*>* inMap,
-        ASTBuilder* inAstBuilder,
-        DiagnosticSink* inSink)
+    SelectedExpressionFinalizer(SemanticsVisitor* inSemantics)
         : semantics(inSemantics)
-        , lambdaExpr(inLambdaExpr)
-        , lambdaDecl(inLambdaDecl)
-        , mapSrcDeclToCapturedDecl(inMap)
-        , astBuilder(inAstBuilder)
-        , sink(inSink)
+        , lambdaDecl(inSemantics->getParentLambdaDecl())
+        , captureContext(inSemantics->getLambdaCaptureContext())
+        , astBuilder(inSemantics->getASTBuilder())
+        , sink(inSemantics->getSink())
     {
     }
 
-    /// Captures an outer-scope declaration referenced by a `VarExpr` or `ThisExpr` when needed.
-    ///
-    /// Returns a `MemberExpr` on the lambda struct when the declaration requires capture.
-    /// Otherwise, returns `exprIn` unchanged.
-    Expr* maybeCaptureDecl(Expr* exprIn, Decl* srcDecl)
+    /// Adds the provisional field used by one selected capture reference to the closure.
+    void attachCaptureField(VarDeclBase* captureField, Expr* captureUseExpr)
     {
-        if (!lambdaExpr)
-            return exprIn;
+        if (!captureContext)
+            return;
+        if (!captureField)
+            return;
 
-        SLANG_RELEASE_ASSERT(lambdaDecl && mapSrcDeclToCapturedDecl);
-        if (!srcDecl)
-            return exprIn;
+        if (!captureContext->fieldToCapturedDecl.containsKey(captureField))
+            return;
 
-        if (as<VarDeclBase>(srcDecl) && isGlobalDecl(srcDecl))
-            return exprIn;
-
-        auto lambdaScope = lambdaExpr->paramScopeDecl;
-        bool isDefinedInLambdaScope = false;
-        for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
+        SLANG_RELEASE_ASSERT(lambdaDecl);
+        if (captureField->parentDecl)
         {
-            if (parentDecl == lambdaScope)
+            SLANG_RELEASE_ASSERT(captureField->parentDecl == lambdaDecl);
+            return;
+        }
+
+        lambdaDecl->addMember(captureField);
+
+        attachReferencedDeclarations(captureField->type.type, captureUseExpr);
+
+        if (!sink)
+            return;
+
+        if (isNonCopyableType(captureField->type.type))
+        {
+            sink->diagnose(Diagnostics::NonCopyableTypeCapturedInLambda{
+                .type = captureField->type.type,
+                .expr = captureUseExpr});
+        }
+    }
+
+    /// Adds the closure field associated with `declaration`, if one exists.
+    ///
+    /// References in a selected expression can name either the outer declaration or its
+    /// provisional closure field. Both forms must attach the same field.
+    void attachDeclarationDependency(Decl* declaration, Expr* captureUseExpr)
+    {
+        if (!captureContext)
+            return;
+        if (!declaration)
+            return;
+
+        if (auto captureField = as<VarDeclBase>(declaration))
+        {
+            if (captureContext->fieldToCapturedDecl.containsKey(captureField))
             {
-                isDefinedInLambdaScope = true;
-                break;
+                attachCaptureField(captureField, captureUseExpr);
+                return;
             }
         }
-        if (isDefinedInLambdaScope)
-            return exprIn;
 
-        // The referenced declaration belongs to an enclosing scope, so the lambda represents the
-        // capture as a field.
+        VarDeclBase* captureField = nullptr;
+        if (captureContext->capturedDeclToField.tryGetValue(declaration, captureField))
+            attachCaptureField(captureField, captureUseExpr);
+    }
 
-        VarDeclBase* capturedVarDecl = nullptr;
-        if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
+    /// Adds capture fields for the capture-eligible declarations referenced by `node`.
+    void attachReferencedDeclarations(NodeBase* node, Expr* captureUseExpr)
+    {
+        if (!captureContext)
+            return;
+        if (!node)
+            return;
+
+        HashSet<Decl*> referencedDecls;
+        collectReferencedDecls(semantics, node, referencedDecls);
+        for (auto declaration : referencedDecls)
+            attachDeclarationDependency(declaration, captureUseExpr);
+    }
+
+    /// Returns whether `expr` has no selected runtime subtree to finalize.
+    ///
+    /// Type-valued expressions are compile-time syntax. Overload or generic resolution must select
+    /// the remaining cases before a later `SelectedExpressionFinalizer` invocation can finalize
+    /// them.
+    bool isUnselectedOrTypeExpression(Expr* expr)
+    {
+        if (as<TypeType>(expr->type.type))
+            return true;
+        if (as<OverloadedExpr>(expr))
+            return true;
+        if (as<OverloadedExpr2>(expr))
+            return true;
+        if (as<PartiallyAppliedGenericExpr>(expr))
+            return true;
+        return false;
+    }
+
+    /// Finalizes `expr` according to the way its selected path is consumed.
+    Expr* finalize(Expr* expr, SelectedExpressionUse use, SourceLoc callableLocation)
+    {
+        if (!expr)
+            return expr;
+        if (semantics->IsErrorExpr(expr))
+            return expr;
+        if (isUnselectedOrTypeExpression(expr))
+            return expr;
+
+        // Lowering consumes the checked result type of every selected runtime expression. If that
+        // type was opened from an existential value, finalization must capture the value that owns
+        // its dynamic type and witness table in the closure. This `finalize` call attaches those
+        // dependencies once, so the individual `visit*` methods do not repeat that work.
+        attachReferencedDeclarations(expr->type.type, expr);
+
+        // `SelectedExpressionFinalizer::finalize()` follows the selected expression through these
+        // wrappers. It finalizes each child as an ordinary value, then validates the complete
+        // wrapper exactly once for a callable use, including any retained local-binding prefix.
+        if (auto parenExpr = as<ParenExpr>(expr))
         {
-            capturedVarDecl = astBuilder->create<VarDecl>();
-            // A captured local variable keeps its own name. A captured `this` instead
-            // uses a *type* as its referenced declaration (a struct, or an interface's `This`
-            // generic parameter), so its closure field gets a synthesized name rather
-            // than the type's name. The interface `This` parameter is literally named
-            // "This", and a closure field named "This" is hijacked by the reserved-name
-            // member lookup when the synthesized `$init` re-checks `this.<field> = ...`,
-            // breaking constructor synthesis (issue #12923).
-            if (as<VarDeclBase>(srcDecl))
-            {
-                capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
-            }
-            else
-            {
-                // The only non-VarDeclBase capture is a `this`: visitVarExpr passes a VarDeclBase,
-                // and visitThisExpr passes the this-type declaration for a ThisExpr. This assertion
-                // enforces that contract so a future caller cannot silently mis-name another
-                // declaration kind.
-                SLANG_RELEASE_ASSERT(as<ThisExpr>(exprIn));
-                capturedVarDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("$this");
-                capturedVarDecl->nameAndLoc.loc = exprIn->loc;
-            }
-            SLANG_RELEASE_ASSERT(exprIn->type.type);
-            capturedVarDecl->type.type = exprIn->type.type;
-            mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
-            lambdaDecl->addMember(capturedVarDecl);
+            parenExpr->base = finalizeValue(parenExpr->base);
+            parenExpr->abstractStorageAccess = parenExpr->base->abstractStorageAccess;
+            return use != SelectedExpressionUse::Value
+                       ? validateCallable(parenExpr, use, callableLocation)
+                       : parenExpr;
+        }
+        if (auto genericAppExpr = as<GenericAppExpr>(expr))
+        {
+            genericAppExpr->functionExpr = finalizeValue(genericAppExpr->functionExpr);
+            genericAppExpr->abstractStorageAccess =
+                genericAppExpr->functionExpr->abstractStorageAccess;
+            return use != SelectedExpressionUse::Value
+                       ? validateCallable(genericAppExpr, use, callableLocation)
+                       : genericAppExpr;
+        }
+        if (auto letExpr = as<LetExpr>(expr))
+        {
+            SLANG_RELEASE_ASSERT(letExpr->decl);
+            SLANG_RELEASE_ASSERT(letExpr->decl->initExpr);
+            SLANG_RELEASE_ASSERT(letExpr->body);
+            letExpr->decl->initExpr = finalize(
+                letExpr->decl->initExpr,
+                SelectedExpressionUse::Value,
+                SourceLoc());
+            letExpr->body = finalizeValue(letExpr->body);
+            _setLocalBindingStorageAccess(letExpr);
+            return use != SelectedExpressionUse::Value
+                       ? validateCallable(letExpr, use, callableLocation)
+                       : letExpr;
+        }
 
-            if (isNonCopyableType(capturedVarDecl->type.type))
+        expr = dispatch(expr);
+        if (use == SelectedExpressionUse::Value)
+            return expr;
+        if (semantics->IsErrorExpr(expr))
+            return expr;
+
+        return validateCallable(expr, use, callableLocation);
+    }
+
+    Expr* finalizeValue(Expr* expr)
+    {
+        return finalize(expr, SelectedExpressionUse::Value, SourceLoc());
+    }
+
+    /// Finalizes an evaluated operand according to its checked result type.
+    ///
+    /// For a result-forming wrapper, finalization leaves the operand's abstract-storage use to the
+    /// wrapper's recorded access path. It still finalizes a function-typed operand as a callable so
+    /// that finalization validates the receiver of a bound method hidden below the wrapper.
+    Expr* finalizeOperandSelection(Expr* expr)
+    {
+        if (!expr)
+            return expr;
+        return finalize(
+            expr,
+            semantics->getSelectedExpressionUseForType(expr->type.type),
+            expr->loc);
+    }
+
+    void finalizeValues(List<Expr*>& expressions)
+    {
+        for (auto& expression : expressions)
+            expression = finalizeValue(expression);
+    }
+
+    /// Finalizes an expression selected as an ordinary consumed value.
+    ///
+    /// A selected function-typed expression can carry a callable receiver that must be validated
+    /// before the enclosing aggregate consumes the resulting function value.
+    bool finalizeConsumedValue(Expr*& expr)
+    {
+        expr = finalizeOperandSelection(expr);
+        expr = semantics->checkAbstractStorageUse(expr, AbstractStorageUse::ReadValue);
+        return !semantics->IsErrorExpr(expr);
+    }
+
+    /// Finalizes and consumes an expression used as an immediate call operand.
+    ///
+    /// Finalization validates the receiver of the already selected callable. The subsequent
+    /// `checkAbstractStorageUse` call separately reads the expression that produced that callable,
+    /// such as a function-valued property or a retained local binding.
+    bool finalizeCallableOperand(Expr*& expr, SourceLoc location)
+    {
+        expr = finalize(expr, SelectedExpressionUse::CallableInvocation, location);
+        expr = semantics->checkAbstractStorageUse(expr, AbstractStorageUse::ReadValue);
+        return !semantics->IsErrorExpr(expr);
+    }
+
+    Expr* visitExpr(Expr*)
+    {
+        SLANG_UNEXPECTED("selected-expression finalization lacks an expression classification");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    Expr* visitIncompleteExpr(IncompleteExpr* expr) { return expr; }
+    Expr* visitLiteralExpr(LiteralExpr* expr) { return expr; }
+    Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr) { return expr; }
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr) { return expr; }
+    Expr* visitThisExpr(ThisExpr* expr) { return expr; }
+    Expr* visitReturnValExpr(ReturnValExpr* expr) { return expr; }
+    Expr* visitLambdaExpr(LambdaExpr* expr) { return expr; }
+    Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr) { return expr; }
+    Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr) { return expr; }
+    Expr* visitThisTypeExpr(ThisTypeExpr* expr) { return expr; }
+    Expr* visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr* expr) { return expr; }
+
+    /// Validates the receiver on the direct member selected as a callable.
+    Expr* validateCallable(
+        Expr* callableExpr,
+        SelectedExpressionUse use,
+        SourceLoc location)
+    {
+        SLANG_RELEASE_ASSERT(use != SelectedExpressionUse::Value);
+        auto directCallableExpr = semantics->getDirectCallableDeclRefExpr(callableExpr);
+        auto memberExpr = as<MemberExpr>(directCallableExpr);
+        if (memberExpr)
+        {
+            if (!memberExpr->declRef.as<SubscriptDecl>())
             {
-                if (sink)
+                auto callableDeclRef = memberExpr->declRef.as<CallableDecl>();
+                SLANG_RELEASE_ASSERT(callableDeclRef);
+
+                if (auto thisParamInfo = semantics->findEffectiveThisParamInfo(callableDeclRef))
                 {
-                    sink->diagnose(Diagnostics::NonCopyableTypeCapturedInLambda{
-                        .type = capturedVarDecl->type.type,
-                        .expr = exprIn});
+                    auto diagnosticLocation = location.isValid() ? location : callableExpr->loc;
+                    if (!semantics->validateCallableReceiver(
+                            memberExpr->baseExpression,
+                            callableDeclRef,
+                            diagnosticLocation))
+                    {
+                        return semantics->CreateErrorExpr(callableExpr);
+                    }
+
+                    auto receiverUse =
+                        use == SelectedExpressionUse::CallableInvocation
+                            ? getAbstractStorageUseForParameter(thisParamInfo->mode)
+                            : AbstractStorageUse::DiscardResult;
+                    if (!_checkAbstractStorageAccess(
+                            semantics,
+                            memberExpr->baseExpression->abstractStorageAccess,
+                            receiverUse))
+                        return semantics->CreateErrorExpr(callableExpr);
                 }
             }
         }
 
-        auto thisLambdaExpr = astBuilder->create<ThisExpr>();
-        thisLambdaExpr->scope = lambdaDecl->ownedScope;
-        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
-        thisLambdaExpr->checked = true;
-
-        auto resultMemberExpr = astBuilder->create<MemberExpr>();
-        resultMemberExpr->declRef = capturedVarDecl;
-        resultMemberExpr->baseExpression = thisLambdaExpr;
-        resultMemberExpr->type = exprIn->type;
-        resultMemberExpr->loc = exprIn->loc;
-        resultMemberExpr->type.isLeftValue = false;
-        resultMemberExpr->checked = true;
-        return resultMemberExpr;
+        return callableExpr;
     }
 
-    Expr* visitVarExpr(VarExpr* expr)
+    Expr* visitExprWithArgsBase(ExprWithArgsBase* expr)
     {
-        auto srcDecl = as<VarDeclBase>(expr->declRef.getDecl());
-        return maybeCaptureDecl(expr, srcDecl);
-    }
-
-    Expr* visitThisExpr(ThisExpr* expr)
-    {
-        // Parameter modifiers such as `no_diff` are part of the effective `this` parameter's
-        // value type. They do not change the declaration whose value a lambda must capture.
-        auto thisTypeDecl = isDeclRefTypeOf<Decl>(unwrapModifiedType(expr->type.type));
-        if (!thisTypeDecl)
-            return expr;
-        // A `this` reference created by capture rewriting already refers to the lambda struct and
-        // therefore requires no further capture.
-        if (thisTypeDecl.getDecl() == lambdaDecl)
-            return expr;
-        return maybeCaptureDecl(expr, thisTypeDecl.getDecl());
-    }
-
-    Expr* visitMemberExpr(MemberExpr* expr)
-    {
-        expr->baseExpression = dispatchIfNotNull(expr->baseExpression);
-
-        // Consider `outer.field` after a lambda captures `outer` by value. The member expression
-        // was initially an l-value, but its rewritten base is an immutable closure field. Ordinary
-        // field access follows that new value category. A property can instead remain writable
-        // through a setter or `ref` accessor whose `this` parameter accepts the rewritten base.
-        if (auto propertyDeclRef = expr->declRef.as<PropertyDecl>())
-        {
-            expr->type.isLeftValue = _isPropertyReferenceLValue(
-                semantics,
-                propertyDeclRef,
-                expr->baseExpression,
-                expr->type);
-        }
-        else if (!expr->baseExpression->type.isLeftValue && !as<DerefMemberExpr>(expr))
-        {
-            expr->type.isLeftValue = false;
-        }
-
-        if (expr->selectedCallableReceiverCheckState !=
-            SelectedCallableReceiverCheckState::Pending)
-        {
-            return expr;
-        }
-
-        auto location = expr->selectedCallableReceiverCheckLoc;
-
-        // The pending state belongs to this one selected path. Advancing it before checking prevents
-        // a later traversal of the rewritten expression from diagnosing the receiver twice.
-        expr->selectedCallableReceiverCheckState =
-            SelectedCallableReceiverCheckState::Completed;
-        expr->selectedCallableReceiverCheckLoc = SourceLoc();
-
-        auto callableDeclRef = expr->declRef.as<CallableDecl>();
-        SLANG_RELEASE_ASSERT(callableDeclRef);
-        if (!semantics->checkCallableReceiverAfterSelection(
-                expr->baseExpression,
-                callableDeclRef,
-                location))
-        {
-            return semantics->CreateErrorExpr(expr);
-        }
+        for (auto& argument : expr->arguments)
+            argument = finalizeOperandSelection(argument);
         return expr;
     }
 
     Expr* visitIndexExpr(IndexExpr* expr)
     {
-        expr->baseExpression = dispatchIfNotNull(expr->baseExpression);
-        for (auto& indexExpr : expr->indexExprs)
-            indexExpr = dispatchIfNotNull(indexExpr);
-
-        // Array and vector indexing preserve their base's storage, whereas pointer indexing names
-        // pointee storage. Capturing an array or vector by value therefore makes its elements
-        // immutable, but capturing a pointer by value does not make its pointee immutable.
-        if (!as<PtrTypeBase>(expr->baseExpression->type))
-        {
-            expr->type.isLeftValue =
-                expr->type.isLeftValue && expr->baseExpression->type.isLeftValue;
-        }
+        expr->baseExpression = finalizeValue(expr->baseExpression);
+        finalizeValues(expr->indexExprs);
         return expr;
     }
 
-    Expr* visitParenExpr(ParenExpr* expr)
+    Expr* visitDerefExpr(DerefExpr* expr)
     {
-        expr->base = dispatchIfNotNull(expr->base);
-        expr->type = expr->base->type;
+        expr->base = finalizeValue(expr->base);
         return expr;
     }
 
     Expr* visitSwizzleExpr(SwizzleExpr* expr)
     {
-        expr->base = dispatchIfNotNull(expr->base);
-        // The existing value records whether the swizzle indices are unique. Capture rewriting can
-        // only remove writability by replacing its base with an immutable closure field.
-        expr->type.isLeftValue = expr->type.isLeftValue && expr->base->type.isLeftValue;
+        expr->base = finalizeValue(expr->base);
         return expr;
     }
 
     Expr* visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {
-        expr->base = dispatchIfNotNull(expr->base);
-        // The existing value records whether the selected coordinates are unique. Capture
-        // rewriting can only remove writability from the base.
-        expr->type.isLeftValue = expr->type.isLeftValue && expr->base->type.isLeftValue;
+        expr->base = finalizeValue(expr->base);
         return expr;
     }
 
-    Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
+    Expr* visitOpenRefExpr(OpenRefExpr* expr)
     {
-        expr->valueArg = dispatchIfNotNull(expr->valueArg);
-        // The original value category already accounts for the conversion. An interface cast, for
-        // example, constructs an existential r-value. Capture rewriting can remove l-value status,
-        // but it must not turn an existing r-value cast into an l-value.
-        expr->type.isLeftValue = expr->type.isLeftValue && expr->valueArg->type.isLeftValue;
+        expr->innerExpr = finalizeValue(expr->innerExpr);
+        return expr;
+    }
+
+    Expr* visitTryExpr(TryExpr* expr)
+    {
+        expr->base = finalizeValue(expr->base);
+        return expr;
+    }
+
+    Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
+    {
+        expr->innerExpr = finalizeOperandSelection(expr->innerExpr);
+        return expr;
+    }
+
+    Expr* visitAssignExpr(AssignExpr* expr)
+    {
+        // Assignment checking finalizes the selected destination before accessor validation and
+        // finalizes the assignment right-hand side after coercion. Revisiting either child here
+        // would repeat assignment checking and selected-expression finalization.
+        return expr;
+    }
+
+    Expr* visitModifierCastExpr(ModifierCastExpr* expr)
+    {
+        expr->valueArg = finalizeOperandSelection(expr->valueArg);
+        return expr;
+    }
+
+    Expr* visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto& element : expr->elements)
+        {
+            if (!finalizeConsumedValue(element))
+                return semantics->CreateErrorExpr(expr);
+        }
+        return expr;
+    }
+
+    Expr* visitInitializerListExpr(InitializerListExpr* expr)
+    {
+        for (auto& argument : expr->args)
+        {
+            if (!finalizeConsumedValue(argument))
+                return semantics->CreateErrorExpr(expr);
+        }
+        return expr;
+    }
+
+    Expr* visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        expr->valueArg = finalizeOperandSelection(expr->valueArg);
+        expr->innerCoercedExpr = finalizeOperandSelection(expr->innerCoercedExpr);
+        return expr;
+    }
+
+    Expr* visitPackExpr(PackExpr* expr)
+    {
+        for (auto& argument : expr->args)
+        {
+            if (!finalizeConsumedValue(argument))
+                return semantics->CreateErrorExpr(expr);
+        }
+        return expr;
+    }
+
+    Expr* visitExpandExpr(ExpandExpr* expr)
+    {
+        expr->baseExpr = finalizeValue(expr->baseExpr);
+        return expr;
+    }
+
+    Expr* visitEachExpr(EachExpr* expr)
+    {
+        expr->baseExpr = finalizeValue(expr->baseExpr);
+        return expr;
+    }
+
+    Expr* visitAddressOfExpr(AddressOfExpr* expr)
+    {
+        expr->arg = finalizeValue(expr->arg);
+        return expr;
+    }
+
+    Expr* visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        expr->base = finalizeOperandSelection(expr->base);
+        return expr;
+    }
+
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr)
+    {
+        expr->value = finalizeValue(expr->value);
+        return expr;
+    }
+
+    Expr* visitPackQueryExpr(PackQueryExpr* expr)
+    {
+        expr->value = finalizeValue(expr->value);
+        return expr;
+    }
+
+    Expr* visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        finalizeValues(expr->args);
+        return expr;
+    }
+
+    Expr* visitDetachExpr(DetachExpr* expr)
+    {
+        expr->inner = finalizeOperandSelection(expr->inner);
+        return expr;
+    }
+
+    Expr* visitVarExpr(VarExpr* expr)
+    {
+        attachReferencedDeclarations(expr->declRef.declRefBase, expr);
+        return expr;
+    }
+
+    Expr* visitMemberExpr(MemberExpr* expr)
+    {
+        expr->baseExpression =
+            finalize(expr->baseExpression, SelectedExpressionUse::Value, SourceLoc());
+        attachCaptureField(as<VarDeclBase>(expr->declRef.getDecl()), expr);
+        attachReferencedDeclarations(expr->declRef.declRefBase, expr);
         return expr;
     }
 
     Expr* visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        // A static member lookup such as `makeReceiver().staticValue` does not evaluate
-        // `makeReceiver()`. `ConstructDeclRefExpr` retains the discarded qualifier inside a
-        // `SharedTypeExpr` for diagnostics, so this visitor must not recurse into
-        // `StaticMemberExpr::baseExpression`.
+        attachReferencedDeclarations(expr->declRef.declRefBase, expr);
         return expr;
     }
 
-    Expr* visitOverloadedExpr(OverloadedExpr* expr)
+    Expr* visitInvokeExpr(InvokeExpr* expr)
     {
-        // No candidate is an evaluated path until overload resolution selects one.
+        const bool callableIsValid = finalizeCallableOperand(expr->functionExpr, expr->loc);
+        for (auto& argument : expr->arguments)
+            argument = finalizeOperandSelection(argument);
+
+        if (!callableIsValid)
+            return semantics->CreateErrorExpr(expr);
         return expr;
     }
 
-    Expr* visitOverloadedExpr2(OverloadedExpr2* expr)
+    /// Finalizes the selected callable and returns whether its higher-order operator remains valid.
+    bool finalizeHigherOrderBaseFunction(HigherOrderInvokeExpr* expr)
     {
-        // Candidate completion can retain several paths for a later invocation to select.
+        return finalizeCallableOperand(expr->baseFunction, expr->loc);
+    }
+
+    Expr* visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        if (!finalizeHigherOrderBaseFunction(expr))
+            return semantics->CreateErrorExpr(expr);
+
+        // A contextual conversion can select a higher-order expression without an immediate call.
+        // This visitor enforces the same differentiation-operand contract here as on the
+        // invocation path above.
+        if (auto differentiateExpr = as<DifferentiateExpr>(expr))
+        {
+            if (_diagnoseBoundInstanceMethodDifferentiationOperand(
+                    semantics,
+                    differentiateExpr))
+            {
+                return semantics->CreateErrorExpr(expr);
+            }
+        }
         return expr;
     }
+
+    Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr)
+    {
+        if (!finalizeHigherOrderBaseFunction(expr))
+            return semantics->CreateErrorExpr(expr);
+
+        // `IRDispatchKernel` identifies a kernel function but has no representation for an
+        // implicit receiver. Reject both `value.kernel` and `Type::kernel` after overload
+        // selection, using the selected declaration's effective receiver rather than lookup-path
+        // metadata. A static method selected through a value has no receiver and remains valid.
+        auto callableDeclRef = _getHigherOrderBaseFunctionDeclRef(semantics, expr->baseFunction);
+        if (callableDeclRef && semantics->findEffectiveThisParamInfo(callableDeclRef))
+        {
+            sink->diagnose(
+                Diagnostics::NonStaticMemberFunctionNotAllowedAsDispatchKernelOperand{
+                    .func = callableDeclRef.getDecl(),
+                    .expr = expr->baseFunction});
+            return semantics->CreateErrorExpr(expr);
+        }
+
+        expr->dispatchSize = semantics->checkAbstractStorageUse(
+            finalizeValue(expr->dispatchSize),
+            AbstractStorageUse::ReadValue);
+        expr->threadGroupSize = semantics->checkAbstractStorageUse(
+            finalizeValue(expr->threadGroupSize),
+            AbstractStorageUse::ReadValue);
+        if (semantics->IsErrorExpr(expr->dispatchSize))
+            return semantics->CreateErrorExpr(expr);
+        if (semantics->IsErrorExpr(expr->threadGroupSize))
+            return semantics->CreateErrorExpr(expr);
+        return expr;
+    }
+
+    Expr* visitAggTypeCtorExpr(AggTypeCtorExpr* expr)
+    {
+        for (auto& argument : expr->arguments)
+            argument = finalizeOperandSelection(argument);
+        return expr;
+    }
+
+    Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
+    {
+        auto arrayType = as<ArrayExpressionType>(expr->arrayExpr->type.type);
+        SLANG_RELEASE_ASSERT(arrayType);
+        attachReferencedDeclarations(arrayType->getElementCount(), expr);
+        return expr;
+    }
+
+    Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        if (as<CountOfExpr>(expr))
+        {
+            if (auto arrayType = as<ArrayExpressionType>(expr->sizedType))
+            {
+                attachReferencedDeclarations(arrayType->getElementCount(), expr);
+                return expr;
+            }
+        }
+
+        attachReferencedDeclarations(expr->sizedType, expr);
+        attachReferencedDeclarations(expr->dataLayoutType, expr);
+        if (_doesSizeOfLikeExprEvaluateValue(expr))
+            expr->value = finalizeOperandSelection(expr->value);
+        return expr;
+    }
+
+    Expr* visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        if (expr->constantVal)
+            return expr;
+
+        attachReferencedDeclarations(expr->typeExpr.type, expr);
+        if (expr->witnessArg)
+            attachReferencedDeclarations(expr->witnessArg, expr);
+        else
+            attachReferencedDeclarations(expr->value->type.type, expr);
+
+        if (_doesIsTypeExprEvaluateValue(expr))
+            expr->value = finalizeOperandSelection(expr->value);
+        return expr;
+    }
+
+    Expr* visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        attachReferencedDeclarations(expr->witnessArg, expr);
+        expr->value = finalizeOperandSelection(expr->value);
+        return expr;
+    }
+
+    Expr* visitMakeOptionalExpr(MakeOptionalExpr* expr)
+    {
+        expr->value = finalizeOperandSelection(expr->value);
+        return expr;
+    }
+
+    Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
+    {
+        attachReferencedDeclarations(expr->witnessArg, expr);
+        expr->valueArg = finalizeOperandSelection(expr->valueArg);
+        return expr;
+    }
+
+    Expr* visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
+    {
+        attachCaptureField(expr->declRef.getDecl(), expr->originalExpr);
+        attachReferencedDeclarations(expr->declRef.declRefBase, expr->originalExpr);
+        return expr;
+    }
+
+    Expr* visitMakeRefExpr(MakeRefExpr* expr)
+    {
+        expr->base = finalize(expr->base, SelectedExpressionUse::Value, SourceLoc());
+        return expr;
+    }
+
+    bool finalizeSPIRVAsmOperand(SPIRVAsmExpr* expr, SPIRVAsmOperand& operand)
+    {
+        switch (operand.flavor)
+        {
+        case SPIRVAsmOperand::BuiltinVar:
+        case SPIRVAsmOperand::SlangType:
+        case SPIRVAsmOperand::SampledType:
+            attachReferencedDeclarations(operand.type.type, expr);
+            return true;
+
+        case SPIRVAsmOperand::SlangValueAddr:
+            operand.expr = semantics->checkAbstractStorageUse(
+                finalizeValue(operand.expr),
+                AbstractStorageUse::RequireAddress);
+            return !semantics->IsErrorExpr(operand.expr);
+
+        case SPIRVAsmOperand::SlangValue:
+        case SPIRVAsmOperand::SlangImmediateValue:
+        case SPIRVAsmOperand::ImageType:
+        case SPIRVAsmOperand::SampledImageType:
+        case SPIRVAsmOperand::ConvertTexel:
+        case SPIRVAsmOperand::RayPayloadFromLocation:
+        case SPIRVAsmOperand::RayAttributeFromLocation:
+        case SPIRVAsmOperand::RayCallableFromLocation:
+            operand.expr = semantics->checkAbstractStorageUse(
+                finalizeValue(operand.expr),
+                AbstractStorageUse::ReadValue);
+            return !semantics->IsErrorExpr(operand.expr);
+
+        default:
+            SLANG_RELEASE_ASSERT(!operand.expr);
+            return true;
+        }
+    }
+
+    Expr* visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
+    {
+        for (auto& inst : expr->insts)
+        {
+            if (!finalizeSPIRVAsmOperand(expr, inst.opcode))
+                return semantics->CreateErrorExpr(expr);
+            for (auto& operand : inst.operands)
+            {
+                if (!finalizeSPIRVAsmOperand(expr, operand))
+                    return semantics->CreateErrorExpr(expr);
+            }
+        }
+        return expr;
+    }
+
+    Expr* visitSharedTypeExpr(SharedTypeExpr* expr) { return expr; }
+    Expr* visitAndTypeExpr(AndTypeExpr* expr) { return expr; }
+    Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return expr; }
+    Expr* visitPointerTypeExpr(PointerTypeExpr* expr) { return expr; }
+    Expr* visitFuncTypeExpr(FuncTypeExpr* expr) { return expr; }
+    Expr* visitTupleTypeExpr(TupleTypeExpr* expr) { return expr; }
+    Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* expr) { return expr; }
+    Expr* visitOverloadedExpr(OverloadedExpr* expr) { return expr; }
+    Expr* visitOverloadedExpr2(OverloadedExpr2* expr) { return expr; }
+    Expr* visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr) { return expr; }
 };
 
-Expr* SemanticsVisitor::maybeFinalizeSelectedExpressionPath(Expr* exprIn)
+Expr* SemanticsVisitor::finalizeSelectedExpression(
+    Expr* expr,
+    SelectedExpressionUse use,
+    SourceLoc callableLocation)
 {
-    if (!exprIn || isMemberBaseFinalizationDeferred())
-        return exprIn;
+    if (!expr)
+        return expr;
+    if (isCheckingPotentiallyUnevaluatedTerm())
+        return expr;
 
-    if (IsErrorExpr(exprIn))
-        return exprIn;
+    SelectedExpressionFinalizer finalizer(this);
+    return finalizer.finalize(expr, use, callableLocation);
+}
 
-    SelectedExpressionPathVisitor visitor(
-        this,
-        m_parentLambdaExpr,
-        m_parentLambdaDecl,
-        m_mapSrcDeclToCapturedLambdaDecl,
-        m_astBuilder,
-        getSink());
-    return visitor.dispatch(exprIn);
+SelectedExpressionUse SemanticsVisitor::getSelectedExpressionUseForType(Type* type)
+{
+    return as<FuncType>(type) ? SelectedExpressionUse::CallableValue
+                              : SelectedExpressionUse::Value;
 }
 
 Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
@@ -6104,19 +8116,21 @@ static std::optional<ParamInfo> _getHigherOrderThisParamInfo(
     return semantics->findEffectiveThisParamInfo(callableDeclRef);
 }
 
-/// Centralizes construction of higher-order expression types and receiver-prefix metadata.
+/// Centralizes construction of higher-order expression types and receiver-derived parameter
+/// metadata.
 ///
-/// Each concrete action supplies the operator-specific type transformation. The shared wrapper
-/// keeps the resulting type and `receiverParameterPrefixCount` synchronized.
+/// Each subclass implements its operator-specific type transformation in
+/// `fillHigherOrderInvokeExprImpl`. The shared construction routine invokes that transformation and
+/// records the resulting type together with `receiverDerivedParameterCount`.
 struct HigherOrderInvokeExprCheckingActions
 {
     /// Creates the concrete expression for this higher-order operator.
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
 
-    /// Fills one higher-order expression and publishes its receiver-derived parameter prefix.
+    /// Fills one higher-order expression and records its receiver-derived parameters.
     ///
-    /// Common initialization and prefix publication stay here so every concrete operator keeps its
-    /// function type and `receiverParameterPrefixCount` consistent.
+    /// Common initialization and metadata recording stay here so the function type and
+    /// `receiverDerivedParameterCount` remain consistent for every concrete operator.
     void fillHigherOrderInvokeExpr(
         HigherOrderInvokeExpr* resultExpr,
         SemanticsVisitor* semantics,
@@ -6125,7 +8139,7 @@ struct HigherOrderInvokeExprCheckingActions
     {
         resultExpr->baseFunction = funcExpr;
         resultExpr->newParameterNames.clear();
-        resultExpr->receiverParameterPrefixCount = 0;
+        resultExpr->receiverDerivedParameterCount = 0;
 
         auto prependsReceiver = fillHigherOrderInvokeExprImpl(
             resultExpr,
@@ -6134,7 +8148,7 @@ struct HigherOrderInvokeExprCheckingActions
             thisParamInfo);
         if (as<FuncType>(resultExpr->type.type))
         {
-            publishReceiverParameterPrefixCount(resultExpr, funcExpr, prependsReceiver);
+            setReceiverDerivedParameterCount(resultExpr, funcExpr, prependsReceiver);
         }
         else
         {
@@ -6157,7 +8171,8 @@ struct HigherOrderInvokeExprCheckingActions
         if (auto funcType = as<FuncType>(funcExpr->type.type))
             return funcType;
         auto astBuilder = semantics->getASTBuilder();
-        if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
+        if (auto declRefExpr =
+                as<DeclRefExpr>(getCallableExprThroughTransparentWrappers(funcExpr)))
         {
             if (auto baseFuncGenericDeclRef = declRefExpr->declRef.as<GenericDecl>())
             {
@@ -6177,24 +8192,25 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    /// Publishes the number of leading parameters derived from a receiver.
+    /// Sets the number of leading parameters derived from a receiver.
     ///
     /// For `__fwd_diff(__fwd_diff(Type::method))`, the outer type inherits the inner receiver
     /// parameters and may prepend another receiver-related parameter. Centralizing this step keeps
     /// every higher-order operator's type and prefix count in sync.
-    void publishReceiverParameterPrefixCount(
+    void setReceiverDerivedParameterCount(
         HigherOrderInvokeExpr* resultExpr,
         Expr* funcExpr,
         bool prependsReceiver)
     {
         Count count = prependsReceiver ? 1 : 0;
-        if (auto baseHigherOrderExpr = as<HigherOrderInvokeExpr>(funcExpr))
-            count += baseHigherOrderExpr->receiverParameterPrefixCount;
+        if (auto baseHigherOrderExpr =
+                as<HigherOrderInvokeExpr>(getCallableExprThroughTransparentWrappers(funcExpr)))
+            count += baseHigherOrderExpr->receiverDerivedParameterCount;
 
         auto resultFuncType = as<FuncType>(resultExpr->type.type);
         SLANG_RELEASE_ASSERT(resultFuncType);
         SLANG_RELEASE_ASSERT(count <= resultFuncType->getParamCount());
-        resultExpr->receiverParameterPrefixCount = uint32_t(count);
+        resultExpr->receiverDerivedParameterCount = uint32_t(count);
     }
 };
 
@@ -6310,28 +8326,42 @@ struct PassthroughHigherOrderExprCheckingActionsBase : HigherOrderInvokeExprChec
 
 /// Checks one higher-order operator while preserving overloads of its base function.
 ///
-/// An overloaded base produces one higher-order expression per candidate. Every candidate retains
-/// its actual function type and publishes the receiver prefix that overload resolution may
-/// normalize in a temporary view.
+/// For an overloaded base, `_checkHigherOrderInvokeExpr()` produces one higher-order expression per
+/// candidate and stores the actual function type and number of receiver-derived leading parameters
+/// on each one. `getHigherOrderOverloadComparisonType()` substitutes `in` for those parameters only
+/// in the type used by overload resolution.
 static Expr* _checkHigherOrderInvokeExpr(
     SemanticsVisitor* semantics,
     HigherOrderInvokeExpr* expr,
     HigherOrderInvokeExprCheckingActions* actions)
 {
-    // The operand allows an unbound instance method such as `Type::method`.
-    SemanticsVisitor subVisitor(semantics->getShared());
-    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    // The subvisitor permits an unbound instance method such as `Type::method` as the operand.
+    SemanticsVisitor subVisitor(semantics->allowStaticReferenceToNonStaticMember());
     expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
-    expr->baseFunction =
-        subVisitor.maybeResolveOverloadedExpr(expr->baseFunction, LookupMask::Function, nullptr);
 
-    if (semantics->IsErrorExpr(expr->baseFunction))
+    auto selectedBaseFunction =
+        getCallableExprThroughTransparentWrappers(expr->baseFunction);
+    auto resolvedBaseFunction = subVisitor.maybeResolveOverloadedExpr(
+        selectedBaseFunction,
+        LookupMask::Function,
+        nullptr);
+    if (resolvedBaseFunction != selectedBaseFunction)
+    {
+        semantics->replaceSelectedCallableThroughTransparentWrappers(
+            expr->baseFunction,
+            resolvedBaseFunction);
+        selectedBaseFunction = resolvedBaseFunction;
+    }
+
+    if (semantics->IsErrorExpr(selectedBaseFunction))
         return semantics->CreateErrorExpr(expr);
 
     auto astBuilder = semantics->getASTBuilder();
 
-    // An overloaded operand distributes the higher-order operator over its candidates.
-    if (auto overloadedExpr = as<OverloadedExpr>(expr->baseFunction))
+    // `_checkHigherOrderInvokeExpr()` distributes the higher-order operator over an overloaded
+    // operand's candidates. `ConstructLookupResultExpr()` reconstructs each candidate and
+    // `fillHigherOrderInvokeExpr()` stores its checked higher-order type.
+    if (auto overloadedExpr = as<OverloadedExpr>(selectedBaseFunction))
     {
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
         for (auto item : overloadedExpr->lookupResult2)
@@ -6346,7 +8376,10 @@ static Expr* _checkHigherOrderInvokeExpr(
             actions->fillHigherOrderInvokeExpr(
                 candidateExpr,
                 semantics,
-                lookupResultExpr,
+                rebuildCallableTransparentWrappers(
+                    astBuilder,
+                    expr->baseFunction,
+                    lookupResultExpr),
                 _getHigherOrderThisParamInfo(semantics, lookupResultExpr));
             candidateExpr->loc = expr->loc;
             result->candidateExprs.add(candidateExpr);
@@ -6355,7 +8388,7 @@ static Expr* _checkHigherOrderInvokeExpr(
         result->loc = expr->loc;
         return result;
     }
-    else if (auto overloadedExpr2 = as<OverloadedExpr2>(expr->baseFunction))
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(selectedBaseFunction))
     {
         OverloadedExpr2* result = astBuilder->create<OverloadedExpr2>();
         for (auto item : overloadedExpr2->candidateExprs)
@@ -6364,7 +8397,7 @@ static Expr* _checkHigherOrderInvokeExpr(
             actions->fillHigherOrderInvokeExpr(
                 candidateExpr,
                 semantics,
-                item,
+                rebuildCallableTransparentWrappers(astBuilder, expr->baseFunction, item),
                 _getHigherOrderThisParamInfo(semantics, item));
             candidateExpr->loc = expr->loc;
             result->candidateExprs.add(candidateExpr);
@@ -6372,6 +8405,15 @@ static Expr* _checkHigherOrderInvokeExpr(
         result->type.type = astBuilder->getOverloadedType();
         result->loc = expr->loc;
         return result;
+    }
+
+    // An overload set must remain intact until ordinary call resolution selects a candidate. Once
+    // the operand is known to be a single differentiation target, however, a bound instance method
+    // cannot be represented by differentiation IR and must not reach lowering.
+    if (auto differentiateExpr = as<DifferentiateExpr>(expr))
+    {
+        if (_diagnoseBoundInstanceMethodDifferentiationOperand(semantics, differentiateExpr))
+            return semantics->CreateErrorExpr(expr);
     }
 
     actions->fillHigherOrderInvokeExpr(
@@ -6448,15 +8490,15 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
     }
 };
 
-FuncType* SemanticsVisitor::getReceiverModeNeutralHigherOrderFunctionType(
+FuncType* SemanticsVisitor::getHigherOrderOverloadComparisonType(
     HigherOrderInvokeExpr* expr,
     FuncType* funcType)
 {
     SLANG_RELEASE_ASSERT(expr);
     SLANG_RELEASE_ASSERT(funcType);
 
-    auto receiverParameterCount = expr->receiverParameterPrefixCount;
-    if (receiverParameterCount == 0)
+    auto receiverDerivedParameterCount = expr->receiverDerivedParameterCount;
+    if (receiverDerivedParameterCount == 0)
         return funcType;
 
     List<Type*> parameterTypes;
@@ -6464,8 +8506,9 @@ FuncType* SemanticsVisitor::getReceiverModeNeutralHigherOrderFunctionType(
         parameterTypes.add(parameterType);
 
     bool changed = false;
-    SLANG_RELEASE_ASSERT(receiverParameterCount <= uint32_t(parameterTypes.getCount()));
-    for (Index i = 0; i < receiverParameterCount; ++i)
+    SLANG_RELEASE_ASSERT(
+        receiverDerivedParameterCount <= uint32_t(parameterTypes.getCount()));
+    for (Index i = 0; i < receiverDerivedParameterCount; ++i)
     {
         auto parameterInfo = getParamInfoFromTypeWithModeWrapper(parameterTypes[i]);
         if (parameterInfo.mode == ParamPassingMode::In)
@@ -6505,9 +8548,10 @@ Expr* SemanticsExprVisitor::visitApplyForBwdExpr(ApplyForBwdExpr* expr)
 
 Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
 {
-    SemanticsContext ctx(*this);
-    ctx = ctx.allowStaticReferenceToNonStaticMember();
-    expr->base = dispatchExpr(expr->base, ctx);
+    auto context = withPotentiallyUnevaluatedTerm()
+                       .allowStaticReferenceToNonStaticMember();
+    SemanticsVisitor visitor(context);
+    expr->base = visitor.CheckTerm(expr->base);
 
     if (auto overloadedExpr = as<OverloadedExpr>(expr->base))
         expr->base = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::Function, nullptr);
@@ -6539,7 +8583,7 @@ Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitFuncTypeOfExpr(FuncTypeOfExpr* expr)
 {
-    expr->base = dispatchExpr(expr->base, *this);
+    expr->base = checkPotentiallyUnevaluatedTerm(expr->base);
     auto funcType = as<FuncType>(expr->base->type.type);
     if (!funcType)
     {
@@ -6577,17 +8621,6 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             return false;
         return constElementCount->getValue() == 3;
     };
-    expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
-    if (!isInt3Type(expr->threadGroupSize->type.type))
-    {
-        auto uint3Type = m_astBuilder->getVectorType(
-            m_astBuilder->getUIntType(),
-            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
-        getSink()->diagnose(Diagnostics::TypeMismatch{
-            .expectedType = uint3Type,
-            .actualType = expr->threadGroupSize->type,
-            .expr = expr->threadGroupSize});
-    }
     expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
     if (!isInt3Type(expr->dispatchSize->type.type))
     {
@@ -6599,6 +8632,17 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             .actualType = expr->dispatchSize->type,
             .expr = expr->dispatchSize});
     }
+    expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
+    if (!isInt3Type(expr->threadGroupSize->type.type))
+    {
+        auto uint3Type = m_astBuilder->getVectorType(
+            m_astBuilder->getUIntType(),
+            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expectedType = uint3Type,
+            .actualType = expr->threadGroupSize->type,
+            .expr = expr->threadGroupSize});
+    }
     PassthroughHigherOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }
@@ -6608,6 +8652,8 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
     auto subContext = withTreatAsDifferentiable(expr).allowDroppingDerivatives();
     expr->innerExpr = dispatchExpr(expr->innerExpr, subContext);
     expr->type = expr->innerExpr->type;
+    expr->abstractStorageAccess = expr->innerExpr->abstractStorageAccess;
+
     auto innerExpr = expr->innerExpr;
     while (auto parenExpr = as<ParenExpr>(innerExpr))
     {
@@ -6626,7 +8672,7 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
 
 Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
 {
-    expr->arrayExpr = CheckTerm(expr->arrayExpr);
+    expr->arrayExpr = checkPotentiallyUnevaluatedTerm(expr->arrayExpr);
     if (auto arrType = as<ArrayExpressionType>(expr->arrayExpr->type))
     {
         expr->type = m_astBuilder->getIntType();
@@ -6659,6 +8705,12 @@ Expr* SemanticsExprVisitor::visitDetachExpr(DetachExpr* expr)
     expr->type = getTypeWithModifier(
         expr->inner->type,
         getCurrentASTBuilder()->getOrCreate<NoDiffModifierVal>());
+    expr->type.isLeftValue = false;
+    expr->type.isWriteOnly = false;
+    expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+        m_astBuilder,
+        expr->inner->abstractStorageAccess,
+        AbstractStorageUse::ReadValue);
     return expr;
 }
 
@@ -6962,7 +9014,7 @@ bool SemanticsVisitor::isKnownNonEmptyPack(Val* packVal)
 
 Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 {
-    auto valueExpr = dispatch(sizeOfLikeExpr->value);
+    auto valueExpr = checkPotentiallyUnevaluatedTerm(sizeOfLikeExpr->value);
     sizeOfLikeExpr->value = valueExpr;
     sizeOfLikeExpr->type = m_astBuilder->getIntType();
 
@@ -7009,7 +9061,8 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
         Type* dataLayoutType = nullptr;
         if (sizeOfLikeExpr->dataLayout)
         {
-            auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
+            auto dataLayoutExpr =
+                checkPotentiallyUnevaluatedTerm(sizeOfLikeExpr->dataLayout);
             sizeOfLikeExpr->dataLayout = dataLayoutExpr;
             if (as<TypeType>(dataLayoutExpr->type))
             {
@@ -7046,6 +9099,13 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     }
 
     sizeOfLikeExpr->sizedType = type;
+    if (_doesSizeOfLikeExprEvaluateValue(sizeOfLikeExpr))
+    {
+        sizeOfLikeExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            sizeOfLikeExpr->value->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
+    }
 
     return sizeOfLikeExpr;
 }
@@ -7128,6 +9188,14 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
         packQueryExpr->type = m_astBuilder->getTypeType(resultType);
         return packQueryExpr;
     }
+
+    // A term-valued pack query evaluates the complete operand before selecting or trimming its
+    // elements. The query result is an r-value, so every later use has already committed a read of
+    // the operand's abstract storage.
+    packQueryExpr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+        m_astBuilder,
+        valueExpr->abstractStorageAccess,
+        AbstractStorageUse::ReadValue);
 
     if (auto valuePackType = as<ValuePackType>(operandType))
     {
@@ -7614,6 +9682,11 @@ static PtrType* getValidTypeForAddressOf(
     Expr* baseExpr,
     Type* targetType)
 {
+    // Addressable syntax must still denote writable storage. In particular, a local captured by
+    // value keeps its `VarExpr` shape until the enclosing expression is known to be evaluated, but
+    // its prepared value category is already immutable.
+    if (!baseExpr->type.isLeftValue)
+        return nullptr;
 
     // If our base is a variable like expression, we should check if this expr is a
     // block of memory we allow getting the address of.
@@ -7824,6 +9897,7 @@ static PtrType* getValidTypeForAddressOf(
 Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
+    expr->arg = checkAbstractStorageUse(expr->arg, AbstractStorageUse::RequireAddress);
 
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
@@ -7941,7 +10015,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
-                        return coerce(
+                        return coerceExpressionWithoutFinalization(
                             CoercionSite::General,
                             typeExp.type,
                             checkedInitListExpr,
@@ -7968,10 +10042,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                 maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
             }
 
-            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
-            {
-                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
-            }
+            registerAssociatedMethodsForSelectedCallable(this, checkedInvokeExpr->functionExpr);
         }
     }
 
@@ -8085,8 +10156,9 @@ static bool _isTypeParametric(Type* type)
 
 Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 {
-    expr->typeExpr = CheckProperType(expr->typeExpr);
-    auto originalVal = CheckTerm(expr->value);
+    SemanticsVisitor unevaluatedVisitor(withPotentiallyUnevaluatedTerm());
+    expr->typeExpr = unevaluatedVisitor.CheckProperType(expr->typeExpr);
+    auto originalVal = unevaluatedVisitor.CheckTerm(expr->value);
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
 
@@ -8133,6 +10205,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         if (!optionalWitness && !isInterfaceType(valueInterfaceType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
+        }
+        if (_doesIsTypeExprEvaluateValue(expr))
+        {
+            expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+                m_astBuilder,
+                expr->value->abstractStorageAccess,
+                AbstractStorageUse::ReadValue);
         }
         return expr;
     }
@@ -8194,6 +10273,10 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         makeOptional->value = castToSuperType;
         makeOptional->typeExpr = typeExpr.exp;
         makeOptional->checked = true;
+        makeOptional->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            castToSuperType->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
         return makeOptional;
     }
 
@@ -8208,6 +10291,10 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
         expr->value = maybeOpenExistential(expr->value);
+        expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            expr->value->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
         return expr;
     }
 
@@ -8222,6 +10309,10 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->typeExpr = typeExpr.exp;
+    expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+        m_astBuilder,
+        expr->value->abstractStorageAccess,
+        AbstractStorageUse::ReadValue);
     return expr;
 }
 
@@ -8261,7 +10352,13 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
     if (isTypeExpr)
         expr->type = m_astBuilder->getTypeType(expandType);
     else
+    {
         expr->type = QualType(expandType);
+        expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+            m_astBuilder,
+            expr->baseExpr->abstractStorageAccess,
+            AbstractStorageUse::ReadValue);
+    }
     return expr;
 }
 
@@ -8306,6 +10403,10 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
                     m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
             }
             expr->type = QualType(valPackType->getElementType());
+            expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+                m_astBuilder,
+                expr->baseExpr->abstractStorageAccess,
+                AbstractStorageUse::ReadValue);
             return expr;
         }
     }
@@ -8344,7 +10445,13 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         if (isTypeNode)
             expr->type = m_astBuilder->getTypeType(eachType);
         else
+        {
             expr->type = QualType(eachType);
+            expr->abstractStorageAccess = AbstractStorageAccessPath::makeFixedOperandUse(
+                m_astBuilder,
+                expr->baseExpr->abstractStorageAccess,
+                AbstractStorageUse::ReadValue);
+        }
         return expr;
     }
 error:;
@@ -8361,10 +10468,9 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     ASTSynthesizer synthesizer = ASTSynthesizer(m_astBuilder, getNamePool());
     synthesizer.pushContainerScope(m_outerScope->containerDecl);
 
-    Dictionary<Decl*, VarDeclBase*> mapSrcDeclToCapturedDecl;
+    LambdaCaptureContext captureContext;
     ensureAllDeclsRec(lambdaExpr->paramScopeDecl, DeclCheckState::DefinitionChecked);
     LambdaDecl* lambdaStructDecl = m_astBuilder->create<LambdaDecl>();
-    auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
     synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
@@ -8393,11 +10499,16 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
     addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());
+    auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &captureContext)
+                          .withParentFunc(funcDecl)
+                          .allowDroppingDerivatives();
 
-    // As we check the body, we will fill in the result type when we visit `ReturnStmt`.
+    // Checking the body both infers the result type and prepares provisional captures. This is the
+    // definitive body check for the synthesized call operator; declaration checking must not
+    // revisit the same statements after the inferred signature has been installed.
     dispatchStmt(lambdaExpr->bodyStmt, subContext);
 
-    // If the lambda has no return type, we will set it to `void`.
+    // A lambda with no return expression has a `void` result.
     if (!funcDecl->returnType.type)
         funcDecl->returnType.type = m_astBuilder->getVoidType();
 
@@ -8428,22 +10539,28 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         lambdaStructDecl->addMember(inheritanceDecl);
     }
 
-    // Synthesizer the ctor signature, and `IFunc` witness.
+    // The manual body check above precedes the declaration phases that need its inferred result
+    // type. `ensureDecl()` advances the synthesized function through those phases, then
+    // `setCheckState()` records that its definition has already been checked. Later recursive
+    // declaration checking can proceed to capability analysis without checking the body a second
+    // time.
+    ensureDecl(funcDecl, DeclCheckState::AttributesChecked, &subContext);
+    funcDecl->setCheckState(DeclCheckState::DefinitionChecked);
+
+    // The synthesized closure now has enough type information to check its constructor signature
+    // and `IFunc` witness.
     ensureDecl(lambdaStructDecl, DeclCheckState::AttributesChecked);
 
     // Return an expr that represents `SynthesizedLambdaStruct.__init(captured_args...)`.
     List<Expr*> args;
-    Dictionary<VarDeclBase*, Decl*> mapCapturedDeclToSrcDecl;
-    for (auto kv : mapSrcDeclToCapturedDecl)
-    {
-        mapCapturedDeclToSrcDecl[kv.second] = kv.first;
-    }
     for (auto capturedField : getMembersOfType<VarDecl>(m_astBuilder, lambdaStructDecl))
     {
-        auto src = mapCapturedDeclToSrcDecl[capturedField.getDecl()];
-        if (auto srcVarDecl = as<VarDeclBase>(src))
+        Decl* capturedDecl = nullptr;
+        SLANG_RELEASE_ASSERT(
+            captureContext.fieldToCapturedDecl.tryGetValue(capturedField.getDecl(), capturedDecl));
+        if (auto capturedVarDecl = as<VarDeclBase>(capturedDecl))
         {
-            args.add(synthesizer.emitVarExpr(srcVarDecl));
+            args.add(synthesizer.emitVarExpr(capturedVarDecl));
         }
         else
         {
@@ -8646,9 +10763,14 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle names writable storage only when its base does and no component is repeated.
+    swizExpr->type.isLeftValue = memberRefExpr->baseExpression->type.isLeftValue;
+    if (anyDuplicates)
+        swizExpr->type.isLeftValue = false;
+    swizExpr->abstractStorageAccess = AbstractStorageAccessPath::makeProjection(
+        m_astBuilder,
+        swizExpr->base->abstractStorageAccess,
+        AbstractStorageProjectionMode::ReadModifyWrite);
 
     return swizExpr;
 }
@@ -8760,9 +10882,17 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle names writable storage only when its base does and no element is repeated.
+    swizExpr->type.isLeftValue = memberExpr->baseExpression->type.isLeftValue;
+    if (anyDuplicates)
+        swizExpr->type.isLeftValue = false;
+    auto projectionMode = swizExpr->elementIndices.getCount() == 1
+                              ? AbstractStorageProjectionMode::RequireAddressForWrite
+                              : AbstractStorageProjectionMode::ReadModifyWrite;
+    swizExpr->abstractStorageAccess = AbstractStorageAccessPath::makeProjection(
+        m_astBuilder,
+        swizExpr->base->abstractStorageAccess,
+        projectionMode);
     return swizExpr;
 }
 
@@ -8870,8 +11000,17 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
 
     // A swizzle can be used as an l-value as long as there
     // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
-                                 swizExpr->base->type.isLeftValue;
+    swizExpr->type.isLeftValue = !anyDuplicates;
+    if (swizExpr->type.isLeftValue)
+        swizExpr->type.isLeftValue = swizExpr->base != nullptr;
+    if (swizExpr->type.isLeftValue)
+        swizExpr->type.isLeftValue = swizExpr->base->type != nullptr;
+    if (swizExpr->type.isLeftValue)
+        swizExpr->type.isLeftValue = swizExpr->base->type.isLeftValue;
+    swizExpr->abstractStorageAccess = AbstractStorageAccessPath::makeProjection(
+        m_astBuilder,
+        swizExpr->base->abstractStorageAccess,
+        AbstractStorageProjectionMode::ReadModifyWrite);
 
     return swizExpr;
 }
@@ -9108,7 +11247,12 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
         }
         else if (as<FuncType>(e->type))
         {
-            auto declRefExpr = as<DeclRefExpr>(e);
+            // Callable selection may retain a `LetExpr` that evaluates the qualifier once.
+            // Inspect its declaration-reference leaf here; `handleLeafCase` keeps the original
+            // `baseExpression` so the selected member still evaluates that binding.
+            auto declRefExpr =
+                as<DeclRefExpr>(getCallableExprThroughTransparentWrappers(e));
+            SLANG_RELEASE_ASSERT(declRefExpr);
             handleLeafCase(declRefExpr->declRef, nullptr);
         }
     };
@@ -9154,20 +11298,13 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
 
 Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
 {
-    expr->baseExpression = CheckTerm(expr->baseExpression);
+    SemanticsExprVisitor baseVisitor(withPotentiallyUnevaluatedTerm());
+    bool needDeref = false;
+    expr->baseExpression = baseVisitor.checkBaseForMemberExpr(
+        expr->baseExpression,
+        CheckBaseContext::Member,
+        needDeref);
 
-    // Not sure this is needed -> but guess someone could do
-    expr->baseExpression = maybeDereference(expr->baseExpression, CheckBaseContext::Member);
-
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
-    //
-
-    expr->baseExpression = maybeOpenExistential(expr->baseExpression);
-    // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
 }
 
@@ -9450,20 +11587,31 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     CheckBaseContext checkBaseContext,
     bool& outNeedDeref)
 {
-    auto baseExpr = inBaseExpr;
-    baseExpr = CheckTerm(baseExpr);
+    ExprLocalScope localScope;
+    SemanticsVisitor scopedVisitor(withExprLocalScope(&localScope));
 
-    auto resultBaseExpr =
-        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+    auto baseExpr = scopedVisitor.CheckTerm(inBaseExpr);
+    if (IsErrorExpr(baseExpr))
+        return baseExpr;
+
+    auto resultBaseExpr = scopedVisitor.maybeInsertImplicitOpForMemberBase(
+        baseExpr,
+        checkBaseContext,
+        outNeedDeref);
 
     // We might want to register differentiability on any implicit ops that we add in.
-    if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
-        maybeRegisterDifferentiableType(
-            getASTBuilder(),
-            resultBaseExpr->type.type,
-            resultBaseExpr->loc);
+    if (scopedVisitor.m_parentFunc)
+    {
+        if (scopedVisitor.m_parentFunc->findModifier<DifferentiableAttribute>())
+        {
+            scopedVisitor.maybeRegisterDifferentiableType(
+                getASTBuilder(),
+                resultBaseExpr->type.type,
+                resultBaseExpr->loc);
+        }
+    }
 
-    return resultBaseExpr;
+    return _wrapExpressionInLocalBindings(resultBaseExpr, localScope);
 }
 
 Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
@@ -9530,7 +11678,7 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
-    SemanticsExprVisitor baseVisitor(withDeferredMemberBaseFinalization());
+    SemanticsExprVisitor baseVisitor(withPotentiallyUnevaluatedTerm());
     bool needDeref = false;
     expr->baseExpression = baseVisitor.checkBaseForMemberExpr(
         expr->baseExpression,
@@ -9563,14 +11711,14 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
         // Treat scalar like a 1-element vector when swizzling
         auto swizzle = CheckSwizzleExpr(expr, baseScalarType, 1);
         if (swizzle)
-            return maybeFinalizeSelectedExpressionPath(swizzle);
+            return swizzle;
     }
     else if (auto baseVecType = as<VectorExpressionType>(baseType))
     {
         auto swizzle =
             CheckSwizzleExpr(expr, baseVecType->getElementType(), baseVecType->getElementCount());
         if (swizzle)
-            return maybeFinalizeSelectedExpressionPath(swizzle);
+            return swizzle;
     }
     else if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
     {
@@ -9580,32 +11728,28 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
             baseMatrixType->getRowCount(),
             baseMatrixType->getColumnCount());
         if (swizzle)
-            return maybeFinalizeSelectedExpressionPath(swizzle);
+            return swizzle;
     }
 
     if (as<NamespaceType>(baseType))
     {
-        return maybeFinalizeSelectedExpressionPath(
-            _lookupStaticMember(expr, expr->baseExpression));
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else if (const auto typeType = as<TypeType>(baseType); typeType)
     {
-        return maybeFinalizeSelectedExpressionPath(
-            _lookupStaticMember(expr, expr->baseExpression));
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else if (as<OverloadedExpr>(expr->baseExpression))
     {
-        return maybeFinalizeSelectedExpressionPath(
-            _lookupStaticMember(expr, expr->baseExpression));
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else if (as<OverloadedExpr2>(expr->baseExpression))
     {
-        return maybeFinalizeSelectedExpressionPath(
-            _lookupStaticMember(expr, expr->baseExpression));
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else if (auto baseTupleType = as<TupleType>(baseType))
     {
-        return maybeFinalizeSelectedExpressionPath(checkTupleSwizzleExpr(expr, baseTupleType));
+        return checkTupleSwizzleExpr(expr, baseTupleType);
     }
     else if (as<ErrorType>(baseType))
     {
@@ -9613,12 +11757,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else if (as<FuncType>(baseType))
     {
-        return maybeFinalizeSelectedExpressionPath(
-            _lookupStaticMember(expr, expr->baseExpression));
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else
     {
-        return maybeFinalizeSelectedExpressionPath(checkGeneralMemberLookupExpr(expr, baseType));
+        return checkGeneralMemberLookupExpr(expr, baseType);
     }
 }
 
@@ -9647,17 +11790,20 @@ Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     return expr;
 }
 
-/// Checks an object-oriented `this` expression without rewriting a lambda capture.
+/// Checks an object-oriented `this` expression and creates its lambda capture reference if needed.
 ///
-/// Lookup uses this operation while reconstructing a candidate path. The complete selected path
-/// performs capture rewriting later, after overload resolution has discarded unused candidates.
-Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
+/// `ConstructLookupResultExpr()` uses `checkThisExpr()` while replaying a `ThisValue` breadcrumb
+/// for a candidate path. `SelectedExpressionFinalizer` attaches the capture field later, after
+/// overload resolution has discarded unused candidates.
+Expr* SemanticsVisitor::checkThisExpr(ThisExpr* expr)
 {
-    // A `this` expression starts as an r-value. A constructor or instance callable below can make
-    // it writable and supplies its type.
+    // `this` starts as an r-value. An enclosing constructor can make it writable, and the enclosing
+    // aggregate supplies its type. An instance callable instead supplies both its type and value
+    // category.
     expr->type.isLeftValue = false;
 
-    // Search outward for the constructor, callable, aggregate, or extension that supplies `this`.
+    // The outward scope search finds the constructor, callable, aggregate, or extension that
+    // supplies `this`.
     auto scope = expr->scope;
     while (scope)
     {
@@ -9669,10 +11815,28 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
-            // A receiverless callable is a lexical boundary for `this`. In particular, a static
-            // method, local function, or extension of a free function must not inherit an
-            // unrelated receiver from an enclosing declaration.
-            if (isReceiverlessDeclarationBoundary(funcDeclBase))
+            std::optional<ParamInfo> thisParamInfo;
+            bool isCheckingSignature = funcDeclBase->checkState.isBeingChecked() &&
+                                       !funcDeclBase->isChecked(DeclCheckState::SignatureChecked);
+            if (isCheckingSignature)
+            {
+                // `checkAndAttachEffectiveThisParamInfo()` publishes the receiver information
+                // before signature checking examines default arguments and array bounds. An
+                // explicit or implicit `this` in those expressions reads the published attribute
+                // without recursively ensuring the method.
+                SLANG_RELEASE_ASSERT(
+                    funcDeclBase->checkState.getState() == DeclCheckState::ScopesWired);
+                if (auto attribute = funcDeclBase->findModifier<ThisParamInfoAttribute>())
+                    thisParamInfo = attribute->info;
+            }
+            else
+            {
+                thisParamInfo = findEffectiveThisParamInfo(getDefaultDeclRef(funcDeclBase));
+            }
+
+            // Every callable is a lexical boundary for `this`. A callable without published
+            // receiver information must not inherit an unrelated receiver from an outer scope.
+            if (!thisParamInfo)
             {
                 if (auto sink = getSink())
                 {
@@ -9682,62 +11846,22 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
                 return CreateErrorExpr(expr);
             }
 
-            std::optional<ParamInfo> thisParamInfo;
-            if (funcDeclBase->checkState.isBeingChecked() &&
-                !funcDeclBase->isChecked(DeclCheckState::SignatureChecked))
-            {
-                // The `SignatureChecked` dispatch checks callable-header expressions before
-                // `checkAndAttachEffectiveThisParamInfo` publishes the result. That checking can
-                // recursively enter a parameter type or an untyped default used for type
-                // inference, while `ensureDecl` does not advance the callable's state until the
-                // dispatch returns. Earlier transitions do not check callable-header expressions,
-                // and later transitions have already published the effective parameter
-                // information. Thus every pre-publication `this` expression that reaches this
-                // branch must observe `ScopesWired`.
-                SLANG_RELEASE_ASSERT(
-                    funcDeclBase->checkState.getState() == DeclCheckState::ScopesWired);
-                // Consider this example:
-                //
-                //     struct S
-                //     {
-                //         static const int N = 4;
-                //         func f(values: int[this.N]) {}
-                //     }
-                //
-                // Checking `this.N` must use the same effective-parameter computation that will
-                // publish the callable's checked information at the end of the transition. Asking
-                // the ordinary semantic query here would instead try to ensure the in-progress
-                // callable to `SignatureChecked` and report a spurious cyclic reference. The
-                // publishing call emits diagnostics so each invalid modifier is reported exactly
-                // once.
-                thisParamInfo = checkEffectiveThisParamInfo(
-                    funcDeclBase,
-                    /* shouldDiagnoseModeSpecifiers */ false);
-            }
-            else
-            {
-                thisParamInfo = findEffectiveThisParamInfo(getDefaultDeclRef(funcDeclBase));
-            }
-
-            if (thisParamInfo)
-            {
-                expr->type.type = thisParamInfo->type;
-                expr->type.isLeftValue = isThisExprWritable(
-                    getDefaultDeclRef(funcDeclBase).as<CallableDecl>(),
-                    *thisParamInfo);
-                return expr;
-            }
+            expr->type.type = thisParamInfo->type;
+            expr->type.isLeftValue = isThisExprWritable(
+                getDefaultDeclRef(funcDeclBase).as<CallableDecl>(),
+                *thisParamInfo);
+            return _captureThisForLambdaIfNeeded(this, expr);
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))
         {
             expr->type.type = calcThisType(makeDeclRef(typeOrExtensionDecl));
-            return expr;
+            return _captureThisForLambdaIfNeeded(this, expr);
         }
         else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
-            return expr;
+            return _captureThisForLambdaIfNeeded(this, expr);
         }
 #if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
@@ -9780,14 +11904,9 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
     return CreateErrorExpr(expr);
 }
 
-/// Checks an object-oriented `this` expression and then rewrites any lambda capture on the
-/// selected expression path.
 Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
 {
-    auto checkedExpr = checkThisExprWithoutCapturing(expr);
-    if (IsErrorExpr(checkedExpr))
-        return checkedExpr;
-    return maybeFinalizeSelectedExpressionPath(checkedExpr);
+    return checkThisExpr(expr);
 }
 
 Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
@@ -9835,11 +11954,7 @@ Expr* SemanticsExprVisitor::visitThisInterfaceExpr(ThisInterfaceExpr* expr)
 
 Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
 {
-    // CastToSuperType is effectively a struct field.
-    // As long as the type is not readonly tagged we
-    // can use CastToSuperType as an L-value
-    if (!expr->type.hasReadOnlyOnTarget)
-        expr->type.isLeftValue = true;
+    updateCastToSuperTypeStorageInfo(m_astBuilder, expr);
     return expr;
 }
 

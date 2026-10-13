@@ -14,8 +14,8 @@ algorithm** described in the source doc — how Slang narrows a
 `LookupResult` containing multiple candidates to a single best
 candidate (or to a structured ambiguity error). It covers candidate
 enumeration, the `TryCheckOverloadCandidate` probe-phase filter
-pipeline (arity, fixity, type/coercion, directions, constraints,
-visibility), the `ConversionCost` ranking, the
+pipeline (arity, fixity, type/coercion and ordinary parameter modes,
+constraints, visibility), the `ConversionCost` ranking, the
 `CompareOverloadCandidates` tie-breaker (status, cost, specificity,
 implicit-conversion preference, export-rank, scope-distance),
 partial generic application, operator overloading dispatch through
@@ -56,9 +56,13 @@ directive per claim is sufficient.
    - **no candidate is applicable** —
      `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):` matching
      `no overload applicable to arguments of type ~args` (code 39999);
-   - **arity / direction / visibility / generic-inference fails** —
+   - **arity / ordinary parameter mode / visibility / generic-inference
+     fails** —
      `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):` matching
      the specific filter-step diagnostic;
+   - **the selected callable rejects its receiver** —
+     `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):` matching
+     the receiver diagnostic from final selected-expression checking;
    - **witness-table dispatch** — positive `//TEST:INTERPRET` that
      calls an interface method through a generic and observes the
      conforming-type override fires (operator overloading section).
@@ -66,17 +70,38 @@ directive per claim is sufficient.
 3. Coverage of the doc's structural sections. Each load-bearing
    section should be represented by at least one test:
    - `#probe-phase-trycheckoverloadcandidate` — the per-step filter:
-     arity, fixity, types, directions, constraints, visibility. At
+     arity, fixity, types and ordinary parameter modes, constraints,
+     visibility. At
      least one positive ("survives all steps, becomes Applicable")
      and one negative test per visible failure step (arity over,
-     arity under, direction lvalue-required, type-mismatch with no
-     conversion).
+     arity under, ordinary `inout` lvalue-required, type-mismatch with
+     no conversion).
+     Attribute ordinary and brace-initializer argument matching to
+     `matchOverloadArgument`, which `TryCheckOverloadCandidateTypes`
+     calls after obtaining the parameter information.
    - `#probe-phase-where-candidates-come-from` — exercise multiple
      candidate families: free-function, constructor, member.
    - `#finalize-phase-completeoverloadcandidate` — the chosen
      candidate's diagnostic re-emission in `ForReal` mode (e.g.
      generic-argument-inference-failed when the only candidate has
-     that status).
+     that status). Keep the execution order explicit: the `ForReal`
+     type step commits argument conversions before
+     `CompleteOverloadCandidate` constructs the callable expression.
+     Ordinary calls validate the selected argument storage uses
+     immediately; type casts and compiler-synthesized initializer
+     invocations retain those uses for the result's later consumer.
+     Also cover a selected callable with no `retainedExpr` through an
+     overloaded, interface-bounded member call.
+     `_lookupMembersInSuperTypeFacets` records a `SuperType` witness
+     breadcrumb on each lookup item, `createLookupResultExpr` produces
+     a raw `OverloadedExpr`, and `AddOverloadCandidates` therefore
+     creates each candidate without a retained path.
+     `CompleteOverloadCandidate` calls `ConstructLookupResultExpr` to
+     replay the selected item's breadcrumb.
+   - `#selected-receiver-validation` — a mutating method selected
+     through an immutable receiver is diagnosed only after overload
+     selection. Do not describe this as a probe filter or imply that
+     receiver mode participates in candidate ranking.
    - `#conversion-costs` — at least one test that pins a known
      low-cost conversion beating a known high-cost conversion (e.g.
      `int` -> `int` (cost 0) wins over `int` -> `float` (cost 400)
@@ -97,9 +122,11 @@ directive per claim is sufficient.
      generic-argument-inference-failed.
 
 4. Coverage rules:
-   - **15-25 tests total.** At least 30% must be
+   - Test count follows the claim inventory rather than a fixed target.
+     At least 30% must be
      `DIAGNOSTIC_TEST` (negative — ambiguous, no-applicable, arity,
-     direction, visibility, inference-failed).
+     ordinary parameter mode, receiver validation, visibility,
+     inference-failed).
    - At least one **operator overload** test (positive INTERPRET).
    - At least one **witness-table dispatch** test (positive INTERPRET
      through an interface-bounded generic).
@@ -189,7 +216,7 @@ set** is built. Do not re-claim:
 
 ## Quality checklist
 
-- [ ] 15-25 tests; >= 30% are DIAGNOSTIC_TEST.
+- [ ] Every verifiable claim has coverage; >= 30% of tests are DIAGNOSTIC_TEST.
 - [ ] Each algorithm section in the doc has at least one test.
 - [ ] At least one operator-overload test.
 - [ ] At least one witness-table dispatch test.

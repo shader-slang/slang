@@ -447,13 +447,17 @@ explicitly.
   See: [syntax-reference/grammar.md](syntax-reference/grammar.md)
 
 **lookup breadcrumb** `[Slang]`
-: A linked navigation step recorded during name lookup so that the
-  checker can reconstruct the canonical AST expression for a found
-  decl. `LookupResultItem_Breadcrumb::Kind` enumerates the kinds:
-  `Member` (a transparent in-scope decl was looked through), `Deref`
-  (a pointer-like value was implicitly dereferenced), `SuperType` (a
-  super-type witness was applied), `This` (an implicit `this`/`This`
-  needs to be supplied). Declared in
+: A deferred navigation operation that lookup records so expression
+  reconstruction can form the canonical AST expression for a found
+  declaration. `LookupBreadcrumbStep::Kind` enumerates `Member`,
+  `Deref`, `SuperType`, `ThisValue`, and `ThisType`.
+  The `makeMember`, `makeDeref`, `makeSuperType`, `makeThisValue`, and
+  `makeThisType` factories construct those kinds.
+  The `getMemberDeclRef`, `getSubtypeWitness`, `getLookupOriginScope`,
+  and `getThisTypeDeclRef` accessors expose only the payload valid for
+  each kind.
+  `LookupResultItem_Breadcrumb` adds the reference-counted link to the
+  next step. Declared in
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)

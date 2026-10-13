@@ -8,7 +8,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 struct S
@@ -50,6 +50,15 @@ interface IFoo
 
 struct Impl : IFoo { int getVal() { return 21; } }
 
+extension<T : IFoo> T
+{
+    int captureGenericExtensionReceiver()
+    {
+        let f = () => this.getVal();
+        return f();
+    }
+}
+
 int withLocal<T : IFoo>(T v) { return v.computeWithLocal(); }
 int nested<T : IFoo>(T v) { return v.computeNested(); }
 
@@ -70,4 +79,6 @@ void computeMain()
     // CHECK: 121
     outputBuffer[3] = nested(impl);
     // CHECK: 22
+    outputBuffer[4] = impl.captureGenericExtensionReceiver();
+    // CHECK: 21
 }

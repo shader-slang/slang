@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): tests/diagnostics/effective-this-higher-order-overload-selection.slang -no-codegen
 
-// A higher-order expression retains its actual receiver modes. Overload inference and ranking use
-// a temporary view in which receiver-derived parameters are neutral, then final call checking uses
-// the selected expression's actual type.
+// Semantic checking records the actual receiver modes in the higher-order expression's type.
+// Overload inference and ranking use a temporary view in which receiver-derived parameters are
+// neutral, then final call checking uses the selected expression's actual type.
 
 struct FloatArgument {}
 struct VectorArgument {}
@@ -48,22 +48,24 @@ void selectAfterHigherOrderTransformation(
     FloatArgument floatArgument,
     VectorArgument vectorArgument)
 {
-    // The second argument selects the mutating overload through a receiver-neutral candidate view.
-    // Final call checking uses the selected expression's actual writable receiver and rejects this
-    // r-value.
-    __fwd_diff(Receiver::evaluate)(Receiver(), floatArgument);
-//CHECK:                                   ^ argument must be l-value
-//CHECK:                                   ^ argument passed to parameter '0' must be l-value.
+    // Overload resolution selects the mutating overload from the second argument through a
+    // receiver-neutral candidate view. Final call checking uses the selected expression's actual
+    // writable receiver and rejects this r-value.
+    __fwd_diff((Receiver::evaluate))(Receiver(), floatArgument);
+//CHECK:                                     ^ argument must be l-value
+//CHECK:                                     ^ argument passed to parameter '0' must be l-value.
 
-    // Selecting the nonmutating overload leaves an ordinary value receiver.
-    __fwd_diff(Receiver::evaluate)(Receiver(), vectorArgument);
+    // Overload resolution selects the nonmutating overload, leaving an ordinary value receiver.
+    __fwd_diff((Receiver::evaluate))(Receiver(), vectorArgument);
 
-    // Generic inference substitutes `T` through a receiver-neutral view. The expression retains
-    // the mutating mode that final call checking uses after the argument type selects this overload.
-    __fwd_diff(Receiver::evaluateGeneric)(Receiver(), GenericFloatArgument<int>());
-//CHECK:                                          ^ argument must be l-value
-//CHECK:                                          ^ argument passed to parameter '0' must be l-value.
+    // Generic inference substitutes `T` through a receiver-neutral view. Overload resolution uses
+    // the argument type to select this overload, while semantic checking keeps the mutating mode in
+    // the expression's actual type for final call checking.
+    __fwd_diff((Receiver::evaluateGeneric))(Receiver(), GenericFloatArgument<int>());
+//CHECK:                                            ^ argument must be l-value
+//CHECK:                                            ^ argument passed to parameter '0' must be l-value.
 
-    // The same inference path leaves the selected nonmutating receiver as an ordinary value.
-    __fwd_diff(Receiver::evaluateGeneric)(Receiver(), GenericVectorArgument<int>());
+    // The same inference and selection process leaves the selected nonmutating receiver as an
+    // ordinary value.
+    __fwd_diff((Receiver::evaluateGeneric))(Receiver(), GenericVectorArgument<int>());
 }
