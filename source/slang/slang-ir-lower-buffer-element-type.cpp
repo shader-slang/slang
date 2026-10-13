@@ -366,12 +366,12 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     /// which extracts the pointee struct as its own element type.
     ///
     /// The base-class default covers the historical set of lowerable leaf
-    /// types (struct, matrix, array, bool). Override to discover additional
-    /// leaf types.
+    /// types (struct, matrix, array, bool and bool vectors). Override to discover
+    /// additional leaf types.
     virtual bool needsElementLowering(IRType* elementType)
     {
         return as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
-               as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
+               as<IRArrayType>(elementType) || isBoolOrBoolVectorType(elementType);
     }
 
     /// Controls whether a pass invocation re-processes types that a prior
@@ -3061,7 +3061,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     }
 
     // Discover top-level vector buffer elements for lowering; the base class's
-    // set (struct/matrix/array/bool) does not include bare vectors. The actual
+    // set (struct/matrix/array/bool/bool vector) does not include other vectors. The actual
     // decision is `needsPackedVectorStorage`, shared with vector fields found
     // inside lowered composites.
     bool needsElementLowering(IRType* elementType) override
