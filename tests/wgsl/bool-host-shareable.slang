@@ -31,13 +31,22 @@ struct Params
     Inner inner;
 };
 
+struct ElemSource
+{
+    bool a[2];
+    bool2x2 m;
+};
+
 ConstantBuffer<Params> gCB;
+ConstantBuffer<ElemSource> gCBElem;
 ParameterBlock<Params> gPB;
 
 struct Elem
 {
     float x;
     bool f;
+    bool a[2];
+    bool2x2 m;
 };
 
 StructuredBuffer<Elem> gSB;
@@ -49,9 +58,8 @@ RWStructuredBuffer<bool2> gRWSBBool2;
 // No buffer member or buffer element is declared with a `bool` type.
 // NOBOOL-NOT: : bool,
 // NOBOOL-NOT: : vec{{[234]}}<bool>,
-// NOBOOL-NOT: <bool>, i32
-// NOBOOL-NOT: array<bool>
-// NOBOOL-NOT: array<vec{{[234]}}<bool>>
+// NOBOOL-NOT: array<bool
+// NOBOOL-NOT: array<vec{{[234]}}<bool>
 
 // CHECK-DAG: var<uniform> globalParams_0 :
 // CHECK-DAG: var<uniform> CB_0 :
@@ -82,6 +90,8 @@ RWStructuredBuffer<bool2> gRWSBBool2;
 
 // Stores convert `bool` to the stored integer.
 // CHECK-DAG: gRWSB_0[i32(0)].f_0 = select(u32(0), u32(1),
+// CHECK-DAG: gRWSB_0[i32(2)].a_{{[0-9]+}}.data_{{[0-9]+}}[i32(1)] = select(u32(0), u32(1),
+// CHECK-DAG: gRWSB_0[i32(2)].m_{{[0-9]+}}.data_{{[0-9]+}}[i32(1)] = select(vec2<u32>(0), vec2<u32>(1),
 // CHECK-DAG: gRWSBBool_0[i32(0)] = select(u32(0), u32(1),
 // CHECK-DAG: gRWSBBool2_0[i32(0)] = select(vec2<u32>(0), vec2<u32>(1),
 
@@ -103,6 +113,11 @@ float4 fragMain(uniform bool epFlag) : SV_Target
     if (gSB[1].f) r.w += gSB[0].x;
 
     gRWSB[0].f = !gRWSB[1].f;
+
+    // The uniform (std140) and storage (std430) copies of these fields have different storage
+    // types, so whole-value copies go through the logical type.
+    gRWSB[2].a = gCBElem.a;
+    gRWSB[2].m = gCBElem.m;
     gRWSBBool[0] = !gRWSBBool[1];
     if (gSBBool2[0].y) r.x += 8;
     gRWSBBool2[0] = !gRWSBBool2[1];

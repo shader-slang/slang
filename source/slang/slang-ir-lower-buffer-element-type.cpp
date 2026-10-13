@@ -1887,7 +1887,7 @@ struct LoweredElementTypeContext
             // can define their own discovery criteria (e.g., the Metal
             // pointer policy recurses through structs/arrays looking for
             // pointer fields, while the base class checks for the
-            // historical set of struct/matrix/array/bool).
+            // historical set of struct/matrix/array/bool/bool vector).
             //
             if (!leafTypeLoweringPolicy->needsElementLowering(elementType))
                 continue;
@@ -2009,6 +2009,21 @@ struct LoweredElementTypeContext
         }
     }
 
+    /// Returns true if the storage-typed value at `src` can be copied to `dest` without
+    /// unpacking it to its logical type first. That holds when both have the same storage type,
+    /// or on targets that cannot declare locals of a storage type (SPIR-V), where `src` is a
+    /// logical-storage temporary and `copyLogical` emits a `CopyLogical`. Other targets have no
+    /// `CopyLogical`, so values in two different layouts (e.g. a std140 and a std430 copy of
+    /// `bool[2]`) must go through the logical type.
+    bool canCopyStorageDirectly(IRBuilder& builder, IRInst* dest, IRInst* src)
+    {
+        if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
+            return true;
+        return isTypeEqual(
+            tryGetPointedToType(&builder, dest->getDataType()),
+            tryGetPointedToType(&builder, src->getDataType()));
+    }
+
     void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
         auto destValType = tryGetPointedToType(&builder, dest->getDataType());
@@ -2064,8 +2079,9 @@ struct LoweredElementTypeContext
                     &builder,
                     getElementPtr->getBase()->getDataType())))
             {
-                // For WGSL, an array of scalar or vector type will always be converted to
-                // an array of 16-byte aligned vector type. In this case, we will run into a
+                // An array of scalars or vectors may be stored with a different element type:
+                // WGSL widens std140 array elements to 16-byte aligned vectors, and lowers
+                // `bool` elements to `uint`. In this case, we will run into a
                 // GetElementPtr where the result type is different from the element type of
                 // the base array.
                 // We should setup loweredElementTypeInfo so the remaining logic can handle
@@ -2191,7 +2207,8 @@ struct LoweredElementTypeContext
                                     addr,
                                     alignedAttr->getAlignment());
                             }
-                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
+                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref &&
+                                canCopyStorageDirectly(builder, addr, originalVal->getOperand(0)))
                             {
                                 auto valAddr = originalVal->getOperand(0);
 

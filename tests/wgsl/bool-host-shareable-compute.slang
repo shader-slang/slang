@@ -11,8 +11,8 @@ struct Params
     bool arr[2];
 };
 
-// std140: flag @0, pair @8, arr[0] @16, arr[1] @32.
-//TEST_INPUT:set params = cbuffer(data=[1 0 0 1 1 0 0 0 0 0 0 0 1 0 0 0])
+// std140 words: flag @0, pair @2..3, arr[0] @4, arr[1] @8 (48 bytes).
+//TEST_INPUT:set params = cbuffer(data=[1 0 0 1 0 0 0 0 1 0 0 0])
 ConstantBuffer<Params> params;
 
 struct Elem
