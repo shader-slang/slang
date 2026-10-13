@@ -6,15 +6,15 @@
 //TEST:SIMPLE: -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry SecondMiss -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CODEGEN): -experimental-feature -r tests/ray-tracing-2/frontend/module/magic-first-stage-cache.slang-module -r tests/ray-tracing-2/frontend/module/magic-second-stage-cache.slang-module -entry FirstMiss<Payload> -target hlsl
 
+import slang.raytracing;
 import magic_stage_library;
 import magic_stage_secondary_library;
 
 // The serialized filenames deliberately differ from the import names, so the first two runs
-// always use source. Each serialized module retains its own stage-interface instruction. Loading
-// another contract with the same magic type must neither replace it nor erase its stage identity.
+// always use source. Both application interfaces inherit the standard rt::IMissShader contract;
+// their ordinary inheritance witnesses must preserve its stage identity after serialization.
 // IR-DAG: [nameHint("first.IBackgroundStage")]
 // IR-DAG: [nameHint("second.IBackgroundStage")]
-// IR-DAG: miss_stage_interface(
 // IR-DAG: miss_stage_interface(
 
 struct Payload
@@ -22,36 +22,30 @@ struct Payload
     uint value;
 }
 
-struct FirstTraversal : first::ITraversal
+struct Traversal : rt::ITraceContext
 {
-    typealias AccelerationStructure = uint;
-    typealias Motion = void;
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
 }
 
-struct FirstContext<P> : first::IPayloadContext
+struct FirstContext<P> : rt::IPayloadContext
 {
-    typealias TraceContext = FirstTraversal;
+    typealias TraceContext = Traversal;
     typealias Record = void;
     typealias Payload = P;
 }
 
-// The selected invoke witness must retain P = Payload. Both source and serialized contracts
-// must select this specialization, even after another module declares its own MissShaderType.
+// The selected invoke witness must retain P = Payload through the imported refinement of
+// rt::IMissShader. Both source and serialized application interfaces must select this specialization.
 struct FirstMiss<P> : first::IBackgroundStage
 {
     typealias Context = FirstContext<P>;
-    void invoke(in first::BackgroundInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
 }
 
-struct SecondTraversal : second::ITraversal
+struct SecondContext : rt::IPayloadContext
 {
-    typealias AccelerationStructure = uint;
-    typealias Motion = void;
-}
-
-struct SecondContext : second::IPayloadContext
-{
-    typealias TraceContext = SecondTraversal;
+    typealias TraceContext = Traversal;
     typealias Record = uint;
     typealias Payload = uint2;
 }
@@ -59,7 +53,7 @@ struct SecondContext : second::IPayloadContext
 struct SecondMiss : second::IBackgroundStage
 {
     typealias Context = SecondContext;
-    void invoke(in second::BackgroundInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
 }
 
 // CODEGEN: structural ray-tracing entry point 'FirstMiss.invoke' must be converted to a native adapter before target code generation

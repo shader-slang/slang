@@ -1,6 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS): -experimental-feature -entry DualMiss -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS): -experimental-feature -entry DualMiss -stage miss -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS): -experimental-feature -entry DualStage -stage miss -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=AMBIGUOUS): -experimental-feature -entry DualStage -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry DualStage -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry DualStage -stage callable -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry SharedInvoke -no-codegen
 
@@ -8,32 +7,13 @@ import slang.raytracing;
 import magic_stage_library;
 import magic_stage_secondary_library;
 
-interface ICallableContext : first::IRecordContext
+struct Traversal : rt::ITraceContext
 {
-    [KnownBuiltin(rt::__RayTracingBuiltin.CallableData)]
-    associatedtype CallableData;
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
 }
 
-[require(structural_raytracing_callable)]
-[KnownBuiltin(rt::__RayTracingBuiltin.CallableInput)]
-struct CallableInput<C : ICallableContext> {}
-
-[require(structural_raytracing_callable)]
-__magic_type(CallableShaderType)
-interface ICallableStage
-{
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
-    associatedtype Context : ICallableContext;
-    void invoke(in CallableInput<Context> input);
-}
-
-struct Traversal : first::ITraversal, second::ITraversal
-{
-    typealias AccelerationStructure = uint;
-    typealias Motion = void;
-}
-
-struct SharedContext : first::IPayloadContext, second::IPayloadContext, ICallableContext
+struct SharedContext : rt::IPayloadContext, rt::ICallableContext
 {
     typealias TraceContext = Traversal;
     typealias Payload = uint;
@@ -41,37 +21,22 @@ struct SharedContext : first::IPayloadContext, second::IPayloadContext, ICallabl
     typealias CallableData = uint;
 }
 
-// Both interfaces denote a miss stage, but selecting that stage cannot choose between its bodies.
-struct DualMiss : first::IBackgroundStage, second::IBackgroundStage
+// This struct implements two different standard stages. The command line must select one;
+// the imported refinement of rt::IMissShader must preserve the same rule as direct conformance.
+struct DualStage : first::IBackgroundStage, rt::ICallableShader
 {
     typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
-    void invoke(in second::BackgroundInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
+    void invoke(in rt::CallableInput<Context> input) {}
 }
 
-// An ambiguous miss stage must not prevent explicitly selecting a separate, unique callable stage.
-struct DualStage : first::IBackgroundStage, second::IBackgroundStage, ICallableStage
+// Two application interfaces inherit the same rt::IMissShader requirement. Their witnesses
+// select the same implementation, so they do not create a second stage or an ambiguity.
+struct SharedInvoke : first::IBackgroundStage, second::IBackgroundStage
 {
     typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
-    void invoke(in second::BackgroundInput<Context> input) {}
-    void invoke(in CallableInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
 }
 
-[require(structural_raytracing_miss)]
-__magic_type(MissShaderType)
-interface ISharedMiss
-{
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
-    associatedtype Context : first::IPayloadContext;
-    void invoke(in first::BackgroundInput<Context> input);
-}
-
-// Repeated stage contracts are unambiguous when their checked witnesses select the same method.
-struct SharedInvoke : first::IBackgroundStage, ISharedMiss
-{
-    typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
-}
-
-// AMBIGUOUS: multiple 'invoke' implementations for the 'miss' stage
+// AMBIGUOUS: ambiguous structural ray-tracing entry point stage
+// AMBIGUOUS: struct 'DualStage' implements more than one executable ray-tracing stage; use '-stage <name>' to select one

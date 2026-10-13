@@ -2,23 +2,18 @@
 
 module metal_trace_intrinsic_library;
 
+import slang.raytracing;
+
 namespace traceir
 {
-public interface IProgramShape {}
-
-__magic_type(TraceProgramDescriptorType)
-__intrinsic_type(TraceProgramDescriptor)
-public struct ProgramHandle<Schema : IProgramShape>
-{
-    private __init(int unavailable) {}
-}
-
-// Ordinary source declarations must lower through the same intrinsic mechanism as the standard
-// ray-tracing module. The two signatures encode motion by the presence of the final time operand.
+// This compiler-internal fixture tests low-level intrinsic-call lowering. Applications use
+// RayTracer.trace, whose ordinary function call remains in frontend IR. Repeating the internal
+// operation signatures lets this test inspect the instruction before backend lowering; the
+// descriptor type, schema constraints, and resource rules all come from slang.raytracing.
 __intrinsic_op(metalTraceRay)
-public void trace<Schema : IProgramShape, Payload>(
+public void trace<Schema : rt::ITraceProgramSchema, Payload>(
     RaytracingAccelerationStructure scene,
-    ProgramHandle<Schema> program,
+    rt::TraceProgramDescriptor<Schema> program,
     uint rayFlags,
     uint instanceMask,
     uint sbtOffset,
@@ -28,12 +23,13 @@ public void trace<Schema : IProgramShape, Payload>(
     float rayTMin,
     float3 rayDirection,
     float rayTMax,
-    inout Payload payload);
+    inout Payload payload)
+    where Schema.TraceContext.Motion == rt::NoMotion;
 
 __intrinsic_op(metalTraceRay)
-public void traceMotion<Schema : IProgramShape, Payload>(
+public void traceMotion<Schema : rt::ITraceProgramSchema, Payload>(
     RaytracingAccelerationStructure scene,
-    ProgramHandle<Schema> program,
+    rt::TraceProgramDescriptor<Schema> program,
     uint rayFlags,
     uint instanceMask,
     uint sbtOffset,
@@ -44,5 +40,6 @@ public void traceMotion<Schema : IProgramShape, Payload>(
     float3 rayDirection,
     float rayTMax,
     inout Payload payload,
-    float time);
+    float time)
+    where Schema.TraceContext.Motion : rt::IEnabledRayMotion;
 }

@@ -1,49 +1,29 @@
-//TEST:SIMPLE: -experimental-feature -entry ExtraBoundFirst -no-codegen
-//TEST:SIMPLE: -experimental-feature -entry PayloadBoundFirst -no-codegen
+//TEST:SIMPLE: -experimental-feature -entry ExtraBound -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry RefinedPayloadBound -no-codegen
 
 import slang.raytracing;
 import magic_stage_library;
 
 interface IExtra {}
-interface IRefinedPayloadContext : first::IPayloadContext {}
+interface IRefinedPayloadContext : rt::IPayloadContext {}
 
-// Additional bounds must not change which witness supplies the stage's payload and record.
-[require(structural_raytracing_miss)]
-__magic_type(MissShaderType)
-interface IExtraFirstStage
+// An application interface can constrain the Context inherited from the standard stage
+// interface. Its additional bound does not replace the inherited payload and record requirements.
+interface IExtraStage : first::IBackgroundStage
 {
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
-    associatedtype Context : IExtra;
-    __constraint Context : first::IPayloadContext;
-    void invoke(in first::BackgroundInput<Context> input);
-}
-
-[require(structural_raytracing_miss)]
-__magic_type(MissShaderType)
-interface IPayloadFirstStage
-{
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
-    associatedtype Context : first::IPayloadContext;
     __constraint Context : IExtra;
-    void invoke(in first::BackgroundInput<Context> input);
 }
 
-// A refined bound carries the payload contract through ordinary interface inheritance.
-[require(structural_raytracing_miss)]
-__magic_type(MissShaderType)
-interface IRefinedStage
+// A refined context bound carries the standard payload contract through ordinary inheritance.
+interface IRefinedStage : first::IBackgroundStage
 {
-    [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
-    associatedtype Context : IExtra;
     __constraint Context : IRefinedPayloadContext;
-    void invoke(in first::BackgroundInput<Context> input);
 }
 
-struct Traversal : first::ITraversal
+struct Traversal : rt::ITraceContext
 {
-    typealias AccelerationStructure = uint;
-    typealias Motion = void;
+    typealias AccelerationStructure = rt::AccelerationStructure;
+    typealias Motion = rt::NoMotion;
 }
 
 struct SharedContext : IExtra, IRefinedPayloadContext
@@ -53,20 +33,14 @@ struct SharedContext : IExtra, IRefinedPayloadContext
     typealias Payload = uint;
 }
 
-struct ExtraBoundFirst : IExtraFirstStage
+struct ExtraBound : IExtraStage
 {
     typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
-}
-
-struct PayloadBoundFirst : IPayloadFirstStage
-{
-    typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct RefinedPayloadBound : IRefinedStage
 {
     typealias Context = SharedContext;
-    void invoke(in first::BackgroundInput<Context> input) {}
+    void invoke(in rt::MissInput<Context> input) {}
 }

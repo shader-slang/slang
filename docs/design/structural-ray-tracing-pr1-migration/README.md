@@ -162,9 +162,10 @@ its constraint interface directly incorrectly imposed miss/callable requirements
 
 ## 7. Recognize stage contracts through their AST types
 
-Stage interfaces now declare their compiler identity with `__magic_type`, for example:
+The RT library's stage interfaces declare their compiler identity with `__magic_type`, for example:
 
 ```slang
+// Inside slang.raytracing, in namespace rt:
 __magic_type(MissShaderType)
 public interface IMissShader
 {
@@ -206,7 +207,11 @@ to an explicit IR instruction, as described in section 11. Callable dispatch sti
 source-operation IR decoration. Builtin loading and ownership are separate responsibilities,
 described in section 9.
 
-Module-defined magic types retain their checked declaration references, including generic
+Application modules implement or refine the RT library's stage interfaces and use
+`rt::TraceProgramDescriptor` directly. Tests check these references through source and serialized
+application-helper imports instead of declaring replacement compiler types in the fixtures.
+
+The RT library's magic types retain their checked declaration references, including generic
 arguments. Resolve a stage's associated types and `invoke` implementation from its selected
 conformance witness so generic specializations retain their own identities. The RT-specific
 restriction on collecting builtin-registration entries has been removed; existing registration
