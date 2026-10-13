@@ -2630,6 +2630,21 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+DerivativeGroupMode inferDerivativeGroupMode(IRFunc* entryPoint)
+{
+    if (auto decoration = entryPoint->findDecoration<IRDerivativeGroupDecoration>())
+        return decoration->getMode();
+
+    if (auto numThreads = entryPoint->findDecoration<IRNumThreadsDecoration>())
+    {
+        // Y selects the default grouping; the full thread-group shape is validated separately.
+        // Only inspect a literal Y; a specialization constant's default can be overridden.
+        if (auto y = numThreads->getY())
+            return y->getValue() == 1 ? DerivativeGroupMode::Linear : DerivativeGroupMode::Quad;
+    }
+    return DerivativeGroupMode::Quad;
+}
+
 /// Gets a literal thread count, unwrapping a specialization constant's default when needed.
 static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
 {
