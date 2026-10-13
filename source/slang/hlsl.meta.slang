@@ -473,7 +473,8 @@ struct ByteAddressBuffer
     /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
     ///   `asfloat`, because those profiles have no templated `Load<T>`.
-    /// - Other HLSL profiles, SPIR-V, GLSL, CUDA and C++: two `float2` loads.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
     /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
     ///   `alignment`.
     [__readNone]
@@ -6961,7 +6962,8 @@ struct $(item.name)
     /// for any remainder. For example, `LoadAligned<float4>(location, 8)` lowers as follows:
     /// - HLSL with a Shader Model 5.0 or earlier profile: four `uint` loads, each converted with
     ///   `asfloat`, because those profiles have no templated `Load<T>`.
-    /// - Other HLSL profiles, SPIR-V, GLSL, CUDA and C++: two `float2` loads.
+    /// - HLSL with a Shader Model 5.1 or later profile, SPIR-V, GLSL, CUDA and C++: two `float2`
+    ///   loads.
     /// - Metal, WGSL and LLVM-based CPU targets: four per-component loads, for any valid
     ///   `alignment`.
     [__NoSideEffect]
