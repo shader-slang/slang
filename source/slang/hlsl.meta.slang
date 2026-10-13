@@ -32417,6 +32417,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 OpCooperativeVectorStoreNV &data $byteOffset16ByteAligned $this None;
             };
             return;
+        case hlsl:
+            __Store(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -33039,9 +33042,14 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     void __Store(__ref groupshared T buffer[M], uint elemOffset)
     {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
         __target_switch
         {
-        case hlsl: static_assert(false, "Not supported");
+        case hlsl:
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                buffer[i + elemOffset] = this[i];
+            return;
         }
     }
 
