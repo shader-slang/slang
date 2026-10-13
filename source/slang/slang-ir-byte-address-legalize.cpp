@@ -314,10 +314,8 @@ struct ByteAddressBufferLegalizationContext
     // access-width decision, so a constant `location` and a runtime `location` carrying the same
     // promise legalize identically. `promise == 0` is the "no promise" sentinel of the plain
     // `Load`/`Store` forms; those fall back to a compile-time-constant base offset (a runtime
-    // no-promise access cannot be proven aligned and stays per-component). Both the whole-access
-    // decision and the width of each group in `chooseGroupWidth` use this predicate, so on targets
-    // that group accesses a plain `Load<float4>(8)` is emitted as two `float2` loads. This
-    // predicate is pure: it never diagnoses (the alignment contract is validated separately).
+    // no-promise access cannot be proven aligned). This predicate is pure: it never diagnoses (the
+    // alignment contract is validated separately).
     bool isWideAccessAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
@@ -379,10 +377,11 @@ struct ByteAddressBufferLegalizationContext
     // example, a `half4` promised alignment 4 is loaded as two `half2` groups, and a `float3`
     // promised alignment 8 as a `float2` group followed by a single `float`.
     //
-    // The caller has already ruled out a single access of the whole vector. A group of width 2 or
-    // more passed `isWideAccessAligned` in `chooseGroupWidth`, so it is emitted directly as one
-    // access; a single component goes back through `emitLegalLoad` for the per-target scalar
-    // handling (such as splitting a misaligned 64-bit scalar).
+    // The caller has already ruled out a single access of the whole vector, and the target keeps
+    // typed vector accesses (neither `scalarizeVectorLoadStore` nor `useBitCastFromUInt`). A group
+    // of width 2 or more passed `isWideAccessAligned` in `chooseGroupWidth`, so it is emitted
+    // directly as one typed sub-vector access; a single component goes back through `emitLegalLoad`
+    // for the per-target scalar handling (such as splitting a misaligned 64-bit scalar).
     IRInst* emitLegalGroupedVectorLoad(
         IRType* vecType,
         IRInst* buffer,
@@ -393,6 +392,7 @@ struct ByteAddressBufferLegalizationContext
         IRIntegerValue elementStride,
         IRIntegerValue elementCount)
     {
+        SLANG_ASSERT(!m_options.scalarizeVectorLoadStore && !m_options.useBitCastFromUInt);
         List<IRInst*> components;
         for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
         {
@@ -441,6 +441,7 @@ struct ByteAddressBufferLegalizationContext
         IRIntegerValue elementStride,
         IRIntegerValue elementCount)
     {
+        SLANG_ASSERT(!m_options.scalarizeVectorLoadStore && !m_options.useBitCastFromUInt);
         for (IRIntegerValue firstComponent = 0; firstComponent < elementCount;)
         {
             IRIntegerValue groupOffset = immediateOffset + firstComponent * elementStride;
@@ -749,9 +750,6 @@ struct ByteAddressBufferLegalizationContext
             //
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // A vector load is emitted per component on targets that scalarize vectors,
-                // as one access when the alignment covers the whole vector, per component
-                // on `useBitCastFromUInt` targets, and otherwise as aligned groups.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
@@ -1731,9 +1729,6 @@ struct ByteAddressBufferLegalizationContext
         {
             if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
             {
-                // Vector stores follow the same four-way choice as vector loads in
-                // `emitLegalLoad`.
-
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
                     m_target,
