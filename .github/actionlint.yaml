@@ -5,6 +5,7 @@ self-hosted-runner:
     - build
     - falcor
     - falcor-bridge
+    - falcor2-perf-bridge
     - GCP
     - GCP-T4
     - GPU

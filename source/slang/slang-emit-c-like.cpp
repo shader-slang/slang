@@ -3190,10 +3190,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
 void CLikeSourceEmitter::emitInst(IRInst* inst)
 {
-    try
+    SLANG_EXCEPTION_TRY
     {
         _emitInst(inst);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -3205,6 +3206,7 @@ void CLikeSourceEmitter::emitInst(IRInst* inst)
         noteInternalErrorLoc(inst->sourceLoc);
         throw;
     }
+#endif
 }
 
 void CLikeSourceEmitter::_emitInst(IRInst* inst)
@@ -3286,6 +3288,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         break;
@@ -3791,7 +3794,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     emitLoopControlDecorationImpl(loopControlDecoration);
                 }
 
-                m_writer->emit("for(;;)\n{\n");
+                m_writer->emit(getUnconditionalLoopHeader());
+                m_writer->emit("\n{\n");
                 m_writer->indent();
                 emitRegion(loopRegion->body);
                 m_writer->dedent();
@@ -5345,6 +5349,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugVar:
     case kIROp_DebugLine:
     case kIROp_DebugSource:

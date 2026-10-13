@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: doc_section_digest=c46b8381a22ed9261bb077edf82624f0780a9341487b887a991950c813ffc188
 //META: purpose=A BreakStmt nested inside a SwitchStmt targets the enclosing SwitchStmt (a BreakableStmt) and not any surrounding loop; control returns to the statement after the switch and the surrounding loop continues.
 //META: intent=boundary
 //META: pipeline_stage=lower

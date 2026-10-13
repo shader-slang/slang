@@ -1,5 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
-//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute -g -experimental-feature
+//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute -g -experimental-feature
 
 // Verify that user code can name multi-index subscript accessors as function-extension targets.
 // The two indices also lock down the parent-then-accessor parameter ordering.

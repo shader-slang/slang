@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=8f873a7e67bec608b74c11364d191e8a9af0122bb32b3a8409d1b57ac5e3d4bd
+//META: doc_section_digest=3616dae83508b4ffad03f364c704966c745acf49fe621c5856bbbe38e68899eb
 //META: purpose=DebugFunction carries the optional trailing parentScope operand at full debug level, where a DebugCompilationUnit exists for it to reference.
 //META: intent=boundary
 //META: pipeline_stage=lower-to-ir
@@ -16,9 +16,9 @@
 // optional operand from a fixed one.
 //
 // `debug-function-name-line-col-file-type.slang` covers the absent form at
-// `-g1`, where no `DebugCompilationUnit` is emitted at all and the record stops
-// after the function type. This test raises the debug level to full `-g`, where
-// the compilation unit exists and the record gains the trailing reference to it.
+// `-g1`, where only the five fixed operands are pinned. This test raises the
+// debug level to full `-g` and pins the trailing reference to the compilation
+// unit.
 //
 // At full `-g` the `DebugSource` record embeds the entire text of this file, so
 // the dump contains a copy of these CHECK lines and a naive pattern can match
@@ -26,7 +26,7 @@
 // prefix that only a real dumped instruction carries, which no echoed comment
 // line reproduces.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 RWStructuredBuffer<int> outBuf;
 

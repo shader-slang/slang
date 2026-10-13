@@ -3,6 +3,7 @@
 
 #include "core/slang-dictionary.h"
 #include "core/slang-list.h"
+#include "core/slang-semantic-version.h"
 #include "core/slang-string.h"
 
 #include <optional>
@@ -498,6 +499,11 @@ inline CapabilityAtom asAtom(T name)
     SLANG_ASSERT((UInt)name < (UInt)CapabilityAtom::Count);
     return CapabilityAtom(name);
 }
+
+/// Returns the CUDA Shader Model version named by a `_cuda_sm_X_Y` capability atom
+/// (for example `_cuda_sm_8_9` -> 8.9), or an unset `SemanticVersion` for any atom that
+/// does not name a CUDA SM.
+SemanticVersion getCUDASMVersionForAtom(CapabilityAtom atom);
 
 /// Gets the capability names.
 void getCapabilityNames(List<UnownedStringSlice>& ioNames);

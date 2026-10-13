@@ -50,18 +50,39 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+
       - id: set-matrix
+        env:
+          BUILD_OS: ${{ inputs.os }}
         run: |
           {
             echo "matrix<<MATRIX_EOF"
-            cat .github/cmake-options-matrix.json
+            jq --arg os "$BUILD_OS" \
+              '{include: [.include[] | select(.macos_only != "true" or $os == "macos")]}' \
+              .github/cmake-options-matrix.json
             echo "MATRIX_EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
@@ -92,7 +113,24 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "recursive"
@@ -132,6 +170,14 @@ jobs:
       - name: Install system apt packages
         if: matrix.apt_packages != '' && inputs.os == 'linux'
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Install system Homebrew packages
+        if: matrix.brew_packages != '' && inputs.os == 'macos'
+        env:
+          BREW_PACKAGES: ${{ matrix.brew_packages }}
+        run: |
+          read -r -a packages <<< "$BREW_PACKAGES"
+          brew install "${packages[@]}"
 
       - name: Configure CMake (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')

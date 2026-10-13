@@ -1,0 +1,60 @@
+# clang-tidy configuration for spvdb.
+#
+# Enabled groups: bugprone, clang-analyzer, cppcoreguidelines, modernize,
+# performance, readability.
+#
+# Disabled checks (with rationale):
+#   bugprone-easily-swappable-parameters
+#       Too noisy: SPIR-V APIs naturally take adjacent same-typed params
+#       such as (uint32_t set, uint32_t binding) and (uint32_t type_id, uint32_t member).
+#   cppcoreguidelines-avoid-magic-numbers / readability-magic-numbers
+#       SPIR-V opcode handling is full of spec-defined numeric constants;
+#       naming every one would obscure the code.
+#   cppcoreguidelines-non-private-member-variables-in-classes
+#       SpvModule, Value, SourceLoc, and similar are intentional data
+#       structs (all public members).  The rule does not apply to them.
+#   cppcoreguidelines-pro-bounds-pointer-arithmetic
+#       The SPIR-V binary parser walks raw uint32_t word arrays.
+#   cppcoreguidelines-pro-type-reinterpret-cast
+#       Result<T> uses reinterpret_cast on aligned storage to avoid
+#       requiring T to be default-constructible — a deliberate design.
+#   cppcoreguidelines-pro-type-union-access
+#       ScalarData is an intentional discriminated union; access is always
+#       guarded by the Kind tag.
+#   modernize-use-trailing-return-type
+#       Not the project's style; would require touching every function.
+#   readability-identifier-length
+#       Short names (id, v, r, e, sc) are idiomatic in low-level IR code.
+
+Checks: >-
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-magic-numbers
+
+# Report diagnostics in our own headers; suppress third-party headers.
+HeaderFilterRegex: '.*(lib|cli|tests)/.*\.(h|cpp)$'
+
+# Treat no checks as errors by default; tighten per-project as the codebase
+# is cleaned up.
+WarningsAsErrors: ''
+
+CheckOptions:
+  # Warn on implicit bool conversions in conditions (e.g. pointer-as-bool is fine,
+  # but integer-as-bool can be a bug).
+  - key:   readability-implicit-bool-conversion.AllowIntegerConditions
+    value: 'true'
+  - key:   readability-implicit-bool-conversion.AllowPointerConditions
+    value: 'true'

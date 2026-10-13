@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#metal-specific-runtime-predicates
-//META: doc_section_digest=275b7da5949f8c2296fb59114278d0adffc4d57d97d8e80bf7f6abfea9486334
+//META: doc_section_digest=2505970409fcc154b1729d4288b0e2157f30a8a12acb307081f42550bdd77187
 //META: purpose=Negative: Vulkan cross-API options are filtered out of the Metal pipeline, so `-fvk-invert-y` and `-fvk-use-dx-position-w` leave the emitted MSL unchanged.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

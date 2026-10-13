@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#varlayout-and-entrypointlayout
-//META: doc_section_digest=0ce1b4071a5a571cfc1945ea83ae995cc4721673793ce1d486650e97ce5658bb
+//META: doc_section_digest=a05fb260f7d47ee1abd511a8a11324bf04dda1c08576336dd8e39bd0213adba4
 //META: purpose=A varLayout has one fixed operand, the type layout, followed by a variable-length tail of attributes.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // attribute. That combination is only consistent with "operand 0 is the type
 // layout, everything after it is the attribute tail".
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

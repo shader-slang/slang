@@ -14,7 +14,7 @@
 // condition is thread-id dependent and the result escapes through a buffer
 // write, so the conditional is still present when the dump is taken.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

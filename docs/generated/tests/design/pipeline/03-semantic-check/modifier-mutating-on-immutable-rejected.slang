@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#modifier-validation
-//META: doc_section_digest=233c54717a586cdba7e515d0d6fbb4c7e6363f272d4b60a4aed8b9997a298ad9
+//META: doc_section_digest=cf9986ac73585feb8d7138003d7be69083848e024e0c79dad6db42132ddad3fe
 //META: purpose=Modifier validation rejects calling a `[mutating]` method on an immutable receiver (E30050).
 //META: intent=negative
 //META: pipeline_stage=check

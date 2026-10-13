@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#synthesized-derivative-witnesses
-//META: doc_section_digest=4ac46248bc67dd90a58b5dbd80b92929f4d02dd326a0ef7823411d0e2a772c21
+//META: doc_section_digest=78050e8840112aefbd29c4d742e5c6beb9ffb31026048eaa31338aaf55782a36
 //META: purpose=The __func_extension surface behind the IdentityRemat row is experimental and is rejected in user code unless -experimental-feature is passed.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -2340,9 +2340,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
 // Diagnose that the current target provides no type-layout rules for a
 // ray-tracing entry-point parameter (payload or hit attributes) of `stage`.
 // Some targets do not support ray tracing at all (e.g. Metal, whose payload,
-// callable-payload, and hit-attribute rules are all null) or lack rules for a
-// specific parameter kind (e.g. CUDA callable payload); reporting this keeps
-// callers from dereferencing a null rules pointer during type layout.
+// callable-payload, and hit-attribute rules are all null) or may lack rules for
+// a specific parameter kind; reporting this keeps callers from dereferencing a
+// null rules pointer during type layout.
 static void diagnoseUnsupportedRayTracingParameter(
     ParameterBindingContext* context,
     Stage stage,
@@ -2607,7 +2607,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = meshOutputType;
 
             // TODO: Ellie, this is probably not the right place to handle this
             // On GLSL the indices type is built in and as such doesn't consume
@@ -2639,7 +2639,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = patchType;
 
             for (auto rr : elementTypeLayout->resourceInfos)
             {
@@ -4849,10 +4849,16 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 
     if (!m_layout)
     {
+        auto errorCountBefore = sink->getErrorCount();
         m_layout = generateParameterBindings(this, sink);
-        if (sink->getErrorCount() != 0)
-            return nullptr;
+        if (sink->getErrorCount() != errorCountBefore)
+            m_layoutHasErrors = true;
     }
+
+    // Layout generation reported errors on an earlier call (to a different sink, or this one).
+    // Don't hand out the layout of an invalid program, or build IR for it.
+    if (m_layoutHasErrors)
+        return nullptr;
 
     if (m_layout && !m_irModuleForLayout)
     {

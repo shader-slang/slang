@@ -13,7 +13,7 @@
 // `uniform` operands are divided so the IR dump shows `div(%a, %b)`
 // instead of a folded constant.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform int b;

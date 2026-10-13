@@ -15,7 +15,7 @@
 // the all-zero corner and a case where the component letter must map to a
 // non-zero index.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 cbuffer MyCB
 {

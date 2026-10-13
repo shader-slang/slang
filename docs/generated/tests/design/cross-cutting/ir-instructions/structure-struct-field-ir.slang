@@ -14,7 +14,7 @@
 // `struct` parent inst whose members are `field` insts referencing their
 // `key`s.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Point { int x; int y; }
 

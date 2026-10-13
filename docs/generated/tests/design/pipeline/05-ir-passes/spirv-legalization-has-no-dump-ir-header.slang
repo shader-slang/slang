@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#how-the-passes-are-ordered
-//META: doc_section_digest=66d40862801105520d0f443657f6c0a7e1b9289bce092153a8e9060d2f1b77f5
+//META: doc_section_digest=001add4d9cbccea05ca89933729900fe1f83fbf7e7387da75e796d7bf9c552c7
 //META: purpose=SPIR-V legalization is a direct call rather than a SLANG_PASS, so no BEFORE legalizeSPIRV / AFTER legalizeSPIRV header appears in -dump-ir output even though the stage certainly ran.
 //META: intent=negative
 //META: pipeline_stage=ir-pass
@@ -17,7 +17,7 @@
 // the CHECK-NOTs assert neither legalization stage ever names a header —
 // which is what tells a reader not to go looking for one.
 
-//TEST:SIMPLE(filecheck=DUMP):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=DUMP):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outBuf;
 

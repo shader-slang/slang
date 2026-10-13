@@ -564,6 +564,20 @@ extern "C"
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarLayout(
         SlangReflectionTypeLayout* type);
 
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer this returns a
+     * variable layout over an (unbounded) array of the element type at offset zero, so element
+     * stride and element type can be queried through the normal array-layout accessors. Returns
+     * null for type layouts that are not container-like.
+     */
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+        SlangReflectionTypeLayout* type);
+
     SLANG_API SlangParameterCategory
     spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* type);
 
@@ -1400,7 +1414,21 @@ struct ICompileRequest : public ISlangUnknown
         int slotIndex,
         char const* typeName) = 0;
 
-    /** Enable or disable an experimental, best-effort GLSL frontend
+    /** Deprecated. When enabled, treat every translation unit in this request as GLSL.
+
+    Prefer selecting the source language when creating each translation unit:
+
+    @code
+    int translationUnit = request->addTranslationUnit(
+        SLANG_SOURCE_LANGUAGE_GLSL,
+        "moduleName");
+    request->addTranslationUnitSourceFile(translationUnit, path);
+    @endcode
+
+    Enabling this compatibility path emits deprecation diagnostic 117 when the request is
+    compiled. If the request already contains a translation unit explicitly selected as a
+    non-GLSL language, diagnostic 129 warns that this request-wide compatibility setting takes
+    precedence and treats that translation unit as GLSL.
      */
     virtual SLANG_NO_THROW void SLANG_MCALL setAllowGLSLInput(bool value) = 0;
 

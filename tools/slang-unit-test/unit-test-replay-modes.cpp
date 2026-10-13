@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
@@ -664,3 +665,5 @@ SLANG_UNIT_TEST(replayContextCreateGlobalSessionIdleLeavesContextPristine)
 
     slang_enableRecordLayer(wasActive);
 }
+
+#endif // SLANG_ENABLE_RECORD_REPLAY
