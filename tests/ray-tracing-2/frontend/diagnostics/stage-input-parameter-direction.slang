@@ -23,22 +23,24 @@ struct HitContext : rt::IHitContext
 [require(closesthit)]
 void outputInput(out rt::ClosestHitInput<HitContext> input) { input = {}; }
 //CHECK:                                             ^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                             ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                             ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:                                                              ^ construction of a structural ray-tracing type
+//CHECK:                                                              ^ structural ray-tracing type 'rt.ClosestHitInput<HitContext>' cannot be constructed by user code
 
 [require(closesthit)]
 void updateInput(inout rt::ClosestHitInput<HitContext> input) {}
 //CHECK:                                               ^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                               ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                               ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 [require(closesthit)]
 void referenceInput(__ref rt::ClosestHitInput<HitContext> input) {}
 //CHECK:                                                  ^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                                  ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                                  ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 [require(closesthit)]
 void readInput(__constref rt::ClosestHitInput<HitContext> input) {}
 //CHECK:                                                  ^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                                  ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                                  ^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 struct ClosestHitStage : rt::IClosestHitShader
 {

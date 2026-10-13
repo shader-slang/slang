@@ -950,14 +950,16 @@ struct ConformanceCheckingContext : public RefObject
     Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
 };
 
-/// A checked source type use whose structural restrictions require completed inheritance.
-/// This retains semantic types and their source locations, not syntax that checking may replace.
+/// Retains a use until its type's inheritance is ready for the ray-tracing checks.
+/// Variables keep their declaration so the check can use the normal checked initializer and
+/// scope. Other uses retain checked types, including arguments whose source syntax is replaced
+/// by generic application checking.
 struct StructuralRayTracingTypeUse
 {
     enum class Kind
     {
         Value,
-        ReadOnlyInputParameter,
+        Variable,
         Construction,
         GenericArguments,
     };
@@ -969,6 +971,7 @@ struct StructuralRayTracingTypeUse
     };
 
     Kind kind = Kind::Value;
+    VarDeclBase* variable = nullptr;
     Type* type = nullptr;
     SourceLoc location;
     /// A type application's result determines whether it owns structural generic arguments.
@@ -3099,8 +3102,7 @@ public:
     void diagnosePendingStructuralRayTracingTypeUses();
     void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
-    bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
-    bool diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(
         GenericAppExpr* genericApplication,

@@ -39,19 +39,19 @@ void invalidStorage(
 {
     rt::ClosestHitInput<TestHitContext> localInput;
 //CHECK:                                ^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                ^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                ^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 
     Box<rt::ClosestHitInput<TestHitContext>> wrappedInput;
 //CHECK:    ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 //CHECK:                                     ^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                     ^^^^^^^^^^^^ ray-tracing stage input type 'Box<rt.ClosestHitInput<TestHitContext>>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                     ^^^^^^^^^^^^ ray-tracing stage input type 'Box<rt.ClosestHitInput<TestHitContext>>' may only be used as an 'in' parameter or an initialized local copy
 
     Box<Box<rt::ClosestHitInput<TestHitContext>>> nestedWrappedInput;
 //CHECK:        ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 //CHECK:                                          ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                          ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'Box<Box<rt.ClosestHitInput<TestHitContext>>>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                          ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'Box<Box<rt.ClosestHitInput<TestHitContext>>>' may only be used as an 'in' parameter or an initialized local copy
 
     Box<TestClosestHit> wrappedStage;
 //CHECK:^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
@@ -66,20 +66,18 @@ void invalidStorage(
 //CHECK:                     ^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Box<Box<TestClosestHit>>' has no runtime representation
 
     TestClosestHit();
-/*CHECK:
-    ^^^^^^^^^^^^^^ construction of a structural ray-tracing type
-    ^^^^^^^^^^^^^^ structural ray-tracing type 'TestClosestHit' cannot be constructed by user code
-*/
+//CHECK:          ^ construction of a structural ray-tracing type
+//CHECK:          ^ structural ray-tracing type 'TestClosestHit' cannot be constructed by user code
 
     rt::ClosestHitInput<TestHitContext>();
-//CHECK:^^^^^^^^^^^^^^^ construction of a structural ray-tracing type
-//CHECK:^^^^^^^^^^^^^^^ structural ray-tracing type 'rt.ClosestHitInput<TestHitContext>' cannot be constructed by user code
+//CHECK:                               ^ construction of a structural ray-tracing type
+//CHECK:                               ^ structural ray-tracing type 'rt.ClosestHitInput<TestHitContext>' cannot be constructed by user code
 }
 
 rt::ClosestHitInput<TestHitContext> invalidResult();
 /*CHECK:
     ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
+    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 */
 
 [require(closesthit)]
@@ -97,5 +95,5 @@ struct InvalidPropertyContainer
 {
     property rt::ClosestHitInput<TestHitContext> invalidProperty { get; }
 //CHECK:         ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:         ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:         ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 }

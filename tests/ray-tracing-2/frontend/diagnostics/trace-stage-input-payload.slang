@@ -36,6 +36,6 @@ struct Miss : rt::IMissShader
         // A compiler-provided stage input may be read by this stage. It cannot become mutable
         // payload storage merely because trace infers its type as an ordinary generic argument.
         tracer.trace({}, scene, program, input);
-        // CHECK: ray-tracing stage input type 'rt.MissInput<MissContext>' is compiler-provided and may only be used as a value parameter
+        // CHECK: ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
     }
 }

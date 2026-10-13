@@ -37,7 +37,7 @@ void main()
 {
     output[0] = makeValue<rt::ClosestHitInput<HitContext>>().payload.value;
 //CHECK:        ^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:        ^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:        ^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 //CHECK:                                                  ^ storage of a structural ray-tracing stage input
-//CHECK:                                                  ^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                                  ^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 }

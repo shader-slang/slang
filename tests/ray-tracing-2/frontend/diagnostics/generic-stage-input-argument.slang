@@ -45,7 +45,7 @@ struct ClosestHit : rt::IClosestHitShader
     {
         consume(input);
 //CHECK:^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
     }
 }
 
@@ -80,11 +80,11 @@ typealias HitInputAlias = rt::ClosestHitInput<HitContext>;
 
 typealias InvalidPhantom = Phantom<rt::ClosestHitInput<HitContext>>;
 //CHECK:                               ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                               ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                               ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 typealias InvalidAliasedPhantom = Phantom<HitInputAlias>;
 //CHECK:                                  ^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                  ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                                  ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 typealias InvalidStagePhantom = Phantom<ClosestHit>;
 //CHECK:                                ^^^^^^^^^^ runtime use of a structural ray-tracing stage type
@@ -92,7 +92,7 @@ typealias InvalidStagePhantom = Phantom<ClosestHit>;
 
 ConstantBuffer<HitInputAlias> invalidStageInputBuffer;
 //CHECK:       ^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
 // Metadata types remain ordinary generic arguments; only shader stages and inputs retain
 // the restriction needed to prevent a generic body from constructing or storing those values.
@@ -125,11 +125,11 @@ void main()
 {
     output[0] = makeAndRead<rt::ClosestHitInput<HitContext>>();
 //CHECK:        ^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:        ^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:        ^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
     useType<Wrapper<rt::ClosestHitInput<HitContext>>>();
 //CHECK:                ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+//CHECK:                ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 
     useType<ClosestHit>();
 /*CHECK:
@@ -142,7 +142,7 @@ void main()
     useTypes<rt::ClosestHitInput<HitContext>>();
 /*CHECK:
     ^^^^^^^^ storage of a structural ray-tracing stage input
-    ^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' is compiler-provided and may only be used as a value parameter
+    ^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
 */
 
     useTypes<ClosestHit>();

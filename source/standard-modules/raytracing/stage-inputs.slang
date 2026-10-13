@@ -3,7 +3,10 @@ implementing raytracing;
 namespace rt
 {
 
-// Stage inputs are compiler-provided views of the current invocation, with no source storage.
+// Stage inputs are compiler-provided views of the current invocation, with no source fields.
+// For example, `let local = input` copies the view and both names access the same invocation state.
+// Copying a view does not duplicate its payload, callable-data, or shader-record storage. An `in`
+// helper parameter receives the same view; reading `record` still returns application data by value.
 // Native targets expose much of that state through existing core-module intrinsics. The helpers
 // remain force-inlined so capability and stage checks apply at the shader's property access.
 //
@@ -603,8 +606,11 @@ public extension<Input : ICommonHitInput> Input
 ///
 /// @tparam Context The stage context; must conform to `IHitContext`.
 /// @par Constraints
-/// The view requires `Context : IHitContext` and its declared structural stage capability. It may
-/// only be used as an input value parameter; applications cannot construct or store it.
+/// The view requires `Context : IHitContext` and its declared structural stage capability.
+/// An initialized local copy shares the same invocation state and can be passed to an `in` helper
+/// parameter. Copying the view does not duplicate its payload or record storage.
+/// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
+/// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_closesthit)]
 [KnownBuiltin(__RayTracingBuiltin.ClosestHitInput)]
 public struct ClosestHitInput<Context> : ICommonHitInput
@@ -615,10 +621,12 @@ public struct ClosestHitInput<Context> : ICommonHitInput
     ///
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
-    /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. Empty structs are valid payload types.
+    /// The `[nonmutating] ref` accessor leaves the view unchanged and permits mutation of the
+    /// originating payload through an `in` parameter or immutable local copy. Empty structs are
+    /// valid payload types.
     public property Context.Payload payload
     {
+        [nonmutating]
         ref;
     }
 
@@ -626,8 +634,9 @@ public struct ClosestHitInput<Context> : ICommonHitInput
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///
     /// @par Constraints
-    /// Read-only value of exactly `Context.Record`. The host-provided record must match that
-    /// type's target layout; `void` selects a context with no application record data.
+    /// Read-only value of exactly `Context.Record`. The getter returns application data by value;
+    /// copied views read the same bound record. The host-provided record must match that type's
+    /// target layout; `void` selects a context with no application record data.
     public property Context.Record record
     {
         get;
@@ -820,8 +829,11 @@ public extension<Context> ClosestHitInput<Context>
 ///
 /// @tparam Context The stage context; must conform to `IHitContext`.
 /// @par Constraints
-/// The view requires `Context : IHitContext` and its declared structural stage capability. It may
-/// only be used as an input value parameter; applications cannot construct or store it.
+/// The view requires `Context : IHitContext` and its declared structural stage capability.
+/// An initialized local copy shares the same invocation state and can be passed to an `in` helper
+/// parameter. Copying the view does not duplicate its payload or record storage.
+/// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
+/// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_anyhit)]
 [KnownBuiltin(__RayTracingBuiltin.AnyHitInput)]
 public struct AnyHitInput<Context> : ICommonHitInput
@@ -832,10 +844,12 @@ public struct AnyHitInput<Context> : ICommonHitInput
     ///
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
-    /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. Empty structs are valid payload types.
+    /// The `[nonmutating] ref` accessor leaves the view unchanged and permits mutation of the
+    /// originating payload through an `in` parameter or immutable local copy. Empty structs are
+    /// valid payload types.
     public property Context.Payload payload
     {
+        [nonmutating]
         ref;
     }
 
@@ -843,8 +857,9 @@ public struct AnyHitInput<Context> : ICommonHitInput
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///
     /// @par Constraints
-    /// Read-only value of exactly `Context.Record`. The host-provided record must match that
-    /// type's target layout; `void` selects a context with no application record data.
+    /// Read-only value of exactly `Context.Record`. The getter returns application data by value;
+    /// copied views read the same bound record. The host-provided record must match that type's
+    /// target layout; `void` selects a context with no application record data.
     public property Context.Record record
     {
         get;
@@ -1083,8 +1098,11 @@ public extension<Context> AnyHitInput<Context>
 ///
 /// @tparam Context The stage context; must conform to `IHitContext`.
 /// @par Constraints
-/// The view requires `Context : IHitContext` and its declared structural stage capability. It may
-/// only be used as an input value parameter; applications cannot construct or store it.
+/// The view requires `Context : IHitContext` and its declared structural stage capability.
+/// An initialized local copy shares the same invocation state and can be passed to an `in` helper
+/// parameter. Copying the view does not duplicate its payload or record storage.
+/// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
+/// as a global shader parameter or field, or return one from a function.
 /// An `IIntersectionShader` implementation additionally requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`.
 [require(structural_raytracing_intersection)]
@@ -1097,10 +1115,12 @@ public struct IntersectionInput<Context> : ICommonHitInput
     ///
     /// @par Constraints
     /// Requires `structural_raytracing_intersection_payload` (Metal or CUDA/OptiX).
-    /// The `ref` accessor exposes exactly `Context.Payload` for mutation through this `in` view.
+    /// The `[nonmutating] ref` accessor leaves the view unchanged and exposes `Context.Payload`
+    /// for mutation through an `in` parameter or immutable local copy.
     [require(structural_raytracing_intersection_payload)]
     public property Context.Payload payload
     {
+        [nonmutating]
         ref;
     }
 
@@ -1108,8 +1128,9 @@ public struct IntersectionInput<Context> : ICommonHitInput
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///
     /// @par Constraints
-    /// Read-only value of exactly `Context.Record`. The host-provided record must match that
-    /// type's target layout; `void` selects a context with no application record data.
+    /// Read-only value of exactly `Context.Record`. The getter returns application data by value;
+    /// copied views read the same bound record. The host-provided record must match that type's
+    /// target layout; `void` selects a context with no application record data.
     public property Context.Record record
     {
         get;
@@ -1327,9 +1348,11 @@ public extension<Context> IntersectionInput<Context>
 ///
 /// @tparam Context The stage context; must conform to `IPayloadContext`.
 /// @par Constraints
-/// The view requires `Context : IPayloadContext` and its declared structural stage capability. It
-/// may
-/// only be used as an input value parameter; applications cannot construct or store it.
+/// The view requires `Context : IPayloadContext` and its declared structural stage capability.
+/// An initialized local copy shares the same invocation state and can be passed to an `in` helper
+/// parameter. Copying the view does not duplicate its payload or record storage.
+/// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
+/// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_miss)]
 [KnownBuiltin(__RayTracingBuiltin.MissInput)]
 public struct MissInput<Context>
@@ -1340,10 +1363,12 @@ public struct MissInput<Context>
     ///
     /// @par Constraints
     /// The referenced type is exactly `Context.Payload`, inherited through `IPayloadContext`.
-    /// The `ref` accessor allows mutation of the originating trace payload despite the input
-    /// itself being an `in` view. Empty structs are valid payload types.
+    /// The `[nonmutating] ref` accessor leaves the view unchanged and permits mutation of the
+    /// originating payload through an `in` parameter or immutable local copy. Empty structs are
+    /// valid payload types.
     public property Context.Payload payload
     {
+        [nonmutating]
         ref;
     }
 
@@ -1351,8 +1376,9 @@ public struct MissInput<Context>
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///
     /// @par Constraints
-    /// Read-only value of exactly `Context.Record`. The host-provided record must match that
-    /// type's target layout; `void` selects a context with no application record data.
+    /// Read-only value of exactly `Context.Record`. The getter returns application data by value;
+    /// copied views read the same bound record. The host-provided record must match that type's
+    /// target layout; `void` selects a context with no application record data.
     public property Context.Record record
     {
         get;
@@ -1456,9 +1482,11 @@ public extension<Context> MissInput<Context>
 ///
 /// @tparam Context The stage context; must conform to `ICallableContext`.
 /// @par Constraints
-/// The view requires `Context : ICallableContext` and its declared structural stage capability. It
-/// may
-/// only be used as an input value parameter; applications cannot construct or store it.
+/// The view requires `Context : ICallableContext` and its declared structural stage capability.
+/// An initialized local copy shares the same invocation state and can be passed to an `in` helper
+/// parameter. Copying the view does not duplicate its callable-data or record storage.
+/// Applications cannot construct a fresh input, declare an uninitialized input local, use an input
+/// as a global shader parameter or field, or return one from a function.
 [require(structural_raytracing_callable)]
 [KnownBuiltin(__RayTracingBuiltin.CallableInput)]
 public struct CallableInput<Context>
@@ -1469,9 +1497,11 @@ public struct CallableInput<Context>
     ///
     /// @par Constraints
     /// The referenced type is exactly `Context.CallableData`, required by `ICallableContext`.
-    /// The `ref` accessor permits mutation of the data passed to the originating `callShader`.
+    /// The `[nonmutating] ref` accessor leaves the view unchanged and permits mutation of the
+    /// originating callable data through an `in` parameter or immutable local copy.
     public property Context.CallableData data
     {
+        [nonmutating]
         ref;
     }
 
@@ -1479,8 +1509,9 @@ public struct CallableInput<Context>
     /// @todo The compiler must synthesize this accessor from the target's record-data binding.
     ///
     /// @par Constraints
-    /// Read-only value of exactly `Context.Record`. The host-provided record must match that
-    /// type's target layout; `void` selects a context with no application record data.
+    /// Read-only value of exactly `Context.Record`. The getter returns application data by value;
+    /// copied views read the same bound record. The host-provided record must match that type's
+    /// target layout; `void` selects a context with no application record data.
     public property Context.Record record
     {
         get;

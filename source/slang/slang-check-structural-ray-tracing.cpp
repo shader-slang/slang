@@ -1382,8 +1382,8 @@ static bool _isStructuralRayTracingTypeApplication(Type* type)
 
 // Restricts stage/input values and generic substitutions under the current adapter contract.
 // For example, Box<MissInput<C>> cannot store an input, and Factory<MissInput<C>> cannot defer
-// manufacturing it to a generic method. A direct read-only parameter is supplied by the adapter.
-// Schema/group/list values and their use as ordinary generic arguments are unrestricted.
+// manufacturing it to a generic method. An `in` parameter and its initialized local copies refer
+// to the same invocation. Schema/group/list values and ordinary generic arguments are unrestricted.
 static bool _checkStructuralRayTracingTypeUse(
     SemanticsVisitor* visitor,
     const StructuralRayTracingTypeUse& use)
@@ -1417,24 +1417,41 @@ static bool _checkStructuralRayTracingTypeUse(
         return false;
     }
 
-    auto kind = _findStructuralRuntimeType(visitor, use.type, use.location);
+    auto type = use.variable ? use.variable->getType() : use.type;
+    auto location = use.variable ? use.variable->loc : use.location;
+    auto kind = _findStructuralRuntimeType(visitor, type, location);
     if (kind == StructuralRayTracingRuntimeTypeKind::None)
         return false;
-    if (use.kind == StructuralRayTracingTypeUse::Kind::ReadOnlyInputParameter &&
-        kind == StructuralRayTracingRuntimeTypeKind::StageInput &&
-        _getDirectStageInputKind(use.type) != StructuralRayTracingStageKind::Count)
+    if (use.variable && kind == StructuralRayTracingRuntimeTypeKind::StageInput &&
+        _getDirectStageInputKind(type) != StructuralRayTracingStageKind::Count)
     {
-        return false;
+        // Consider `void helper(in MissInput<C> input) { let local = input; }`.
+        // Parameter direction and local scope already have shared AST helpers. Initialization
+        // checking supplies the checked copy expression; it does not need an RT-specific copy
+        // operation. Fresh constructors and initializer lists are checked at their expression.
+        if (auto param = as<ParamDecl>(use.variable))
+        {
+            if (getExplicitlyDeclaredParamPassingMode(param) == ParamPassingMode::In &&
+                !param->hasModifier<HLSLUniformModifier>())
+                return false;
+        }
+        else if (
+            isLocalVar(use.variable) && !use.variable->hasModifier<HLSLStaticModifier>() &&
+            use.variable->initExpr)
+        {
+            return false;
+        }
     }
     if (use.kind == StructuralRayTracingTypeUse::Kind::Construction)
     {
-        visitor->getSink()->diagnose(Diagnostics::StructuralRayTracingTypeConstruction{
-            .type = use.type,
-            .location = use.location});
+        // The same constructor expression can be checked at its call and again when coerced
+        // into a variable or argument. Use the checker's existing diagnostic suppression.
+        visitor->diagnoseOnce(
+            Diagnostics::StructuralRayTracingTypeConstruction{.type = type, .location = location});
     }
     else
     {
-        _diagnoseInvalidStructuralRayTracingRuntimeType(visitor, kind, use.type, use.location);
+        _diagnoseInvalidStructuralRayTracingRuntimeType(visitor, kind, type, location);
     }
     return true;
 }
@@ -1451,7 +1468,8 @@ static bool _diagnoseOrDeferStructuralRayTracingTypeUse(
         if (use.genericArguments.getCount() == 0)
             return false;
     }
-    else if (!use.type || as<ErrorType>(use.type))
+    else if (auto type = use.variable ? use.variable->getType() : use.type;
+             !type || as<ErrorType>(type))
     {
         return false;
     }
@@ -1480,21 +1498,19 @@ void SemanticsVisitor::diagnosePendingStructuralRayTracingTypeUses()
     shared->m_deferStructuralRayTracingTypeUses = false;
 }
 
-// Allows stage inputs only as direct read-only parameters, not as stored variables or references.
-// For example, `void helper(in rt::MissInput<C> input)` can borrow the current stage view;
-// `rt::MissInput<C> saved;` and `void helper(out rt::MissInput<C> input)` cannot create that state.
+// Keeps the declaration for the stage/input storage check. Consider these two locals:
+//
+//     rt::MissInput<C> local = input;
+//     rt::MissInput<C> fresh;
+//
+// Both have the same type, but only the first receives an existing invocation view. Retaining the
+// VarDecl lets the deferred check read its checked initializer and scope instead of recording a
+// second classification that loses this distinction. Parameters use the same declaration path.
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
 {
-    auto paramDecl = as<ParamDecl>(varDecl);
-    auto isReadOnlyValueParameter = paramDecl && !paramDecl->hasModifier<OutModifier>() &&
-                                    !paramDecl->hasModifier<RefModifier>() &&
-                                    !paramDecl->hasModifier<BorrowModifier>() &&
-                                    !paramDecl->hasModifier<HLSLPayloadModifier>();
     StructuralRayTracingTypeUse use;
-    use.kind = isReadOnlyValueParameter ? StructuralRayTracingTypeUse::Kind::ReadOnlyInputParameter
-                                        : StructuralRayTracingTypeUse::Kind::Value;
-    use.type = varDecl->type.type;
-    use.location = varDecl->loc;
+    use.kind = StructuralRayTracingTypeUse::Kind::Variable;
+    use.variable = varDecl;
     _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
 }
 
@@ -1523,30 +1539,39 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
     _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
 }
 
-// Rejects direct source construction of values whose state must come from the stage adapter.
-// For example, `rt::MissInput<C>()` cannot create a current ray or a reference to its payload.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke)
+// Checks actual construction and call results after normal expression checking. Consider:
+//
+//     use(rt::MissInput<C>(input)); // Same-type coercion returns `input` itself: allowed.
+//     use(rt::MissInput<C>());      // A constructor creates a fresh view: rejected.
+//     use({});                     // Aggregate/default initialization is also fresh: rejected.
+//
+// ResolveInvoke and coercion already distinguish these cases. Use their checked
+// expression rather than treating every `Type(...)` spelling as construction. A specialized
+// ordinary call such as `makeDefault<MissInput<C>>()` is still an invalid input result.
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
 {
-    auto typeType = as<TypeType>(invoke->functionExpr->type);
-    if (!typeType)
+    StructuralRayTracingTypeUse use;
+    use.type = expr->type;
+    use.location = expr->loc;
+    if (auto invoke = as<InvokeExpr>(expr))
+    {
+        if (auto callee = as<DeclRefExpr>(invoke->functionExpr))
+        {
+            if (as<ConstructorDecl>(callee->declRef.getDecl()))
+            {
+                use.kind = StructuralRayTracingTypeUse::Kind::Construction;
+                use.location = invoke->functionExpr->loc;
+            }
+        }
+    }
+    else if (as<InitializerListExpr>(expr) || as<DefaultConstructExpr>(expr))
+    {
+        use.kind = StructuralRayTracingTypeUse::Kind::Construction;
+    }
+    else
+    {
         return false;
-    StructuralRayTracingTypeUse use;
-    use.kind = StructuralRayTracingTypeUse::Kind::Construction;
-    // Constructor resolution can replace the type expression with a function reference. Preserve
-    // its checked Type here, before that ordinary expression rewrite loses the construction form.
-    use.type = typeType->getType();
-    use.location = invoke->functionExpr->loc;
-    return _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
-}
-
-// Checks the concrete result of a call, including results specialized from ordinary generics.
-// For example, `makeDefault<rt::MissInput<C>>()` must not manufacture an input just because the
-// generic function's declared return type was T.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke)
-{
-    StructuralRayTracingTypeUse use;
-    use.type = invoke->type;
-    use.location = invoke->loc;
+    }
     return _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
 }
 

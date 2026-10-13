@@ -3454,6 +3454,12 @@ Expr* SemanticsVisitor::coerce(
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
 
+    // Check the chosen conversion after overload-viability probes have finished. This includes
+    // `helper({})`, a user-defined implicit constructor in `helper(1)`, and already-typed
+    // initializers supplied by `-zero-initialize`: none can create a fresh RT stage input.
+    if (diagnoseInvalidStructuralRayTracingExpression(expr))
+        return CreateImplicitCastExpr(m_astBuilder->getErrorType(), expr);
+
     return expr;
 }
 

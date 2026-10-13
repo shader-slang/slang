@@ -1112,7 +1112,7 @@ err(
     "structural-ray-tracing-input-storage",
     20026,
     "storage of a structural ray-tracing stage input",
-    span { loc = "location", message = "ray-tracing stage input type '~type:type' is compiler-provided and may only be used as a value parameter" }
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' may only be used as an 'in' parameter or an initialized local copy" }
 )
 
 err(

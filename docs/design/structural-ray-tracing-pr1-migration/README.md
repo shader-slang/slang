@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-12. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-13. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -236,8 +236,28 @@ registration should use the existing builtin mechanisms described in section 9.
 
 Schemas, hit groups, and shader lists can be constructed, stored, and used by ordinary generics.
 A value such as `MySchema schema = {};` neither constructs shader instances nor allocates an SBT.
-Stage/input construction, storage, writable parameters, returned values, and arbitrary generic
-arguments retain their checks. The generic restriction prevents a deferred generic body such as
+Shader implementation types still have no ordinary runtime values. Stage inputs allow `in`
+parameters and initialized local copies:
+
+```slang
+void helper(in rt::MissInput<SkyContext> input)
+{
+    let local = input;
+    local.payload.value = local.record.value;
+}
+```
+
+Copying the input view preserves access to the same invocation's payload and SBT record; it does
+not clone their storage. The `record` getter still returns application data by value. Payload and
+callable-data accessors use `[nonmutating] ref`, so the view can be immutable while the referenced
+data remains mutable. Full-backend adapter synthesis must preserve this behavior for copied views.
+PR1 checks the source rules; it does not yet implement or test that target execution.
+
+Fresh construction (`MissInput<C>()` or `{}`), uninitialized locals, global variables, `uniform`
+parameters, fields, writable/reference parameters, returned views, and arbitrary stage/input generic
+arguments retain their checks. Normal initializer checking and same-type coercion handle copies;
+the RT checker uses the checked variable declaration and existing parameter-direction/scope helpers.
+The generic restriction prevents a deferred generic body such as
 `make<T>() { T local = T(); }` from manufacturing an input after frontend checking. Supporting
 broader type-only uses would require validating the eventual specialized body.
 

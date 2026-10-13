@@ -4367,10 +4367,14 @@ void SemanticsVisitor::settlePendingTryCoverage(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
-    if (diagnoseInvalidStructuralRayTracingConstruction(expr))
-        return CreateErrorExpr(expr);
-
     auto rs = ResolveInvoke(expr);
+    // A same-type coercion reuses its argument, so its creation (if any) was already checked.
+    if (expr->arguments.getCount() == 1 && rs == expr->arguments[0])
+        return rs;
+
+    if (diagnoseInvalidStructuralRayTracingExpression(rs))
+        return CreateErrorExpr(rs);
+
     if (auto invoke = as<InvokeExpr>(rs))
     {
         if (!invoke->functionExpr)
@@ -4379,16 +4383,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         // if this is still an invoke expression, test arguments passed to inout/out parameter
         // are LValues.
         //
-        // A special case that allows us to skip this validation is when `expr` is an identical type
-        // cast, e.g. `(T)(funcThatReturnsT())`. In this case `ResolveInvoke(expr)` will simply
-        // return the argument expr `funcThatReturnsT()`. And we can skip rerunning any `out` param
-        // validation logic on the inner expr.
-        if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
-            return rs;
-
-        if (diagnoseInvalidStructuralRayTracingInvokeResult(invoke))
-            return CreateErrorExpr(invoke);
-
         if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
             return CreateErrorExpr(invoke);
 
