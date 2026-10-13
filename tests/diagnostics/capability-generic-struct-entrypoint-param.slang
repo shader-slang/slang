@@ -45,12 +45,10 @@
 // Multi-level wrapper nesting (`Wrap<Wrap<Foo<int>>>`): both recursion arms must
 // keep descending and the depth guard must not fire too early.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDeep -stage vertex
-// Scoping invariant: a *non-entry-point* function taking a requiring generic
-// struct must NOT be diagnosed (only entry-point signatures are checked). Here
-// `mainScope`'s own signature is clean and it calls `helper(Foo<int>)` in its
-// body; no E36107 must fire.
-//DIAGNOSTIC_TEST:SIMPLE(diag=SCOPE,non-exhaustive): -target spirv -emit-spirv-directly -entry mainScope -stage vertex
-//SCOPE-NOT: E36107
+// A requiring generic struct used only in the body of a clean-signature entry
+// point (passed to a helper) is diagnosed by general capability inference rather
+// than by the signature check; see generic-struct-require-in-body.slang.
+//DIAGNOSTIC_TEST:SIMPLE(diag=SCOPE): -target spirv -emit-spirv-directly -entry mainScope -stage vertex
 // Positive case: the cpp requirement is satisfied for the cpp target, so the same
 // code must compile. We assert no E36107 *and* that compilation reaches code
 // emission (the entry-point rename warning E40100 only fires on success), so the
@@ -215,17 +213,24 @@ void mainDeep(Wrap<Wrap<Foo<int> > > a)
 {
 }
 
-// A non-entry-point function whose parameter is a requiring generic struct. The
-// validation is scoped to entry points, so this signature must not be diagnosed.
 void helper(Foo<int> a)
 {
 }
 
 [shader("vertex")]
 void mainScope(int x)
+/*SCOPE:
+     ^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^ entrypoint 'mainScope' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+*/
 {
     helper(Foo<int>());
+/*SCOPE:
+    ^^^^^^ see using of 'Foo'
+*/
 }
+//SCOPE: see definition of 'Foo'
+//SCOPE: see declaration of 'require'
 
 [shader("vertex")]
 Foo<int> mainRet()
