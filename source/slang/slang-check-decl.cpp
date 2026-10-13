@@ -21850,6 +21850,29 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // A specialized generic such as `Foo<3>` (`GenericAppDeclRef`) or a member of one such
+    // as `Outer<3>.In` (`MemberDeclRef`) holds the referenced decl as a plain operand
+    // rather than a `DirectDeclRef`, so the base walk never references it and a
+    // `[require]` on that struct would be dropped. Visiting at the decl-ref level covers
+    // both type uses and static member accesses like `Foo<3>.make()`. Builtin
+    // magic/intrinsic types are excluded: core-module APIs taking e.g. `CoopVec<T,N>` do
+    // not redeclare those types' requirements, and inferring them would reject the core
+    // module itself.
+    void visitGenericAppDeclRef(GenericAppDeclRef* declRef) { referenceStructOfDeclRef(declRef); }
+    void visitMemberDeclRef(MemberDeclRef* declRef) { referenceStructOfDeclRef(declRef); }
+    void referenceStructOfDeclRef(DeclRefBase* declRef)
+    {
+        auto structDecl = as<StructDecl>(declRef->getDecl());
+        if (structDecl && !isMagicOrIntrinsicTypeDecl(structDecl) &&
+            !Base::visitedVals.contains(declRef) && !structDecl->checkState.isBeingChecked())
+        {
+            // `processReferencedDecl` reads the requirement before `_propagateRequirement`
+            // checks the decl, so a struct declared after this use must be checked first.
+            this->ensureDecl(structDecl, DeclCheckState::CapabilityChecked);
+            processReferencedDecl(structDecl);
+        }
+        Base::visitVal(declRef);
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
