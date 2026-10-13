@@ -807,6 +807,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto rr : varLayout->getOffsetAttrs())
         {
             auto addressSpace = getAddressSpaceFromGlobalParamResourceKind(rr->getResourceKind());
+            // Some resource kinds carry no storage class (e.g. the `InputAttachmentIndex` slot of a
+            // `SubpassInput`, which lowers only to a decoration), so they neither seed nor conflict
+            // with the inferred address space.
+            if (addressSpace == AddressSpace::Generic)
+                continue;
             // If we haven't inferred a storage class yet, use the one we just found.
             if (result == AddressSpace::Generic)
                 result = addressSpace;
