@@ -1640,6 +1640,12 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     for (auto modifier : decl->modifiers)
     {
+        // Receiver-mode spellings do not participate in overload identity and therefore do not
+        // appear in declaration signatures. Trailing `const` is suppressed here rather than
+        // printing suffix-only syntax as a prefix modifier.
+        if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+            continue;
+
         if (modifier->getKeywordName())
         {
             if (m_optionFlags & OptionFlag::NoInternalKeywords)

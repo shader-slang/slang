@@ -2394,6 +2394,24 @@ static void parseOptionalGenericConstraints(
     }
 }
 
+/// Parses an optional C++-style `const` after a `FuncDecl` parameter list.
+///
+/// The dedicated modifier lets semantic checking distinguish this receiver-mode spelling from
+/// prefix `const`, diagnose non-HLSL use, and retain nonmutating receiver semantics during
+/// recovery. The callers parse only `FuncDecl` syntax, so constructors and accessors do not accept
+/// trailing `const`.
+static void parseOptionalCppStyleTrailingThisParamConstModifier(Parser* parser, FuncDecl* decl)
+{
+    Token constToken;
+    if (!AdvanceIf(parser, "const", &constToken))
+        return;
+
+    auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
+    modifier->keywordName = constToken.getName();
+    modifier->loc = constToken.getLoc();
+    addModifier(decl, modifier);
+}
+
 static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
 {
     if (AdvanceIf(parser, TokenType::Colon))
@@ -2448,6 +2466,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
 
             if (AdvanceIf(parser, "throws"))
             {
@@ -5321,6 +5340,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            parseOptionalCppStyleTrailingThisParamConstModifier(parser, decl);
             auto funcScope = parser->currentScope;
             parser->PopScope();
             if (AdvanceIf(parser, "throws"))

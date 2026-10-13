@@ -33,6 +33,16 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Records `const` written after a function parameter list.
+///
+/// Semantic checking interprets this syntax as an explicit nonmutating receiver spelling.
+/// `ConstModifier` represents the distinct prefix spelling.
+FIDDLE()
+class CppStyleTrailingThisParamConstModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class BuiltinModifier : public Modifier
 {
@@ -1423,9 +1433,8 @@ class MutatingAttribute : public Attribute
     FIDDLE(...)
 };
 
-// A `[nonmutating]` attribute, which indicates that a
-// `set` accessor does not need to modify anything through
-// its `this` parameter.
+// A `[nonmutating]` attribute, which indicates that a member function or accessor does not need to
+// modify anything through its `this` parameter.
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute

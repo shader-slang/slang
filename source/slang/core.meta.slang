@@ -4723,11 +4723,13 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 //@public:
-/// Mark a function or a property or subscript accessor as mutating. A mutating function receives the implicit `this` parameter
-/// as an `inout` parameter, so that mutations to members access from `this` argument will be visible to the caller.
+/// Marks a function or property/subscript accessor as mutating. A mutating function receives the
+/// implicit `this` parameter as an `inout` parameter, so mutations to members accessed from the
+/// `this` argument are visible to the caller.
 ///
 /// @remarks
-/// By default, Slang treats all member functions as non-mutating. For example, consider the following function:
+/// By default, the Slang dialect treats all member functions as non-mutating. For example,
+/// consider the following function:
 /// ```csharp
 /// struct S
 /// {
@@ -4739,8 +4741,9 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 /// }
 ///
 /// ```
-/// The line `x = 1` will lead to a compile time error because by-default, all member methods in Slang are non-mutating. To
-/// allow `foo` to modify `x`, you can use `[mutating]` to mark the function as such:
+/// The line `x = 1` will lead to a compile-time error because member methods are non-mutating by
+/// default in the Slang dialect. To allow `foo` to modify `x`, you can use `[mutating]` to mark the
+/// function as such:
 /// ```csharp
 /// struct S
 /// {
@@ -4757,11 +4760,14 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
 
-/// Marks a function or a property and subscript accessor as non-mutating. A non-mutating function receives the implicit `this` parameter
-/// as an `in` parameter, so mutations to members accessed from `this` argument will be prohibited by the compiler.
+/// Marks a function or property/subscript accessor as non-mutating. A non-mutating function
+/// receives the implicit `this` parameter as an `in` parameter, so the compiler prohibits
+/// mutations to members accessed from the `this` argument.
 /// @remarks
-/// Member functions of a type are non-mutating by default, so this attribute is not necessary in most cases.
-/// However, the `set` accessor of a property or subscript is mutating by default, and you can use `[nonmutating]` to mark it as non-mutating.
+/// Member functions are non-mutating by default in the Slang dialect. HLSL member functions are
+/// mutating by default, so `[nonmutating]` can opt an HLSL method into a non-mutating receiver. A
+/// `set` accessor of a property or subscript is also mutating by default and can use
+/// `[nonmutating]` to opt into a non-mutating receiver.
 /// For example:
 /// ```csharp
 /// struct S
@@ -4783,7 +4789,7 @@ attribute_syntax [mutating] : MutatingAttribute;
 /// it to be called with a non-mutating value of `S`.
 /// @see `[mutating]`.
 ///
-__attributeTarget(AccessorDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a

@@ -50,12 +50,6 @@ enum class IsSubTypeOptions
 /// Should the given `decl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(Decl* decl);
 
-/// Apply one declaration's source-level policy for its effective `this` parameter mode.
-///
-/// This operation only interprets declaration kind and modifiers. It does not apply the declared
-/// receiver type's copyability adjustment or any specialization.
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode);
-
 bool isGlobalDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -2213,6 +2207,13 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// Checks an object-oriented `this` expression without registering a lambda capture.
+    ///
+    /// `ConstructLookupResultExpr` uses this operation when it reconstructs an implicit receiver,
+    /// because capture registration belongs to the surrounding expression-checking path. The
+    /// ordinary `this` expression visitor registers its own capture after calling this operation.
+    Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
+
     /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
     /// references an outer-scope variable that needs to be captured into the lambda struct.
     /// This handles the case where an expression was already checked by the parser's
@@ -2500,6 +2501,10 @@ public:
         bool ignoreUnallowedModifier);
 
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+
+    /// Diagnoses repeated or conflicting receiver-mode specifiers directly attached to `decl`.
+    void checkThisParamModeSpecifiers(Decl* decl);
+
     void checkVisibility(Decl* decl);
 
     bool doesAccessorMatchRequirement(
@@ -3221,7 +3226,7 @@ public:
     /// transition can finish, but leaves diagnostics to the final call that publishes the result.
     std::optional<ParamInfo> checkEffectiveThisParamInfo(
         Decl* decl,
-        bool shouldDiagnoseModeAttributes);
+        bool shouldDiagnoseModeSpecifiers);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);

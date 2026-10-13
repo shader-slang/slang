@@ -17408,63 +17408,171 @@ Type* SemanticsVisitor::calcThisType(Type* type)
     }
 }
 
-static bool _isThisParamModeAttribute(Modifier* modifier)
+/// A `ThisParamModeSpecifierMask` identifies the receiver-mode spellings on one declaration.
+enum ThisParamModeSpecifierMask : UInt
 {
-    return as<MutatingAttribute>(modifier) || as<ConstRefAttribute>(modifier) ||
-           as<RefAttribute>(modifier) || as<NonmutatingAttribute>(modifier);
+    kThisParamModeSpecifierMask_None = 0,
+    kThisParamModeSpecifierMask_Mutating = 1 << 0,
+    kThisParamModeSpecifierMask_ConstRef = 1 << 1,
+    kThisParamModeSpecifierMask_Ref = 1 << 2,
+    kThisParamModeSpecifierMask_Nonmutating = 1 << 3,
+    kThisParamModeSpecifierMask_CppStyleTrailingConst = 1 << 4,
+};
+
+/// Returns the mask bit for a receiver-mode specifier, or zero for another modifier.
+static ThisParamModeSpecifierMask _getThisParamModeSpecifierMask(Modifier* modifier)
+{
+    if (as<MutatingAttribute>(modifier))
+        return kThisParamModeSpecifierMask_Mutating;
+    if (as<ConstRefAttribute>(modifier))
+        return kThisParamModeSpecifierMask_ConstRef;
+    if (as<RefAttribute>(modifier))
+        return kThisParamModeSpecifierMask_Ref;
+    if (as<NonmutatingAttribute>(modifier))
+        return kThisParamModeSpecifierMask_Nonmutating;
+    if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+        return kThisParamModeSpecifierMask_CppStyleTrailingConst;
+    return kThisParamModeSpecifierMask_None;
 }
 
-ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode defaultMode)
+/// The mask records distinct spelling kinds for mode selection. The ordered list retains every
+/// occurrence so that duplicate identical spellings and diagnostic order are not lost.
+struct ThisParamModeSpecifiers
 {
-    auto mode = defaultMode;
-    if (policyDecl->hasModifier<MutatingAttribute>())
-        mode = ParamPassingMode::BorrowInOut;
-    else if (policyDecl->hasModifier<ConstRefAttribute>())
-        mode = ParamPassingMode::BorrowIn;
-    else if (policyDecl->hasModifier<RefAttribute>())
-        mode = ParamPassingMode::Ref;
-    else if (policyDecl->hasModifier<NonmutatingAttribute>())
-        mode = ParamPassingMode::In;
-    else if (as<SetterDecl>(policyDecl))
-        mode = ParamPassingMode::BorrowInOut;
+    ThisParamModeSpecifierMask mask = kThisParamModeSpecifierMask_None;
+    List<Modifier*> orderedSpecifiers;
+};
+
+/// Returns the receiver-mode specifiers directly attached to `decl` in source order.
+static ThisParamModeSpecifiers _collectThisParamModeSpecifiers(Decl* decl)
+{
+    ThisParamModeSpecifiers result;
+    List<Modifier*> trailingConstSpecifiers;
+    for (auto modifier : decl->modifiers)
+    {
+        auto modifierMask = _getThisParamModeSpecifierMask(modifier);
+        if (modifierMask == kThisParamModeSpecifierMask_None)
+            continue;
+
+        result.mask = ThisParamModeSpecifierMask(result.mask | modifierMask);
+        if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+            trailingConstSpecifiers.add(modifier);
+        else
+            result.orderedSpecifiers.add(modifier);
+    }
+
+    // The parser attaches trailing `const` before `CompleteDecl` attaches prefix modifiers.
+    for (auto modifier : trailingConstSpecifiers)
+        result.orderedSpecifiers.add(modifier);
+
+    return result;
+}
+
+void SemanticsVisitor::checkThisParamModeSpecifiers(Decl* decl)
+{
+    auto specifiers = _collectThisParamModeSpecifiers(decl);
+    if (specifiers.orderedSpecifiers.getCount() <= 1)
+        return;
+
+    auto firstSpecifier = specifiers.orderedSpecifiers[0];
+    for (Index i = 1; i < specifiers.orderedSpecifiers.getCount(); ++i)
+    {
+        getSink()->diagnose(Diagnostics::DuplicateModifier{
+            .existingModifier = firstSpecifier,
+            .modifier = specifiers.orderedSpecifiers[i]});
+    }
+}
+
+/// Returns the receiver mode selected by the direct specifiers on `specifierDecl`.
+///
+/// No specifier preserves `fallbackMode`. Exactly one specifier selects its corresponding mode.
+/// Modifier checking has already diagnosed multiple or conflicting specifiers; this computation
+/// recovers with `fallbackMode`.
+static ParamPassingMode _applyDirectThisParamModeSpecifiers(
+    Decl* specifierDecl,
+    ParamPassingMode fallbackMode)
+{
+    auto specifiers = _collectThisParamModeSpecifiers(specifierDecl);
+    if (specifiers.orderedSpecifiers.getCount() > 1)
+        return fallbackMode;
+
+    switch (specifiers.mask)
+    {
+    case kThisParamModeSpecifierMask_None:
+        return fallbackMode;
+    case kThisParamModeSpecifierMask_Mutating:
+        return ParamPassingMode::BorrowInOut;
+    case kThisParamModeSpecifierMask_ConstRef:
+        return ParamPassingMode::BorrowIn;
+    case kThisParamModeSpecifierMask_Ref:
+        return ParamPassingMode::Ref;
+    case kThisParamModeSpecifierMask_Nonmutating:
+    case kThisParamModeSpecifierMask_CppStyleTrailingConst:
+        return ParamPassingMode::In;
+    default:
+        SLANG_UNREACHABLE("all receiver-mode specifier masks handled");
+    }
+}
+
+/// Returns the receiver mode used when a declaration has no receiver-mode specifier.
+static ParamPassingMode _getThisParamModeFallback(SemanticsVisitor* semantics, Decl* decl)
+{
+    if (as<SetterDecl>(decl))
+        return ParamPassingMode::BorrowInOut;
+
+    // Declarations other than `FuncDecl`s default to `in`.
+    if (!as<FuncDecl>(decl))
+        return ParamPassingMode::In;
+
+    // Synthesized functions without a declaration-owned mode default to `in`.
+    if (decl->hasModifier<SynthesizedModifier>())
+        return ParamPassingMode::In;
+
+    // At this point, the `SemanticsVisitor` carries the translation unit that contains `decl`.
+    auto translationUnit = semantics->getShared()->getTranslationUnitRequest();
+    SLANG_RELEASE_ASSERT(translationUnit);
+    if (translationUnit->sourceLanguage == SourceLanguage::HLSL)
+        return ParamPassingMode::BorrowInOut;
+    return ParamPassingMode::In;
+}
+
+/// Applies receiver-mode specifiers from the callable outward through transparent containers.
+static ParamPassingMode _applyThisParamModeSpecifiers(
+    List<Decl*> const& specifierDecls,
+    ParamPassingMode fallbackMode)
+{
+    // An outer property, subscript, or generic declaration can override the mode selected for its
+    // child. An invalid combination on that outer declaration preserves the child's mode.
+    auto mode = fallbackMode;
+    for (auto specifierDecl : specifierDecls)
+        mode = _applyDirectThisParamModeSpecifiers(specifierDecl, mode);
     return mode;
 }
 
-static ParamPassingMode _foldThisParamModePolicies(
-    List<Decl*> const& policyDecls,
-    ParamPassingMode defaultMode)
-{
-    // Fold from the innermost declaration toward its transparent parents. An outer declaration's
-    // policy replaces the mode carried from its child, while the ordering below preserves the
-    // established precedence when multiple spellings occur on the same declaration.
-    auto mode = defaultMode;
-    for (auto policyDecl : policyDecls)
-        mode = applyThisParamModePolicy(policyDecl, mode);
-    return mode;
-}
-
-static void _diagnoseThisParamModeAttributes(
+/// Diagnoses every collected receiver-mode specifier when no receiver exists or a `ClassDecl`
+/// fixes the receiver mode to `in`.
+static void _diagnoseThisParamModeSpecifiers(
     SemanticsVisitor* semantics,
-    List<Decl*> const& policyDecls,
+    List<Decl*> const& specifierDecls,
     bool isClassMember)
 {
-    for (auto policyDecl : policyDecls)
+    for (auto specifierDecl : specifierDecls)
     {
-        for (auto modifier : policyDecl->modifiers)
+        for (auto modifier : specifierDecl->modifiers)
         {
-            if (!_isThisParamModeAttribute(modifier))
+            if (_getThisParamModeSpecifierMask(modifier) == kThisParamModeSpecifierMask_None)
                 continue;
 
             if (isClassMember)
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeAttributeOnClassMember{.attribute = modifier});
+                    Diagnostics::ThisParamModeSpecifierOnClassMember{.specifier = modifier});
             }
             else
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeAttributeWithoutEffectiveThisParam{
-                        .attribute = modifier});
+                    Diagnostics::ThisParamModeSpecifierWithoutEffectiveThisParam{
+                        .specifier = modifier});
             }
         }
     }
@@ -17488,34 +17596,34 @@ static bool _shouldEffectiveThisParamTypeBeNoDiff(
 
 std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     Decl* decl,
-    bool shouldDiagnoseModeAttributes)
+    bool shouldDiagnoseModeSpecifiers)
 {
     // Build the effective `this` parameter from the declaration outward. Constructors do not have
     // such a parameter, and a static or unsupported nesting edge ends the search. Otherwise, walk
     // through property, subscript, and generic containers until reaching the declaration that
-    // supplies the receiver value type, collecting the mode policy along the way.
+    // supplies the receiver value type, collecting receiver-mode specifiers along the way.
     //
     // Next, resolve that receiver type. An extension on a callable delegates to the callable's
     // effective `this` parameter so that it preserves the callable ABI. Then select the effective
     // mode: a `SynthesizedParamPassingModeModifier` makes the mode declaration-owned; otherwise the
-    // collected policy and declared receiver type determine it. Declaration ownership is what lets
-    // a synthesized wrapper retain a non-`In` mode even for a class receiver; an ordinary class
-    // member instead diagnoses mode attributes and defaults to `In`. Finally, encode `no_diff` in
-    // the parameter value type and return the `ParamInfo`.
-    List<Decl*> policyDecls;
-    policyDecls.add(decl);
+    // language fallback, collected specifiers, and declared receiver type determine it. Declaration
+    // ownership is what lets a synthesized wrapper retain a non-`In` mode even for a class
+    // receiver; an ordinary class member instead diagnoses mode specifiers and defaults to `In`.
+    // Finally, encode `no_diff` in the parameter value type and return the `ParamInfo`.
+    List<Decl*> specifierDecls;
+    specifierDecls.add(decl);
 
-    auto diagnoseModeAttributes = [&](bool isClassMember)
+    auto diagnoseModeSpecifiers = [&](bool isClassMember)
     {
-        if (shouldDiagnoseModeAttributes)
-            _diagnoseThisParamModeAttributes(this, policyDecls, isClassMember);
+        if (shouldDiagnoseModeSpecifiers)
+            _diagnoseThisParamModeSpecifiers(this, specifierDecls, isClassMember);
     };
 
     // A constructor operates on a local `this` value that is uninitialized on entry and returned
     // by default at the end of the body. That value is deliberately not modeled as a parameter.
     if (as<ConstructorDecl>(decl))
     {
-        diagnoseModeAttributes(false);
+        diagnoseModeSpecifiers(false);
         return std::nullopt;
     }
 
@@ -17529,7 +17637,7 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
         // `GenericDecl`.
         if (isEffectivelyStatic(innerDecl, parentDecl))
         {
-            diagnoseModeAttributes(false);
+            diagnoseModeSpecifiers(false);
             return std::nullopt;
         }
 
@@ -17540,23 +17648,22 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
         }
 
         // These declarations are transparent when finding the declaration that supplies the
-        // receiver type, but their modifiers can still participate in the established mode
-        // policy.
+        // receiver type, but their modifiers can still specify a receiver mode.
         if (as<PropertyDecl>(parentDecl) || as<SubscriptDecl>(parentDecl) ||
             as<GenericDecl>(parentDecl))
         {
-            policyDecls.add(parentDecl);
+            specifierDecls.add(parentDecl);
             innerDecl = parentDecl;
             continue;
         }
 
-        diagnoseModeAttributes(false);
+        diagnoseModeSpecifiers(false);
         return std::nullopt;
     }
 
     if (!receiverProvider)
     {
-        diagnoseModeAttributes(false);
+        diagnoseModeSpecifiers(false);
         return std::nullopt;
     }
 
@@ -17589,7 +17696,7 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
             auto targetInfo = findEffectiveThisParamInfo(targetDeclRefType->getDeclRef());
             if (!targetInfo)
             {
-                diagnoseModeAttributes(false);
+                diagnoseModeSpecifiers(false);
                 return std::nullopt;
             }
             receiverType = targetInfo->type;
@@ -17616,19 +17723,19 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
 
     if (!receiverType)
     {
-        diagnoseModeAttributes(false);
+        diagnoseModeSpecifiers(false);
         return std::nullopt;
     }
 
     if (isClassMember)
     {
-        diagnoseModeAttributes(true);
+        diagnoseModeSpecifiers(true);
         if (!hasDeclarationOwnedMode)
             mode = ParamPassingMode::In;
     }
     else if (!hasDeclarationOwnedMode)
     {
-        mode = _foldThisParamModePolicies(policyDecls, mode);
+        mode = _applyThisParamModeSpecifiers(specifierDecls, _getThisParamModeFallback(this, decl));
         mode = adjustParamPassingModeBasedOnParamType(mode, receiverType);
     }
 
@@ -17653,7 +17760,7 @@ void SemanticsVisitor::checkAndAttachEffectiveThisParamInfo(Decl* decl)
         return;
 
     SLANG_ASSERT(!decl->findModifier<ThisParamInfoAttribute>());
-    auto info = checkEffectiveThisParamInfo(decl, /* shouldDiagnoseModeAttributes */ true);
+    auto info = checkEffectiveThisParamInfo(decl, /* shouldDiagnoseModeSpecifiers */ true);
     if (!info)
         return;
 

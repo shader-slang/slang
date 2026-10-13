@@ -1365,28 +1365,16 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // The lookup process considered a member of an
-            // enclosing type as being in scope, so that any
-            // reference to that member needs to use a `this`
-            // expression as appropriate.
-            This,
+            // The lookup process did not prove that an enclosing declaration prevents instance
+            // access, so expression checking must validate a reconstructed `this` value.
+            ThisValue,
+
+            // The lookup process proved that only the `This` type is available as a base.
+            ThisType,
         };
 
         // The kind of lookup step that was performed
         Kind kind;
-
-        // For the `Kind::This` case, should lookup reconstruct a `this` value or a `This` type,
-        // and is that value mutable?
-        //
-        enum class ThisParameterMode : uint8_t
-        {
-            ImmutableValue, // An immutable `this` value
-            MutableValue,   // A mutable `this` value
-            Type,           // A `This` type
-
-            Default = ImmutableValue,
-        };
-        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
 
         // As needed, a reference to the declaration that faciliated
         // the lookup step.
@@ -1401,6 +1389,11 @@ FIDDLE() namespace Slang
 
         Val* val = nullptr;
 
+        // The scope in which lookup began for a `Kind::ThisValue` step. Ordinary `this` checking
+        // uses this scope to validate the receiver and determine its type and mutability. Other
+        // breadcrumb kinds leave it null.
+        Scope* thisValueScope = nullptr;
+
         // The next implicit step that the lookup process took to
         // arrive at a final value.
         RefPtr<LookupResultItem_Breadcrumb> next;
@@ -1410,13 +1403,17 @@ FIDDLE() namespace Slang
             DeclRef<Decl> declRef,
             Val* val,
             RefPtr<LookupResultItem_Breadcrumb> next,
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default)
-            : kind(kind)
-            , thisParameterMode(thisParameterMode)
-            , declRef(declRef)
-            , val(val)
-            , next(next)
+            Scope* thisValueScope = nullptr)
+            : kind(kind), declRef(declRef), val(val), thisValueScope(thisValueScope), next(next)
         {
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisValue) == (thisValueScope != nullptr));
+        }
+
+        Scope* getThisValueScope() const
+        {
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisValue);
+            SLANG_RELEASE_ASSERT(thisValueScope);
+            return thisValueScope;
         }
 
     protected:
