@@ -14,6 +14,8 @@
 /// buffer element. Examples are:
 /// - In SPIRV, `bool` is considered a logical type, meaning it cannot appear inside
 ///   buffers. bool vectors and matrices needs to be lowered into arrays.
+/// - In WGSL, `bool` is not host-shareable, so it cannot appear in uniform or storage
+///   buffers either; it is stored as `u32`.
 /// - In SPIRV, if `T` is used to declare a buffer, then every member in `T` must have
 ///   explicit offset. But if it is used to declare a local variable, then it cannot
 ///   have explicit member offset. This means that we cannot use the same `Foo` struct
@@ -3364,6 +3366,17 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     virtual bool shouldTranslateArrayElementTo16ByteAlignedVectorForConstantBuffer() override
     {
         return true;
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        // WGSL `bool` is not host-shareable, so it cannot appear in uniform or storage buffers.
+        if (isBoolOrBoolVectorType(type))
+        {
+            IRBuilder builder(type);
+            return lowerBoolToIntStorage(type, builder.getUIntType());
+        }
+        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
 };
 
