@@ -21,29 +21,41 @@ struct Elem
     bool f;
 };
 
-//TEST_INPUT:set elems = ubuffer(data=[0 1 0 0], stride=8)
+// Each store below changes the value it overwrites, so a dropped store is visible.
+//TEST_INPUT:set elems = ubuffer(data=[0 1 0 0 0 1], stride=8)
 RWStructuredBuffer<Elem> elems;
 
-//TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT:set flags3 = ubuffer(data=[0 1 0 0], stride=16)
+RWStructuredBuffer<bool3> flags3;
+
+//TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    elems[1].f = !elems[0].f;
+    elems[1].f = elems[0].f;  // 0 -> 1
+    elems[2].f = !elems[0].f; // 1 -> 0
+    flags3[0] = !flags3[0];   // (0, 1, 0) -> (1, 0, 1)
 
     // CHECK: 1
     outputBuffer[0] = params.flag ? 1 : 0;
-    // CHECK: 0
+    // CHECK-NEXT: 0
     outputBuffer[1] = params.pair.x ? 1 : 0;
-    // CHECK: 1
+    // CHECK-NEXT: 1
     outputBuffer[2] = params.pair.y ? 1 : 0;
-    // CHECK: 0
+    // CHECK-NEXT: 0
     outputBuffer[3] = params.arr[0] ? 1 : 0;
-    // CHECK: 1
+    // CHECK-NEXT: 1
     outputBuffer[4] = params.arr[1] ? 1 : 0;
-    // CHECK: 1
-    outputBuffer[5] = elems[0].f ? 1 : 0;
-    // CHECK: 0
-    outputBuffer[6] = elems[1].f ? 1 : 0;
+    // CHECK-NEXT: 1
+    outputBuffer[5] = elems[1].f ? 1 : 0;
+    // CHECK-NEXT: 0
+    outputBuffer[6] = elems[2].f ? 1 : 0;
+    // CHECK-NEXT: 1
+    outputBuffer[7] = flags3[0].x ? 1 : 0;
+    // CHECK-NEXT: 0
+    outputBuffer[8] = flags3[0].y ? 1 : 0;
+    // CHECK-NEXT: 1
+    outputBuffer[9] = flags3[0].z ? 1 : 0;
 }

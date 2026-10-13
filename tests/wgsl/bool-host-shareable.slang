@@ -118,6 +118,7 @@ float4 fragMain(uniform bool epFlag) : SV_Target
     // types, so whole-value copies go through the logical type.
     gRWSB[2].a = gCBElem.a;
     gRWSB[2].m = gCBElem.m;
+
     gRWSBBool[0] = !gRWSBBool[1];
     if (gSBBool2[0].y) r.x += 8;
     gRWSBBool2[0] = !gRWSBBool2[1];
