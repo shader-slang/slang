@@ -74,19 +74,6 @@ __magic_type(TraceProgramDescriptorType)
 __intrinsic_type(TraceProgramDescriptor)
 public struct TraceProgramDescriptor<Schema>
     where Schema : ITraceProgramSchema
-{
-    /// Suppresses the synthesized public constructor without declaring a default constructor.
-    ///
-    /// Consider `struct Bindings { TraceProgramDescriptor<MySchema> program; }`, bound through
-    /// `ParameterBlock<Bindings>`. A private zero-argument constructor would still be selected as
-    /// the field's default initializer while synthesizing `Bindings`' constructor, then fail access
-    /// checking. Requiring an argument leaves the descriptor non-default-initializable, so the
-    /// containing binding struct can carry a host-supplied handle without trying to construct one.
-    /// @param[in] unavailable An unused argument preventing implicit default construction.
-    ///
-    /// @par Constraints
-    /// Private to this type; callers obtain descriptors through host binding.
-    private __init(int unavailable) {}
-}
+{}
 
 } // namespace rt

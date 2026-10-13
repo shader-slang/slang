@@ -45,19 +45,13 @@ void main()
 // RESOURCES: 'resources' is not a member of 'rt.TraceProgramDescriptor<Schema>'
 #elif defined(TEST_CALL)
     rt::TraceProgramDescriptor<Schema> fromCall = rt::TraceProgramDescriptor<Schema>();
-//CALL: not enough arguments to call
-//CALL: not enough arguments to call (got 0, expected 1)
-//CALL: candidate: private rt::TraceProgramDescriptor<Schema>.init(int)
+//CALL: cannot use initializer list for type 'rt.TraceProgramDescriptor<Schema>'
 #elif defined(TEST_ARGUMENT)
     rt::TraceProgramDescriptor<Schema> fromArgument = rt::TraceProgramDescriptor<Schema>(0);
-//ARGUMENT: declaration not accessible
-//ARGUMENT: 'TraceProgramDescriptor.init' is not accessible from the current context.
-//ARGUMENT: type mismatch in expression
-//ARGUMENT: expected an expression of type 'rt.TraceProgramDescriptor<Schema>', got 'int'
+//ARGUMENT: cannot use initializer list for type 'rt.TraceProgramDescriptor<Schema>'
+//ARGUMENT: too many initializers (expected 0, got 1)
 #elif defined(TEST_INITIALIZER)
     rt::TraceProgramDescriptor<Schema> fromInitializer = {};
-//INITIALIZER: not enough arguments to call
-//INITIALIZER: not enough arguments to call (got 0, expected 1)
-//INITIALIZER: candidate: private rt::TraceProgramDescriptor<Schema>.init(int)
+//INITIALIZER: cannot use initializer list for type 'rt.TraceProgramDescriptor<Schema>'
 #endif
 }
