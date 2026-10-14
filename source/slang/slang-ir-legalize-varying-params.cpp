@@ -2907,6 +2907,10 @@ protected:
 
         bool isUnsupported = false;
         bool isSpecial = false;
+
+        // A WGSL enable-extension that a shader must declare before it can use this builtin,
+        // such as `primitive_index`.
+        String requiredWGSLExtension;
     };
 
     struct SystemValLegalizationWorkItem
@@ -3020,6 +3024,10 @@ protected:
             return;
 
         builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        if (info.requiredWGSLExtension.getLength())
+            builder.addRequireWGSLExtensionDecoration(
+                entryPoint.entryPointFunc,
+                info.requiredWGSLExtension.getUnownedSlice());
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -5258,6 +5266,13 @@ protected:
             }
 
         case SystemValueSemanticName::PrimitiveID:
+            {
+                result.systemValueName = toSlice("primitive_index");
+                result.permittedTypes.add(builder.getUIntType());
+                result.requiredWGSLExtension = toSlice("primitive_index");
+                break;
+            }
+
         case SystemValueSemanticName::RenderTargetArrayIndex:
             {
                 result.isUnsupported = true;
