@@ -2909,29 +2909,51 @@ protected:
         bool isSpecial = false;
 
         // The WGSL enable-extension that a module must declare before it can use the target
-        // builtin named by `systemValueName`, such as `primitive_index`. We record it on the
-        // entry point, and the WGSL emitter writes one module-wide `enable` line per extension.
-        // An empty value means the legalizer adds no `enable` requirement for the builtin.
+        // builtin named by `systemValueName`, such as `primitive_index`. An empty value means the
+        // builtin needs no `enable` directive from this legalizer.
         String requiredWGSLExtension;
 
-        // Some target builtins exist only as an input of one stage (`Stage::Unknown` means any
-        // stage). We check this here because the front end does not check the stage of a global
-        // `in` varying, and `-ignore-capabilities` turns its stage checks off.
+        // The only stage the target builtin exists in, or `Stage::Unknown` for any stage, and
+        // whether it exists only as an input. The front end rejects most misuses first, but it
+        // does not check the stage of a global `in` varying, and `-ignore-capabilities` turns its
+        // stage checks off. Only WGSL's `primitive_index` sets these today, so other builtins
+        // still rely on the front end alone.
         Stage onlyStage = Stage::Unknown;
         bool isInputOnly = false;
     };
 
-    static bool isSystemValueSupported(const SystemValueInfo& info, Stage stage, bool isOutput)
+    // Return false and report a diagnostic when the system value described by `info` cannot be
+    // used as `var` in an entry point for `stage`, as an input or, when `isOutput` (which includes
+    // `inout`), as an output. An unsupported semantic reports E55202; a semantic the target
+    // supports elsewhere reports E30702 for the stage or direction it was used in.
+    bool checkSystemValueUse(
+        const SystemValueInfo& info,
+        IRInst* var,
+        UnownedStringSlice semanticName,
+        Stage stage,
+        bool isOutput)
     {
         if (info.isUnsupported)
+        {
+            reportUnsupportedSystemAttribute(var, semanticName);
             return false;
-        if (info.onlyStage != Stage::Unknown && info.onlyStage != stage)
-            return false;
-        return !(isOutput && info.isInputOnly);
+        }
+        const bool isWrongStage = info.onlyStage != Stage::Unknown && info.onlyStage != stage;
+        const bool isWrongDirection = isOutput && info.isInputOnly;
+        if (!isWrongStage && !isWrongDirection)
+            return true;
+        m_sink->diagnose(Diagnostics::SystemValueSemanticInvalidDirection{
+            .semantic = semanticName,
+            .direction = isOutput ? "output" : "input",
+            .stage = getStageName(stage),
+            .location = var->sourceLoc});
+        return false;
     }
 
-    // We put the extension requirement on the entry-point function rather than on `var`, because
-    // the WGSL emitter collects required extensions only from global instructions.
+    // Mark `var` (a parameter, global varying or struct key) as the target builtin described by
+    // `info`. A builtin that needs a WGSL enable-extension also adds a
+    // `RequireWGSLExtensionDecoration` to the entry-point function, which the WGSL emitter turns
+    // into one `enable` directive for the whole module.
     static void addTargetSystemValueDecorations(
         IRBuilder& builder,
         const EntryPointInfo& entryPoint,
@@ -3049,11 +3071,8 @@ protected:
 
         const auto stage = entryPoint.entryPointDecor->getProfile().getStage();
         const bool isOutput = as<IROutParamTypeBase>(varType) != nullptr;
-        if (!isSystemValueSupported(info, stage, isOutput))
-        {
-            reportUnsupportedSystemAttribute(var, semanticName);
+        if (!checkSystemValueUse(info, var, semanticName.getUnownedSlice(), stage, isOutput))
             return;
-        }
         if (!info.permittedTypes.getCount())
             return;
 
@@ -3537,8 +3556,9 @@ private:
         IRStructType* structType,
         IRVarLayout* varLayout)
     {
-        // Ensure each field in an output struct type has either a system semantic or a user
-        // semantic, so that signature matching can happen correctly.
+        // Ensure each field of `structType`, an entry point's flattened input struct or output
+        // struct depending on the direction `K`, has either a system semantic or a user semantic,
+        // so that signature matching can happen correctly.
         auto typeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
         Index index = 0;
         IRBuilder builder(structType);
@@ -3552,14 +3572,12 @@ private:
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
-                    if (!isSystemValueSupported(
+                    if (checkSystemValueUse(
                             sysValInfo,
+                            field,
+                            semanticDecor->getSemanticName(),
                             entryPoint.entryPointDecor->getProfile().getStage(),
                             K == LayoutResourceKind::VaryingOutput))
-                    {
-                        reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
-                    }
-                    else
                     {
                         addTargetSystemValueDecorations(builder, entryPoint, key, sysValInfo);
                         semanticDecor->removeAndDeallocate();
