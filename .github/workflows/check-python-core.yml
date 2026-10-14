@@ -4,9 +4,35 @@ on:
   workflow_dispatch:
     inputs:
       runtime-perf:
-        description: "Also build runtime-perf on Windows and run it on the Linux GPU pool"
+        description: "Run the runtime workload suite on the selected CI target"
         type: boolean
         default: false
+      runtime-target:
+        description: "Machine to execute workloads on (linux-gpu also checks the hosted Windows build)"
+        type: choice
+        options: [windows-perf, linux-gpu]
+        default: windows-perf
+      windows-runner-labels:
+        description: "Windows target labels as a JSON array; default is the compile-perf pool"
+        type: string
+        default: '["Windows", "X64", "nvrgfx-perf-kernelvm-bridge"]'
+      runtime-backend:
+        description: "Runtime API (D3D12 and both require the Windows target)"
+        type: choice
+        options: [vulkan, d3d12, both]
+        default: vulkan
+      runtime-cases:
+        description: "all, or comma-separated workload/family names"
+        type: string
+        default: all
+      runtime-adapter:
+        description: "RHI adapter index for the selected backend (use the same index for both)"
+        type: number
+        default: 0
+      runtime-max-spread:
+        description: "Total GPU relative-MAD target (0.05 = 5%, 0.03 = 3%)"
+        type: number
+        default: 0.05
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -25,6 +51,13 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/runtime-perf-test.yml
+    with:
+      target: ${{ inputs.runtime-target }}
+      windows-runner-labels: ${{ inputs.windows-runner-labels }}
+      backend: ${{ inputs.runtime-backend }}
+      cases: ${{ inputs.runtime-cases }}
+      adapter: ${{ inputs.runtime-adapter }}
+      max-spread: ${{ inputs.runtime-max-spread }}
 
   check-python-core:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true

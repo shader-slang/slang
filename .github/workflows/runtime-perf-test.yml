@@ -4,6 +4,25 @@ name: Runtime Perf Prototype Test
 # hardware measurements off ordinary PRs until the prototype is established.
 on:
   workflow_call:
+    inputs:
+      target:
+        type: string
+        default: windows-perf
+      windows-runner-labels:
+        type: string
+        default: '["Windows", "X64", "nvrgfx-perf-kernelvm-bridge"]'
+      backend:
+        type: string
+        default: vulkan
+      cases:
+        type: string
+        default: all
+      adapter:
+        type: number
+        default: 0
+      max-spread:
+        type: number
+        default: 0.05
 
 permissions:
   contents: read
@@ -11,14 +30,28 @@ permissions:
 
 jobs:
   windows-build:
-    runs-on: windows-2022
-    timeout-minutes: 25
+    name: ${{ inputs.target == 'windows-perf' && 'Windows target workload execution' || 'Windows build check' }}
+    runs-on: ${{ inputs.target == 'windows-perf' && fromJSON(inputs.windows-runner-labels) || fromJSON('["windows-2022"]') }}
+    timeout-minutes: 45
+    concurrency:
+      group: runtime-perf-windows-${{ inputs.windows-runner-labels }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
       - name: Initialize RHI
         run: git submodule update --init --recursive external/slang-rhi
+      - name: Set up MSVC tools on the performance runner
+        if: inputs.target == 'windows-perf'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      - name: Set up Python on the performance runner
+        if: inputs.target == 'windows-perf'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
       - name: Download matching compiler package and headers
         shell: pwsh
         run: |
@@ -36,6 +69,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build/runtime-perf --config Release --parallel 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # RHI copies DXC beside the runner. Let paired slangc invocations
+          # find those downstream DLLs too when measuring the D3D12 target.
+          "$PWD/build/runtime-perf/Release" >> $env:GITHUB_PATH
       - name: Check orchestration and shared sources
         run: python -m unittest discover -s tools/runtime-perf -p 'test_*.py' -v
       - name: Record available devices
@@ -44,11 +80,44 @@ jobs:
           New-Item -ItemType Directory -Force results | Out-Null
           python tools/runtime-perf/perf.py devices --runner build/runtime-perf/Release/slang-runtime-perf.exe > results/windows-devices.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Execute workloads and paired compilation on the Windows target
+        if: inputs.target == 'windows-perf'
+        shell: pwsh
+        env:
+          PERF_BACKEND: ${{ inputs.backend }}
+          PERF_CASES: ${{ inputs.cases }}
+          PERF_ADAPTER: ${{ inputs.adapter }}
+          PERF_MAX_SPREAD: ${{ inputs.max-spread }}
+          PERF_RUNNER_NAME: ${{ runner.name }}
+        run: |
+          $controllers = @(Get-CimInstance Win32_VideoController | Select-Object Name, PNPDeviceID, DriverVersion)
+          if ($controllers.Count -eq 0) { throw 'No video controller/driver identity found' }
+          $controllers | ConvertTo-Json -Depth 4 | Set-Content results/windows-gpus.json
+          $driver = ($controllers | Sort-Object PNPDeviceID | ForEach-Object { "$($_.PNPDeviceID):$($_.DriverVersion)" }) -join ';'
+          @{
+            runner = $env:PERF_RUNNER_NAME
+            machine = $env:COMPUTERNAME
+            commit = $env:GITHUB_SHA
+            run_id = $env:GITHUB_RUN_ID
+          } | ConvertTo-Json | Set-Content results/machine.json
+          $backends = if ($env:PERF_BACKEND -eq 'both') { @('vulkan', 'd3d12') } else { @($env:PERF_BACKEND) }
+          $failed = $false
+          foreach ($backend in $backends) {
+            python tools/runtime-perf/perf.py run `
+              --runner build/runtime-perf/Release/slang-runtime-perf.exe `
+              --config tools/runtime-perf/ci-example.json `
+              --backend $backend --adapter $env:PERF_ADAPTER --cases $env:PERF_CASES `
+              --max-spread $env:PERF_MAX_SPREAD --driver-id $driver `
+              --environment-id $env:PERF_RUNNER_NAME `
+              --slangc "$PWD/compiler/bin/slangc.exe" --output "results/$backend"
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
       - name: Upload Windows diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: runtime-perf-windows-diagnostics
+          name: runtime-perf-windows-results
           path: |
             results/
             build/runtime-perf/CMakeFiles/CMakeConfigureLog.yaml
@@ -56,7 +125,7 @@ jobs:
 
   linux-gpu:
     # These labels select the upstream scaler pool, unavailable to forks.
-    if: github.repository == 'shader-slang/slang'
+    if: inputs.target == 'linux-gpu' && github.repository == 'shader-slang/slang'
     runs-on: [Linux, self-hosted, GPU, GCP]
     timeout-minutes: 30
     container:
@@ -95,7 +164,16 @@ jobs:
             -DSLANG_RHI_ENABLE_CUDA=OFF -DSLANG_RHI_ENABLE_OPTIX=OFF
           cmake --build build/runtime-perf --parallel 4
       - name: Run all workload families with paired compilation
+        env:
+          PERF_BACKEND: ${{ inputs.backend }}
+          PERF_CASES: ${{ inputs.cases }}
+          PERF_ADAPTER: ${{ inputs.adapter }}
+          PERF_MAX_SPREAD: ${{ inputs.max-spread }}
         run: |
+          if [[ "$PERF_BACKEND" != vulkan ]]; then
+            echo 'The Linux target requires runtime-backend=vulkan.' >&2
+            exit 1
+          fi
           mkdir -p results
           nvidia-smi --query-gpu=name,uuid,driver_version --format=csv > results/gpu.csv
           python3 tools/runtime-perf/perf.py devices --runner build/runtime-perf/slang-runtime-perf > results/devices.json
@@ -103,6 +181,8 @@ jobs:
           python3 tools/runtime-perf/perf.py run \
             --runner build/runtime-perf/slang-runtime-perf \
             --config tools/runtime-perf/ci-example.json \
+            --backend "$PERF_BACKEND" --adapter "$PERF_ADAPTER" --cases "$PERF_CASES" \
+            --max-spread "$PERF_MAX_SPREAD" \
             --driver-id "$driver_id" --environment-id github-actions-linux-gpu \
             --slangc "$PWD/compiler/bin/slangc" --output results/baseline
       - name: Upload samples and diagnostics

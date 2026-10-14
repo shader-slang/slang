@@ -81,13 +81,36 @@ reporting a failure, including the per-case logs.
 ## Local and CI usage
 
 For an explicit CI test, manually dispatch **Check Python Scripts (Core Python
-Only)** with its `runtime-perf` input enabled. This also builds the runner on
-hosted Windows and executes all workload families with paired compilation on
-the upstream Linux NVIDIA GPU pool. The compiler package is pinned to 2026.17.1
-with verified checksums. Windows CI validates the build and orchestration;
-hardware runtime measurements come from the Linux job. Both jobs upload their
-diagnostics, and the GPU job archives the full result bundle. Forks can run the
-Windows check but do not have access to that upstream GPU pool.
+Only)** with its `runtime-perf` input enabled. The `runtime-perf-target-ci`
+branch defaults to the same Windows performance pool used by compile-perf:
+`["Windows", "X64", "nvrgfx-perf-kernelvm-bridge"]`. It builds the native
+runner and executes all 14 runtime cases plus their 16 paired compile entries
+on that machine. The compiler package is pinned to 2026.17.1 with matching
+headers and verified checksums. This tests the new benchmark workloads and
+runner, using a released compiler.
+
+```sh
+gh workflow run check-python-core.yml --repo shader-slang/slang \
+  --ref runtime-perf-target-ci \
+  -f runtime-perf=true -f runtime-target=windows-perf \
+  -f runtime-backend=both -f runtime-max-spread=0.05
+```
+
+`runtime-backend` selects `vulkan` (the default), `d3d12`, or `both`; both APIs
+run sequentially into separate result bundles. Set `windows-runner-labels`
+to a JSON array to select another Windows machine. `runtime-cases` accepts
+`all` or a comma-separated subset, and `runtime-adapter` selects the backend's
+adapter index. For example, add `-f runtime-cases=arithmetic,image` for a focused
+run or `-f runtime-max-spread=0.03` for 3%. The artifact
+`runtime-perf-windows-results` includes machine/driver identity, device
+enumeration, full samples, calibration, sources, target code, and logs. A run
+with unsupported hardware or unstable total measurements fails and retains
+its diagnostics.
+
+Use `-f runtime-target=linux-gpu -f runtime-backend=vulkan` to select the
+upstream NVIDIA GPU pool instead. That mode also checks the hosted Windows
+build. Forks do not have access to the upstream performance pools. Workflows
+are dispatched explicitly; pushing this branch does not launch a benchmark.
 
 Run these commands from the Slang repository root. All paths and the backend
 are explicit; CI can invoke exactly the same commands. Use an empty output
