@@ -60,10 +60,11 @@ _Note_ that `@builtin(instance_index)` counts from `firstInstance`, so `SV_Insta
 base instance on WGSL, unlike on D3D, SPIR-V and Metal. WGSL has no base-instance builtin to
 subtract, and `SV_StartInstanceLocation` is not supported.
 
-_Note_ that `@builtin(primitive_index)` requires the WGSL enable-extension `primitive_index`.
-Slang emits `enable primitive_index;` automatically when an entry point has an `SV_PrimitiveID`
-input, and the application must request the `"primitive-index"` feature when it creates the
-WebGPU device.
+_Note_ that `@builtin(primitive_index)` is a fragment-stage input only, and it requires the WGSL
+enable-extension `primitive_index`. Slang emits `enable primitive_index;` automatically when an
+entry point has an `SV_PrimitiveID` input. The directive applies to the whole WGSL module, so when
+several entry points are compiled into one module, all of them need a device created with the
+`"primitive-index"` feature.
 
 
 Supported HLSL features when targeting WGSL
