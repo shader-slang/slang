@@ -11734,7 +11734,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
-    checkStructuralRayTracingStageConformance(
+    checkStructuralRayTracingStageRestrictions(
         superInterfaceDeclRef,
         witnessTable,
         inheritanceDecl->loc);

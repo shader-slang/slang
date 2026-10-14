@@ -1665,11 +1665,13 @@ SlangResult diagnoseUnloweredStructuralRayTracing(
 // SemanticsVisitor methods
 // =============================================================================
 
-// Validates the receiver of each completed executable-stage conformance.
-// For example, `struct Miss : rt::IMissShader` selects the structural API and must have no
-// instance fields. `struct Schema : rt::ITraceProgramSchema` is an ordinary type and has no such
-// receiver restriction. Ordinary conformance checking has already validated required members.
-void SemanticsVisitor::checkStructuralRayTracingStageConformance(
+// Checks the extra RT API restrictions after ordinary interface conformance checking succeeds.
+// For example, `struct Miss : rt::IMissShader` must have no instance fields and cannot share a
+// module with legacy ray-tracing stages. Ordinary conformance checking has already verified its
+// required members, such as Context and invoke. Applying these restrictions at that point also
+// covers a Miss listed in a schema without being selected directly with `-entry Miss`.
+// A conformance to an ordinary interface, such as ITraceProgramSchema, needs no stage restrictions.
+void SemanticsVisitor::checkStructuralRayTracingStageRestrictions(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable,
     SourceLoc conformanceLoc)
