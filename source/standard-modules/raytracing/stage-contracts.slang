@@ -6,8 +6,8 @@ namespace rt
 /// Represents the source implementation of a closest-hit stage.
 ///
 /// `Context` fixes the payload, primitive, and shader-record types exposed through the stage
-/// input. The compiler turns `invoke` into a native closest-hit entry point; shader code cannot
-/// call it as an ordinary method.
+/// input. The compiler generates a native closest-hit entry point for `invoke`. An ordinary call
+/// can forward an existing input to this method, using the caller's payload and shader record.
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_closesthit` capability.

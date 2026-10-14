@@ -218,9 +218,9 @@ restriction on collecting builtin-registration entries has been removed; existin
 can be used when the RT library has builtin ownership.
 
 Do not keep a stage-implementation registry on `Linkage` or cache stage identity on an `invoke`
-method. One generic method can implement both an ordinary type and a shader type. Direct-call
-validation uses the actual receiver's conformance and its selected implementation. Module checking
-validates stage capabilities and input parameters through the completed conformance witnesses.
+method. One generic method can implement both an ordinary type and a shader type. Ordinary calls
+can forward an existing stage input to either implementation. Module checking validates stage
+capabilities and input parameters through the completed conformance witnesses.
 Representation diagnostics use the semantic checker's existing duplicate suppression. The first
 structural and legacy shader declarations are retained on the module declaration so later
 entry-point selection can enforce the same-module mixing restriction, including after serialization.
@@ -252,6 +252,40 @@ not clone their storage. The `record` getter still returns application data by v
 callable-data accessors use `[nonmutating] ref`, so the view can be immutable while the referenced
 data remains mutable. Full-backend adapter synthesis must preserve this behavior for copied views.
 PR1 checks the source rules; it does not yet implement or test that target execution.
+
+An `invoke` method can be called as an ordinary function with an existing input. For example,
+a stage method can call another stage's static implementation:
+
+```slang
+struct SharedMiss : rt::IMissShader
+{
+    typealias Context = SkyContext;
+    static void invoke(in rt::MissInput<Context> input)
+    {
+        input.payload.value = input.record.value;
+    }
+}
+
+struct SkyMiss : rt::IMissShader
+{
+    typealias Context = SkyContext;
+    void invoke(in rt::MissInput<Context> input)
+    {
+        SharedMiss::invoke(input);
+    }
+}
+```
+
+This uses Slang's existing support for a static method implementing an interface requirement.
+The call uses the current invocation's input; it does not dispatch a new shader or select a new
+SBT record. Instance methods can similarly forward an input using an existing `this` receiver.
+The restriction on constructing stage objects remains separate.
+
+The adapter implementation must preserve an ordinary callable body when generating a native
+entry wrapper. Keep `StructuralRayTracingEntryPointInfo` on the entry wrapper, not on an ordinary
+helper clone. The existing entry-point callsite pass removes native entry decorations from clones
+but does not currently remove this structural metadata. PR1 still stops code generation when a
+structural entry has no adapter; the positive tests here check frontend acceptance only.
 
 Fresh construction (`MissInput<C>()` or `{}`), uninitialized locals, global variables, `uniform`
 parameters, fields, writable/reference parameters, returned views, and arbitrary stage/input generic

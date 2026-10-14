@@ -4404,14 +4404,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Reject stage.invoke(input) when this method implements a shader stage. An ordinary
-            // method with the same name remains legal; the RT checker uses the selected
-            // conformance.
-            if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
-            {
-                return CreateErrorExpr(invoke);
-            }
-
             Index paramCount = funcType->getParamCount();
 
             // Check argument requirements for the selected function. In particular, arguments

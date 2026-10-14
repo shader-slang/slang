@@ -1095,13 +1095,6 @@ err(
 )
 
 err(
-    "direct-structural-ray-tracing-stage-invoke",
-    20024,
-    "direct invocation of a structural ray-tracing stage",
-    span { loc = "location", message = "a structural ray-tracing stage method may only be invoked by compiler-generated dispatch" }
-)
-
-err(
     "structural-ray-tracing-stage-runtime-value",
     20025,
     "runtime use of a structural ray-tracing stage type",

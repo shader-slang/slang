@@ -3454,9 +3454,15 @@ Expr* SemanticsVisitor::coerce(
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
 
-    // Check the chosen conversion after overload-viability probes have finished. This includes
-    // `helper({})`, a user-defined implicit constructor in `helper(1)`, and already-typed
-    // initializers supplied by `-zero-initialize`: none can create a fresh RT stage input.
+    // Check whether the conversion creates a forbidden RT stage or stage input. For example:
+    //
+    //     void helper(in rt::MissInput<C> input) {}
+    //     helper({}); // Converting {} to MissInput<C> creates a fresh input.
+    //
+    // A fresh input has no invocation's payload or shader record to refer to. Passing an existing
+    // input to helper is allowed. Check the converted expression here, after _coerce succeeds.
+    // Overload resolution also calls _coerce to try conversions for candidates it may discard;
+    // reporting an error there could reject a call whose chosen overload needs no forbidden input.
     if (diagnoseInvalidStructuralRayTracingExpression(expr))
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), expr);
 

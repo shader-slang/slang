@@ -27,14 +27,3 @@ struct StatefulMiss : first::IBackgroundStage
 
     void invoke(in rt::MissInput<Context> input) {}
 }
-
-struct RecursiveMiss : first::IBackgroundStage
-{
-    typealias Context = MissContext;
-    void invoke(in rt::MissInput<Context> input)
-    {
-        this.invoke(input);
-//CHECK:     ^^^^^^ direct invocation of a structural ray-tracing stage
-//CHECK:     ^^^^^^ a structural ray-tracing stage method may only be invoked by compiler-generated dispatch
-    }
-}

@@ -4220,9 +4220,6 @@ public:
         InvokeExpr* invoke,
         FuncType* funcType,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
-bool diagnoseDirectStructuralRayTracingStageInvoke(
-    InvokeExpr* invoke,
-    FunctionDeclBase* functionDecl);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
 
     /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its

@@ -999,39 +999,6 @@ static bool _diagnoseOrDeferRayTracingStageOrInputUse(
     return _checkRayTracingStageOrInputUse(visitor, use);
 }
 
-// Finds whether a checked call names the receiver's selected stage implementation. Consider:
-//
-//     interface IProvider { associatedtype Context : rt::IPayloadContext; }
-//     extension<T : IProvider> T
-//     { void invoke(in rt::MissInput<Context> input) {} }
-//     struct Miss : IProvider, rt::IMissShader { typealias Context = MyContext; }
-//     struct Ordinary : IProvider { typealias Context = MyContext; }
-//
-// Both types use the same function declaration, but only Miss selects it for a stage contract.
-// Member lookup has already retained the receiver type and the specialized callee DeclRef. Match
-// that callee against the receiver's checked conformance, preserving its generic substitutions.
-// Unqualified calls in a method are MemberExprs with an implicit ThisExpr base as well.
-static bool _isDirectStructuralRayTracingStageInvoke(SemanticsVisitor* visitor, DeclRefExpr* callee)
-{
-    auto member = as<MemberExpr>(callee);
-    if (!member)
-        return false;
-    auto receiverType = unwrapModifiedType(member->baseExpression->type.type);
-    for (auto facet : visitor->getShared()->getInheritanceInfo(receiverType).facets)
-    {
-        auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
-        if (!isExecutableStructuralRayTracingStageInterface(interfaceDeclRef.getDecl()))
-            continue;
-        auto implementation = _getStageImplementationFromSubtypeWitness(
-            visitor->getASTBuilder(),
-            interfaceDeclRef.getDecl(),
-            facet->subtypeWitness);
-        if (implementation && implementation.declRefBase->equals(callee->declRef.declRefBase))
-            return true;
-    }
-    return false;
-}
-
 // Prevents a logical structural stage signature from reaching native entry-point ABI passes.
 //
 // Consider `-entry MyMiss` selecting a struct whose `invoke` takes `rt::MissInput<C>`.
@@ -1935,28 +1902,6 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
             use.genericArguments.add({argumentType->getType(), argument->loc});
     }
     return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
-}
-
-// Rejects ordinary calls to the method selected as an executable stage implementation.
-// For example, `stage.invoke(input)` must enter through pipeline dispatch, which supplies stage
-// state and handles any-hit termination. An unrelated ordinary type's method named invoke is legal.
-bool SemanticsVisitor::diagnoseDirectStructuralRayTracingStageInvoke(
-    InvokeExpr* invoke,
-    FunctionDeclBase* functionDecl)
-{
-    // A generic receiver such as T : IMissShader can refer directly to the interface requirement
-    // before a concrete implementation is known. Its annotated owner already identifies the role.
-    auto interfaceDecl = as<InterfaceDecl>(functionDecl->parentDecl);
-    bool isStageRequirement =
-        interfaceDecl &&
-        functionDecl == getStructuralRayTracingStageInvokeRequirement(interfaceDecl);
-    if (!isStageRequirement &&
-        !_isDirectStructuralRayTracingStageInvoke(this, as<DeclRefExpr>(invoke->functionExpr)))
-        return false;
-
-    getSink()->diagnose(
-        Diagnostics::DirectStructuralRayTracingStageInvoke{.location = invoke->functionExpr->loc});
-    return true;
 }
 
 } // namespace Slang
