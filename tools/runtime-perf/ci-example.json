@@ -1,0 +1,17 @@
+{
+  "backend": "vulkan",
+  "adapter": 0,
+  "cases": "all",
+  "complexity": 4,
+  "samples": 10,
+  "max_samples": 30,
+  "warmup": 5,
+  "target_ms": 10.0,
+  "max_spread": 0.05,
+  "strict_phases": false,
+  "max_elements": 4194304,
+  "max_batch": 128,
+  "timeout": 300,
+  "allow_unsupported": false,
+  "allow_unstable": false
+}

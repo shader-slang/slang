@@ -94,6 +94,9 @@ class WorkloadSpec:
     api_cmd: str = None
     api_root: str = None
     api_flags: list = field(default_factory=list)
+    # Prototype paired runtime cases are available through --only without
+    # silently extending the established compile-only nightly corpus.
+    opt_in: bool = False
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -920,6 +923,12 @@ WORKLOADS = [
         sweep_sizes=[100, 200, 400, 800],
     ),
 ]
+
+from . import runtime_workloads
+
+for _paired in runtime_workloads.compile_specs(WorkloadSpec):
+    _paired.opt_in = True
+    WORKLOADS.append(_paired)
 
 BY_NAME = {w.name: w for w in WORKLOADS}
 
