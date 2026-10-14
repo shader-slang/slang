@@ -71,21 +71,21 @@ State useWhole(State s)
     return r;
 }
 
-// A dynamic index can read any element of `unused`, so the whole array would have
-// to be passed. That is most of `State`, so the parameter is left alone.
-// CUDA: readDynamic{{[_0-9]*}}(State{{[_0-9]*}} * s{{[_0-9]*}}, uint i
+// A dynamic index can read any element of `unused`, so the whole array is passed.
+// Together with `a` that is still smaller than `State`, so the parameter is promoted.
+// CUDA: readDynamic{{[_0-9]*}}(uint s_a{{[_0-9]*}}, FixedArray<uint, 64> {{ *}}* s_unused{{[_0-9]*}}, uint i
 [noinline]
 uint readDynamic(State s, uint i)
 {
     return s.unused[i] + s.a;
 }
 
-// Small aggregates are cheap to copy and are left alone.
+// A callee that reads every field would not pass fewer bytes, so it is left alone.
 // CUDA: readSmall{{[_0-9]*}}(Small{{[_0-9]*}} * s
 [noinline]
 uint readSmall(Small s)
 {
-    return s.x;
+    return s.x + s.y;
 }
 
 // A parameter that is never read is removed.
@@ -129,7 +129,7 @@ void computeMain()
     output[6] = readDynamic(original, inputs[3] - 13);
 
     Small small = { inputs[0], inputs[1] };
-    // BUF-NEXT: 3
+    // BUF-NEXT: 8
     output[7] = readSmall(small);
     // BUF-NEXT: 42
     output[8] = ignoreState(original, 42);

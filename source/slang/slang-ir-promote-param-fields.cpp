@@ -43,18 +43,6 @@ struct PromoteParamFieldsContext
     TargetRequest* targetReq;
     IRBuilder builder;
 
-    // Aggregates smaller than this are cheap enough to copy that splitting them
-    // is not worth the larger parameter list.
-    static const IRIntegerValue kMinParamSize = 64;
-
-    // Only promote a parameter when the fields that are read add up to at most
-    // half of the aggregate, so the promotion clearly reduces the amount of
-    // thread-local state.
-    static const IRIntegerValue kMaxPromotedSizeDivisor = 2;
-
-    // Do not split one parameter into more than this many parameters.
-    static const Index kMaxPromotedParamsPerParam = 16;
-
     PromoteParamFieldsContext(IRModule* module, TargetRequest* targetReq)
         : module(module), targetReq(targetReq), builder(module)
     {
@@ -314,14 +302,11 @@ struct PromoteParamFieldsContext
         return true;
     }
 
-    // Returns true if passing the promoted fields instead of the whole aggregate
-    // is worth it: the aggregate is large, the promoted fields are a small part
-    // of it, and the parameter list stays reasonably short.
-    bool isPromotionProfitable(ParamPlan& plan, IRIntegerValue paramSize)
+    // Returns true if the promoted fields take strictly fewer bytes than the
+    // aggregate. Promotion then never makes a call copy more data than it does
+    // today, so we do not need any tuned size threshold to decide when it pays off.
+    bool passesFewerBytes(ParamPlan& plan, IRIntegerValue paramSize)
     {
-        if (plan.promoted.getCount() > kMaxPromotedParamsPerParam)
-            return false;
-
         IRIntegerValue promotedSize = 0;
         for (auto nodeIndex : plan.promoted)
         {
@@ -330,7 +315,7 @@ struct PromoteParamFieldsContext
                 return false;
             promotedSize += size;
         }
-        return promotedSize * kMaxPromotedSizeDivisor <= paramSize;
+        return promotedSize < paramSize;
     }
 
     // Decide whether `param` should be promoted, and if so fill in `outPlan`.
@@ -343,7 +328,7 @@ struct PromoteParamFieldsContext
             return false;
 
         auto paramSize = getSize(paramType);
-        if (paramSize < kMinParamSize)
+        if (paramSize < 0)
             return false;
 
         outPlan.param = param;
@@ -361,7 +346,7 @@ struct PromoteParamFieldsContext
             return false;
 
         collectPromotedNodes(outPlan.nodes, 0, outPlan.promoted);
-        return isPromotionProfitable(outPlan, paramSize);
+        return passesFewerBytes(outPlan, paramSize);
     }
 
     // Emit the value at `path` within the aggregate value `arg`.
