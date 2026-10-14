@@ -2,7 +2,7 @@
 // forwarded to a mode that only reads, including `__ref_readonly`, but not to one that writes.
 // A `__ref` parameter may be forwarded to any mode.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 void fIn(int v) {}
 void fInOut(inout int v) {}

@@ -1989,6 +1989,16 @@ Modifier* SemanticsVisitor::checkModifier(
             }
             return m;
         }
+
+        // Semantic checking does not yet report reads of a `__ref_writeonly` parameter, so user
+        // code opts in to the modifier as an experimental feature until it does.
+        if (as<WriteOnlyModifier>(m) && !ignoreUnallowedModifier &&
+            !getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
+            !isFromCoreModule(decl))
+        {
+            getSink()->diagnose(
+                Diagnostics::RefWriteonlyRequiresExperimentalFeature{.modifier = m});
+        }
     }
 
     if (as<ConstExprModifier>(m))

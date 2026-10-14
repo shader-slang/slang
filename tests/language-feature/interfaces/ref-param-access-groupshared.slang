@@ -1,7 +1,7 @@
 // A `groupshared` array and its elements are memory locations in the Workgroup storage class,
 // so they can be passed to `__ref_readonly` and `__ref_writeonly` parameters.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 // CHECK: OpTypePointer Workgroup
 

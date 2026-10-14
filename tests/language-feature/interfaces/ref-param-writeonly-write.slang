@@ -1,8 +1,8 @@
 // The callee can write through a `__ref_writeonly` parameter, including an array element and
 // a forwarded `__ref_writeonly` argument, and the caller sees the writes.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -experimental-feature
 
 void store(__ref_writeonly int x, int value)
 {

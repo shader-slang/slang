@@ -1,7 +1,7 @@
 // A `__ref_writeonly` parameter has the `RefWriteOnly` passing mode, so it matches only a
 // `__ref_writeonly` requirement parameter and not a plain `__ref` one, in either direction.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 interface IWriteOnly
 {

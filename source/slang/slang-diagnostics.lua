@@ -2384,6 +2384,13 @@ warning(
     span { loc = "expr:Expr", message = "__apply expressions are rejected unless '-experimental-feature' is enabled." }
 )
 
+err(
+    "ref-writeonly-requires-experimental-feature",
+    30133,
+    "__ref_writeonly is experimental and requires '-experimental-feature'",
+    span { loc = "modifier:Modifier", message = "reads of a '__ref_writeonly' parameter are not yet diagnosed, so it is rejected unless '-experimental-feature' is enabled." }
+)
+
 -- type pack diagnostics
 
 err(

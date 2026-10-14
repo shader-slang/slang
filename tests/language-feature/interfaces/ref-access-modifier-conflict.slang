@@ -1,7 +1,7 @@
 // A parameter has at most one reference access, so `__ref_readonly` and `__ref_writeonly`
 // conflict with each other, with `__ref`, with themselves, and with `const` on a `__ref`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 void readOnlyThenRef(__ref_readonly __ref int x) {}
 //CHECK:                            ^^^^^ E31202
