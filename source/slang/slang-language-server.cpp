@@ -2549,8 +2549,11 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
         String str;
         if (SLANG_SUCCEEDED(converter.convert(value, &str)))
         {
-            WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
-            if (str == "standard")
+            // `standard` and `vfx` select that flavor. An empty value selects `standard`: there is
+            // no unset flavor, and `standard` is the default the VS Code extension declares for
+            // `slang.workspaceFlavor`. Any other value is logged and the previous flavor is kept.
+            WorkspaceFlavor flavor;
+            if (str.getLength() == 0 || str == "standard")
             {
                 flavor = WorkspaceFlavor::Standard;
             }
@@ -2558,8 +2561,27 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
             {
                 flavor = WorkspaceFlavor::VFX;
             }
+            else
+            {
+                logMessage(
+                    2 /* warning */,
+                    String("slang.workspaceFlavor: unknown flavor '") + str +
+                        "'; keeping the previous setting.");
+                return;
+            }
 
-            m_core.m_workspace->workspaceFlavor = flavor;
+            if (m_core.m_workspace->updateWorkspaceFlavor(flavor))
+            {
+                // The flavor changes how every open document compiles, and the next
+                // publishDiagnostics() starts from a new workspace version that only holds the
+                // modules it loads itself. Queue the open documents so that it recompiles them
+                // under the new flavor instead of clearing their published diagnostics.
+                for (const auto& [path, _] : m_core.m_workspace->openedDocuments)
+                {
+                    m_pendingModulesToUpdateDiagnostics.add(path);
+                }
+                sendRefreshRequests(m_connection);
+            }
         }
     }
 }
