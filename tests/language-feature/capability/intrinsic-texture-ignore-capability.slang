@@ -50,18 +50,19 @@ uniform usampler2DArray uniform_usampler2DArray;
 uniform usamplerCubeArray uniform_usamplerCubeArray;
 uniform usamplerBuffer uniform_usamplerBuffer;
 
-__generic<T : ITexelData, let sampleCount:int, let format:int>
-bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
-    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
-    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
-    , _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
-    , _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
-    , _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
-    , _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
-    , _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
-    , _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
+__generic<Texel : ITexelElement, let sampleCount:int, let format:int>
+bool textureFuncs( _Texture<Texel, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<Texel, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<Texel, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<Texel, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<Texel, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<Texel, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<Texel, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
 )
 {
+    typealias T = Texel.DataType;
     typealias gvec4 = vector<T.Element,4>;
 
     const ivec2 ivec2_0 = ivec2(0);
@@ -359,18 +360,19 @@ bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gs
         ;
 }
 
-__generic<T : ITexelData, let sampleCount:int, let format:int>
-bool itextureFuncs(_Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
-    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
-    , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
-    , _Texture<T, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
-    , _Texture<T, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
-    , _Texture<T, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
-    , _Texture<T, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
-    , _Texture<T, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
-    , _Texture<T, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
+__generic<Texel : ITexelElement, let sampleCount:int, let format:int>
+bool itextureFuncs(_Texture<Texel, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<Texel, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<Texel, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<Texel, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<Texel, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<Texel, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<Texel, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
 )
 {
+    typealias T = Texel.DataType;
     typealias gvec4 = vector<T.Element, 4>;
 
     const ivec2 ivec2_0 = ivec2(0);

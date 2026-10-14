@@ -1957,7 +1957,7 @@ FIDDLE() namespace Slang
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    /// The role of a builtin type member or interface requirement known to the compiler.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -2001,6 +2001,8 @@ FIDDLE() namespace Slang
         BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
                                    ///< conformance (witness that the backward-callable context type
                                    ///< conforms to `IBwdCallable`)
+
+        TextureElementType, ///< The `_Texture.T` alias for the loaded and stored texel data type.
     };
 
     enum class FunctionDifferentiableLevel

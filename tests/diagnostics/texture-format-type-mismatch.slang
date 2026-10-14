@@ -19,9 +19,9 @@ void computeMain(uint2 tid : SV_DispatchThreadID)
 {
     takesFormatted(plainTexture);
 //CHECK:           ^^^^^^^^^^^^ type mismatch in expression
-//CHECK:           ^^^^^^^^^^^^ expected an expression of type 'RWTexture2D<vector<float,4>>', got 'RWTexture2D<vector<float,4>>'
+//CHECK:           ^^^^^^^^^^^^ expected an expression of type 'RWTexture2D<RGBA16F>', got 'RWTexture2D<vector<float,4>>'
 
     takesPlain(formattedTexture);
 //CHECK:       ^^^^^^^^^^^^^^^^ type mismatch in expression
-//CHECK:       ^^^^^^^^^^^^^^^^ expected an expression of type 'RWTexture2D<vector<float,4>>', got 'RWTexture2D<vector<float,4>>'
+//CHECK:       ^^^^^^^^^^^^^^^^ expected an expression of type 'RWTexture2D<vector<float,4>>', got 'RWTexture2D<RGBA16F>'
 }

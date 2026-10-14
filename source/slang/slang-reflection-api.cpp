@@ -1318,6 +1318,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     if (auto textureType = as<TextureTypeBase>(type))
     {
+        SLANG_AST_BUILDER_RAII(textureType->getASTBuilderForReflection());
         return convert(textureType->getElementType());
     }
 
