@@ -58,9 +58,10 @@ ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode def
 
 bool isGlobalDecl(Decl* decl);
 
-/// Return true if `decl` is a builtin type declared with `__magic_type` or `__intrinsic_type`,
-/// whose meaning comes from the compiler rather than from its Slang declaration. Callers use it to
-/// keep such types out of handling meant for ordinary user types, and each caller states why.
+/// Return true if `decl` carries `__magic_type` (`MagicTypeModifier`) or `__intrinsic_type`
+/// (`IntrinsicTypeModifier`), i.e. a type the compiler gives meaning to directly. A
+/// `__builtin_type` scalar such as `float` is not included, nor is a `[require]` type a standard
+/// module declares in plain Slang.
 bool isMagicOrIntrinsicTypeDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -4644,8 +4645,9 @@ bool isOpaqueHandleType(Type* type);
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
 /// Follow `decl`'s capability-provenance chain down to the use that introduced a requirement not
-/// implying `setToFind`, taking the first such entry at each level. If no entry of `decl` fails,
-/// the result is `decl` itself at `decl->loc`.
+/// implying `setToFind`, taking the first such entry at each level. The result may be a non-`Decl`
+/// node such as a `__target_switch` statement. If no entry of `decl` fails, the result is `decl`
+/// itself at `decl->loc`.
 ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind);
 
 /// Report `provNode` with a "see using of" note at its use site and, when it is a declaration,

@@ -1652,23 +1652,23 @@ struct GenericStructTypeUse
 // `ConstantBuffer<Foo<int>>` are all found. Results are appended to `outUses` and
 // `visited` guards against cycles in the `Val` graph.
 //
-// General capability inference already contributes a struct named by a parameter's
-// or return type itself, but a struct's requirements do not include those of its
-// fields, so a wrapper such as `struct Field<T> { Foo<T> f; }` used as `Field<int>`
-// reaches `Foo` only through this walk. The provenance chain of an incompatible entry
-// point also names a single use, so collecting every use here lets `validateEntryPoint`
-// report each contributing struct at its own use site.
+// General capability inference contributes a struct named by a parameter's own type, but it
+// never walks the return type, and a struct's requirements do not include those of its fields.
+// So a struct named only by the return type (`Foo<int> main()`) or reached only through a
+// wrapper's field (`struct Field<T> { Foo<T> f; }` used as `Field<int>`) reaches the entry point
+// only through this walk. The provenance chain of an incompatible entry point also names a single
+// use, so collecting every use here lets `validateEntryPoint` report each contributing struct at
+// its own use site.
 //
-// Only generic specializations are collected; a field-only non-generic struct
-// (`struct W { Bar b; }`) or member type (`struct W { Outer<3>.In f; }`) is outside
-// this check. The result is joined non-destructively, so a body with requirements of
-// its own can hide a field-only requirement.
+// Only generic struct specializations are collected, the spelling reported in
+// shader-slang/slang#9489. The same return-type and field-only gaps exist for a non-generic
+// struct (`Bar main()`, `struct W { Bar b; }`), a member type (`Outer<3>.In`) and an enum, and
+// this walk does not cover them.
 //
-// Builtin magic/intrinsic structs stay excluded: some (e.g. `LineStream<T>`,
-// `OutputPatch<T,N>`) have dedicated signature diagnostics, and the standard-library
-// functions that use the others do not redeclare their requirements. Builtin wrappers
-// are still recursed *through* so that a user-defined `Foo<int>` nested inside them is
-// found.
+// Builtin magic/intrinsic structs are excluded to match general inference (see
+// `isMagicOrIntrinsicTypeDecl`); those that appear in signatures, such as `LineStream<T>` and
+// `OutputPatch<T,N>`, already get more specific stage diagnostics. Builtin wrappers are still
+// recursed *through* so that a user-defined `Foo<int>` nested inside them is found.
 static void collectGenericStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,
@@ -1985,11 +1985,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // The entry point's effective requirements, seeded from the decl's inferred set and augmented
-    // at this boundary with two contributions the per-decl capability walk does not fully record:
-    // the SV_ semantic-accessor requirements (walk just below) and the generic structs reachable
-    // from the signature, including through fields (`signatureStructUses` loop further below).
-    // Both are gathered into this local set — matching the existing generic-struct handling —
-    // because the accessor match is resolved here using the entry-point stage, and the decl's own
+    // at this boundary with two contributions general inference does not make: the SV_
+    // semantic-accessor requirements (walk just below), and the requirements of generic structs
+    // that the signature reaches only through its return type or a field (`signatureStructUses`
+    // loop further below). Both are gathered into this local set because the accessor match is
+    // resolved here using the entry-point stage, and the decl's own
     // `inferredCapabilityRequirements` was already frozen in the earlier CapabilityChecked phase.
     CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
 
@@ -2529,7 +2529,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             signatureStructUses);
     }
     // Every collected use carries a non-empty requirement (filtered in the
-    // collector), so this join is unconditional.
+    // collector), so this join is unconditional. The join is non-destructive: it
+    // narrows the targets the set already lists but drops none that the struct does
+    // not list. With a `[require(cpp)] struct Foo<T>` reached only through
+    // `Field<int>`, `void main(Field<int> w) { buffer[0] = 1; }` therefore still
+    // compiles for SPIR-V, because the body already put SPIR-V in the set.
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
@@ -2562,10 +2566,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            // The provenance chain names a single use and cannot see a struct reached
-            // only through a field, so we also point at every signature struct whose own
-            // requirement is incompatible with the target. When the chain ends at one of
-            // exactly those structs, we report it once, at its signature use site.
+            // The provenance chain names a single use and cannot see a struct reached only
+            // through the return type or a field, so we also point at every signature struct
+            // whose own requirement is incompatible with the target. When the chain ends at one
+            // of exactly those structs, we report that struct once, at its signature use site,
+            // even when the chain reached it through the body.
             List<GenericStructTypeUse> incompatibleStructUses;
             for (auto& use : signatureStructUses)
             {
@@ -2582,24 +2587,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
 
             for (auto& use : incompatibleStructUses)
-            {
-                maybeDiagnose(
-                    sink,
+                diagnoseMissingCapabilityProvenance(
                     linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeUsingOf{.decl = use.structDecl, .location = use.useLoc});
-                maybeDiagnose(
                     sink,
-                    linkage->m_optionSet,
-                    DiagnosticCategory::Capability,
-                    Diagnostics::SeeDefinitionOf{.decl = use.structDecl});
-                if (auto requireAttr = use.structDecl->findModifier<RequireCapabilityAttribute>())
-                    maybeDiagnose(
-                        sink,
-                        linkage->m_optionSet,
-                        DiagnosticCategory::Capability,
-                        Diagnostics::SeeDeclarationOfModifier{.modifier = requireAttr});
-            }
+                    ProvenenceNodeWithLoc{use.structDecl, use.useLoc});
         }
         else
         {

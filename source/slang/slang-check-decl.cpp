@@ -21850,24 +21850,28 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
-    // The base walk contributes a decl only through `visitDirectDeclRef`. A specialized generic
-    // such as `Foo<3>` (`GenericAppDeclRef`) and a member of one such as `Outer<3>.In`
-    // (`MemberDeclRef`) hold their decl as a plain operand, which `visitVal` skips, so without
-    // these overrides a `[require]` on a generic user type would be enforced or dropped depending
-    // on spelling. We override them here rather than in the base walk so that the walk shared with
-    // `CollectReferencedDeclsVisitor` (the generic-parameter reference checks) is unchanged. A
-    // `LookupDeclRef` (`T.A`) names an interface requirement through a witness, whose capabilities
-    // are checked at the conformance, so it is left alone. `Foo<3>.make()` is a `MemberDeclRef` to
-    // a function, which contributes nothing itself; `Foo` is reached through its parent
-    // `GenericAppDeclRef`.
+    // Within a `Val`, the base walk contributes a decl only through `visitDirectDeclRef`. A
+    // specialized generic such as `Foo<3>` (`GenericAppDeclRef`) and a member of one such as
+    // `Outer<3>.In` (`MemberDeclRef`) hold their decl as a plain operand, which `visitVal` skips,
+    // so without these overrides a `[require]` on a generic type would be enforced or dropped
+    // depending on spelling. We override them here rather than in the base walk so that the walk
+    // shared with `CollectReferencedDeclsVisitor` (the generic-parameter reference checks) is
+    // unchanged. A `LookupDeclRef` (`T.A`) names an interface requirement through a witness, whose
+    // capabilities are checked at the conformance, so it is left alone.
     void visitGenericAppDeclRef(GenericAppDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
     void visitMemberDeclRef(MemberDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
 
     // Contribute the requirements of the type declaration that `declRef` names, once per
-    // `declRef`, then continue the usual operand walk. Only a user `AggTypeDecl` (struct, enum,
-    // interface, ...) contributes. Member functions such as `make` in `G<3>.make()` and
-    // magic/intrinsic types such as `CoopVec<T, N>` do not, because the standard-library
-    // functions that use them do not redeclare their requirements.
+    // `declRef`, then continue the usual operand walk. Every `AggTypeDecl` (struct, enum,
+    // interface, ...) contributes except a magic/intrinsic one such as `CoopVec<T, N>`, because
+    // the core-module functions that use those do not redeclare their requirements; a `[require]`
+    // generic type declared in plain Slang, including in a standard module, contributes.
+    //
+    // A member function is not a type declaration and contributes nothing here, because the
+    // core-module functions that call such members do not redeclare their requirements either.
+    // For `G<3>.make()`, `G` is still reached through the parent `GenericAppDeclRef`, but a
+    // `[require]` on `make` itself is not: a static member access never reaches
+    // `processDeclModifiers`, while the non-generic `S.make()` is a `DirectDeclRef` to `make`.
     void referenceAggTypeOfDeclRef(DeclRefBase* declRef)
     {
         // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
@@ -21876,11 +21880,16 @@ struct CapabilityDeclReferenceVisitor
         if (aggTypeDecl && !isMagicOrIntrinsicTypeDecl(aggTypeDecl) &&
             !Base::visitedVals.contains(declRef))
         {
-            // A type's own `CapabilityChecked` step only collects its declared requirements and
-            // never runs this walk, so no walk can be nested inside it.
+            // This walk runs only within some declaration's `CapabilityChecked` step, after the
+            // module checker has taken every module-level declaration through the earlier states,
+            // and a type's own `CapabilityChecked` step (`visitContainerDecl`) never runs this
+            // walk, so no check of the type is in progress here. `_propagateRequirement` keeps its
+            // cycle skip for recursive references such as a function that calls itself.
             SLANG_ASSERT(!aggTypeDecl->checkState.isBeingChecked());
             // `processReferencedDecl` reads the requirement before `_propagateRequirement` checks
-            // the decl, so a type declared after this use must be checked first.
+            // the decl, so a type declared after this use must be checked first. The
+            // `visitDirectDeclRef` path has the same ordering, so a non-generic type reached only
+            // through it before its declaration, as in `typeOnly<Late>()`, is still dropped.
             this->ensureDecl(aggTypeDecl, DeclCheckState::CapabilityChecked);
             processReferencedDecl(aggTypeDecl);
         }
