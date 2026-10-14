@@ -1,17 +1,22 @@
-// A `[require(...)]` on a user-defined generic struct must be enforced wherever the
-// struct is used, not only in entry-point signatures: the non-generic spelling of
-// each use below has always reported E36107.
+// A `[require(...)]` on a user-defined generic type must be enforced wherever the
+// type is used, not only in entry-point signatures, exactly as for the non-generic
+// spelling. The `*NG` cases are the non-generic twins of the rows above them and
+// must report the same diagnostics.
 //
 // Regression test for https://github.com/shader-slang/slang/issues/13579.
 //
 // Each entry point uses its own diag tag because only the compiled entry point's
 // diagnostics fire, and every invocation is exhaustive so an unexpected extra
-// diagnostic fails the test.
+// diagnostic fails the test. A value of a requiring type also contributes the
+// requirement through its own type, so the caret of each "see using of" note is
+// what pins the path under test: a regression there moves the note rather than
+// removing the error.
 
 // Field read of a `uniform` of the generic struct type.
 //DIAGNOSTIC_TEST:SIMPLE(diag=FIELD): -target hlsl -profile sm_6_5 -entry mainField -stage compute -no-codegen
 // The issue's reproducer: the value is only passed to a generic helper.
 //DIAGNOSTIC_TEST:SIMPLE(diag=GENERIC): -target hlsl -profile sm_6_5 -entry mainGenericHelper -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=GENERICNG): -target hlsl -profile sm_6_5 -entry mainGenericHelperNG -stage compute -no-codegen
 // A local variable of the generic struct type, never constructed.
 //DIAGNOSTIC_TEST:SIMPLE(diag=LOCAL): -target hlsl -profile sm_6_5 -entry mainLocal -stage compute -no-codegen
 // Element read through a builtin generic resource wrapping the struct.
@@ -28,6 +33,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target hlsl -profile sm_6_5 -entry mainStatic -stage compute -no-codegen
 // The struct is named only as a generic argument, before its declaration in the file.
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE): -target hlsl -profile sm_6_5 -entry mainLate -stage compute -no-codegen
+// A requiring generic enum, passed to a generic helper.
+//DIAGNOSTIC_TEST:SIMPLE(diag=ENUM): -target hlsl -profile sm_6_5 -entry mainEnum -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=ENUMNG): -target hlsl -profile sm_6_5 -entry mainEnumNG -stage compute -no-codegen
+// A case of a requiring enum nested in a generic parent (`Outer<3>.E.A`).
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTEDENUM): -target hlsl -profile sm_6_5 -entry mainNestedEnum -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTEDENUMNG): -target hlsl -profile sm_6_5 -entry mainNestedEnumNG -stage compute -no-codegen
 // Positive case: every entry point compiles for the target the struct requires.
 //DIAGNOSTIC_TEST:SIMPLE(diag=METAL): -target metal -no-codegen
 
@@ -42,12 +53,39 @@ struct MetalOnly<let N : int>
     }
 }
 
+[require(metal)]
+struct MetalOnlyNG
+{
+    uint value;
+}
+
+[require(metal)]
+enum GenericEnum<let N : int>
+{
+    A,
+    B
+}
+
+[require(metal)]
+enum PlainEnum
+{
+    A,
+    B
+}
+
 struct Outer<let N : int>
 {
     [require(metal)]
     struct In
     {
         uint value;
+    }
+
+    [require(metal)]
+    enum E
+    {
+        A,
+        B
     }
 }
 
@@ -58,9 +96,19 @@ struct Holder
     {
         uint value;
     }
+
+    [require(metal)]
+    enum E
+    {
+        A,
+        B
+    }
 }
 
 uniform MetalOnly<3> gInput;
+uniform MetalOnlyNG gInputNG;
+uniform GenericEnum<3> gEnum;
+uniform PlainEnum gEnumNG;
 uniform Outer<3>.In gNested;
 uniform Holder.In<3> gNestedGeneric;
 StructuredBuffer<MetalOnly<3> > gBuffer;
@@ -103,6 +151,20 @@ void mainGenericHelper()
 }
 //GENERIC: see definition of 'MetalOnly'
 //GENERIC: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainGenericHelperNG()
+/*GENERICNG:
+     ^^^^^^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^^^^^^ entrypoint 'mainGenericHelperNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = read(gInputNG);
+//GENERICNG:     ^^^^ see using of 'MetalOnlyNG'
+}
+//GENERICNG: see definition of 'MetalOnlyNG'
+//GENERICNG: see declaration of 'require'
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -210,6 +272,62 @@ void mainLate()
 }
 //LATE: see definition of 'DeclaredLater'
 //LATE: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainEnum()
+/*ENUM:
+     ^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^ entrypoint 'mainEnum' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = read(gEnum);
+//ENUM:          ^^^^ see using of 'GenericEnum'
+}
+//ENUM: see definition of 'GenericEnum'
+//ENUM: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainEnumNG()
+/*ENUMNG:
+     ^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^ entrypoint 'mainEnumNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = read(gEnumNG);
+//ENUMNG:        ^^^^ see using of 'PlainEnum'
+}
+//ENUMNG: see definition of 'PlainEnum'
+//ENUMNG: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainNestedEnum()
+/*NESTEDENUM:
+     ^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^ entrypoint 'mainNestedEnum' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = (uint)Outer<3>.E.A;
+//NESTEDENUM:                     ^ see using of 'E'
+}
+//NESTEDENUM: see definition of 'E'
+//NESTEDENUM: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainNestedEnumNG()
+/*NESTEDENUMNG:
+     ^^^^^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^^^^^ entrypoint 'mainNestedEnumNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = (uint)Holder.E.A;
+//NESTEDENUMNG:                 ^ see using of 'E'
+}
+//NESTEDENUMNG: see definition of 'E'
+//NESTEDENUMNG: see declaration of 'require'
 
 [require(metal)]
 struct DeclaredLater<let N : int>

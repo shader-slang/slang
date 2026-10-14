@@ -21850,26 +21850,42 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
-    // A specialized generic such as `Foo<3>` (`GenericAppDeclRef`) or a member of one such
-    // as `Outer<3>.In` (`MemberDeclRef`) holds the referenced decl as a plain operand
-    // rather than a `DirectDeclRef`, so the base walk never references it and a
-    // `[require]` on that struct would be dropped. Visiting at the decl-ref level covers
-    // both type uses and static member accesses like `Foo<3>.make()`. Builtin
-    // magic/intrinsic types are excluded: core-module APIs taking e.g. `CoopVec<T,N>` do
-    // not redeclare those types' requirements, and inferring them would reject the core
-    // module itself.
-    void visitGenericAppDeclRef(GenericAppDeclRef* declRef) { referenceStructOfDeclRef(declRef); }
-    void visitMemberDeclRef(MemberDeclRef* declRef) { referenceStructOfDeclRef(declRef); }
-    void referenceStructOfDeclRef(DeclRefBase* declRef)
+    // The base walk contributes a decl only through `visitDirectDeclRef`. A specialized generic
+    // such as `Foo<3>` (`GenericAppDeclRef`) and a member of one such as `Outer<3>.In`
+    // (`MemberDeclRef`) hold their decl as a plain operand, which `visitVal` skips, so without
+    // these overrides a `[require]` on a generic user type would be enforced or dropped depending
+    // on spelling. We override them here rather than in the base walk so that the walk shared with
+    // `CollectReferencedDeclsVisitor` (the generic-parameter reference checks) is unchanged. A
+    // `LookupDeclRef` (`T.A`) names an interface requirement through a witness, whose capabilities
+    // are checked at the conformance, so it is left alone. `Foo<3>.make()` is a `MemberDeclRef` to
+    // a function, which contributes nothing itself; `Foo` is reached through its parent
+    // `GenericAppDeclRef`.
+    void visitGenericAppDeclRef(GenericAppDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
+    void visitMemberDeclRef(MemberDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
+
+    // Contribute the requirements of the type declaration that `declRef` names, once per
+    // `declRef`, then continue the usual operand walk. Only a non-builtin `AggTypeDecl` (struct,
+    // enum, interface, ...) contributes. A member function such as `make` in `G<3>.make()` does
+    // not: contributing every member decl rejects core-module functions that do not redeclare
+    // their callees' requirements. Magic/intrinsic types such as `CoopVec<T, N>` are skipped for
+    // the same reason. Today every requiring generic type in the core module is one of these; a
+    // plain `[require]` generic type, e.g. in the `neural` module, propagates like a user type.
+    // Whether to propagate the builtin ones too is tracked in shader-slang/slang#13579.
+    void referenceAggTypeOfDeclRef(DeclRefBase* declRef)
     {
-        auto structDecl = as<StructDecl>(declRef->getDecl());
-        if (structDecl && !isMagicOrIntrinsicTypeDecl(structDecl) &&
-            !Base::visitedVals.contains(declRef) && !structDecl->checkState.isBeingChecked())
+        // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
+        // contributes nothing.
+        auto aggTypeDecl = as<AggTypeDecl>(declRef->getDecl());
+        if (aggTypeDecl && !isMagicOrIntrinsicTypeDecl(aggTypeDecl) &&
+            !Base::visitedVals.contains(declRef))
         {
-            // `processReferencedDecl` reads the requirement before `_propagateRequirement`
-            // checks the decl, so a struct declared after this use must be checked first.
-            this->ensureDecl(structDecl, DeclCheckState::CapabilityChecked);
-            processReferencedDecl(structDecl);
+            // A type's own `CapabilityChecked` step only collects its declared requirements and
+            // never runs this walk, so no walk can be nested inside it.
+            SLANG_ASSERT(!aggTypeDecl->checkState.isBeingChecked());
+            // `processReferencedDecl` reads the requirement before `_propagateRequirement` checks
+            // the decl, so a type declared after this use must be checked first.
+            this->ensureDecl(aggTypeDecl, DeclCheckState::CapabilityChecked);
+            processReferencedDecl(aggTypeDecl);
         }
         Base::visitVal(declRef);
     }
