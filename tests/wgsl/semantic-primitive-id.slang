@@ -5,6 +5,7 @@
 //TEST:SIMPLE(filecheck=PARAM): -target wgsl -stage fragment -entry paramMain
 //TEST:SIMPLE(filecheck=FIELD): -target wgsl -stage fragment -entry fieldMain
 //TEST:SIMPLE(filecheck=NESTED): -target wgsl -stage fragment -entry nestedMain
+//TEST:SIMPLE(filecheck=GLOBAL): -target wgsl -stage fragment -entry globalMain
 //TEST:SIMPLE(filecheck=INT): -target wgsl -stage fragment -entry intMain
 //TEST:SIMPLE(filecheck=NONE): -target wgsl -stage fragment -entry noneMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=RTAI): -target wgsl -stage fragment -entry renderTargetArrayIndexMain
@@ -31,7 +32,8 @@ float4 fieldMain(FragmentInput input) : SV_Target0
 }
 
 // A nested struct field is flattened by `flattenInputParameters` instead of being hoisted to an
-// entry-point parameter like a plain field, so it reaches the builtin through a different path.
+// entry-point parameter like a plain field, so `ensureStructHasUserSemantic<VaryingInput>` assigns
+// its builtin before `legalizeSystemValue` sees the struct key.
 struct InnerInput
 {
     uint primitive : SV_PrimitiveID;
@@ -49,6 +51,16 @@ struct NestedInput
 float4 nestedMain(NestedInput input) : SV_Target0
 {
     return float4(input.inner.color + float(input.inner.primitive));
+}
+
+// A global `in` varying is how GLSL's `gl_PrimitiveID` reaches the WGSL target.
+in uint globalPrimitive : SV_PrimitiveID;
+
+//GLOBAL: enable primitive_index;
+//GLOBAL: @builtin(primitive_index) {{.*}}: u32
+float4 globalMain() : SV_Target0
+{
+    return float4(float(globalPrimitive));
 }
 
 //INT: enable primitive_index;

@@ -1,16 +1,17 @@
 // WGSL's `@builtin(primitive_index)` is only a fragment-stage input, so the WGSL legalizer rejects
-// `SV_PrimitiveID` everywhere else. The front end reports most of these uses first, but it does not
-// check the stage of a global `in` varying, and `-ignore-capabilities` silences its checks.
+// `SV_PrimitiveID` everywhere else with E30702. The front end reports most of these uses first, but
+// it does not check the stage of a global `in` varying, and `-ignore-capabilities` silences its
+// stage checks.
 // https://github.com/shader-slang/slang/issues/13617
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=GLOBAL): -target wgsl -stage vertex -entry globalInputVertexMain
 //DIAGNOSTIC_TEST:SIMPLE(diag=VSIN): -target wgsl -stage vertex -entry vertexInputMain -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=VSOUT): -target wgsl -stage vertex -entry vertexOutputMain -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=FSOUT): -target wgsl -stage fragment -entry fragmentOutputMain -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=OUTPARAM): -target wgsl -stage fragment -entry fragmentOutParamMain -ignore-capabilities
 
 // The legalized global carries no source location, so these annotations match by text only.
-//GLOBAL: error E55202
-//GLOBAL: system value semantic 'sv_primitiveid' is not supported for the current target.
+//GLOBAL: system value semantic 'sv_primitiveid' cannot be used as input in 'vertex' shader stage
 in uint globalPrimitive : SV_PrimitiveID;
 
 float4 globalInputVertexMain() : SV_Position
@@ -19,8 +20,7 @@ float4 globalInputVertexMain() : SV_Position
 }
 
 float4 vertexInputMain(uint primitive : SV_PrimitiveID) : SV_Position
-//VSIN:                     ^^^^^^^^^ error E55202
-//VSIN:                     ^^^^^^^^^ system value semantic 'sv_primitiveid' is not supported for the current target.
+//VSIN:                     ^^^^^^^^^ system value semantic 'sv_primitiveid' cannot be used as input in 'vertex' shader stage
 {
     return float4(float(primitive));
 }
@@ -28,8 +28,7 @@ float4 vertexInputMain(uint primitive : SV_PrimitiveID) : SV_Position
 // A field of a legalized output struct reports its error at the struct's name.
 struct VertexOutput
 /*VSOUT:
-       ^^^^^^^^^^^^ error E55202
-       ^^^^^^^^^^^^ system value semantic 'sv_primitiveid' is not supported for the current target.
+       ^^^^^^^^^^^^ system value semantic 'sv_primitiveid' cannot be used as output in 'vertex' shader stage
 */
 {
     float4 position : SV_Position;
@@ -46,8 +45,7 @@ VertexOutput vertexOutputMain()
 
 struct FragmentOutput
 /*FSOUT:
-       ^^^^^^^^^^^^^^ error E55202
-       ^^^^^^^^^^^^^^ system value semantic 'sv_primitiveid' is not supported for the current target.
+       ^^^^^^^^^^^^^^ system value semantic 'sv_primitiveid' cannot be used as output in 'pixel' shader stage
 */
 {
     float4 color : SV_Target0;
@@ -60,4 +58,11 @@ FragmentOutput fragmentOutputMain(float4 position : SV_Position)
     output.color = position;
     output.primitive = 0;
     return output;
+}
+
+float4 fragmentOutParamMain(float4 position : SV_Position, out uint primitive : SV_PrimitiveID) : SV_Target0
+//OUTPARAM:                                                         ^^^^^^^^^ system value semantic 'sv_primitiveid' cannot be used as output in 'pixel' shader stage
+{
+    primitive = 0;
+    return position;
 }
