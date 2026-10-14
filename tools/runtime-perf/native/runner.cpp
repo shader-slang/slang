@@ -67,10 +67,10 @@ static double spread(const std::vector<double>& values)
 struct Options
 {
     std::string backend = "vulkan", caseName, directory;
-    uint32_t adapter = 0, complexity = 4, elements = 0, maxElements = 4194304;
+    uint32_t adapter = 0, complexity = 4, elements = 0, maxElements = 16777216;
     uint32_t samples = 10, maxSamples = 30, warmup = 5;
-    uint32_t batch = 0, maxBatch = 128;
-    double targetMs = 10.0, maxSpread = 0.05;
+    uint32_t batch = 0, maxBatch = 1024;
+    double targetMs = 25.0, maxSpread = 0.05;
     bool strictPhases = false;
 };
 

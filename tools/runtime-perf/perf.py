@@ -21,9 +21,9 @@ import bench
 from lib import manifest, runtime_workloads as workloads
 
 DEFAULTS = dict(backend="vulkan", adapter=0,
-                complexity=4, samples=10, max_samples=30, warmup=5, target_ms=10.0,
+                complexity=4, samples=10, max_samples=30, warmup=5, target_ms=25.0,
                 max_spread=0.05, strict_phases=False,
-                max_elements=4194304, elements=0, batch=0, max_batch=128, timeout=300,
+                max_elements=16777216, elements=0, batch=0, max_batch=1024, timeout=300,
                 cases="all", environment_id="", driver_id="", allow_unsupported=False,
                 allow_unstable=False, compile_samples=3)
 

@@ -141,19 +141,42 @@ timeouts apply to optional CLI compilation measurements.
 
 Calibration starts at 65,536 elements, doubles up to `max_elements`, then doubles
 the number of ordered executions per batch up to `max_batch`. Initial limits
-are 4,194,304 elements and 128 executions. Image width is 256 and height scales
+are 16,777,216 elements and 1,024 executions. Image width is 256 and height scales
 with element count. Each calibration step warms up and takes five pilot samples.
-It aims for at least 1.25 times `target_ms` and relative median absolute deviation
-(MAD/median) at or below `max_spread` for the GPU total.
+It aims for at least 1.25 times `target_ms` (25 ms by default) and relative
+median absolute deviation (MAD/median) at or below `max_spread` for the GPU total.
 
 Final measurement freezes those dimensions, warms up after CPU validation,
 and takes 10–30 samples by default. The run is valid only if the total median
-is at least 10 ms and the GPU total meets the 5% relative-MAD target. Individual
-GPU stage variability is reported, but does not gate calibration or success by
+is at least `target_ms` (25 ms by default) and the GPU total meets the 5%
+relative-MAD target. Individual GPU stage variability is reported, but does
+not gate calibration or success by
 default. This avoids increasing job sizes just to chase noisy phase timings
 on a laptop in active use. Hardware activity, thermal drift, or reaching the size limit can leave
 a run `unstable`; additional samples do not guarantee low variance. Calibration
 history, raw samples, phase variability, and selected dimensions are archived.
+
+### Sizing on fast GPUs
+
+The default limits leave room for calibration on fast GPUs without changing
+shader complexity. On a Windows RTX 4090 (driver 591.86, Slang 2026.17,
+complexity 4), 8,388,608 elements at batch 128 left 12 of 14 cases below
+10 ms on both Vulkan and D3D12. At 16,777,216 elements, all cases cleared
+10 ms, but a 25 ms target provides more duration margin.
+
+Calibration with that target selected 16,777,216 elements and batch 256 for
+all single-pass cases, and batch 128 for the image pipeline. Three complete
+runs per backend, with frozen dimensions and 30 samples per case, passed all
+84 case runs. The largest within-run relative MAD was 1.30% on Vulkan and
+0.10% on D3D12. The largest range of the three run medians, divided by their
+median, was 3.30% and 0.18%, respectively. These are local observations, not
+accuracy guarantees or regression thresholds.
+
+The 1,024-execution ceiling leaves calibration room beyond those measured
+sizes. An RTX 5090 CI runner must calibrate independently; its sizes and
+stability have not been measured here. Do not reuse the RTX 4090 calibration
+on another GPU. Larger batches remain serialized throughput measurements,
+and resource-array inputs still have their fixed small working set.
 
 `--max-spread 0.05` is a development starting point, not a guarantee of 5%
 accuracy or a regression threshold. MAD measures within-run dispersion; it
