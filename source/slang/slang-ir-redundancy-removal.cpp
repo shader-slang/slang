@@ -608,7 +608,7 @@ bool tryRemoveRedundantStore(
             if (load->getParent() == store->getParent())
             {
                 bool valueMayChange = false;
-                for (auto inst = load->next; inst; inst = inst->next)
+                for (auto inst = load->getNextInst(); inst; inst = inst->getNextInst())
                 {
                     if (inst == store)
                         break;
