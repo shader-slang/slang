@@ -208,22 +208,65 @@ compile-perf's summary/raw-sample statistics shape under `timers`, plus richer
 runtime metadata. Runtime bundles have a versioned envelope and must not be
 passed directly to the existing compile-only dashboard or trend script.
 
-Measured phases:
+Schema version 2 separates repeated execution samples from single host
+observations. Version 1 bundles and calibrations must not be mixed with these
+results; create a fresh baseline after updating the runner.
 
-- Device initialization and resource initialization/upload/synchronization
-  as separately labeled host setup intervals.
-- Per-stage module loading, link, target-code generation, and RHI program/pipeline
-  preparation. These are one-time preparation observations, not repeated cold
-  startup benchmarks. Driver caches are not flushed.
-- GPU total and each dispatch/pass, plus normalized time per pipeline iteration.
-- Host recording, submission, waiting, and recording-through-completion latency.
-- Validation readback as a separate host interval.
+### Repeated execution samples
 
-CPU and GPU intervals overlap and must not be added together. GPU pass timings
-exclude resource setup and CPU reference checks, but include ordering barriers.
+All values are milliseconds. Host values measure elapsed wall time, including
+blocking and scheduling, rather than CPU execution cost.
+
+| Field                          | Boundary                                                                                                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gpu_total_ms`                 | GPU timestamps around the entire serialized batch, including ordering and timestamp instrumentation overhead.                                            |
+| `gpu_<stage>_ms`               | Sum of that stage's timestamp regions across the batch, including its ordering barriers. These are instrumented pass regions, not pure shader execution. |
+| `gpu_iteration_ms`             | GPU batch total divided by batch count; throughput with reused resources, not isolated dispatch latency.                                                 |
+| `host_record_ms`               | Command encoder creation through command-buffer finalization, including binding and recording.                                                           |
+| `host_submit_ms`               | Wall time inside queue submission.                                                                                                                       |
+| `host_wait_ms`                 | Wall time waiting for queue completion, including remaining GPU execution and host scheduling.                                                           |
+| `host_record_to_completion_ms` | Encoder creation through completion of the host wait. Excludes query reset/result retrieval, setup, calibration, and correctness validation.             |
+
+Host recording, submission, and waiting are contained in record-to-completion.
+GPU intervals overlap host intervals; do not add them together. Per-stage GPU
+regions need not sum to the batch total because there is work between regions.
+Raw samples, summary statistics, and GPU relative MAD remain available.
+
+### Single host observations
+
+`host_observations` contains one wall-time observation of each named interval.
+These are diagnostics, not repeated startup or transfer benchmarks:
+
+- `case_ms`: adapter lookup through completion of the final correctness check.
+  Includes device/shader preparation, calibration, both validations, final warmup,
+  sampled execution, and timestamp result retrieval. Excludes argument parsing,
+  result serialization, teardown, Python orchestration, and paired CLI compilation.
+- `device_create_ms`: the device creation API call, including its internal setup.
+- `resource_setup_ms`: the final calibration step's CPU input generation, buffer
+  allocation/initialization/upload, and queue synchronization. Earlier allocation
+  steps and destruction of the previous buffers are not included in this value.
+- `calibration_ms`: the complete calibration loop, including all allocation steps,
+  query-pool creation, pilot warmups/executions, and pilot timestamp retrieval.
+  Frozen-calibration runs still perform their single pilot step.
+- `validation_before_ms` and `validation_after_ms`: the complete correctness check
+  before and after measurement, including CPU reference calculation, output
+  readback, comparison, and temporary storage allocation/destruction.
+- `validation_readback_before_ms` and `validation_readback_after_ms`: the readback
+  API call inside the corresponding validation. Both observations are preserved.
+
+These intervals are nested: resource setup is inside calibration, readback is
+inside validation, and all are inside case time. Do not sum them as disjoint phases.
+
+`preparation_observations` records one observation per shader stage: module-load
+API time (`load_ms`), composition/link API time (`link_ms`), target-code API time
+(`codegen_ms`), and combined RHI program/pipeline creation (`program_pipeline_ms`).
+These are API boundaries rather than isolated compiler passes. Deferred work,
+reflection, compiler caches, and driver caches can affect attribution; driver
+caches are not flushed. They are included in case time, but not execution samples.
+
 GPU upload/readback timing, detailed allocation/binding breakdowns, timestamp
-overhead estimation, percentile/confidence-interval reports, automated regression
-thresholds, and publishing adapters are not implemented in this prototype.
+and barrier overhead estimation, percentile/confidence-interval reports, automated
+regression thresholds, and publishing adapters are not implemented.
 
 ## Paired compile benchmarks
 

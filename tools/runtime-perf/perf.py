@@ -132,7 +132,7 @@ def aggregate(samples):
 
 
 def check_calibration(saved, env, config, corpus):
-    if saved.get("schema_version") != 1 or saved.get("workload_version") != workloads.VERSION:
+    if saved.get("schema_version") != 2 or saved.get("workload_version") != workloads.VERSION:
         raise ValueError("incompatible calibration schema/workload version")
     if saved["environment"] != env or saved["policy"] != policy(config):
         raise ValueError("calibration environment or measurement policy differs")
@@ -179,11 +179,11 @@ def run(args):
         compiler_version = subprocess.run([str(Path(args.slangc).resolve()), "-version"], text=True,
                                        capture_output=True, check=True, timeout=30)
         compiler_version = (compiler_version.stdout + compiler_version.stderr).strip()
-    results = dict(schema_version=1, workload_version=workloads.VERSION, environment=env,
+    results = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                    config=config, created_unix=time.time(), runner_sha256=digest(runner.read_bytes()),
                    generator_sha256=digest(Path(workloads.__file__).read_bytes()),
                    runner_source_sha256=digest((HERE / "native/runner.cpp").read_bytes()), runs=[])
-    calibration = dict(schema_version=1, workload_version=workloads.VERSION, environment=env,
+    calibration = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                        policy=policy(config), runner_source_sha256=results["runner_source_sha256"], cases={})
     failed = False
     for case in cases:

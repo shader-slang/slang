@@ -10,7 +10,7 @@ import perf
 
 class RuntimePerfTests(unittest.TestCase):
     def fixture(self):
-        return dict(schema_version=1, workload_version=1, environment={"driver_id": "driver-1"},
+        return dict(schema_version=2, workload_version=1, environment={"driver_id": "driver-1"},
                     generator_sha256="generator", runner_source_sha256="runner", config=perf.DEFAULTS,
                     runs=[dict(workload="arithmetic_basic", status="ok", validated=True, size=4, elements=65536,
                                width=256, batch=8, measurement_mode="batched_throughput",
@@ -80,7 +80,7 @@ class RuntimePerfTests(unittest.TestCase):
 
     def test_rejects_incomplete_and_nonfinite_samples(self):
         for samples in ([], [{"gpu_total_ms": float("nan")}], [{"gpu_total_ms": -1}],
-                        [{"gpu_total_ms": 1}, {"cpu_wait_ms": 1}]):
+                        [{"gpu_total_ms": 1}, {"host_wait_ms": 1}]):
             with self.subTest(samples=samples), self.assertRaises(ValueError):
                 perf.aggregate(samples)
 
@@ -103,7 +103,7 @@ class RuntimePerfTests(unittest.TestCase):
     def test_saved_calibration_rejects_changed_source_or_policy(self):
         config = dict(perf.DEFAULTS)
         corpus = {"arithmetic_basic": {"source_sha256": "a"}}
-        saved = dict(schema_version=1, workload_version=perf.workloads.VERSION,
+        saved = dict(schema_version=2, workload_version=perf.workloads.VERSION,
                      environment={}, policy=perf.policy(config),
                      runner_source_sha256=perf.digest((perf.HERE / "native/runner.cpp").read_bytes()),
                      cases={"arithmetic_basic": {"source_sha256": "a"}})
@@ -116,6 +116,17 @@ class RuntimePerfTests(unittest.TestCase):
         config["target_ms"] *= 2
         with self.assertRaisesRegex(ValueError, "policy"):
             perf.check_calibration(saved, {}, config, corpus)
+
+    def test_old_calibration_schema_requires_fresh_measurements(self):
+        with self.assertRaisesRegex(ValueError, "schema"):
+            perf.check_calibration(dict(schema_version=1), {}, dict(perf.DEFAULTS), {})
+
+    def test_comparison_rejects_old_timer_schema(self):
+        a = self.fixture()
+        b = copy.deepcopy(a)
+        b["schema_version"] = 1
+        with self.assertRaisesRegex(ValueError, "schema_version"):
+            self.compare(a, b)
 
     def test_invalid_sizes_fail_before_native_execution(self):
         class Args:

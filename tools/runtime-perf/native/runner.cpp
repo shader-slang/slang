@@ -106,7 +106,7 @@ struct Stage
 
 struct Sample
 {
-    double total = 0, record = 0, submit = 0, wait = 0, endToEnd = 0;
+    double total = 0, record = 0, submit = 0, wait = 0, recordToCompletion = 0;
     std::vector<double> stages;
 };
 
@@ -373,7 +373,7 @@ struct Benchmark
         auto waitStart = Clock::now();
         CHECK(queue->waitOnHost());
         sample.wait = elapsed(waitStart);
-        sample.endToEnd = elapsed(start);
+        sample.recordToCompletion = elapsed(start);
         std::vector<uint64_t> ticks(stages.size() * 2 * batch + 2);
         CHECK(queries->getResult(0, uint32_t(ticks.size()), ticks.data()));
         double scale = 1000.0 / double(device->getInfo().timestampFrequency);
@@ -513,6 +513,7 @@ int main(int argc, char** argv)
 {
     if (argc == 2 && strcmp(argv[1], "--devices") == 0)
         return devices();
+    // Case wall time excludes argument parsing, result serialization, and teardown.
     Benchmark bench;
     auto& o = bench.options;
     for (int i = 1; i < argc; ++i)
@@ -575,6 +576,7 @@ int main(int argc, char** argv)
             "16777216)\n");
         return 1;
     }
+    auto caseStart = Clock::now();
     if (!getRHI()->getAdapter(deviceType(o.backend), o.adapter))
     {
         printf("{\"status\":\"unsupported\",\"reason\":\"requested adapter unavailable\"}\n");
@@ -598,6 +600,7 @@ int main(int argc, char** argv)
         double duration;
     };
     std::vector<Calibration> calibration;
+    auto calibrationStart = Clock::now();
     for (;;)
     {
         if (!bench.allocate(elements))
@@ -634,8 +637,12 @@ int main(int argc, char** argv)
         else
             break;
     }
+    double calibrationMs = elapsed(calibrationStart);
+    auto validationStart = Clock::now();
     if (!bench.validate())
         return 1;
+    double validationBeforeMs = elapsed(validationStart);
+    double readbackBeforeMs = bench.readbackMs;
     // CPU reference validation is deliberately outside timing; warm up again afterward.
     for (uint32_t i = 0; i < o.warmup; ++i)
     {
@@ -656,8 +663,11 @@ int main(int argc, char** argv)
             break;
     }
     // Validate the measured execution too, not only the warmup output.
+    validationStart = Clock::now();
     if (!bench.validate())
         return 1;
+    double validationAfterMs = elapsed(validationStart);
+    double caseMs = elapsed(caseStart);
     bool stable =
         stableSamples(samples, o.maxSpread, o.strictPhases) && median(durations) >= o.targetMs;
     auto globalSession = bench.session->getGlobalSession();
@@ -665,8 +675,7 @@ int main(int argc, char** argv)
         "{\"status\":\"%s\",\"validated\":true,\"elements\":%u,\"width\":%u,\"batch\":%u,"
         "\"measurement_mode\":%s,"
         "\"relative_mad\":%.12g,\"backend\":%s,\"adapter\":%s,\"compiler\":%s,\"rhi_revision\":%s,"
-        "\"timestamp_frequency\":%llu,\"device_ms\":%.12g,\"resource_setup_ms\":%.12g,\"validation_"
-        "readback_ms\":%.12g,",
+        "\"timestamp_frequency\":%llu,",
         stable ? "ok" : "unstable",
         elements,
         bench.width,
@@ -677,9 +686,20 @@ int main(int argc, char** argv)
         quote(bench.device->getInfo().adapterName).c_str(),
         quote(globalSession->getBuildTagString()).c_str(),
         quote(RUNTIME_PERF_RHI_REV).c_str(),
-        (unsigned long long)bench.device->getInfo().timestampFrequency,
+        (unsigned long long)bench.device->getInfo().timestampFrequency);
+    // These are single host wall-time observations. Nested intervals must not be summed.
+    printf(
+        "\"host_observations\":{\"case_ms\":%.12g,\"device_create_ms\":%.12g,"
+        "\"resource_setup_ms\":%.12g,\"calibration_ms\":%.12g,"
+        "\"validation_before_ms\":%.12g,\"validation_after_ms\":%.12g,"
+        "\"validation_readback_before_ms\":%.12g,\"validation_readback_after_ms\":%.12g},",
+        caseMs,
         bench.deviceMs,
         bench.resourceMs,
+        calibrationMs,
+        validationBeforeMs,
+        validationAfterMs,
+        readbackBeforeMs,
         bench.readbackMs);
     printf("\"runner_source_sha256\":%s,\"calibration\":[", quote(RUNTIME_PERF_SOURCE_SHA).c_str());
     for (size_t i = 0; i < calibration.size(); ++i)
@@ -689,7 +709,7 @@ int main(int argc, char** argv)
             calibration[i].elements,
             calibration[i].batch,
             calibration[i].duration);
-    printf("],\"preparation\":[");
+    printf("],\"preparation_observations\":[");
     for (size_t i = 0; i < bench.stages.size(); ++i)
     {
         auto& s = bench.stages[i];
@@ -708,15 +728,15 @@ int main(int argc, char** argv)
     {
         auto& s = samples[i];
         printf(
-            "%s{\"gpu_total_ms\":%.12g,\"gpu_iteration_ms\":%.12g,\"cpu_record_ms\":%.12g,\"cpu_"
-            "submit_ms\":%.12g,\"cpu_wait_ms\":%.12g,\"cpu_end_to_end_ms\":%.12g",
+            "%s{\"gpu_total_ms\":%.12g,\"gpu_iteration_ms\":%.12g,\"host_record_ms\":%.12g,\"host_"
+            "submit_ms\":%.12g,\"host_wait_ms\":%.12g,\"host_record_to_completion_ms\":%.12g",
             i ? "," : "",
             s.total,
             s.total / batch,
             s.record,
             s.submit,
             s.wait,
-            s.endToEnd);
+            s.recordToCompletion);
         for (size_t j = 0; j < s.stages.size(); ++j)
             printf(
                 ",%s:%.12g",
