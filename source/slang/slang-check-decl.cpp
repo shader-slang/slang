@@ -6751,7 +6751,7 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
     RefPtr<WitnessTable> witnessTable,
-    Decl* satisfyingDecl)
+    SourceLoc satisfyingDeclLoc)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6765,7 +6765,7 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         satisfyingType,
         requiredAssociatedTypeDeclRef.getDecl(),
         witnessTable->witnessedType,
-        satisfyingDecl);
+        satisfyingDeclLoc);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6879,7 +6879,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
                 witnessTable,
-                subAggTypeDeclRef.getDecl());
+                subAggTypeDeclRef.getDecl()->loc);
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6895,7 +6895,7 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
                 witnessTable,
-                typedefDeclRef.getDecl());
+                typedefDeclRef.getDecl()->loc);
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())

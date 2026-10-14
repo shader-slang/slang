@@ -2608,7 +2608,7 @@ public:
         Type* satisfyingType,
         DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable,
-        Decl* satisfyingDecl);
+        SourceLoc satisfyingDeclLoc);
 
     // Does the given `memberDecl` work as an implementation
     // to satisfy the requirement `requiredMemberDeclRef`
@@ -3069,7 +3069,7 @@ public:
         Type* entryListType,
         AssocTypeDecl* associatedTypeRequirement,
         Type* schemaType,
-        Decl* satisfyingDecl);
+        SourceLoc satisfyingDeclLoc);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
     void diagnosePendingRayTracingStageOrInputUses();
     void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);

@@ -1703,14 +1703,14 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
     Type* entryListType,
     AssocTypeDecl* associatedTypeRequirement,
     Type* schemaType,
-    Decl* satisfyingDecl)
+    SourceLoc satisfyingDeclLoc)
 {
 
     auto sectionName = _getStructuralRayTracingSchemaSectionName(associatedTypeRequirement);
     if (!sectionName)
         return;
 
-    SLANG_RELEASE_ASSERT(entryListType && schemaType && satisfyingDecl);
+    SLANG_RELEASE_ASSERT(entryListType && schemaType);
 
     // Consider this example:
     //
@@ -1738,7 +1738,7 @@ void SemanticsVisitor::diagnoseDuplicateStructuralRayTracingSchemaEntries(
             .section = sectionName,
             .entry = entryType,
             .schema = schemaType->getCanonicalType(),
-            .location = satisfyingDecl->loc});
+            .location = satisfyingDeclLoc});
     }
 }
 
