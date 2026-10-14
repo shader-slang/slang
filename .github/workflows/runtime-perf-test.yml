@@ -1,0 +1,116 @@
+name: Runtime Perf Prototype Test
+
+# Explicitly requested through check-python-core's manual dispatch. Keep
+# hardware measurements off ordinary PRs until the prototype is established.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  windows-build:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Initialize RHI
+        run: git submodule update --init --recursive external/slang-rhi
+      - name: Download matching compiler package and headers
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/shader-slang/slang/releases/download/v2026.17.1/slang-2026.17.1-windows-x86_64.zip'
+          Invoke-WebRequest $url -OutFile slang.zip
+          if ((Get-FileHash slang.zip -Algorithm SHA256).Hash.ToLower() -ne 'a41896cba523ecfecaf67d18bdb7767349112a45540ac0b88e8ce48e10ce239f') {
+            throw 'Compiler package checksum mismatch'
+          }
+          Expand-Archive slang.zip -DestinationPath compiler
+          "$PWD/compiler/bin" >> $env:GITHUB_PATH
+      - name: Build native runner
+        shell: pwsh
+        run: |
+          cmake -S tools/runtime-perf -B build/runtime-perf -A x64 "-DSLANG_ROOT=$PWD/compiler" -DSLANG_RHI_ENABLE_CUDA=OFF -DSLANG_RHI_ENABLE_OPTIX=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build/runtime-perf --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check orchestration and shared sources
+        run: python -m unittest discover -s tools/runtime-perf -p 'test_*.py' -v
+      - name: Record available devices
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force results | Out-Null
+          python tools/runtime-perf/perf.py devices --runner build/runtime-perf/Release/slang-runtime-perf.exe > results/windows-devices.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload Windows diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: runtime-perf-windows-diagnostics
+          path: |
+            results/
+            build/runtime-perf/CMakeFiles/CMakeConfigureLog.yaml
+          retention-days: 14
+
+  linux-gpu:
+    # These labels select the upstream scaler pool, unavailable to forks.
+    if: github.repository == 'shader-slang/slang'
+    runs-on: [Linux, self-hosted, GPU, GCP]
+    timeout-minutes: 30
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Configure checkout ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Initialize RHI
+        run: git submodule update --init --recursive external/slang-rhi
+      - uses: ./.github/actions/setup-vulkan-icd
+      - name: Download matching compiler package and headers
+        run: |
+          curl --fail --location --retry 3 --output slang.tar.gz https://github.com/shader-slang/slang/releases/download/v2026.17.1/slang-2026.17.1-linux-x86_64.tar.gz
+          echo '31d7e53377dd9a80a1b7b9ec86f800562db91ca4ed2fb4c77573cba4d3e5095d  slang.tar.gz' | sha256sum --check
+          mkdir compiler
+          tar -xf slang.tar.gz -C compiler
+          echo "$PWD/compiler/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$PWD/compiler/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+      - name: Build native runner
+        run: |
+          cmake -S tools/runtime-perf -B build/runtime-perf -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DSLANG_ROOT="$PWD/compiler" \
+            -DSLANG_RHI_ENABLE_CUDA=OFF -DSLANG_RHI_ENABLE_OPTIX=OFF
+          cmake --build build/runtime-perf --parallel 4
+      - name: Run all workload families with paired compilation
+        run: |
+          mkdir -p results
+          nvidia-smi --query-gpu=name,uuid,driver_version --format=csv > results/gpu.csv
+          python3 tools/runtime-perf/perf.py devices --runner build/runtime-perf/slang-runtime-perf > results/devices.json
+          driver_id=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1)
+          python3 tools/runtime-perf/perf.py run \
+            --runner build/runtime-perf/slang-runtime-perf \
+            --config tools/runtime-perf/ci-example.json \
+            --driver-id "$driver_id" --environment-id github-actions-linux-gpu \
+            --slangc "$PWD/compiler/bin/slangc" --output results/baseline
+      - name: Upload samples and diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: runtime-perf-linux-gpu-results
+          path: |
+            results/
+            build/runtime-perf/CMakeFiles/CMakeConfigureLog.yaml
+          retention-days: 14

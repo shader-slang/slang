@@ -80,6 +80,15 @@ reporting a failure, including the per-case logs.
 
 ## Local and CI usage
 
+For an explicit CI test, manually dispatch **Check Python Scripts (Core Python
+Only)** with its `runtime-perf` input enabled. This also builds the runner on
+hosted Windows and executes all workload families with paired compilation on
+the upstream Linux NVIDIA GPU pool. The compiler package is pinned to 2026.17.1
+with verified checksums. Windows CI validates the build and orchestration;
+hardware runtime measurements come from the Linux job. Both jobs upload their
+diagnostics, and the GPU job archives the full result bundle. Forks can run the
+Windows check but do not have access to that upstream GPU pool.
+
 Run these commands from the Slang repository root. All paths and the backend
 are explicit; CI can invoke exactly the same commands. Use an empty output
 directory for each run.

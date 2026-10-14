@@ -1,6 +1,12 @@
 name: Check Python Scripts (Core Python Only)
 
 on:
+  workflow_dispatch:
+    inputs:
+      runtime-perf:
+        description: "Also build runtime-perf on Windows and run it on the Linux GPU pool"
+        type: boolean
+        default: false
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -13,6 +19,13 @@ on:
     types: [checks_requested]
 
 jobs:
+  runtime-perf:
+    if: github.event_name == 'workflow_dispatch' && inputs.runtime-perf
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/runtime-perf-test.yml
+
   check-python-core:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     strategy:
