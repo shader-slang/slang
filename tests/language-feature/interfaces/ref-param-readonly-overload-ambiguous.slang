@@ -5,11 +5,11 @@
 
 int read(__ref_readonly int x);
 /*CHECK:
-    ^^^^ candidate: func read(const int) -> int
+    ^^^^ candidate: func read(readonly ref int) -> int
 */
 int read(__ref int x) { return x + 1; }
 /*CHECK:
-    ^^^^ candidate: func read(int) -> int
+    ^^^^ candidate: func read(ref int) -> int
 */
 
 RWStructuredBuffer<int> outputBuffer;
