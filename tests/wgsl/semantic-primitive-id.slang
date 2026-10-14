@@ -30,7 +30,8 @@ float4 fieldMain(FragmentInput input) : SV_Target0
     return float4(input.color + float(input.primitive));
 }
 
-// An entry point that reads a nested struct field goes through the flattened input struct.
+// A nested struct field is flattened by `flattenInputParameters` instead of being hoisted to an
+// entry-point parameter like a plain field, so it reaches the builtin through a different path.
 struct InnerInput
 {
     uint primitive : SV_PrimitiveID;
@@ -58,7 +59,7 @@ int intMain(int primitive : SV_PrimitiveID) : SV_Target0
     return primitive;
 }
 
-// A shader that does not read `SV_PrimitiveID` must not require the extension.
+// A shader without an `SV_PrimitiveID` input must not require the extension.
 //NONE-NOT: primitive_index
 //NONE: @fragment
 float4 noneMain(float4 position : SV_Position) : SV_Target0
