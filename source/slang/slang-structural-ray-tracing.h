@@ -121,8 +121,10 @@ struct StructuralRayTracingEntryPointInfo
 /// Names the concrete entries and matching subtype witnesses encoded by a section-list type.
 ///
 /// Concrete lists keep the two packs index-aligned, including two zero-length packs for an empty
-/// list. Dependent lists whose entries are not known yet have an empty `types` pack and no witness
-/// pack. Callers discover each pack by semantic value kind rather than operand position.
+/// list. A list that is still a type parameter or unresolved associated type returns an empty
+/// `types` pack to skip the current duplicate check; this does not prove that the list is empty
+/// or arrange another check after specialization. Callers discover each pack by semantic value
+/// kind rather than operand position.
 struct StructuralRayTracingEntryPack
 {
     ConcreteTypePack* types = nullptr;

@@ -1396,7 +1396,19 @@ StructuralRayTracingEntryPack getStructuralRayTracingEntryPack(
             }
         }
     }
-    // Dependent list types have no concrete entries until specialization.
+    // The list itself may still be a type parameter. Consider this example:
+    //
+    //     struct Schema<Misses : rt::IMissShaderList> : rt::ITraceProgramSchema
+    //     {
+    //         // Other requirements omitted.
+    //         typealias MissShaders = Misses;
+    //     }
+    //
+    // While checking Schema, we cannot enumerate Misses. Return an empty pack so the caller's
+    // duplicate-entry loop has nothing to visit. This does not mean Misses is an empty list.
+    // A list such as MissShaderList<T> already has an enumerable pack, even if T is generic.
+    // TODO: Check duplicates after specialization too. This fallback does not schedule a later
+    // check; Schema<MissShaderList<M, M>> currently passes this declaration-time restriction.
     if (!result.types)
         result.types = astBuilder->getTypePack(ArrayView<Type*>());
     SLANG_RELEASE_ASSERT(
