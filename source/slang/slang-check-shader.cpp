@@ -1665,9 +1665,10 @@ struct GenericStructTypeUse
 // its own can hide a field-only requirement.
 //
 // Builtin magic/intrinsic structs stay excluded: some (e.g. `LineStream<T>`,
-// `OutputPatch<T,N>`) have dedicated signature diagnostics, and others need separate
-// capability handling (shader-slang/slang#13579). Builtin wrappers are still recursed
-// *through* so that a user-defined `Foo<int>` nested inside them is found.
+// `OutputPatch<T,N>`) have dedicated signature diagnostics, and the standard-library
+// functions that use the others do not redeclare their requirements. Builtin wrappers
+// are still recursed *through* so that a user-defined `Foo<int>` nested inside them is
+// found.
 static void collectGenericStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,

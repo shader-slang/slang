@@ -21867,8 +21867,7 @@ struct CapabilityDeclReferenceVisitor
     // `declRef`, then continue the usual operand walk. Only a user `AggTypeDecl` (struct, enum,
     // interface, ...) contributes. Member functions such as `make` in `G<3>.make()` and
     // magic/intrinsic types such as `CoopVec<T, N>` do not, because the standard-library
-    // functions that use them do not redeclare their requirements; whether the builtin types
-    // should propagate is an open question on shader-slang/slang#13579.
+    // functions that use them do not redeclare their requirements.
     void referenceAggTypeOfDeclRef(DeclRefBase* declRef)
     {
         // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
