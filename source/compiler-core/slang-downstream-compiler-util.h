@@ -115,6 +115,8 @@ struct DownstreamCompilerUtil : public DownstreamCompilerUtilBase
     static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
     static void updateDefaults(DownstreamCompilerSet* set);
 
+    static SlangPassThrough getDefaultDXBCCompiler();
+
     static void setDefaultLocators(
         DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);
 
