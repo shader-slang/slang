@@ -179,7 +179,7 @@ static StructuralRayTracingStageKind _getDirectStageInputKind(Type* type)
     return getStructuralRayTracingStageInputKind(typeDecl);
 }
 
-// Rejects storage when a structural stage conformance finishes checking.
+// Requires stage implementations to be ordinary structs without instance fields.
 //
 // Consider this example:
 //
@@ -189,12 +189,12 @@ static StructuralRayTracingStageKind _getDirectStageInputKind(Type* type)
 //         ...
 //     }
 //
-// A standalone `-entry StatefulClosestHit` request finds the struct by name, but a ray-generation
-// entry point reaches the same stage only through an `ITraceProgramSchema` witness. Both paths
-// later synthesize a receiver without a source value. Checking the concrete conformance keeps that
-// compiler-created receiver valid for schema entries and standalone stages.
-// The semantic checker suppresses repeated diagnostics using its ordinary diagnoseOnce helper:
-// several conformances may reach the same invalid stage or stateful base struct.
+// The RT API selects StatefulClosestHit by type. It does not receive an application-created
+// StatefulClosestHit object containing a value for state, so this field is rejected. Application
+// data can be supplied through the payload or shader record instead.
+// This check runs after ordinary interface conformance checking. It therefore also checks stages
+// listed in a schema when the command selects only a ray-generation entry point.
+// diagnoseOnce avoids repeating the same error when several stages inherit the same invalid field.
 static void _checkStructuralRayTracingStageStorage(
     SemanticsVisitor* visitor,
     Type* stageType,
@@ -206,7 +206,6 @@ static void _checkStructuralRayTracingStageStorage(
     auto resolvedStageType = as<Type>(stageType->resolve());
     SLANG_RELEASE_ASSERT(resolvedStageType);
 
-    const bool hasNominalWitnessType = as<DeclRefType>(witnessedStageType) != nullptr;
     auto stageDeclRef = isDeclRefTypeOf<AggTypeDecl>(resolvedStageType);
     const bool isCompilerBuiltinType =
         stageDeclRef && (stageDeclRef.getDecl()->findModifier<BuiltinTypeModifier>() ||
@@ -217,16 +216,13 @@ static void _checkStructuralRayTracingStageStorage(
     if (stageDeclRef.as<InterfaceDecl>())
         return;
 
-    // Structural dispatch creates a stage value without a source object. Only a nominal struct has
-    // the representation that contract requires. A scalar such as `float` can resolve through its
-    // compiler-provided builtin struct declaration, but that declaration does not make the scalar
-    // a source struct. Extension conformances can also witness generic parameters that have no
-    // aggregate declaration. Treating either representation as an ordinary source struct would
-    // bypass this contract.
-    if (!hasNominalWitnessType || !stageDeclRef.as<StructDecl>() || isCompilerBuiltinType)
+    // The RT API requires an ordinary struct even if another type satisfies the stage interface.
+    // The StructDecl check rejects a class or an extension on a generic parameter T. It does not
+    // reject `extension float : rt::IClosestHitShader`: float's built-in declaration is a struct.
+    // The separate isCompilerBuiltinType check rejects float and other built-in types.
+    if (!stageDeclRef.as<StructDecl>() || isCompilerBuiltinType)
     {
-        const bool hasSourceAggregateDeclaration =
-            hasNominalWitnessType && stageDeclRef && !isCompilerBuiltinType;
+        const bool hasSourceAggregateDeclaration = stageDeclRef && !isCompilerBuiltinType;
         visitor->diagnoseOnce(Diagnostics::StructuralRayTracingStageImplementationMustBeStruct{
             .stageType = witnessedStageType,
             .location =
