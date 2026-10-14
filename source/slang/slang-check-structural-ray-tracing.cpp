@@ -192,9 +192,13 @@ static StructuralRayTracingStageKind _getDirectStageInputKind(Type* type)
 // The RT API selects StatefulClosestHit by type. It does not receive an application-created
 // StatefulClosestHit object containing a value for state, so this field is rejected. Application
 // data can be supplied through the payload or shader record instead.
-// This check runs after ordinary interface conformance checking. It therefore also checks stages
-// listed in a schema when the command selects only a ray-generation entry point.
-// diagnoseOnce avoids repeating the same error when several stages inherit the same invalid field.
+// This check runs after StatefulClosestHit passes ordinary interface conformance checking in its
+// module. It rejects the field even if no entry point or schema ever uses StatefulClosestHit.
+// Entry-point selection is not what triggers this check.
+//
+// Ordinary declaration and conformance checking reuse completed results. Separate conformances
+// can still reach this helper and inspect the same field again, for example when two stages inherit
+// from one base struct. diagnoseOnce suppresses repeated error messages; it does not skip the walk.
 static void _checkStructuralRayTracingStageStorage(
     SemanticsVisitor* visitor,
     Type* stageType,
@@ -220,6 +224,9 @@ static void _checkStructuralRayTracingStageStorage(
     // The StructDecl check rejects a class or an extension on a generic parameter T. It does not
     // reject `extension float : rt::IClosestHitShader`: float's built-in declaration is a struct.
     // The separate isCompilerBuiltinType check rejects float and other built-in types.
+    // TODO: Allow a generic extension's target T and check the concrete types it applies to.
+    // Simply skipping T here would leave those types unchecked by this rule.
+    // Tracked in https://github.com/shader-slang/slang/issues/13618.
     if (!stageDeclRef.as<StructDecl>() || isCompilerBuiltinType)
     {
         const bool hasSourceAggregateDeclaration = stageDeclRef && !isCompilerBuiltinType;

@@ -1,7 +1,8 @@
-// Structural stages use compiler-created value receivers. Classes, built-in types, and generic
-// parameters do not provide the required concrete value representation, so reject them when their
-// conformances are checked. An interface inheriting the stage contract remains legal because it
-// refines the requirements for implementations without itself defining an executable stage.
+// Stage implementations must be ordinary structs, so classes and built-in types are rejected.
+// An interface may add stage requirements without itself defining an executable stage.
+// Generic extension targets are also rejected for now: the check sees T before it can validate
+// the concrete implementations. Supporting them is tracked in
+// https://github.com/shader-slang/slang/issues/13618.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
