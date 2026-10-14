@@ -967,8 +967,9 @@ static bool _checkRayTracingStageOrInputUse(
 /// @retval true The immediate check rejects this use. Expression callers can return an error
 /// expression; a repeated diagnostic may have been suppressed.
 /// @retval false The use was queued, skipped, or checked without an RT-use rejection. Skipped uses
-/// have no type arguments to check, or have a missing type or ErrorType. A queued use has not
-/// passed validation yet; false also does not rule out errors from other semantic checks.
+/// have no type arguments to check, or have a missing, erroneous, or concrete scalar/void type.
+/// A queued use has not passed validation yet; false also does not rule out errors from other
+/// semantic checks.
 static bool _diagnoseOrDeferRayTracingStageOrInputUse(
     SemanticsVisitor* visitor,
     const RayTracingStageOrInputUse& use)
@@ -978,10 +979,15 @@ static bool _diagnoseOrDeferRayTracingStageOrInputUse(
         if (use.genericArguments.getCount() == 0)
             return false;
     }
-    else if (auto type = use.variable ? use.variable->getType() : use.type;
-             !type || as<ErrorType>(type))
+    else
     {
-        return false;
+        auto type = unwrapModifiedType(use.variable ? use.variable->getType() : use.type);
+        // A call returning float or void cannot produce a stage or stage input. Built-in scalar
+        // types cannot contain fields, and stage conformance checking rejects them as stage
+        // implementations. Skip these uses before queueing or querying inheritance. Generic
+        // arguments still need their separate check: make<MissInput<C>>() may return void.
+        if (!type || as<ErrorType>(type) || as<BasicExpressionType>(type))
+            return false;
     }
 
     auto shared = visitor->getShared();
