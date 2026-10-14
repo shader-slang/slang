@@ -1003,8 +1003,9 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
 
         case LookupResultItem::Breadcrumb::Kind::ThisType:
             {
-                // An implicit `This` base can only start a lookup path.
-                SLANG_RELEASE_ASSERT(bb == nullptr);
+                // We expect a `this` to always come
+                // at the start of a chain.
+                SLANG_ASSERT(bb == nullptr);
 
                 // We will compute the type to use for `This` using
                 // the same logic that a direct reference to `This`
@@ -1012,6 +1013,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //
                 auto thisType = calcThisType(breadcrumb->declRef);
 
+                // If we are in a static context, then we do not have a `this` expression, and
+                // the expression we construct will need to start with the `This` type.
+                //
+                // Because we are constrained to yield an expression
+                // here, we must construct an expression that
+                // references `This`, and the *type* of that expression
+                // will be `typeof(This)`, which conceptually
+                // `typeof(typeof(this))`
+                //
                 auto thisTypeType = m_astBuilder->getTypeType(thisType);
 
                 auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
@@ -1024,17 +1034,27 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
 
         case LookupResultItem::Breadcrumb::Kind::ThisValue:
             {
-                // An implicit `this` base can only start a lookup path.
-                SLANG_RELEASE_ASSERT(bb == nullptr);
+                // We expect a `this` to always come
+                // at the start of a chain.
+                SLANG_ASSERT(bb == nullptr);
 
                 auto thisExpr = m_astBuilder->create<ThisExpr>();
                 thisExpr->loc = loc;
                 thisExpr->scope = breadcrumb->getThisValueScope();
 
-                // Lookup records only whether lexical structure requires a `This` type base.
-                // Ordinary `this` checking validates a reconstructed value and determines its type
-                // and mutability. Capture registration remains the responsibility of the
-                // surrounding expression-checking path.
+                // Consider this HLSL example:
+                //
+                //     struct Counter
+                //     {
+                //         static const int elementCount = 4;
+                //         void replace(int[elementCount] values) {}
+                //     };
+                //
+                // Checking the parameter type needs an implicit `this` before checking has attached
+                // `replace`'s effective receiver parameter. We check implicit and explicit `this`
+                // expressions through the same routine, so both use the HLSL receiver mode even
+                // during header checking. We defer lambda capture until the surrounding member
+                // expression has been constructed.
                 bb = checkThisExprWithoutCapturing(thisExpr);
 
                 // This direct helper call bypasses `CheckTerm`, which normally marks the returned
@@ -9459,7 +9479,7 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
                 // exactly once.
                 thisParamInfo = checkEffectiveThisParamInfo(
                     funcDeclBase,
-                    /* shouldDiagnoseModeSpecifiers */ false);
+                    /* shouldDiagnoseModeAttributes */ false);
             }
             else
             {
@@ -9533,10 +9553,10 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     if (IsErrorExpr(checkedExpr))
         return checkedExpr;
 
-    // An explicit `this` in a lambda body becomes a closure capture after its type and value
-    // category have been determined.
     if (m_parentLambdaExpr)
+    {
         return maybeRegisterLambdaCapture(checkedExpr);
+    }
     return checkedExpr;
 }
 

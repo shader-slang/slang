@@ -1,10 +1,10 @@
 //TEST:SIMPLE: -no-codegen
 
-// Lookup for a default-value expression can run while its containing callable's signature is still
-// being checked. Lookup records that expression checking should attempt an instance base without
-// computing its mode. Expression checking then validates the reconstructed `this` expression and
-// obtains its effective receiver mode. This test stops after header checking because
-// default-argument expansion does not materialize a default expression that mutates its receiver.
+// Parameter types can refer to `this` before signature checking has attached the containing
+// method's effective receiver parameter. Default arguments also perform member lookup and must
+// use the same receiver mode as an explicit `this` expression. This test stops after header
+// checking because default-argument expansion does not materialize a default expression that
+// mutates its receiver.
 
 struct HeaderLookup
 {

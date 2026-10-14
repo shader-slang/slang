@@ -33,10 +33,10 @@ class ConstModifier : public Modifier
     FIDDLE(...)
 };
 
-/// Records `const` written after a function parameter list.
+/// A `const` modifier written after a function parameter list.
 ///
-/// Semantic checking interprets this syntax as an explicit nonmutating receiver spelling.
-/// `ConstModifier` represents the distinct prefix spelling.
+/// Specifies `ParamPassingMode::In` for the receiver parameter.
+/// Prefix `const` uses `ConstModifier`.
 FIDDLE()
 class CppStyleTrailingThisParamConstModifier : public Modifier
 {
@@ -1423,21 +1423,29 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
+/// An attribute that specifies the parameter-passing mode of a declaration's receiver.
+FIDDLE(abstract)
+class ReceiverModeSpecifierAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
 // argument.
 //
 FIDDLE()
-class MutatingAttribute : public Attribute
+class MutatingAttribute : public ReceiverModeSpecifierAttribute
 {
     FIDDLE(...)
 };
 
-// A `[nonmutating]` attribute, which indicates that a member function or accessor does not need to
-// modify anything through its `this` parameter.
+// A `[nonmutating]` attribute, which indicates that a
+// `set` accessor does not need to modify anything through
+// its `this` parameter.
 //
 FIDDLE()
-class NonmutatingAttribute : public Attribute
+class NonmutatingAttribute : public ReceiverModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1459,7 +1467,7 @@ class NoDiscardAttribute : public Attribute
 // a member function should be passed by const reference.
 //
 FIDDLE()
-class ConstRefAttribute : public Attribute
+class ConstRefAttribute : public ReceiverModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1468,7 +1476,7 @@ class ConstRefAttribute : public Attribute
 // a member function should be passed by reference.
 //
 FIDDLE()
-class RefAttribute : public Attribute
+class RefAttribute : public ReceiverModeSpecifierAttribute
 {
     FIDDLE(...)
 };

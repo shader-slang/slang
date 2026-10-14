@@ -1471,6 +1471,16 @@ public:
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
+    /// Return the language of the translation unit being checked.
+    ///
+    /// Returns `SourceLanguage::Unknown` for reflection and specialization contexts that have no
+    /// translation unit.
+    SourceLanguage getSourceLanguage()
+    {
+        auto translationUnit = getShared()->getTranslationUnitRequest();
+        return translationUnit ? translationUnit->sourceLanguage : SourceLanguage::Unknown;
+    }
+
     DiagnosticSink* getSink() { return m_sink; }
 
     Session* getSession() { return m_shared->getSession(); }
@@ -2503,6 +2513,8 @@ public:
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
 
     /// Diagnoses repeated or conflicting receiver-mode specifiers directly attached to `decl`.
+    ///
+    /// Requires checked modifiers, so attributes have their concrete attribute classes.
     void checkThisParamModeSpecifiers(Decl* decl);
 
     void checkVisibility(Decl* decl);
@@ -3226,7 +3238,13 @@ public:
     /// transition can finish, but leaves diagnostics to the final call that publishes the result.
     std::optional<ParamInfo> checkEffectiveThisParamInfo(
         Decl* decl,
-        bool shouldDiagnoseModeSpecifiers);
+        bool shouldDiagnoseModeAttributes);
+
+    /// Return the receiver parameter mode used for `decl` when no specifier is present.
+    ///
+    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
+    /// other declarations use `ParamPassingMode::In`.
+    ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
     void checkAndAttachEffectiveThisParamInfo(Decl* decl);

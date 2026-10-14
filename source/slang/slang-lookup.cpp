@@ -782,27 +782,28 @@ static bool _isDeclOverloadable(Decl* decl)
     return false;
 }
 
-/// Returns whether lookup beyond `decl`'s lexical scope must use `This` instead of a `this` value.
-static bool _mustUseThisTypeBeyondScope(Decl* decl)
+/// Returns whether lookup outside `decl`'s scope must use an enclosing `This` type.
+static bool _isThisTypeOnlyScope(Decl* decl)
 {
-    if (!decl)
-        return false;
-
-    // A generic scope has the same static-versus-instance classification as its inner declaration.
-    // An unlinked wrapper is inconclusive, so expression checking will validate any reconstructed
-    // `this` value.
+    // We classify a generic declaration by the declaration it wraps. During parsing, `inner` can
+    // still be null; none of the declaration-kind tests below match that incomplete wrapper.
     while (auto genericDecl = as<GenericDecl>(decl))
-    {
-        if (!genericDecl->inner)
-            return false;
         decl = genericDecl->inner;
-    }
 
-    // A constructor supplies its own local `this` value.
+    // `isEffectivelyStatic` treats constructors as static for calls, but their bodies have a
+    // local `this` value that can refer to instance members.
     if (as<ConstructorDecl>(decl))
         return false;
+
+    // Members of a nested type or extension belong to that type or extension target, so lookup
+    // outside that declaration cannot use an instance of the enclosing type. Extensions need
+    // this rule even though `isEffectivelyStatic` does not classify them as static members.
     if (as<AggTypeDeclBase>(decl))
         return true;
+
+    // A static callable, property, or subscript has no receiver. Ordinary block scopes do not
+    // impose this restriction, even when nested in a function that makes their declarations
+    // effectively static for member lookup.
     if (as<CallableDecl>(decl) || as<PropertyDecl>(decl))
         return isEffectivelyStatic(decl);
     return false;
@@ -814,7 +815,7 @@ static void _lookUpInScopes(
     LookupRequest const& request,
     LookupResult& result)
 {
-    bool mustUseThisType = false;
+    auto thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisValue;
 
     auto scope = request.scope;
 
@@ -825,13 +826,10 @@ static void _lookUpInScopes(
 
     for (; scope != endScope; scope = scope->parent)
     {
-        auto lexicalScope = scope;
-        bool mustUseThisTypeInOuterScopes = mustUseThisType;
-
         // Note that we consider all "peer" scopes together,
         // so that a hit in one of them does not preclude
         // also finding a hit in another
-        for (auto link = lexicalScope; link; link = link->nextSibling)
+        for (auto link = scope; link; link = link->nextSibling)
         {
             auto containerDecl = link->containerDecl;
 
@@ -843,11 +841,6 @@ static void _lookUpInScopes(
             //
             if (!containerDecl)
                 continue;
-
-            // Peer scopes share one lexical parent. Record whether any peer establishes a boundary,
-            // but apply that boundary only after lookup has considered every peer at this level.
-            if (!mustUseThisTypeInOuterScopes && _mustUseThisTypeBeyondScope(containerDecl))
-                mustUseThisTypeInOuterScopes = true;
 
             if (auto fileDecl = as<FileDecl>(containerDecl))
             {
@@ -890,10 +883,12 @@ static void _lookUpInScopes(
                 // a "breadcrumb" here to track that fact.
                 //
                 BreadcrumbInfo breadcrumb;
-                breadcrumb.kind = mustUseThisType ? LookupResultItem::Breadcrumb::Kind::ThisType
-                                                  : LookupResultItem::Breadcrumb::Kind::ThisValue;
+                breadcrumb.kind = thisBreadcrumbKind;
                 breadcrumb.declRef = aggTypeDeclBaseRef;
-                breadcrumb.thisValueScope = mustUseThisType ? nullptr : request.scope;
+                breadcrumb.thisValueScope =
+                    thisBreadcrumbKind == LookupResultItem::Breadcrumb::Kind::ThisValue
+                        ? request.scope
+                        : nullptr;
                 breadcrumb.prev = nullptr;
                 BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
@@ -989,11 +984,12 @@ static void _lookUpInScopes(
                 if (getText(name) != "This")
                 {
                     BreadcrumbInfo breadcrumb;
-                    breadcrumb.kind = mustUseThisType
-                                          ? LookupResultItem::Breadcrumb::Kind::ThisType
-                                          : LookupResultItem::Breadcrumb::Kind::ThisValue;
+                    breadcrumb.kind = thisBreadcrumbKind;
                     breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
-                    breadcrumb.thisValueScope = mustUseThisType ? nullptr : request.scope;
+                    breadcrumb.thisValueScope =
+                        thisBreadcrumbKind == LookupResultItem::Breadcrumb::Kind::ThisValue
+                            ? request.scope
+                            : nullptr;
                     breadcrumb.prev = nullptr;
                     Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
@@ -1008,11 +1004,12 @@ static void _lookUpInScopes(
                 }
                 break;
             }
-        }
 
-        // Once a lexical declaration prevents access to an enclosing `this` value, no outer scope
-        // can restore it.
-        mustUseThisType = mustUseThisTypeInOuterScopes;
+            // Once lookup crosses a static callable or a nested type, enclosing instance members
+            // can only be referenced through a `This` type.
+            if (_isThisTypeOnlyScope(containerDecl))
+                thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisType;
+        }
 
         if (result.isValid())
         {

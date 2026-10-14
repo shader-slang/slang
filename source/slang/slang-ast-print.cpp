@@ -1640,9 +1640,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     for (auto modifier : decl->modifiers)
     {
-        // Receiver-mode spellings do not participate in overload identity and therefore do not
-        // appear in declaration signatures. Trailing `const` is suppressed here rather than
-        // printing suffix-only syntax as a prefix modifier.
+        // We omit trailing `const` because this loop prints prefix modifiers. For example,
+        // `int read() const` must not be displayed as `const func read() -> int`.
         if (as<CppStyleTrailingThisParamConstModifier>(modifier))
             continue;
 

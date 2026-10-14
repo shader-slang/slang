@@ -2,8 +2,7 @@
 
 // Methods written in HLSL use `inout` for `this` by default. Each explicit receiver-mode spelling
 // below selects its corresponding mode, and trailing `const` requests a nonmutating receiver.
-// `replaceWithDefault` also checks a mutating member call while the containing method's signature
-// is in progress.
+// `replaceWithDefault` also checks lookup of a mutating member in a default argument.
 
 struct Counter
 {

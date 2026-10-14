@@ -2019,10 +2019,9 @@ Modifier* SemanticsVisitor::checkModifier(
     }
     if (as<CppStyleTrailingThisParamConstModifier>(m))
     {
-        // `checkEffectiveThisParamInfo` later interprets this modifier, so retaining it after the
-        // diagnostic preserves nonmutating receiver semantics during recovery.
-        if (auto translationUnit = getShared()->getTranslationUnitRequest();
-            translationUnit && translationUnit->sourceLanguage != SourceLanguage::HLSL)
+        // We leave trailing `const` attached after the diagnostic so receiver checking can
+        // interpret the method as nonmutating while checking its body.
+        if (getSourceLanguage() != SourceLanguage::HLSL)
         {
             getSink()->diagnose(
                 Diagnostics::CppStyleTrailingThisParamConstRequiresHlsl{.modifier = m});

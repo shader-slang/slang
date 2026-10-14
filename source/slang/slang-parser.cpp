@@ -2396,16 +2396,16 @@ static void parseOptionalGenericConstraints(
 
 /// Parses an optional C++-style `const` after a `FuncDecl` parameter list.
 ///
-/// The dedicated modifier lets semantic checking distinguish this receiver-mode spelling from
-/// prefix `const`, diagnose non-HLSL use, and retain nonmutating receiver semantics during
-/// recovery. The callers parse only `FuncDecl` syntax, so constructors and accessors do not accept
-/// trailing `const`.
+/// Attaches a receiver-mode modifier to `decl` when `const` follows its parameter list.
+/// Constructors and accessors do not accept trailing `const`.
 static void parseOptionalCppStyleTrailingThisParamConstModifier(Parser* parser, FuncDecl* decl)
 {
     Token constToken;
     if (!AdvanceIf(parser, "const", &constToken))
         return;
 
+    // We use a distinct modifier because prefix `const` qualifies a variable rather than a
+    // method's receiver. For example, `int read() const` has a nonmutating receiver.
     auto modifier = parser->astBuilder->create<CppStyleTrailingThisParamConstModifier>();
     modifier->keywordName = constToken.getName();
     modifier->loc = constToken.getLoc();
