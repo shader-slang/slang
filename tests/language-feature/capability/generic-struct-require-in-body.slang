@@ -1,16 +1,20 @@
 // A `[require(...)]` on a user-defined generic type must be enforced wherever the
 // type is used, not only in entry-point signatures, exactly as for the non-generic
-// spelling. The `*NG` cases are the non-generic twins of the rows above them and
-// must report the same diagnostics.
+// spelling. The `*NG` cases are non-generic twins: GENERICNG, ENUMNG, NESTEDENUMNG
+// and STATICNG must report the same diagnostics as the rows they follow. LATENG
+// records a known gap instead: a non-generic type named only as a generic argument
+// before its declaration is still dropped, so its expected output is empty.
 //
 // Regression test for https://github.com/shader-slang/slang/issues/13579.
 //
 // Each entry point uses its own diag tag because only the compiled entry point's
 // diagnostics fire, and every invocation is exhaustive so an unexpected extra
-// diagnostic fails the test. A value of a requiring type also contributes the
-// requirement through its own type, so the caret of each "see using of" note is
-// what pins the path under test: a regression there moves the note rather than
-// removing the error.
+// diagnostic fails the test. Several rows reach the type by two paths. In GENERIC,
+// `read(gInput)` names `MetalOnly<3>` both through the callee's type and through
+// `gInput`, whose own declaration requires `metal`. The callee is visited first, so
+// the "see using of" caret sits on `read`; if the generic-argument path regressed,
+// the caret would move to `gInput` rather than the error disappearing. The caret is
+// what pins the path under test.
 
 // Field read of a `uniform` of the generic struct type.
 //DIAGNOSTIC_TEST:SIMPLE(diag=FIELD): -target hlsl -profile sm_6_5 -entry mainField -stage compute -no-codegen
@@ -31,8 +35,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=HELPERSIG): -target hlsl -profile sm_6_5 -entry mainHelperSig -stage compute -no-codegen
 // A static member accessed through the specialized struct (`MetalOnly<3>.make()`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=STATIC): -target hlsl -profile sm_6_5 -entry mainStatic -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATICNG): -target hlsl -profile sm_6_5 -entry mainStaticNG -stage compute -no-codegen
 // The struct is named only as a generic argument, before its declaration in the file.
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE): -target hlsl -profile sm_6_5 -entry mainLate -stage compute -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATENG): -target hlsl -profile sm_6_5 -entry mainLateNG -stage compute -no-codegen
 // A requiring generic enum, passed to a generic helper.
 //DIAGNOSTIC_TEST:SIMPLE(diag=ENUM): -target hlsl -profile sm_6_5 -entry mainEnum -stage compute -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=ENUMNG): -target hlsl -profile sm_6_5 -entry mainEnumNG -stage compute -no-codegen
@@ -57,6 +63,11 @@ struct MetalOnly<let N : int>
 struct MetalOnlyNG
 {
     uint value;
+
+    static uint make()
+    {
+        return 1;
+    }
 }
 
 [require(metal)]
@@ -254,6 +265,19 @@ void mainStatic()
 //STATIC: see definition of 'MetalOnly'
 //STATIC: see declaration of 'require'
 
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainStaticNG()
+/*STATICNG:
+     ^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^ entrypoint 'mainStaticNG' uses features that are not available in 'compute' stage for 'hlsl' compilation target.
+*/
+{
+    gOutput[0] = MetalOnlyNG.make();
+//STATICNG:                  ^^^^ see using of 'make'
+}
+//STATICNG: see definition of 'make'
+
 uint typeOnly<T>()
 {
     return 1;
@@ -272,6 +296,13 @@ void mainLate()
 }
 //LATE: see definition of 'DeclaredLater'
 //LATE: see declaration of 'require'
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainLateNG()
+{
+    gOutput[0] = typeOnly<DeclaredLaterNG>();
+}
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -331,6 +362,12 @@ void mainNestedEnumNG()
 
 [require(metal)]
 struct DeclaredLater<let N : int>
+{
+    uint value;
+}
+
+[require(metal)]
+struct DeclaredLaterNG
 {
     uint value;
 }

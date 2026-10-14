@@ -6,9 +6,12 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13579.
 //
 // CHECK is non-exhaustive because E36108 repeats its "see definition of" note for
-// the function (for both spellings). CLEAN compiles only the declarations whose
-// requirements are compatible, and is exhaustive with no annotations, so any
-// diagnostic there fails the test.
+// the function (for both spellings). The unanchored CHECK lines below pin, once per
+// spelling, the notes that point back at a type declaration: the "see definition of"
+// note of each E36108/E36104, the "see declaration of" the interface of each E36118,
+// and the "see declaration of 'get'" of each E36119. CLEAN compiles only the
+// declarations whose requirements are compatible, and is exhaustive with no
+// annotations, so any diagnostic there fails the test.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CLEAN): -target hlsl -no-codegen -DCLEAN_ONLY
 

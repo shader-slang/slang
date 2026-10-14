@@ -8,7 +8,7 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. PARAM, DUP and SCOPE are exhaustive, so each pins exactly one
+// diagnostics fire. PARAM, DUP and BODYONLY are exhaustive, so each pins exactly one
 // "see using of 'Foo'" note per use site. The other error invocations are
 // non-exhaustive and pin only the notes they are about. Carets align to the
 // columns of the preceding source line.
@@ -48,9 +48,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDeep -stage vertex
 // A requiring generic struct used only in the body of a clean-signature entry
 // point (passed to a helper) is diagnosed by general capability inference rather
-// than by the signature check. The note points at the helper call, not at a
-// signature use; generic-struct-require-in-body.slang covers other body uses.
-//DIAGNOSTIC_TEST:SIMPLE(diag=SCOPE): -target spirv -emit-spirv-directly -entry mainScope -stage vertex
+// than by the signature check, so its only note points at the helper call.
+// generic-struct-require-in-body.slang covers other body uses.
+//DIAGNOSTIC_TEST:SIMPLE(diag=BODYONLY): -target spirv -emit-spirv-directly -entry mainBodyOnly -stage vertex
 // Positive case: the cpp requirement is satisfied for the cpp target, so the same
 // code must compile. We assert no E36107 *and* that compilation reaches code
 // emission (the entry-point rename warning E40100 only fires on success), so the
@@ -226,19 +226,19 @@ void helper(Foo<int> a)
 }
 
 [shader("vertex")]
-void mainScope(int x)
-/*SCOPE:
-     ^^^^^^^^^ unavailable features in entry point
-     ^^^^^^^^^ entrypoint 'mainScope' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
+void mainBodyOnly(int x)
+/*BODYONLY:
+     ^^^^^^^^^^^^ unavailable features in entry point
+     ^^^^^^^^^^^^ entrypoint 'mainBodyOnly' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
 */
 {
     helper(Foo<int>());
-/*SCOPE:
+/*BODYONLY:
     ^^^^^^ see using of 'Foo'
 */
 }
-//SCOPE: see definition of 'Foo'
-//SCOPE: see declaration of 'require'
+//BODYONLY: see definition of 'Foo'
+//BODYONLY: see declaration of 'require'
 
 [shader("vertex")]
 Foo<int> mainRet()
