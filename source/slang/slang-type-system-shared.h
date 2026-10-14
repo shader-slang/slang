@@ -167,6 +167,12 @@ enum class AddressSpace : uint64_t
     SpecializationConstant,
     // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
     NodePayloadAMDX,
+    // A CUDA-family entry-point kernel parameter. `ConstRef<T, CudaKernelParam>` is emitted as the
+    // by-value kernel argument `T p` (ABI unchanged) and a reference of it as `&p`, so an
+    // entry-point uniform aggregate's address can be forwarded into a `borrow in` callee without a
+    // per-thread copy. A distinct atom, rather than reusing `Uniform`, keeps that by-value emission
+    // unambiguous against the SPIR-V/Metal storage-class mapping.
+    CudaKernelParam,
 
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
