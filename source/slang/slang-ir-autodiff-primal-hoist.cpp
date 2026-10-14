@@ -462,7 +462,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
         for (auto child : block->getChildren())
         {
-            // A dead pair, e.g. around a call with no derivative, has no primals to keep.
+            // Zero-derivative call splitting can leave an unused pair. Such temporary IR is valid,
+            // and checkpointing has no primal operands to preserve for it.
             if (as<IRMakeDifferentialPair>(child) && !child->hasUses())
                 continue;
 

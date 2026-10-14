@@ -617,6 +617,8 @@ public:
                     switch (inst->getOp())
                     {
                     case kIROp_Call:
+                        // Record constant-input calls before specializing optional conformances.
+                        shouldCallImpliesNoDiff(diffTypeContext, as<IRCall>(inst));
                         if (isDifferentiableFunc(
                                 diffTypeContext,
                                 as<IRCall>(inst)->getCallee(),

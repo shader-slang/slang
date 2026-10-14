@@ -13,6 +13,14 @@
 namespace Slang
 {
 
+bool isAbsentOptionalDerivative(IRInst* inst)
+{
+    if (as<IRVoidLit>(inst))
+        return true;
+    if (auto table = as<IRWitnessTable>(inst))
+        return as<IRVoidType>(table->getConformanceType()) != nullptr;
+    return false;
+}
 
 IRInst* _lookupWitness(
     IRBuilder* builder,
@@ -28,7 +36,7 @@ IRInst* _lookupWitness(
                 return entry->getSatisfyingVal();
         }
 
-        if (witnessTable->getConformanceType()->getOp() == kIROp_VoidType)
+        if (isAbsentOptionalDerivative(witnessTable))
         {
             return builder->getVoidValue();
         }
@@ -921,12 +929,16 @@ void stripTempDecorations(IRInst* inst)
         case kIROp_DifferentialInstDecoration:
         case kIROp_MixedDifferentialInstDecoration:
         case kIROp_RecomputeBlockDecoration:
-        case kIROp_AutoDiffOriginalValueDecoration:
         case kIROp_BackwardDerivativePrimalReturnDecoration:
         case kIROp_BackwardDerivativePrimalContextDecoration:
         case kIROp_PrimalValueStructKeyDecoration:
         case kIROp_PrimalElementTypeDecoration:
             decor->removeAndDeallocate();
+            break;
+        case kIROp_AutoDiffOriginalValueDecoration:
+            // Calls retain their primal callee until higher-order differentiation is finished.
+            if (!as<IRCall>(inst))
+                decor->removeAndDeallocate();
             break;
         default:
             break;

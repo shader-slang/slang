@@ -1346,8 +1346,8 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         if (resultDiffWitness)
             resultDiffWitness = makeDiffPairWitness(resultDiffWitness->getSub(), resultDiffWitness);
 
-        // A derivative is a static function that takes the base's `this` as its first parameter,
-        // so that `this` is described as one.
+        // The derivative is static: witness 0 describes its explicit receiver parameter.
+        // Parameter direction, including a mutating receiver's inout mode, comes from its FuncType.
         List<SubtypeWitness*> pairDiffWitnesses;
         if (diffTypeInfoWitness->getThisParamType())
         {

@@ -5,7 +5,7 @@
 // Each cubic gives `d2/dt2 (k t^3) = 6 k t`, evaluated at `t = 2`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 // `a t^3`, differentiable in both `a` and `t`.
 interface IScaledCurve : IDifferentiable
@@ -27,6 +27,26 @@ interface IMutatingCurve
     [Differentiable]
     [mutating]
     float eval(float t);
+}
+
+interface IMutatingScaledCurve : IDifferentiable
+{
+    [Differentiable]
+    [mutating]
+    float eval(float t);
+}
+
+struct MutatingScaledCubic : IMutatingScaledCurve
+{
+    float a;
+
+    [Differentiable]
+    [mutating]
+    float eval(float t)
+    {
+        a *= t;
+        return a * t * t;
+    }
 }
 
 struct CountingCubic : IMutatingCurve
@@ -211,6 +231,15 @@ float slopeScaled<C : IScaledCurve>(C c, float t)
 float evalMutating<C : IMutatingCurve>(no_diff C c, float t) { return c.eval(t); }
 
 [Differentiable]
+float evalMutatingScaled<C : IMutatingScaledCurve>(C c, float t) { return c.eval(t); }
+
+[Differentiable]
+float slopeMutatingScaled<C : IMutatingScaledCurve>(C c, float t)
+{
+    return __fwd_diff(evalMutatingScaled<C>)(diffPair(c, C.dzero()), diffPair(t, 1.0)).d;
+}
+
+[Differentiable]
 float evalCurve<C : ICurve>(no_diff C c, float t) { return c.eval(t); }
 
 [Differentiable]
@@ -263,64 +292,78 @@ void computeMain()
     var c = diffPair(scaled);
     var s = diffPair(2.0);
     __bwd_diff(slopeScaled<ScaledCubic>)(c, s, 1.0);
-    // CHECK: {{^}}12.0
+    // CHECK: {{^}}12.000000{{$}}
     outputBuffer[0] = c.d.a;
-    // CHECK-NEXT: 24.0
+    // CHECK-NEXT: {{^}}24.000000{{$}}
     outputBuffer[1] = s.d;
 
     CountingCubic counting;
     counting.count = 0;
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[2] = __fwd_diff(__fwd_diff(evalMutating<CountingCubic>))(counting, t).d.d;
 
     Poly<2> poly;
-    // CHECK-NEXT: 24.0
+    // CHECK-NEXT: {{^}}24.000000{{$}}
     outputBuffer[3] = __fwd_diff(__fwd_diff(evalCurve<Poly<2>>))(poly, t).d.d;
 
     ExtCubic ext;
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[4] = __fwd_diff(__fwd_diff(evalCurve<ExtCubic>))(ext, t).d.d;
 
     SubscriptCubic subscript;
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[5] = __fwd_diff(__fwd_diff(evalSubscript<SubscriptCubic>))(subscript, t).d.d;
     var u = diffPair(2.0);
     __bwd_diff(slopeSubscript<SubscriptCubic>)(subscript, u, 1.0);
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[6] = u.d;
 
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[7] = __fwd_diff(__fwd_diff(make<MadeCubic>))(t).d.d;
     var v = diffPair(2.0);
     __bwd_diff(slopeMake<MadeCubic>)(v, 1.0);
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[8] = v.d;
 
     GenericSubscriptCubic genericSubscript;
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[9] =
         __fwd_diff(__fwd_diff(evalGenericSubscript<GenericSubscriptCubic>))(genericSubscript, t).d.d;
 
     Box box;
     box.v = 0.0;
     let z = Box.dzero();
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[10] =
         __fwd_diff(__fwd_diff(roundtrip<Box>))(diffPair(diffPair(box, z), diffPair(z, z)), t).d.d;
     var b = diffPair(box);
     var r = diffPair(2.0);
     __bwd_diff(slopeRoundtrip<Box>)(b, r, 1.0);
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[11] = r.d;
 
-    // CHECK-NEXT: 24.0
+    // CHECK-NEXT: {{^}}24.000000{{$}}
     outputBuffer[12] = __fwd_diff(__fwd_diff(make<MadePoly<2>>))(t).d.d;
     var g = diffPair(2.0);
     __bwd_diff(slopeMake<MadeGeneric<float>>)(g, 1.0);
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[13] = g.d;
 
     Variadic variadic;
-    // CHECK-NEXT: 2.0
+    // CHECK-NEXT: {{^}}2.000000{{$}}
     outputBuffer[14] = __fwd_diff(__fwd_diff(evalVariadic<Variadic>))(variadic, t).d.d;
+
+    MutatingScaledCubic mutating;
+    mutating.a = 2.0;
+    let mz = MutatingScaledCubic.dzero();
+    // CHECK-NEXT: {{^}}24.000000{{$}}
+    outputBuffer[15] = __fwd_diff(__fwd_diff(evalMutatingScaled<MutatingScaledCubic>))(
+        diffPair(diffPair(mutating, mz), diffPair(mz, mz)), t).d.d;
+    var mc = diffPair(mutating);
+    var mt = diffPair(2.0);
+    __bwd_diff(slopeMutatingScaled<MutatingScaledCubic>)(mc, mt, 1.0);
+    // CHECK-NEXT: {{^}}24.000000{{$}}
+    outputBuffer[16] = mt.d;
+    // CHECK-NEXT: {{^}}12.000000{{$}}
+    outputBuffer[17] = mc.d.a;
 }

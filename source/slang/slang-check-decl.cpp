@@ -10179,40 +10179,36 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     return doesSignatureMatch;
 }
 
-/// Returns whether the higher-order conformance of the synthesized derivative `synFuncDecl` is
-/// recorded. Only a member method's derivative is reached through an interface, and core-module
-/// methods keep the absent entry, which would otherwise add tables to every module using their
-/// conformances.
-static bool needsHigherOrderDiffWitness(SynthesizedFuncDecl* synFuncDecl)
+/// Returns whether to record optional higher-order witnesses for a user member.
+/// Core members omit these tables to avoid expanding every module's core conformances; a request
+/// for an unavailable higher-order derivative must diagnose rather than assume a zero gradient.
+static bool shouldRecordHigherOrderDiffWitness(SynthesizedFuncDecl* synFuncDecl)
 {
-    if (synFuncDecl->operands.getCount() == 0)
-        return false;
+    SLANG_RELEASE_ASSERT(
+        synFuncDecl->irOp == kIROp_ForwardDifferentiate && synFuncDecl->operands.getCount() == 1);
     auto baseDeclRef = as<DeclRefBase>(synFuncDecl->operands[0]);
     auto baseDecl = baseDeclRef ? as<FunctionDeclBase>(baseDeclRef->getDecl()) : nullptr;
-    if (!baseDecl || isFromCoreModule(baseDecl))
+    SLANG_RELEASE_ASSERT(baseDecl);
+    if (isFromCoreModule(baseDecl))
         return false;
-    auto parent = baseDecl->parentDecl;
-    if (as<GenericDecl>(parent))
-        parent = parent->parentDecl;
+    auto parent = getParentDecl(baseDecl);
     // An accessor belongs to its subscript or property.
     if (as<AccessorDecl>(baseDecl))
     {
         if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
-            parent = parent->parentDecl;
-        if (as<GenericDecl>(parent))
-            parent = parent->parentDecl;
+            parent = getParentDecl(parent);
     }
     return as<AggTypeDeclBase>(parent) != nullptr;
 }
 
-/// Finds the conformance of `synFuncDecl` to `superType` in the extension synthesized with it,
-/// without the general subtype search, which can recurse through that same conformance.
 SubtypeWitness* SemanticsVisitor::findSynthesizedHigherOrderDiffWitness(
     SynthesizedFuncDecl* synFuncDecl,
     Type* subType,
     Type* superType)
 {
-    for (auto extDecl : getShared()->getCandidateExtensionsForTypeDecl(synFuncDecl))
+    SubtypeWitness* result = nullptr;
+    auto candidateExtensions = getShared()->getCandidateExtensionsForTypeDecl(synFuncDecl);
+    for (auto extDecl : candidateExtensions)
     {
         auto extDeclRef = applyExtensionToType(extDecl, subType);
         if (!extDeclRef)
@@ -10223,10 +10219,12 @@ SubtypeWitness* SemanticsVisitor::findSynthesizedHigherOrderDiffWitness(
             auto baseType = getBaseType(m_astBuilder, inheritanceDeclRef);
             if (!baseType || !baseType->equals(superType))
                 continue;
-            return m_astBuilder->getDeclaredSubtypeWitness(subType, superType, inheritanceDeclRef);
+            SLANG_RELEASE_ASSERT(!result);
+            result =
+                m_astBuilder->getDeclaredSubtypeWitness(subType, superType, inheritanceDeclRef);
         }
     }
-    return nullptr;
+    return result;
 }
 
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
@@ -10550,7 +10548,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                         if (synFuncDecl->irOp == kIROp_ForwardDifferentiate)
                         {
                             SubtypeWitness* witness = nullptr;
-                            if (needsHigherOrderDiffWitness(synFuncDecl))
+                            if (shouldRecordHigherOrderDiffWitness(synFuncDecl))
                                 witness = findSynthesizedHigherOrderDiffWitness(
                                     synFuncDecl,
                                     constraintSub,

@@ -5,7 +5,7 @@
 // `Cubic.eval(t) = t^3`: `eval'(t) = 3t^2`, `eval''(t) = 6t`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 
 interface ICurve
 {
@@ -41,6 +41,12 @@ interface IMaybeMutate
 {
     [MaybeDifferentiable]
     void mutate(inout float x);
+}
+
+interface IMaybeProduce
+{
+    [MaybeDifferentiable]
+    void produce(float x, out float y);
 }
 
 interface IMaybeCount
@@ -106,6 +112,12 @@ struct NonDiffMutate : IMaybeMutate
 {
     [NoDiffThis]
     void mutate(inout float x) { x = 5.0; }
+}
+
+struct NonDiffProduce : IMaybeProduce
+{
+    [NoDiffThis]
+    void produce(float x, out float y) { y = x * x; }
 }
 
 struct NonDiffCount : IMaybeCount
@@ -191,6 +203,15 @@ float useMaybeMutate<T : IMaybeMutate>(no_diff T t, float x)
     return y * x;
 }
 
+// Only the final multiplication carries a tangent, so its derivative is y = x^2.
+[Differentiable]
+float useMaybeProduce<T : IMaybeProduce>(no_diff T t, float x)
+{
+    float y;
+    t.produce(x, y);
+    return y * x;
+}
+
 // The result is not differentiable, so only `+ x` is.
 [Differentiable]
 float useMaybeCount<T : IMaybeCount>(no_diff T t, float x) { return float(t.count(x)) + x; }
@@ -234,74 +255,87 @@ void computeMain()
 
     var a = diffPair(3.0);
     __bwd_diff(slopeGeneric<Cubic>)(c, a, 1.0);
-    // CHECK: {{^}}18.0
+    // CHECK: {{^}}18.000000{{$}}
     outputBuffer[0] = a.d;
 
-    // CHECK-NEXT: 30.0
+    // CHECK-NEXT: {{^}}30.000000{{$}}
     outputBuffer[1] = __fwd_diff(slopeGeneric<Cubic>)(c, diffPair(5.0, 1.0)).d;
 
     var d = diffPair(3.0);
     __bwd_diff(slopeStatic<StaticCubic>)(d, 1.0);
-    // CHECK-NEXT: 18.0
+    // CHECK-NEXT: {{^}}18.000000{{$}}
     outputBuffer[2] = d.d;
 
     Surface surface;
     var e = diffPair(2.0);
     __bwd_diff(slopeSurface<Surface>)(surface, e, 1.0);
-    // CHECK-NEXT: 30.0
+    // CHECK-NEXT: {{^}}30.000000{{$}}
     outputBuffer[3] = e.d;
 
     var f = diffPair(3.0);
     __bwd_diff(detachedGeneric<Cubic>)(c, f, 1.0);
-    // CHECK-NEXT: 27.0
+    // CHECK-NEXT: {{^}}27.000000{{$}}
     outputBuffer[4] = f.d;
 
     NonDiff n;
-    // CHECK-NEXT: 1.0
+    // CHECK-NEXT: {{^}}1.000000{{$}}
     outputBuffer[5] = __fwd_diff(useMaybe<NonDiff>)(n, diffPair(3.0, 1.0)).d;
     NonDiffGeneric ng;
-    // CHECK-NEXT: 1.0
+    // CHECK-NEXT: {{^}}1.000000{{$}}
     outputBuffer[6] = __fwd_diff(useMaybeGeneric<NonDiffGeneric>)(ng, diffPair(2.0, 1.0)).d;
     var g = diffPair(3.0);
     __bwd_diff(useMaybe<NonDiff>)(n, g, 1.0);
-    // CHECK-NEXT: 1.0
+    // CHECK-NEXT: {{^}}1.000000{{$}}
     outputBuffer[7] = g.d;
 
     NonDiffMutate nm;
-    // CHECK-NEXT: 5.0
+    // CHECK-NEXT: {{^}}5.000000{{$}}
     outputBuffer[8] = __fwd_diff(useMaybeMutate<NonDiffMutate>)(nm, diffPair(3.0, 1.0)).d;
     var h = diffPair(3.0);
     __bwd_diff(useMaybeMutate<NonDiffMutate>)(nm, h, 1.0);
-    // CHECK-NEXT: 5.0
+    // CHECK-NEXT: {{^}}5.000000{{$}}
     outputBuffer[9] = h.d;
 
     NonDiffCount nc;
-    // CHECK-NEXT: 1.0
+    // CHECK-NEXT: {{^}}1.000000{{$}}
     outputBuffer[10] = __fwd_diff(useMaybeCount<NonDiffCount>)(nc, diffPair(3.0, 1.0)).d;
     var k = diffPair(3.0);
     __bwd_diff(useMaybeCount<NonDiffCount>)(nc, k, 1.0);
-    // CHECK-NEXT: 1.0
+    // CHECK-NEXT: {{^}}1.000000{{$}}
     outputBuffer[11] = k.d;
 
     CustomCubic cc;
     var u = diffPair(3.0);
     __bwd_diff(slopeGeneric<CustomCubic>)(cc, u, 1.0);
-    // CHECK-NEXT: 100.0
+    // CHECK-NEXT: {{^}}100.000000{{$}}
     outputBuffer[12] = u.d;
 
-    // CHECK-NEXT: 12.0
+    // CHECK-NEXT: {{^}}12.000000{{$}}
     outputBuffer[13] = secondGeneric(c, 2.0);
 
     OutCubic oc;
-    // CHECK-NEXT: 24.0
+    // CHECK-NEXT: {{^}}24.000000{{$}}
     outputBuffer[14] =
         __fwd_diff(__fwd_diff(evalOut<OutCubic>))(oc, diffPair(diffPair(2.0, 1.0), diffPair(1.0, 0.0))).d.d;
     var w = diffPair(2.0);
     __bwd_diff(slopeOut<OutCubic>)(oc, w, 1.0);
-    // CHECK-NEXT: 24.0
+    // CHECK-NEXT: {{^}}24.000000{{$}}
     outputBuffer[15] = w.d;
 
     Quartic q;
-    // CHECK-NEXT: 48.0
+    // CHECK-NEXT: {{^}}48.000000{{$}}
     outputBuffer[16] = __fwd_diff(curvatureGeneric<Quartic>)(q, diffPair(2.0, 1.0)).d;
+
+    NonDiffProduce np;
+    // CHECK-NEXT: {{^}}9.000000{{$}}
+    outputBuffer[17] = __fwd_diff(useMaybeProduce<NonDiffProduce>)(np, diffPair(3.0, 1.0)).d;
+    var produced = diffPair(3.0);
+    __bwd_diff(useMaybeProduce<NonDiffProduce>)(np, produced, 1.0);
+    // CHECK-NEXT: {{^}}9.000000{{$}}
+    outputBuffer[18] = produced.d;
+
+    var generic = diffPair(2.0);
+    __bwd_diff(useMaybeGeneric<NonDiffGeneric>)(ng, generic, 1.0);
+    // CHECK-NEXT: {{^}}1.000000{{$}}
+    outputBuffer[19] = generic.d;
 }

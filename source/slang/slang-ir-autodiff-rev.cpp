@@ -242,7 +242,7 @@ struct BackwardDiffTranslationContext
             trivialFwdDiffInst));
     }
 
-    void translateFunc(
+    SlangResult translateFunc(
         IRBuilder* builder,
         IRFunc* targetFunc,
         IRInst*& applyFuncInst,
@@ -264,12 +264,14 @@ struct BackwardDiffTranslationContext
         IRBuilder tempBuilder = *builder;
         tempBuilder.setInsertBefore(propagateFunc);
 
+        auto errorCount = sink->getErrorCount();
         auto fwdDiffFunc =
             (!isTrivial)
                 ? generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc)
                 : generateTrivialForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
-        if (!fwdDiffFunc)
-            return;
+        // Failed transcription has no differential program that can be safely transposed.
+        if (!fwdDiffFunc || sink->getErrorCount() != errorCount)
+            return SLANG_FAIL;
 
         // Split first block into a paramter block.
         makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
@@ -421,6 +423,7 @@ struct BackwardDiffTranslationContext
         propagateFuncInst = propagateFunc;
         applyFuncInst = applyFunc;
         rematFuncInst = rematFuncResult;
+        return SLANG_OK;
     }
 };
 
@@ -1023,7 +1026,7 @@ IRInst* maybeTranslateBackwardDerivative(
     IRInst* bwdPropagateFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
-    translater.translateFunc(
+    auto result = translater.translateFunc(
         &builder,
         targetFunc,
         bwdPrimalFunc,
@@ -1032,6 +1035,12 @@ IRInst* maybeTranslateBackwardDerivative(
         bwdContextType,
         bwdMinimalContextType,
         false);
+    if (SLANG_FAILED(result))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     builder.setInsertAfter(translateInst);
     return builder.emitMakeTuple(
@@ -1082,7 +1091,7 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
     IRInst* bwdPropagateFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
-    translater.translateFunc(
+    auto result = translater.translateFunc(
         &builder,
         targetFunc,
         bwdPrimalFunc,
@@ -1091,6 +1100,12 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
         bwdContextType,
         bwdMinimalContextType,
         true);
+    if (SLANG_FAILED(result))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     builder.setInsertAfter(translateInst);
     return builder.emitMakeTuple(

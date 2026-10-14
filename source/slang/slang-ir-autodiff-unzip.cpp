@@ -23,7 +23,7 @@ struct UnzippingContext
 
     IRBlock* firstDiffBlock;
 
-    DiagnosticSink* sink = nullptr;
+    DiagnosticSink* sink;
 
     UnzippingContext(AutoDiffSharedContext* autodiffContext, DiagnosticSink* sink)
         : autodiffContext(autodiffContext), diffTypeContext(autodiffContext), sink(sink)
@@ -221,8 +221,8 @@ struct UnzippingContext
         }
     }
 
-    /// Splits a call whose optional backward derivative is absent into the primal call and zero
-    /// differentials for its result and its `out`/`inout` arguments.
+    /// Splits a no_diff call or an absent optional derivative into the primal call and zero
+    /// differentials. Both out and inout outputs stop carrying the incoming tangent.
     InstPair splitCallWithoutBackwardDerivative(
         IRBuilder* primalBuilder,
         IRBuilder* diffBuilder,
@@ -232,7 +232,8 @@ struct UnzippingContext
         // Only a callee that is not differentiable at all has a zero derivative.
         auto fwdFunc =
             diffTypeContext.tryGetAssociationOfKind(primalFunc, AnnotationKind::ForwardDerivative);
-        if (fwdFunc && !as<IRVoidLit>(fwdFunc) && sink)
+        if (fwdFunc && !isAbsentOptionalDerivative(fwdFunc) &&
+            !mixedCall->findDecoration<IRTreatCallAsDifferentiableDecoration>())
         {
             sink->diagnose(Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
                 .diffLevel = "backward",
@@ -251,10 +252,12 @@ struct UnzippingContext
                 continue;
             }
             primalArgs.add(lookupPrimalInst(arg));
+            // By-value inputs have no tangent to write back.
             auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
             if (!argPtrType)
                 continue;
             auto pairType = as<IRDifferentialPairType>(argPtrType->getValueType());
+            // Pointer-pair outputs bypass mixed-call splitting in forward transcription.
             if (!pairType)
                 continue;
             auto primalValueType = pairType->getValueType();
@@ -289,7 +292,8 @@ struct UnzippingContext
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             AnnotationKind::BackwardDerivativeApply);
-        if (as<IRVoidLit>(applyBwdFunc))
+        if (isAbsentOptionalDerivative(applyBwdFunc) ||
+            (!applyBwdFunc && mixedCall->findDecoration<IRTreatCallAsDifferentiableDecoration>()))
             return splitCallWithoutBackwardDerivative(
                 primalBuilder,
                 diffBuilder,
