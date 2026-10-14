@@ -477,23 +477,55 @@ SlangResult Session::loadCoreModule(const void* coreModule, size_t coreModuleSiz
     return loadBuiltinModule(slang::BuiltinModuleName::Core, coreModule, coreModuleSizeInBytes);
 }
 
+// Extract a named builtin into owned storage. The temporary archive file system can then
+// release its compressed entries, and lazy AST readers can retain the extracted blob.
+static SlangResult extractBuiltinModule(
+    const void* archiveData,
+    size_t archiveSize,
+    slang::BuiltinModuleName moduleName,
+    ComPtr<ISlangBlob>& outModule)
+{
+    // The public API accepts byte buffers with no alignment requirement. Align such input
+    // before archive readers inspect typed RIFF headers; ordinary embedded arrays need no copy.
+    ComPtr<ISlangBlob> alignedArchive;
+    if (size_t(archiveData) % RIFF::Chunk::kChunkAlignment != 0)
+    {
+        SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(archiveData, archiveSize, alignedArchive));
+        archiveData = alignedArchive->getBufferPointer();
+    }
+    ComPtr<ISlangFileSystemExt> fileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(archiveData, archiveSize, fileSystem));
+    String fileName = String(getBuiltinModuleNameStr(moduleName)) + ".slang-module";
+    return fileSystem->loadFile(fileName.getBuffer(), outModule.writeRef());
+}
+
+SlangResult BuiltinModuleArchive::getModule(ComPtr<ISlangBlob>& outModule)
+{
+    outModule = nullptr;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_module)
+    {
+        ComPtr<ISlangBlob> module;
+        SLANG_RETURN_ON_FAIL(extractBuiltinModule(
+            m_archive->getBufferPointer(),
+            m_archive->getBufferSize(),
+            m_moduleName,
+            module));
+        m_module = module;
+    }
+    outModule = m_module;
+    return SLANG_OK;
+}
+
 SlangResult Session::loadBuiltinModule(
     slang::BuiltinModuleName moduleName,
     const void* moduleData,
     size_t sizeInBytes)
 {
-    // The public raw-pointer API must not retain caller-owned storage.
-    auto root = RIFF::RootChunk::getFromBlob(moduleData, sizeInBytes);
+    // Public input is never cached: each caller may supply a different archive and may
+    // release its buffer as soon as this call returns.
     ComPtr<ISlangBlob> moduleBlob;
-    if (root && root->getType() == SerialBinary::kModuleFourCC)
-    {
-        SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(moduleData, sizeInBytes, moduleBlob));
-    }
-    else
-    {
-        // Archive extraction below makes an independent copy before this call returns.
-        moduleBlob = UnownedRawBlob::create(moduleData, sizeInBytes);
-    }
+    SLANG_RETURN_ON_FAIL(extractBuiltinModule(moduleData, sizeInBytes, moduleName, moduleBlob));
     return loadBuiltinModule(moduleName, moduleBlob);
 }
 
@@ -511,27 +543,14 @@ SlangResult Session::loadBuiltinModule(slang::BuiltinModuleName moduleName, ISla
         return SLANG_FAIL;
     }
 
-    ComPtr<ISlangBlob> fileContents(moduleBlob);
-    auto root = RIFF::RootChunk::getFromBlob(moduleBlob);
-    if (!root || root->getType() != SerialBinary::kModuleFourCC)
-    {
-        ComPtr<ISlangFileSystemExt> fileSystem;
-        SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
-            moduleBlob->getBufferPointer(),
-            moduleBlob->getBufferSize(),
-            fileSystem));
-        String fileName = String(builtinModuleInfo.name) + ".slang-module";
-        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(fileName.getBuffer(), fileContents.writeRef()));
-    }
-
     // Fossil AST values are accessed in place and require the serialized module's alignment.
     SLANG_RELEASE_ASSERT(
-        size_t(fileContents->getBufferPointer()) % RIFF::Chunk::kChunkAlignment == 0);
+        size_t(moduleBlob->getBufferPointer()) % RIFF::Chunk::kChunkAlignment == 0);
 
     // Let's try loading serialized modules and adding them
     Module* module = nullptr;
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(
-        fileContents,
+        moduleBlob,
         builtinModuleInfo.languageScope,
         builtinModuleInfo.name,
         module));

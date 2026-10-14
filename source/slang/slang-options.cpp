@@ -12,7 +12,6 @@
 #include "compiler-core/slang-core-diagnostics.h"
 #include "compiler-core/slang-name-convention-util.h"
 #include "compiler-core/slang-source-embed-util.h"
-#include "core/slang-archive-file-system.h"
 #include "core/slang-castable.h"
 #include "core/slang-char-util.h"
 #include "core/slang-command-options-writer.h"
@@ -1343,14 +1342,6 @@ void initCommandOptions(CommandOptions& options)
          "-save-glsl-module-bin-source <filename>",
          "Save the serialized glsl module "
          "as a C array.\n"},
-        {OptionKind::SaveCoreModuleRawBinSource,
-         "-save-core-module-raw-bin-source",
-         "-save-core-module-raw-bin-source <filename>",
-         "Save the uncompressed serialized core module as a C array, without an archive."},
-        {OptionKind::SaveGLSLModuleRawBinSource,
-         "-save-glsl-module-raw-bin-source",
-         "-save-glsl-module-raw-bin-source <filename>",
-         "Save the uncompressed serialized GLSL module as a C array, without an archive."},
         {OptionKind::TrackLiveness,
          "-track-liveness",
          nullptr,
@@ -1510,7 +1501,6 @@ struct OptionsParser
         SlangArchiveType archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
         String fileName;
         bool writeAsSourceBytes = false;
-        bool writeRawModule = false;
     };
 
     /// Add matching raw/API translation-unit records and preserve explicit-language provenance.
@@ -1547,8 +1537,7 @@ struct OptionsParser
     // Adds a built-in module save request to be written after optional core-module compilation.
     SlangResult addPendingBuiltinModuleSave(
         slang::BuiltinModuleName moduleName,
-        bool writeAsSourceBytes,
-        bool writeRawModule = false);
+        bool writeAsSourceBytes);
 
     // Writes deferred built-in module saves, compiling each requested module if needed.
     // For example, GLSL serialization after loading core reuses that archive.
@@ -2038,16 +2027,14 @@ void OptionsParser::addOutputPath(char const* inPath)
 
 SlangResult OptionsParser::addPendingBuiltinModuleSave(
     slang::BuiltinModuleName moduleName,
-    bool writeAsSourceBytes,
-    bool writeRawModule)
+    bool writeAsSourceBytes)
 {
     CommandLineArg fileName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
 
     PendingBuiltinModuleSave save;
     save.moduleName = moduleName;
-    save.archiveType = writeRawModule ? SLANG_ARCHIVE_TYPE_RIFF : m_archiveType;
-    save.writeRawModule = writeRawModule;
+    save.archiveType = m_archiveType;
     save.fileName = fileName.value;
     save.writeAsSourceBytes = writeAsSourceBytes;
     m_pendingBuiltinModuleSaves.add(save);
@@ -2077,18 +2064,6 @@ SlangResult OptionsParser::writePendingBuiltinModuleSaves()
                 blob->getBufferPointer(),
                 blob->getBufferSize()));
             continue;
-        }
-
-        if (save.writeRawModule)
-        {
-            // The archive puts file contents immediately after a variable-length path, which
-            // need not be aligned. Embed the module itself so alignas on the C array also
-            // aligns the fossil data that will be accessed directly at run time.
-            ComPtr<ISlangFileSystemExt> fileSystem;
-            SLANG_RETURN_ON_FAIL(
-                loadArchiveFileSystem(blob->getBufferPointer(), blob->getBufferSize(), fileSystem));
-            String modulePath = String(getBuiltinModuleNameStr(save.moduleName)) + ".slang-module";
-            SLANG_RETURN_ON_FAIL(fileSystem->loadFile(modulePath.getBuffer(), blob.writeRef()));
         }
 
         StringBuilder builder;
@@ -3110,16 +3085,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::SaveCoreModuleBinSource:
         case OptionKind::SaveGLSLModuleBinSource:
-        case OptionKind::SaveCoreModuleRawBinSource:
-        case OptionKind::SaveGLSLModuleRawBinSource:
             {
-                const bool isCore = optionKind == OptionKind::SaveCoreModuleBinSource ||
-                                    optionKind == OptionKind::SaveCoreModuleRawBinSource;
-                const bool isRaw = optionKind == OptionKind::SaveCoreModuleRawBinSource ||
-                                   optionKind == OptionKind::SaveGLSLModuleRawBinSource;
-                const auto moduleName =
-                    isCore ? slang::BuiltinModuleName::Core : slang::BuiltinModuleName::GLSL;
-                SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true, isRaw));
+                const auto moduleName = optionKind == OptionKind::SaveCoreModuleBinSource
+                                            ? slang::BuiltinModuleName::Core
+                                            : slang::BuiltinModuleName::GLSL;
+                SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true));
                 break;
             }
         case OptionKind::DumpIrIds:

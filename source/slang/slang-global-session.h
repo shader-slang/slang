@@ -26,6 +26,28 @@ namespace Slang
 {
 
 
+/// Lazily extracts one immutable builtin module from a fixed archive.
+/// The embedded core and GLSL archives each use a library-lifetime instance, so sessions
+/// share decompressed bytes while keeping their own AST and IR. Caller-supplied archives
+/// bypass this cache. A failed extraction is not published and can be retried.
+class BuiltinModuleArchive
+{
+public:
+    BuiltinModuleArchive(ISlangBlob* archive, slang::BuiltinModuleName moduleName)
+        : m_archive(archive), m_moduleName(moduleName)
+    {
+    }
+
+    /// Return shared, independently owned module bytes, extracting them on the first success.
+    SlangResult getModule(ComPtr<ISlangBlob>& outModule);
+
+private:
+    std::mutex m_mutex;
+    ComPtr<ISlangBlob> m_archive;
+    slang::BuiltinModuleName m_moduleName;
+    ComPtr<ISlangBlob> m_module;
+};
+
 class CodeGenTransitionMap
 {
 public:
@@ -172,9 +194,9 @@ public:
         slang::BuiltinModuleName moduleName,
         const void* coreModule,
         size_t coreModuleSizeInBytes) override;
-    /// Load an immutable builtin module blob, retaining its storage for lazy deserialization.
-    /// Serialized module blobs must be aligned to RIFF::Chunk::kChunkAlignment. Archive blobs
-    /// are also accepted, but their entries still need to be extracted and decompressed.
+    /// Load an already extracted builtin module, retaining its bytes for lazy deserialization.
+    /// Internal callers supply immutable, RIFF::Chunk::kChunkAlignment-aligned storage from
+    /// archive extraction. Public callers continue to use the archive-taking overload above.
     SlangResult loadBuiltinModule(slang::BuiltinModuleName moduleName, ISlangBlob* moduleBlob);
 
     SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(

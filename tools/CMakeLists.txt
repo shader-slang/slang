@@ -595,11 +595,6 @@ if(
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         FOLDER test
     )
-    target_compile_definitions(
-        slang-static-unit-test
-        PRIVATE
-            SLANG_TEST_UNCOMPRESSED_BUILTINS=$<BOOL:${SLANG_EMBED_BUILTIN_MODULES_UNCOMPRESSED}>
-    )
     # The tests include internal slang headers that transitively pull in the
     # FIDDLE and capability generated headers. The `slang` target consumes those
     # as PRIVATE link dependencies so their include directories do not

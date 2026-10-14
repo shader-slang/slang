@@ -76,12 +76,10 @@ SlangResult tryLoadBuiltinModuleFromCache(
     return SLANG_OK;
 }
 
-// Attempt to load a precompiled builtin module from slang-xxx-module.
-// The module name is versioned on Mac and Linux platforms, but not on Windows.
-SlangResult tryLoadBuiltinModuleFromDLL(
-    slang::IGlobalSession* globalSession,
-    slang::BuiltinModuleName builtinModuleName)
+// Attempt to load the precompiled GLSL module from its versioned library.
+SlangResult tryLoadGLSLModuleFromDLL(slang::IGlobalSession* globalSession)
 {
+    const auto builtinModuleName = slang::BuiltinModuleName::GLSL;
     // Construct the versioned module name: slang-{module}-module[-{version}]
     // e.g., "slang-glsl-module-2025.19.1" which becomes:
     //   - Linux: libslang-glsl-module-2025.19.1.so
@@ -130,9 +128,13 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     }
     typedef ISlangBlob*(GetEmbeddedModuleFunc)();
     auto getEmbeddedModule = (GetEmbeddedModuleFunc*)emPtr;
-    auto blob = getEmbeddedModule();
+    // Successful GLSL library handles already stay loaded for the process lifetime. Cache
+    // only this version-checked embedded archive, never files or caller-supplied archives.
+    static Slang::BuiltinModuleArchive archive(getEmbeddedModule(), builtinModuleName);
+    Slang::ComPtr<ISlangBlob> module;
+    SLANG_RETURN_ON_FAIL(archive.getModule(module));
     SLANG_RETURN_ON_FAIL(
-        static_cast<Slang::Session*>(globalSession)->loadBuiltinModule(builtinModuleName, blob));
+        static_cast<Slang::Session*>(globalSession)->loadBuiltinModule(builtinModuleName, module));
     return SLANG_OK;
 }
 
@@ -188,9 +190,14 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
     ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule();
     if (coreModuleBlob)
     {
-        SLANG_RETURN_ON_FAIL(
-            static_cast<Slang::Session*>(globalSession.get())
-                ->loadBuiltinModule(slang::BuiltinModuleName::Core, coreModuleBlob));
+        // Function-local initialization and extraction are synchronized. The cache keeps
+        // one decompressed copy until this compiler library unloads, including across gaps
+        // with no live sessions; each session retains its own reference for lazy reads.
+        static Slang::BuiltinModuleArchive archive(coreModuleBlob, slang::BuiltinModuleName::Core);
+        Slang::ComPtr<ISlangBlob> module;
+        SLANG_RETURN_ON_FAIL(archive.getModule(module));
+        SLANG_RETURN_ON_FAIL(static_cast<Slang::Session*>(globalSession.get())
+                                 ->loadBuiltinModule(slang::BuiltinModuleName::Core, module));
     }
     else
     {
@@ -226,8 +233,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         SlangResult loadFromCacheResult = SLANG_FAIL;
         if (!internalDesc->isBootstrap)
         {
-            loadFromCacheResult =
-                tryLoadBuiltinModuleFromDLL(globalSession, slang::BuiltinModuleName::GLSL);
+            loadFromCacheResult = tryLoadGLSLModuleFromDLL(globalSession);
             if (SLANG_FAILED(loadFromCacheResult))
             {
                 loadFromCacheResult = tryLoadBuiltinModuleFromCache(
