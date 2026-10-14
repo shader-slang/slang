@@ -1653,11 +1653,18 @@ struct GenericStructTypeUse
 // `visited` guards against cycles in the `Val` graph.
 //
 // General capability inference already contributes a struct named by a parameter's
-// own type, but a struct's requirements do not include those of its fields, so a
-// wrapper such as `struct Field<T> { Foo<T> f; }` used as `Field<int>` reaches
-// `Foo` only through this walk. Its provenance notes also follow a single chain,
-// so collecting every use here lets each contributing struct be reported at its
-// own use site.
+// or return type itself, but a struct's requirements do not include those of its
+// fields, so a wrapper such as `struct Field<T> { Foo<T> f; }` used as `Field<int>`
+// reaches `Foo` only through this walk. The provenance chain of an incompatible entry
+// point also names a single use, so collecting every use here lets `validateEntryPoint`
+// report each contributing struct at its own use site.
+//
+// Only generic specializations are collected, as they were before general inference
+// covered them; the same field-only gap for a non-generic struct (`struct W { Bar b; }`)
+// or a member type (`struct W { Outer<3>.In f; }`) is not covered here. The result is
+// joined non-destructively, so it can only narrow the targets of an entry point whose
+// own inferred set is empty or compatible; a body with requirements on other targets
+// can hide a field-only struct.
 //
 // Only the struct decl itself is filtered for `MagicTypeModifier`/
 // `IntrinsicTypeModifier`: builtin generic types (e.g. `LineStream<T>`,
@@ -1981,12 +1988,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // The entry point's effective requirements, seeded from the decl's inferred set and augmented
-    // at this boundary with two contributions the per-decl capability walk does not record: the
-    // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
-    // requirements (`signatureStructUses` loop further below). Both are gathered into this local
-    // set — matching the existing generic-struct handling — because the accessor match is resolved
-    // here using the entry-point stage, and the decl's own `inferredCapabilityRequirements` was
-    // already frozen in the earlier CapabilityChecked phase.
+    // at this boundary with two contributions the per-decl capability walk does not fully record:
+    // the SV_ semantic-accessor requirements (walk just below) and the generic structs reachable
+    // from the signature, including through fields (`signatureStructUses` loop further below).
+    // Both are gathered into this local set — matching the existing generic-struct handling —
+    // because the accessor match is resolved here using the entry-point stage, and the decl's own
+    // `inferredCapabilityRequirements` was already frozen in the earlier CapabilityChecked phase.
     CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
 
     // Validate system value semantics, and collect the capabilities their accessors require:
@@ -2558,23 +2565,27 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
-            // The provenance chain reports a single use and cannot see a struct
-            // reached only through a field or the return type, so we also point at
-            // every signature struct whose requirement is itself incompatible with
-            // the target. When the chain ends at one of those structs, the loop below
-            // already reports it at its signature use site.
-            auto provenance = findMissingCapabilityProvenance(entryPointFuncDecl, failedSet);
-            bool isProvenanceSignatureStruct = false;
-            for (auto& use : signatureStructUses)
-                isProvenanceSignatureStruct |= use.structDecl == provenance.referencedNode;
-            if (!isProvenanceSignatureStruct)
-                diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
-
+            // The provenance chain names a single use and cannot see a struct reached
+            // only through a field, so we also point at every signature struct whose own
+            // requirement is incompatible with the target. When the chain ends at one of
+            // exactly those structs, we report it once, at its signature use site.
+            List<GenericStructTypeUse> incompatibleStructUses;
             for (auto& use : signatureStructUses)
             {
-                if (!targetCaps.isIncompatibleWith(
+                if (targetCaps.isIncompatibleWith(
                         CapabilitySet{use.structDecl->inferredCapabilityRequirements}))
-                    continue;
+                    incompatibleStructUses.add(use);
+            }
+            auto provenance = findMissingCapabilityProvenance(entryPointFuncDecl, failedSet);
+            bool isProvenanceAnIncompatibleStruct =
+                incompatibleStructUses.findFirstIndex(
+                    [&](GenericStructTypeUse const& use)
+                    { return use.structDecl == provenance.referencedNode; }) != -1;
+            if (!isProvenanceAnIncompatibleStruct)
+                diagnoseMissingCapabilityProvenance(linkage->m_optionSet, sink, provenance);
+
+            for (auto& use : incompatibleStructUses)
+            {
                 maybeDiagnose(
                     sink,
                     linkage->m_optionSet,

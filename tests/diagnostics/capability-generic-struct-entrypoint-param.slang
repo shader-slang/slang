@@ -8,12 +8,13 @@
 //
 // Each entry point uses its own diag tag because a `DIAGNOSTIC_TEST` invocation
 // must match every annotation for its tag, and only the compiled entry point's
-// diagnostics fire. All error invocations are non-exhaustive because the entry
-// point also emits "see using/definition of '<entry>'" notes we don't pin.
-// Carets align to the columns of the preceding source line.
+// diagnostics fire. PARAM, DUP and SCOPE are exhaustive, so each pins exactly one
+// "see using of 'Foo'" note per use site. The other error invocations are
+// non-exhaustive and pin only the notes they are about. Carets align to the
+// columns of the preceding source line.
 
 // Plain generic parameter.
-//DIAGNOSTIC_TEST:SIMPLE(diag=PARAM,non-exhaustive): -target spirv -emit-spirv-directly -entry main -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=PARAM): -target spirv -emit-spirv-directly -entry main -stage vertex
 // Generic parameter nested inside a builtin wrapper (array).
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARR,non-exhaustive): -target spirv -emit-spirv-directly -entry mainArr -stage vertex
 // Multiple contributing generic structs.
@@ -22,7 +23,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=RET,non-exhaustive): -target spirv -emit-spirv-directly -entry mainRet -stage vertex
 // Same generic struct on two parameters: both use sites must be reported (the
 // hash-consed `Val` for `Foo<int>` must not collapse to a single note).
-//DIAGNOSTIC_TEST:SIMPLE(diag=DUP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUP): -target spirv -emit-spirv-directly -entry mainDup -stage vertex
 // Generic struct nested inside a builtin generic wrapper (`ConstantBuffer<...>`).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CB,non-exhaustive): -target spirv -emit-spirv-directly -entry mainCB -stage vertex
 // Generic struct nested inside `Optional<...>`.
@@ -47,7 +48,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DEEP,non-exhaustive): -target spirv -emit-spirv-directly -entry mainDeep -stage vertex
 // A requiring generic struct used only in the body of a clean-signature entry
 // point (passed to a helper) is diagnosed by general capability inference rather
-// than by the signature check; see generic-struct-require-in-body.slang.
+// than by the signature check. The note points at the helper call, not at a
+// signature use; generic-struct-require-in-body.slang covers other body uses.
 //DIAGNOSTIC_TEST:SIMPLE(diag=SCOPE): -target spirv -emit-spirv-directly -entry mainScope -stage vertex
 // Positive case: the cpp requirement is satisfied for the cpp target, so the same
 // code must compile. We assert no E36107 *and* that compilation reaches code
@@ -67,10 +69,14 @@
 /*PARAM:
  ^^^^^^^ see declaration of 'require'
 */
+//DUP: see declaration of 'require'
+//DUP: see declaration of 'require'
 struct Foo<T>
 /*PARAM:
        ^^^ see definition of 'Foo'
 */
+//DUP: see definition of 'Foo'
+//DUP: see definition of 'Foo'
 {
     int x;
 }
@@ -106,6 +112,7 @@ struct NonGenField
 void main(Foo<int> a)
 /*PARAM:
      ^^^^ unavailable features in entry point
+     ^^^^ entrypoint 'main' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
           ^^^ see using of 'Foo'
 */
 {
@@ -134,6 +141,7 @@ void mainMulti(Foo<int> a, Bar<int> b)
 void mainDup(Foo<int> a, Foo<int> b)
 /*DUP:
      ^^^^^^^ unavailable features in entry point
+     ^^^^^^^ entrypoint 'mainDup' uses features that are not available in 'vertex' stage for 'spirv' compilation target.
              ^^^ see using of 'Foo'
                          ^^^ see using of 'Foo'
 */

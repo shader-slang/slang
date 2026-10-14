@@ -58,6 +58,9 @@ ParamPassingMode applyThisParamModePolicy(Decl* policyDecl, ParamPassingMode def
 
 bool isGlobalDecl(Decl* decl);
 
+/// Return true if `decl` is a builtin type declared with `__magic_type` or `__intrinsic_type`,
+/// whose meaning comes from the compiler rather than from its Slang declaration. Callers use it to
+/// keep such types out of handling meant for ordinary user types, and each caller states why.
 bool isMagicOrIntrinsicTypeDecl(Decl* decl);
 
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
@@ -4640,16 +4643,18 @@ bool isOpaqueHandleType(Type* type);
 // (or array thereof) that transitively contains an opaque handle field.
 bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
 
-/// Find the node at the bottom of `decl`'s capability-provenance chain whose requirements
-/// do not provide `setToFind`, i.e. the use that introduced the missing capability.
+/// Follow `decl`'s capability-provenance chain down to the use that introduced a requirement not
+/// implying `setToFind`, taking the first such entry at each level. If no entry of `decl` fails,
+/// the result is `decl` itself at `decl->loc`.
 ProvenenceNodeWithLoc findMissingCapabilityProvenance(Decl* decl, CapabilitySet const& setToFind);
 
-/// Report the use site of `provenance` and, when it is a declaration, its definition and
-/// `[require]` attribute.
+/// Report `provNode` with a "see using of" note at its use site and, when it is a declaration,
+/// notes for its definition and its `[require]` attribute. A null `referencedNode` reports
+/// nothing.
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
-    ProvenenceNodeWithLoc const& provenance);
+    ProvenenceNodeWithLoc const& provNode);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
