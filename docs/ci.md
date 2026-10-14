@@ -49,6 +49,10 @@ requires no upload. If one platform fails, completed platform archives can still
 be published; fix the failed build or upload and dispatch the workflow again.
 Rerunning a PR cannot publish a missing prebuilt, because its ref is not `master`.
 Recipe changes on a PR can still require a cold build before they reach `master`.
+Release prepares its tools with `common-setup`, then calls `setup-llvm-from-gcs`
+with `upload-if-missing: false`. It can download cached LLVM or build it on a miss,
+but does not attempt unauthenticated GCS publication.
+The population workflow publishes the missing archives independently.
 
 Population verifies the installed LLVM and Clang packages by compiling, linking,
 and running a small LLVM consumer before staging an archive. It links the LLVM
@@ -64,9 +68,7 @@ standard-library symbols that their older linker cannot resolve.
 
 LLVM itself is built in Release mode, including for Windows Debug Slang builds
 because of the differences in Debug/Release standard libraries. We cache the
-installed build product rather than using sccache for LLVM compilation. See the
-[Internal NVIDIA Slang CI LLVM-cache documentation](https://slang.gitlab-master-pages.nvidia.com/slang-ci-docs/caching/llvm-cache)
-for the infrastructure details.
+installed build product rather than using sccache for LLVM compilation.
 
 ## sccache
 
