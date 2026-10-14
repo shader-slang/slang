@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -55,17 +55,18 @@ struct Callable : rt::ICallableShader
     void invoke(rt::CallableInput<Context> input) {}
 }
 
+// Each listed implementation receives one function index. Repeating a type in any section is
+// invalid; the host can instead reference the same listed implementation from multiple SBT records.
 struct Schema : rt::ITraceProgramSchema
 {
     typealias TraceContext = ::TraceContext;
     typealias HitGroups = rt::HitGroupList<HitGroup, HitGroup>;
+//CHECK:      ^^^^^^^^^ duplicate structural ray-tracing entry
+//CHECK:      ^^^^^^^^^ hit-group entry 'HitGroup' is listed more than once in schema 'Schema'
     typealias MissShaders = rt::MissShaderList<Miss, Miss>;
+//CHECK:      ^^^^^^^^^^^ duplicate structural ray-tracing entry
+//CHECK:      ^^^^^^^^^^^ miss-shader entry 'Miss' is listed more than once in schema 'Schema'
     typealias CallableShaders = rt::CallableShaderList<Callable, Callable>;
+//CHECK:      ^^^^^^^^^^^^^^^ duplicate structural ray-tracing entry
+//CHECK:      ^^^^^^^^^^^^^^^ callable-shader entry 'Callable' is listed more than once in schema 'Schema'
 }
-
-// Each listed implementation receives one function index. Repeating a type in any section is
-// invalid; the host can instead reference the same listed implementation from multiple SBT records.
-//CHECK-COUNT-3: error[E38074]: duplicate structural ray-tracing entry
-//CHECK-DAG: hit-group entry 'HitGroup' is listed more than once in schema 'Schema'
-//CHECK-DAG: miss-shader entry 'Miss' is listed more than once in schema 'Schema'
-//CHECK-DAG: callable-shader entry 'Callable' is listed more than once in schema 'Schema'
