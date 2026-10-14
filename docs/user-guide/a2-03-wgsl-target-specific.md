@@ -40,7 +40,7 @@ The system-value semantics are translated to the following WGSL code.
 | SV_OutputControlPointID | *Not supported* |
 | SV_PointSize | *Not supported* |
 | SV_Position | `@builtin(position)` |
-| SV_PrimitiveID | *Not supported* |
+| SV_PrimitiveID | `@builtin(primitive_index)` |
 | SV_RenderTargetArrayIndex | *Not supported* |
 | SV_SampleIndex | `@builtin(sample_index)` |
 | SV_ShadingRate | *Not supported* |
@@ -59,6 +59,11 @@ The system-value semantics are translated to the following WGSL code.
 _Note_ that `@builtin(instance_index)` counts from `firstInstance`, so `SV_InstanceID` includes the
 base instance on WGSL, unlike on D3D, SPIR-V and Metal. WGSL has no base-instance builtin to
 subtract, and `SV_StartInstanceLocation` is not supported.
+
+_Note_ that `@builtin(primitive_index)` requires the WGSL enable-extension `primitive_index`.
+Slang emits `enable primitive_index;` automatically when an entry point has an `SV_PrimitiveID`
+input, and the application must request the `"primitive-index"` feature when it creates the
+WebGPU device.
 
 
 Supported HLSL features when targeting WGSL
