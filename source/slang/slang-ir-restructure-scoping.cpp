@@ -38,17 +38,6 @@ static SimpleRegion* getFirstRegionForInst(RegionTree* regionTree, IRInst* inst)
     return nullptr;
 }
 
-/// Return true if code emitted for `region` can refer to `inst`, either because `inst` is
-/// defined outside the body of the function, or because `region` is nested inside a region
-/// for the block that defines `inst`.
-static bool isInstInScopeForRegion(RegionTree* regionTree, IRInst* inst, SimpleRegion* region)
-{
-    auto block = as<IRBlock>(inst->getParent());
-    if (!block || block->getParent() != regionTree->irCode)
-        return true;
-    return region->isDescendentOf(block);
-}
-
 /// Compute the depth of a node in the region tree.
 ///
 /// This is the number of nodes (including `region`)
@@ -315,7 +304,9 @@ static void fixValueScopingForInst(
         {
             def->removeFromParent();
             addHoistableInst(&builder, def);
-            if (isInstInScopeForRegion(regionTree, def, useRegion))
+            auto hoistedBlock = as<IRBlock>(def->getParent());
+            if (!hoistedBlock || hoistedBlock->getParent() != regionTree->irCode ||
+                useRegion->isDescendentOf(hoistedBlock))
                 continue;
 
             // Hoisting cannot move `def` above an operand that is defined in a region
@@ -324,11 +315,14 @@ static void fixValueScopingForInst(
             //     if (c) { x = s.a[t * 2]; } else { return 0; }
             //     s.a[t * 2] = x + 7;
             //
-            // Redundancy removal makes the store use the `getElementPtr` from the `if`
-            // block, and `t * 2` is a temporary declared in that block. The text of a
-            // folded `def` is emitted at each use anyway, so we give this use its own
-            // copy of `def`. Its operands then have a use in `useRegion`, which we fix
-            // below like any other bad use.
+            // Redundancy removal makes the store reuse the `s.a[t * 2]` address from the
+            // `if`, and `t * 2` gets a temporary inside the `if`. We give the store its own
+            // copy of the address, and its operand `t * 2` then gets a temporary declared
+            // before the `if`:
+            //
+            //     int tmp = 0;
+            //     if (c) { int i = t * 2; tmp = i; x = s.a[i]; } else { return 0; }
+            //     s.a[tmp] = x + 7;
             //
             builder.setInsertBefore(user);
             IRCloneEnv cloneEnv;
@@ -461,10 +455,17 @@ static void fixValueScopingForInst(
         defaultInitializeVar(&builder, tmp, def->getDataType());
     }
 
-    // The copies of `def` gave its operands new uses, which may be bad even if the
-    // operands have already been visited. Visiting an operand again only fixes its new bad
-    // uses, possibly with a second temporary, and the recursion ends because each operand
-    // is defined before the instruction that uses it.
+    // Each copy of `def` gives its operands a new use after the region they are declared in,
+    // so we fix their scoping again. In the example above, that is what declares `tmp`. The
+    // fix can take several steps when the address is nested:
+    //
+    //     if (c) { x = s.e[t * 2].node; } else { return 0; }
+    //     s.e[t * 2].node = x + 7;
+    //
+    // Copying the `.node` address for the store gives the element address `s.e[t * 2]` a use
+    // after the `if`, so revisiting it copies that address too, and its index `t * 2` then
+    // gets a temporary declared before the `if`. The recursion ends because each operand is
+    // defined before the instruction that uses it.
     //
     if (isInstCopiedToUses)
     {

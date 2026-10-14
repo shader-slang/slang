@@ -354,8 +354,9 @@ public:
         WhenSafe,
     };
 
-    /// Return the fold policy for `inst`. It must not depend on where the users of `inst` are,
-    /// and must not change while a function body is emitted.
+    /// Return whether `inst` is never folded, always folded (e.g. an address on a target without
+    /// pointers), or folded only when it is safe. The answer depends on `inst` and, for some
+    /// instructions, on the kinds of its users, but never on where those users are.
     virtual FoldPolicy getFoldPolicy(IRInst* inst);
 
     /// Return true if `inst` is folded into the expressions of its users instead of being
@@ -364,8 +365,7 @@ public:
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
 
     /// Return true if the text of `inst` can be emitted where its users are emitted without
-    /// moving it past a possible side effect, into another block, or into a branch. This checks
-    /// only where `inst` would be emitted, not the final fold decision.
+    /// moving it past a possible side effect, into another block, or into a branch.
     bool isSafeToFoldIntoUseSites(IRInst* inst);
 
     void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec)
