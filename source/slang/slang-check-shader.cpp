@@ -1659,19 +1659,15 @@ struct GenericStructTypeUse
 // point also names a single use, so collecting every use here lets `validateEntryPoint`
 // report each contributing struct at its own use site.
 //
-// Only generic specializations are collected, as they were before general inference
-// covered them; the same field-only gap for a non-generic struct (`struct W { Bar b; }`)
-// or a member type (`struct W { Outer<3>.In f; }`) is not covered here. The result is
-// joined non-destructively, so it can only narrow the targets of an entry point whose
-// own inferred set is empty or compatible; a body with requirements on other targets
-// can hide a field-only struct.
+// Only generic specializations are collected; a field-only non-generic struct
+// (`struct W { Bar b; }`) or member type (`struct W { Outer<3>.In f; }`) is outside
+// this check. The result is joined non-destructively, so a body with requirements of
+// its own can hide a field-only requirement.
 //
-// Only the struct decl itself is filtered for `MagicTypeModifier`/
-// `IntrinsicTypeModifier`: builtin generic types (e.g. `LineStream<T>`,
-// `OutputPatch<T,N>`) already have dedicated, more specific entry-point
-// diagnostics, so reporting a generic capability error for them would only
-// duplicate those. Wrapper builtins are still recursed *through* so that a
-// user-defined `Foo<int>` nested inside them is found.
+// Builtin magic/intrinsic structs stay excluded: some (e.g. `LineStream<T>`,
+// `OutputPatch<T,N>`) have dedicated signature diagnostics, and others need separate
+// capability handling (shader-slang/slang#13579). Builtin wrappers are still recursed
+// *through* so that a user-defined `Foo<int>` nested inside them is found.
 static void collectGenericStructTypeUses(
     ASTBuilder* astBuilder,
     Val* type,

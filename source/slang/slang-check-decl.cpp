@@ -21864,13 +21864,11 @@ struct CapabilityDeclReferenceVisitor
     void visitMemberDeclRef(MemberDeclRef* declRef) { referenceAggTypeOfDeclRef(declRef); }
 
     // Contribute the requirements of the type declaration that `declRef` names, once per
-    // `declRef`, then continue the usual operand walk. Only a non-builtin `AggTypeDecl` (struct,
-    // enum, interface, ...) contributes. A member function such as `make` in `G<3>.make()` does
-    // not: contributing every member decl rejects core-module functions that do not redeclare
-    // their callees' requirements. Magic/intrinsic types such as `CoopVec<T, N>` are skipped for
-    // the same reason. Today every requiring generic type in the core module is one of these; a
-    // plain `[require]` generic type, e.g. in the `neural` module, propagates like a user type.
-    // Whether to propagate the builtin ones too is tracked in shader-slang/slang#13579.
+    // `declRef`, then continue the usual operand walk. Only a user `AggTypeDecl` (struct, enum,
+    // interface, ...) contributes. Member functions such as `make` in `G<3>.make()` and
+    // magic/intrinsic types such as `CoopVec<T, N>` do not, because the standard-library
+    // functions that use them do not redeclare their requirements; whether the builtin types
+    // should propagate is an open question on shader-slang/slang#13579.
     void referenceAggTypeOfDeclRef(DeclRefBase* declRef)
     {
         // `visitedVals` is tested before `Base::visitVal` records `declRef`, so a repeated visit
