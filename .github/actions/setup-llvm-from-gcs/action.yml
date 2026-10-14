@@ -15,6 +15,10 @@ inputs:
     description: "Build LLVM if not found in GCS"
     required: false
     default: "true"
+  upload-if-missing:
+    description: "Upload a newly built prebuilt on master; disable when a separate job publishes it"
+    required: false
+    default: "true"
   github-token:
     description: "GitHub token for LLVM repo access"
     required: false
@@ -87,7 +91,7 @@ runs:
         echo "Clang_DIR=$(pwd)/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
-      if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+      if: steps.download.outputs.cache-hit != 'true' && inputs.upload-if-missing == 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
