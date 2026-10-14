@@ -206,8 +206,6 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             openedValue->type = QualType(openedType);
             openedValue->originalExpr = expr;
             openedValue->checked = true;
-            // The opened value is a view of the same memory location as the existential.
-            openedValue->type.isWriteOnlyRef = expr->type.isWriteOnlyRef;
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
             //
@@ -596,7 +594,6 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // Reading a member of a write-only value would also read that base value. We
             // propagate the base's write-only restriction to the resulting member expression.
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
-            expr->type.isWriteOnlyRef = baseExpr->type.isWriteOnlyRef;
 
             // It's not valid to reference a non-static member with a static
             // func using 'this'.
@@ -716,10 +713,6 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
 
     if (as<PtrType>(base->type))
     {
-        // The pointee is a different memory location from the pointer, but finding it reads
-        // the pointer's value, so a `__ref_writeonly` pointer is reported here.
-        diagnoseReadOfWriteOnlyRef(base, getSink());
-
         // TODO(tfoley): It is not clear why this is being unconditionally
         // set to `true` when the `Ptr` types in the core module has an
         // `AccessQualifier` parameter that can be used to form a read-only pointer.
@@ -996,8 +989,6 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     auto witness = as<SubtypeWitness>(breadcrumb->val);
                     SLANG_ASSERT(witness);
                     auto expr = createCastToSuperTypeExpr(witness->getSup(), bb, witness);
-                    // The cast is a view of the same memory location as its base.
-                    expr->type.isWriteOnlyRef = bb->type.isWriteOnlyRef;
 
                     // Note that we allow a cast of an l-value to
                     // be used as an l-value here because it enables
@@ -3508,8 +3499,6 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
     subscriptExpr->type.isReadOnlyLocation = baseExpr->type.isReadOnlyLocation;
-    // An element of a `__ref_writeonly` array or vector is part of the same memory location.
-    subscriptExpr->type.isWriteOnlyRef = baseExpr->type.isWriteOnlyRef;
 
     return subscriptExpr;
 }
@@ -3838,9 +3827,7 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
-    // `coerce` reports a `__ref_writeonly` right-hand side, so an expression that is both GLSL
-    // `writeonly` and a write-only reference is reported only once.
-    if (expr->right->type.isWriteOnly && !expr->right->type.isWriteOnlyRef)
+    if (expr->right->type.isWriteOnly)
         getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
 
     expr->left = maybeOpenRef(expr->left);
@@ -4852,7 +4839,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
 
         auto arg = expr->arguments[0];
-        if (!arg->type.type || arg->type.isWriteOnlyRef)
+        if (!arg->type.type)
             return nullptr;
         Type* uOperandType = arg->type.type;
         // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
@@ -4940,10 +4927,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 
     auto leftArg = expr->arguments[0];
     auto rightArg = expr->arguments[1];
-    // A `__ref_writeonly` operand goes through ordinary overload resolution, whose argument
-    // coercion reports the read.
-    if (leftArg->type.isWriteOnlyRef || rightArg->type.isWriteOnlyRef)
-        return nullptr;
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
 
@@ -7652,10 +7635,6 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
-    // The result is an `Access.ReadWrite` pointer, through which the memory location of a
-    // `__ref_writeonly` parameter could be read, so we treat taking its address as a read.
-    diagnoseReadOfWriteOnlyRef(expr->arg, getSink());
-
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -8480,7 +8459,6 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     // A swizzle can be used as an l-value as long as there
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates;
-    swizExpr->type.isWriteOnlyRef = memberRefExpr->baseExpression->type.isWriteOnlyRef;
 
     return swizExpr;
 }
@@ -8595,7 +8573,6 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     // A swizzle can be used as an l-value as long as there
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates;
-    swizExpr->type.isWriteOnlyRef = memberExpr->baseExpression->type.isWriteOnlyRef;
     return swizExpr;
 }
 
@@ -8707,7 +8684,6 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                                  swizExpr->base->type.isLeftValue;
     swizExpr->type.isReadOnlyLocation =
         !anyDuplicates && swizExpr->base && swizExpr->base->type.isReadOnlyLocation;
-    swizExpr->type.isWriteOnlyRef = swizExpr->base && swizExpr->base->type.isWriteOnlyRef;
 
     return swizExpr;
 }

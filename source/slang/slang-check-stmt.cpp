@@ -445,8 +445,6 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
             Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
         return;
     }
-    if (conditionType && !as<ErrorType>(conditionType))
-        stmt->condition = coerce(CoercionSite::Argument, conditionType, stmt->condition, getSink());
 
     subContext.checkStmt(stmt->body);
 

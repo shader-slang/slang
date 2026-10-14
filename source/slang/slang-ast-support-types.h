@@ -637,10 +637,6 @@ FIDDLE() namespace Slang
         /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
 
-        /// The expression denotes (part of) the memory location bound to a
-        /// `RefParam<T, Access.WriteOnly>` parameter, so any read of its value is an error.
-        FIDDLE() bool isWriteOnlyRef = false;
-
         /// The expression denotes a memory location that it cannot write, such as a
         /// `__ref_readonly` or `__constref` parameter, or a field or element of one. It is never
         /// set together with `isLeftValue`, which means a writable location. Together the two

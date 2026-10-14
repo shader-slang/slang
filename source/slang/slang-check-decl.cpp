@@ -1761,8 +1761,6 @@ QualType getTypeForDeclRef(
         qualType.isReadOnlyLocation = !isLValue && (paramMode == ParamPassingMode::RefReadOnly ||
                                                     paramMode == ParamPassingMode::BorrowIn);
         qualType.isWriteOnly = isWriteOnly;
-        // A `RefWriteOnly` parameter is the one passed as `RefParam<T, Access.WriteOnly>`.
-        qualType.isWriteOnlyRef = paramMode == ParamPassingMode::RefWriteOnly;
         return qualType;
     }
     else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -2674,9 +2672,6 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     SemanticsVisitor subVisitor(contextToUse);
     initExpr = subVisitor.CheckExpr(initExpr);
     initExpr = maybeOpenRef(initExpr);
-
-    // An inferred-type initializer is not coerced, so `coerce` cannot report the read.
-    diagnoseReadOfWriteOnlyRef(initExpr, getSink());
 
     // TODO: We might need some additional steps here to ensure
     // that the type of the expression is one we are okay with
@@ -3609,9 +3604,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
 
-        // `coerce` reports a `__ref_writeonly` source, so an expression that is both GLSL
-        // `writeonly` and a write-only reference is reported only once.
-        if (initExpr->type.isWriteOnly && !initExpr->type.isWriteOnlyRef)
+        if (initExpr->type.isWriteOnly)
             getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());

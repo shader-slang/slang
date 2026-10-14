@@ -1,8 +1,6 @@
-// An argument is read unless its parameter is `out` or `__ref_writeonly`, so the memory location
-// of a `__ref_writeonly` parameter may only be forwarded to those two modes. A `__ref_readonly`
-// parameter denotes a memory location that is not writable, so it may be forwarded to a mode
-// that only reads, including `__ref_readonly`, but not to one that writes. A `__ref` parameter
-// may be forwarded to any mode.
+// A `__ref_readonly` parameter denotes a memory location that is not writable, so it may be
+// forwarded to a mode that only reads, including `__ref_readonly`, but not to one that writes.
+// A `__ref` parameter may be forwarded to any mode.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
@@ -13,27 +11,6 @@ void fRef(__ref int v) {}
 void fRO(__ref_readonly int v) {}
 void fWO(__ref_writeonly int v) { v = 1; }
 void fCR(__constref int v) {}
-
-void writeOnlyArgs(__ref_writeonly int x)
-{
-    fIn(x);
-//CHECK:^ E30119
-//CHECK:^ cannot read from writeonly, check modifiers.
-    fInOut(x);
-//CHECK:   ^ E30119
-//CHECK:   ^ cannot read from writeonly, check modifiers.
-    fOut(x);
-    fRef(x);
-//CHECK: ^ E30119
-//CHECK: ^ cannot read from writeonly, check modifiers.
-    fRO(x);
-//CHECK:^ E30119
-//CHECK:^ cannot read from writeonly, check modifiers.
-    fWO(x);
-    fCR(x);
-//CHECK:^ E30119
-//CHECK:^ cannot read from writeonly, check modifiers.
-}
 
 void readOnlyArgs(__ref_readonly int x)
 {
@@ -86,30 +63,6 @@ struct S
     [constref] int byConstRef() { return v; }
 }
 
-void writeOnlyReceivers(__ref_writeonly S s)
-{
-    s.byValue();
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    s.mutate();
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    s.byRef();
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    s.byConstRef();
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-}
-
 void readOnlyReceivers(__ref_readonly S s)
 {
     s.byValue();
@@ -128,46 +81,6 @@ void readWriteReceivers(__ref S s)
     s.mutate();
     s.byRef();
     s.byConstRef();
-}
-
-void atomics(__ref_writeonly int x, __ref_writeonly Atomic<int> a)
-{
-    InterlockedAdd(x, 1);
-//CHECK:           ^ E30119
-//CHECK:           ^ cannot read from writeonly, check modifiers.
-    int orig;
-    InterlockedAdd(x, 1, orig);
-//CHECK:           ^ E30119
-//CHECK:           ^ cannot read from writeonly, check modifiers.
-    InterlockedCompareExchange(x, 0, 1, orig);
-//CHECK:                       ^ E30119
-//CHECK:                       ^ cannot read from writeonly, check modifiers.
-    a.add(1);
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    a += 1;
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    a.store(1);
-/*CHECK:
-    ^ E30119
-    ^ cannot read from writeonly, check modifiers.
-*/
-    a = 1;
-}
-
-void addresses(__ref_writeonly int x)
-{
-    let p = &x;
-//CHECK:     ^ E30119
-//CHECK:     ^ cannot read from writeonly, check modifiers.
-    let q = __getAddress(x);
-//CHECK:                 ^ E30119
-//CHECK:                 ^ cannot read from writeonly, check modifiers.
 }
 
 [numthreads(1, 1, 1)]

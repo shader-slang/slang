@@ -287,27 +287,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     return true;
 }
 
-/// Does `conversionExpr`, the result of coercing the argument of a one-argument type call such
-/// as `Q(x)` or `(float)x`, read the argument's value?
-///
-/// Consider `Q(x)`, where `x` is a `__ref_writeonly int`. If `Q` has `__init(int)`, the call reads
-/// `x`; if it has `__init(__ref_writeonly int)` or `__init(out int)`, it only writes `x`. A
-/// conversion that is not a constructor call, such as a builtin cast, reads its argument. A result
-/// that still denotes the argument's memory location (the identity conversion `int(x)`, or a
-/// type-equality view) has not read it yet: whatever consumes the result decides.
-static bool doesTypeConversionReadArgument(Expr* conversionExpr)
-{
-    if (conversionExpr->type.isWriteOnlyRef)
-        return false;
-    auto invokeExpr = as<InvokeExpr>(conversionExpr);
-    auto calleeExpr = invokeExpr ? as<DeclRefExpr>(invokeExpr->functionExpr) : nullptr;
-    auto ctorDecl = calleeExpr ? as<ConstructorDecl>(calleeExpr->declRef.getDecl()) : nullptr;
-    if (!ctorDecl || ctorDecl->getParameters().isEmpty())
-        return true;
-    return doesParamPassingModeReadArgument(
-        getParamPassingMode(ctorDecl->getParameters().getFirst()));
-}
-
 static bool isArrayDecl(Decl* decl)
 {
     if (auto magicMod = decl->findModifier<MagicTypeModifier>())
@@ -843,7 +822,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     Index argCount = context.getArgCount();
 
     List<QualType> paramTypes;
-    List<ParamPassingMode> paramModes;
     List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
@@ -854,7 +832,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         {
             paramDecls.add(param);
             paramTypes.add(getParamQualType(m_astBuilder, param));
-            paramModes.add(getParamPassingMode(param.getDecl()));
         }
         break;
 
@@ -864,8 +841,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                paramTypes.add(getParamQualType(funcType->getParamTypeWithModeWrapper(i)));
-                paramModes.add(funcType->getParamPassingMode(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
+                paramTypes.add(paramType);
             }
         }
         break;
@@ -951,18 +928,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            // Only an argument that the parameter reads can read a `__ref_writeonly` memory
-            // location. The argument of a conversion call that `_coerce` forms is the
-            // expression being coerced, whose read the consumer of that coercion reports.
-            const bool readsArgument = doesParamPassingModeReadArgument(paramModes[paramIndex]) &&
-                                       !context.isCoercionConversionCall;
-            Expr* coercedExpr =
-                readsArgument ? coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink())
-                              : coerceForWriteOnlyArgument(
-                                    CoercionSite::Argument,
-                                    paramType,
-                                    arg.argExpr,
-                                    getSink());
+            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
@@ -1130,16 +1096,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     //
     if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        // The receiver binds to `this` by the same rule as an argument binds to a parameter.
-        // A resource handle's methods are exempt: the restriction is on the resource's
-        // contents, and a method's signature does not say whether it reads them.
-        if (context.mode == OverloadResolveContext::Mode::ForReal &&
-            doesParamPassingModeReadArgument(thisParamInfo->mode) && context.baseExpr &&
-            !isOpaqueHandleType(context.baseExpr->type))
-        {
-            diagnoseReadOfWriteOnlyRef(context.baseExpr, getSink());
-        }
-
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
@@ -1734,12 +1690,6 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 // sure
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
-                    // Whether a subscript reads its base depends on the accessor chosen later, so
-                    // the element is treated as part of a `__ref_writeonly` base's memory
-                    // location and `coerce` reports a value use.
-                    if (context.baseExpr && context.baseExpr->type.isWriteOnlyRef)
-                        callExpr->type.isWriteOnlyRef = true;
-
                     const auto& decl = subscriptDeclRef.getDecl();
                     for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
@@ -3622,14 +3572,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     resultInvokeExpr->loc = expr->loc;
                 }
                 if (coerceResult)
-                {
-                    // The conversion call binds its argument without reporting a read (see
-                    // `isCoercionConversionCall`), and nothing coerces this call's result from the
-                    // argument, so we report the read here.
-                    if (doesTypeConversionReadArgument(resultExpr))
-                        diagnoseReadOfWriteOnlyRef(expr->arguments[0], getSink());
                     return resultExpr;
-                }
                 typeOverloadChecked = true;
             }
         }

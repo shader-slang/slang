@@ -457,10 +457,6 @@ bool SemanticsVisitor::_readValueFromInitializerList(
     if (shouldUseInitializerDirectly(toType, firstInitExpr))
     {
         ioInitArgIndex++;
-        // The element initializes a new value, so it is read. A `canCoerce` probe passes no
-        // `outToExpr` and stays silent.
-        if (outToExpr)
-            diagnoseReadOfWriteOnlyRef(firstInitExpr, getSink());
         return _coerce(
             CoercionSite::Initializer,
             toType,
@@ -1019,10 +1015,6 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         if (ioArgIndex < argCount)
         {
             auto arg = fromInitializerListExpr->args[ioArgIndex++];
-            // The element initializes a new value, so it is read. A `canCoerce` probe passes no
-            // `outToExpr` and stays silent.
-            if (outToExpr)
-                diagnoseReadOfWriteOnlyRef(arg, getSink());
             return _coerce(
                 CoercionSite::Initializer,
                 toType,
@@ -1066,8 +1058,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
                 defaultConstructExpr->type = QualType(toType);
 
-                if (outToExpr)
-                    *outToExpr = defaultConstructExpr;
+                *outToExpr = defaultConstructExpr;
                 return true;
             }
 
@@ -1470,13 +1461,10 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // We will fall back to the legacy logic of initialize list.
-    //
-    // A probe without `outToExpr` must stay silent, and the readers report only when they are
-    // given an output expression, so we forward the probe's null.
     Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
             toType,
-            outToExpr ? &outInitListExpr : nullptr,
+            &outInitListExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
@@ -2434,10 +2422,7 @@ bool SemanticsVisitor::_coerce(
                 // types are structurally equivalent (e.g., T.Differential == T
                 // via a where clause).
                 if (fromExpr)
-                {
                     (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
-                    (*outToExpr)->type.isWriteOnlyRef = fromExpr->type.isWriteOnlyRef;
-                }
             }
             if (outCost)
                 *outCost = 0;
@@ -2673,7 +2658,6 @@ bool SemanticsVisitor::_coerce(
 
     OverloadResolveContext overloadContext;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
-    overloadContext.isCoercionConversionCall = true;
     overloadContext.argCount = 1;
     List<Expr*> args;
     args.add(fromExpr);
@@ -3409,37 +3393,7 @@ Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* f
 }
 
 
-void diagnoseReadOfWriteOnlyRef(Expr* expr, DiagnosticSink* sink)
-{
-    if (!sink || !expr || !expr->type.isWriteOnlyRef)
-        return;
-    // Opening an existential synthesizes a view without a source location, and an up-cast of that
-    // view copies it, so we report the expression the user wrote.
-    while (!expr->loc.isValid())
-    {
-        Expr* viewedExpr = nullptr;
-        if (auto openedValue = as<ExtractExistentialValueExpr>(expr))
-            viewedExpr = openedValue->originalExpr;
-        else if (auto upCast = as<CastToSuperTypeExpr>(expr))
-            viewedExpr = upCast->valueArg;
-        if (!viewedExpr)
-            break;
-        expr = viewedExpr;
-    }
-    sink->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr});
-}
-
 Expr* SemanticsVisitor::coerce(
-    CoercionSite site,
-    Type* toType,
-    Expr* fromExpr,
-    DiagnosticSink* sink)
-{
-    diagnoseReadOfWriteOnlyRef(fromExpr, sink);
-    return coerceForWriteOnlyArgument(site, toType, fromExpr, sink);
-}
-
-Expr* SemanticsVisitor::coerceForWriteOnlyArgument(
     CoercionSite site,
     Type* toType,
     Expr* fromExpr,

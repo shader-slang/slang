@@ -30,10 +30,9 @@ QualType::QualType(Type* type)
                 break;
 
             // Checking rejects a write-only `Ref`, but a write-only memory location
-            // may still be assigned and must not be read.
+            // may still be assigned.
             case AccessQualifier::WriteOnly:
                 isLeftValue = true;
-                isWriteOnlyRef = true;
                 break;
 
             default:
