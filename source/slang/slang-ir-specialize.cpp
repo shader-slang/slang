@@ -189,6 +189,7 @@ struct SpecializationContext
         case kIROp_ShapeSwap:
         case kIROp_ShapeReduce:
         case kIROp_PackBranch:
+        case kIROp_ResourceElementType:
             return false;
         case kIROp_NonEmptyPackWitness:
             return getPackBranchCardinality(inst->getOperand(0)) ==
@@ -917,6 +918,9 @@ struct SpecializationContext
         case kIROp_FuncTypeOf:
             return maybeSpecializeFuncTypeOf(inst);
 
+        case kIROp_ResourceElementType:
+            return maybeSpecializeResourceElementType(cast<IRResourceElementType>(inst));
+
         case kIROp_Func:
 
             if (tryExpandParameterPack(as<IRFunc>(inst)))
@@ -1172,6 +1176,52 @@ struct SpecializationContext
         auto newInst = builder.getIntValue(inst->getDataType(), operand->getOperandCount());
         addUsersToWorkList(inst);
         inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    /// Resolves resource storage metadata once the original texel argument is known.
+    bool maybeSpecializeResourceElementType(IRResourceElementType* inst)
+    {
+        // Consider `struct S<T : ITexelElement> { Buffer<T> b; }` specialized with
+        // `T = unorm float4`. The associated DataType correctly resolves to float4,
+        // but the resource still needs unorm. AST lowering keeps both inputs in this
+        // type computation so the normal specialization worklist can reconstruct
+        // the same attributed element type as a directly declared normalized buffer.
+        if (!areAllOperandsFullySpecialized(inst))
+            return false;
+
+        // A concrete AST texel already contributed these modifiers to the payload.
+        // Collect attributes once so concrete and generic declarations produce the
+        // same canonical attributed type, including through nested type aliases.
+        auto elementType = inst->getPayloadType();
+        List<IRAttr*> elementAttrs;
+        while (auto attributedType = as<IRAttributedType>(elementType))
+        {
+            for (auto attr : attributedType->getAllAttrs())
+                elementAttrs.add(attr);
+            elementType = attributedType->getBaseType();
+        }
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        for (auto type = inst->getTexelType(); auto attributedType = as<IRAttributedType>(type);)
+        {
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                if ((attr->getOp() == kIROp_UNormAttr || attr->getOp() == kIROp_SNormAttr) &&
+                    !elementAttrs.contains(attr))
+                {
+                    elementAttrs.add(attr);
+                }
+            }
+            type = attributedType->getBaseType();
+        }
+        if (elementAttrs.getCount())
+            elementType = builder.getAttributedType(elementType, elementAttrs);
+
+        addUsersToWorkList(inst);
+        inst->replaceUsesWith(elementType);
         inst->removeAndDeallocate();
         return true;
     }

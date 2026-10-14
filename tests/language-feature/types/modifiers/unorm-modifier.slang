@@ -1,6 +1,8 @@
 // unorm-modifier.slang
 
 //TEST:COMPARE_HLSL:-profile cs_5_0 -entry main
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry main
+// HLSL: Buffer<unorm float4 {{ *}}> input_0
 
 // Check that this compiler for glsl (without using the modifiers)
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage compute

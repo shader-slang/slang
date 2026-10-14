@@ -252,7 +252,7 @@ class ResourceType : public BuiltinType
     SlangResourceAccess getAccess();
     /// Returns the original texel type argument, including any explicit format descriptor.
     Type* getTexelType();
-    /// Returns the data type produced by loads and accepted by stores.
+    /// Returns the resource element type, including storage-format modifiers on its value type.
     Type* getElementType();
     void _toTextOverride(StringBuilder& out);
 };

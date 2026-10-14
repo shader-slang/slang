@@ -2402,7 +2402,27 @@ Type* ResourceType::getElementType()
             BuiltinRequirementKind::TextureElementType));
     SLANG_RELEASE_ASSERT(elementTypeDecl && elementTypeDecl->type);
     SLANG_RELEASE_ASSERT(elementTypeDecl->parentDecl == getDeclRef().getDecl());
-    return getType(astBuilder, astBuilder->getMemberDeclRef(getDeclRef(), elementTypeDecl));
+    auto elementType =
+        getType(astBuilder, astBuilder->getMemberDeclRef(getDeclRef(), elementTypeDecl));
+
+    // For `Buffer<unorm float4>`, the inherited ITexelElement conformance correctly
+    // projects DataType to the ordinary value type `float4`. The resource still
+    // needs its storage modifier, so preserve that metadata on its element type
+    // before IR lowering. Other type modifiers do not describe resource storage.
+    for (auto texelType = getTexelType();;)
+    {
+        auto modifiedTexelType = as<ModifiedType>(texelType);
+        if (!modifiedTexelType)
+            break;
+        for (Index i = 0; i < modifiedTexelType->getModifierCount(); ++i)
+        {
+            auto modifier = modifiedTexelType->getModifier(i);
+            if (as<ResourceFormatModifierVal>(modifier))
+                elementType = getTypeWithModifier(elementType, modifier);
+        }
+        texelType = modifiedTexelType->getBase();
+    }
+    return elementType;
 }
 
 void ResourceType::_toTextOverride(StringBuilder& out)

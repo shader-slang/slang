@@ -1,6 +1,8 @@
 // snorm-modifier.slang
 
 //TEST:COMPARE_HLSL:-profile cs_5_0 -entry main
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_5_0 -entry main
+// HLSL: Buffer<snorm float4 {{ *}}> input_0
 
 #ifndef __SLANG__
 #define input input_0
