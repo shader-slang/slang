@@ -2927,16 +2927,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
-                    // Retain the original texel until specialization can preserve its
-                    // storage modifiers. In `struct S<T> { Buffer<T> b; }`, T can become
-                    // `unorm float4` only after this generic has been lowered to IR.
+                    // The AST preserves the original texel argument for inference and
+                    // reflection. IR texture operand zero is the load/store data type:
+                    // for example, `Texture2D<RGBA16F>` lowers with `float4` here.
                     if (resourceType && operands.getCount() == 0)
-                    {
-                        operands.add(getBuilder()->getResourceElementType(
-                            lowerType(context, resourceType->getElementType()),
-                            lowerType(context, resourceType->getTexelType())));
-                        return;
-                    }
+                        arg = resourceType->getElementType();
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);

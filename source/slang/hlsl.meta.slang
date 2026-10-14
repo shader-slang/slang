@@ -595,8 +595,10 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 [sealed]
 interface ITexelData
 {
+    /// The unqualified scalar component type used to construct texture operation results.
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    __init(Element x);
 }
 
 /// Represents types that can be used as public texture type arguments.
@@ -613,6 +615,7 @@ interface ITexelData
 [builtin]
 interface ITexelElement
 {
+    /// The complete payload type, including any resource format modifiers.
     associatedtype DataType : ITexelData;
     static const int format;
     [OverloadRank(-1)]
@@ -621,6 +624,21 @@ interface ITexelElement
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(DataType value);
     DataType __getData();
+}
+
+// The identity mapping retains the complete payload type, including resource
+// format modifiers such as `unorm` and `snorm`, in the conformance's type argument.
+extension<T:ITexelData> T : ITexelElement
+{
+    typealias DataType = T;
+    static const int format = 0;
+    // Satisfy ITexelElement's initializer by calling the payload's higher-ranked
+    // scalar initializer, which performs identity conversion or vector splatting.
+    [OverloadRank(-1)]
+    [ForceInline]
+    __init(T.Element value) { this = T(value); }
+    __intrinsic_op(0) __init(T value);
+    T __getData() { return this; }
 }
 
 extension<T:ITexelData> T
@@ -635,18 +653,25 @@ extension<T:ITexelData> T
     }
 }
 
-extension<T:__BuiltinArithmeticType> T : ITexelData, ITexelElement
+${
+// Element is the unqualified scalar even when the payload carries a resource
+// format modifier. Texture gathers use it to construct ordinary result vectors.
+for (auto scalarType : kBaseTypes)
 {
-    typealias Element = T;
-    typealias DataType = T;
+    if (!(scalarType.flags & (INT_MASK | FLOAT_MASK)))
+        continue;
+$}
+extension $(scalarType.name) : ITexelData
+{
+    typealias Element = $(scalarType.name);
     static const int elementCount = 1;
-    static const int format = 0;
-    __intrinsic_op(0) __init(T x);
-    T __getData() { return this; }
+    __intrinsic_op(0) __init($(scalarType.name) x);
 }
 
 ${
-// Scalar types that can be used as texel element.
+}
+
+// Scalar types whose vectors of any size can be used as texel data.
 const char* texeElementScalarTypes[] = {
     "half",
     "float",
@@ -660,74 +685,35 @@ const char* texeElementScalarTypes[] = {
 for (auto elementType : texeElementScalarTypes)
 {
 $}
-extension<int N> vector<$(elementType), N> : ITexelData, ITexelElement
+extension<int N> vector<$(elementType), N> : ITexelData
 {
     typealias Element = $(elementType);
-    typealias DataType = vector<$(elementType), N>;
     static const int elementCount = N;
-    static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init($(elementType) x);
-    vector<$(elementType), N> __getData() { return this; }
 }
 
 ${
 } // end for texelElementScalarTypes.
 $}
 
-// Additional 64-bit types that can be used as texel element.
-extension double : ITexelData, ITexelElement
+// Additional 64-bit vector types that can be used as texel data.
+extension double2 : ITexelData
 {
     typealias Element = double;
-    typealias DataType = double;
-    static const int elementCount = 1;
-    static const int format = 0;
-    __intrinsic_op(0) __init(double x);
-    double __getData() { return this; }
-}
-extension double2 : ITexelData, ITexelElement
-{
-    typealias Element = double;
-    typealias DataType = double2;
     static const int elementCount = 2;
-    static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(double x);
-    double2 __getData() { return this; }
 }
-extension uint64_t : ITexelData, ITexelElement
+extension vector<uint64_t,2> : ITexelData
 {
     typealias Element = uint64_t;
-    typealias DataType = uint64_t;
-    static const int elementCount = 1;
-    static const int format = 0;
-    __intrinsic_op(0) __init(uint64_t x);
-    uint64_t __getData() { return this; }
-}
-extension int64_t : ITexelData, ITexelElement
-{
-    typealias Element = int64_t;
-    typealias DataType = int64_t;
-    static const int elementCount = 1;
-    static const int format = 0;
-    __intrinsic_op(0) __init(int64_t x);
-    int64_t __getData() { return this; }
-}
-extension vector<uint64_t,2> : ITexelData, ITexelElement
-{
-    typealias Element = uint64_t;
-    typealias DataType = vector<uint64_t,2>;
     static const int elementCount = 2;
-    static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(uint64_t x);
-    vector<uint64_t,2> __getData() { return this; }
 }
-extension vector<int64_t,2> : ITexelData, ITexelElement
+extension vector<int64_t,2> : ITexelData
 {
     typealias Element = int64_t;
-    typealias DataType = vector<int64_t,2>;
     static const int elementCount = 2;
-    static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(int64_t x);
-    vector<int64_t,2> __getData() { return this; }
 }
 
 ${
@@ -22223,27 +22209,21 @@ interface __BuiltinSamplerFeedbackType {};
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
-struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelData, ITexelElement {
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelData {
     typealias Element = float;
-    typealias DataType = SAMPLER_FEEDBACK_MIN_MIP;
     static const int elementCount = 1;
-    static const int format = 0;
     __intrinsic_op(0) __init(float x){}
-    SAMPLER_FEEDBACK_MIN_MIP __getData() { return this; }
 };
 
 /// @category texture_types
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
-struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelData, ITexelElement
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelData
 {
     typealias Element = float;
-    typealias DataType = SAMPLER_FEEDBACK_MIP_REGION_USED;
     static const int elementCount = 1;
-    static const int format = 0;
     __intrinsic_op(0) __init(float x){}
-    SAMPLER_FEEDBACK_MIP_REGION_USED __getData() { return this; }
 };
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.

@@ -880,6 +880,5 @@ return {
 	["Decoration.postDepthCoverage"] = 903,
 	["Decoration.AutodiffParameterContextTypeDecoration"] = 905,
 	["DebugLexicalBlock"] = 906,
-	["Decoration.fileOrNamespaceScopeStaticVar"] = 907,
-	["Type.ResourceElementType"] = 908
+	["Decoration.fileOrNamespaceScopeStaticVar"] = 907
 }

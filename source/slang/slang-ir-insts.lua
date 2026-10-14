@@ -134,14 +134,6 @@ local insts = {
 				},
 			},
 			{
-				-- Preserves resource-storage modifiers from the original texel argument
-				-- until specialization can project them onto its value payload type.
-				ResourceElementType = {
-					operands = { { "payloadType", "IRType" }, { "texelType", "IRType" } },
-					hoistable = true,
-				},
-			},
-			{
 				-- Represents an `Result<T,E>`, used by functions that throws error codes.
 				Result = {
 					struct_name = "ResultType",

@@ -704,6 +704,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         selfFacetKind = Facet::Kind::Extension;
     }
 
+    // A generic extension on `T` applies to the complete qualified type. Keep the
+    // nominal type for its declared bases and extensions such as `vector<float, N>`.
+    auto extensionApplicationType = selfType;
+    if (!declRef.as<ExtensionDecl>())
+        selfType = unwrapModifiedType(selfType);
+
     // Because we are dealing with entities that have declarations, the
     // first item in our linearization will always be a facet for
     // the declaration itself.
@@ -852,8 +858,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // the extension to the type and see if we succeed in
             // making a match.
             //
-            auto extDeclRef =
-                applyExtensionToType(&visitor, extDecl, selfType, additionalSubtypeWitness);
+            auto extensionTargetType = selfType;
+            if (isDeclRefTypeOf<GenericTypeParamDecl>(extDecl->targetType.type))
+                extensionTargetType = extensionApplicationType;
+            auto extDeclRef = applyExtensionToType(
+                &visitor,
+                extDecl,
+                extensionTargetType,
+                additionalSubtypeWitness);
             if (!extDeclRef)
                 continue;
 
@@ -867,8 +879,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
             addDirectBaseFacet(
                 Facet::Kind::Extension,
-                selfType,
-                selfIsSelf,
+                extensionTargetType,
+                extensionTargetType == selfType
+                    ? selfIsSelf
+                    : visitor.createTypeEqualityWitness(extensionTargetType),
                 extDeclRef,
                 extInheritanceInfo);
             result = true;
@@ -1468,36 +1482,30 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
-                        // TODO: De-duplicate the logic in the two branches.
+                        SubtypeWitness* transitiveWitness;
                         if (auto baseInterfaceDeclRef =
                                 baseFacet->origin.declRef.as<InterfaceDecl>())
                         {
-                            auto transitiveWitness = _specializeInterfaceInheritanceWitness(
+                            transitiveWitness = _specializeInterfaceInheritanceWitness(
                                 baseInterfaceDeclRef.getDecl(),
                                 (*base)->facetImpl.subtypeWitness,
                                 facet->subtypeWitness);
-                            additionalSubtypeWitnesses.addIfNotExists(
-                                facet->origin.type,
-                                transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
-                            {
-                                supTypeWorkList.add(interfaceDeclRef);
-                            }
                         }
                         else
                         {
-                            SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
                             transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
                                 baseFacet->subtypeWitness,
                                 facet->subtypeWitness);
-
-                            additionalSubtypeWitnesses.addIfNotExists(
+                        }
+                        additionalSubtypeWitnesses.addIfNotExists(
+                            facet->origin.type,
+                            visitor.getSubtypeWitnessForType(
+                                extensionApplicationType,
                                 facet->origin.type,
-                                transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
-                            {
-                                supTypeWorkList.add(interfaceDeclRef);
-                            }
+                                transitiveWitness));
+                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                        {
+                            supTypeWorkList.add(interfaceDeclRef);
                         }
                     }
                 }
@@ -2420,12 +2428,43 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        auto baseInheritanceInfo = _calcInheritanceInfo(
-            modifiedType->getBase(),
-            circularityInfo,
-            ioSkippedIncompleteFacet);
+        // Consider this identity conformance:
+        //
+        //     extension<T : ITexelData> T : ITexelElement { typealias DataType = T; }
+        //
+        // For `unorm float4`, reusing float4's completed facets would bind T to float4
+        // and lose the qualifier from DataType. Discover extensions from the nominal
+        // declaration again, retaining the qualified type for generic extensions on T.
+        // Nominal extensions such as `vector<float, N>` still apply to the base type.
+        // Call `_calcInheritanceInfo` directly: the outer type query caches this result
+        // under ModifiedType, while the declaration-keyed cache belongs to the base type.
+        //
+        // Aliases can introduce nested modifier wrappers. Record no_diff at every level
+        // so its interface exclusions still apply after the single discovery pass.
+        Type* baseType = modifiedType;
+        bool excludesDifferentiability = false;
+        while (auto wrapper = as<ModifiedType>(baseType))
+        {
+            excludesDifferentiability |= wrapper->findModifier<NoDiffModifierVal>() != nullptr;
+            baseType = wrapper->getBase();
+        }
 
-        if (modifiedType->findModifier<NoDiffModifierVal>())
+        InheritanceInfo baseInheritanceInfo;
+        if (auto baseDeclRefType = as<DeclRefType>(baseType))
+        {
+            baseInheritanceInfo = _calcInheritanceInfo(
+                baseDeclRefType->getDeclRef(),
+                modifiedType,
+                circularityInfo,
+                ioSkippedIncompleteFacet);
+        }
+        else
+        {
+            baseInheritanceInfo =
+                _calcInheritanceInfo(baseType, circularityInfo, ioSkippedIncompleteFacet);
+        }
+
+        if (excludesDifferentiability)
         {
             // Create a filtered facet list that excludes facets whose
             // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
