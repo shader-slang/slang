@@ -4368,22 +4368,20 @@ void SemanticsVisitor::settlePendingTryCoverage(
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
-    // ResolveInvoke can return the existing argument for a same-type cast, such as
-    // rt::MissInput<C>(input) or (T)(functionReturningT()). That argument was already checked.
-    // Return before the checks below: the outer cast adds no new call or construction.
-    if (expr->arguments.getCount() == 1 && rs == expr->arguments[0])
-        return rs;
-
-    // Check what the resolved expression produces. For example, rt::MissInput<C>() constructs
-    // a forbidden fresh input; makeValue<rt::MissInput<C>>() can also return an input after
-    // substituting its type arguments. The shared RT checker handles both cases.
-    if (diagnoseInvalidStructuralRayTracingExpression(rs))
-        return CreateErrorExpr(rs);
-
     if (auto invoke = as<InvokeExpr>(rs))
     {
         if (!invoke->functionExpr)
             return rs;
+
+        // For a same-type cast such as (T)(functionReturningT()), ResolveInvoke returns the
+        // already-checked inner call. The outer cast adds no new call or construction.
+        if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
+            return rs;
+
+        // Check constructor calls and ordinary call results. A user-defined constructor cannot
+        // create a fresh MissInput<C>; makeValue<rt::MissInput<C>>() cannot return one either.
+        if (diagnoseInvalidStructuralRayTracingExpression(invoke))
+            return CreateErrorExpr(invoke);
 
         // Check generic arguments even when the result is void. A call to make<MissInput<C>>()
         // could otherwise hide construction inside a generic body such as void make<T>() { T(); }.
@@ -4630,6 +4628,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
         }
+    }
+    // ResolveInvoke can produce an initializer list for rt::MissInput<C>() rather than a call.
+    // `typealias Inputs = rt::MissInput<C>[1]; Inputs();` likewise constructs fresh inputs.
+    // Its aggregate fallback calls _coerceInitializerList directly, bypassing coerce's check.
+    else if (diagnoseInvalidStructuralRayTracingExpression(rs))
+    {
+        return CreateErrorExpr(rs);
     }
     rs->checked = true;
     return rs;
