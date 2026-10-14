@@ -9,7 +9,11 @@ namespace Slang
 class Type;
 class VarDeclBase;
 
-/// Records a source use for the rules in slang-check-structural-ray-tracing.cpp.
+/// Records a source use to check for restrictions on ray-tracing stage and stage-input types.
+///
+/// These restrictions concern shader implementations, such as SkyMiss implementing rt::IMissShader,
+/// and input views, such as rt::MissInput<C>. This record does not mean the type is already known
+/// to be one of those: ordinary types also reach the checker and pass these restrictions.
 ///
 /// Checking whether a type implements a shader interface can require inheritance information
 /// that is unfinished when the use is first encountered. During module checking, these records
@@ -19,7 +23,7 @@ class VarDeclBase;
 /// Each record refers to existing declarations or checked types. In particular, a variable keeps
 /// its declaration so the later check can distinguish `let copy = input` from an uninitialized
 /// input local. The examples below use C for a valid stage context and MyMiss for a miss shader.
-struct StructuralRayTracingTypeUse
+struct RayTracingStageOrInputUse
 {
     /// Describes how the source uses a type and which fields the check needs.
     /// Any kind can contain an ordinary type that passes the check; the kind alone does not mean

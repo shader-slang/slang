@@ -1035,10 +1035,10 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    /// Whole-module checking records type uses until signatures and conformances are complete.
-    /// Ad hoc checking of already checked declarations evaluates these restrictions immediately.
-    bool m_deferStructuralRayTracingTypeUses = false;
-    List<StructuralRayTracingTypeUse> m_pendingStructuralRayTracingTypeUses;
+    /// Defer checks for stage and stage-input uses until the module's signatures and conformances
+    /// are complete. When this is false, each use is checked immediately instead of being queued.
+    bool m_deferRayTracingStageOrInputUses = false;
+    List<RayTracingStageOrInputUse> m_pendingRayTracingStageOrInputUses;
 
     /// Whether semantic checking has imported the `glsl` module.
     bool m_hasImportedGLSLModule = false;
@@ -3071,7 +3071,7 @@ public:
         Type* schemaType,
         Decl* satisfyingDecl);
     void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
-    void diagnosePendingStructuralRayTracingTypeUses();
+    void diagnosePendingRayTracingStageOrInputUses();
     void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
     bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);

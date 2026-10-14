@@ -5670,7 +5670,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Furthermore, because a fully checked function will have checked
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
-    diagnosePendingStructuralRayTracingTypeUses();
+    diagnosePendingRayTracingStageOrInputUses();
     checkStructuralRayTracingModule(moduleDecl);
 }
 

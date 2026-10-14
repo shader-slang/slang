@@ -839,8 +839,8 @@ static void _diagnoseStructuralStageDeclarations(
 // recursively ask the inheritance checker to finish that same unfinished declaration.
 void SemanticsVisitor::beginStructuralRayTracingModule()
 {
-    SLANG_RELEASE_ASSERT(!getShared()->m_deferStructuralRayTracingTypeUses);
-    getShared()->m_deferStructuralRayTracingTypeUses = true;
+    SLANG_RELEASE_ASSERT(!getShared()->m_deferRayTracingStageOrInputUses);
+    getShared()->m_deferRayTracingStageOrInputUses = true;
 }
 
 // Finishes stage and module-wide rules after checked conformance witnesses are available.
@@ -1384,11 +1384,11 @@ static bool _isStructuralRayTracingTypeApplication(Type* type)
 // For example, Box<MissInput<C>> cannot store an input, and Factory<MissInput<C>> cannot defer
 // manufacturing it to a generic method. An `in` parameter and its initialized local copies refer
 // to the same invocation. Schema/group/list values and ordinary generic arguments are unrestricted.
-static bool _checkStructuralRayTracingTypeUse(
+static bool _checkRayTracingStageOrInputUse(
     SemanticsVisitor* visitor,
-    const StructuralRayTracingTypeUse& use)
+    const RayTracingStageOrInputUse& use)
 {
-    if (use.kind == StructuralRayTracingTypeUse::Kind::GenericArguments)
+    if (use.kind == RayTracingStageOrInputUse::Kind::GenericArguments)
     {
         auto applicationType = use.genericApplicationType;
         if (applicationType &&
@@ -1442,7 +1442,7 @@ static bool _checkStructuralRayTracingTypeUse(
             return false;
         }
     }
-    if (use.kind == StructuralRayTracingTypeUse::Kind::Construction)
+    if (use.kind == RayTracingStageOrInputUse::Kind::Construction)
     {
         // The same constructor expression can be checked at its call and again when coerced
         // into a variable or argument. Use the checker's existing diagnostic suppression.
@@ -1456,14 +1456,37 @@ static bool _checkStructuralRayTracingTypeUse(
     return true;
 }
 
-// Retains the exact checked type until module checking has completed the constraints that its
-// inheritance depends on. Ad hoc reflection/specialization contexts have no module phase to drain
-// a queue, and operate on already checked declarations, so they evaluate the use immediately.
-static bool _diagnoseOrDeferStructuralRayTracingTypeUse(
+/// Checks a type use now, or saves it until the current module has finished ordinary checking.
+///
+/// Some uses require finding which interfaces a type implements. During module checking, that
+/// lookup can revisit a declaration whose generic constraints are still being checked. Save the
+/// record instead; diagnosePendingRayTracingStageOrInputUses checks it after the module's
+/// declarations and function bodies are checked. When deferral is disabled, check immediately.
+/// There may be no later module-completion step, such as when reflecting an already-checked type.
+///
+/// Consider this example:
+///
+///     void helper<C : rt::IPayloadContext>()
+///     {
+///         rt::MissInput<C> fresh;
+///     }
+///
+/// The uninitialized input is invalid. While checking the module, this function saves that use
+/// and returns false; the pending-use check reports the error later. With deferral disabled,
+/// this function checks the same use immediately and returns true.
+///
+/// @param visitor The semantic checker whose shared state controls whether to defer the check.
+/// @param use The declaration or type-use record to check, including its diagnostic location.
+/// @retval true The immediate check rejects this use. Expression callers can return an error
+/// expression; a repeated diagnostic may have been suppressed.
+/// @retval false The use was queued, skipped, or checked without an RT-use rejection. Skipped uses
+/// have no type arguments to check, or have a missing type or ErrorType. A queued use has not
+/// passed validation yet; false also does not rule out errors from other semantic checks.
+static bool _diagnoseOrDeferRayTracingStageOrInputUse(
     SemanticsVisitor* visitor,
-    const StructuralRayTracingTypeUse& use)
+    const RayTracingStageOrInputUse& use)
 {
-    if (use.kind == StructuralRayTracingTypeUse::Kind::GenericArguments)
+    if (use.kind == RayTracingStageOrInputUse::Kind::GenericArguments)
     {
         if (use.genericArguments.getCount() == 0)
             return false;
@@ -1475,27 +1498,27 @@ static bool _diagnoseOrDeferStructuralRayTracingTypeUse(
     }
 
     auto shared = visitor->getShared();
-    if (shared->m_deferStructuralRayTracingTypeUses)
+    if (shared->m_deferRayTracingStageOrInputUses)
     {
-        shared->m_pendingStructuralRayTracingTypeUses.add(use);
+        shared->m_pendingRayTracingStageOrInputUses.add(use);
         return false;
     }
-    return _checkStructuralRayTracingTypeUse(visitor, use);
+    return _checkRayTracingStageOrInputUse(visitor, use);
 }
 
-void SemanticsVisitor::diagnosePendingStructuralRayTracingTypeUses()
+void SemanticsVisitor::diagnosePendingRayTracingStageOrInputUses()
 {
     auto shared = getShared();
-    SLANG_RELEASE_ASSERT(shared->m_deferStructuralRayTracingTypeUses);
+    SLANG_RELEASE_ASSERT(shared->m_deferRayTracingStageOrInputUses);
     // Inheritance queries can finish a lazily synthesized declaration. Its own uses join this
     // queue, so copy the current record before checking and drain newly added records as well.
-    for (Index i = 0; i < shared->m_pendingStructuralRayTracingTypeUses.getCount(); ++i)
+    for (Index i = 0; i < shared->m_pendingRayTracingStageOrInputUses.getCount(); ++i)
     {
-        auto use = shared->m_pendingStructuralRayTracingTypeUses[i];
-        _checkStructuralRayTracingTypeUse(this, use);
+        auto use = shared->m_pendingRayTracingStageOrInputUses[i];
+        _checkRayTracingStageOrInputUse(this, use);
     }
-    shared->m_pendingStructuralRayTracingTypeUses.clear();
-    shared->m_deferStructuralRayTracingTypeUses = false;
+    shared->m_pendingRayTracingStageOrInputUses.clear();
+    shared->m_deferRayTracingStageOrInputUses = false;
 }
 
 /// Checks ray-tracing restrictions on parameters, local variables, globals, and fields.
@@ -1516,10 +1539,10 @@ void SemanticsVisitor::diagnosePendingStructuralRayTracingTypeUses()
 /// modifiers, and checked initializer instead of keeping only its type.
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl)
 {
-    StructuralRayTracingTypeUse use;
-    use.kind = StructuralRayTracingTypeUse::Kind::Variable;
+    RayTracingStageOrInputUse use;
+    use.kind = RayTracingStageOrInputUse::Kind::Variable;
     use.variable = varDecl;
-    _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 /// Checks function and method return types for shader-stage or stage-input values.
@@ -1531,10 +1554,10 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDec
 {
     if (as<ConstructorDecl>(decl))
         return;
-    StructuralRayTracingTypeUse use;
+    RayTracingStageOrInputUse use;
     use.type = decl->returnType.type;
     use.location = decl->returnType.exp ? decl->returnType.exp->loc : decl->loc;
-    _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 // Prevents properties from manufacturing stage/input views outside the adapter parameter.
@@ -1542,10 +1565,10 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingReturnType(CallableDec
 // Payload and record properties have ordinary application-defined result types and remain legal.
 void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl)
 {
-    StructuralRayTracingTypeUse use;
+    RayTracingStageOrInputUse use;
     use.type = propertyDecl->type.type;
     use.location = propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc;
-    _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 // Checks actual construction and call results after normal expression checking. Consider:
@@ -1559,7 +1582,7 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
 // ordinary call such as `makeDefault<MissInput<C>>()` is still an invalid input result.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
 {
-    StructuralRayTracingTypeUse use;
+    RayTracingStageOrInputUse use;
     use.type = expr->type;
     use.location = expr->loc;
     if (auto invoke = as<InvokeExpr>(expr))
@@ -1568,20 +1591,20 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
         {
             if (as<ConstructorDecl>(callee->declRef.getDecl()))
             {
-                use.kind = StructuralRayTracingTypeUse::Kind::Construction;
+                use.kind = RayTracingStageOrInputUse::Kind::Construction;
                 use.location = invoke->functionExpr->loc;
             }
         }
     }
     else if (as<InitializerListExpr>(expr) || as<DefaultConstructExpr>(expr))
     {
-        use.kind = StructuralRayTracingTypeUse::Kind::Construction;
+        use.kind = RayTracingStageOrInputUse::Kind::Construction;
     }
     else
     {
         return false;
     }
-    return _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 // Prevents a generic body from manufacturing stage/input values after specialization.
@@ -1599,8 +1622,8 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
     if (isStructuralRayTracingCallShaderMethod(functionDecl))
         return false;
 
-    StructuralRayTracingTypeUse use;
-    use.kind = StructuralRayTracingTypeUse::Kind::GenericArguments;
+    RayTracingStageOrInputUse use;
+    use.kind = RayTracingStageOrInputUse::Kind::GenericArguments;
     SubstitutionSet(functionDeclRef->declRef)
         .forEachGenericSubstitution(
             [&](GenericDecl* genericDecl, Val::OperandView<Val> arguments)
@@ -1615,7 +1638,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
                         use.genericArguments.add({argumentType, invoke->functionExpr->loc});
                 }
             });
-    return _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 // Rejects stage/input arguments in arbitrary generic types for the same specialization reason.
@@ -1625,8 +1648,8 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
     GenericAppExpr* genericApplication,
     Expr* checkedResult)
 {
-    StructuralRayTracingTypeUse use;
-    use.kind = StructuralRayTracingTypeUse::Kind::GenericArguments;
+    RayTracingStageOrInputUse use;
+    use.kind = RayTracingStageOrInputUse::Kind::GenericArguments;
     auto applicationTypeType = checkedResult ? as<TypeType>(checkedResult->type) : nullptr;
     use.genericApplicationType = applicationTypeType ? applicationTypeType->getType() : nullptr;
 
@@ -1639,7 +1662,7 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication
         if (auto argumentType = as<TypeType>(argument->type))
             use.genericArguments.add({argumentType->getType(), argument->loc});
     }
-    return _diagnoseOrDeferStructuralRayTracingTypeUse(this, use);
+    return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
 // Finds whether a checked call names the receiver's selected stage implementation. Consider:
