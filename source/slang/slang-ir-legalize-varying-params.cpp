@@ -2908,10 +2908,42 @@ protected:
         bool isUnsupported = false;
         bool isSpecial = false;
 
-        // A WGSL enable-extension that a shader must declare before it can use this builtin,
-        // such as `primitive_index`.
+        // The WGSL enable-extension that a module must declare before it can use the target
+        // builtin named by `systemValueName`, such as `primitive_index`. We record it on the
+        // entry point, and the WGSL emitter writes one module-wide `enable` line per extension.
+        // An empty value means the legalizer adds no `enable` requirement for the builtin.
         String requiredWGSLExtension;
+
+        // Some target builtins exist only as an input of one stage (`Stage::Unknown` means any
+        // stage). We check this here because the front end does not check the stage of a global
+        // `in` varying, and `-ignore-capabilities` turns its stage checks off.
+        Stage onlyStage = Stage::Unknown;
+        bool isInputOnly = false;
     };
+
+    static bool isSystemValueSupported(const SystemValueInfo& info, Stage stage, bool isOutput)
+    {
+        if (info.isUnsupported)
+            return false;
+        if (info.onlyStage != Stage::Unknown && info.onlyStage != stage)
+            return false;
+        return !(isOutput && info.isInputOnly);
+    }
+
+    // We put the extension requirement on the entry-point function rather than on `var`, because
+    // the WGSL emitter collects required extensions only from global instructions.
+    static void addTargetSystemValueDecorations(
+        IRBuilder& builder,
+        const EntryPointInfo& entryPoint,
+        IRInst* var,
+        const SystemValueInfo& info)
+    {
+        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        if (info.requiredWGSLExtension.getLength())
+            builder.addRequireWGSLExtensionDecoration(
+                entryPoint.entryPointFunc,
+                info.requiredWGSLExtension.getUnownedSlice());
+    }
 
     struct SystemValLegalizationWorkItem
     {
@@ -3015,7 +3047,9 @@ protected:
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
         }
 
-        if (info.isUnsupported)
+        const auto stage = entryPoint.entryPointDecor->getProfile().getStage();
+        const bool isOutput = as<IROutParamTypeBase>(varType) != nullptr;
+        if (!isSystemValueSupported(info, stage, isOutput))
         {
             reportUnsupportedSystemAttribute(var, semanticName);
             return;
@@ -3023,11 +3057,7 @@ protected:
         if (!info.permittedTypes.getCount())
             return;
 
-        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
-        if (info.requiredWGSLExtension.getLength())
-            builder.addRequireWGSLExtensionDecoration(
-                entryPoint.entryPointFunc,
-                info.requiredWGSLExtension.getUnownedSlice());
+        addTargetSystemValueDecorations(builder, entryPoint, var, info);
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -3343,6 +3373,7 @@ private:
                 // Validate/rearange all semantics which overlap in our flat struct.
                 fixFieldSemanticsOfFlatStruct(flattenedStruct);
                 ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
+                    entryPoint,
                     flattenedStruct,
                     layout);
                 if (flattenedStruct != structType)
@@ -3501,7 +3532,10 @@ private:
     }
 
     template<LayoutResourceKind K>
-    void ensureStructHasUserSemantic(IRStructType* structType, IRVarLayout* varLayout)
+    void ensureStructHasUserSemantic(
+        const EntryPointInfo& entryPoint,
+        IRStructType* structType,
+        IRVarLayout* varLayout)
     {
         // Ensure each field in an output struct type has either a system semantic or a user
         // semantic, so that signature matching can happen correctly.
@@ -3518,15 +3552,16 @@ private:
                     auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
-                    if (sysValInfo.isUnsupported)
+                    if (!isSystemValueSupported(
+                            sysValInfo,
+                            entryPoint.entryPointDecor->getProfile().getStage(),
+                            K == LayoutResourceKind::VaryingOutput))
                     {
                         reportUnsupportedSystemAttribute(field, semanticDecor->getSemanticName());
                     }
                     else
                     {
-                        builder.addTargetSystemValueDecoration(
-                            key,
-                            sysValInfo.systemValueName.getUnownedSlice());
+                        addTargetSystemValueDecorations(builder, entryPoint, key, sysValInfo);
                         semanticDecor->removeAndDeallocate();
                     }
                 }
@@ -4233,6 +4268,7 @@ private:
             // Ensure non-overlapping semantics
             fixFieldSemanticsOfFlatStruct(flattenedStruct);
             ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+                entryPoint,
                 flattenedStruct,
                 resultLayout);
             return;
@@ -4254,7 +4290,10 @@ private:
         auto typeLayout = structTypeLayoutBuilder.build();
         IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
         auto varLayout = varLayoutBuilder.build();
-        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(structType, varLayout);
+        ensureStructHasUserSemantic<LayoutResourceKind::VaryingOutput>(
+            entryPoint,
+            structType,
+            varLayout);
 
         _replaceAllReturnInst(
             builder,
@@ -5270,6 +5309,8 @@ protected:
                 result.systemValueName = toSlice("primitive_index");
                 result.permittedTypes.add(builder.getUIntType());
                 result.requiredWGSLExtension = toSlice("primitive_index");
+                result.onlyStage = Stage::Fragment;
+                result.isInputOnly = true;
                 break;
             }
 
