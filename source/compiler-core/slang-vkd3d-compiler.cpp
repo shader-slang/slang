@@ -34,20 +34,21 @@ struct Vkd3dIncludeHandler
         void* context,
         vkd3d_shader_code* out)
     {
-        SLANG_UNUSED(local);
         auto handler = static_cast<Vkd3dIncludeHandler*>(context);
         String parentPath = handler->rootPath;
         if (parentData)
         {
-            auto sourceFile = handler->system.getSourceManager()->findSourceFileByContentRecursively(
-                parentData);
+            auto sourceFile =
+                handler->system.getSourceManager()->findSourceFileByContentRecursively(parentData);
             if (sourceFile)
                 parentPath = sourceFile->getPathInfo().foundPath;
         }
 
         PathInfo pathInfo;
         ComPtr<ISlangBlob> blob;
-        if (SLANG_FAILED(handler->system.findAndLoadFile(filename, parentPath, pathInfo, blob)))
+        const auto mode = local ? IncludeSystem::Mode::Quote : IncludeSystem::Mode::System;
+        if (SLANG_FAILED(
+                handler->system.findAndLoadFile(filename, parentPath, pathInfo, blob, mode)))
             return VKD3D_ERROR;
 
         out->code = blob->getBufferPointer();
@@ -97,15 +98,15 @@ static SlangResult _parseDiagnosticLine(
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[codeIndex - 1], column));
         diagnostic.location.line = lineNumber;
         diagnostic.location.column = column;
-        diagnostic.filePath = allocator.allocate(
-            UnownedStringSlice(line.begin(), slices[codeIndex - 2].begin() - 1));
+        diagnostic.filePath =
+            allocator.allocate(UnownedStringSlice(line.begin(), slices[codeIndex - 2].begin() - 1));
     }
     else if (codeIndex == 1)
     {
         diagnostic.filePath = allocator.allocate(slices[0]);
     }
-    diagnostic.text = allocator.allocate(
-        UnownedStringSlice(slices[codeIndex + 1].begin(), line.end()).trim());
+    diagnostic.text =
+        allocator.allocate(UnownedStringSlice(slices[codeIndex + 1].begin(), line.end()).trim());
     return SLANG_OK;
 }
 
@@ -149,7 +150,8 @@ public:
             return SLANG_E_NOT_IMPLEMENTED;
         const auto options = getCompatibleVersion(&inOptions);
         if (options.sourceArtifacts.count != 1 ||
-            options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL || options.targetType != SLANG_DXBC)
+            options.sourceLanguage != SLANG_SOURCE_LANGUAGE_HLSL ||
+            options.targetType != SLANG_DXBC)
             return SLANG_E_INVALID_ARG;
 
         if (options.optimizationLevel != CompileOptions::OptimizationLevel::Default ||
@@ -181,11 +183,33 @@ public:
         for (const auto& path : options.includePaths)
             directories.searchDirectories.add(asString(path));
         Vkd3dIncludeHandler includes(
-            &directories, options.fileSystemExt, options.sourceManager, sourcePath);
+            &directories,
+            options.fileSystemExt,
+            options.sourceManager,
+            sourcePath);
 
         List<vkd3d_shader_macro> macros;
+        StringBuilder sourceText;
         for (const auto& define : options.defines)
-            macros.add({define.nameWithSig, define.value});
+        {
+            if (asStringSlice(define.nameWithSig).indexOf('(') >= 0)
+            {
+                sourceText << "#define " << asStringSlice(define.nameWithSig) << " "
+                           << asStringSlice(define.value) << "\n";
+            }
+            else
+            {
+                macros.add({define.nameWithSig, define.value});
+            }
+        }
+        vkd3d_shader_code sourceCode = {blob->getBufferPointer(), blob->getBufferSize()};
+        if (sourceText.getLength())
+        {
+            sourceText.append(
+                static_cast<const char*>(blob->getBufferPointer()),
+                blob->getBufferSize());
+            sourceCode = {sourceText.getBuffer(), size_t(sourceText.getLength())};
+        }
 
         vkd3d_shader_preprocess_info preprocess = {};
         preprocess.type = VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO;
@@ -214,7 +238,7 @@ public:
         vkd3d_shader_compile_info info = {};
         info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
         info.next = &hlsl;
-        info.source = {blob->getBufferPointer(), blob->getBufferSize()};
+        info.source = sourceCode;
         info.source_type = VKD3D_SHADER_SOURCE_HLSL;
         info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
         info.options = compileOptions;
@@ -224,8 +248,8 @@ public:
         return _compile(info, ArtifactDescUtil::makeDescForCompileTarget(SLANG_DXBC), outArtifact);
     }
 
-    SLANG_NO_THROW bool SLANG_MCALL
-    canConvert(const ArtifactDesc& from, const ArtifactDesc& to) SLANG_OVERRIDE
+    SLANG_NO_THROW bool SLANG_MCALL canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
+        SLANG_OVERRIDE
     {
         return ArtifactDescUtil::isDisassembly(from, to) && from.payload == ArtifactPayload::DXBC;
     }
@@ -289,7 +313,11 @@ private:
             diagnostics->setRaw(asCharSlice(text));
             SliceAllocator allocator;
             ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(
-                allocator, text, 0, _parseDiagnosticLine, diagnostics);
+                allocator,
+                text,
+                0,
+                _parseDiagnosticLine,
+                diagnostics);
         }
         m_freeMessages(messages);
         if (SLANG_FAILED(slangResult))
@@ -323,8 +351,8 @@ SlangResult Vkd3dDownstreamCompilerUtil::locateCompilers(
     DownstreamCompilerSet* set)
 {
     ComPtr<ISlangSharedLibrary> library;
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
-        path, loader, nullptr, "vkd3d-shader", library));
+    SLANG_RETURN_ON_FAIL(
+        DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "vkd3d-shader", library));
     auto compiler = new Vkd3dDownstreamCompiler;
     ComPtr<IDownstreamCompiler> compilerInterface(compiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
@@ -347,4 +375,4 @@ SlangResult Vkd3dDownstreamCompilerUtil::locateCompilers(
 
 #endif
 
-}
+} // namespace Slang
