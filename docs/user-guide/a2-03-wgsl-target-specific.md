@@ -62,9 +62,8 @@ subtract, and `SV_StartInstanceLocation` is not supported.
 
 _Note_ that `@builtin(primitive_index)` is a fragment-stage input only, and it requires the WGSL
 enable-extension `primitive_index`. Slang emits `enable primitive_index;` automatically when an
-entry point has an `SV_PrimitiveID` input. The directive applies to the whole WGSL module, so when
-several entry points are compiled into one module, all of them need a device created with the
-`"primitive-index"` feature.
+entry point has an `SV_PrimitiveID` input. The directive applies to the whole WGSL module, so any
+pipeline built from that module needs a device created with the `"primitive-index"` WebGPU feature.
 
 
 Supported HLSL features when targeting WGSL
