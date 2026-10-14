@@ -3,9 +3,9 @@
 //TEST:SIMPLE(filecheck=LOOP): -target spirv-asm -stage fragment -entry swap -O0 -validate-ir
 //TEST:SIMPLE(filecheck=LOOP): -target spirv-asm -stage fragment -entry swap -validate-ir
 
-// The nested-select case checks that sampler selects become integer selects with correctly typed
-// nonuniform indices. The loop case checks that swapping samplers uses integer state instead of
-// local sampler variables.
+// Check that nested sampler selects become integer selects with correctly typed nonuniform
+// indices, and that swapping samplers in a loop uses integer state instead of local sampler
+// variables.
 
 // SELECT: %a = OpSelect %int
 // SELECT: %b = OpSelect %int
@@ -22,7 +22,8 @@ Texture2D<float4> texture;
 cbuffer Ubo { uint count; };
 
 // Folding the outer select reads the nonuniform indices emitted for the inner selects.
-// Their wrappers must retain the integer operand type, rather than type_t.
+// The NonUniformResourceIndex instructions wrapping them must have the index's integer
+// type rather than TypeType.
 float4 nested(float2 uv : TEXCOORD) : SV_TARGET
 {
     SamplerState a = select(uv.x > 0.5, samplers[0], samplers[1]);

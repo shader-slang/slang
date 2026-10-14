@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage fragment -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage fragment -O1 -validate-ir -validate-ir-detailed
 
-// This test checks that mutually dependent loop parameters and shared sampler selects become
+// Check that mutually dependent loop parameters and shared sampler selects become
 // integer state. The three samplers and the loop counter share branch argument lists,
 // so replacing the resource parameters must also preserve the counter's position.
 // The shared select feeds two later selects, requiring its index to be available to

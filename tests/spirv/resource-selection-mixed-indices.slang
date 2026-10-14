@@ -10,8 +10,10 @@
 //TEST:SIMPLE(filecheck=WIDE): -target spirv-asm -stage fragment -entry mixedWidth -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=WIDE): -target spirv-asm -stage fragment -entry mixedWidth -validate-ir -validate-ir-detailed
 
-// Ordinary array subscripts retain their integer types. Selecting resources must merge those
-// indices without leaving resource-valued phis/selects or narrowing a wider index.
+// Check that selecting resources whose array subscripts have different integer types merges
+// those indices without leaving resource-valued phis/selects or narrowing a wider index.
+// The GLSL check applies to all three GLSL runs.
+// GLSL: nonuniformEXT
 SamplerState samplers[8];
 Texture2D<float4> texture;
 cbuffer Ubo { uint i; int j; uint count; uint64_t wide; };
@@ -20,7 +22,6 @@ cbuffer Ubo { uint i; int j; uint count; uint64_t wide; };
 // PHI: %[[PHI_INDEX:[^ ]+]] = OpLoad %uint %s
 // PHI: OpAccessChain {{.*}} %samplers %[[PHI_INDEX]]
 // PHI: OpImageSampleExplicitLod
-// GLSL: nonuniformEXT
 float4 mixedPhi(float2 uv : TEXCOORD) : SV_TARGET
 {
     SamplerState s = uv.x < 0.5 ? samplers[0] : samplers[i];
@@ -48,6 +49,7 @@ float4 mixedLoop(float2 uv : TEXCOORD) : SV_TARGET
     for (uint k = 0; k < count; k++)
     {
         // The conversion must remain on this branch, after the signed index computation.
+        // -validate-ir-detailed checks this through dominance validation.
         if (uv.x < 0.5)
             s = samplers[j + int(k)];
         else
