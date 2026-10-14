@@ -1776,11 +1776,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     auto user = use->getUser();
 
-    // The target-intrinsic and `SwizzledStore` checks below look only at the direct `user`.
-    // When `user` is always folded, the text of `inst` can still be repeated through it,
-    // which repeats its evaluation but cannot reorder it, since `isSafeToFoldIntoUseSites`
-    // checks every point where it is emitted.
-
     // Check if the use is a call using a target intrinsic that uses the parameter more than once
     // in the intrinsic definition.
     if (auto callInst = as<IRCall>(user))
@@ -1903,12 +1898,9 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
     if (remainingUseCount == 0)
         return true;
 
-    // Each use requires that nothing between `inst` and its user might have side effects.
-    // The window before the last use contains the windows of all the other uses, so we scan
-    // forward once and count off uses as we reach their users. A user's uses are counted
-    // before its own side effects are tested: the last user may have side effects, because
-    // they happen after it evaluates `inst`, but an earlier user may not, because the later
-    // uses would observe them.
+    // Now let's look at all the instructions between this instruction
+    // and its users. If any of them might have side effects, then lets
+    // bail out now.
     for (auto ii = inst->getNextInst();; ii = ii->getNextInst())
     {
         if (!ii)

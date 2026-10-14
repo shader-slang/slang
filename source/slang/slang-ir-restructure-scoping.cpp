@@ -511,9 +511,9 @@ void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldFo
         //
         // We defensively cache the next instruction to visit so that
         // we can continue our iteration after `inst` even if it gets
-        // moved. The operations on `inst` won't affect `nextInst`: the
-        // only other instructions that the pass moves are operands of
-        // `inst`, directly or transitively, and those are defined before it.
+        // moved. For now we are confident that the operations on
+        // `inst` won't affect `nextInst`, since the pass is not supposed
+        // to move or delete any *other* instructions.
         //
         IRInst* nextInst = nullptr;
         for (auto inst = block->getFirstOrdinaryInst(); inst; inst = nextInst)
