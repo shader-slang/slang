@@ -179,7 +179,7 @@ When using 'Sample' on a TextureArray, CUDA treats the array index parameter as 
 
 This feature means that a multiple Samplers can be used with a Texture. In terms of the HLSL code this can be seen as the 'SamplerState' being a parameter passed to the 'Sample' method on a texture object.
 
-On CUDA the SamplerState is ignored, because on this target a 'texture object' is the Texture and Sampler combination.
+On CUDA the SamplerState is ignored, because on this target a 'texture object' is the Texture and Sampler combination. `SampleGrad` does not accept a separate SamplerState on CUDA; use the combined-sampler form (for example `Sampler2D.SampleGrad`).
 
 <a id="graphics-pipeline"></a>
 
