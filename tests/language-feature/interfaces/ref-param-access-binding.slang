@@ -1,7 +1,8 @@
 // An argument is read unless its parameter is `out` or `__ref_writeonly`, so the memory location
 // of a `__ref_writeonly` parameter may only be forwarded to those two modes. A `__ref_readonly`
-// parameter does not denote a writable memory location, so it may not be forwarded to a mode
-// that writes. A `__ref` parameter may be forwarded to any mode.
+// parameter denotes a memory location that is not writable, so it may be forwarded to a mode
+// that only reads, including `__ref_readonly`, but not to one that writes. A `__ref` parameter
+// may be forwarded to any mode.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
@@ -47,8 +48,6 @@ void readOnlyArgs(__ref_readonly int x)
 //CHECK: ^ E30047
 //CHECK: ^ argument passed to parameter '0' must be l-value.
     fRO(x);
-//CHECK:^ E30047
-//CHECK:^ argument passed to parameter '0' must be l-value.
     fWO(x);
 //CHECK:^ E30047
 //CHECK:^ argument passed to parameter '0' must be l-value.

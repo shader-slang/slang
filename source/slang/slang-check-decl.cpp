@@ -1757,6 +1757,9 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
+        // A parameter passed by read-only pointer names its argument's memory location.
+        qualType.isReadOnlyLocation = !isLValue && (paramMode == ParamPassingMode::RefReadOnly ||
+                                                    paramMode == ParamPassingMode::BorrowIn);
         qualType.isWriteOnly = isWriteOnly;
         // A `RefWriteOnly` parameter is the one passed as `RefParam<T, Access.WriteOnly>`.
         qualType.isWriteOnlyRef = paramMode == ParamPassingMode::RefWriteOnly;

@@ -26,6 +26,7 @@ QualType::QualType(Type* type)
             case AccessQualifier::Read:
             case AccessQualifier::Immutable:
                 isLeftValue = false;
+                isReadOnlyLocation = true;
                 break;
 
             // Checking rejects a write-only `Ref`, but a write-only memory location

@@ -641,6 +641,21 @@ FIDDLE() namespace Slang
         /// `RefParam<T, Access.WriteOnly>` parameter, so any read of its value is an error.
         FIDDLE() bool isWriteOnlyRef = false;
 
+        /// The expression denotes a memory location that it cannot write, such as a
+        /// `__ref_readonly` or `__constref` parameter, or a field or element of one. It is never
+        /// set together with `isLeftValue`, which means a writable location. Together the two
+        /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
+        /// for a `__ref_readonly` parameter may be either.
+        ///
+        /// TODO: A more general design is an `isAddressable` flag set on every expression that
+        /// denotes a memory location, writable or not, with `__ref` arguments requiring it
+        /// rather than `isLeftValue`. Semantic checking would then reject an l-value that is not
+        /// a memory location (a multi-element swizzle, or a property with `get`/`set`), which
+        /// lowering's `getAddress` currently reports as E40008. We chose the narrower flag
+        /// because the general one must be set at every site that produces an l-value, which
+        /// is a larger change than adding `__ref_readonly` needs.
+        FIDDLE() bool isReadOnlyLocation = false;
+
         QualType() = default;
 
         QualType(Type* type);
