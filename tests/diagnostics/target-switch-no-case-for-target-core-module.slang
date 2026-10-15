@@ -11,9 +11,8 @@
 //TEST:SIMPLE(filecheck=LOAD):-target ptx -entry typedBufferLoad -stage compute -ignore-capabilities
 //TEST:SIMPLE(filecheck=LOAD_CPP):-target cpp -entry typedBufferLoad -stage compute -ignore-capabilities
 
-// The cpp target has no capability error for `Buffer<T>.Load`, so E41037 is currently reported
-// even without `-ignore-capabilities`. The cpp prelude implements `Buffer<T>::Load`; if
-// `_Texture.Load` gains a `case cpp:`, this lane and the one above should be removed.
+// cpp has no capability diagnostic for `Buffer<T>.Load`; this lane checks E41037 without
+// `-ignore-capabilities`.
 //TEST:SIMPLE(filecheck=LOAD_CPP):-target cpp -entry typedBufferLoad -stage compute
 
 // `sincos` links `__sincos_metal` from its `metal` case, and `pickTwice` links `metalOnlyTwice`
@@ -107,7 +106,6 @@ void userHelperFromOtherTarget()
 
 RWStructuredBuffer<int> input;
 
-// The issue's original shape: on PTX the dropped sample, store and `break` became an infinite loop.
 [numthreads(1, 1, 1)]
 void sampleLevelInLoop()
 {

@@ -31,6 +31,24 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target cuda -entry resourceFunc -stage compute -ignore-capabilities
 //DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE):-target cpp -entry resourceFunc -stage compute -ignore-capabilities
 
+// The annotations above are shared by several targets, so the target named in the message is
+// pinned separately for each target family. PTX is generated from CUDA source and reports 'cuda'.
+//TEST:SIMPLE(filecheck=PIN_CUDA):-target cuda -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_CUDA):-target ptx -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_CPP):-target cpp -entry userVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_METAL):-target metal -entry userFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_HLSL):-target hlsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_SPIRV):-target spirv -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_GLSL):-target glsl -entry resourceFunc -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=PIN_WGSL):-target wgsl -entry metalOnlyVoidFunc -stage compute -ignore-capabilities
+// PIN_CUDA: 'twice' contains a __target_switch with no case for target 'cuda'
+// PIN_CPP: 'setToTwo' contains a __target_switch with no case for target 'cpp'
+// PIN_METAL: 'twice' contains a __target_switch with no case for target 'metal'
+// PIN_HLSL: 'metalOnlySet' contains a __target_switch with no case for target 'hlsl'
+// PIN_SPIRV: 'metalOnlySet' contains a __target_switch with no case for target 'spirv'
+// PIN_GLSL: 'pickTexture' contains a __target_switch with no case for target 'glsl'
+// PIN_WGSL: 'metalOnlySet' contains a __target_switch with no case for target 'wgsl'
+
 RWStructuredBuffer<float> output;
 
 float twice(float x)
