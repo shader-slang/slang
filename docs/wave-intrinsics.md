@@ -290,7 +290,8 @@ T WaveMultiBitOr(T value, uint4 mask);
 T WaveMultiBitXor(T value, uint4 mask);
 
 
-// Prefix arithmetic operations. Supported when targeting SPIRV, GLSL, CUDA and HLSL.
+// Prefix arithmetic operations. Supported when targeting SPIRV, GLSL, CUDA and HLSL, and on
+// WGSL by emulation (each reads every lane of the subgroup in turn).
 // In addition to these non-HLSL standard intrinsics are the standard `WaveMultiPrefix*`
 // intrinsics provided by SM 6.5, detailed in the `Standard Wave Intrinsics` section.
 
