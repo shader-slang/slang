@@ -23,6 +23,10 @@ void constThenReadOnly(const __ref_readonly int x) {}
 //CHECK:                     ^^^^^^^^^^^^^^ E31202
 //CHECK:                     ^^^^^^^^^^^^^^ modifier '__ref_readonly' is redundant or conflicting with existing modifier 'const'
 
+void constThenWriteOnly(const __ref_writeonly int x) {}
+//CHECK:                      ^^^^^^^^^^^^^^^ E31202
+//CHECK:                      ^^^^^^^^^^^^^^^ modifier '__ref_writeonly' is redundant or conflicting with existing modifier 'const'
+
 [numthreads(1, 1, 1)]
 void main()
 {
