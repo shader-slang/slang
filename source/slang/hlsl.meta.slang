@@ -35585,14 +35585,15 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 ///
 /// Where the call synchronizes:
 /// - WGSL: it maps to the built-in.
-/// - Other GPU targets, in compute, mesh and amplification shaders: it synchronizes the workgroup and requires
-///   the `memorybarrier` capability, so a caller declared with only a target, such as `[require(spirv)]`, must
-///   also require `memorybarrier`.
+/// - Other GPU targets, in compute, mesh and amplification shaders and `[CudaKernel]` functions: it synchronizes
+///   the workgroup and requires the `memorybarrier` capability, so a caller declared with only a target, such as
+///   `[require(spirv)]`, must also require `memorybarrier`.
 ///
 /// Everywhere else the call is a plain load of `v` by the calling thread, with no synchronization and no
 /// cross-thread guarantee. That covers other shader stages, including work-graph node shaders; functions that
-/// no entry point calls, such as an uncalled `[CudaDeviceExport]` function; and the `c`, `cpp` and `llvm`
-/// targets.
+/// neither an entry point nor a `[CudaKernel]` function calls, such as an uncalled `[CudaDeviceExport]`
+/// function; and the `c`, `cpp` and `llvm` targets. On `-target slangvm` and `-target host-cpp`, a compute
+/// entry point that calls it currently fails with E41011 (shader-slang/slang#13675).
 T workgroupUniformLoad<T>(__ref T v)
 {
     // Off WGSL we use the lowering Tint uses for the WGSL built-in: a barrier, the load, and a second barrier
@@ -35603,9 +35604,11 @@ T workgroupUniformLoad<T>(__ref T v)
     // distinguish launch modes.
     //
     // Known gaps: on Metal, simplifyForEmit can move the load past the second barrier when its use is in the
-    // same block (shader-slang/slang#13409). On targets with no target capabilities (`-target slangvm` and
-    // `-target host-cpp`), a compute entry point that calls this function fails with E41011
-    // (shader-slang/slang#13675).
+    // same block (shader-slang/slang#13409). `-target slangvm` and `-target host-cpp` have no target
+    // capabilities, so they reach the target `default:` (shader-slang/slang#13675). A `[noinline]` function
+    // that calls this one and is called both from an entry point and from an uncalled `[CudaDeviceExport]`
+    // function leaves the export calling a removed function, as for any `__stage_switch` user
+    // (shader-slang/slang#13683).
     __target_switch
     {
     case c:

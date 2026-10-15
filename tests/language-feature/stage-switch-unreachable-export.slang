@@ -1,7 +1,6 @@
 // A `__stage_switch` in a function that no entry point reaches takes its
 // `default:` case. A `[CudaDeviceExport]` function that the kernel does not call
-// has no stage to specialize to; before this was handled, its `GetCurrentStage`
-// reached CUDA emit as an internal error ("unexpected IR opcode").
+// has no stage to specialize to.
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
 
