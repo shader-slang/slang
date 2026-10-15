@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -2902,6 +2903,13 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         // parameter, we always want to wrap it in a struct.
         // Matrices within uniform and storage buffers are already members in the overall buffer
         // struct type, hence do not need to be lowered.
+        //
+        // SPIR-V and GLSL have no matrix type for int/uint/bool elements, so such a matrix in
+        // memory always needs a storage type that records its layout; otherwise
+        // `legalizeMatrixTypes` turns it into row vectors regardless of `column_major`. In the
+        // stage interface it keeps those row vectors.
+        if (isMatrixTypeLoweredToArray(target->getTargetReq(), matrixType))
+            return config.addressSpace != AddressSpace::Input;
 
         if (target->shouldEmitSPIRVDirectly())
         {
