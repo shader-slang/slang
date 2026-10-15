@@ -82,6 +82,54 @@ and driver. Runner labels do not prove the VM exposes these capabilities: setup
 or coverage failures remain failures, with diagnostics archived. RTX 4090 local
 results cannot serve as the RTX 5090 machine's calibration.
 
+### BenchView integration
+
+[PR #13625](https://github.com/shader-slang/slang/pull/13625) introduces submissions
+to the shared `slang` project with suite `compile-perf`. Extend that integration
+with suite `runtime-perf` after reconciling the two nightly workflow changes.
+This is a planned export contract; the runtime collector does not yet submit to
+BenchView. Reuse the adapter's transport, batching, artifact export and replay
+handling rather than maintaining another HTTP client.
+
+| Runtime data               | Planned BenchView representation                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subtest                    | Stable test ID `runtime-perf/<workload>`                                                                                                                            |
+| Backend and implementation | Case dimensions for Vulkan/D3D12/CUDA and Slang/equivalent reference; reserve an explicit optimized-reference value for future frozen targets                       |
+| Measurement configuration  | Dimensions for element count, batch, source/harness/scene contract and suite versus matched-reference measurement; incompatible contracts must not become one trend |
+| GPU execution              | `runtime.gpu_iteration_ms`, milliseconds, lower is better, with the original per-execution samples                                                                  |
+| Paired compilation         | CLI wall and internal compiler samples on the same subtest, retaining individual stage identity for multi-stage workloads                                           |
+| Machine                    | Recorded host, GPU identity and driver; RTX 4090 and RTX 5090 must remain separate environments                                                                     |
+| Compiler and cadence       | Full tested compiler SHA in VCS provenance; daily runs omit release metadata, main releases use `run.metadata.release.label` as in #13625                           |
+| Execution                  | Original measurement timestamp and immutable attempt identity, with deterministic replay keys                                                                       |
+| Diagnostics                | Correctness/stability status, raw records, phase/setup observations and reference toolchain provenance in metadata/artifacts                                        |
+
+The intended BenchView view follows the HTML report: a runtime graph with Slang
+and reference curves, and a compilation graph with wall/internal curves, for each
+subtest/backend and daily/release cadence. Direct reference comparisons require
+matching dimensions; preserve the matched Slang samples even when the suite used
+a larger workload. Do not duplicate paired compilation for each reference
+implementation or treat one-time reference compilation as repeated compile data.
+
+Export actual sample distributions, never reconstructed samples from medians.
+GPU stage and host timings overlap and must not be exported as an additive phase
+breakdown. Failed, unstable or unsupported runtime observations retain their
+status/reason without publishing a successful timing curve; independently valid
+paired compile results remain exportable. Verify the service's supported status
+and environment fields before implementing the adapter. Honor its metric/request
+limits and retain overflow diagnostics in artifacts.
+
+Follow #13625's publication policy: export reviewable payloads, submit only on the
+publishing path with the configured write key, and surface submission failures
+without blocking the existing report. Release backfill uses the same adapter
+with explicit release metadata and original measurement provenance. Do not infer
+a release date from the measurement date or a compiler SHA from a display label.
+
+Acceptance requires an archived runtime/reference/compile fixture, deterministic
+replay and failed-case tests, API ingestion, and a check that the deployed
+BenchView UI can overlay the requested metrics and implementation dimensions in
+both daily and release views. #13625's compile ingestion validation alone does
+not establish those runtime visualization capabilities.
+
 Remaining reporting extensions are cached runtime measurements of the last five
 main releases (excluding patches), and
 independently confirmed, frozen optimized reference targets. These do not alter
