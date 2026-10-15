@@ -1,0 +1,74 @@
+{
+  "archive_revision": "b09b0ea004d79340b726ae0865f994663b0864b9",
+  "releases": [
+    {
+      "tag": "v2026.17",
+      "meta": {
+        "commit": "5bcb1c031b7873444f745b757a35e25567bbe043",
+        "commit_time": "2026-09-04T05:08:34Z",
+        "runner": "Windows-AMD64-AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD-14cpu",
+        "kind": "release",
+        "tag": "v2026.17",
+        "source_archive_revision": "b09b0ea004d79340b726ae0865f994663b0864b9",
+        "source_file": "releases/v2026.17/results.json",
+        "observed_at_basis": "Archive snapshot commit timestamp; approximation, exact measurement time unknown",
+        "runner_basis": "Archive-level runner.json; no per-release runner record",
+        "corpus_basis": "Not recorded for these release results"
+      },
+      "observed_at": "2026-10-14T05:28:40Z",
+      "release": {
+        "label": "v2026.17",
+        "releasedAt": "2026-09-04T08:09:03Z"
+      },
+      "payload_sha256": [
+        "eef5111a7e982cd46d3588c3461d9ebf1a9de0c3c9e731193ac877045cd4dcfc"
+      ]
+    },
+    {
+      "tag": "v2026.18",
+      "meta": {
+        "commit": "c8ba6929456b8e9c1a097970d929f5bc003250f8",
+        "commit_time": "2026-09-15T12:11:09Z",
+        "runner": "Windows-AMD64-AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD-14cpu",
+        "kind": "release",
+        "tag": "v2026.18",
+        "source_archive_revision": "b09b0ea004d79340b726ae0865f994663b0864b9",
+        "source_file": "releases/v2026.18/results.json",
+        "observed_at_basis": "Archive snapshot commit timestamp; approximation, exact measurement time unknown",
+        "runner_basis": "Archive-level runner.json; no per-release runner record",
+        "corpus_basis": "Not recorded for these release results"
+      },
+      "observed_at": "2026-10-14T05:28:40Z",
+      "release": {
+        "label": "v2026.18",
+        "releasedAt": "2026-09-15T20:08:30Z"
+      },
+      "payload_sha256": [
+        "4684ff379954e097c865973e59c9ade9ffd2c33e35ee239286929a85f149d084"
+      ]
+    },
+    {
+      "tag": "v2026.19",
+      "meta": {
+        "commit": "0fb6b7587a94fa33d88141ec9930766eedc6f59a",
+        "commit_time": "2026-09-29T14:20:26Z",
+        "runner": "Windows-AMD64-AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD-14cpu",
+        "kind": "release",
+        "tag": "v2026.19",
+        "source_archive_revision": "b09b0ea004d79340b726ae0865f994663b0864b9",
+        "source_file": "releases/v2026.19/results.json",
+        "observed_at_basis": "Archive snapshot commit timestamp; approximation, exact measurement time unknown",
+        "runner_basis": "Archive-level runner.json; no per-release runner record",
+        "corpus_basis": "Not recorded for these release results"
+      },
+      "observed_at": "2026-10-14T05:28:40Z",
+      "release": {
+        "label": "v2026.19",
+        "releasedAt": "2026-09-29T16:37:25Z"
+      },
+      "payload_sha256": [
+        "b2c85dc928717689c7a07f1fa628b34e3f67d50ad53d3e664d0977204c2ee6b2"
+      ]
+    }
+  ]
+}
