@@ -202,7 +202,21 @@ async function runSmokeTest() {
         if (badSession) {
             throw new Error('A descriptor without a target should not create a session');
         }
-        module.getLastError();
+        const badError = module.getLastError();
+        if (!badError || badError.type !== 'USER' || badError.result === module.SLANG_OK) {
+            throw new Error('A descriptor without a target should set a USER invalid-argument error');
+        }
+        const badProfileSession =
+            globalSession.createSession({ target: wgslTarget, profile: 'not_a_profile' });
+        if (badProfileSession) {
+            throw new Error('An unknown profile should not create a session');
+        }
+        const badProfileError = module.getLastError();
+        if (!badProfileError || badProfileError.type !== 'USER' ||
+            badProfileError.result === module.SLANG_OK ||
+            !badProfileError.message.includes('not_a_profile')) {
+            throw new Error('An unknown profile should set a USER error naming the profile');
+        }
         optionsProgram.delete();
         optionsModule.delete();
         optionsSession.delete();

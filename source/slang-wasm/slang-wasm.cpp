@@ -167,6 +167,13 @@ Session* GlobalSession::createSession(emscripten::val desc)
         if (!profile.empty())
         {
             target.profile = spFindProfile(m_interface, profile.c_str());
+            if (target.profile == SLANG_PROFILE_UNKNOWN)
+            {
+                g_error.type = std::string("USER");
+                g_error.result = SLANG_E_INVALID_ARG;
+                g_error.message = "createSession: unknown profile '" + profile + "'";
+                return nullptr;
+            }
         }
         else if (compileTarget == SLANG_HLSL)
         {
