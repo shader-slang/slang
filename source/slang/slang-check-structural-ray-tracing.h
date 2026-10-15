@@ -30,15 +30,12 @@ struct RayTracingStageOrInputUse
     /// that a use is invalid or that its type is a ray-tracing type.
     enum class Kind
     {
-        /// Checks a function result, property type, resolved non-constructor call result, or
-        /// expression producing an optional.
+        /// Checks a function result, property type, or resolved non-constructor call result.
         ///
         /// Consider `rt::MissInput<C> makeInput();`. The function promises to return a stage
         /// view, which this API does not allow. A call to `makeDefault<rt::MissInput<C>>()`
         /// needs the same check on its specialized result even if the function declares T as
         /// its return type. The check also finds restricted stage/input types inside containers.
-        /// For example, `other as rt::MissInput<C>` produces a forbidden Optional<MissInput<C>>,
-        /// even if the caller immediately reads `.value` without declaring an optional variable.
         ///
         /// Uses `type` and `location`. Variables and individual references to existing inputs
         /// are not recorded as Value uses; copying an existing view remains allowed.
@@ -78,7 +75,8 @@ struct RayTracingStageOrInputUse
         ///
         /// Uses `genericArguments`, checking direct stage/input types and concrete pack
         /// elements. `genericApplicationType`, when supplied, identifies type applications
-        /// allowed to carry those arguments, such as rt::MissShaderList<MyMiss>. This is
+        /// allowed to carry those arguments, such as rt::MissShaderList<MyMiss> or
+        /// Optional<rt::MissInput<C>>. This is
         /// separate from the recursive field/container check used by Value and Variable.
         GenericArguments,
     };

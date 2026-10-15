@@ -59,6 +59,13 @@ void invalidStorage(
 //CHECK:                ^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
 //CHECK:                ^^^^^^^^^^^^ structural ray-tracing stage type 'Box<TestClosestHit>' has no runtime representation
 
+    // Allowing optional input aliases does not give stage structs a runtime representation.
+    Optional<TestClosestHit> optionalStage;
+//CHECK:     ^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:     ^^^^^^^^^^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation
+//CHECK:                     ^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
+//CHECK:                     ^^^^^^^^^^^^^ structural ray-tracing stage type 'Optional<TestClosestHit>' has no runtime representation
+
     Box<Box<TestClosestHit>> nestedWrappedStage;
 //CHECK:    ^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
 //CHECK:    ^^^^^^^^^^^^^^ structural ray-tracing stage type 'TestClosestHit' has no runtime representation

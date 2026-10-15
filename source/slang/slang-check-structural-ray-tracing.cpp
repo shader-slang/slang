@@ -749,12 +749,20 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
             location,
             depth + 1);
     if (auto optionalType = as<OptionalType>(type))
+    {
+        // Optional<MissInput<C>> holds either an existing invocation view or none. Neither case
+        // creates a fresh input. Its input constructor argument is checked separately. Continue
+        // inspecting other element types: an Optional<MissShader> still contains a stage value.
+        if (_getDirectStageInputKind(optionalType->getValueType()) !=
+            StructuralRayTracingStageKind::Count)
+            return StructuralRayTracingRuntimeTypeKind::None;
         return _findStructuralRuntimeType(
             visitor,
             optionalType->getValueType(),
             seenTypes,
             location,
             depth + 1);
+    }
     if (auto pointerType = as<PtrTypeBase>(type))
         return _findStructuralRuntimeType(
             visitor,
@@ -796,16 +804,14 @@ static void _diagnoseInvalidStructuralRayTracingRuntimeType(
     Type* type,
     SourceLoc location)
 {
-    // Expression checking and a later coercion can see the same optional result. Report that
-    // use once, just as construction checking does for a constructor used as an argument.
     if (kind == StructuralRayTracingRuntimeTypeKind::Stage)
     {
-        visitor->diagnoseOnce(
+        visitor->getSink()->diagnose(
             Diagnostics::StructuralRayTracingStageRuntimeValue{.type = type, .location = location});
     }
     else if (kind == StructuralRayTracingRuntimeTypeKind::StageInput)
     {
-        visitor->diagnoseOnce(
+        visitor->getSink()->diagnose(
             Diagnostics::StructuralRayTracingInputStorage{.type = type, .location = location});
     }
 }
@@ -895,6 +901,11 @@ static bool _checkRayTracingStageOrInputUse(
             auto invalidType =
                 _getDirectStructuralRuntimeGenericArgument(visitor, argument.type, invalidKind);
             if (!invalidType)
+                continue;
+            // Optional's constructors wrap an existing value or produce none; they never call T().
+            // Permit Optional<MissInput<C>> without allowing arbitrary Factory<MissInput<C>>.
+            if (invalidKind == StructuralRayTracingRuntimeTypeKind::StageInput &&
+                as<OptionalType>(applicationType))
                 continue;
             _diagnoseInvalidStructuralRayTracingRuntimeType(
                 visitor,
@@ -1812,37 +1823,6 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
     _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
-// Rejects optional results containing a stage or stage input, including unnamed temporaries.
-// Consider this example, where Input is rt::MissInput<C>:
-//
-//     interface IMarker {}
-//     extension Input : IMarker {}
-//     void helper(in Input input) {}
-//     void use(IMarker other) { helper((other as Input).value); }
-//
-// The `as` expression produces Optional<Input>; `.value` then has the allowed parameter type
-// Input. Checking only declared variables or the final argument would miss the optional. The
-// `as` visitor checks its result here, as do resolved name lookups, indexing, dereferences, calls,
-// and successful coercions. A lookup can substitute Input into a property's Optional<T.Value>
-// result without making a call. The shared type-use checker finds inputs inside nested optionals as
-// well. Only Optional results enter that checker here; ordinary references to an input remain
-// allowed.
-bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingOptionalExpression(Expr* expr)
-{
-    if (!as<OptionalType>(unwrapModifiedType(expr->type)))
-        return false;
-
-    // A same-type coercion can return its parenthesized argument. visitParenExpr already
-    // checked the base, so report the optional there rather than again at the opening `(`.
-    if (as<ParenExpr>(expr))
-        return false;
-
-    RayTracingStageOrInputUse use;
-    use.type = expr->type;
-    use.location = expr->loc;
-    return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
-}
-
 // Checks actual construction and call results after normal expression checking. Consider:
 //
 //     use(rt::MissInput<C>(input)); // Same-type coercion returns `input` itself: allowed.
@@ -1854,10 +1834,6 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingOptionalExpression(Exp
 // ordinary call such as `makeDefault<MissInput<C>>()` is still an invalid input result.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
 {
-    // Coercion can create an already-checked optional expression without visiting its syntax.
-    if (as<OptionalType>(unwrapModifiedType(expr->type)))
-        return diagnoseInvalidStructuralRayTracingOptionalExpression(expr);
-
     RayTracingStageOrInputUse use;
     use.type = expr->type;
     use.location = expr->loc;
@@ -1904,7 +1880,11 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
         .forEachGenericSubstitution(
             [&](GenericDecl* genericDecl, Val::OperandView<Val> arguments)
             {
-                if (_isStructuralRayTracingTypeList(genericDecl->inner))
+                // Calls to Optional's builtin constructors carry its element type substitution.
+                // For Optional<MissInput<C>>(input), the constructor wraps the supplied view.
+                // Skip only Optional's own substitution; user-defined generic helpers are checked.
+                if (_isStructuralRayTracingTypeList(genericDecl->inner) ||
+                    _getMagicTypeClass(genericDecl->inner) == ASTNodeType::OptionalType)
                     return;
                 for (auto argument : arguments)
                 {

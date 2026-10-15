@@ -37,6 +37,8 @@ void uniformParameter(uniform rt::MissInput<Context> input) {}
 
 void useView(in rt::MissInput<Context> input) {}
 
+Optional<T> makeFreshOptional<T>() { return T(); }
+
 void cannotCreateView(in rt::MissInput<Context> input)
 {
     rt::MissInput<Context> uninitialized;
@@ -54,4 +56,17 @@ void cannotCreateView(in rt::MissInput<Context> input)
     useView({});
 //CHECK:    ^ construction of a structural ray-tracing type
 //CHECK:    ^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
+
+    // An arbitrary generic helper can construct T. Returning Optional<T> must not exempt
+    // the helper's input type argument from the normal restriction.
+    makeFreshOptional<rt::MissInput<Context>>();
+/*CHECK:
+    ^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+    ^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
+*/
+
+    // Optional can wrap an existing view, but cannot make this fresh input legal.
+    Optional<rt::MissInput<Context>> maybe = rt::MissInput<Context>();
+//CHECK:                                                           ^ construction of a structural ray-tracing type
+//CHECK:                                                           ^ structural ray-tracing type 'rt.MissInput<Context>' cannot be constructed by user code
 }

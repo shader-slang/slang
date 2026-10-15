@@ -738,11 +738,6 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
 
-    // A member access through Ptr<Optional<T.Value>> can implicitly dereference the pointer.
-    // Check its optional result after substitution, before `.value` extracts the stage input.
-    if (diagnoseInvalidStructuralRayTracingOptionalExpression(derefExpr))
-        return CreateErrorExpr(derefExpr);
-
     return derefExpr;
 }
 
@@ -1099,11 +1094,6 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
     }
 
     auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
-    // A generic property or static field can have type Optional<T.Value>. Only this lookup
-    // knows that T.Value is MissInput<C>; reading the member need not make a call or conversion.
-    if (diagnoseInvalidStructuralRayTracingOptionalExpression(resultExpr))
-        return CreateErrorExpr(resultExpr);
-
     // A property reference does not produce an `InvokeExpr` during semantic checking. Register
     // its accessors here so that lowering can later select the getter or setter without losing
     // the derivative associations needed by the enclosing differentiable function.
@@ -3503,11 +3493,6 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
-
-    // Indexing an array is not an invocation. Its element type can become Optional<MissInput<C>>
-    // after substituting a generic property's type arguments, so check the selected element too.
-    if (diagnoseInvalidStructuralRayTracingOptionalExpression(subscriptExpr))
-        return CreateErrorExpr(subscriptExpr);
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
@@ -8121,11 +8106,6 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
-
-    // `other as MissInput<C>` creates an optional even if the caller immediately reads `.value`.
-    // Check that result before either returning the cast or simplifying it to MakeOptionalExpr.
-    if (diagnoseInvalidStructuralRayTracingOptionalExpression(expr))
-        return CreateErrorExpr(expr);
 
     // If value is a subtype of `type`, then this expr is equivalent to a CastToSuperTypeExpr.
     if (auto witness = tryGetSubtypeWitness(valueType, typeExpr.type))

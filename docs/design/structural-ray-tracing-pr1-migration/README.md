@@ -295,26 +295,23 @@ The generic restriction prevents a deferred generic body such as
 `make<T>() { T local = T(); }` from manufacturing an input after frontend checking. Supporting
 broader type-only uses would require validating the eventual specialized body.
 
-An expression cannot produce an `Optional` containing a stage or stage input, even as an unnamed
-temporary. For example, with `Input = rt::MissInput<C>` and `extension Input : IMarker {}`:
+`Optional<MissInput<C>>` can hold an alias to an existing invocation's input, or `none`:
 
 ```slang
-void helper(in Input input) {}
-void inspect(IMarker other)
+void inspect<C : rt::IPayloadContext>(in rt::MissInput<C> input)
 {
-    helper((other as Input).value); // Rejected: `as` produces Optional<Input>.
+    Optional<rt::MissInput<C>> absent = none;
+    let present = input as rt::MissInput<C>;
+    if (present.hasValue)
+    {
+        let alias = present.value;
+    }
 }
 ```
 
-Check `as` in `visitAsTypeExpr` after assigning its optional result type. Keep the existing checks
-on resolved calls and successful coercions, which also produce optional values. Check resolved
-name references too: a generic property or static field declared as `Optional<T.Value>` can become
-`Optional<Input>` when lookup substitutes the type arguments. Built-in array indexing checks its
-element result separately; it does not invoke a subscript method. Implicit pointer dereference can
-also produce an optional and checks its result before further member access. Reuse the RT type-use
-check to find stage/input types inside the optional. Checking only variables or the final helper
-argument misses this temporary: `.value` already has type `Input`. Direct copies and forwarding of an existing input remain allowed. This restriction does
-not prohibit boxing an existing input into an interface; it rejects recovering it through `as`.
+The optional does not allocate an invocation's payload or shader record. Creating a fresh
+`MissInput<C>()` or fresh `MissInput` initializer remains invalid. The separate restrictions on
+shader implementation values and direct global stage-input storage still apply.
 
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
 `input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
