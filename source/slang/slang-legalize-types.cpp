@@ -209,6 +209,7 @@ enum class ContainedTypeProperty
 {
     Opaque,
     Unsized,
+    DescriptorHandle,
 };
 
 /// Find the first by-value type, including `type`, with the requested `property`.
@@ -243,6 +244,10 @@ static IRType* findContainedTypeWithProperty(
         break;
     case ContainedTypeProperty::Unsized:
         if (as<IRUnsizedArrayType>(type))
+            return type;
+        break;
+    case ContainedTypeProperty::DescriptorHandle:
+        if (as<IRDescriptorHandleType>(type))
             return type;
         break;
     }
@@ -306,6 +311,13 @@ bool isUnsizedType(IRType* type)
 {
     HashSet<IRType*> visited;
     return findContainedTypeWithProperty(type, ContainedTypeProperty::Unsized, visited) != nullptr;
+}
+
+bool containsDescriptorHandleType(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return findContainedTypeWithProperty(type, ContainedTypeProperty::DescriptorHandle, visited) !=
+           nullptr;
 }
 
 SourceLoc findBestSourceLocFromUses(IRInst* inst)

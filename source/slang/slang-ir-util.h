@@ -299,6 +299,12 @@ bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 /// `IRArrayType` element count; an `IRUnsizedArrayType` has no count.
 bool isUnsizedType(IRType* type);
 
+/// Test whether by-value storage for `type` contains a `DescriptorHandle<T>`.
+///
+/// Examines struct fields, array elements, and tuple elements, so a handle nested in an
+/// aggregate is found as well as a bare one.
+bool containsDescriptorHandleType(IRType* type);
+
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
 // also the set of `DescriptorHandle` element types that are represented as `uint64` under that
