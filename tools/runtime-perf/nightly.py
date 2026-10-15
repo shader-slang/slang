@@ -42,7 +42,7 @@ def collect_references(args, output):
 def baseline(results, config, corpus, rhi_revision=None):
     """Reuse the newest compatible calibration, never silently resize a candidate."""
     candidates = []
-    for path in results.glob("daily/*/runtime/*/*/results.json"):
+    for path in list(results.glob("daily/*/runtime/*/*/results.json")) + list(results.glob("releases/*/runtime/*/*/results.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
@@ -72,9 +72,12 @@ def collect(args):
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", value) or value in (".", ".."):
             raise ValueError("label and attempt must be single path components")
     root = Path(args.results).resolve()
-    output = root / "daily" / args.label / "runtime" / args.attempt
+    kind = getattr(args, "kind", "daily")
+    if kind == "release" and not re.fullmatch(r"v\d{4}\.\d+", args.label):
+        raise ValueError("release label must be a main release tag, e.g. v2026.19")
+    output = root / ("releases" if kind == "release" else "daily") / args.label / "runtime" / args.attempt
     output.mkdir(parents=True, exist_ok=False)
-    record = dict(schema_version=1, label=args.label, attempt=args.attempt,
+    record = dict(schema_version=1, kind=kind, label=args.label, attempt=args.attempt,
                   commit=args.commit, suite_commit=args.suite_commit,
                   created_unix=time.time(), status="running", backends={})
     manifest = output / "run.json"
@@ -158,6 +161,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results", required=True)
     parser.add_argument("--label", required=True)
+    parser.add_argument("--kind", choices=("daily", "release"), default="daily")
     parser.add_argument("--attempt", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--suite-commit", required=True)

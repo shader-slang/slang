@@ -55,9 +55,13 @@ A setup failure produces a failed manifest rather than successful empty coverage
 The existing `report.py` renders the **GPU runtime** section through
 `runtime_report.py`. The landing page is titled **Slang performance**; existing
 compile report URLs are preserved and **API & RT compilation** is labeled
-explicitly. Runtime pages show sample dispersion, batch/iteration timings,
-previous compatible daily deltas with baseline labels, per-case phases, paired
-CLI compile times, setup observations, and downloadable reproduction bundles.
+explicitly. The runtime landing page lists each subtest and its backends, linking to a page
+with daily and main-release graphs for that subtest. Each backend has GPU runtime,
+paired CLI wall-time, and internal compile-total graphs. Equivalent-reference
+curves overlay their matched Slang measurements; full-suite timings remain
+separate when dimensions differ. Changed measurement contracts produce separate
+panels, and failed/missing points break lines. Tooltips show exact values. Raw run
+pages retain dispersion, phase/setup observations and downloadable bundles.
 The nightly also runs the six existing equivalent reference cases after primary
 measurements. Those paired comparisons are separately calibrated within each run;
 primary daily comparisons use the frozen normal-suite calibration. No tuned
@@ -79,7 +83,7 @@ or coverage failures remain failures, with diagnostics archived. RTX 4090 local
 results cannot serve as the RTX 5090 machine's calibration.
 
 Remaining reporting extensions are cached runtime measurements of the last five
-main releases (excluding patches), richer per-case historical plots, and
+main releases (excluding patches), and
 independently confirmed, frozen optimized reference targets. These do not alter
 the current workload set. The previous local release study remains a separate
 artifact until compatible runtime release bundles are archived by CI. Runtime
@@ -459,3 +463,18 @@ perf runner; only pursue if Phases 1–2 prove insufficient.
 ladder as the internal benchmark's data (2026.5.2, 2026.12, 2026.12.2,
 `f4975a7`) and confirm they reproduce both signals (the release-boundary jump
 and the 2026-07-03 step). If they do, the dimension is captured.
+
+### Runtime release archives
+
+The shared report reads both `daily/<label>/runtime/<attempt>/run.json` and
+`releases/<tag>/runtime/<attempt>/run.json`, with the same bundle layout. A runner
+built against a release package can archive a main-release point with
+`tools/runtime-perf/nightly.py --kind release --label vYYYY.N` and the normal
+collector arguments. Patch tags are rejected by the collector and excluded from
+release charts. Automated release-package backfill remains separate from rendering.
+
+Each subtest page shows the last 30 daily labels and the last five main-release
+tags available for its backend. Release tags are sorted numerically. The latest
+attempt for a label is shown, including a failed attempt; earlier attempts remain
+in the raw archive. Compilation charts keep individual image stages separate.
+One-time reference compilation is not plotted as a repeated compile benchmark.

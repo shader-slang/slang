@@ -8,6 +8,7 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "runtime-perf"))
 import perf as runtime_perf
+import runtime_charts
 
 
 def esc(value):
@@ -27,7 +28,8 @@ def page(path, title, body):
                    'main{max-width:1450px;margin:auto}table{border-collapse:collapse;width:100%;background:white}'
                    'td,th{padding:8px 12px;text-align:left;border-bottom:1px solid #dae0e7}'
                    'th{background:#eaf0f7}a{color:#075da8}pre{white-space:pre-wrap;overflow-wrap:anywhere}'
-                   '.scroll{overflow:auto}.note{color:#536375}h2{margin-top:32px}'
+                   '.scroll{overflow:auto}.chart{max-width:1100px;background:white;border:1px solid #dae0e7;margin:16px 0}'
+                   '.chart svg{display:block;width:100%;height:auto}.note{color:#536375}h2{margin-top:32px}'
                    '</style><main><p><a href="../index.html">Performance overview</a> · '
                    '<a href="index.html">GPU runtime</a></p>'
                    f'<h1>{esc(title)}</h1>{body}</main></html>', encoding="utf-8")
@@ -130,7 +132,7 @@ def write_report(results, outdir):
     root, output = Path(results), Path(outdir) / "runtime"
     output.mkdir(parents=True, exist_ok=True)
     manifests, errors = [], []
-    for path in root.glob("daily/*/runtime/*/run.json"):
+    for path in list(root.glob("daily/*/runtime/*/run.json")) + list(root.glob("releases/*/runtime/*/run.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(record, dict) or record.get("schema_version") != 1:
@@ -140,23 +142,33 @@ def write_report(results, outdir):
                     raise ValueError(f"invalid manifest {key}")
             if not isinstance(record["backends"], dict) or not math.isfinite(record["created_unix"]):
                 raise ValueError("invalid manifest backends or timestamp")
+            record["kind"] = "release" if path.relative_to(root).parts[0] == "releases" else "daily"
             manifests.append((record, path))
         except (OSError, ValueError, KeyError, TypeError) as error:
             errors.append(f"{path.relative_to(root)}: {error}")
     manifests.sort(key=lambda entry: entry[0]["created_unix"])
-    history, links, latest = {}, [], {}
-    latest_references = ""
+    history, links = {}, []
+    chart_events = []
     for record, path in manifests:
         identity = runtime_perf.digest(str(path.relative_to(root)).encode())[:20]
         stem = "run-" + identity
         # Publish the complete reproducible bundle, not machine-local file links.
         archive(path.parent, output / (stem + ".zip"))
         title = f"{record['label']} / attempt {record['attempt']}"
+        reference_data = {}
+        try:
+            reference_data = json.loads((path.parent / "references/results.json").read_text(encoding="utf-8"))
+            if not isinstance(reference_data, dict) or not isinstance(reference_data.get("cases"), list):
+                reference_data = {}
+        except (OSError, ValueError):
+            pass
         body = (f'<p>Status: <b>{esc(record["status"])}</b> · compiler commit '
                 f'<code>{esc(record["commit"])}</code></p>'
                 f'<p><a href="{stem}.zip">Download sources, samples, binaries and logs</a></p>')
         if record.get("reason"):
             body += f'<p>{esc(record["reason"])}</p>'
+        if record.get("provenance"):
+            body += f'<p>{esc(record["provenance"])}</p>'
         for backend, item in record["backends"].items():
             body += f'<h2>{esc(backend)} — {esc(item["status"])}</h2>'
             try:
@@ -165,21 +177,33 @@ def write_report(results, outdir):
                     raise ValueError("unsupported runtime results schema")
                 table = case_table(bundle, item["expected_cases"], history.get(backend, []), record["label"])
                 body += table + details(bundle)
-                latest[backend] = (title, stem, table, item["status"], bundle.get("environment", {}))
-                history.setdefault(backend, []).append((record["label"], bundle))
+                if record["kind"] == "daily":
+                    history.setdefault(backend, []).append((record["label"], bundle))
+                by_case = {r["workload"]: r for r in bundle.get("runs", [])}
+                for name in item["expected_cases"]:
+                    reference = next((r for r in reference_data.get("cases", [])
+                                      if isinstance(r, dict) and r.get("backend") == backend and r.get("case") == name), None)
+                    chart_events.append(dict(id=identity, record=record, kind=record["kind"],
+                                             backend=backend, bundle=bundle,
+                                             case=by_case.get(name, dict(workload=name, status="missing")),
+                                             href=stem + ".html", references=reference_data, reference=reference))
             except (OSError, ValueError, KeyError, TypeError) as error:
                 message = esc(item.get("reason", str(error)))
                 body += f'<p>Measurement unavailable: {message}</p>'
-                latest[backend] = (title, stem, f'<p>Measurement unavailable: {message}</p>', "failed", {})
+                for name in item.get("expected_cases", []):
+                    chart_events.append(dict(id=identity, record=record, kind=record["kind"],
+                                             backend=backend, bundle={},
+                                             case=dict(workload=name, status="missing"),
+                                             href=stem + ".html", references={}, reference=None))
         if "references" in record:
-            latest_references = reference_table(path.parent / "references/results.json", record["references"])
-            latest_references += f'<p>Run: <a href="{stem}.html">{esc(title)}</a></p>'
-            body += latest_references
+            reference_body = reference_table(path.parent / "references/results.json", record["references"])
+            reference_body += f'<p>Run: <a href="{stem}.html">{esc(title)}</a></p>'
+            body += reference_body
         page(output / (stem + ".html"), title, body)
         links.append(f'<li><a href="{stem}.html">{esc(title)}</a> — {esc(record["status"])}</li>')
-    intro = ('<p>GPU execution and paired compilation from the same nightly compiler build. '
-             'Timing changes are advisory; positive deltas mean slower execution. '
-             'Comparisons require compatible environment, workload and measurement policy.</p>'
+    intro = ('<p>Choose a subtest to see daily and main-release graphs for GPU execution and paired compilation. '
+             'Slang and equivalent-reference timings share a graph when measured at matching dimensions. '
+             'Timing changes remain advisory.</p>'
              '<p class="note">µs / execution is serialized batch throughput with reused resources, '
              'not isolated dispatch latency. MAD describes sample variability, not a confidence interval. '
              'GPU and host intervals overlap. Setup and ray-scene construction are excluded from GPU timings.</p>')
@@ -187,11 +211,8 @@ def write_report(results, outdir):
         intro += '<p>No runtime nightlies have been collected. Existing compile-only history is unchanged.</p>'
     if manifests and manifests[-1][0].get("reason"):
         intro += '<p>Latest attempt failed before collection: ' + esc(manifests[-1][0]["reason"]) + '</p>'
-    for backend, (title, stem, table, status, environment) in latest.items():
-        intro += (f'<h2>{esc(backend)} — {esc(status)}</h2><p><a href="{stem}.html">{esc(title)}</a>'
-                  f' · {esc(environment.get("host", ""))} · driver {esc(environment.get("driver_id", ""))}</p>' + table)
-    intro += latest_references
-    intro += '<h2>Run history and paired compile times</h2><ul>' + ''.join(reversed(links)) + '</ul>'
+    intro += runtime_charts.write_subtests(output, chart_events, page)
+    intro += '<details><summary>Run archive and measurement health</summary><ul>' + ''.join(reversed(links)) + '</ul></details>'
     if errors:
         intro += '<h2>Unreadable history</h2><pre>' + esc('\n'.join(errors)) + '</pre>'
     page(output / "index.html", "GPU runtime performance", intro)

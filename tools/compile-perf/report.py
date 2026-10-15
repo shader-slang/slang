@@ -498,7 +498,7 @@ def main():
                 f"<p>{desc}</p></div>")
 
     rows = ['<div class="secrow"><b>GPU runtime</b>'
-            '<div class="links"><a href="runtime/index.html">Daily results and paired compile times</a></div>'
+            '<div class="links"><a href="runtime/index.html">Daily / release graphs and paired compile times</a></div>'
             f'<p>{runtime_count} runtime attempts. Stability, compiler-sensitive and ray-tracing cases; '
             'Vulkan, D3D12 and CUDA coverage is recorded per run.</p></div>']
     if api_names:

@@ -4,6 +4,10 @@ The existing compile-perf nightly now collects this suite after compilation and
 publishes a GPU runtime section on the same report site. See
 [`../compile-perf/DESIGN.md`](../compile-perf/DESIGN.md#shared-runtime-reporting-and-schedule)
 for scheduling, runner prerequisites, failure handling, and history compatibility.
+The runtime landing page links each subtest/backend to its own daily and release
+graphs, including paired compilation. Reference comparisons overlay the Slang run
+measured at the reference's exact dimensions; full-suite history remains separately
+labeled when sizes differ. Missing or incompatible measurements are never joined.
 The manual prototype workflow below remains a separate build/smoke check.
 
 ## Optimization-sensitive workloads and alternative references
