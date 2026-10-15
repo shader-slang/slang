@@ -31,9 +31,10 @@
 namespace Slang
 {
 
-// In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
-// so to construct infinity or nan, we have to assign the float literal to a variable
-// and then use it to bypass the compile error.
+// WGSL has no NaN or infinity literal, and a const-expression such as `1.0 / 0.0` that evaluates
+// to one is a shader-creation error. These f32 and f16 helpers build the value from `let`
+// bindings, so `a / b` is a runtime expression rather than a const-expression. See
+// `emitFloatLitValue` for where they are used.
 static const char* kWGSLBuiltinPreludeGetInfinity = R"(
 fn _slang_getInfinity(positive: bool) -> f32
 {
@@ -1074,38 +1075,36 @@ void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, Declarator
     emitSimpleType(type);
 }
 
-// Emit the value of float literal `litInst`. A finite value is written with `suffix` ("f" or
-// "h"). WGSL has no NaN or infinity literal, and a const-expression that evaluates to one is a
-// shader-creation error, so those are emitted as calls to the given prelude helpers instead: NaN
-// as `<nanFunc>()`, and an infinity as `<infinityFunc>(true)` or `<infinityFunc>(false)`.
-void WGSLSourceEmitter::emitFloatLitValue(
-    IRConstant* litInst,
-    const char* nanPrelude,
-    const char* nanFunc,
-    const char* infinityPrelude,
-    const char* infinityFunc,
-    const char* suffix)
+// Emit the value of float literal `litInst`, whose type is `half` or `float` (`baseType`). A
+// finite value is written with an `h` or `f` suffix. A NaN or infinity is written as a call to the
+// matching prelude helper (`_slang_getNan()`, `_slang_getInfinity(positive)` or their `Half`
+// counterparts), because WGSL cannot spell it as a literal. That call is a runtime expression, so
+// it is valid only where WGSL accepts one: not in a `const` declaration, a module-scope
+// `var<private>` initializer or an `override` default (issues #13658 and #13671).
+void WGSLSourceEmitter::emitFloatLitValue(IRFloatLit* litInst, BaseType baseType)
 {
+    SLANG_ASSERT(baseType == BaseType::Half || baseType == BaseType::Float);
+    const bool isHalf = baseType == BaseType::Half;
+    if (isHalf)
+        m_f16ExtensionEnabled = true;
+
     switch (litInst->getFloatKind())
     {
     case IRConstant::FloatKind::Nan:
-        ensurePrelude(nanPrelude);
-        m_writer->emit(nanFunc);
-        m_writer->emit("()");
+        ensurePrelude(isHalf ? kWGSLBuiltinPreludeGetNanHalf : kWGSLBuiltinPreludeGetNan);
+        m_writer->emit(isHalf ? "_slang_getNanHalf()" : "_slang_getNan()");
         break;
     case IRConstant::FloatKind::PositiveInfinity:
-        ensurePrelude(infinityPrelude);
-        m_writer->emit(infinityFunc);
-        m_writer->emit("(true)");
-        break;
     case IRConstant::FloatKind::NegativeInfinity:
-        ensurePrelude(infinityPrelude);
-        m_writer->emit(infinityFunc);
-        m_writer->emit("(false)");
+        ensurePrelude(isHalf ? kWGSLBuiltinPreludeGetInfinityHalf : kWGSLBuiltinPreludeGetInfinity);
+        m_writer->emit(isHalf ? "_slang_getInfinityHalf(" : "_slang_getInfinity(");
+        m_writer->emit(
+            litInst->getFloatKind() == IRConstant::FloatKind::PositiveInfinity ? "true)"
+                                                                               : "false)");
         break;
-    default:
-        m_writer->emit(litInst->value.floatVal);
-        m_writer->emit(suffix);
+    case IRConstant::FloatKind::Finite:
+        m_writer->emit(litInst->getValue());
+        m_writer->emit(isHalf ? "h" : "f");
         break;
     }
 }
@@ -1225,26 +1224,11 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 default:
 
                 case BaseType::Half:
-                    {
-                        m_f16ExtensionEnabled = true;
-                        emitFloatLitValue(
-                            litInst,
-                            kWGSLBuiltinPreludeGetNanHalf,
-                            "_slang_getNanHalf",
-                            kWGSLBuiltinPreludeGetInfinityHalf,
-                            "_slang_getInfinityHalf",
-                            "h");
-                    }
+                    emitFloatLitValue(static_cast<IRFloatLit*>(inst), BaseType::Half);
                     break;
 
                 case BaseType::Float:
-                    emitFloatLitValue(
-                        litInst,
-                        kWGSLBuiltinPreludeGetNan,
-                        "_slang_getNan",
-                        kWGSLBuiltinPreludeGetInfinity,
-                        "_slang_getInfinity",
-                        "f");
+                    emitFloatLitValue(static_cast<IRFloatLit*>(inst), BaseType::Float);
                     break;
 
                 case BaseType::Double:
