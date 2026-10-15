@@ -4373,8 +4373,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (!invoke->functionExpr)
             return rs;
 
-        // For a same-type cast such as (T)(functionReturningT()), ResolveInvoke returns the
-        // already-checked inner call. The outer cast adds no new call or construction.
+        // if this is still an invoke expression, test arguments passed to inout/out parameter
+        // are LValues.
+        //
+        // A special case that allows us to skip this validation is when `expr` is an identical type
+        // cast, e.g. `(T)(funcThatReturnsT())`. In this case `ResolveInvoke(expr)` will simply
+        // return the argument expr `funcThatReturnsT()`. And we can skip rerunning any `out` param
+        // validation logic on the inner expr.
         if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
             return rs;
 
