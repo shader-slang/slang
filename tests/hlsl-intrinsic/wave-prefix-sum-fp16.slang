@@ -7,8 +7,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK_WGSL-NOT: subgroups_f16
 // CHECK_WGSL: enable f16;
+// CHECK_WGSL-NOT: subgroups_f16
 // CHECK_WGSL: enable subgroups;
 // CHECK_WGSL-NOT: subgroups_f16
 
