@@ -111,9 +111,14 @@ static IRIntLit* findLiteralToEmitAsRuntimeValue(
     if (!getParentFunc(inst))
         return nullptr;
 
-    // Finite literals stay bare so Tint can fold them.
+    // `_slang_nonConstU32` takes a `u32`, and a user intrinsic with this spelling can take
+    // another type, so only a `uint` literal is wrapped.
     auto literal = as<IRIntLit>(inst->getArg(0));
-    if (!literal || !hasNonFiniteHalf(uint32_t(literal->getValue())))
+    if (!literal || literal->getDataType()->getOp() != kIROp_UIntType)
+        return nullptr;
+
+    // Finite literals stay bare so Tint can fold them.
+    if (!hasNonFiniteHalf(uint32_t(literal->getValue())))
         return nullptr;
     return literal;
 }
