@@ -816,6 +816,7 @@ static void _lookUpInScopes(
     LookupResult& result)
 {
     auto thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisValue;
+    auto thisBreadcrumbScope = request.scope;
 
     auto scope = request.scope;
 
@@ -885,10 +886,7 @@ static void _lookUpInScopes(
                 BreadcrumbInfo breadcrumb;
                 breadcrumb.kind = thisBreadcrumbKind;
                 breadcrumb.declRef = aggTypeDeclBaseRef;
-                breadcrumb.thisValueScope =
-                    thisBreadcrumbKind == LookupResultItem::Breadcrumb::Kind::ThisValue
-                        ? request.scope
-                        : nullptr;
+                breadcrumb.thisValueScope = thisBreadcrumbScope;
                 breadcrumb.prev = nullptr;
                 BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
@@ -986,10 +984,7 @@ static void _lookUpInScopes(
                     BreadcrumbInfo breadcrumb;
                     breadcrumb.kind = thisBreadcrumbKind;
                     breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
-                    breadcrumb.thisValueScope =
-                        thisBreadcrumbKind == LookupResultItem::Breadcrumb::Kind::ThisValue
-                            ? request.scope
-                            : nullptr;
+                    breadcrumb.thisValueScope = thisBreadcrumbScope;
                     breadcrumb.prev = nullptr;
                     Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);
@@ -1008,7 +1003,10 @@ static void _lookUpInScopes(
             // Once lookup crosses a static callable or a nested type, enclosing instance members
             // can only be referenced through a `This` type.
             if (_isThisTypeOnlyScope(containerDecl))
+            {
                 thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisType;
+                thisBreadcrumbScope = nullptr;
+            }
         }
 
         if (result.isValid())
