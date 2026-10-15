@@ -99,6 +99,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<FuncSpecializationKey, IRFunc*> functionSpecializations;
 
+    // The function each specialization was cloned from, so that a call that already targets a
+    // specialization is keyed on the original function (and finds the existing specialization)
+    // when its caller is processed again.
+    Dictionary<IRFunc*, IRFunc*> specializationOrigin;
+
     IRFunc* specializeFunc(const FuncSpecializationKey& key)
     {
         auto func = key.getFunc();
@@ -134,6 +139,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         fixUpFuncType(specializedFunc);
 
         functionSpecializations[key] = specializedFunc;
+        specializationOrigin[specializedFunc] = func;
         return specializedFunc;
     }
 
@@ -291,7 +297,10 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 // If callee doesn't have a body, don't specialize.
                                 if (!callee->getFirstBlock())
                                     break;
-                                FuncSpecializationKey key(callee, argAddrSpaces);
+                                IRFunc* originalCallee = callee;
+                                if (auto origin = specializationOrigin.tryGetValue(callee))
+                                    originalCallee = *origin;
+                                FuncSpecializationKey key(originalCallee, argAddrSpaces);
                                 IRFunc* specializedCallee = nullptr;
                                 if (IRFunc** specializedFunc =
                                         functionSpecializations.tryGetValue(key))
