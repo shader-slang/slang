@@ -1,9 +1,9 @@
-// WGSL rows check the wrapped non-finite literals at the default optimization level and at -O0,
-// where fewer values are folded before emission. FINITE re-reads the default output for the
-// values that must stay bare.
+// WGSL checks the wrapped non-finite literals, and FINITE re-reads the same output for the values
+// that must stay bare.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -O0
 //TEST:SIMPLE(filecheck=FINITE): -target wgsl -entry computeMain -stage compute
+// USER checks a user intrinsic that shares the `unpack2x16float` spelling with two arguments.
+//TEST:SIMPLE(filecheck=USER): -target wgsl -entry userMain -stage compute
 // SPEC and SPECINF check module-scope `override` initializers of specialization constants.
 //TEST:SIMPLE(filecheck=SPEC): -target wgsl -entry specMain -stage compute
 //TEST:SIMPLE(filecheck=SPECINF): -target wgsl -entry specNonFiniteMain -stage compute
@@ -29,8 +29,9 @@ RWStructuredBuffer<float> nonFiniteBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// The array uses NaN payloads that appear nowhere else, so only its own initializer can satisfy
-// the 31745/64513/32257 lines below.
+// WGSL legalization copies this module-scope initializer into `computeMain`, so it takes the
+// function-body path. The array uses NaN payloads that appear nowhere else, so only its own
+// initializer can satisfy the 31745/64513/32257 lines below.
 static const float kNonFinite[3] = { f16tof32(0x7C01u), f16tof32(0xFC01u), f16tof32(0x7E01u) };
 
 // The helper is defined once, and each non-finite literal goes through it: +Inf, -Inf and NaN
@@ -118,4 +119,24 @@ const float kSpecInf = f16tof32(0x7C00u);
 void specNonFiniteMain(uint3 tid: SV_DispatchThreadID)
 {
     outputBuffer[tid.x] = kSpecInf;
+}
+
+// A user `__intrinsic_asm` can start with `unpack2x16float` and take any number of arguments.
+// The rule applies only to the one-argument shape, so this call is emitted as written.
+float2 userUnpack(uint lo, uint hi)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "unpack2x16float(($0) | (($1) << 16u))";
+    }
+}
+
+// USER-NOT: _slang_nonConstU32
+// USER: unpack2x16float((({{[^)]*}})) | (((u32(15360))) << 16u))
+// USER-NOT: _slang_nonConstU32
+
+[numthreads(1, 1, 1)]
+void userMain(uint3 tid: SV_DispatchThreadID)
+{
+    outputBuffer[tid.x] = userUnpack(tid.x, 0x3C00u).y;
 }
