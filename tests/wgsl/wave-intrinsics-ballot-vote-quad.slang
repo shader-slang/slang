@@ -50,17 +50,39 @@ void allEqualMain(uint3 tid: SV_DispatchThreadID)
     outputBuffer[tid.x] = r;
 }
 
-// WGSL's quadBroadcast needs a const-expression lane, so all four lanes are read and selected.
+// WGSL's quadBroadcast needs a const-expression lane, so all four lanes are read and the
+// requested one (the lane index modulo 4) is selected. Bools are broadcast as 0/1.
 // QUAD: enable subgroups;
-// QUAD: quadBroadcast({{.*}}u32(0)
-// QUAD: quadBroadcast({{.*}}u32(1)
-// QUAD: quadBroadcast({{.*}}u32(2)
-// QUAD: quadBroadcast({{.*}}u32(3)
+// QUAD: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : u32,  quadLaneID_{{[0-9]+}} : u32) -> u32
+// QUAD: var [[LANE:lane_[0-9]+]] : u32 = (quadLaneID_{{[0-9]+}} & (u32(3)));
+// QUAD: var [[Q0:q0_[0-9]+]] : u32 = (quadBroadcast((sourceValue_{{[0-9]+}}), (u32(0))));
+// QUAD: var [[Q1:q1_[0-9]+]] : u32 = (quadBroadcast((sourceValue_{{[0-9]+}}), (u32(1))));
+// QUAD: var [[Q2:q2_[0-9]+]] : u32 = (quadBroadcast((sourceValue_{{[0-9]+}}), (u32(2))));
+// QUAD: var [[Q3:q3_[0-9]+]] : u32 = (quadBroadcast((sourceValue_{{[0-9]+}}), (u32(3))));
+// QUAD: if([[LANE]] == u32(0))
+// QUAD-NEXT: {
+// QUAD-NEXT: = [[Q0]];
+// QUAD: if([[LANE]] == u32(1))
+// QUAD-NEXT: {
+// QUAD-NEXT: = [[Q1]];
+// QUAD: if([[LANE]] == u32(2))
+// QUAD-NEXT: {
+// QUAD-NEXT: = [[Q2]];
+// QUAD: else
+// QUAD-NEXT: {
+// QUAD-NEXT: = [[Q3]];
+// QUAD-NOT: quadBroadcast({{.*}}bool
+// QUAD-DAG: = (select(u32(0u), u32(1u), (sourceValue_{{[0-9]+}})));
+// QUAD-DAG: = (select(vec2<u32>(0u), vec2<u32>(1u), (sourceValue_{{[0-9]+}})));
+// QUAD-DAG: = (bool((
+// QUAD-DAG: = (vec2<bool>((
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
 {
     const uint v = outputBuffer[tid.x];
-    outputBuffer[tid.x] = QuadReadLaneAt(v, v);
+    const bool b = QuadReadLaneAt(v > 3, v);
+    const bool2 b2 = QuadReadLaneAt(bool2(v > 1, v > 2), 1);
+    outputBuffer[tid.x] = QuadReadLaneAt(v, v) + (b ? 8u : 0u) + (b2.x ? 16u : 0u) + (b2.y ? 32u : 0u);
     floatBuffer[tid.x] = QuadReadLaneAt(floatBuffer[tid.x], 2);
 }
