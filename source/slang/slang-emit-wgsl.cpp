@@ -1908,15 +1908,10 @@ void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     {
         if (const auto extensionDecoration = as<IRRequireWGSLExtensionDecoration>(decoration))
         {
+            // Subgroup operations on f16 values need only `enable f16;` and
+            // `enable subgroups;`. WGSL has no separate `subgroups_f16` extension
+            // (it was folded into `subgroups`), and validators reject it.
             _requireExtension(extensionDecoration->getExtensionName());
-
-            // TODO: Make this cleaner and only enable this extension if f16 is actually used on the
-            // subgroup intrinsic. Check float type in meta file.
-            if (m_f16ExtensionEnabled && extensionDecoration->getExtensionName() == "subgroups")
-            {
-                String extName = "subgroups_f16";
-                _requireExtension(extName.getUnownedSlice());
-            }
         }
     }
 }
