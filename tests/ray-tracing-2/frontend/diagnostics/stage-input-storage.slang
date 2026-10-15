@@ -61,8 +61,8 @@ void cannotCreateView(in rt::MissInput<Context> input)
     // the helper's input type argument from the normal restriction.
     makeFreshOptional<rt::MissInput<Context>>();
 /*CHECK:
-    ^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-    ^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' may only be used as an 'in' parameter or an initialized local copy
+    ^^^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+    ^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<Context>' cannot be used as a generic type argument
 */
 
     // Optional can wrap an existing view, but cannot make this fresh input legal.

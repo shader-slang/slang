@@ -907,11 +907,22 @@ static bool _checkRayTracingStageOrInputUse(
             if (invalidKind == StructuralRayTracingRuntimeTypeKind::StageInput &&
                 as<OptionalType>(applicationType))
                 continue;
-            _diagnoseInvalidStructuralRayTracingRuntimeType(
-                visitor,
-                invalidKind,
-                invalidType,
-                argument.location);
+            // consume(input) can infer MissInput<C> for T without declaring input storage.
+            // Explain that the inferred or explicit type argument is what this rule rejects.
+            if (invalidKind == StructuralRayTracingRuntimeTypeKind::StageInput)
+            {
+                visitor->getSink()->diagnose(Diagnostics::StructuralRayTracingInputGenericArgument{
+                    .type = invalidType,
+                    .location = argument.location});
+            }
+            else
+            {
+                _diagnoseInvalidStructuralRayTracingRuntimeType(
+                    visitor,
+                    invalidKind,
+                    invalidType,
+                    argument.location);
+            }
             return true;
         }
         return false;

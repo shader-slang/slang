@@ -42,14 +42,14 @@ void invalidStorage(
 //CHECK:                                ^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
 
     Box<rt::ClosestHitInput<TestHitContext>> wrappedInput;
-//CHECK:    ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:    ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' cannot be used as a generic type argument
 //CHECK:                                     ^^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                     ^^^^^^^^^^^^ ray-tracing stage input type 'Box<rt.ClosestHitInput<TestHitContext>>' may only be used as an 'in' parameter or an initialized local copy
 
     Box<Box<rt::ClosestHitInput<TestHitContext>>> nestedWrappedInput;
-//CHECK:        ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:        ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<TestHitContext>' cannot be used as a generic type argument
 //CHECK:                                          ^^^^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
 //CHECK:                                          ^^^^^^^^^^^^^^^^^^ ray-tracing stage input type 'Box<Box<rt.ClosestHitInput<TestHitContext>>>' may only be used as an 'in' parameter or an initialized local copy
 

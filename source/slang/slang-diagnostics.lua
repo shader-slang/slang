@@ -1124,6 +1124,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-input-generic-argument",
+    20030,
+    "ray-tracing stage input cannot be used as a generic type argument",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' cannot be used as a generic type argument" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",

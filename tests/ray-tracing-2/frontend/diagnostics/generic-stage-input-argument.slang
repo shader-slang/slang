@@ -44,8 +44,8 @@ struct ClosestHit : rt::IClosestHitShader
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
         consume(input);
-//CHECK:^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
     }
 }
 
@@ -69,9 +69,8 @@ struct Wrapper<T>
 {
 }
 
-// A generic type may erase its argument physically, but passing a compiler-provided stage input or
-// a structural stage as a type argument is still invalid. Cover direct, type-aliased, and
-// resource-wrapper applications.
+// Even a generic type with no fields cannot use a stage or stage-input type argument.
+// Cover direct types, type aliases, and resource wrappers.
 struct Phantom<T>
 {
 }
@@ -79,20 +78,20 @@ struct Phantom<T>
 typealias HitInputAlias = rt::ClosestHitInput<HitContext>;
 
 typealias InvalidPhantom = Phantom<rt::ClosestHitInput<HitContext>>;
-//CHECK:                               ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                               ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:                               ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:                               ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 
 typealias InvalidAliasedPhantom = Phantom<HitInputAlias>;
-//CHECK:                                  ^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                                  ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:                                  ^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:                                  ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 
 typealias InvalidStagePhantom = Phantom<ClosestHit>;
 //CHECK:                                ^^^^^^^^^^ runtime use of a structural ray-tracing stage type
 //CHECK:                                ^^^^^^^^^^ structural ray-tracing stage type 'ClosestHit' has no runtime representation
 
 ConstantBuffer<HitInputAlias> invalidStageInputBuffer;
-//CHECK:       ^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:       ^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 
 // Metadata types remain ordinary generic arguments; only shader stages and inputs retain
 // the restriction needed to prevent a generic body from constructing or storing those values.
@@ -124,12 +123,12 @@ RWStructuredBuffer<uint> output;
 void main()
 {
     output[0] = makeAndRead<rt::ClosestHitInput<HitContext>>();
-//CHECK:        ^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:        ^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:        ^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:        ^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 
     useType<Wrapper<rt::ClosestHitInput<HitContext>>>();
-//CHECK:                ^^^^^^^^^^^^^^^ storage of a structural ray-tracing stage input
-//CHECK:                ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:                ^^^^^^^^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+//CHECK:                ^^^^^^^^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 
     useType<ClosestHit>();
 /*CHECK:
@@ -138,11 +137,11 @@ void main()
 */
 
     // Variadic substitutions arrive at semantic checking as a single concrete type pack. Its
-    // immediate elements obey the same no-runtime-representation rule as ordinary arguments.
+    // immediate elements obey the same generic-argument restriction as individual types.
     useTypes<rt::ClosestHitInput<HitContext>>();
 /*CHECK:
-    ^^^^^^^^ storage of a structural ray-tracing stage input
-    ^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' may only be used as an 'in' parameter or an initialized local copy
+    ^^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
+    ^^^^^^^^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be used as a generic type argument
 */
 
     useTypes<ClosestHit>();
