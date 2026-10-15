@@ -96,6 +96,8 @@ private:
 
     bool m_f16ExtensionEnabled = false;
 
+    IRInst* m_literalToEmitAsRuntimeValue = nullptr;
+
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 

@@ -52,6 +52,26 @@ fn _slang_getNan() -> f32
 }
 )";
 
+// A call to a user-declared function is never a WGSL const-expression, so passing a literal
+// through this identity function keeps a `@const` builtin applied to it from being evaluated
+// at shader-creation time.
+static const char* kWGSLBuiltinPreludeNonConstU32 = R"(
+fn _slang_nonConstU32(x : u32) -> u32
+{
+    return x;
+}
+)";
+
+// Return true if either 16-bit half of `packedHalves` is an IEEE binary16 Inf or NaN, i.e. has an
+// all-ones exponent. For example, 0x7C00 (+Inf) and 0x7E003C00 (NaN in the high half) return
+// true, and 0x7BFF7BFF (the largest finite pair) returns false.
+static bool hasNonFiniteHalf(uint32_t packedHalves)
+{
+    const uint32_t kHalfExponentMask = 0x7C00u;
+    return (packedHalves & kHalfExponentMask) == kHalfExponentMask ||
+           ((packedHalves >> 16) & kHalfExponentMask) == kHalfExponentMask;
+}
+
 WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     : CLikeSourceEmitter(desc)
 {
@@ -1040,6 +1060,13 @@ void WGSLSourceEmitter::emitOperandImpl(IRInst* operand, EmitOpInfo const& outer
         m_writer->emit(getName(operand));
         m_writer->emit(")");
     }
+    else if (operand == m_literalToEmitAsRuntimeValue)
+    {
+        ensurePrelude(kWGSLBuiltinPreludeNonConstU32);
+        m_writer->emit("_slang_nonConstU32(");
+        CLikeSourceEmitter::emitOperandImpl(operand, getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
     else
     {
         CLikeSourceEmitter::emitOperandImpl(operand, outerPrec);
@@ -1839,6 +1866,30 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
     if (intrinsicDefinition.startsWith("f16"))
     {
         m_f16ExtensionEnabled = true;
+    }
+
+    // `unpack2x16float` is a `@const` builtin, so applied to a literal it is a const-expression,
+    // and WGSL rejects a const-expression whose value is Inf or NaN. Consider
+    // `f16tof32(0x7C00u)`, which emits `unpack2x16float(u32(31744)).x`: Tint fails with "value inf
+    // cannot be represented as 'f32'". We emit such a literal through `_slang_nonConstU32` so the
+    // call is evaluated at run time, as it is on other targets. Finite literals stay bare, which
+    // keeps them valid in module-scope `override` initializers, where a user-declared function
+    // call is not allowed.
+    if (intrinsicDefinition.startsWith("unpack2x16float") && inst->getArgCount() == 1)
+    {
+        auto literal = as<IRIntLit>(inst->getArg(0));
+        if (literal && hasNonFiniteHalf(uint32_t(literal->getValue())))
+        {
+            auto savedLiteral = m_literalToEmitAsRuntimeValue;
+            m_literalToEmitAsRuntimeValue = literal;
+            CLikeSourceEmitter::emitIntrinsicCallExprImpl(
+                inst,
+                intrinsicDefinition,
+                intrinsicInst,
+                inOuterPrec);
+            m_literalToEmitAsRuntimeValue = savedLiteral;
+            return;
+        }
     }
 
     CLikeSourceEmitter::emitIntrinsicCallExprImpl(
