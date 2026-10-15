@@ -2,8 +2,13 @@
 
 import copy
 import io
+import json
+import subprocess
+import sys
+import tempfile
 import unittest
 import urllib.error
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import benchview
@@ -43,11 +48,69 @@ class BenchViewTests(unittest.TestCase):
         for i, total in enumerate([10, 20]):
             self.assertAlmostEqual(sum(c["distribution"]["samples"][i] for c in components), total)
 
-    def test_unaligned_samples_rejected(self):
-        """Do not invent phase alignment for partial timer streams."""
+    def test_unaligned_samples_omit_only_breakdown(self):
+        """Keep passed measurements without inventing phase sample alignment."""
         self.record["timers"]["linkAndOptimizeIR"]["samples"] = [12]
-        with self.assertRaisesRegex(ValueError, "align"):
+        with patch('sys.stderr', new_callable=io.StringIO) as stderr:
+            observation = self.convert()[0]["observations"][0]
+        self.assertEqual(observation["status"], "passed")
+        root = next(m for m in observation["metrics"] if m["name"] == "compileInner")
+        self.assertNotIn("breakdown", root)
+        self.assertEqual(root["distribution"]["samples"], [10, 20])
+        self.assertIn("breakdownOmitted", root["metadata"])
+        self.assertIn("omitted unaligned breakdown", stderr.getvalue())
+
+    def test_source_emission_tree_and_priority(self):
+        """Source emission contains linking, including when the metric cap is reached."""
+        values = {"compileInner": 100, "generateOutput": 90,
+                  "emitEntryPointsSourceFromIR": 80, "linkAndOptimizeIR": 60}
+        self.record["timers"] = {name: {"samples": [value, value * 2]}
+                                 for name, value in values.items()}
+        self.record["timers"].update({f"aaa{i}": {"samples": [1, 2]} for i in range(80)})
+        metrics = self.convert()[0]["observations"][0]["metrics"]
+        self.assertIn("emitEntryPointsSourceFromIR", [m["name"] for m in metrics])
+        root = next(m for m in metrics if m["name"] == "compileInner")
+        actual = {c["name"]: c["distribution"]["samples"]
+                  for c in root["breakdown"]["components"]}
+        for i in range(2):
+            expected = benchview.buckets({name: value * (i + 1) for name, value in values.items()})
+            self.assertEqual({name: samples[i] for name, samples in actual.items()}, expected)
+        self.assertEqual(actual["emitEntryPointsSourceFromIR (self)"], [20, 40])
+
+    def test_component_id_collision(self):
+        """Reject normalized component collisions before contacting the server."""
+        tree = ("root", [("Foo", []), ("foo", [])])
+        timers = {"root": {"samples": [10]}, "Foo": {"samples": [2]},
+                  "foo": {"samples": [3]}}
+        with self.assertRaisesRegex(ValueError, "component names collide"):
+            benchview.phase_breakdown(timers, tree)
+
+    def test_runner_os_mismatch(self):
+        """A changed runner platform cannot silently inherit the Windows label."""
+        self.meta["runner"] = "Linux-x86_64-cpu"
+        with self.assertRaisesRegex(ValueError, "OS disagrees"):
             self.convert()
+
+    def test_malformed_inputs_have_single_line_errors(self):
+        """CLI input errors should not leak tracebacks into the nightly log."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'meta.json').write_text(json.dumps(self.meta))
+            malformed = copy.deepcopy(self.record)
+            malformed['timers']['compileInner'] = 5
+            for records in ([None], [malformed]):
+                (root / 'results.json').write_text(json.dumps(records))
+                result = subprocess.run(
+                    [sys.executable, str(Path(benchview.__file__)),
+                     '--results', str(root / 'results.json'), '--meta', str(root / 'meta.json'),
+                     '--os', 'Windows', '--observed-at', '2026-10-15T00:00:00Z',
+                     '--execution-id', 'test', '--output', str(root / 'out')],
+                    capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(len(result.stderr.splitlines()), 1)
+                self.assertIn('BenchView export failed:', result.stderr)
+        with self.assertRaises(ValueError):
+            benchview.timestamp(123)
 
     def test_zero_root(self):
         """A zero-duration root still exports a valid complete breakdown."""
@@ -85,6 +148,17 @@ class BenchViewTests(unittest.TestCase):
         observation = self.convert()[0]["observations"][0]
         self.assertEqual(observation["status"], "failed")
         self.assertIn("error", observation)
+
+    def test_failed_partial_samples_do_not_abort_nightly(self):
+        """One failed workload exports its source alongside unaffected successful results."""
+        failed = copy.deepcopy(self.record)
+        failed.update(workload="failed", ok=False, error="sample failed")
+        failed['timers']['linkAndOptimizeIR']['samples'] = [12]
+        observations = self.convert([self.record, failed])[0]['observations']
+        self.assertEqual([o['status'] for o in observations], ['passed', 'failed'])
+        self.assertTrue(observations[0]['metrics'])
+        self.assertEqual(observations[1]['metrics'], [])
+        self.assertEqual(json.loads(observations[1]['artifacts'][0]['content']['text']), failed)
 
     def test_invalid_dates_and_duplicates(self):
         """Reject impossible release dates and ambiguous observation identities."""

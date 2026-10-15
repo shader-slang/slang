@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import statistics
 import sys
 import time
 import urllib.error
@@ -14,13 +15,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from lib.buckets import TREE, API_TREE, buckets
+from lib.buckets import TREE, SOURCE_TREE, API_TREE, buckets, tree_for
 
 
 def metric(metric_id, name, unit, stats):
     """Preserve raw samples rather than recomputing rounded source summaries."""
-    samples = stats.get("samples")
-    if not samples or any(isinstance(x, bool) or not isinstance(x, (int, float))
+    samples = stats.get("samples") if isinstance(stats, dict) else None
+    if not isinstance(samples, list) or not samples or any(isinstance(x, bool) or not isinstance(x, (int, float))
                           or not math.isfinite(x) for x in samples):
         raise ValueError(f"{name}: finite raw samples are required")
     return {"id": "compile." + metric_id, "name": name, "unit": unit,
@@ -47,35 +48,52 @@ def phase_breakdown(timers, tree):
                  for i in range(len(total))]
     # An entirely zero root still needs one component in the API contract.
     labels = sorted({name for sample in allocated for name in sample}) or [tree[0] + " (self)"]
-    return {"mode": "complete", "components": [
+    components = [
         {"id": "phase." + name.lower().replace(" (self)", ".self"),
          "name": name, "distribution": {"samples": [s.get(name, 0.0) for s in allocated]}}
-        for name in labels]}
+        for name in labels]
+    if len({component["id"] for component in components}) != len(components):
+        raise ValueError("Breakdown component names collide after normalization")
+    return {"mode": "complete", "components": components}
 
 
 def observation(record, observed, runner, os_name):
     """Map native quantities and retain every source field in a JSON artifact."""
-    timers = record.get("timers") or {}
-    priority = list(dict.fromkeys(tree_names(TREE) + tree_names(API_TREE)
+    # Failed samples may leave partial, unaligned streams. Retain those in the
+    # source artifact, but do not present them as a successful timing result.
+    timers = (record.get("timers") or {}) if record["ok"] else {}
+    priority = list(dict.fromkeys(tree_names(TREE) + tree_names(SOURCE_TREE) + tree_names(API_TREE)
                                  + record.get("primary_timers", [])))
     names = [n for n in priority if n in timers]
     names += [n for n in sorted(timers) if n not in names]
     metrics = []
     for key, unit in (("wall_ms", "ms"), ("rss_kb", "KiB")):
-        if record.get(key):
+        if record["ok"] and record.get(key):
             metrics.append(metric(key, key, unit, record[key]))
-    for name, stats in (record.get("memory") or {}).items():
+    for name, stats in ((record.get("memory") or {}) if record["ok"] else {}).items():
         metrics.append(metric("memory." + name.lower(), name, "KiB", stats))
     if len(metrics) > 64:
         raise ValueError("Memory metrics exceed BenchView's per-observation limit")
     selected = names[:64 - len(metrics)]
+    # Validate distributions before selecting a tree or aligning samples. The
+    # median selects the same source-emission hierarchy as the existing reports.
+    timer_metrics = {name: metric("timer." + name.lower(), name, "ms", timers[name])
+                     for name in names}
+    compiler_tree = tree_for({name: statistics.median(entry["distribution"]["samples"])
+                              for name, entry in timer_metrics.items()})
     for name in selected:
-        entry = metric("timer." + name.lower(), name, "ms", timers[name])
+        entry = timer_metrics[name]
         if name in ("compileInner", "apiTotal"):
-            tree = TREE if name == "compileInner" else API_TREE
-            entry["breakdown"] = phase_breakdown(timers, tree)
-            entry["metadata"] = {"allocation": "lib.buckets per sample; overlapping children "
-                                 "scaled proportionally to parent budget; missing timers zero"}
+            tree = compiler_tree if name == "compileInner" else API_TREE
+            if any(len(timers[n]["samples"]) != len(timers[name]["samples"])
+                   for n in tree_names(tree) if n in timers):
+                entry["metadata"] = {"breakdownOmitted": "Cannot align phase samples"}
+                print(f"Warning: {record['workload']}/{name}: omitted unaligned breakdown",
+                      file=sys.stderr)
+            else:
+                entry["breakdown"] = phase_breakdown(timers, tree)
+                entry["metadata"] = {"allocation": "lib.buckets per sample; overlapping children "
+                                     "scaled proportionally to parent budget; missing timers zero"}
         metrics.append(entry)
     if len({m["id"] for m in metrics}) != len(metrics):
         raise ValueError("Metric names collide after normalization")
@@ -98,6 +116,7 @@ def observation(record, observed, runner, os_name):
     }
     if not record["ok"]:
         result["error"] = {"message": str(record.get("error") or "Workload failed")[:4096]}
+        result["metadata"]["metricsOmitted"] = "Failed workload; partial samples retained in source record"
     return result
 
 
@@ -109,6 +128,11 @@ def encode(value):
 def submissions(records, meta, os_name, observed, execution, release=None, branch=None):
     """Convert one measured compiler run, splitting requests within API limits."""
     timestamp(observed)
+    # track.runner_id() prefixes its fingerprint with platform.system(). Check
+    # known prefixes without guessing the OS of arbitrary historical runner IDs.
+    runner_os = meta["runner"].split("-", 1)[0]
+    if runner_os in ("Windows", "Linux", "Darwin") and runner_os != os_name:
+        raise ValueError("Measured OS disagrees with the recorded runner fingerprint")
     if release:
         if not isinstance(release["label"], str) or not 1 <= len(release["label"]) <= 128:
             raise ValueError("Release labels must contain 1 to 128 characters")
@@ -161,7 +185,7 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
 
 def timestamp(value):
     """Require an actual RFC3339 timestamp instead of guessing from file mtimes."""
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", value):
+    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", value):
         raise ValueError("Expected an RFC3339 timestamp with timezone")
     datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -239,7 +263,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, KeyError, RuntimeError, OSError) as error:
+    except (ValueError, KeyError, TypeError, AttributeError, RuntimeError, OSError) as error:
         print(f"BenchView export failed: {error}", file=sys.stderr)
         sys.exit(1)
 

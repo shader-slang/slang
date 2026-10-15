@@ -401,6 +401,9 @@ variable `BENCHVIEW_URL` overrides that server. Without the key, the job only
 archives submission payloads. Upload failures do not block existing reports.
 The exporter preserves raw timing/memory samples and derived phase breakdowns;
 metrics beyond BenchView's limit remain in the attached original record.
+Failed workloads retain their error and original record without metrics. Passed
+workloads with unequal timer sample counts retain independent metrics but omit
+the unalignable breakdown with a warning; malformed distributions are rejected.
 Historical and release imports use the same CLI (`python3 benchview.py --help`),
 with `--release` supplying the tested Slang version through release metadata.
 Summary-only archives are unsupported, and repeated measurements of the same

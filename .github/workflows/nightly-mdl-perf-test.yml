@@ -314,8 +314,8 @@ jobs:
             --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
             --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
             --os Windows --observed-at "$PERF_OBSERVED_AT" \
-            --execution-id "github-${{ github.run_id }}-${{ github.run_attempt }}" \
-            --output "$RUNNER_TEMP/benchview-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --output "$RUNNER_TEMP/benchview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             "${args[@]}"
 
       - name: Archive BenchView submission payloads
