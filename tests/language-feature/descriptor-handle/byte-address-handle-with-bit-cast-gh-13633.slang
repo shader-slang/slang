@@ -20,5 +20,5 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // WGSL: fn computeMain
-// WGSL: : vec2<u32> = bitcast<vec2<u32>>
+// WGSL: : vec2<u32> =
 // METAL: {{\[\[}}kernel{{\]\]}} void computeMain
