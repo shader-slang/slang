@@ -652,12 +652,13 @@ struct IRTypeLegalizationContext
     /// Customization point for a structured buffer whose element type legalized to a non-simple
     /// form, which `legalizeTypeImpl` cannot represent as a buffer element.
     ///
-    /// The resource context reports E38204 here, and `legalizeResourceTypes` stops before any
-    /// value is rewritten. The existential and empty-type contexts do not expect this shape and
-    /// keep the buffer type unchanged.
+    /// Only the resource context splits a buffer element: it reports E38204 here, and
+    /// `legalizeResourceTypes` stops before any value is rewritten. An existential or empty-type
+    /// context reaching here is a compiler bug.
     virtual void handleStructuredBufferWithSplitElement(IRHLSLStructuredBufferTypeBase* bufferType)
     {
         SLANG_UNUSED(bufferType);
+        SLANG_UNEXPECTED("structured buffer element split outside resource type legalization");
     }
 };
 

@@ -2193,8 +2193,8 @@ static LegalVal legalizeInst(
     case kIROp_StructuredBufferLoad:
         // A load reaches here only when its result type, the element type, is non-simple.
         // An empty element legalizes to none, and the load with it. Any other flavor is a
-        // split element, which `legalizeResourceTypes` rejects before rewriting any value, and
-        // which the existential and empty-type passes do not produce for a buffer element.
+        // split element, which `legalizeResourceTypes` rejects before rewriting any value and
+        // which `handleStructuredBufferWithSplitElement` rejects in every other context.
         SLANG_RELEASE_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
