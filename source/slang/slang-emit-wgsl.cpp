@@ -74,8 +74,10 @@ static bool hasNonFiniteHalf(uint32_t packedHalves)
            ((packedHalves >> 16) & kHalfExponentMask) == kHalfExponentMask;
 }
 
-// Return the literal operand of an `unpack2x16float` intrinsic call that is emitted through
-// `_slang_nonConstU32`, or null when the call is emitted as written.
+// Return the argument of `inst` if `inst` is a one-argument intrinsic call whose WGSL text starts
+// with `unpack2x16float`, it is inside a function body, and its argument is an `IRIntLit` with an
+// Inf or NaN half; otherwise return null. The emitter then writes that argument as
+// `_slang_nonConstU32(<literal>)`.
 //
 // `unpack2x16float` is a `@const` builtin, so applied to a literal it is a const-expression, and
 // WGSL makes a const-expression whose value is Inf or NaN a shader-creation error. Consider
@@ -84,24 +86,32 @@ static bool hasNonFiniteHalf(uint32_t packedHalves)
 // `_slang_nonConstU32` the call is a runtime expression, so Tint accepts the shader; as for any
 // runtime Inf or NaN in WGSL, the value the implementation then produces is not guaranteed.
 //
-// The rule covers the two core-module definitions spelled with `unpack2x16float`: `f16tof32(uint)`
-// (`"unpack2x16float($0).x"`) and `unpackHalf2x16ToFloat(uint)` (`"unpack2x16float"`). It applies
-// only to an operand folded to an `IRIntLit` by emit time; an operand that WGSL still treats as a
+// The rule is keyed on the WGSL spelling, which in the core module is used by `f16tof32(uint)`
+// (`"unpack2x16float($0).x"`) and `unpackHalf2x16ToFloat(uint)` (`"unpack2x16float"`). It sees
+// only operands folded to an `IRIntLit` by emit time: an operand that WGSL still treats as a
 // const-expression without being a literal, such as `max(0x7C00u, 0u)` or
-// `asuint(<float literal>)`, is emitted as written and is still rejected. Finite literals stay
-// bare so Tint can fold them. A call outside a function body is a module-scope initializer, such
-// as the `override` default of a specialization constant, where WGSL allows no user-declared
-// function call, so it is left as written: a non-finite value is invalid there either way, and
-// Tint's "value inf" error names the actual problem.
+// `asuint(<float literal>)`, is emitted as written and is still rejected.
 static IRIntLit* findLiteralToEmitAsRuntimeValue(
     IRCall* inst,
     UnownedStringSlice intrinsicDefinition)
 {
     if (!intrinsicDefinition.startsWith("unpack2x16float"))
         return nullptr;
-    SLANG_RELEASE_ASSERT(inst->getArgCount() == 1);
+
+    // User-written `__intrinsic_asm` text can share the spelling with any number of arguments.
+    // The one-argument shape is also what makes the literal the only operand the expansion emits.
+    if (inst->getArgCount() != 1)
+        return nullptr;
+
+    // WGSL legalization copies module-scope calls into the functions that use them, so a call
+    // still outside a function body is a module-scope initializer, such as the `override` default
+    // of a specialization constant. WGSL allows no user-declared function call there, and a
+    // non-finite value is invalid there either way, so the call is left as written and Tint's
+    // "value inf" error names the actual problem.
     if (!getParentFunc(inst))
         return nullptr;
+
+    // Finite literals stay bare so Tint can fold them.
     auto literal = as<IRIntLit>(inst->getArg(0));
     if (!literal || !hasNonFiniteHalf(uint32_t(literal->getValue())))
         return nullptr;
@@ -1098,6 +1108,7 @@ void WGSLSourceEmitter::emitOperandImpl(IRInst* operand, EmitOpInfo const& outer
     }
     else if (operand == m_literalToEmitAsRuntimeValue)
     {
+        // See `m_literalToEmitAsRuntimeValue` for why matching a shared `IRIntLit` is safe.
         ensurePrelude(kWGSLBuiltinPreludeNonConstU32);
         m_writer->emit("_slang_nonConstU32(");
         CLikeSourceEmitter::emitOperandImpl(operand, getInfo(EmitOp::General));
@@ -1904,8 +1915,9 @@ void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
         m_f16ExtensionEnabled = true;
     }
 
-    // The marked literal is an `IRIntLit`, and emitting it cannot reach another intrinsic call,
-    // so no literal is ever marked on entry.
+    // `m_literalToEmitAsRuntimeValue` is null on entry: it is reset after every expansion, and
+    // the expansion that sets it emits only an `IRIntLit`, which cannot reach another intrinsic
+    // call.
     SLANG_ASSERT(!m_literalToEmitAsRuntimeValue);
     m_literalToEmitAsRuntimeValue = findLiteralToEmitAsRuntimeValue(inst, intrinsicDefinition);
     CLikeSourceEmitter::emitIntrinsicCallExprImpl(
