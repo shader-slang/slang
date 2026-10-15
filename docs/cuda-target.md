@@ -132,7 +132,9 @@ Slang has some preliminary support for TextureSampler type - a combined Texture 
 
 Load on a read-only texture is supported for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms (it lowers to the `tex*fetch_int<T>` prelude templates); the mip map selection argument is ignored, because these fetch paths read the base level only. RWTexture also allows Load on its supported dimensions.
 
-Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates and `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins; neither is defined for `__half` types (both are float/uint/int only), so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
+The combined-sampler `SampleGrad(location, gradX, gradY)` is supported for `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube` and their array forms; it lowers to the `tex*Grad<T>` CUDA runtime built-ins, which sample through the texture object's own sampler state. The separate-sampler `SampleGrad(s, location, gradX, gradY)` is not supported on CUDA, because a `CUtexObject` cannot take a separate `SamplerState`; nor are the overloads that also take a texel offset or a minimum-LOD clamp. Using any of them on CUDA is a compile-time capability error (E36107).
+
+Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates, `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins and `SampleGrad` lowers to the `tex*Grad<T>` CUDA runtime built-ins; none of these is defined for `__half` types, so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
 
 ## RWTexture
 
@@ -146,6 +148,8 @@ RWTexture2D<float2> rwt2D_2;
 ```
 
 The format names used are the same as for [GLSL layout format types](<https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)>). If no format is specified Slang will _assume_ that the format is the same as the type specified.
+
+Hardware write conversions are available for `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray` and `RWTexture2DArray` whose element type is a `float`, `int` or `uint` scalar, 2-vector or 4-vector; other element types (3-vectors, `half`, 64-bit types) are not supported and fail when the generated CUDA is compiled.
 
 Note that the format attribution is on variables/parameters/fields and not part of the type system. This means that if you have a scenario like...
 

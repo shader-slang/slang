@@ -1663,7 +1663,10 @@ SLANG_SURF1DWRITE_CONVERT_IMPL(float, "f")
 SLANG_SURF1DWRITE_CONVERT_IMPL(uint, "r")
 SLANG_SURF1DWRITE_CONVERT_IMPL(int, "r")
 
-// surf1DLayeredwrite_convert (not supported)
+// surf1DLayeredwrite_convert
+
+// CUDA has no formatted layered surface-write API, so we use PTX `sust.p.a1d` directly. Its
+// coordinate vector is {layer, x}.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
@@ -1671,12 +1674,63 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
     cudaSurfaceObject_t surfObj,
     int x,
     int layer,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
-    // We should check for this in hlsl.meta.slang instead.
-    // static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
-}
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(T, c)                                            \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T>(                     \
+        T v,                                                                                   \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        asm volatile(                                                                          \
+            "sust.p.a1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1, %2}], {%3};" ::"l"(surfObj), \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(v));                                                                             \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T##2>(                  \
+        T##2 v,                                                                                \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        const T vx = v.x, vy = v.y;                                                            \
+        asm volatile(                                                                          \
+            "sust.p.a1d.v2.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4};" ::"l"(surfObj),                                       \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(vx),                                                                             \
+            c(vy));                                                                            \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert<T##4>(                  \
+        T##4 v,                                                                                \
+        cudaSurfaceObject_t surfObj,                                                           \
+        int x,                                                                                 \
+        int layer,                                                                             \
+        cudaSurfaceBoundaryMode boundaryMode)                                                  \
+    {                                                                                          \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                                        \
+        asm volatile(                                                                          \
+            "sust.p.a1d.v4.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4, %5, %6};" ::"l"(surfObj),                               \
+            "r"(layer),                                                                        \
+            "r"(x),                                                                            \
+            c(vx),                                                                             \
+            c(vy),                                                                             \
+            c(vz),                                                                             \
+            c(vw));                                                                            \
+    }
+
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF1DLAYEREDWRITE_CONVERT_IMPL(int, "r")
 
 // surf2Dwrite_convert
 
@@ -1744,7 +1798,10 @@ SLANG_SURF2DWRITE_CONVERT_IMPL(float, "f")
 SLANG_SURF2DWRITE_CONVERT_IMPL(uint, "r")
 SLANG_SURF2DWRITE_CONVERT_IMPL(int, "r")
 
-// surf2DLayeredwrite_convert (not supported)
+// surf2DLayeredwrite_convert
+
+// The `sust.p.a2d` coordinate vector is {layer, x, y, unused}; we repeat y in the unused slot, as
+// nvcc does for `surf2DLayeredwrite`.
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
@@ -1753,12 +1810,70 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
     int x,
     int y,
     int layer,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
-    // We should check for this in hlsl.meta.slang instead.
-    // static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
-}
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(T, c)                           \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T>(    \
+        T v,                                                                  \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        asm volatile(                                                         \
+            "sust.p.a2d.b32." SLANG_PTX_BOUNDARY_MODE                         \
+            " [%0, {%1, %2, %3, %3}], {%4};" ::"l"(surfObj),                  \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(v));                                                            \
+    }                                                                         \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T##2>( \
+        T##2 v,                                                               \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        const T vx = v.x, vy = v.y;                                           \
+        asm volatile(                                                         \
+            "sust.p.a2d.v2.b32." SLANG_PTX_BOUNDARY_MODE                      \
+            " [%0, {%1, %2, %3, %3}], {%4, %5};" ::"l"(surfObj),              \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(vx),                                                            \
+            c(vy));                                                           \
+    }                                                                         \
+    template<>                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert<T##4>( \
+        T##4 v,                                                               \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int layer,                                                            \
+        cudaSurfaceBoundaryMode boundaryMode)                                 \
+    {                                                                         \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                       \
+        asm volatile(                                                         \
+            "sust.p.a2d.v4.b32." SLANG_PTX_BOUNDARY_MODE                      \
+            " [%0, {%1, %2, %3, %3}], {%4, %5, %6, %7};" ::"l"(surfObj),      \
+            "r"(layer),                                                       \
+            "r"(x),                                                           \
+            "r"(y),                                                           \
+            c(vx),                                                            \
+            c(vy),                                                            \
+            c(vz),                                                            \
+            c(vw));                                                           \
+    }
+
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF2DLAYEREDWRITE_CONVERT_IMPL(int, "r")
 
 // surf3Dwrite_convert
 
