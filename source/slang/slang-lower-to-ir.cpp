@@ -2920,12 +2920,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
+        auto resourceType = as<ResourceType>(type);
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
         SubstitutionSet(type->getDeclRef())
             .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
+                    // The AST preserves the original texel argument for inference and
+                    // reflection. IR texture operand zero is the load/store data type:
+                    // for example, `Texture2D<RGBA16F>` lowers with `float4` here.
+                    if (resourceType && operands.getCount() == 0)
+                        arg = resourceType->getElementType();
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
