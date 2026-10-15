@@ -302,6 +302,16 @@ static void fixValueScopingForInst(
         //
         if (isInstFolded)
         {
+            // Hoisting is enough when the operands of `def` are visible at the use.
+            // Consider:
+            //
+            //     if (c) { x = gs[t]; } else { return 0; }
+            //     gs[t] = x + 7;
+            //
+            // Redundancy removal makes the store reuse the `gs[t]` address computed in the
+            // `if`. `gs` is a global and `t` a parameter, so hoisting moves the address to
+            // the start of the function, where the store can see it.
+            //
             def->removeFromParent();
             addHoistableInst(&builder, def);
             auto hoistedBlock = as<IRBlock>(def->getParent());
@@ -312,17 +322,16 @@ static void fixValueScopingForInst(
             // Hoisting cannot move `def` above an operand that is defined in a region
             // that does not enclose the use. Consider:
             //
-            //     if (c) { x = s.a[t * 2]; } else { return 0; }
-            //     s.a[t * 2] = x + 7;
+            //     if (c) { x = gs[t * 2]; } else { return 0; }
+            //     gs[t * 2] = x + 7;
             //
-            // Redundancy removal makes the store reuse the `s.a[t * 2]` address from the
-            // `if`, and `t * 2` gets a temporary inside the `if`. We give the store its own
-            // copy of the address, and its operand `t * 2` then gets a temporary declared
-            // before the `if`:
+            // The address `gs[t * 2]` can only be hoisted to just after `t * 2`, which is
+            // inside the `if`. We give the store its own copy of the address, and the
+            // operand `t * 2` then gets a temporary declared before the `if`:
             //
             //     int tmp = 0;
-            //     if (c) { int i = t * 2; tmp = i; x = s.a[i]; } else { return 0; }
-            //     s.a[tmp] = x + 7;
+            //     if (c) { int i = t * 2; tmp = i; x = gs[i]; } else { return 0; }
+            //     gs[tmp] = x + 7;
             //
             builder.setInsertBefore(user);
             IRCloneEnv cloneEnv;
@@ -455,17 +464,11 @@ static void fixValueScopingForInst(
         defaultInitializeVar(&builder, tmp, def->getDataType());
     }
 
-    // Each copy of `def` gives its operands a new use after the region they are declared in,
-    // so we fix their scoping again. In the example above, that is what declares `tmp`. The
-    // fix can take several steps when the address is nested:
-    //
-    //     if (c) { x = s.e[t * 2].node; } else { return 0; }
-    //     s.e[t * 2].node = x + 7;
-    //
-    // Copying the `.node` address for the store gives the element address `s.e[t * 2]` a use
-    // after the `if`, so revisiting it copies that address too, and its index `t * 2` then
-    // gets a temporary declared before the `if`. The recursion ends because each operand is
-    // defined before the instruction that uses it.
+    // In the example above, `def` is the address `gs[t * 2]` and its operands are `gs` and
+    // `t * 2`. The copy of `def` before the store gives `t * 2` a use after the `if`, so we
+    // fix the scoping of each operand again, and that is what declares `tmp`. An operand that
+    // is itself a folded address is hoisted or copied in the same way. The recursion ends
+    // because each operand is defined before the instruction that uses it.
     //
     if (isInstCopiedToUses)
     {
