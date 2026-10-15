@@ -324,6 +324,13 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// Returns true if `inst` is a float literal whose value is NaN or an infinity.
+inline bool isNonFiniteFloatLit(IRInst* inst)
+{
+    auto floatLit = as<IRFloatLit>(inst);
+    return floatLit && !floatLit->isFinite();
+}
+
 // Returns true for the integer arithmetic and bitwise op-kinds through which a
 // NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
 // elementwise integer op with a non-uniform operand yields a non-uniform result
