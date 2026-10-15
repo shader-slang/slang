@@ -399,6 +399,10 @@ The publishing nightly also exports results through `benchview.py` to the
 Configure the Actions secret `BENCHVIEW_WRITE_KEY`; the optional repository
 variable `BENCHVIEW_URL` overrides that server. Without the key, the job only
 archives submission payloads. Upload failures do not block existing reports.
+The current internal server uses HTTP: the write key and results cross the
+network **unencrypted**. The CLI requires `--allow-insecure` for HTTP; the nightly
+explicitly opts in only for the default internal endpoint. Prefer HTTPS when
+available. The HTTP web UI link above does not provide encrypted transport either.
 The exporter preserves raw timing/memory samples and derived phase breakdowns;
 metrics beyond BenchView's limit remain in the attached original record.
 Failed workloads retain their error and original record without metrics. Passed

@@ -198,12 +198,14 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def submit(payload, base_url, key):
+def submit(payload, base_url, key, allow_insecure=False):
     """Retry transient transport failures with the exact same idempotency key."""
     parsed = urllib.parse.urlsplit(base_url)
     if (parsed.scheme not in ("http", "https") or not parsed.hostname
             or parsed.username or parsed.password or parsed.query or parsed.fragment):
         raise ValueError("Expected a BenchView HTTP(S) base URL without credentials or query")
+    if parsed.scheme == "http" and not allow_insecure:
+        raise ValueError("HTTP sends the write key unencrypted; use HTTPS or --allow-insecure")
     request = urllib.request.Request(
         base_url.rstrip("/") + "/api/v1/submissions", data=encode(payload),
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
@@ -238,6 +240,8 @@ def main():
     parser.add_argument("--released-at", help="Actual release timestamp, if known")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--url", help="Omit to export without submitting")
+    parser.add_argument("--allow-insecure", action="store_true",
+                        help="Allow HTTP submission with an unencrypted write key")
     args = parser.parse_args()
     if args.released_at and not args.release:
         parser.error("--released-at requires --release")
@@ -256,7 +260,7 @@ def main():
         if not key:
             raise ValueError("BENCHVIEW_WRITE_KEY is required for submission")
         for payload in payloads:
-            submit(payload, args.url, key)
+            submit(payload, args.url, key, allow_insecure=args.allow_insecure)
         print(f"Submitted {len(payloads)} batch(es) to BenchView")
 
 

@@ -307,6 +307,11 @@ jobs:
           args=()
           if [ -n "$BENCHVIEW_WRITE_KEY" ]; then
             args+=(--url "$BENCHVIEW_URL")
+            # This internal deployment currently provides HTTP only. Keep the
+            # transport opt-in limited to that endpoint; prefer HTTPS elsewhere.
+            if [ "$BENCHVIEW_URL" = "http://rtrci.nvidia.com/benchview" ]; then
+              args+=(--allow-insecure)
+            fi
           else
             echo "::warning::BENCHVIEW_WRITE_KEY is not configured; exporting without submission"
           fi

@@ -175,12 +175,12 @@ class BenchViewTests(unittest.TestCase):
         response = MagicMock()
         response.__enter__.return_value.status = 201
         opener.open.side_effect = [urllib.error.URLError("offline"), response]
-        benchview.submit(self.convert()[0], "http://example.test/benchview", "secret")
+        benchview.submit(self.convert()[0], "https://example.test/benchview", "secret")
         self.assertEqual(opener.open.call_count, 2)
         self.assertIs(opener.open.call_args_list[0].args[0],
                       opener.open.call_args_list[1].args[0])
         self.assertEqual(opener.open.call_args.args[0].full_url,
-                         "http://example.test/benchview/api/v1/submissions")
+                         "https://example.test/benchview/api/v1/submissions")
 
     @patch("benchview.urllib.request.build_opener")
     def test_auth_error_not_retried_or_echoed(self, build_opener):
@@ -188,10 +188,20 @@ class BenchViewTests(unittest.TestCase):
         build_opener.return_value.open.side_effect = urllib.error.HTTPError(
             "http://example.test/secret", 401, "secret", {}, io.BytesIO(b"secret"))
         with self.assertRaisesRegex(RuntimeError, "^BenchView submission failed: HTTP 401$"):
-            benchview.submit(self.convert()[0], "http://example.test", "secret")
+            benchview.submit(self.convert()[0], "https://example.test", "secret")
         self.assertEqual(build_opener.return_value.open.call_count, 1)
         self.assertIsNone(benchview.NoRedirect().redirect_request(None, None, 302, "", {},
                                                                  "http://other.test"))
+
+    @patch("benchview.urllib.request.build_opener")
+    def test_http_requires_explicit_opt_in(self, build_opener):
+        """Reject cleartext before creating a credential-bearing network request."""
+        with self.assertRaisesRegex(ValueError, "unencrypted"):
+            benchview.submit(self.convert()[0], "http://example.test", "secret")
+        build_opener.assert_not_called()
+        build_opener.return_value.open.return_value.__enter__.return_value.status = 201
+        benchview.submit(self.convert()[0], "http://example.test", "secret", allow_insecure=True)
+        build_opener.return_value.open.assert_called_once()
 
 
 if __name__ == "__main__":
