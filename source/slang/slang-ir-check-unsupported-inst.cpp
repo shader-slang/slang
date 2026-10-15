@@ -426,6 +426,36 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+void checkUnsupportedPhysicalPointers(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // WGSL and HLSL have no pointers to memory addresses. Without this check, `nullptr` aborted
+    // the emitter and a pointer cast from an integer address was emitted as invalid code
+    // (issue #13632).
+    if (!isWGPUTarget(target) && !isD3DTarget(target))
+        return;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                // `nullptr` is a hoisted constant, so it is found among the operands.
+                bool usesPhysicalPointer = inst->getOp() == kIROp_CastIntToPtr;
+                for (UInt i = 0; !usesPhysicalPointer && i < inst->getOperandCount(); i++)
+                    usesPhysicalPointer = inst->getOperand(i)->getOp() == kIROp_PtrLit;
+                if (!usesPhysicalPointer)
+                    continue;
+                auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas

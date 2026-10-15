@@ -15,4 +15,13 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 /// This validation is required regardless of the selected optimization mode. Other targets,
 /// including HLSL source output, are not checked by this operation.
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
+
+/// Diagnose pointers to memory addresses (a pointer cast from an integer address, or `nullptr`)
+/// on targets that have none (WGSL and the D3D family), instead of failing during emit.
+///
+/// This validation is required regardless of the selected optimization mode.
+void checkUnsupportedPhysicalPointers(
+    IRModule* module,
+    TargetRequest* target,
+    DiagnosticSink* sink);
 } // namespace Slang
