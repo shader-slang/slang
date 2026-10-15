@@ -20,6 +20,9 @@
 //TEST:SIMPLE(filecheck=NATIVE):-target cuda -entry resourceToHandle -stage compute
 //TEST:SIMPLE(filecheck=NATIVE):-target cpp -entry resourceToHandle -stage compute
 //TEST:SIMPLE(filecheck=NATIVE):-target metal -entry resourceToHandle -stage compute
+//TEST:SIMPLE(filecheck=MISMATCH):-target cuda -entry resourceToOtherHandle -stage compute
+//TEST:SIMPLE(filecheck=MISMATCH):-target cpp -entry resourceToOtherHandle -stage compute
+//TEST:SIMPLE(filecheck=MISMATCH):-target metal -entry resourceToOtherHandle -stage compute
 
 uniform DescriptorHandle<Texture2D<float4>> handle;
 uniform Texture2D<float4> texture;
@@ -75,3 +78,15 @@ void resourceToHandle(uint3 tid: SV_DispatchThreadID)
 
 // NATIVE-NOT: E41206
 // NATIVE: resourceToHandle
+
+// Only the resource the handle wraps is accepted; a different resource type is still rejected.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void resourceToOtherHandle(uint3 tid: SV_DispatchThreadID)
+{
+    let h = bit_cast<DescriptorHandle<RWTexture2D<float4>>>(texture);
+    outputBuffer[tid.x] = h.Load(int2(0));
+}
+
+// MISMATCH-COUNT-1: error[E41206]
+// MISMATCH-NOT: error[E41206]

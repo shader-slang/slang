@@ -236,14 +236,10 @@ struct BitCastLoweringContext
     }
 
     // Rewrite `inst`, a `BitCast` out of `handleType` on a target where the handle is an integer
-    // value, to read that value with the dedicated cast op and reinterpret it from there.
-    //
-    // Consider `bit_cast<uint2>(h)` on Vulkan. The handle is emitted as a `uint2` already, so
-    // `CastDescriptorHandleToUInt2(h)` is the whole result. Byte-wise lowering would instead read
-    // the handle as one 64-bit leaf, which WGSL cannot express and GLSL truncates to its first
-    // component, while forwarding the cast unchanged gives SPIR-V an `OpBitcast` between equal
-    // types. Under `spvBindlessTextureNV` a texture handle is a `uint64_t` instead, and is read
-    // with `CastDescriptorHandleToUInt64`.
+    // value, into a read of that value with `CastDescriptorHandleToUInt2` (or
+    // `CastDescriptorHandleToUInt64` for a `uint64_t` handle under `spvBindlessTextureNV`)
+    // followed by a `BitCast` from it when the destination type differs. Emitters spell the
+    // handle as that integer type, so the typed read is the only form every target accepts.
     void lowerBitCastFromDescriptorHandle(IRInst* inst, IRDescriptorHandleType* handleType)
     {
         auto targetReq = targetProgram->getTargetReq();
@@ -472,9 +468,10 @@ void diagnoseBitCastsToDescriptorHandle(
             auto toType = inst->getDataType();
             if (isTypeEqual(fromType, toType) || !containsDescriptorHandleType(toType))
                 return;
-            // Where a handle is the native resource, casting a bare resource to a handle is a
-            // same-representation cast that the target performs directly.
-            if (handleIsResource && isResourceType(fromType) && !as<IRArrayTypeBase>(fromType))
+            // Where a handle is the native resource, casting that resource to its own handle type
+            // is a same-representation cast that the target performs directly.
+            if (auto handleType = as<IRDescriptorHandleType>(toType);
+                handleIsResource && handleType && isTypeEqual(fromType, handleType->getResourceType()))
                 return;
             sink->diagnose(Diagnostics::BitCastToDescriptorHandle{
                 .fromType = fromType,
