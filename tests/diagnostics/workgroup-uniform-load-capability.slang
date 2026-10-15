@@ -1,20 +1,19 @@
 // On GPU targets other than WGSL, `workgroupUniformLoad` executes a workgroup
-// barrier, so it requires the `memorybarrier` capability. A caller declared with only a target
-// must also require `memorybarrier` (shader-slang/slang#13631).
+// barrier in compute shaders, so it requires the `memorybarrier` capability. A
+// caller declared with only a target must also require `memorybarrier`
+// (shader-slang/slang#13631). The companion test
+// workgroup-uniform-load-capability-ok.slang shows that it then compiles.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -emit-spirv-directly -entry computeMain -stage compute
 
 groupshared uint sharedVal;
 RWStructuredBuffer<uint> outputBuffer;
 
 [require(spirv)]
 uint loadWithTargetOnly()
-{
-    return workgroupUniformLoad(sharedVal);
-}
-
-[require(spirv, memorybarrier)]
-uint loadWithBarrierCapability()
+/*CHECK:
+     ^^^^^^^^^^^^^^^^^^ 'loadWithTargetOnly' uses undeclared capability 'spirv_1_0'
+*/
 {
     return workgroupUniformLoad(sharedVal);
 }
@@ -22,9 +21,5 @@ uint loadWithBarrierCapability()
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = loadWithTargetOnly() + loadWithBarrierCapability();
+    outputBuffer[0] = loadWithTargetOnly();
 }
-
-// CHECK: error[E36104]
-// CHECK: 'loadWithTargetOnly' uses undeclared capability
-// CHECK-NOT: 'loadWithBarrierCapability' uses undeclared capability

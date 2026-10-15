@@ -1,10 +1,10 @@
 // In a compute shader, `workgroupUniformLoad` returns every thread the value of
 // `v` at a workgroup barrier, unaffected by a later write
-// (shader-slang/slang#13631). Off WGSL it is lowered as barrier, load, barrier.
-// Thread 0 writes the groupshared value, every thread reads it, and thread 0
-// then overwrites it. Each GPU lane checks the write, the first barrier,
-// exactly one read of `sharedVal`, the second barrier, no further read, and
-// then the later write.
+// (shader-slang/slang#13631). Thread 0 writes the groupshared value, every
+// thread reads it, and thread 0 then overwrites it. The SPIR-V, HLSL, GLSL,
+// Metal and CUDA lanes check the write, the first barrier, exactly one read of
+// `sharedVal`, the second barrier, no further read, and then the later write.
+// The WGSL lane checks the single built-in; the CPU lanes check a plain load.
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain
@@ -13,6 +13,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=LLVM): -target llvm-shader-ir -stage compute -entry computeMain
 
 groupshared uint sharedVal;
 RWStructuredBuffer<uint> outputBuffer;
@@ -53,9 +54,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
 // GLSL-NOT: = sharedVal
 // GLSL: sharedVal{{.*}} = 0U;
 
-// On Metal, the emit-time load deferral can move the load past the second
-// barrier when nothing between them writes `sharedVal`
-// (shader-slang/slang#13409). The write after the call keeps the load in place.
+// On Metal, simplifyForEmit can move the load past the second barrier when its
+// use is in the same block (shader-slang/slang#13409). Here the `if` after the
+// call ends the block, which keeps the load in place.
 // METAL: sharedVal{{.*}} = {{.*}}+ 1U;
 // METAL: threadgroup_barrier(mem_flags::mem_threadgroup)
 // METAL-NOT: threadgroup_barrier
@@ -79,8 +80,13 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
 // WGSL-NOT: workgroupUniformLoad(
 // WGSL-NOT: workgroupBarrier
 
-// The CPU targets have no workgroup barrier, so the C++ helper is a plain load.
+// The CPU targets have no workgroup barrier, so the C++ helper is a plain load
+// and the LLVM output compiles without one.
 // CPP: workgroupUniformLoad_0(uint32_t * v_0)
 // CPP-NOT: Barrier
 // CPP: return *v_0;
 // CPP-NOT: Barrier
+
+// LLVM-NOT: error[E
+// LLVM: define void @{{.*}}computeMain
+// LLVM-NOT: Barrier

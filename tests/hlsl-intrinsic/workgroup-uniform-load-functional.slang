@@ -4,7 +4,10 @@
 //
 // Thread 0 writes 7, every thread loads it, then thread 0 overwrites it with 0.
 // Without the first barrier other threads can read the old value 0; without
-// the second they can read the overwrite. Every thread must report 7.
+// the second they can read the overwrite. One thread in each group of eight
+// reports its value, and each must report 7. A missing barrier makes the race
+// possible rather than certain, so the emission tests in this directory pin the
+// barriers themselves.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
