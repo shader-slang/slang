@@ -372,15 +372,26 @@ struct SimplifyForEmitContext : public InstPassBase
                 case kIROp_Rsh:
                     builder.setInsertBefore(inst);
                     SLANG_ASSERT(inst->getOperandCount() == 2);
-                    if (as<IRVectorType>(inst->getDataType()))
+                    if (auto resultVectorType = as<IRVectorType>(inst->getDataType()))
                     {
+                        // The operands of a shift may have different integer types, such as
+                        // `int s >> uint3(1, 2, 3)`. A scalar operand is splat to a vector of its
+                        // own element type rather than the other operand's type, because
+                        // splatting `s` to `uint3` would turn an arithmetic shift into a logical
+                        // one. The preludes provide the mixed-type vector shift operators.
+                        bool isShift = inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh;
                         for (UInt a = 0; a < 2; a++)
                         {
-                            if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
+                            auto operandType = inst->getOperand(a)->getDataType();
+                            if (as<IRBasicType>(operandType))
                             {
-                                auto v = builder.emitMakeVectorFromScalar(
-                                    inst->getOperand(1 - a)->getDataType(),
-                                    inst->getOperand(a));
+                                IRType* splatType = isShift
+                                                        ? builder.getVectorType(
+                                                              operandType,
+                                                              resultVectorType->getElementCount())
+                                                        : inst->getOperand(1 - a)->getDataType();
+                                auto v =
+                                    builder.emitMakeVectorFromScalar(splatType, inst->getOperand(a));
                                 inst->setOperand(a, v);
                             }
                         }
