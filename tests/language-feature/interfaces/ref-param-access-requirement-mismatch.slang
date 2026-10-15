@@ -15,7 +15,7 @@ struct WritesThroughRef : IReadOnly
 {
     void f(__ref uint a[8]) { a[0] = 1; }
 //CHECK:              ^ E38108
-//CHECK:              ^ parameter 'a' direction 'ref' does not match interface requirement 'readonly ref'.
+//CHECK:              ^ parameter 'a' direction 'ref' does not match interface requirement 'ref readonly'.
 }
 
 interface IReadWrite
@@ -30,7 +30,7 @@ struct ReadsThroughConstRef : IReadWrite
 {
     void g(const __ref uint a[8]) {}
 //CHECK:                    ^ E38108
-//CHECK:                    ^ parameter 'a' direction 'readonly ref' does not match interface requirement 'ref'.
+//CHECK:                    ^ parameter 'a' direction 'ref readonly' does not match interface requirement 'ref'.
 }
 
 groupshared uint sh[8];

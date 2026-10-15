@@ -21,6 +21,6 @@ void use()
 }
 
 //CHECK: func fRef(ref int x) -> int
-//CHECK: func fReadOnly(readonly ref int x) -> int
-//CHECK: func fWriteOnly(writeonly ref int x) -> int
-//CHECK: func fConstRef(readonly ref int x) -> int
+//CHECK: func fReadOnly(ref readonly int x) -> int
+//CHECK: func fWriteOnly(ref writeonly int x) -> int
+//CHECK: func fConstRef(ref readonly int x) -> int

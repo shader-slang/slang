@@ -1415,10 +1415,10 @@ void RefParamType::_toTextOverride(StringBuilder& out)
         out << toSlice("ref ");
         break;
     case ParamPassingMode::RefReadOnly:
-        out << toSlice("readonly ref ");
+        out << toSlice("ref readonly ");
         break;
     case ParamPassingMode::RefWriteOnly:
-        out << toSlice("writeonly ref ");
+        out << toSlice("ref writeonly ");
         break;
     default:
         SLANG_UNEXPECTED("ref parameter type with a non-reference passing mode");

@@ -26,8 +26,8 @@ void useInlayHints()
 
 // CHECK: inlay hints:
 // CHECK-NEXT: ref refArg:
-// CHECK-NEXT: readonly ref readOnlyArg:
-// CHECK-NEXT: readonly ref constRefArg:
-// CHECK-NEXT: writeonly ref writeOnlyArg:
+// CHECK-NEXT: ref readonly readOnlyArg:
+// CHECK-NEXT: ref readonly constRefArg:
+// CHECK-NEXT: ref writeonly writeOnlyArg:
 // CHECK-NEXT: out outArg:
 // CHECK-NEXT: inArg:

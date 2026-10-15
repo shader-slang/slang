@@ -18,7 +18,7 @@ struct ReadWriteForWriteOnly : IWriteOnly
 {
     void f(__ref uint a) { a = 1; }
 //CHECK:              ^ E38108
-//CHECK:              ^ parameter 'a' direction 'ref' does not match interface requirement 'writeonly ref'.
+//CHECK:              ^ parameter 'a' direction 'ref' does not match interface requirement 'ref writeonly'.
 }
 
 interface IReadWrite
@@ -31,7 +31,7 @@ struct WriteOnlyForReadWrite : IReadWrite
 {
     void g(__ref_writeonly uint a) { a = 1; }
 //CHECK:                        ^ E38108
-//CHECK:                        ^ parameter 'a' direction 'writeonly ref' does not match interface requirement 'ref'.
+//CHECK:                        ^ parameter 'a' direction 'ref writeonly' does not match interface requirement 'ref'.
 }
 
 [numthreads(1, 1, 1)]

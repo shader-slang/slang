@@ -1574,10 +1574,10 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                         sb << toSlice("ref ");
                         break;
                     case ParamPassingMode::RefReadOnly:
-                        sb << toSlice("readonly ref ");
+                        sb << toSlice("ref readonly ");
                         break;
                     case ParamPassingMode::RefWriteOnly:
-                        sb << toSlice("writeonly ref ");
+                        sb << toSlice("ref writeonly ");
                         break;
                     default:
                         if (paramDecl->hasModifier<InOutModifier>())

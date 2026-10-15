@@ -82,10 +82,10 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                             lblSb << "ref ";
                             break;
                         case ParamPassingMode::RefReadOnly:
-                            lblSb << "readonly ref ";
+                            lblSb << "ref readonly ";
                             break;
                         case ParamPassingMode::RefWriteOnly:
-                            lblSb << "writeonly ref ";
+                            lblSb << "ref writeonly ";
                             break;
                         case ParamPassingMode::BorrowIn:
                             lblSb << "constref ";
