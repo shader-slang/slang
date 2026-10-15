@@ -1995,14 +1995,16 @@ Modifier* SemanticsVisitor::checkModifier(
             return m;
         }
 
-        // Semantic checking does not yet report reads of a `__ref_writeonly` parameter, so user
-        // code opts in to the modifier as an experimental feature until it does.
-        if (as<WriteOnlyModifier>(m) && !ignoreUnallowedModifier &&
+        // Reference parameters are a core-module mechanism, so the `__ref_readonly` and
+        // `__ref_writeonly` keywords are intended for the core module, and user code opts in to
+        // them as an experimental feature. Only these keywords create a `ReadOnlyModifier` or
+        // `WriteOnlyModifier`; the legacy alias `const __ref` remains available to user code.
+        if ((as<ReadOnlyModifier>(m) || as<WriteOnlyModifier>(m)) && !ignoreUnallowedModifier &&
             !getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
             !isFromCoreModule(decl))
         {
             getSink()->diagnose(
-                Diagnostics::RefWriteonlyRequiresExperimentalFeature{.modifier = m});
+                Diagnostics::RefAccessKeywordRequiresExperimentalFeature{.modifier = m});
         }
     }
 

@@ -1,7 +1,7 @@
 // A `__ref_readonly` parameter has the `RefReadOnly` passing mode, so it does not match a
 // plain `__ref` (`RefReadWrite`) requirement parameter, in either direction.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 interface IReadOnly
 {

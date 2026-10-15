@@ -1,7 +1,7 @@
 // `__ref` and `__ref_readonly` are different passing modes, so a declaration and a definition
 // that differ only between them declare two functions, and a call that both accept is ambiguous.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 int read(__ref_readonly int x);
 /*CHECK:

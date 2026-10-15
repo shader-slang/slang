@@ -1,7 +1,7 @@
 // A `__ref_readonly` argument must still be a memory location, and a read-only location is still
 // not writable. A swizzle that repeats a component does not name a memory location.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 struct S { int a; int4 v; }
 

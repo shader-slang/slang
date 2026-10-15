@@ -1,0 +1,82 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 50
+; Schema: 0
+OpCapability PhysicalStorageBufferAddresses
+OpCapability Shader
+OpExtension "SPV_KHR_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64 GLSL450
+OpEntryPoint GLCompute %computeMain "main" %entryPointParams %gl_GlobalInvocationID
+OpExecutionMode %computeMain LocalSize 1 1 1
+
+; Debug Information
+OpSource Slang 1
+OpName %Foo_natural_logical "Foo_natural_logical"   ; id %5
+OpMemberName %Foo_natural_logical 0 "x"
+OpMemberName %Foo_natural_logical 1 "y"
+OpMemberName %Foo_natural_logical 2 "z"
+OpMemberName %Foo_natural_logical 3 "w"
+OpName %EntryPointParams_std430 "EntryPointParams_std430"   ; id %14
+OpMemberName %EntryPointParams_std430 0 "src"
+OpMemberName %EntryPointParams_std430 1 "dst"
+OpName %entryPointParams "entryPointParams"         ; id %18
+OpName %Foo_natural "Foo_natural"                   ; id %15
+OpMemberName %Foo_natural 0 "x"
+OpMemberName %Foo_natural 1 "y"
+OpMemberName %Foo_natural 2 "z"
+OpMemberName %Foo_natural 3 "w"
+OpName %computeMain "computeMain"                   ; id %2
+
+; Annotations
+OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+OpDecorate %_ptr_PhysicalStorageBuffer_Foo_natural ArrayStride 16
+OpDecorate %EntryPointParams_std430 Block
+OpMemberDecorate %EntryPointParams_std430 0 Offset 0
+OpMemberDecorate %EntryPointParams_std430 1 Offset 8
+OpMemberDecorate %Foo_natural 0 Offset 0
+OpMemberDecorate %Foo_natural 1 Offset 4
+OpMemberDecorate %Foo_natural 2 Offset 8
+OpMemberDecorate %Foo_natural 3 Offset 12
+
+; Types, variables and constants
+%void = OpTypeVoid
+%3 = OpTypeFunction %void
+%uint = OpTypeInt 32 0
+%Foo_natural_logical = OpTypeStruct %uint %uint %uint %uint
+%v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+OpTypeForwardPointer %_ptr_PhysicalStorageBuffer_Foo_natural PhysicalStorageBuffer
+%EntryPointParams_std430 = OpTypeStruct %_ptr_PhysicalStorageBuffer_Foo_natural %_ptr_PhysicalStorageBuffer_Foo_natural     ; Block
+%_ptr_PushConstant_EntryPointParams_std430 = OpTypePointer PushConstant %EntryPointParams_std430
+%int = OpTypeInt 32 1
+%int_1 = OpConstant %int 1
+%_ptr_PushConstant_16 = OpTypePointer PushConstant %_ptr_PhysicalStorageBuffer_Foo_natural
+%int_0 = OpConstant %int 0
+%Foo_natural = OpTypeStruct %uint %uint %uint %uint
+%_ptr_PhysicalStorageBuffer_Foo_natural = OpTypePointer PhysicalStorageBuffer %Foo_natural  ; ArrayStride 16
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input                                ; BuiltIn GlobalInvocationId
+%entryPointParams = OpVariable %_ptr_PushConstant_EntryPointParams_std430 PushConstant
+
+; Function computeMain
+%computeMain = OpFunction %void None %3
+%4 = OpLabel
+%10 = OpLoad %v3uint %gl_GlobalInvocationID
+%13 = OpCompositeExtract %uint %10 0
+%22 = OpAccessChain %_ptr_PushConstant_16 %entryPointParams %int_1
+%23 = OpLoad %_ptr_PhysicalStorageBuffer_Foo_natural %22
+%24 = OpPtrAccessChain %_ptr_PhysicalStorageBuffer_Foo_natural %23 %13
+%26 = OpAccessChain %_ptr_PushConstant_16 %entryPointParams %int_0
+%27 = OpLoad %_ptr_PhysicalStorageBuffer_Foo_natural %26
+%28 = OpPtrAccessChain %_ptr_PhysicalStorageBuffer_Foo_natural %27 %13
+%29 = OpLoad %Foo_natural %28 Aligned 4
+%30 = OpCopyLogical %Foo_natural_logical %29
+%41 = OpCompositeExtract %uint %30 0
+%42 = OpCompositeExtract %uint %30 1
+%43 = OpCompositeExtract %uint %30 2
+%44 = OpCompositeExtract %uint %30 3
+%49 = OpCompositeConstruct %Foo_natural_logical %41 %42 %43 %44
+%33 = OpCopyLogical %Foo_natural %49
+OpStore %24 %33 Aligned 4
+OpReturn
+OpFunctionEnd

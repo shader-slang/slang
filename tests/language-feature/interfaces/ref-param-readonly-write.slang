@@ -1,7 +1,7 @@
 // The callee cannot write through a `__ref_readonly` parameter, nor through its legacy
 // aliases `const __ref` and `__ref const`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry main -stage compute -experimental-feature
 
 void writeReadOnly(__ref_readonly uint a[4])
 {

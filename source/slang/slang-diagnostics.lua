@@ -2385,10 +2385,10 @@ warning(
 )
 
 err(
-    "ref-writeonly-requires-experimental-feature",
+    "ref-access-keyword-requires-experimental-feature",
     30133,
-    "__ref_writeonly is experimental and requires '-experimental-feature'",
-    span { loc = "modifier:Modifier", message = "reads of a '__ref_writeonly' parameter are not yet diagnosed, so it is rejected unless '-experimental-feature' is enabled." }
+    "reference access keyword requires '-experimental-feature'",
+    span { loc = "modifier:Modifier", message = "'~modifier' is intended for the core module, so it is rejected in user code unless '-experimental-feature' is enabled." }
 )
 
 -- type pack diagnostics
