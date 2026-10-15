@@ -3597,28 +3597,32 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
-    // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its operands.
-    SemanticsVisitor operandVisitor(withOperandTryCoverage(nullptr));
-
     bool needDeref = false;
-    auto baseExpr = operandVisitor.checkBaseForMemberExpr(
-        subscriptExpr->baseExpression,
-        CheckBaseContext::Subscript,
-        needDeref);
+    Expr* baseExpr = nullptr;
+    {
+        // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its
+        // operands.
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
-    // If the base expression is a type, it means that this is an array declaration,
-    // then we should disable short-circuit in case there is logical expression in
-    // the subscript
+        baseExpr = checkBaseForMemberExpr(
+            subscriptExpr->baseExpression,
+            CheckBaseContext::Subscript,
+            needDeref);
+
+        // If the base expression is a type, it means that this is an array declaration,
+        // then we should disable short-circuit in case there is logical expression in
+        // the subscript
+        auto subVisitor = (as<TypeType>(baseExpr->type.Ptr()) && m_shouldShortCircuitLogicExpr)
+                              ? SemanticsVisitor(disableShortCircuitLogicalExpr())
+                              : *this;
+
+        for (auto& arg : subscriptExpr->indexExprs)
+        {
+            arg = subVisitor.CheckTerm(arg);
+        }
+    }
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
-    auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(operandVisitor.disableShortCircuitLogicalExpr())
-                          : operandVisitor;
-
-    for (auto& arg : subscriptExpr->indexExprs)
-    {
-        arg = subVisitor.CheckTerm(arg);
-    }
 
     // If anything went wrong in the base expression,
     // then just move along...
@@ -5243,12 +5247,15 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     // arguments and the callee outside it. A throwing call in the argument of a possible identity
     // conversion waits for this call to resolve, as in `try int(f())`.
     List<InvokeExpr*> pendingTryCoverage;
-    SemanticsVisitor operandVisitor(withOperandTryCoverage(
-        shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr));
-    // Next check the argument expressions
-    for (auto& arg : expr->arguments)
     {
-        arg = operandVisitor.CheckExpr(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+        // Next check the argument expressions
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckExpr(arg);
+        }
     }
 
     // if the expression is '&&' or '||', we will convert it
@@ -5303,8 +5310,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
-    expr->functionExpr =
-        SemanticsVisitor(withOperandTryCoverage(nullptr)).CheckTerm(expr->functionExpr);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+        expr->functionExpr = CheckTerm(expr->functionExpr);
+    }
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
@@ -7686,26 +7695,32 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     // As in `visitInvokeExpr`, an enclosing `try` covers the cast but not its operand, and a
     // throwing call in the operand waits for the cast to resolve, as in `try (int)f()`.
     List<InvokeExpr*> pendingTryCoverage;
-    SemanticsVisitor operandVisitor(withOperandTryCoverage(nullptr));
-    SemanticsVisitor argumentVisitor(withOperandTryCoverage(
-        shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr));
-
-    // Check the term we are applying first
-    auto funcExpr = expr->functionExpr;
-    funcExpr = operandVisitor.CheckTerm(funcExpr);
-
-    // Now ensure that the term represents a (proper) type.
     TypeExp typeExp;
-    typeExp.exp = funcExpr;
-    typeExp = operandVisitor.CheckProperType(typeExp);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+
+        // Check the term we are applying first
+        auto funcExpr = expr->functionExpr;
+        funcExpr = CheckTerm(funcExpr);
+
+        // Now ensure that the term represents a (proper) type.
+        typeExp.exp = funcExpr;
+        typeExp = CheckProperType(typeExp);
+    }
 
     expr->functionExpr = typeExp.exp;
     expr->type.type = typeExp.type;
 
-    // Next check the argument expression (there should be only one)
-    for (auto& arg : expr->arguments)
     {
-        arg = argumentVisitor.CheckTerm(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+
+        // Next check the argument expression (there should be only one)
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckTerm(arg);
+        }
     }
 
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))

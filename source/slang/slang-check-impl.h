@@ -1455,6 +1455,7 @@ struct SemanticsContext
 {
 public:
     friend struct OuterScopeContextRAII;
+    friend struct OperandTryCoverageRAII;
 
     explicit SemanticsContext(SharedSemanticsContext* shared)
         : m_shared(shared)
@@ -1622,17 +1623,6 @@ public:
         return result;
     }
 
-    /// A context for checking an operand of a call, which a `try` on that call does not cover.
-    /// The throwing calls found in it are diagnosed, or collected in `pendingTryCoverage` when that
-    /// is non-null (see `m_pendingTryCoverage`).
-    SemanticsContext withOperandTryCoverage(List<InvokeExpr*>* pendingTryCoverage)
-    {
-        SemanticsContext result(*this);
-        result.m_enclosingTryClauseType = TryClauseType::None;
-        result.m_pendingTryCoverage = pendingTryCoverage;
-        return result;
-    }
-
     DifferentiableAttribute* getParentDifferentiableAttribute()
     {
         return m_parentDifferentiableAttr;
@@ -1751,7 +1741,7 @@ protected:
 
     /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
     /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
-    /// their operands in a `withOperandTryCoverage` context, where this is `None`.
+    /// their operands under an `OperandTryCoverageRAII`, where this is `None`.
     TryClauseType m_enclosingTryClauseType = TryClauseType::None;
 
     /// The throwing calls whose coverage waits for the single-argument call around them to
@@ -1814,6 +1804,35 @@ struct OuterScopeContextRAII
     }
 
     ~OuterScopeContextRAII() { m_context->m_outerScope = m_oldOuterScope; }
+};
+
+/// Checks the operands of a call, which a `try` on that call does not cover, on the current
+/// context for the lifetime of this object. A throwing call found in an operand is diagnosed, or
+/// collected in `pendingTryCoverage` when that is non-null (see `m_pendingTryCoverage`).
+///
+/// We change the context in place so that each recursive operand level does not hold a copy of it;
+/// a long operator chain, as in `tests/glsl-intrinsic/intrinsic-texture.slang`, would otherwise
+/// overflow the stack of a Debug build.
+struct OperandTryCoverageRAII
+{
+    SemanticsContext* m_context;
+    TryClauseType m_oldEnclosingTryClauseType;
+    List<InvokeExpr*>* m_oldPendingTryCoverage;
+
+    OperandTryCoverageRAII(SemanticsContext* context, List<InvokeExpr*>* pendingTryCoverage)
+        : m_context(context)
+        , m_oldEnclosingTryClauseType(context->m_enclosingTryClauseType)
+        , m_oldPendingTryCoverage(context->m_pendingTryCoverage)
+    {
+        context->m_enclosingTryClauseType = TryClauseType::None;
+        context->m_pendingTryCoverage = pendingTryCoverage;
+    }
+
+    ~OperandTryCoverageRAII()
+    {
+        m_context->m_enclosingTryClauseType = m_oldEnclosingTryClauseType;
+        m_context->m_pendingTryCoverage = m_oldPendingTryCoverage;
+    }
 };
 
 #define SLANG_OUTER_SCOPE_CONTEXT_RAII(context, scope) \
