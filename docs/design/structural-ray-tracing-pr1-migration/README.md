@@ -295,6 +295,23 @@ The generic restriction prevents a deferred generic body such as
 `make<T>() { T local = T(); }` from manufacturing an input after frontend checking. Supporting
 broader type-only uses would require validating the eventual specialized body.
 
+An expression cannot produce an `Optional` containing a stage or stage input, even as an unnamed
+temporary. For example, with `Input = rt::MissInput<C>` and `extension Input : IMarker {}`:
+
+```slang
+void helper(in Input input) {}
+void inspect(IMarker other)
+{
+    helper((other as Input).value); // Rejected: `as` produces Optional<Input>.
+}
+```
+
+Check the result of every expression visitor, and successful coercions that introduce optional
+values. Reuse the shared RT type-use check to find stage/input types inside the optional. Checking
+only variables or the final helper argument misses this temporary: `.value` already has type
+`Input`. Direct copies and forwarding of an existing input remain allowed. This restriction does
+not prohibit boxing an existing input into an interface; it rejects recovering it through `as`.
+
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and
 `input.payload` when its type is empty. Remove the old explicit-empty diagnostics and property
 annotations from the full implementation. Backend adapters must preserve the native payload

@@ -227,7 +227,12 @@ Expr* SemanticsVisitor::dispatchExpr(Expr* expr, SemanticsContext const& context
     SemanticsExprVisitor visitor(context);
     SLANG_EXCEPTION_TRY
     {
-        return visitor.dispatch(expr);
+        auto result = visitor.dispatch(expr);
+        // An `as` expression can produce Optional<MissInput<C>> without naming Optional in
+        // source. Check the result before a parent expression extracts its `.value`.
+        if (visitor.diagnoseInvalidStructuralRayTracingOptionalExpression(result))
+            return visitor.CreateErrorExpr(result);
+        return result;
     }
 #if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)

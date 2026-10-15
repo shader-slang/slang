@@ -3074,6 +3074,7 @@ public:
     void diagnosePendingRayTracingStageOrInputUses();
     void diagnoseInvalidStructuralRayTracingReturnType(CallableDecl* decl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
+    bool diagnoseInvalidStructuralRayTracingOptionalExpression(Expr* expr);
     bool diagnoseInvalidStructuralRayTracingExpression(Expr* expr);
     bool diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke);
     bool diagnoseInvalidStructuralRayTracingGenericTypeApplication(

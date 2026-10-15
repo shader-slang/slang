@@ -796,14 +796,16 @@ static void _diagnoseInvalidStructuralRayTracingRuntimeType(
     Type* type,
     SourceLoc location)
 {
+    // Expression checking and a later coercion can see the same optional result. Report that
+    // use once, just as construction checking does for a constructor used as an argument.
     if (kind == StructuralRayTracingRuntimeTypeKind::Stage)
     {
-        visitor->getSink()->diagnose(
+        visitor->diagnoseOnce(
             Diagnostics::StructuralRayTracingStageRuntimeValue{.type = type, .location = location});
     }
     else if (kind == StructuralRayTracingRuntimeTypeKind::StageInput)
     {
-        visitor->getSink()->diagnose(
+        visitor->diagnoseOnce(
             Diagnostics::StructuralRayTracingInputStorage{.type = type, .location = location});
     }
 }
@@ -1810,6 +1812,35 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
     _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
+// Rejects optional results containing a stage or stage input, including unnamed temporaries.
+// Consider this example, where Input is rt::MissInput<C>:
+//
+//     interface IMarker {}
+//     extension Input : IMarker {}
+//     void helper(in Input input) {}
+//     void use(IMarker other) { helper((other as Input).value); }
+//
+// The `as` expression produces Optional<Input>; `.value` then has the allowed parameter type
+// Input. Checking only declared variables or the final argument would miss the optional. Check
+// the result of every expression visitor and of successful coercions, which can also introduce
+// optional values. The shared type-use checker finds inputs inside nested optionals as well.
+// Only Optional results enter that checker here; ordinary references to an input remain allowed.
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingOptionalExpression(Expr* expr)
+{
+    if (!as<OptionalType>(unwrapModifiedType(expr->type)))
+        return false;
+
+    // visitParenExpr has already checked its base. Parentheses retain the same value, so
+    // report the optional at the inner expression rather than again at each opening `(`.
+    if (as<ParenExpr>(expr))
+        return false;
+
+    RayTracingStageOrInputUse use;
+    use.type = expr->type;
+    use.location = expr->loc;
+    return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
+}
+
 // Checks actual construction and call results after normal expression checking. Consider:
 //
 //     use(rt::MissInput<C>(input)); // Same-type coercion returns `input` itself: allowed.
@@ -1821,6 +1852,10 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
 // ordinary call such as `makeDefault<MissInput<C>>()` is still an invalid input result.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
 {
+    // Coercion can create an already-checked optional expression without visiting its syntax.
+    if (as<OptionalType>(unwrapModifiedType(expr->type)))
+        return diagnoseInvalidStructuralRayTracingOptionalExpression(expr);
+
     RayTracingStageOrInputUse use;
     use.type = expr->type;
     use.location = expr->loc;
