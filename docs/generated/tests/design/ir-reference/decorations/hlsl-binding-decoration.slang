@@ -15,7 +15,7 @@
 // not warn about a D3D register without a Vulkan binding; the CHECK pins
 // the bare decoration.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 [[vk::binding(3, 0)]]
 uniform RWStructuredBuffer<int> buf : register(u3);

@@ -111,6 +111,9 @@ jobs:
               new_release_check, sweep, sweep_report, track, trend, \
               compare_repro, ladder_scaling, fetch_releases, slack_status"
 
+      - name: Test compile-perf sampling, provenance and confirmation
+        run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
+
   # The compile-perf suite's only Windows consumer is the scheduled nightly,
   # so a Windows-only defect in an import-time self-check merges green and
   # surfaces a day later as a lost data point rather than as a PR failure.
@@ -151,3 +154,6 @@ jobs:
           python -c "import bench, report, breakdown, daily_movers, \
               new_release_check, sweep, sweep_report, track, trend, \
               compare_repro, ladder_scaling, fetch_releases, slack_status"
+
+      - name: Test compile-perf sampling, provenance and confirmation
+        run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'

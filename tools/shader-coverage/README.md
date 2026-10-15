@@ -222,13 +222,33 @@ where the width is capped automatically), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
-direct telemetry, a custom LCOV writer, a dashboard, etc. In the
-current line/function/branch producers, entries and counters are
-one-to-one. Future source-region modes may expose source entries that
-are not identical to runtime counter slots, including entries with no
-direct runtime counter of their own. Hosts should use
-`entry.counterIndex` and be prepared for future extended entry data
-rather than assuming the entry index equals the counter index.
+direct telemetry, a custom LCOV writer, a dashboard, etc.
+
+**Entries and counters are not one-to-one.** Line coverage coalesces
+markers that provably execute together — those in one basic block with
+nothing between them that can abandon the invocation — onto a single
+counter and a single runtime probe. This is what keeps instrumented
+shader code small, since emitted size scales with probe count. Several
+entries therefore share a `counterIndex`, and `counterCount` is never
+larger than the entry count -- roughly half on the bundled demos.
+Function and branch entries keep a dedicated counter, so a compile that
+enables only those modes leaves the two counts equal; do not code
+against a strict inequality.
+
+Two consequences for hosts:
+
+- Size the readback buffer from `counterCount`, never from the entry
+  count. They are different numbers.
+- Accumulate per entry (`counters[entry.counterIndex]` for each entry),
+  never per counter. A counter no longer identifies one source
+  location, so iterating counters and attributing each to "its" line is
+  wrong.
+
+Both were already the documented contract; coalescing is what makes
+getting them wrong actually break. Future modes may additionally expose
+entries with no direct runtime counter, so hosts should keep using
+`entry.counterIndex` and be prepared for extended entry data rather
+than assuming the entry index equals the counter index.
 
 #### Producing the canonical manifest JSON in-process
 
@@ -325,14 +345,14 @@ contract.
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                    |
-| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                   |
-| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
-| `-coverage-manifest-output <path>`        | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                              |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                       |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                    |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                                                       |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                                                      |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists, and true/false arms for the condition of a scalar `?:` and the left operand of a short-circuiting `&&` / `\|\|`. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
+| `-coverage-manifest-output <path>`        | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                                                                 |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                                                          |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -347,9 +367,15 @@ effectively never wrap; uint32 slots wrap silently at 2^32 hits per
 slot and read back as small numbers.
 
 Counter slot indices are per-compile: slot `K` does not identify the
-same source location across two compiles or shader variants. Aggregate
-by the source attribution in the manifest or metadata, never by slot
-index.
+same source location across two compiles or shader variants, and one
+slot may serve several source locations. Aggregate by the source
+attribution in the manifest or metadata, never by slot index.
+
+The counter buffer and the manifest must come from the *same* compile.
+`slang-coverage-to-lcov.py` enforces this by requiring the buffer size
+to match `counter_count` exactly; a mismatch is an error rather than a
+silently truncated read, because a prefix of a stale buffer produces
+plausible but wrong hit counts.
 
 ---
 
@@ -443,10 +469,13 @@ declares the slot in its own pipeline layout / root signature.
   general) is a follow-up, tracked at
   [shader-slang/slang#11169](https://github.com/shader-slang/slang/issues/11169);
   D3D hosts pin a slot with `-trace-coverage-binding` instead.
-- **Branch coverage is statement-level.** `-trace-branch-coverage`
-  instruments `if` / `else` arms, loop-condition outcomes, and
-  `switch` dispatch arms; expression-level short-circuit (`&&` /
-  `||`) and ternary (`?:`) branches are not instrumented yet.
+- **Short-circuit sites record the left operand.** `-trace-branch-coverage`
+  gives each `&&` / `||` a site whose true/false arms count the left
+  operand's value, which decides whether the right operand is
+  evaluated. The last right operand of a chain is the expression's
+  value, not a branch: an enclosing `if` or loop site records it, but
+  in a value context such as `bool r = a && b;` its outcome is not
+  recorded.
 - **WGSL and LLVM-emitted CPU targets are not instrumented.**
   Coverage tracing emits warning E45102 and skips instrumentation on
   these targets (see the support matrix above for details and

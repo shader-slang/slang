@@ -203,12 +203,20 @@ These add to the universal lessons in `_common.md`. Apply them ALL:
   `vk::binding(N)` or HLSL `register(uN)`. When asserting Metal
   binding shape, accept any `buffer({{[0-9]+}})` rather than a
   specific N.
-- **CUDA factors `__ldg(&uniform)` reads into temporaries.** A
-  compound expression like `a + b` over two `uniform` globals
-  becomes `__ldg(...)` + `__ldg(...)` + `... + ...` on separate
-  lines on CUDA. To observe `+` directly on CUDA, derive operands
-  from `SV_DispatchThreadID` or other locals, not `uniform`
-  globals.
+- **CUDA `__ldg` applies to eligible global-memory reads, not plain
+  global uniforms.** Top-level `uniform` values live in the emitted
+  `__constant__` `SLANG_globalParams` object and must not be wrapped
+  in `__ldg`. Use `StructuredBuffer<T>` or `ConstantBuffer<T>` for a
+  positive `__ldg` observation, and use a top-level `uniform` only
+  for the corresponding `CHECK-NOT` boundary.
+- **Pair cross-target `-NOT` checks with positive emit anchors.** A
+  FileCheck prefix containing only `-NOT: __ldg` can pass on empty
+  output. For each non-CUDA arm of an immutable-buffer test, match a
+  target-specific ordinary buffer load and bracket that anchor with
+  `-NOT: __ldg` before and after it. For SPIR-V, capture the
+  `OpAccessChain` rooted at the input buffer and require the following
+  `OpLoad` to consume that captured pointer; a bare `OpLoad` is too
+  broad to establish that the buffer read was emitted.
 - **`__target_switch` must include a `default:` arm** (or be
   exhaustive over every active target keyhole) when feeding through
   `slangc` — a missing arm for an active target is itself a

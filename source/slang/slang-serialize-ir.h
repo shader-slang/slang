@@ -29,11 +29,20 @@ void writeSerializedModuleIR(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule);
 
+/// Reads module metadata without deserializing the IR or checking the semantic module version.
+/// `moduleVersion` is required and is written on success. `compilerVersion`, `name`, and
+/// `serializationVersion` are optional. `serializationVersion` is written as soon as the metadata
+/// record is available, including when an unsupported format causes `SLANG_E_NOT_AVAILABLE`;
+/// `compilerVersion` and `name` are written only on success. A well-formed metadata record with a
+/// null module pointer returns `SLANG_FAIL`. A non-data chunk or missing Fossil root triggers
+/// `SLANG_UNEXPECTED`. The distinct unsupported-format result lets metadata callers issue a
+/// specific diagnostic before attempting IR deserialization.
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
-    String& compilerVersion,
-    UInt& version,
-    String& name);
+    String* compilerVersion,
+    UInt64& moduleVersion,
+    String* name,
+    UInt64* serializationVersion = nullptr);
 
 // Enable a mild optimization by putting instructions with payloads at the end
 // of the stream to make deserialization slightly faster

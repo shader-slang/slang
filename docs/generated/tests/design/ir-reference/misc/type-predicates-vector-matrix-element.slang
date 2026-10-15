@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#type-queries-and-predicates
-//META: doc_section_digest=dd5dde08daf5ef4afa93de9a5f62e011969dd2709cf191720b25851af591f755
+//META: doc_section_digest=cab621016e64a7e1c7e309a2dec68b9f941414337db801f7d55a994e5fdebe08
 //META: purpose=A scalar type predicate applied to a vector or matrix answers for that type's element type, so `__isFloat<float3>()` and `__isFloat<float3x3>()` are both true.
 //META: intent=boundary
 //META: pipeline_stage=lower

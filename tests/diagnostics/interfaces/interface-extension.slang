@@ -3,7 +3,7 @@
 interface IFoo{}
 
 extension IFoo
-//CHECK:  ^^^^ cannot extend interface type 'IFoo'
+//CHECK:  ^^^^ error E30852
 //CHECK:  ^^^^ cannot extend interface type 'IFoo'. consider using a generic extension: `extension<T:IFoo> T {...}`
 {
     int f() { return 0; }

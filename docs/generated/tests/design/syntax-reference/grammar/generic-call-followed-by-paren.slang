@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#-disambiguation
-//META: doc_section_digest=dadb4ac2edfa61b92a02ca7923eeb5ee0f3e9aa8cc05a01e2bcfdef41f1a3055
+//META: doc_section_digest=5bdf1269b8206a09e76ed3099e3be23084e5fadaadeeb860053823b4f5e48c23
 //META: purpose=`<` is treated as a generic-argument list when followed by `>` and a "generic-follower" token like `(`.
 //META: intent=functional
 //META: pipeline_stage=parse

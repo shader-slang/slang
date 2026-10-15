@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:25:34Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 1ec94893dbf01f578c85e79607171f593c06c00e297add42831695b6d50bc8d0
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 917048d00bf2ca8d602f020a3f3abf2e8a657faa21c329751eaa25597c3f0ed3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -306,10 +306,37 @@ GLSL directives `#version` / `#extension`.
 
 Every directive consumes its own line, so none contributes tokens to
 the output list. Of the four non-C entries, `#language` / `#lang`
-(line 4536) parse an optional `slang` name plus a version and set the
-source language and version that `preprocessSource` returns through
-`outDetectedLanguage` / `outLanguageVersion`
-([slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h));
+(`HandleLanguageDirective`, line 4536) take an optional `slang` name
+followed by a version —
+
+```
+#lang [slang] <version>
+#language [slang] <version>
+```
+
+— and set the source language and version that `preprocessSource`
+returns through `outDetectedLanguage` / `outLanguageVersion`
+([slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h)).
+The version operand is resolved by name rather than by arithmetic:
+whether it arrived as an identifier or as an integer literal, its
+*text* is handed to `TypeTextUtil::findLanguageVersion`, which looks it
+up in one table where each version carries several accepted spellings —
+`legacy` / `default` / `2018`, `2025` / `202a`, `2026` / `202b` /
+`latest`, and `202c` / `next`. So `#lang 2026`, `#lang 202b` and
+`#lang latest` are the same directive, and a version this compiler does
+not know is simply absent from the table rather than being a number out
+of range. Note that only `slang` is accepted as the optional language
+name; the directive no longer recognizes `glsl`.
+
+Which diagnostic an unusable operand produces depends on what the
+parser can still infer about it, which is why there are three:
+
+| Operand | Diagnostic |
+| --- | --- |
+| Neither an identifier nor an integer literal | `ExpectedIntegralVersionNumber` |
+| An unrecognized identifier, with no `slang` name given | `UnknownLanguage` — with the language unspecified, the lone identifier is read as an attempt to name one |
+| An unrecognized integer literal, or an unrecognized identifier *after* an explicit `slang` | `UnknownLanguageVersion` — the language is settled, so the token can only have been a version |
+
 `#version` (line 4501) takes an integer and switches the detected
 language to GLSL when it names a valid GLSL version; `#extension`
 (line 4496) is accepted and discarded.

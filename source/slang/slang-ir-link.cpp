@@ -114,6 +114,7 @@ struct IRSpecContextBase
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
     HashSet<IRInst*> globalsWithClonedAnnotations;
+    HashSet<AnnotationCacheKey> clonedAnnotationKeys;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
@@ -227,8 +228,6 @@ IRInst* cloneInst(
 
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
-    SLANG_UNUSED(clonedInst);
-
     // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
     // derivative functions and differential type/zero/add/pair witnesses. Every
     // `AnnotationKind` is differentiability-related (see the note at its
@@ -260,8 +259,16 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
 
     auto annotations =
         originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
+    // We clone at most one annotation per (cloned target, kind), because `tryLookupAnnotation`
+    // assumes a single value per (target, kind) and `cloneGlobalValueImpl` unions the
+    // annotations of several declarations of one symbol onto one clone.
     for (auto annotation : annotations)
+    {
+        AnnotationCacheKey key = {clonedInst, AnnotationKind(annotation->getConformanceID())};
+        if (!context->clonedAnnotationKeys.add(key))
+            continue;
         cloneInst(context, context->builder, annotation, annotation);
+    }
 }
 
 IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
@@ -1543,7 +1550,24 @@ IRInst* cloneGlobalValueImpl(
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
+
+    // A linked symbol can have several same-mangled-name declarations across the input
+    // modules (e.g. an importing module's `[import]` and the defining module's `[export]`),
+    // which link collapses into this one inst. Any of them may carry module-scope auto-diff
+    // trait annotations, since the module that differentiates a symbol records them on its
+    // own declaration, which need not be the one selected as `originalInst`. We therefore
+    // recover the annotations from every declaration, not just `originalInst`. The selected
+    // declaration is cloned first and `cloneAnnotations` dedups per (cloned target, kind) with
+    // every call keyed on `clonedValue`, so the selected declaration's annotations take
+    // precedence and a sibling only supplies a kind it lacks. A declaration in the module we
+    // are linking into is skipped: its annotations stay in place, and its linking info is not
+    // prebuilt.
     cloneAnnotations(context, clonedValue, originalInst);
+    for (auto s = originalValues.sym; s; s = s->nextWithSameName)
+    {
+        if (s->irGlobalValue->getModule() != context->getModule())
+            cloneAnnotations(context, clonedValue, s->irGlobalValue);
+    }
     return clonedValue;
 }
 
@@ -2035,11 +2059,17 @@ void convertAtomicToStorageBuffer(
     }
 }
 
-void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram, IRModule* irModule)
+/// Replace directly-declared GLSL atomic-counter globals with storage-buffer-backed globals.
+///
+/// The GLSL front end lowers each supported `atomic_uint` global to a global whose direct type is
+/// `kIROp_GLSLAtomicUintType` and whose layout carries its binding and byte offset. This pass
+/// groups those globals by binding and rewrites their direct uses to the representation shared by
+/// SPIR-V and HLSL emission. Aggregate types containing atomic counters are outside that existing
+/// lowering contract and are intentionally not rediscovered by recursively walking arbitrary type
+/// graphs. Source semantic checking rejects a direct global that lacks the required GLSL binding
+/// layout; the release assertions below enforce that producer contract for loaded serialized IR.
+static void replaceGLSLAtomicUintGlobals(IRSpecContext* context, IRModule* irModule)
 {
-    if (!targetProgram->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-        return;
-
     Dictionary<int, List<IRInst*>> bindingToInstMapUnsorted;
     for (auto inst : irModule->getGlobalInsts())
     {
@@ -2049,16 +2079,15 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
             {
             case kIROp_GLSLAtomicUintType:
                 {
-                    // atomic_uint are supported by GLSL->VK through converting to a different
-                    // type (GL_EXT_vulkan_glsl_relaxed). atomic_uint are not supported by
-                    // SPIR-V->VK; this means that to get SPIR-V to work we must convert the
-                    // type ourselves to an equivlent representation (storage buffer); the added
-                    // benifit is that then HLSL is possible to emit as a target as well since
-                    // atomic_uint is not an HLSL concept, but storageBuffer->RWBuffer is and
-                    // HLSL concept
-                    auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
+                    // GLSL drivers can implement `atomic_uint` through
+                    // `GL_EXT_vulkan_glsl_relaxed`, but the placeholder type cannot be emitted as
+                    // SPIR-V or HLSL. Use the existing storage-buffer representation for both.
+                    auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>();
+                    SLANG_RELEASE_ASSERT(layoutDecoration);
+                    auto layout = layoutDecoration->getLayout();
+                    SLANG_RELEASE_ASSERT(layout->getOperandCount() > 1);
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
-                    SLANG_ASSERT(layoutVal != nullptr);
+                    SLANG_RELEASE_ASSERT(layoutVal);
                     bindingToInstMapUnsorted
                         .getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>())
                         .add(inst);
@@ -2155,6 +2184,11 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
+
+    // Once source modules have been lowered and linked, the IR is the complete definition of the
+    // program. Back-end transformations must be selected from IR operations/decorations or from
+    // target/code-generation options. An input source language, and especially a legacy front-end
+    // option such as `-allow-glsl`, is not a valid back-end policy switch.
 
     auto linkage = codeGenContext->getLinkage();
     auto program = codeGenContext->getProgram();
@@ -2430,10 +2464,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // definition.
     diagnoseUnresolvedSymbols(targetReq, codeGenContext->getSink(), state->irModule);
 
-    // type-use reformatter of GLSL types (only if compiler is set to AllowGLSL mode)
-    // which are not supported by SPIRV->Vulkan but is supported by GLSL->Vulkan through
-    // compiler magic tricks
-    GLSLReplaceAtomicUint(context, targetProgram, state->irModule);
+    // Rewrite direct GLSL atomic-counter globals that reached the linked IR. No target consumes
+    // this placeholder directly: SPIR-V cannot represent it, while targets such as HLSL need the
+    // equivalent storage-buffer representation. The direct global's type opcode selects this
+    // existing legalization path. Unlike the ray-location rewrite, detecting it requires only this
+    // cheap global-instruction scan, which is a no-op for every module without such a global.
+    replaceGLSLAtomicUintGlobals(context, state->irModule);
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
@@ -2497,9 +2533,17 @@ struct IRPrelinkContext : IRSpecContext
                     mangledName = exportDecor->getMangledName();
                     decorsToRemove.add(exportDecor);
                 }
-                else if (as<IRImportDecoration>(decor))
+                else if (auto importDecor = as<IRImportDecoration>(decor))
                 {
                     hasImportDecor = true;
+                    // We register [Import]-origin clones too, not just [Export]-origin ones: a
+                    // helper cloned once under [Import] must be reused -- not re-cloned -- when a
+                    // later transitive closure in the same prelink pass reaches the same mangled
+                    // name, or checkIRDuplicate fires. When both decorations are present [Export]
+                    // wins the key independently of iteration order, because the [Export] branch
+                    // assigns unconditionally while this one assigns only when the key is unset.
+                    if (!mangledName.getLength())
+                        mangledName = importDecor->getMangledName();
                 }
             }
             if (mangledName.getLength() && !hasImportDecor)

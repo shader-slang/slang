@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#option-set-toggles
-//META: doc_section_digest=7c951a88b67c0d94a6d4504f2d7616fdfe324b58f96f2245c67178d693892a88
+//META: doc_section_digest=af8456e51bdb3fb57f8ddeaae70da165649c7adf3497efb5a4038eb6995a71a1
 //META: purpose=The non-essential-validation toggle gates D1 and D3-D9, so the missing-return warning disappears when validation is disabled while code generation still succeeds.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

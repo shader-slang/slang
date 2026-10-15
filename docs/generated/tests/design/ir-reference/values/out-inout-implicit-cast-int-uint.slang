@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#out--inout-argument-casts
-//META: doc_section_digest=4e540a522f9a0cc4f325c6d7e9f89f294e159f1a25d5b1bbbfbd0c481519dfe0
+//META: doc_section_digest=ae3ab5a85d01268c9dfd985e9d4780ff6414522ba230669261f386fb2979871b
 //META: purpose=Passing an `int` l-value to an `out uint` / `inout uint` parameter materializes `outImplicitCast` / `inOutImplicitCast` on the caller's address, whereas a same-type argument produces no cast at all.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -21,7 +21,7 @@
 // gives the contrast case, and there the `var` pointer reaches the call
 // with no cast in between.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

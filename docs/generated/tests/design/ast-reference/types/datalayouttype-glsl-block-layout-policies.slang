@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=71d352a8c5034422ec1e8eb2b4a93b52395bd85cc8305cee8432fdeb2101642c
+//META: doc_section_digest=e9219cdb5c991479475f495fed529b3a717626417843075cd38373dfd41801fa
 //META: purpose=The data-layout policy types are the second generic argument of a uniform parameter group and each selects a distinct GLSL block layout, with the scalar policy additionally requiring the GL_EXT_scalar_block_layout extension.
 //META: intent=functional
 //META: pipeline_stage=emit

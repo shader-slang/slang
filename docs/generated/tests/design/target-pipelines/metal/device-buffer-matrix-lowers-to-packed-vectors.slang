@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations
-//META: doc_section_digest=41531393ced08c0803ee8c63b01f36a7cafa65309b49df24964c1309a93f4b8e
+//META: doc_section_digest=660b8f85e32242335c2f53585b6b33fcee2998390a47d71a9f0e187a004c5469
 //META: purpose=The Phase-C `Metal` policy stores a `float3x3` device-buffer field as an array of packed vectors, emitted as MSL `packed_float3`.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

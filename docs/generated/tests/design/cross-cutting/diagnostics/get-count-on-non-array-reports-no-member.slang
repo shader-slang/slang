@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
-//META: doc_section_digest=e5426f9afa17becb9e7d33c23301014e082fad12bbf8aff1c4a169d90575556e
+//META: doc_section_digest=5ef206950ef0e6ecfe2a9d8abf02d78b471d242f0a4a1fb9094dec1de2c240ba
 //META: purpose=A catalog entry is not a promise that some input reaches it: getCount on a non-array reports no-member-of-name-in-type E30027, never the expected-array-expression entry E30020.
 //META: intent=negative
 //META: pipeline_stage=check

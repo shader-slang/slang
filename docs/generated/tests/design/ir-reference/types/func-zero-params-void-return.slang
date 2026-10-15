@@ -13,7 +13,7 @@
 // operands. The minimal Func is one with no params and Void result; it
 // appears as `Func(Void)` with no further operands.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

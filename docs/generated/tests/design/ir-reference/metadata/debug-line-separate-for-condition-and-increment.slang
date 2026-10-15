@@ -17,7 +17,7 @@
 // continue block. The CHECKs anchor at `func %main` so no core-module function
 // can satisfy them, then require the two column ranges in that order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<float> gOut;
 

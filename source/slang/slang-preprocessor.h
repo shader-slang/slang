@@ -5,6 +5,7 @@
 #include "compiler-core/slang-include-system.h"
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-basic.h"
+#include "slang-profile.h"
 
 namespace Slang
 {
@@ -12,8 +13,6 @@ namespace Slang
 class DiagnosticSink;
 class Linkage;
 struct PreprocessorContentAssistInfo;
-
-enum class SourceLanguage : SlangSourceLanguageIntegral;
 
 namespace preprocessor
 {
@@ -61,21 +60,46 @@ struct PreprocessorDesc
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
-/// Take a source `file` and preprocess it into a list of tokens.
+/// The first source-language selection discovered while preprocessing one source segment.
+///
+/// The preprocessor diagnoses later conflicting directives and preserves this first selection so
+/// the translation unit can choose one parser mode before any source file is parsed. A Slang
+/// `#language` directive also records its version so the translation unit can enforce one version
+/// for parsing and semantic checking of the complete module.
+struct SourceLanguageDirective
+{
+    /// The selected language, or `Unknown` when the source contains no language directive.
+    SourceLanguage language = SourceLanguage::Unknown;
+
+    /// The location of the first directive that selected `language`.
+    SourceLoc location;
+
+    /// The version selected by a Slang `#language` directive, or `Unknown` for another language or
+    /// when the source contains no directive.
+    SlangLanguageVersion slangLanguageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+};
+
+/// Preprocess `file` and return its tokens and first source-language directive, if any.
+///
+/// Conflicting directives in the same source segment are diagnosed and do not replace the
+/// first selection. `outLanguageVersion` changes only when a valid Slang `#language` directive is
+/// present.
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion);
 
-/// Convenience wrapper for `preprocessSource` when a `Linkage` is available
+/// Preprocess `file` using services and language-server state supplied by `linkage`.
+///
+/// The output and conflict behavior match the `PreprocessorDesc` overload.
 TokenList preprocessSource(
     SourceFile* file,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
     Dictionary<String, String> const& defines,
     Linkage* linkage,
-    SourceLanguage& outDetectedLanguage,
+    SourceLanguageDirective& outSourceLanguageDirective,
     SlangLanguageVersion& outLanguageVersion,
     PreprocessorHandler* handler = nullptr);
 

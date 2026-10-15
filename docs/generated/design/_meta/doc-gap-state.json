@@ -1,5 +1,14 @@
 {
   "gaps": {
+    "0005f0d9cb1a": {
+      "decided_at": "2026-09-11T12:15:20Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Cited E31202 and its message in the EnumClassModifier row. Confirmed in the watched slang-check-modifier.cpp lines 1666-1668, where getModifierConflictGroupKind maps both EnumClassModifier and UnscopedEnumAttribute to the EnumClassModifier group, and slang-diagnostics.lua line 3001 where duplicate-modifier is err 31202 with the message 'modifier ~modifier is redundant or conflicting with existing modifier ~existingModifier'. Stated that it is an error rather than a precedence rule.",
+      "status": "fixed",
+      "summary": "The `EnumClassModifier` row now names the conflicting shape -- an explicit `[UnscopedEnum]` on an `enum class` -- but still cites no diagnostic, so a reader ...",
+      "target_doc": "docs/generated/design/ast-reference/modifiers.md"
+    },
     "01340fd96350": {
       "decided_at": "2026-08-11T16:38:07+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -392,6 +401,15 @@
       "summary": "The section states the invariant in terms of `Val*` pointer equality, which is not observable from program text, and does not say what a language user would ...",
       "target_doc": "docs/generated/design/ast-reference/values.md"
     },
+    "14b1f1a288e8": {
+      "decided_at": "2026-09-11T12:47:36Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Noted that WGSL rejects ray-tracing stages before parameter binding runs, so -target wgsl -stage miss reports E99997 'abort compilation: unsupported stage' rather than anything about payload layout, and that the presence of WGSL's layout rules therefore is not observable through this example - the claim is about the layout-rules family, which would supply them if a stage using them were reachable.",
+      "status": "fixed",
+      "summary": "The section says \"the SPIR-V/GLSL, HLSL/DXIL, and WGSL families supply all three\", but a reader cannot confirm the WGSL third of that sentence from the page's ...",
+      "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
+    },
     "151da0a0a8be": {
       "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -412,6 +430,15 @@
       "status": "deferred",
       "summary": "The section names VM bytecode as a separately dispatched non-source target but never names the tool or invocation that requests it, so a reader cannot exercise ...",
       "target_doc": "docs/generated/design/pipeline/overview.md"
+    },
+    "163417e4aa2a": {
+      "decided_at": "2026-09-11T12:42:00Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Dropped 'where U(T)' from the GenericArgumentDoesNotSatisfyConstraint fallback list and named its own diagnostic: E38043 type-coerce-constraint-missing-conversion, \"'<from>' is not convertible to '<to>', not satisfying the type coerce constraint '<to>(<from>)'\" (slang-diagnostics.lua:4536), with its see-definition note. Equality and non-empty pack remain in the fallback group.",
+      "status": "fixed",
+      "summary": "The `GenericConstraintNotSatisfied` row lists type coercion (`where U(T)`) alongside equality and non-empty pack as spellings that reach ...",
+      "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
     },
     "16397e63407b": {
       "decided_at": "2026-08-11T16:41:13+00:00",
@@ -521,6 +548,15 @@
       "summary": "The descriptor-heap bullet names `UntypedResourceHandle`, `UntypedSamplerHandle`, `__ResourceDescriptorHeapType`, and `__SamplerDescriptorHeapType`, but not ...",
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
+    "1c64b8fe0918": {
+      "decided_at": "2026-09-11T11:57:38Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added a '## Severity levels' subsection naming both routes to a rendered 'fatal error': a table of the nine fatal()-declared entries with codes (E39901, E39997, E40002, E40003, E40030, E51701, E55206, E55207, E56003) as test-author candidates, and the code-less route via outputExceptionDiagnostic in the watched slang-diagnostic-sink.cpp line 978, which calls diagnoseRaw(Severity::Fatal, 'An unknown exception occurred'). Stated explicitly that the raise sites for the nine live outside this doc's watched paths, so the page cannot promise which one a given input reaches.",
+      "status": "fixed",
+      "summary": "The section now says only five of the six rendered names are ever printed and that `internal` entries mean a compiler defect, but it still gives no input that ...",
+      "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
+    },
     "1d8770e795d5": {
       "decided_at": "2026-08-11T16:30:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -608,6 +644,24 @@
       "summary": "The section names `SyntaxDecl` and `AttributeSyntaxDecl` and says the `':'` clause \"names the AST node class to construct\", but no legal class name is listed, ...",
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
     },
+    "23225b07a3c3": {
+      "decided_at": "2026-09-11T12:54:18Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Named what makes inlineCall decline. CustomInliningPass::shouldInline always returns true (slang-ir-inline.cpp:1393), so the refusal is never policy - considerCallSite bails when the callee is not an IRFunc: a specialize applied to a non-generic, a generic whose returned value cannot be determined, or a callee reached through a witness lookup. The doc now names the concrete shape to aim a test at: an anyhit entry point calling IgnoreHit() from inside an interface method implementation invoked through an interface-typed value, where dynamic dispatch leaves a lookupWitness callee that survives the inlining loop and reaches the residual scan.",
+      "status": "fixed",
+      "summary": "The section now correctly notes the recursive-chain example is shadowed by `E55201` and says the reachable shape is \"a terminate-reaching call `inlineCall` ...",
+      "target_doc": "docs/generated/design/target-pipelines/cuda.md"
+    },
+    "238d7877d055": {
+      "decided_at": "2026-09-11T12:48:55Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added the distinction the gap was missing: plain constant data such as 'static const int kTable[4] = {...}' is holdable at module scope on HLSL, WGSL and Metal alike and survives unchanged, so it is not an example of this pass. What moves is a global whose value the target has no module-scope form for, with the resource-typed global constants handled by inlineGlobalConstantsForLegalization named as the clearest case.",
+      "status": "fixed",
+      "summary": "The `Legalize global values` row explains the mechanism well but names no global-inst shape a target actually cannot hold at module scope, so a reader cannot ...",
+      "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
+    },
     "23b139a02fb5": {
       "decided_at": "2026-08-11T16:38:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -673,6 +727,15 @@
       "status": "fixed",
       "summary": "The section says the single-expression form `(x) => x + 1` is desugared into a `ReturnStmt`-wrapped block and that \"there is no bare-identifier parameter ...",
       "target_doc": "docs/generated/design/ast-reference/expressions.md"
+    },
+    "25eecf495176": {
+      "decided_at": "2026-09-11T12:54:18Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Noted that the kIROp_MatrixType arm is not reachable for a matrix that is a buffer element: buffer element types are rewritten ahead of this pass into a _MatrixStorage_* struct wrapping a FixedArray of row vectors (slang-ir-lower-buffer-element-type.cpp:2787 and the CUDA-specific builder at slang-ir-lower-cuda-builtin-types.cpp:150), so the load that arrives takes the kIROp_StructType arm. The row is now framed as covering a matrix-typed load that is not a buffer element.",
+      "status": "fixed",
+      "summary": "The recognized-type list includes `kIROp_MatrixType`, but a matrix element of an immutable buffer is rewritten into a `_MatrixStorage_*` struct wrapping a ...",
+      "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "27bdc3599a05": {
       "decided_at": "2026-08-12T06:41:25+00:00",
@@ -860,6 +923,15 @@
       "summary": "The `entryPoint` write-up says the first operand is \"the profile (an `IRIntLit` tag)\" but never says what the tag values are. Reading an IR dump, ...",
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
+    "322a120874cf": {
+      "decided_at": "2026-09-11T12:37:02Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Noted on the IdentityRemat row that its only surface, __func_extension, is gated behind -experimental-feature, and corrected the body: the gate emits W30131 (func-extension-requires-experimental-feature, slang-diagnostics.lua:2157) which is a warning rather than an error, the declaration is then dropped, and the compile fails later on whatever referred to it with a separate and less obvious error.",
+      "status": "fixed",
+      "summary": "`IdentityRemat`'s AST origin is given as \"`SynthesizedFuncDecl` `remat` from `_funcExtensionApply`\" with no hint that the `__func_extension` surface behind it ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
     "32e51a777983": {
       "decided_at": "2026-08-11T16:12:24+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1034,6 +1106,15 @@
       "summary": "The `alloca` row gives the opcode and its `allocSize` operand but no Slang construct that produces it. Every local declaration a reader would try \u2014 scalars, ...",
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
+    "3b3efc3eda31": {
+      "decided_at": "2026-09-11T12:42:00Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "Stated that [OverloadRank(N)] is tolerated rather than supported. The @internal marker on core.meta.slang:4786 is a doc-comment convention: the core-module-only enforcement in slang-check-modifier.cpp:1961 covers only MagicTypeModifier, BuiltinTypeModifier and BuiltinRequirementModifier, and OverloadRankAttribute is not among them, so the attribute written in user code is accepted and does break a tie. The doc now says its behaviour is not part of the language surface and may change without deprecation.",
+      "status": "fixed",
+      "summary": "Step 8 says the `[OverloadRank(N)]` attribute is declared `@internal` and that `core.meta.slang` / `hlsl.meta.slang` are its only users in the tree. Written in ...",
+      "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
+    },
     "3beeb23ba3da": {
       "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1044,6 +1125,15 @@
       "status": "fixed",
       "summary": "The doc describes the GLSL legalizer pass but does not enumerate the system-value-semantic to gl\\_\\* builtin mapping table ...",
       "target_doc": "docs/generated/design/target-pipelines/spirv.md"
+    },
+    "3d3ef9d34516": {
+      "decided_at": "2026-09-11T12:49:54Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Added a sentence above the table stating that T in an emitted MSL spelling means the scalar component of the declared element type, not the element type itself, because MSL texture types take a scalar type argument and the vector is dropped; gave Texture2D<float4> -> texture2d<float, access::sample> and Texture2DMS<float4> -> texture2d_ms<float, access::read> as the concrete substitutions, and repeated the first as an inline example on the Texture1D/2D/3D/Cube row.",
+      "status": "fixed",
+      "summary": "Every row of the mapping table writes the MSL type argument as `T`, e.g. `texture2d<T, access::sample>`, which reads as though `T` is the Slang element type ...",
+      "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
     "3d47ed25d143": {
       "decided_at": "2026-08-11T16:09:27+00:00",
@@ -1088,6 +1178,16 @@
       "summary": "The section names `Diagnostics::PreciseQualifierUnsupportedOnTarget` but not the user-visible diagnostic id, so a negative test has to discover `E56005` by ...",
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
+    "3ff3643a6c5e": {
+      "decided_at": "2026-09-11T12:56:24Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "finding_id": "cli-embed-downstream-ir-silent-failure",
+      "kind": "drift-from-source",
+      "rationale": "The 'leaves the emitted HLSL text unchanged' phrasing is removed because it cannot be checked on that path: the flag on a source-target compile writes nothing and exits non-zero with no diagnostic, which is the defect recorded in finding cli-embed-downstream-ir-silent-failure (exit 255, zero bytes, on every target tried except spirv). The row now says the option belongs to a module compile emitting a .slang-module artifact and cites the finding.",
+      "status": "escalated-to-finding",
+      "summary": "The `EmbedDownstreamIR` row says `-embed-downstream-ir` \"leaves the emitted HLSL text unchanged\", which reads as an invitation to pass the flag on an ordinary ...",
+      "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
+    },
     "3ffbd8c00902": {
       "decided_at": "2026-08-11T16:41:08+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1099,6 +1199,16 @@
       "summary": "The `MetalPackedVec` row says the type is \"emitted as MSL `packed_T<N>`\" but does not say what selects it. It is the buffer element type that does: a ...",
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
+    "40982cac82c7": {
+      "decided_at": "2026-09-11T12:54:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "finding_id": "cli-embed-downstream-ir-silent-failure",
+      "kind": "undocumented-behavior",
+      "rationale": "The observation is a compiler defect, not a documentation one: -embed-downstream-ir exits 255 with zero bytes on stdout and stderr for every target tried except spirv, which the existing finding cli-embed-downstream-ir-silent-failure already records (suspected_kind: wrong-diagnostic). The doc row now notes the CUDA combination produces no output and a non-zero exit with no diagnostic and cites that finding, rather than documenting the silence as intended behaviour.",
+      "status": "escalated-to-finding",
+      "summary": "The table says `-embed-downstream-ir` gates `unexportNonEmbeddableIR` with no CUDA-excluding condition, but adding that flag to an otherwise-working `-target ...",
+      "target_doc": "docs/generated/design/target-pipelines/cuda.md"
+    },
     "4311bafc8a6a": {
       "decided_at": "2026-08-11T16:40:37+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1109,6 +1219,15 @@
       "status": "fixed",
       "summary": "The section says `Expr` carries a `QualType` but describes it only as \"the type assigned to the expression\". The l-value/r-value component \u2014 which is what ...",
       "target_doc": "docs/generated/design/ast-reference/base.md"
+    },
+    "43d70b2c8a58": {
+      "decided_at": "2026-09-11T12:52:18Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Dropped the unsupported -O0/spirv-opt explanation and replaced it with what the source shows. PreserveParameters sets deadCodeEliminationOptions.keepGlobalParamsAlive at slang-emit.cpp:1481 (a field that defaults to true, so the assignment turns it off when unset), and the Phase D loop at slang-emit-spirv.cpp:12267-12272 calls ensureInst on each IRGlobalParam still in the module. Since that loop can only re-emit a parameter that survived to emit, the doc now says an unreferenced module-scope global is not reliably preserved by the option alone and records the bundle's -O0 observation, framing the option as keeping surviving parameters rather than resurrecting dead ones.",
+      "status": "fixed",
+      "summary": "The doc says `getBoolOption(PreserveParameters)` makes Phase D emit unreferenced `IRGlobalParam`s \"complete with their `Binding` / `DescriptorSet` ...",
+      "target_doc": "docs/generated/design/target-pipelines/spirv.md"
     },
     "44c688035185": {
       "decided_at": "2026-08-11T16:19:01+00:00",
@@ -1197,6 +1316,15 @@
       "summary": "The section states the cases are encoded as child instructions of the `Enum` inst, but shows no `-dump-ir` excerpt, so the printed form of the case children ...",
       "target_doc": "docs/generated/design/ir-reference/types.md"
     },
+    "4a6eeeb10605": {
+      "decided_at": "2026-09-11T12:56:23Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Named the surface for both decorations. IRNVAPISlotDecoration comes from preprocessor macros, not an attribute: findMacroValue reads NV_SHADER_EXTN_SLOT and NV_SHADER_EXTN_REGISTER_SPACE (defaulting to space0) after preprocessing and attaches an NVAPISlotModifier to the ModuleDecl (slang-compile-request.h 283-340), lowered at slang-lower-to-ir.cpp:15831 - so the user writes '#define NV_SHADER_EXTN_SLOT u3' or the equivalent -D. IRNVAPIMagicDecoration has no spelling at all: the checker attaches NVAPIMagicModifier to exactly one thing, a module-scope variable named g_NvidiaExt (slang-check-decl.cpp:2781). That is why a shader merely using an NVAPI-backed operation emits neither.",
+      "status": "fixed",
+      "summary": "The front-matter section names `#define NV_SHADER_EXTN_SLOT` / `NV_SHADER_EXTN_REGISTER_SPACE` as emitted \"when an `IRNVAPISlotDecoration` supplies them\", and ...",
+      "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
+    },
     "4b8da54e1594": {
       "decided_at": "2026-08-11T16:38:52+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1273,6 +1401,15 @@
       "status": "fixed",
       "summary": "The preludes table lists HLSL alongside CUDA and C++, but the emitted HLSL contains no unconditional `#include` of a Slang header \u2014 only `#pragma ...",
       "target_doc": "docs/generated/design/pipeline/06-emit.md"
+    },
+    "4f92e0fbf0f4": {
+      "decided_at": "2026-09-11T12:14:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Named a concrete reachable pair: 'globallycoherent' on a function parameter, 'void f(globallycoherent int x) { }'. Confirmed in the watched slang-check-modifier.cpp line 1731 - the non-GLSL arm for GloballyCoherentModifier/HLSLVolatileModifier requires as<VarDecl>(decl), and ParamDecl derives from VarDeclBase as a sibling of VarDecl (slang-ast-decl.h 321/339/597), so the predicate returns false and E31201 is reported. The doc also now says why other candidates a reader would try never reach E31201.",
+      "status": "fixed",
+      "summary": "The section states that a modifier used in a position `isModifierAllowedOnDecl` rejects is reported as `E31201`, but names no such position. Every candidate a ...",
+      "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "4fd9329675d8": {
       "decided_at": "2026-08-11T16:19:01+00:00",
@@ -1361,6 +1498,15 @@
       "status": "fixed",
       "summary": "The section says neither type \"reaches a backend\" because `lowerUntypedResourceHandleToUInt` forwards each cast to its `uint` operand, but does not say at ...",
       "target_doc": "docs/generated/design/ir-reference/types.md"
+    },
+    "54541bd5c25c": {
+      "decided_at": "2026-09-11T12:37:50Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Named the placement diagnostic and added the rejected example. isDeclAllowed (slang-parser.cpp:5360) does not list GenericTypeConstraintDecl in its StructDecl/ClassDecl/EnumDecl arm, and a failure there raises Diagnostics::DeclNotAllowed = E30102 decl-not-allowed, message '~declType is not allowed here.' (slang-diagnostics.lua:1026). Added 'struct S { __constraint int : IBar; }' as the one-line rejected example and stated explicitly that this placement rule is separate from the This-subject rule that follows.",
+      "status": "fixed",
+      "summary": "The `__constraint` bullet says `isDeclAllowed` \"enforces the placement\" of a `GenericTypeConstraintDecl` but names no diagnostic for the rejected case, unlike ...",
+      "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
     "55020f37a0c7": {
       "decided_at": "2026-08-11T16:16:45+00:00",
@@ -1591,6 +1737,15 @@
       "summary": "The section describes `SPIRVAsm` as a parent owning `SPIRVAsmInst` children but does not show the printed form. In a dump the parent is a typed one-line header ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
+    "5ff4a6e9732c": {
+      "decided_at": "2026-09-11T12:21:52Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "Named both target sets. The switch (target) in slang-emit.cpp calls legalizeBoolSwitchForTargetsRequiringIntSwitch from exactly two arms: GLSL/SPIRV/SPIRVAssembly (line 2366) and WGSL/WGSLSPIRV/WGSLSPIRVAssembly (line 2404), both commented as requiring an integer switch selector. Every other target - HLSL, Metal, CUDA, the C++ family - falls through without the pass, so a bool switch reaches the emitted code with case true:/case false: intact, matching what the reporting test observed.",
+      "status": "fixed",
+      "summary": "The section says the bool-switch legalization \"pass is selected per target in slang-emit.cpp\" but never says which targets select it, so a reader cannot tell ...",
+      "target_doc": "docs/generated/design/ir-reference/control-flow.md"
+    },
     "60366ad2b2ce": {
       "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1612,6 +1767,24 @@
       "status": "fixed",
       "summary": "The `DeclPassesLookupMask` bullet names only the internal modifier classes (`ExternModifier`, `ExtensionExternVarModifier`) and not the Slang spelling that ...",
       "target_doc": "docs/generated/design/name-resolution/visibility.md"
+    },
+    "641b8383ac33": {
+      "decided_at": "2026-09-11T12:48:55Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "cascading-only-mention",
+      "rationale": "Scoped the claim to conformance cycles. diagnoseCircularConformances (slang-ir-any-value-inference.cpp:339) walks (interface, impl) pairs and asks whether an implementation's own AnyValue size depends on the interface it implements (implCreatesCircularConformance); an ordinary source-level inheritance cycle like 'interface IA : IB' / 'interface IB : IA' is rejected earlier by semantic checking with E39999 cyclic reference in inheritance graph and never reaches it. The row now says to read the pass as an IR backstop rather than as the diagnostic a user meets.",
+      "status": "fixed",
+      "summary": "The AnyValue-inference row says `diagnoseCircularConformances` \"runs before specialization so a self-referential or cross-interface conformance cycle is ...",
+      "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
+    },
+    "641c838e2b9f": {
+      "decided_at": "2026-09-11T12:11:12Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Reworded so the parenthesised list can no longer be read as 'all four work'. At the parser layer the test really is on the AggTypeDecl base class (slang-parser.cpp parseVarDeclrStatement), so struct/class/enum/interface are indistinguishable there - that is what this document describes and it is correct. The bullet now says being kept is not acceptance overall, that only struct is usable in a function body in practice, and names the second layer: validateDeclNesting in slang-check-decl.cpp:304 reports DeclNotAllowedInContext (E31400) from its own rule table and suppresses itself when the parser already set nestingAlreadyDiagnosed. The per-keyword codes belong to 03-semantic-check.md, which is cross-linked; slang-check-decl.cpp is not a watched path here, so this page does not assert them.",
+      "status": "fixed",
+      "summary": "The bullet says the statement parser keeps an `AggTypeDecl` and parenthesises that as \"`struct`, `class`, `enum`, `interface`\", but only `struct` is actually ...",
+      "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "642fcb8b6989": {
       "decided_at": "2026-08-11T16:19:01+00:00",
@@ -1721,6 +1894,15 @@
       "summary": "The section says the file validates \"mutually exclusive combinations\" and \"HLSL-vs-Slang dialect differences\" but names no exclusive pair, no dialect-selecting ...",
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
+    "6cf8e5aa790e": {
+      "decided_at": "2026-09-11T12:52:18Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "cascading-only-mention",
+      "rationale": "Noted that the mixed-depth case is unreachable from source: the front end rejects a second depth output with E30705 (multiple-depth-output-semantics, slang-diagnostics.lua:3735), so the collapse to DepthReplacing alone is a backstop for IR that already carries both semantics, such as a linked or generated module.",
+      "status": "fixed",
+      "summary": "The section states that \"an entry point mixing two depth semantics collapses to `DepthReplacing` alone\". No Slang source can reach that branch: declaring both ...",
+      "target_doc": "docs/generated/design/target-pipelines/spirv.md"
+    },
     "6d040fda2fc4": {
       "decided_at": "2026-08-11T16:39:23+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1753,6 +1935,24 @@
       "status": "fixed",
       "summary": "The three trace-coverage rows name the toggles only through `CompilerOptionName` and the internal `context->trace*` fields, and say they emit \"function-entry ...",
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
+    },
+    "6deff4232165": {
+      "decided_at": "2026-09-11T12:48:54Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "Named the invocable surface: IComponentType::getTargetMetadata / getEntryPointMetadata (include/slang.h lines 5619 and 5630) returning an IMetadata (line 4750), whose whole surface is isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed) plus getDebugBuildIdentifier(). Also stated that there is no slangc flag that prints it, so a test checks a specific binding rather than dumping the table.",
+      "status": "fixed",
+      "summary": "The `Metadata` row now names `collectMetadata` / `collectCooperativeMetadata` and the `ArtifactPostEmitMetadata` type, and says the data is read back through ...",
+      "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
+    },
+    "6e8aaac601ab": {
+      "decided_at": "2026-09-11T12:11:12Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "The without-flag outcome is now stated: the declarator-level clause is never recognized as an annotation, the '<' falls through to the generic-argument reading, and the first ';' is reported as Diagnostics::UnexpectedTokenExpectedTokenType (E20001, unexpected ';', expected '>') rather than anything mentioning annotations. E20001 confirmed as unexpected-token-expected-token-type in the watched slang-diagnostics.lua line 846; the flag's two set-sites corrected to slang-parser.cpp 9988 and 10020.",
+      "status": "fixed",
+      "summary": "The section says the declarator-level skip \"is opt-in\" but never says what happens to the same source without the flag. Running it produces E20001 \"unexpected ...",
+      "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "700f09296336": {
       "decided_at": "2026-08-12T06:45:28+00:00",
@@ -1829,6 +2029,24 @@
       "status": "fixed",
       "summary": "The pointer-width integer-literal suffix (`z` / `Z`, optionally with `u`) is not described anywhere in `docs/language-reference/expressions-literal.md` or the ...",
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
+    },
+    "7123c28e425b": {
+      "decided_at": "2026-09-11T12:42:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Replaced the one-phrase meanings with the condition that charges each level, from the consuming sites: MatrixLayout at slang-check-conversion.cpp:2248 (two matrix types agreeing on element type and shape but not layout); GetRef at :2458 (a Ref<T> result from an l-value source, refused outright otherwise); LValueCast at :2898 (added whenever the source is an l-value, which is what makes an exact-type overload beat a converting one); FailedOptionalConstraint at slang-check-constraint.cpp:3327 (per constraint whose solved witness is a NoneWitness, i.e. an unsatisfied optional where-term, leaving the candidate viable but worse). ScalarToCoopVector is marked declared-but-never-used, like MutablePtrToConstPtr.",
+      "status": "fixed",
+      "summary": "The rows for `kConversionCost_MatrixLayout` (5), `kConversionCost_GetRef` (5), `kConversionCost_FailedOptionalConstraint` (150), `kConversionCost_LValueCast` ...",
+      "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
+    },
+    "7211d1217c71": {
+      "decided_at": "2026-09-11T12:14:00Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "The worked example now carries a modifier: S gains 'static const int tag = 1;', and the walkthrough gives 'modifiers validated' its own referent - checkModifier asks isModifierAllowedOnDecl whether static may sit on a struct field, and getModifierConflictGroupKind whether anything else claimed static's group (uniform shares it). The 'nothing here carries a modifier' sentence is gone.",
+      "status": "fixed",
+      "summary": "The worked example now shows what checking does to one program, but it walks all five output properties through a single snippet, so a reader cannot see which ...",
+      "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "726d790825ac": {
       "decided_at": "2026-08-11T16:23:37+00:00",
@@ -1917,6 +2135,15 @@
       "summary": "The section says operand 0 of both attributes is a `LayoutResourceKind` but never shows a value, so a reader looking at `size(8 : Int, 16 : Int)` next to ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
+    "76520d973827": {
+      "decided_at": "2026-09-11T12:56:24Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Scoped the bullet: the MakeArray form describes targets that lower a matrix to an array of row vectors, and HLSL is explicitly excluded because it keeps native matrix<bool,R,C>, so bool2x2 && bool2x2 emits a single whole-matrix and(matrix<bool,2,2>(...), matrix<bool,2,2>(...)) as the reporting test observed.",
+      "status": "fixed",
+      "summary": "The third bullet says a lowered matrix \"reaches emit as the `MakeArray` the pass built, so each row is its own `And` / `Or` ... inside an array-construction ...",
+      "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
+    },
     "767e963b3518": {
       "decided_at": "2026-08-11T16:40:39+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -1949,6 +2176,15 @@
       "status": "fixed",
       "summary": "The Value-instruction table has no row for aggregate constructors even though the family page it points at lists them; `float3(a,b,c)` produces `makeVector` ...",
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
+    },
+    "7767d36583a0": {
+      "decided_at": "2026-09-11T12:29:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Stated the rule and why the surface does not reach it. getCapabilityValue (slang-ir.cpp:2688-2709) builds one capabilityConjunction per atom set of the compacted CapabilitySet and returns a bare conjunction only when conjunctions.getCount() == 1. The doc now says __requireCapability conjoins the atom with the stage axis, so the compacted set comes back with one atom set per stage and always takes the disjunction path, listing the six atoms the reporting bundle tried and the 16-operand result, and frames the single-conjunction return as a builder shape rather than a reachable surface.",
+      "status": "fixed",
+      "summary": "The section states that \"a lone conjunction is returned directly with no `capabilityDisjunction` wrapper\", but names no source shape that produces one. Every ...",
+      "target_doc": "docs/generated/design/ir-reference/misc.md"
     },
     "777a56bb41c0": {
       "decided_at": "2026-08-12T06:45:28+00:00",
@@ -2057,6 +2293,15 @@
       "status": "fixed",
       "summary": "The section ends with \"When no leaf of a type is `__ldg`-able the pass leaves the original load alone\", but names no such type. Every scalar the section lists ...",
       "target_doc": "docs/generated/design/target-pipelines/cuda.md"
+    },
+    "7b6db8370cf7": {
+      "decided_at": "2026-09-11T12:36:00Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Corrected: all three metalSet* opcodes have core-module producers - __intrinsic_op declarations at core.meta.slang 2656 (MetalSetVertex), 2696 (MetalSetIndices) and 2734 (MetalSetPrimitive) - so the two '(no producer at HEAD)' cells now name their origins and the prose says a -target metal -stage mesh compile puts all three in the dump. The builder-helper note is narrowed to what is genuinely unused: emitMetalSetPrimitive/emitMetalSetIndices are never called and both pass kIROp_MetalSetVertex to createInst, which is now described as latent rather than as the reason the opcodes have no producer.",
+      "status": "fixed",
+      "summary": "The `metalSetPrimitive` and `metalSetIndices` rows say \"(no producer at HEAD)\" and ...",
+      "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "7bb8913f2a18": {
       "decided_at": "2026-08-12T06:38:42+00:00",
@@ -2208,6 +2453,15 @@
       "summary": "The new `functype` sentence says the type-specifier chain \"accepts `functype` ... to parse a function type\" but shows no spelling. A reader cannot tell that ...",
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
+    "80d3223cfd3f": {
+      "decided_at": "2026-09-11T12:16:35Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Stated that the unscoped form follows the input file extension and that -lang hlsl cannot select it. Confirmed in the watched slang-options.cpp: OptionsParser::addInputPath (line 1850) tests the extension before consulting the language value - a .slang path goes straight to addInputSlangPath, so CompilerOptionName::Language (what -lang sets) never reaches it - and for other paths findSourceLanguageFromPath derives the language from the extension. Added the foo.hlsl vs foo.slang contrast.",
+      "status": "fixed",
+      "summary": "The `UnscopedForStmt` row says the form is chosen \"when `getSourceLanguage()` is `SourceLanguage::HLSL`\" but never says what sets that. It follows the input ...",
+      "target_doc": "docs/generated/design/ast-reference/statements.md"
+    },
     "813e8869b359": {
       "decided_at": "2026-08-11T16:25:21+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2250,6 +2504,15 @@
       "status": "fixed",
       "summary": "The Conversions table does not mention the HLSL-compatible reinterpret builtins `asuint` / `asint` / `asfloat` / `asdouble`, which a reader looking for the ...",
       "target_doc": "docs/generated/design/ir-reference/values.md"
+    },
+    "83fa22f6b868": {
+      "decided_at": "2026-09-11T12:00:06Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "The per-target table of emitted line directives is emit-layer material owned by pipeline/06-emit.md and the target-pipelines pages; no emit source is in this document's watched paths, so it cannot be confirmed here and a table written from test observation would be unverifiable prose. The part that does belong here is now present: -line-directive-mode is named with all five modes (none, source-map, default, standard, glsl) and the default documented in the watched slang-options.cpp line 857, plus a cross-link to the emit docs for the rendering.",
+      "status": "rejected-out-of-scope",
+      "summary": "The section explains how locations are captured and rebuilt, and now explains the `#line` adjustment, but still never says what any of it looks like on the way ...",
+      "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
     "84e410a04bb8": {
       "decided_at": "2026-08-11T16:16:29+00:00",
@@ -2316,6 +2579,24 @@
       "summary": "The `FlagsAttribute` row's Summary is only the spelling \"`[Flags]`\". The observable effect is that cases without explicit initialisers are numbered with ...",
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
+    "88a46a233e2b": {
+      "decided_at": "2026-09-11T12:36:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "The name was wrong. hlsl.meta.slang has no __getUntypedBufferPtr; the intrinsic behind the getUntypedBufferPtr opcode is __getByteAddressBufferPtr, declared twice at lines 6114 and 6118 for ByteAddressBuffer and RWByteAddressBuffer. Corrected, both overloads noted, and __metal_asDepthTexture (line 1123, behind MetalCastToDepthTexture) added to the no-public-wrapper list as the gap suggested. The stale 26578-26393 range is also corrected to 26572-26576.",
+      "status": "fixed",
+      "summary": "The \"no public wrapper\" paragraph names `__getUntypedBufferPtr` as part of \"the whole surface\", but no declaration of that name exists in `hlsl.meta.slang`; ...",
+      "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
+    },
+    "8915d48482fe": {
+      "decided_at": "2026-09-11T12:40:08Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Stated explicitly that the option is unreachable from user source. The sole producer of TransparentModifier is slang-parser.cpp:4165, which attaches it to the synthesized variable declaration of an unnamed buffer block; that is a VarDecl and has no base clause, so the parent->findModifier<TransparentModifier>() test in checkInheritanceDecl (slang-check-decl.cpp:4800) can never see it. The doc now says to read IgnoreTransparentMembers as a guard for compiler-internal lookups.",
+      "status": "fixed",
+      "summary": "The section says the one context that sets `IgnoreTransparentMembers` is \"the check of a declaration's base clause when the declaration itself carries ...",
+      "target_doc": "docs/generated/design/name-resolution/lookup.md"
+    },
     "891e2c74c784": {
       "decided_at": "2026-08-11T16:45:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2348,6 +2629,15 @@
       "status": "fixed",
       "summary": "The compile-time paragraph says a `BuiltinOperationIntVal` lowers to a hoistable `constexpr*` opcode, but gives no shader whose dump surfaces one; ordinary ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
+    },
+    "8ad01478e699": {
+      "decided_at": "2026-09-11T12:44:57Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Split the D3 row. E40013 (arg-is-not-constexpr) is the call-argument form, reported per argument index at slang-ir-constexpr.cpp:552, and is what the 'uniform to a constexpr parameter' trigger produces. E40012 (need-compile-time-constant) is the general form for any instruction a constexpr context demands be constant and propagation could not make so, raised at slang-ir-constexpr.cpp:671 and slang-lower-to-ir.cpp:7580; the doc notes a call argument does not reach it because the argument-specific check fires first.",
+      "status": "fixed",
+      "summary": "The D3 row of the diagnostics table pairs two codes, `E40012` *expected a compile-time constant* and `E40013` *argument is not a compile-time constant*, with a ...",
+      "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "8ad5729b0ea8": {
       "decided_at": "2026-08-12T06:39:03+00:00",
@@ -2392,6 +2682,15 @@
       "status": "fixed",
       "summary": "`FuncExtensionDecl` is documented as `'__func_extension' ... gated behind -experimental-feature` with `KeywordExprHead` forms like `fwd_diff(foo)`, but no ...",
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
+    },
+    "8c0b5112b4ac": {
+      "decided_at": "2026-09-11T12:15:19Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added the missing prerequisite with the core module's own two-line shape: __attributeTarget(FunctionDeclBase) above attribute_syntax [NoDiscard] : NoDiscardAttribute; (core.meta.slang 4718-4719). Mechanism confirmed in the watched slang-check-modifier.cpp: __attributeTarget creates AttributeTargetModifiers on the attribute decl (line 956) and use-site validation iterates them from validTarget = false (line 1527), so an attribute declared with none has no valid placement and every use reports E31002 (attribute-not-applicable, 'invalid attribute placement').",
+      "status": "fixed",
+      "summary": "The section now says \"a user module can therefore add a new *spelling* for an existing attribute class\", but the `attribute_syntax` line alone is not enough: ...",
+      "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
     "8caf9bf5152a": {
       "decided_at": "2026-08-11T16:41:10+00:00",
@@ -2492,6 +2791,15 @@
       "summary": "Two of the three diagnostics in this section have no reproducer: `UnsupportedAssignmentTarget` names neither a left-hand side that reaches the assignment ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
+    "8fc03cf66530": {
+      "decided_at": "2026-09-11T12:11:11Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added a two-line example of each form under ## Angle-bracket annotations: a declarator-level 'Texture2D tex <string uiName = \"Tex\"; int uiOrder = 3;>;' gated on -enable-effect-annotations, and a semantic-level 'float4 pos : SV_Position <string ann = \"hello\";>;' which needs no flag, with the distinguishing ';' called out in the surrounding prose rather than only asserted.",
+      "status": "fixed",
+      "summary": "The section describes both skips precisely but shows no source for either, so a reader cannot see what an annotation clause looks like or how it differs from a ...",
+      "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
+    },
     "901ca639c751": {
       "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2558,6 +2866,15 @@
       "summary": "The `constructor` row gives the operands as \"(variadic, `min=1`)\" without saying what the operand means. The dump prints `[constructor(true)]`, and nothing in ...",
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
+    "9524cb7a664a": {
+      "decided_at": "2026-09-11T12:47:35Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Rewrote the sentence to scope it to the LayoutResourceKind::InputAttachmentIndex resource kind rather than to the parameter, and added the line the gap asked for: a SubpassInput parameter also reserves an ordinary DescriptorTableSlot, so it still emits Binding 0 and DescriptorSet 0 alongside InputAttachmentIndex 5. The following discussion is now explicitly scoped to the index kind.",
+      "status": "fixed",
+      "summary": "\"it lowers to `OpDecorateInputAttachmentIndex` only, never `OpDecorateDescriptorSet`\" reads as a statement about the `SubpassInput` parameter, which is not ...",
+      "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
+    },
     "9667530c34b5": {
       "decided_at": "2026-08-11T16:12:24+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2590,6 +2907,15 @@
       "status": "fixed",
       "summary": "The `waveGetActiveMask` row gives an `__intrinsic_op` origin in `hlsl.meta.slang`, which reads as \"calling `WaveGetActiveMask()` creates the opcode\". In ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
+    },
+    "97e081921a99": {
+      "decided_at": "2026-09-11T12:11:12Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Named both ways to select the version the gate reads: -std <language-version> (slang-options.cpp line 577), with -std 2018 / 2025 / 2026 mapped to the silently-accepted, deprecated and rejected arms, and the per-file #lang / #language directive, cross-linked to 01-lex-preprocess.md where the accepted version spellings are now tabulated.",
+      "status": "fixed",
+      "summary": "The language-version gate on `struct [attr] Name` is described in terms of the years 2025 and 2026 but names no way to select a version, so a reader cannot ...",
+      "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "97e3c6404b08": {
       "decided_at": "2026-08-12T06:38:51+00:00",
@@ -2819,6 +3145,15 @@
       "summary": "The section states registered keywords \"can be redefined or extended through `syntax` / `attribute_syntax` declarations\", but the doc contains no user-level ...",
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
+    "a33246361ec4": {
+      "decided_at": "2026-09-11T12:07:34Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "The '= Type' StructDecl alternative is relabelled 'link-time symbol alias (aliasedType); NOT a typealias' and a new paragraph explains it: slang-parser.cpp:6424 sets aliasedType, slang-lower-to-ir.cpp:12714 lowers it to an IRSymbolAlias, and isConcreteFieldOwningAggregate (slang-lower-to-ir.cpp:6663) treats it exactly like a bodyless extern struct because the fields 'only materialize during linking'. That is why the name has no members and no initializer conversion in a compile with no link step. typealias is named as the actual aliasing construct.",
+      "status": "fixed",
+      "summary": "`StructDecl` lists a type-alias form `'struct' ... '=' Type ';'`, but the declared name does not behave as an alias: after `struct Alias = Base;` a member ...",
+      "target_doc": "docs/generated/design/syntax-reference/grammar.md"
+    },
     "a36b7c8757cc": {
       "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2852,6 +3187,33 @@
       "summary": "Nothing describes the two independent angle-bracket annotation skips: the declarator-level one, gated on `-enable-effect-annotations` and disambiguated by ...",
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
+    "a3c35bd1e51f": {
+      "decided_at": "2026-09-11T12:29:27Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Replaced the misleading AST-origin cell with 'no lowering producer - see note' and explained. visitGetArrayLengthExpr (slang-lower-to-ir.cpp:6002) is three lines and returns arrayType->getElementCount() directly, so the call folds to the extent for both Array<int,4> and Array<int,N> and no GetArrayLength inst is created - matching the LOWER-TO-IR dump the test observed. The opcode is still consumed in slang-ir-peephole.cpp, slang-ir-translate.cpp, slang-ir-autodiff-fwd.cpp and slang-ir-check-unsupported-inst.cpp, so the row now describes an opcode the IR can carry rather than one this path emits.",
+      "status": "fixed",
+      "summary": "The `GetArrayLength` row names core-module `Array<T>::getCount` as its AST origin. Calling `getCount()` on `Array<int, 4>` and on a generic `Array<int, N>` ...",
+      "target_doc": "docs/generated/design/ir-reference/misc.md"
+    },
+    "a3f43cf5a55f": {
+      "decided_at": "2026-09-11T12:07:35Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Documented as not yet usable, which is the alternative the gap offered. ParseGenericParamDecl (slang-parser.cpp:1662-1671) creates a GenericTypeParamDecl plus a GenericTypeConstraintDecl that is never given a sub or sup and never AddMember'ed, so the parameter survives as an unconstrained type parameter with a dangling constraint node. The optional ': Type' falls to the shared tail (lines 1718-1734) which builds an ordinary subtype constraint and therefore demands an interface, which is why a function type is rejected as a constraint; nothing records callability, so invoking the parameter does not resolve.",
+      "status": "fixed",
+      "summary": "`GenericParam` lists a `'functype' IDENT (':' Type)?` form. `<functype F>` parses, but the section shows no example of how such a parameter is constrained or ...",
+      "target_doc": "docs/generated/design/syntax-reference/grammar.md"
+    },
+    "a42ab6a98f58": {
+      "decided_at": "2026-09-11T12:17:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Named the mechanism that decides where the alias name is visible rather than guessing a surface. NamedExpressionType::_toTextOverride (slang-ast-type.cpp:1414) prints the alias declRef, so a consumer formatting that node shows the alias; _createCanonicalTypeOverride (line 1422) resolves it, so a consumer that canonicalizes first shows the aliased type. The row now says the distinction is canonicalization rather than two printing paths, and records that type-mismatch diagnostics and emitted code are both in the second category - given 'typealias Celsius = float' they say float, never Celsius - which is what the reporting test observed.",
+      "status": "fixed",
+      "summary": "The `NamedExpressionType` row now says an alias \"prints under the alias name\" but does not say where that printing is visible. Neither a type-mismatch ...",
+      "target_doc": "docs/generated/design/ast-reference/types.md"
+    },
     "a43e4751357e": {
       "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -2862,6 +3224,15 @@
       "status": "fixed",
       "summary": "The `stage` row describes the operand as an integer literal without saying which enumeration it indexes or giving any value; a reader cannot tell whether a ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
+    },
+    "a5755ceb350d": {
+      "decided_at": "2026-09-11T12:32:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Stated that the opaque-resource and sampler cases are IR-pass-internal, in the style of the makeCoopMatrixFromScalar note: 'Texture2D t = {};' is rejected with E30513 and Texture2D()/SamplerState() match no constructor overload, so there is no Slang spelling that default-constructs one, while the interface-typed and unspecialized-generic-parameter cases in the same sentence are reachable from source.",
+      "status": "fixed",
+      "summary": "The section names \"an opaque resource or sampler type (`Texture2D`, `SamplerState`, a structured buffer)\" as a fallback case, but there is no Slang spelling ...",
+      "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "a58af9003740": {
       "decided_at": "2026-08-12T06:39:25+00:00",
@@ -2884,6 +3255,15 @@
       "status": "fixed",
       "summary": "The section says `slang-ir-spirv-legalize.cpp` \"retypes a `ConstantBuffer<T>` fetched from a descriptor heap to a Uniform `SPIRVUntypedPtr`\". Compiling exactly ...",
       "target_doc": "docs/generated/design/ir-reference/types.md"
+    },
+    "a5d39304626b": {
+      "decided_at": "2026-09-11T12:37:02Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Replaced 'in emitted HLSL or CUDA' with the accurate scope: the generated names appear in every source-level text target - HLSL, GLSL, Metal, WGSL, CUDA and C++ - and SPIR-V is called out as the exception because its output carries no OpName for the derivative function, so a SPIR-V reader must match on structure rather than name.",
+      "status": "fixed",
+      "summary": "The section says the generated names are ones \"a reader will meet in emitted HLSL or CUDA\", but the derivative function name is present in HLSL, GLSL, Metal, ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
     },
     "a5f989fa1d2a": {
       "decided_at": "2026-08-11T16:47:12+00:00",
@@ -2948,6 +3328,15 @@
       "status": "fixed",
       "summary": "Five rows in this table (`getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`) name only an ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
+    },
+    "a9496fc2bc93": {
+      "decided_at": "2026-09-11T12:29:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Named E41023 next to the internal diagnostic (get-string-hash-must-be-on-string-literal, slang-diagnostics.lua:5153) and recorded the skip the gap asked about: linkAndOptimizeIR guards the pass with !ArtifactDescUtil::isCpuLikeTarget(artifactDesc) && shouldRunNonEssentialValidation() (slang-emit.cpp:1779), so CPU-like targets skip it and the LLVM emitter re-tests the operand itself, reporting Diagnostics::Unimplemented for 'unexpected string hash for non-literal string' (slang-emit-llvm.cpp:2216) rather than E41023.",
+      "status": "fixed",
+      "summary": "The section states that `checkGetStringHashInsts` reports `GetStringHashMustBeOnStringLiteral` \"for an operand that did not fold to a literal\", but does not ...",
+      "target_doc": "docs/generated/design/ir-reference/misc.md"
     },
     "a9afaeff7d54": {
       "decided_at": "2026-08-12T06:39:03+00:00",
@@ -3092,6 +3481,15 @@
       "summary": "`Typeflow set`, `Typeflow specialize`, `Deduplicate`, `Deduplicate generic children`, `Remove unused generic param`, `AnyValue inference` and `AnyValue ...",
       "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
     },
+    "afd5e98315d2": {
+      "decided_at": "2026-09-11T12:00:07Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Naming emitted #line text and SPIR-V debug info as the two consumers requires the emit sources, which are not watched by this document. The ambiguous sentence is nevertheless resolved: the section now states that a source-manager query's SourceLocType parameter selects the physical or the #line-adjusted view, and that nothing in the serialized data makes that choice, cross-linking syntax-reference/tokens.md#source-location which owns that mechanism. Per-consumer behaviour belongs to pipeline/06-emit.md.",
+      "status": "rejected-out-of-scope",
+      "summary": "The `AdjustedLineInfo` paragraph says a reloaded location resolves \"to the physical line or to the remapped line and path depending on which the consumer asks ...",
+      "target_doc": "docs/generated/design/cross-cutting/serialization.md"
+    },
     "b0910e127d33": {
       "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3147,6 +3545,24 @@
       "summary": "The section says `imageSubscript` \"is what the front end produces for `image[coord]`\", but a `-dump-ir` snapshot of a shader that does `rwtex[c] = rwtex[c] + ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
+    "b33276a5f2d8": {
+      "decided_at": "2026-09-11T12:38:13Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Annotated the field as 'internal int n;' so the snippet produces only the 30604 the comment names, and added a paragraph explaining why: left bare, the public-module default makes n public inside an internal struct and draws E30601 (decl-cannot-have-higher-visibility, \"'n' cannot have a higher visibility than 'Counter'.\", slang-diagnostics.lua:2373) on the field line as well.",
+      "status": "fixed",
+      "summary": "The `public module M; internal struct Counter { int n; } void f() { Counter c; }` snippet is annotated as producing only `error 30604`. Compiling it also ...",
+      "target_doc": "docs/generated/design/name-resolution/visibility.md"
+    },
+    "b3699ff64f56": {
+      "decided_at": "2026-09-11T12:40:09Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added the GLSL interface-block example with the mode it needs - 'uniform MyBlock { float a; };' under -allow-glsl (or a module carrying GLSLModuleModifier), which is what sets ParserOptions::allowGLSLInput. Also added the condition that decides whether any block produces a transparent member at all: the modifier is attached only in the else branch at slang-parser.cpp:4165, reached only when the block has no instance name, so 'cbuffer C { float a; } c;' is not transparent while 'cbuffer C { float a; };' is.",
+      "status": "fixed",
+      "summary": "The section lists \"the GLSL interface-block forms\" as a third producer of transparent members alongside `cbuffer` and `tbuffer`, but gives no example of such a ...",
+      "target_doc": "docs/generated/design/name-resolution/lookup.md"
+    },
     "b3a0611e138c": {
       "decided_at": "2026-08-11T16:47:44+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3156,6 +3572,15 @@
       "report_path": "docs/generated/design/_meta/gap-intake/name-resolution/lookup.md.gap-intake.md",
       "status": "fixed",
       "summary": "The mask bits are listed as categories (`type`, `Function`, `Value`, `Attribute`, `SyntaxDecl`, `Semantic`) but the section never names a Slang construct whose ...",
+      "target_doc": "docs/generated/design/name-resolution/lookup.md"
+    },
+    "b482ba8e0552": {
+      "decided_at": "2026-09-11T12:40:08Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "The spelling was wrong. slang-lookup.cpp:1025 tests hasModifier<RefAttribute>(), and RefAttribute's only surface is 'attribute_syntax [__ref] : RefAttribute;' at core.meta.slang:4729 - marked @internal with __attributeTarget(FunctionDeclBase) - so a bare [ref] really is an unknown attribute. The step-5 text now writes [__ref] and says where it is declared and that it is internal.",
+      "status": "fixed",
+      "summary": "Step 5 says a `FunctionDeclBase` consults \"`isEffectivelyStatic`, `[mutating]`, and `[ref]`\", but writing `[ref]` on a method is rejected with `unknown ...",
       "target_doc": "docs/generated/design/name-resolution/lookup.md"
     },
     "b4e069d3023f": {
@@ -3179,6 +3604,15 @@
       "summary": "The `operator <op>` bullet explains the chokepoint and the opt-in in terms of `UnwrapDeclarator` and `allowOperatorName` line numbers, but shows no source text ...",
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
+    "b5e56350dc99": {
+      "decided_at": "2026-09-11T12:14:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "The sentence was wrong and is replaced. Both branches of the GloballyCoherentModifier/HLSLVolatileModifier arm (slang-check-modifier.cpp:1731) already accept a struct field: the non-GLSL branch allows a VarDecl whose parent is any StructDecl, so 'struct G { globallycoherent int a; }' is accepted with or without -allow-glsl, exactly as the gap observed. The doc now states that, and states what isGLSLInput actually widens: as<ParamDecl>(decl), global decls that are VarDeclBase without being VarDecl, and - redundantly - a field of a struct that is itself global.",
+      "status": "fixed",
+      "summary": "The section says `globallycoherent` and `volatile` are \"additionally allowed on the fields of a global struct when `isGLSLInput` holds\", implying they are ...",
+      "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
+    },
     "b6be39692f6d": {
       "decided_at": "2026-08-11T16:28:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3189,6 +3623,15 @@
       "status": "fixed",
       "summary": "The output contract is a five-item list (\"names resolved\", \"types attached\", \"conformances recorded\", \"modifiers validated\", \"default conformance witnesses ...",
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
+    },
+    "b6f0031be3cf": {
+      "decided_at": "2026-09-11T12:48:54Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Named -trace-coverage (slang-options.cpp:627) as the flag that enables instrumentation, at the head of the row, and stated that the -trace-coverage-* options refine an already-enabled mode rather than turning one on - so -trace-coverage-boolean alone emits nothing.",
+      "status": "fixed",
+      "summary": "The row explains what turns the pass on internally (the `coverageTracing` flag and `CodeGenContext::shouldTraceAnyCoverage()`) and names the four ...",
+      "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
     },
     "b81d8b1c1c82": {
       "decided_at": "2026-08-12T06:38:25+00:00",
@@ -3222,6 +3665,15 @@
       "status": "fixed",
       "summary": "The section says the signature is \"the inst's own `FuncType`\" but never shows the printed form, so it is not stated that the dump renders it as `func %name : ...",
       "target_doc": "docs/generated/design/ir-reference/structure.md"
+    },
+    "b9f00f52460d": {
+      "decided_at": "2026-09-11T12:14:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Partly addressed, example still outstanding. The doc now explains precisely when E30815 fires - only when the same ExtensionDecl is re-entered while its own inheritance info is being computed, via the InheritanceCircularityInfo stack walked by _checkForCircularityInExtensionTargetType (slang-check-inheritance.cpp:254) - and says explicitly that this is why the reader's candidate shapes report E30027/E30813/E40002 instead. A verified minimal reproducer still needs the compiler run, which this environment cannot do: the only build present is macOS arm64 and the host is Linux. Note the doc is at 32091 of its 32768 size cap, so adding the example may need trimming elsewhere.",
+      "status": "deferred",
+      "summary": "The `slang-check-inheritance.cpp` row names `E30815`, \"a circular `extension`\", but gives no source shape that produces it. Mutually-referential extension ...",
+      "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "ba43401fe07f": {
       "decided_at": "2026-08-12T06:38:51+00:00",
@@ -3333,6 +3785,24 @@
       "summary": "`BuiltinDecoration` is listed with AST origin \"Core-module lowering\" and no indication of when a reader would see it. It is in fact on nearly every core-module ...",
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
+    "bde95ac32be5": {
+      "decided_at": "2026-09-11T12:20:08Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Corrected the off-by-one. slang-lower-to-ir.cpp:5521 tests invokeLoweringRecursionDepth >= 128 before the counter is incremented for the current call (increment and SLANG_DEFER decrement at 5532-5533), so depth 128 is the last that still lowers. The doc now says a chain of exactly 128 calls compiles cleanly and 129 is the first depth to report E39997, and the kMaxIRInvokeLoweringRecursionDepth cite is corrected from 5513 to 5520.",
+      "status": "fixed",
+      "summary": "The doc says \"A chain of 128 ordinary calls \u2014 `f(f(...f(x)...))` \u2014 is already enough to reach the limit and report `fatal error[E39997]`\". A chain of exactly ...",
+      "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
+    },
+    "bec01ee1ff9d": {
+      "decided_at": "2026-09-11T12:20:08Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Rewrote the dump excerpt in the mangled spelling and explained it. scrubName (slang-ir.cpp:7720, reached via createName/getName/dumpID) passes ASCII letters and digits through and rewrites every other byte as 'x' plus its hex, so '_' (0x5F) prints as x5F and IFoo_zero appears as IFoox5Fzero; a '.' is folded to '_' first and then escaped the same way. The doc now tells the reader to grep for the mangled form.",
+      "status": "fixed",
+      "summary": "The worked example's dump excerpt is written with plain underscores \u2014 `witness_table_entry(%IFoo_zero, %S_zero)` and `%IFoo_twice`. The real `-dump-ir` output ...",
+      "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
+    },
     "bf138b97df57": {
       "decided_at": "2026-08-11T16:47:44+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3366,6 +3836,15 @@
       "summary": "The `GLSLRowMajorLayoutModifier` / `GLSLColumnMajorLayoutModifier` rows describe an intentional row/column inversion but do not name the input dialect or ...",
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
+    "bf6ea2ab79c3": {
+      "decided_at": "2026-09-11T12:48:53Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Noted that __slang_coverage is the internal spelling and survives verbatim only on SPIR-V (OpName %__slang_coverage), while source-language targets run it through the usual identifier mangling, so the HLSL/GLSL declaration to grep for is _slang_coverage_0 - one leading underscore plus the disambiguating suffix.",
+      "status": "fixed",
+      "summary": "The row calls the synthesized buffer `__slang_coverage`, but that spelling only survives on SPIR-V (`OpName %__slang_coverage`). On HLSL and GLSL the emitted ...",
+      "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
+    },
     "bfb77d573b0f": {
       "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3376,6 +3855,15 @@
       "status": "fixed",
       "summary": "The `Aligned` and `MemoryScope` rows cite internal `__intrinsic_op` declarations rather than the public functions a shader author would write. The reachable ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
+    },
+    "c0a3cfbc7429": {
+      "decided_at": "2026-09-11T12:54:19Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Added the emitted CUDA shape: the synthesized buffer is an IRGlobalParam, so collectGlobalUniformParameters folds it into the GlobalParams struct (slang-ir-collect-global-uniforms.cpp:148) which the CUDA emitter passes as SLANG_globalParams (slang-emit-cuda.cpp:416) rather than leaving it a standalone __device__ global; the field name is mangled like any other identifier, so it reads _slang_coverage_0 rather than the internal __slang_coverage, and each entry becomes an atomic add on that field in counting mode or a plain store of 1 under -trace-coverage-boolean.",
+      "status": "fixed",
+      "summary": "Row 13 gives the `E45105` code and the three coverage flags, but does not say what the instrumented CUDA text looks like, so a reader cannot tell that the ...",
+      "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "c0d54084a05b": {
       "decided_at": "2026-08-12T06:38:51+00:00",
@@ -3508,6 +3996,15 @@
       "summary": "The section is written entirely in terms of C++ types and line numbers (`FrontEndCompileRequest`, `checkAllTranslationUnits` \"line 498 at `source_commit`\"), ...",
       "target_doc": "docs/generated/design/pipeline/overview.md"
     },
+    "c77337832cdb": {
+      "decided_at": "2026-09-11T12:56:24Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Stated that the scalar arm has no portable Slang spelling: a scalar a && b is lowered to short-circuit control flow before emit so 'bool r = a && b;' emits an if/else, and 'a & b' on bool is a different opcode emitting '&'. The arm is now described as reachable only from IR that already carries a non-short-circuiting And/Or.",
+      "status": "fixed",
+      "summary": "The first bullet says a scalar `bool` And/Or \"writes the infix `&&` / `||`\", but no portable source shape reaches that emitter path on HLSL: Slang lowers ...",
+      "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
+    },
     "c797e6b42b45": {
       "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3594,6 +4091,15 @@
       "summary": "The section enumerates four uses of the sibling chain but never says what happens when two siblings on the same chain define the same name. Whether that is an ...",
       "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
+    "cb65711fb04c": {
+      "decided_at": "2026-09-11T12:07:34Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Corrected: the A<(x > y)> example is removed and replaced by the actual rule. genericDepth is incremented only on entering a generic argument list and decremented on leaving it (slang-parser.cpp 1750/1780, 2895/2914, 6158/6162) and is never reset for a nested parenthesized subexpression, so GetOpLevel (lines 7817-7831) returns Precedence::Invalid for >, >= and >> anywhere inside an open generic argument list, parentheses included. A<(x < y)> is kept as the example that does behave as described.",
+      "status": "fixed",
+      "summary": "The note ends \"which is why a comparison such as `A<(x > y)>` needs the parentheses\", implying the parenthesized spelling is the way to write a `>` comparison ...",
+      "target_doc": "docs/generated/design/syntax-reference/grammar.md"
+    },
     "cb92e1d6601c": {
       "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3668,6 +4174,15 @@
       "status": "deferred",
       "summary": "The `Metal` policy is described as lowering \"matrices stored in `device` buffers into arrays of _packed_ vectors \u2014 `IRMetalPackedVectorType`, emitted as MSL ...",
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
+    },
+    "d11005481564": {
+      "decided_at": "2026-09-11T12:32:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "The table cell is right about emitCast - slang-ir.cpp:4441 has {kIROp_Neq} for From Float / To Bool - so the cell is kept and the missing framing added: the opMap table describes IRBuilder::emitCast and is reached from IR-internal callers, while a written bool(f) resolves in the front end to a core-module conversion backed by __intrinsic_op($(kIROp_CastFloatToInt)) and lowers to a single castFloatToInt typed Bool, with no cmpNE or defaultConstruct in the dump - which is what the reporting test saw.",
+      "status": "fixed",
+      "summary": "The Conversions intro says the `Float` -> `Bool` entry of the `emitCast` table \"is a `cmpNE` against `defaultConstruct`\", but `bool(f)` on a `uniform`-fed ...",
+      "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "d17d7508aea8": {
       "decided_at": "2026-08-11T16:45:00+00:00",
@@ -3800,6 +4315,15 @@
       "summary": "The `SizeOfExpr` row mentions \"an optional second argument selects the data layout\" but never names a layout a reader can pass. The accepted spellings are type ...",
       "target_doc": "docs/generated/design/ast-reference/expressions.md"
     },
+    "d85bc19e98c5": {
+      "decided_at": "2026-09-11T12:42:00Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Marked the row unreachable, which is stronger than the gap assumed: kConversionCost_MutablePtrToConstPtr has no reference anywhere in the tree outside its definition at slang-ast-support-types.h:112, so nothing charges the level at all - which is why Ptr<int> to Ptr<int, Access::Read> is a type mismatch offered as an explicit cast rather than a costed implicit conversion.",
+      "status": "fixed",
+      "summary": "The `kConversionCost_MutablePtrToConstPtr` (20) row names a mutable-pointer-to-const-pointer conversion, but the only user spelling of that pair, `Ptr<int>` to ...",
+      "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
+    },
     "d984deecc3c7": {
       "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3931,6 +4455,15 @@
       "summary": "The doc records that `lowerAppendConsumeStructuredBuffers` fires for Metal but does not describe what the emitted parameter list looks like afterwards. In ...",
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
+    "e11290cf8da2": {
+      "decided_at": "2026-09-11T11:55:27Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "Added the diagnostic code E00104 (need-to-enable-experiment-feature, number 104 in slang-diagnostics.lua line 469) to the [ExperimentalModule] paragraph in ## Standard modules, together with the message text and the slang-session.cpp check site, so the claim can be pinned by code rather than message text.",
+      "status": "fixed",
+      "summary": "The section now says `[ExperimentalModule]` \"gates the import\" and that the error names the module path and the `-experimental-feature` option, but it still ...",
+      "target_doc": "docs/generated/design/cross-cutting/core-module.md"
+    },
     "e19c29a6b653": {
       "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -3952,6 +4485,15 @@
       "status": "fixed",
       "summary": "The Debug-info section says these opcodes are emitted \"during AST-to-IR lowering\" but never names the option that turns debug info on, nor that the debug ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
+    },
+    "e3943767065c": {
+      "decided_at": "2026-09-11T12:32:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Kept the list, which is accurate for emitDefaultConstruct (slang-ir.cpp:4243-4261 - the kIROp_ArrayType arm breaks to the fallback both when the element count is not an IRIntLit and when a literal count exceeds the 4096 cap), and added why the source experiment disagrees: 'int a[N] = {}' is lowered by the initializer-list path, not by emitDefaultConstruct, and that path emits makeArrayFromElement(0 : Int) typed Array(Int, %N). The rows bind when an IR pass calls the function, not when a user writes = {}.",
+      "status": "fixed",
+      "summary": "The section lists \"an array or cooperative vector whose element count is not an `IRIntLit` (a `let N : int` generic parameter, before specialization)\" among ...",
+      "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "e46af18a3cbc": {
       "decided_at": "2026-08-11T16:38:07+00:00",
@@ -4047,6 +4589,15 @@
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The table is explicitly \"illustrative, not exhaustive\", and several everyday AST families are absent: `IndexExpr` (resource subscript / array element access), ...",
+      "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
+    },
+    "e90f5187bf08": {
+      "decided_at": "2026-09-11T12:20:08Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "Named the inst the argument position actually produces and added the carve-out. tryGetAddress's ImplicitCastedLValue arm (slang-lower-to-ir.cpp:10253) takes the base address and emits a single inOutImplicitCast for ParamPassingMode::BorrowInOut, else outImplicitCast, yielding the Ptr(T) the call consumes - no read-cast/write-cast pair - with the read/write form left for the no-address case. Added that the flavor is only reachable between round-trippable types: an int/float implicit cast here is rejected with E30047 (argument-expected-lvalue) plus note E30063 (implicit-cast-used-as-lvalue-type), both confirmed in the watched slang-diagnostics.lua.",
+      "status": "fixed",
+      "summary": "The `ImplicitCastedLValue` row says the use site emits \"whichever conversion inst `emitCast` picks, on a read; on a write, that cast applied to the source ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "e974ee53af16": {
@@ -4171,6 +4722,24 @@
       "summary": "The section lists AST modules, IR modules and containers as the three payload flavors but names no user-level command that produces or consumes any of them, so ...",
       "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
+    "ee5a0bd96c8a": {
+      "decided_at": "2026-09-11T12:44:57Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added a W41034 row to the diagnostics table with a minimal trigger in the same form as the others: 's << n' where s is a uniform int16_t and n a uniform int - a left operand narrower than 32 bits with a non-literal shift amount. W41030 now has its own row so each code has one trigger. Message text confirmed at slang-diagnostics.lua:5167 (operator-shift-on-narrow-type).",
+      "status": "fixed",
+      "summary": "`W41034` is described in prose as covering \"a *non*-literal shift amount whose type is wider than a narrow (under 32-bit) left operand\", but unlike the other ...",
+      "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
+    },
+    "ee959312ea1b": {
+      "decided_at": "2026-09-11T12:47:35Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Added a paragraph saying which of the seven sibling kinds can actually appear on an entry-point parameter: VaryingInput/VaryingOutput and HitAttributes/RayPayload routinely; PushConstantBuffer not at all ([[vk::push_constant]] on an entry-point parameter is reported unsupported with E38010, the kind being reached through a global parameter); RegisterSpace and SubElementRegisterSpace are properties of a ParameterBlock-style container. The list exists because the predicate is asked about every resource kind, not because each has an entry-point spelling.",
+      "status": "fixed",
+      "summary": "The list of sibling non-descriptor-space kinds (`PushConstantBuffer`, `RegisterSpace`, `VaryingInput`, `VaryingOutput`, `HitAttributes`, `RayPayload`) names no ...",
+      "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
+    },
     "eea2fd2864c6": {
       "decided_at": "2026-08-11T16:45:32+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -4292,6 +4861,15 @@
       "summary": "Row 21 lists `checkForRecursiveTypes` as a Phase B validator, but a struct that contains itself is rejected by the front end with E41001 before ...",
       "target_doc": "docs/generated/design/target-pipelines/spirv.md"
     },
+    "f458fbbc245d": {
+      "decided_at": "2026-09-11T12:17:26Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "The doc said 'the bottom type Never', which is neither the C++ class name nor the printed spelling and is not writable in surface Slang. Corrected using watched sources: BottomType::_toTextOverride prints 'never' (slang-ast-type.cpp:124), the class is BottomType (slang-ast-type.h:50), and grepping the watched core.meta.slang finds no declaration of the name, so writing it in a .slang program is an undefined identifier. The doc now says explicitly that it is a type the compiler forms, not one a user names.",
+      "status": "fixed",
+      "summary": "The section says a callable that cannot fail \"records the bottom type `Never`\" in the error slot, but `Never` is not a name a `.slang` program can write: ...",
+      "target_doc": "docs/generated/design/ast-reference/types.md"
+    },
     "f48cf5bdd4a9": {
       "decided_at": "2026-08-11T16:40:39+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -4380,6 +4958,24 @@
       "summary": "`getOptiXSbtDataPointer` is described as the pointer to the SBT record holding entry-point uniforms, but nothing says what makes an entry-point uniform ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
+    "f7ccad416bdf": {
+      "decided_at": "2026-09-11T12:07:34Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "drift-from-source",
+      "rationale": "The bodyless alternative is relabelled 'bodyless declaration (hasBody = false); NOT a C-style forward declaration' and the new paragraph gives the mechanism: checkForRedeclaration routes only FuncDecl pairs to checkFuncRedeclaration (whose comment cites 'the inherited legacy of C forward declarations') and falls through for every other flavor to 'we do not allow duplicate declarations with the same name', reporting Redeclaration (E30200) plus SeePreviousDeclarationOf at slang-check-decl.cpp:13823-13847. Consistent with findings types-struct-no-body-forward-decl-conflicting-declaration (suspected_kind: doc-claim-overstated).",
+      "status": "fixed",
+      "summary": "`StructDecl`'s third alternative is labelled \"forward declaration (hasBody = false)\", but it cannot be used the way a C forward declaration is: `struct Fwd;` ...",
+      "target_doc": "docs/generated/design/syntax-reference/grammar.md"
+    },
+    "f80731d9d870": {
+      "decided_at": "2026-09-11T12:44:58Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Added the observable consequence to the opening paragraph: because these calls are unwrapped they emit no per-pass dump, so a -dump-ir listing shows a single ### LOWER-TO-IR: snapshot for the whole region (written by the optional dump block at slang-lower-to-ir.cpp 16093-16103) and the ### AFTER <pass>: headings only begin after the link step when the SLANG_PASS-wrapped post-link passes run.",
+      "status": "fixed",
+      "summary": "The page opens by stating the calls here are plain `passName(module)` calls rather than the macro-wrapped post-link form, but does not say what a reader sees ...",
+      "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
+    },
     "f848c4fac6e9": {
       "decided_at": "2026-08-11T16:30:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
@@ -4422,6 +5018,24 @@
       "status": "deferred",
       "summary": "The section introduces `DeclaredVariadicPackCountWitness`, `ConcreteVariadicPackCountWitness`, and the `GenericVariadicPackCountConstraintDecl` that carries ...",
       "target_doc": "docs/generated/design/ast-reference/values.md"
+    },
+    "f99ea11feff1": {
+      "decided_at": "2026-09-11T12:56:23Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "ambiguous-claim",
+      "rationale": "Noted that the example assumes the recombined value is consumed as a struct (e.g. passed whole to a [noinline] callee), and that an entry point reading individual fields leaves no brace-list because later simplification forwards each field read to its use, giving 'gCB_0.a_0.x + ...' with no declaration.",
+      "status": "fixed",
+      "summary": "The worked example presents `S_0 _S1 = { gCB_0.a_0, gCB_0.b_0, gCB_0.c_0 };` as what \"reading a whole `ConstantBuffer<S>`\" reaches the text as, but the ...",
+      "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
+    },
+    "fafb42665df5": {
+      "decided_at": "2026-09-11T12:37:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Named -report-checkpoint-intermediates (slang-options.cpp:622) as the option that turns the report on and showed its output. The report is the standalone_note with id -1 at slang-diagnostics.lua:5916, whose leading line 'checkpointing context of ~size bytes associated with: ~func' surfaces the marker's originalFunc operand, followed by variadic spans rendering each stored value as '<size> bytes (<typeName>)' or '<count> instances of <size> bytes (<typeName>)', which is where storedType surfaces.",
+      "status": "fixed",
+      "summary": "The section says `ReportCheckpointStore` is \"the diagnostic channel for the same machinery\" and describes a \"reporting walk\", but never names the compiler ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
     },
     "fb6c0e3e7b12": {
       "decided_at": "2026-08-11T16:30:18+00:00",
@@ -4487,6 +5101,15 @@
       "status": "rejected-bogus",
       "summary": "The section says the GLSL builtin module is loaded \"at creation time when `SlangGlobalSessionDesc::enableGLSL` is set\" and that `import glsl` then retrieves ...",
       "target_doc": "docs/generated/design/cross-cutting/core-module.md"
+    },
+    "fd5884f7f30c": {
+      "decided_at": "2026-09-11T12:36:01Z",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "undocumented-behavior",
+      "rationale": "Stated the accepted resource kinds and the target requirement. hlsl.meta.slang 26572-26576 declares __getRegisterSpace/__getRegisterIndex only for _Texture and SamplerState, so any other resource is a type error (E30019); and the queries need a binding model that assigns a register/space, with E81111 (opaque-reference-must-resolve-to-global, 'cannot determine register/space for NVAPI resource', slang-diagnostics.lua:5951) named as what a CUDA compile produces.",
+      "status": "fixed",
+      "summary": "The `getRegisterIndex` / `getRegisterSpace` rows say only \"register index/space the resource is bound to\". In practice `__getRegisterIndex` and ...",
+      "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "fd888a29cac2": {
       "decided_at": "2026-08-11T16:41:13+00:00",

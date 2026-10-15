@@ -15,7 +15,7 @@
 // asserts the decoration is present in the module; it is deliberately not
 // tied to one inst because the front end attaches it to several.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

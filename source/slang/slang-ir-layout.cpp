@@ -456,9 +456,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 }
             }
 
-            if (hasBindlessTextureNV)
+            if (isDescriptorHandleRepresentedAsUInt64(type, hasBindlessTextureNV))
             {
-                // For spvBindlessTextureNV, DescriptorHandle<T> is uint64_t
+                // uint64 form (texture/sampler kinds under spvBindlessTextureNV)
                 *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
                 return SLANG_OK;
             }

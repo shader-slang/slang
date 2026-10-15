@@ -1634,6 +1634,23 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_Less:
+    case kIROp_Greater:
+    case kIROp_Leq:
+    case kIROp_Geq:
+        {
+            // WGSL template-list discovery reads `ident <` as opening a template list that a later
+            // `>` or `>=` at the same parenthesis depth closes, even across a `,`, so in
+            // `f(a < b, a > b)` the text `a<b, a>` is a templated identifier and parsing fails.
+            // A `)` discards any candidate opened inside it, so we always parenthesize relational
+            // comparisons; inside those parentheses the operands need only `General` precedence.
+            // `<=` cannot open a template list, but we treat all four operators alike so the rule
+            // stays simple. https://www.w3.org/TR/WGSL/#template-lists-sec
+            m_writer->emit("(");
+            defaultEmitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_BitXor:
     case kIROp_BitOr:
     case kIROp_BitAnd:
@@ -1758,12 +1775,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto opType = inst->getOperand(0)->getDataType();
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
             {
-                // WGSL does not support negate operator on matrices and vectors,
-                // we should emit "(type(0) - op0)" instead.
+                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
+                // native unary '-' only for signed float/int vectors; matrices and unsigned
+                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // The explicit parentheses wrap the whole subtraction, so its outer context is
+                // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
+                // and emit op0 as the subtraction's right-hand side. This wraps an operand that
+                // binds no tighter than '-' -- the additive "a + b" (its left-associative RHS, at
+                // equal precedence) -- but not a multiplicative "a * b" or an atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }

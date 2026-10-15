@@ -458,6 +458,29 @@ static DeclRef<CallableDecl> getCallableDeclRefFromFuncTypeBase(Val* resolvedBas
     return DeclRef<CallableDecl>();
 }
 
+/// Returns the parameter mode produced by the backward-callable transformation.
+///
+/// This mapping is shared by ordinary parameters and an effective `this` parameter after the
+/// latter's compatibility projection. An empty result denotes a mode for which differentiable
+/// backward-callable parameters are unsupported.
+static std::optional<ParamPassingMode> _getBackwardCallableParamMode(ParamPassingMode primalMode)
+{
+    switch (primalMode)
+    {
+    case ParamPassingMode::Out:
+        return ParamPassingMode::In;
+    case ParamPassingMode::In:
+        return ParamPassingMode::Out;
+    case ParamPassingMode::BorrowInOut:
+        return ParamPassingMode::BorrowInOut;
+    case ParamPassingMode::BorrowIn:
+    case ParamPassingMode::Ref:
+        return std::nullopt;
+    default:
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+    }
+}
+
 Val* BwdCallableFuncType::_resolveImplOverride()
 {
     // Resolve all three operands.
@@ -480,43 +503,38 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
         auto thisParamType = diffTypeWitness->getThisParamType();
-        auto [thisParamValueType, thisParamDirection] =
-            splitParameterTypeAndDirection(astBuilder, thisParamType);
-        auto thisTypeDiffWitness =
-            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
-        if (thisTypeDiffWitness)
+        if (thisParamType)
         {
-            if (auto diffThisType = getDifferentialValueTypeFromWitness(
-                    astBuilder,
-                    thisParamValueType,
-                    thisTypeDiffWitness))
+            auto [thisParamValueType, thisParamDirection] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness();
+            if (thisTypeDiffWitness)
             {
-                // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
-                switch (thisParamDirection)
+                if (auto diffThisType = getDifferentialValueTypeFromWitness(
+                        astBuilder,
+                        thisParamValueType,
+                        thisTypeDiffWitness))
                 {
-                case ParamPassingMode::In:
-                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
-                    break;
-                default:
-                    // For other modes, just add as-is or with out
-                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                    break;
+                    auto differentiatedThisMode = _getBackwardCallableParamMode(
+                        getDifferentiatedThisParamMode(thisParamDirection));
+                    SLANG_RELEASE_ASSERT(differentiatedThisMode.has_value());
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        diffThisType,
+                        *differentiatedThisMode));
+                }
+                else
+                {
+                    // We had a witness but not for a differentiable value type (most likely a
+                    // differential pointer type).
+                    newParamTypes.add(astBuilder->getNoneType());
                 }
             }
             else
             {
-                // We had a witness but not for a differentiable value type (most like diff ptr
-                // type)
+                // Non-differentiable this type
                 newParamTypes.add(astBuilder->getNoneType());
             }
-        }
-        else if (thisParamType)
-        {
-            // Non-differentiable this type
-            newParamTypes.add(astBuilder->getNoneType());
         }
 
         // Then, go through and translate all types (parameter & result) to their
@@ -536,32 +554,20 @@ Val* BwdCallableFuncType::_resolveImplOverride()
             }
             else
             {
-                // If differentiable, flip the direction of the type.
-                switch (paramInfo.mode)
+                auto differentiatedMode = _getBackwardCallableParamMode(paramInfo.mode);
+                if (differentiatedMode)
                 {
-                case ParamPassingMode::Out:
-                    // Out becomes just the diff value type (no direction wrapper)
-                    newParamTypes.add(diffValueType);
-                    break;
-                case ParamPassingMode::In:
-                    // In becomes Out
-                    newParamTypes.add(astBuilder->getOutParamType(diffValueType));
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    // BorrowInOut stays BorrowInOut
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffValueType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                case ParamPassingMode::Ref:
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        diffValueType,
+                        *differentiatedMode));
+                }
+                else
+                {
                     // We can't handle ConstRef and Ref properly for differentiable
                     // values in differentiable methods so we return an error type,
                     // and rely on diagnostics instead.
-                    //
                     newParamTypes.add(astBuilder->getErrorType());
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
                 }
             }
         }
@@ -712,13 +718,18 @@ Val* RematFuncType::_resolveImplOverride()
         // First parameter is always the MinimalCtxType.
         newParamTypes.add(resolvedMinimalCtxType);
 
-        // For member methods, include the this-type as an explicit parameter.
-        // Since remat is static, there is no implicit `this` from the extension,
-        // so the this-type must be explicitly present in the parameter list.
+        // For member methods, include the effective `this` parameter type as an explicit
+        // parameter. Since remat is static, it has no effective `this` parameter of its own.
         auto thisParamType = diffTypeWitness->getThisParamType();
         if (thisParamType)
         {
-            newParamTypes.add(thisParamType);
+            auto [thisParamValueType, thisParamMode] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamMode);
+            newParamTypes.add(getParamTypeWithModeWrapper(
+                astBuilder,
+                thisParamValueType,
+                differentiatedThisMode));
         }
 
         // Get references to the differentiable interfaces to determine witness type.
@@ -818,45 +829,38 @@ Val* BwdDiffFuncType::_resolveImplOverride()
 
         // For methods, include the witness-provided this-type as an explicit parameter.
         auto thisParamType = diffTypeWitness->getThisParamType();
-        auto [thisParamValueType, thisParamDirection] =
-            splitParameterTypeAndDirection(astBuilder, thisParamType);
-        auto thisTypeDiffWitness =
-            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
-        if (thisTypeDiffWitness)
+        if (thisParamType)
         {
-            auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
-            switch (thisParamDirection)
+            auto [thisParamValueType, thisParamDirection] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamDirection);
+            if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
             {
-            case ParamPassingMode::In:
-                // In parameters become inout differential pairs in backward diff.
-                if (as<DifferentialPairType>(thisPairType))
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                else if (as<DifferentialPtrPairType>(thisPairType))
-                    newParamTypes.add(thisPairType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
+                auto thisPairType =
+                    getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+
+                // A by-value receiver becomes writable storage when reverse-mode AD needs to
+                // accumulate into a value pair. Pointer pairs already carry indirection, while the
+                // remaining differentiated modes retain their parameter-passing behavior.
+                if (differentiatedThisMode == ParamPassingMode::In &&
+                    as<DifferentialPairType>(thisPairType))
+                {
+                    differentiatedThisMode = ParamPassingMode::BorrowInOut;
+                }
+
+                SLANG_RELEASE_ASSERT(differentiatedThisMode != ParamPassingMode::Out);
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, thisPairType, differentiatedThisMode));
             }
-        }
-        else if (thisParamType)
-        {
-            // Non-differentiable this type gets no_diff modifier.
-            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
-            switch (thisParamDirection)
+            else
             {
-            case ParamPassingMode::In:
-                newParamTypes.add(noDiffThisType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
+                // Non-differentiable this type gets no_diff modifier.
+                auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
+                SLANG_RELEASE_ASSERT(differentiatedThisMode != ParamPassingMode::Out);
+                newParamTypes.add(getParamTypeWithModeWrapper(
+                    astBuilder,
+                    noDiffThisType,
+                    differentiatedThisMode));
             }
         }
 
@@ -972,41 +976,28 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         auto funcType = getFuncType(astBuilder, baseFuncDeclRef);
 
         auto thisParamType = diffTypeWitness->getThisParamType();
-        auto [thisParamValueType, thisParamDirection] =
-            splitParameterTypeAndDirection(astBuilder, thisParamType);
-        auto thisTypeDiffWitness =
-            thisParamType ? diffTypeWitness->getThisTypeDiffWitness() : nullptr;
-        if (thisTypeDiffWitness)
+        if (thisParamType)
         {
-            auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
-            switch (thisParamDirection)
+            auto [thisParamValueType, thisParamDirection] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamDirection);
+            if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
             {
-            case ParamPassingMode::In:
-                newParamTypes.add(thisPairType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(thisPairType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
+                auto thisPairType =
+                    getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+                SLANG_RELEASE_ASSERT(differentiatedThisMode != ParamPassingMode::Out);
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, thisPairType, differentiatedThisMode));
             }
-        }
-        else if (thisParamType)
-        {
-            // Non-differentiable this type
-            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
-            switch (thisParamDirection)
+            else
             {
-            case ParamPassingMode::In:
-                newParamTypes.add(noDiffThisType);
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(noDiffThisType));
-                break;
-            default:
-                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
-                break;
+                // Non-differentiable this type
+                auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
+                SLANG_RELEASE_ASSERT(differentiatedThisMode != ParamPassingMode::Out);
+                newParamTypes.add(getParamTypeWithModeWrapper(
+                    astBuilder,
+                    noDiffThisType,
+                    differentiatedThisMode));
             }
         }
 
@@ -1427,6 +1418,51 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getErrorType();
 }
 
+ParamPassingMode adjustParamPassingModeBasedOnParamType(
+    ParamPassingMode originalMode,
+    Type* paramType)
+{
+    // Type modifiers such as `no_diff` do not change whether passing the underlying value requires
+    // a copy. Inspect the value type rather than letting its semantic annotations hide that fact.
+    while (auto modifiedType = as<ModifiedType>(paramType))
+        paramType = modifiedType->getBase();
+
+    // A mesh-shader output's direction is intrinsic to its `MeshOutputType` (carried by
+    // IRMeshOutputDecoration), so the `out` on the `out vertices T[N]` spelling must not
+    // also wrap it in `IROutParamType`: that would diverge from the generic
+    // `OutputVertices<T,N>` spelling and make the HLSL emitter print a doubled `out`.
+    if (as<MeshOutputType>(paramType))
+        originalMode = ParamPassingMode::In;
+
+    // If the type is copyable, then the original mode is appropriate to use.
+    if (isCopyableType(paramType))
+        return originalMode;
+
+    // A non-copyable value cannot use the copy-in implied by `in`, so borrow it instead.
+    if (originalMode == ParamPassingMode::In)
+        return ParamPassingMode::BorrowIn;
+
+    return originalMode;
+}
+
+ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode)
+{
+    // Derivative signatures currently process an immutable borrow using the ordinary `In` rule and
+    // a non-exclusive mutable reference using the `BorrowInOut` rule. That collapse may be a
+    // mistake: ordinary parameters retain both distinctions. Keep it isolated as an explicit
+    // compatibility projection so that each derivative use-case starts from the declaration's
+    // complete mode and a future ABI change has a single, visible point of control.
+    switch (effectiveMode)
+    {
+    case ParamPassingMode::BorrowIn:
+        return ParamPassingMode::In;
+    case ParamPassingMode::Ref:
+        return ParamPassingMode::BorrowInOut;
+    default:
+        return effectiveMode;
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
@@ -1453,18 +1489,37 @@ ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType
     }
 }
 
+ParamInfo getParamInfoFromTypeWithModeWrapper(Type* paramTypeWithModeWrapper)
+{
+    SLANG_RELEASE_ASSERT(paramTypeWithModeWrapper);
+
+    ParamInfo result;
+    result.mode = getParamPassingModeFromPossiblyWrappedParamType(paramTypeWithModeWrapper);
+    if (auto wrappedParamType = as<ParamPassingModeType>(paramTypeWithModeWrapper))
+        result.type = wrappedParamType->getValueType();
+    else
+        result.type = paramTypeWithModeWrapper;
+
+    // A parameter's mode has exactly one representation in `ParamInfo`: the separate `mode`
+    // field. Reject nested wrappers here so that decoding cannot silently preserve a second mode
+    // inside the value type.
+    SLANG_RELEASE_ASSERT(!as<ParamPassingModeType>(result.type));
+    return result;
+}
+
+ParamInfo FuncType::getParamInfo(Index index)
+{
+    return getParamInfoFromTypeWithModeWrapper(getParamTypeWithModeWrapper(index));
+}
+
 ParamPassingMode FuncType::getParamPassingMode(Index index)
 {
-    auto paramType = getParamTypeWithModeWrapper(index);
-    return getParamPassingModeFromPossiblyWrappedParamType(paramType);
+    return getParamInfo(index).mode;
 }
 
 Type* FuncType::getParamValueType(Index index)
 {
-    auto paramType = getParamTypeWithModeWrapper(index);
-    if (auto wrappedParamType = as<ParamPassingModeType>(paramType))
-        return wrappedParamType->getValueType();
-    return paramType;
+    return getParamInfo(index).type;
 }
 
 

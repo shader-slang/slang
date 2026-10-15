@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#emitting-hlsl-named-constants-rather-than-integers
-//META: doc_section_digest=788bc7519655c8e116120260bbcac10f921c9993b6dbc20665b3dec1d2d85f1b
+//META: doc_section_digest=61877e66ba4a2f5541036e7f197ba8d55829ec539da23c058fd28f7b45a480c6
 //META: purpose=A work-graph `Barrier(...)` flag set emits as HLSL named constants — the all-bits shorthand `(ALL_MEMORY)` / `(REORDER)` and a `|`-joined per-bit list — never as the integer behind the name.
 //META: intent=functional
 //META: pipeline_stage=emit

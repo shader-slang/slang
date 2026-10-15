@@ -14,7 +14,7 @@
 // declares a `param %r : Int` that the predecessors' branches
 // supply as their argument.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int sel;
 uniform RWStructuredBuffer<int> buf;

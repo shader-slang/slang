@@ -1,0 +1,13 @@
+; Minimal GLCompute shader: single entry point that does nothing.
+; Used to verify basic module loading, session creation, and execution.
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpName %main "main"
+       %void = OpTypeVoid
+      %vfunc = OpTypeFunction %void
+       %main = OpFunction %void None %vfunc
+      %entry = OpLabel
+               OpReturn
+               OpFunctionEnd

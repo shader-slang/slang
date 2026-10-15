@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:08:24Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 1a02145d6df9d35fc274dac0e859c24bfa85f644da98d8b22f9096154e3f16ae
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: f9f5d896244f335b58e2e5be3e3edf7c2ed88f52837dc87e7dc720b4087e3700
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -85,7 +85,7 @@ not to the lexer proper:
   the digits do not fit in 64 bits. Its caller
   `parseIntegerLiteralExpr` in
   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
-  (lines 8608-8688) is what accepts `u`/`U`, `l`/`L`, `ll`/`LL`, and
+  (lines 8614-8719, with the suffix loop at 8637-8686) is what accepts `u`/`U`, `l`/`L`, `ll`/`LL`, and
   `z`/`Z` in any order — the two letters of `ll` must match in case —
   and reports `Diagnostics::InvalidIntegerLiteralSuffix` (*invalid
   suffix '...' on integer literal*) for anything else.
