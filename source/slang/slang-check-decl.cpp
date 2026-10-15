@@ -1757,10 +1757,10 @@ QualType getTypeForDeclRef(
         }
 
         qualType.isLeftValue = isLValue;
-        // A parameter passed by read-only pointer names its argument's memory location.
-        qualType.isReadOnlyMemoryLocation =
-            !isLValue &&
-            (paramMode == ParamPassingMode::RefReadOnly || paramMode == ParamPassingMode::BorrowIn);
+        // A read-only reference parameter names its argument's memory location. A `__constref`
+        // parameter is a borrow, which may be a temporary holding the argument's value, so it
+        // does not name a memory location.
+        qualType.isReadOnlyMemoryLocation = !isLValue && paramMode == ParamPassingMode::RefReadOnly;
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }
