@@ -1170,7 +1170,6 @@ Downstream Compilers (aka Pass through)
 
 * `none` : Unknown 
 * `fxc` : FXC HLSL compiler 
-* `vkd3d` : vkd3d HLSL compiler
 * `dxc` : DXC HLSL compiler 
 * `glslang` : GLSLANG GLSL compiler 
 * `spirv-dis` : spirv-tools SPIRV disassembler 
@@ -1183,6 +1182,7 @@ Downstream Compilers (aka Pass through)
 * `spirv-opt` : spirv-tools SPIRV optimizer 
 * `metal` : Metal shader compiler 
 * `tint` : Tint compiler 
+* `vkd3d` : vkd3d HLSL compiler 
 
 <a id="language"></a>
 ## language
