@@ -3067,6 +3067,7 @@ Result linkAndOptimizeIR(
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (isD3DTarget(targetRequest))
         SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
+    SLANG_PASS(checkUnsupportedPhysicalPointers, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
