@@ -1,26 +1,26 @@
-//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage compute  -entry computeMain -target hlsl -DHLSL
-//TEST:SIMPLE(filecheck=HLSL): -allow-glsl -stage fragment -entry fragMain -target hlsl -DHLSL
+//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target hlsl -DHLSL
+//TEST:SIMPLE_EX(filecheck=HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target hlsl -DHLSL
 
 // In GLSL, the transformation to Slang and back shouldn't change GLSL target
-//TEST:SIMPLE(filecheck=GLSL_NOGRADS):  -allow-glsl -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS
-//TEST:SIMPLE(filecheck=GLSL_GRADS):    -allow-glsl -stage compute -entry computeMain -target glsl -DGLSL -capability GL_NV_compute_shader_derivatives
-//TEST:SIMPLE(filecheck=GLSL_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target glsl -DGLSL -DVERTEX_STAGE -DNO_GRADS
-//TEST:SIMPLE(filecheck=GLSL_GRADS):    -allow-glsl -stage fragment -entry fragMain -target glsl -DGLSL
+//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -DNO_GRADS
+//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target glsl -DGLSL -capability GL_NV_compute_shader_derivatives
+//TEST:SIMPLE_EX(filecheck=GLSL_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target glsl -DGLSL -DVERTEX_STAGE -DNO_GRADS
+//TEST:SIMPLE_EX(filecheck=GLSL_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target glsl -DGLSL
 
 // Sampling gradients available. Implicit LOD sampling translates to OpImageSampleImplicitLod and similar
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV -O3
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
+//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target spirv -DSPIRV -O3
+//TEST:SIMPLE_EX(filecheck=SPIR_GRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
 
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
-//TEST:SIMPLE(filecheck=SPIR_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
+//TEST:SIMPLE_EX(filecheck=SPIR_NOGRADS): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
 
-//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCUDA
-//TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda -DCUDA
+//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage compute -entry computeMain -target cuda -DCUDA
+//TEST:SIMPLE_EX(filecheck=CUDA): -lang glsl tests/glsl-intrinsic/intrinsic-texture.slang -stage fragment -entry fragMain -target cuda -DCUDA
 
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -xslang -DSPIRV
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -xslang -DSPIRV
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
-//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -allow-glsl -output-using-type -profile cs_6_6 -xslang -DHLSL
+//T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -source-language glsl -output-using-type -profile cs_6_6 -xslang -DHLSL
 
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -157,23 +157,24 @@ uniform usampler2DMS uniform_usampler2DMS;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
-__generic<T : ITexelElement>
-bool textureFuncs( Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
-    , Sampler2DMS<T> gsampler2DMS
-    , Sampler2DMSArray<T> gsampler2DMSArray
+__generic<Texel : ITexelElement, let sampleCount:int, let format:int>
+bool textureFuncs( _Texture<Texel, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<Texel, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<Texel, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<Texel, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<Texel, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<Texel, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<Texel, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
+    , _Texture<Texel, __Shape2D, 0, 1, sampleCount, 0, 0, 1, format> gsampler2DMS
+    , _Texture<Texel, __Shape2D, 1, 1, sampleCount, 0, 0, 1, format> gsampler2DMSArray
     , bool ignoreResult
 )
 {
     // GLSL_GRADS-LABEL:    textureFuncs_0
     // GLSL_NOGRADS-LABEL:  textureFuncs_0
+    typealias T = Texel.DataType;
     typealias gvec4 = vector<T.Element,4>;
 
     const float coord = 0.5;
@@ -1093,7 +1094,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && (float(0) == textureOffset(uniform_sampler2DShadow, vec3(coord), offset2D) || ignoreResultF32)
 
@@ -1117,7 +1118,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DRectShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DRectShadow, vec3(coord), offset2D)
 

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage hull -entry hullMain -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage hull -entry hullMain
 
 /*
 Repro for SPIR-V emit crash when using vector types for tessellation-factor builtins.

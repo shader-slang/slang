@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugscope
-//META: doc_section_digest=74f15b021c9b1a1fc35f0749401acce4c72e39d8f31ca869b4e8328ed16cdc37
+//META: doc_section_digest=ca7fb4545f10893ab3c9d211926e944ee94d03a581ab401070eaed7fe9f324b8
 //META: purpose=A DebugScope opens a lexical scope whose operand 0 references the enclosing scope, a DebugFunction for a function-level scope, and whose operand 1 records the inlining context.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

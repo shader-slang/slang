@@ -1,11 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK_GLSL_SPIRV): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=CHECK_SPIR): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -O1
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-vector.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL_SPIRV): -lang glsl tests/glsl-intrinsic/intrinsic-basic-vector.slang -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/intrinsic-basic-vector.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -O1
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/intrinsic-basic-vector.slang -stage compute -entry computeMain -target hlsl
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -allow-glsl -output-using-type -Xslang -DTARGET_LLVM
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-via-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -source-language glsl -output-using-type -Xslang -DTARGET_LLVM
 
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 buffer MyBlockName1
@@ -303,8 +303,8 @@ bool Test_VectorType()
 
         // CHECK_GLSL-COUNT-8: min(
         // CHECK_GLSL-NOT: min(
-        // CHECK_SPIR-COUNT-4: FMin{{ }}
-        // CHECK_SPIR-NOT: FMin{{ }}
+        // CHECK_SPIR-COUNT-4: NMin{{ }}
+        // CHECK_SPIR-NOT: NMin{{ }}
         // CHECK_SPIR-COUNT-2: SMin{{ }}
         // CHECK_SPIR-NOT: SMin{{ }}
         // CHECK_SPIR-COUNT-2: UMin{{ }}
@@ -320,8 +320,8 @@ bool Test_VectorType()
 
         // CHECK_GLSL-COUNT-8: max(
         // CHECK_GLSL-NOT: max(
-        // CHECK_SPIR-COUNT-4: FMax{{ }}
-        // CHECK_SPIR-NOT: FMax{{ }}
+        // CHECK_SPIR-COUNT-4: NMax{{ }}
+        // CHECK_SPIR-NOT: NMax{{ }}
         // CHECK_SPIR-COUNT-2: SMax{{ }}
         // CHECK_SPIR-NOT: SMax{{ }}
         // CHECK_SPIR-COUNT-2: UMax{{ }}

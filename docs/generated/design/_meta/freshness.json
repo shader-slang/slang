@@ -97,10 +97,10 @@
       "watched_paths_digest": "6b62ab489b8588366ff25a322f007d3bcd3d102617b9da98cfe118c89e50a57e"
     },
     "glossary.md": {
-      "generated_at": "2026-09-11T12:57:14+00:00",
+      "generated_at": "2026-09-12T07:07:50+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "bae895251b3106e15916b42965c0c503d5cfbfd673f03819aa78209b6ce07073"
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
+      "watched_paths_digest": "61ffea6c38472e843c19fc2b6ed36a41ba779ffce9c70eb8e09f62e30ba50562"
     },
     "ir-reference/control-flow.md": {
       "generated_at": "2026-09-11T12:29:27+00:00",
@@ -229,9 +229,9 @@
       "watched_paths_digest": "bacba2986b0463d7f151bb550e996caeb1476af530ba42c256881fbc105a4c5d"
     },
     "pipeline/04c-layout-ir.md": {
-      "generated_at": "2026-09-11T12:47:36+00:00",
+      "generated_at": "2026-09-12T07:07:23+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
       "watched_paths_digest": "644cdf1c439a7cef9f26cfee202fa4cf0a250918079a2cdb1f7124bcea8090f8"
     },
     "pipeline/05-ir-passes.md": {
@@ -271,10 +271,10 @@
       "watched_paths_digest": "f9f5d896244f335b58e2e5be3e3edf7c2ed88f52837dc87e7dc720b4087e3700"
     },
     "target-pipelines/cuda.md": {
-      "generated_at": "2026-09-11T12:54:26+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "48c746dc1eda1c6e2aa98c17bbdb7a645c24a048",
-      "watched_paths_digest": "b1bdc35e6450db41fb8de1d6f36d65568470482319b625b0c5892390b1b7c893"
+      "generated_at": "2026-09-16T06:46:36+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
+      "watched_paths_digest": "e5562b67ea74e46a354528907747105d65758aab1f148a8f97bb280be9e810f9"
     },
     "target-pipelines/hlsl.md": {
       "generated_at": "2026-09-11T12:56:24+00:00",

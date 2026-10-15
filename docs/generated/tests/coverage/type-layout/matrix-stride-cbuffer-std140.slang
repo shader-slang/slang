@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T17:00:00Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=e885f1a92beacc0053db90ae24923135a05a098bfc3c282c2580a971645fcec9
+//META: doc_section_digest=cb9b7a613d39760a93548dfbce14e96da09e14aa0f49313bd097e522bedd9206
 //META: purpose=Verifies a float2x3 in a ConstantBuffer is decorated RowMajor with MatrixStride 16 under std140, so a following scalar field lands at offset 48.
 //META: intent=characterization
 //META: covers=source/slang/slang-type-layout.cpp

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#capabilities-and-extensions-decided-at-emit-time
-//META: doc_section_digest=a1bda696e594d0d008416384d3cd2b7b449a57153c72f78ceef01aa513a35c5e
+//META: doc_section_digest=3e45dcac84ce250c1ff549e4f6b6a3217763793be302a7a0949f0ec9245f3fec
 //META: purpose=For a matrix operation under precise mode the per-row results are decorated with NoContraction individually and the OpCompositeConstruct that reassembles the matrix is left undecorated.
 //META: intent=boundary
 //META: pipeline_stage=emit

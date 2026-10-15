@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#specializeaddressspaceforwgsl
-//META: doc_section_digest=1d1402207447152945827eb2116a3e8f41c3d12b984d1cc985e2781cd1f4a752
+//META: doc_section_digest=7430da3e9233ea2bf55c1bea479c7ce668cf06b5f720da136de2a6800f764369
 //META: purpose=A loose-uniform global parameter emits with var<uniform> address space and a std140 wrapper struct
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

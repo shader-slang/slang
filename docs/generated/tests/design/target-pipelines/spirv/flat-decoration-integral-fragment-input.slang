@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#flat-decoration-for-integral-fragment-inputs
-//META: doc_section_digest=4dbf7c0ed7254dfa9c7410b71566b04103313977e4ace15e9147d9f906b887b5
+//META: doc_section_digest=77c450e7f5399f3c0ffc5afd5f8dfe85bacb938e26713ebac36047af96de7d29
 //META: purpose=An integral fragment-stage varying input receives the Flat decoration required by SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=emit

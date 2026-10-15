@@ -78,6 +78,50 @@ static inline SlangReflectionTypeLayout* convert(TypeLayout* type)
     return (SlangReflectionTypeLayout*)type;
 }
 
+static SlangImageFormat _getImageFormatFromType(Type* type)
+{
+    if (!type)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    auto textureType = as<TextureTypeBase>(unwrapArrayType(type));
+    if (!textureType)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    IntegerLiteralValue formatValue = 0;
+    if (!tryGetConstantIntVal(textureType->getFormat(), formatValue))
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    auto format = (ImageFormat)formatValue;
+    if (format == ImageFormat::unknown)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    return (SlangImageFormat)format;
+}
+
+static SlangImageFormat _getImageFormat(VarDeclBase* varDecl, TypeLayout* typeLayout)
+{
+    if (typeLayout)
+    {
+        auto format = _getImageFormatFromType(typeLayout->getType());
+        if (format != SLANG_IMAGE_FORMAT_unknown)
+            return format;
+    }
+
+    if (!varDecl)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    auto format = _getImageFormatFromType(varDecl->type.type);
+    if (format != SLANG_IMAGE_FORMAT_unknown)
+        return format;
+
+    if (auto formatAttrib = varDecl->findModifier<FormatAttribute>())
+    {
+        return (SlangImageFormat)formatAttrib->format;
+    }
+
+    return SLANG_IMAGE_FORMAT_unknown;
+}
+
 static inline SpecializationParamLayout* convert(SlangReflectionTypeParameter* typeParam)
 {
     return (SpecializationParamLayout*)typeParam;
@@ -1030,15 +1074,15 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByName(
 
     auto astBuilder = program->getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
-    try
+    SLANG_EXCEPTION_TRY
     {
         return tryConvertExprToFunctionReflection(
             astBuilder,
             program->findDeclFromString(name, &sink));
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     return nullptr;
 }
 
@@ -1059,14 +1103,14 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(
     auto astBuilder = program->getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto result = program->findDeclFromStringInType(type, name, LookupMask::Function, &sink);
         return tryConvertExprToFunctionReflection(astBuilder, result);
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     return nullptr;
 }
 
@@ -1098,14 +1142,14 @@ SLANG_API SlangReflectionFunction* spReflection_TryResolveOverloadedFunction(
         }
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto result = program->tryResolveOverloadedExpr(overloadedFunc);
         return tryConvertExprToFunctionReflection(astBuilder, result);
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     return nullptr;
 }
 
@@ -1123,7 +1167,7 @@ SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
         Lexer::sourceLocationLexer);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto result = program->findDeclFromStringInType(type, name, LookupMask::Value, &sink);
         if (auto declRefExpr = as<DeclRefExpr>(result))
@@ -1132,9 +1176,9 @@ SLANG_API SlangReflectionVariable* spReflection_FindVarByNameInType(
                 return convert(varDeclRef.as<Decl>());
         }
     }
-    catch (...)
-    {
-    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (...) {}
+#endif
     return nullptr;
 }
 
@@ -1152,7 +1196,7 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
         Lexer::sourceLocationLexer);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         Type* result = program->getTypeFromString(name, &sink);
 
@@ -1175,10 +1219,12 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
             return nullptr;
         return convert(result);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return nullptr;
     }
+#endif
 }
 
 
@@ -1197,17 +1243,19 @@ SLANG_API bool spReflection_isSubType(
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
         Lexer::sourceLocationLexer);
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto sub = convert(subType);
         auto super = convert(superType);
 
         return program->isSubType(sub, super);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return false;
     }
+#endif
 }
 
 DeclRef<Decl> getInnermostGenericParent(DeclRef<Decl> declRef)
@@ -1270,6 +1318,7 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     if (auto textureType = as<TextureTypeBase>(type))
     {
+        SLANG_AST_BUILDER_RAII(textureType->getASTBuilderForReflection());
         return convert(textureType->getElementType());
     }
 
@@ -1637,6 +1686,25 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarL
     if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         return convert(parameterGroupTypeLayout->containerVarLayout.Ptr());
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+    SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout)
+        return nullptr;
+
+    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        return convert(parameterGroupTypeLayout->elementVarLayout.Ptr());
+    }
+    else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    {
+        return convert(structuredBufferTypeLayout->contentVarLayout.Ptr());
     }
 
     return nullptr;
@@ -2808,11 +2876,7 @@ SLANG_API SlangImageFormat spReflectionTypeLayout_getBindingRangeImageFormat(
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     auto leafVar = bindingRange.leafVariable;
-    if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
-    {
-        return (SlangImageFormat)formatAttrib->format;
-    }
-    return SLANG_IMAGE_FORMAT_unknown;
+    return _getImageFormat(leafVar, bindingRange.leafTypeLayout);
 }
 
 
@@ -4427,10 +4491,7 @@ spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* inVarLa
 
     if (auto leafVar = varLayout->getVariable())
     {
-        if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
-        {
-            return (SlangImageFormat)formatAttrib->format;
-        }
+        return _getImageFormat(leafVar, varLayout->getTypeLayout());
     }
     return SLANG_IMAGE_FORMAT_unknown;
 }
@@ -4677,7 +4738,7 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
         argTypeList.add(argType);
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
         auto resultFunc =
@@ -4688,10 +4749,12 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
 
         return convert(resultFunc);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (...)
     {
         return nullptr;
     }
+#endif
 }
 
 SLANG_API bool spReflectionFunction_isOverloaded(SlangReflectionFunction* func)
@@ -5560,7 +5623,7 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    try
+    SLANG_EXCEPTION_TRY
     {
         auto specializedType = linkage->specializeType(
             unspecializedType,
@@ -5572,6 +5635,7 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
 
         return convert(specializedType);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -5582,6 +5646,7 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 
@@ -5603,7 +5668,7 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    try
+    SLANG_EXCEPTION_TRY
     {
         List<Expr*> argExprs;
         for (SlangInt i = 0; i < argCount; ++i)
@@ -5650,6 +5715,7 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
 
         return convertDeclToGeneric(specialized);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         outputExceptionDiagnostic(e, sink, outDiagnostics);
@@ -5660,6 +5726,7 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
         outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
+#endif
 }
 
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-returns-and-yields
-//META: doc_section_digest=010f71e10305e8452b6909c94e2da52806525700f6c78aa6daffe80e8b4ca211
+//META: doc_section_digest=f192f41be797c74b1114b7ff57ec1c86180c872b87ad52a64a206e75eec3e27e
 //META: purpose=Boundary: an early `return expr;` from three-deep nested ifs produces a `return_val` terminator on the innermost block — return is a terminator on the block that hosts it, independent of surrounding ifElse depth.
 //META: intent=boundary
 //META: pipeline_stage=lower

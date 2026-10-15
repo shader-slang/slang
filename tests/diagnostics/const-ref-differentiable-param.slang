@@ -19,6 +19,16 @@ struct MyType : IDifferentiable
      ^^^^^^^^ cannot use '[constref]' on a differentiable member method of a differentiable type.
 */
 
+    // The existing restriction is tied to the source attribute even when `[mutating]` takes
+    // precedence in the method's effective parameter-passing mode.
+    [Differentiable]
+    [mutating]
+    [constref] float computeWithOverlappingAttributes(float x) { return 0; }
+/*CHECK:
+     ^^^^^^^^ '[constref]' on differentiable member method
+     ^^^^^^^^ cannot use '[constref]' on a differentiable member method of a differentiable type.
+*/
+
     // OK
     [Differentiable]
     float compute1(float x) { return 0; }

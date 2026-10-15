@@ -1,5 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment -verify-debug-serial-ir
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment -verify-debug-serial-ir -DGLSL -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry main -stage fragment -verify-debug-serial-ir -DGLSL
+
+#if defined(GLSL)
+import glsl;
+#endif
 
 // Confirm that `NonUniformResourceIndex` translates to SPIR-V as expected
 

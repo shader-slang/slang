@@ -1224,7 +1224,9 @@ LLVMInst* LLVMBuilder::emitCompareOp(
         pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OEQ : llvm::CmpInst::Predicate::ICMP_EQ;
         break;
     case Slang::LLVMCompareOp::NotEqual:
-        pred = isFloat ? llvm::CmpInst::Predicate::FCMP_ONE : llvm::CmpInst::Predicate::ICMP_NE;
+        // `!=` must be the complement of `==`, i.e. true when either operand is
+        // NaN, which requires the unordered float predicate FCMP_UNE.
+        pred = isFloat ? llvm::CmpInst::Predicate::FCMP_UNE : llvm::CmpInst::Predicate::ICMP_NE;
         break;
     case Slang::LLVMCompareOp::Greater:
         pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OGT

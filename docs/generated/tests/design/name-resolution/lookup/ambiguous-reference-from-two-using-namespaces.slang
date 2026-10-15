@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=4c78ab08cf659f53d04e87356fa441615410f33a23152c70e9fb93b377efd998
+//META: doc_section_digest=991fc4058be6fd34aec1a4296d60bb722bc2f19a97c9a91c4e3f65165643bfd2
 //META: purpose=When narrowing leaves more than one candidate for a context that needs exactly one, the checker reports an ambiguous reference (E39999) with one candidate note per surviving item.
 //META: intent=negative
 //META: pipeline_stage=check

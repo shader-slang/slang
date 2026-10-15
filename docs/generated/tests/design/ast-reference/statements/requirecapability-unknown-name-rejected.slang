@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#requirecapabilitystmt
-//META: doc_section_digest=3fad924642b0316fb757c593b888cc7f5c8b1f201aa0c0264b34655ffafd3fae
+//META: doc_section_digest=12dedaf2aaf6752e756f7796eb2545e1de64f72f4e5259b97610f7ddfcf5586a
 //META: purpose=Each name listed by a `__requireCapability` statement is validated as it is read, so a name that does not resolve to a capability is dropped and diagnosed as an unknown capability.
 //META: intent=negative
 //META: pipeline_stage=parse

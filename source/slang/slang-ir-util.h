@@ -16,6 +16,17 @@ constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
 constexpr SlangInt kRTTIHandleSize = 8;
 
+/// Return whether a struct contains only void fields or recursively empty structs. Other types,
+/// including arrays of empty elements, return false. This preserves DCE's existing structural
+/// query: type decorations do not affect its result.
+bool isStructEmpty(IRType* type);
+
+/// Return whether a type contains only empty data: void, structs of empty fields, or arrays of
+/// empty elements. Pointers, resources, opaque records, and target-intrinsic types are not empty.
+/// This structural query does not infer emptiness from byte size or predict all target-dependent
+/// type legalization decisions.
+bool isEmptyType(IRType* type);
+
 // A helper class to clone children insts to a different generic parent that has equivalent set of
 // generic parameters. The clone will take care of substitution of equivalent generic parameters and
 // intermediate values between the two generic parents.
@@ -177,8 +188,30 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
-// True if inst produces a derived address from another base address.
+/// Return whether `inst` projects a field, element, or pointer-offset address from operand zero.
 bool isAddressInst(IRInst* inst);
+
+/// Return whether the result of `use->getUser()` may transfer a later storage access to or from the
+/// storage supplied through `use`.
+///
+/// This predicate recognizes only operand zero of address projections, pointer-to-pointer casts,
+/// `GetAddress`, `AssumeAddress`, and l-value implicit casts. Address operations and pointer casts
+/// can make a later access through the result affect storage reached from operand zero. The
+/// predicate therefore treats both reads and writes as transferable; a caller that needs an exact
+/// whole-value, subobject, or unknown relation must classify that relation separately.
+/// `InOutImplicitCast` transfers reads into its temporary and writes back to the source;
+/// `OutImplicitCast` transfers only writes back. A caller that does not track direction must treat
+/// every later access conservatively.
+bool doesUserResultTransferStorageAccessFromUse(IRUse* use);
+
+/// Return the function-type operand for the formal parameter corresponding to `argumentUse`, after
+/// removing outer attributed and rate-qualified wrappers. Parameter-direction wrappers such as
+/// `BorrowIn` and `Out` are preserved. A generic type parameter need not derive from `IRType`, so
+/// callers must test the returned instruction for the specific wrapper they need.
+///
+/// Returns null when `argumentUse` does not belong to `call`, when the callee's data type is not a
+/// function type, or when that function type has no corresponding parameter.
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
@@ -259,9 +292,69 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
+/// Return whether `inst` may inspect operand types but cannot observe operand runtime values.
+///
+/// A value-use analysis may ignore these instructions without treating their operands as read.
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst);
+
+/// Return whether `type`, after removing attributed and rate wrappers, structurally represents one
+/// resource value rather than an aggregate containing resource values.
+///
+/// This predicate recognizes texture, sampler, structured-buffer, and byte-address-buffer IR
+/// types. It does not recursively inspect arrays, structs, or other aggregate types, and it does
+/// not decide whether a particular resource type is legal in a language construct. An unresolved
+/// type instruction, including `IRSymbolAlias`, does not match.
+bool isSingleResourceValueType(IRInst* type);
+
+/// Return whether `type` is one resource value, or a fixed-size homogeneous array of resource
+/// values, that the per-invocation replacement pass can represent with one local per affected
+/// function and one generated parameter per non-entry-point function with runtime access.
+///
+/// This predicate inspects only the IR type structure. An unresolved type instruction, including
+/// `IRSymbolAlias`, does not match.
+bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type);
+
+/// Return the value type stored by `globalVar`.
+///
+/// The module must have been linked, so removing attributed and rate wrappers from the variable's
+/// data type must expose a concrete pointer type with a type instruction as its pointee. Attributes
+/// on the pointee remain part of the returned type.
+IRType* getGlobalVarValueType(IRGlobalVar* globalVar);
+
+/// Return whether `globalVar` is a candidate for replacing mutable resource state with
+/// function-local storage.
+///
+/// This predicate checks the marker, rate, and value-type conditions that make a global eligible
+/// for further analysis. It does not inspect the global's uses, linkage, or other requirements that
+/// can prevent replacement. The module must have been linked, so the global's pointer and value
+/// types are concrete type instructions rather than unresolved `IRSymbolAlias` instructions.
+bool isResourceGlobalCandidateForPerInvocationReplacement(IRGlobalVar* globalVar);
+
+/// Return whether `func` is a shader entry point or a CUDA kernel.
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func);
+
+/// Return whether generic target assembly supplies any part of `func`'s emitted implementation.
+bool hasGenericAssemblyImplementation(IRFunc* func);
+
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
+
+/// Test for opaque values or invalid recursion in the by-value storage of `type`.
+///
+/// Examines struct fields, array elements, and tuple elements. On a match, assigns the
+/// matching type to `outLeafOpaqueHandleType` if supplied. Native pointers remain leaves;
+/// parameter-group types are themselves opaque.
+/// Conservatively returns true for invalid by-value recursion, assigning the recursive
+/// aggregate type to `outLeafOpaqueHandleType` even if that aggregate contains no resource.
+/// Leaves `outLeafOpaqueHandleType` unchanged when no match occurs.
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
+
+/// Test whether by-value storage for `type` contains an unsized array.
+///
+/// Examines struct fields, array elements, and tuple elements for `IRUnsizedArrayType`.
+/// Native pointers and parameter-group types remain leaves. Specialization can determine an
+/// `IRArrayType` element count; an `IRUnsizedArrayType` has no count.
+bool isUnsizedType(IRType* type);
 
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
@@ -286,6 +379,45 @@ IROp getTypeStyle(BaseType op);
 inline bool isScalarIntegerType(IRType* type)
 {
     return getTypeStyle(type->getOp()) == kIROp_IntType;
+}
+
+// Returns true for the integer arithmetic and bitwise op-kinds through which a
+// NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
+// elementwise integer op with a non-uniform operand yields a non-uniform result
+// (Vulkan VUID-RuntimeSpirv-None-10148). This is the single source of truth for
+// that op-set, shared by the SPIR-V float pass that bubbles the wrapper past such
+// an op (slang-ir-float-non-uniform-resource-index.cpp) and by the function-call
+// specializer that detects a non-uniform index passed through arithmetic across a
+// call boundary (slang-ir-specialize-function-call.cpp). Comparison/logical ops
+// are excluded (they yield a bool, not an index); IntCast is handled separately by
+// both consumers.
+//
+// This classifies by op-kind and assumes the operands are the integer index the
+// caller guarantees. That matters because `kIROp_Div` is the type-polymorphic divide
+// (there is no separate integer-divide op, unlike the integer-specific `kIROp_IRem`
+// whose float sibling `kIROp_FRem` is deliberately absent): the set is sound only
+// because the value asked about is always a NonUniformResourceIndex-derived integer
+// index, not because the op-kinds alone are integer-only.
+inline bool isNonUniformIndexArithmeticOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Neg:
+        return true;
+    default:
+        return false;
+    }
 }
 
 // No side effect can take place through a value of a "Value" type.
@@ -442,7 +574,15 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
+// in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
+// Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
+// callee.
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
@@ -583,6 +723,11 @@ IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
 
 IRParam* getParamAt(IRBlock* block, UIndex ii);
 
+/// Selects the compute derivative grouping, honoring explicit entry-point attributes.
+/// Without an attribute, selects linear only for a literal numthreads Y extent of 1.
+/// Specialization constants and all other cases, including missing thread counts, select quad.
+DerivativeGroupMode inferDerivativeGroupMode(IRFunc* entryPoint);
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -653,6 +798,28 @@ IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
 
 IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
+
+/// Return whether `inst` records source-level debug information without affecting execution.
+bool isDebugInfoInst(IRInst* inst);
+
+/// Return whether `op` is a dedicated IR operation that reads resource contents.
+bool doesOpReadResourceContents(IROp op);
+
+/// Return whether `op` directly produces an address into a resource's contents.
+bool doesOpProduceResourceContentAddress(IROp op);
+
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.
 // Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
@@ -703,6 +870,26 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
 bool isReadNoneCallee(IRInst* callee);
+
+/// True iff `callee` is read-none AND every user-supplied derivative variant
+/// of it whose read-none-ness is not already implied by the primary is also
+/// read-none.
+///
+/// In practice this checks the `ForwardDerivative` annotation and the
+/// `BackwardDerivativePropagate` annotation. `BackwardDerivativeApply` is
+/// intentionally not consulted because the apply wrapper inherits
+/// read-none-ness from the primary callee — see the implementation comment
+/// in `slang-ir-util.cpp` for the unwrapping chain.
+///
+/// The carry-set analysis in slang-ir-check-differentiability needs this
+/// stronger property: a primary callee can be `[__readNone]` while its
+/// user-supplied `[ForwardDerivative]` or `[BackwardDerivative]` has side
+/// effects, in which case a call to the primary still produces observable
+/// derivative state through differentiation. Other callers of
+/// `isReadNoneCallee` reason about the local function's own read-none-ness
+/// and should not use this variant.
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee);
+
 bool isNoSideEffectCallee(IRInst* callee);
 
 bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);

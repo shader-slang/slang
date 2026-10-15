@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#generics-and-where-clauses
-//META: doc_section_digest=9ec28a7f9972204cb231849951463cd51e25e934f85ba429e611a1a16838b4e2
+//META: doc_section_digest=9f7b958fb06af2133f1ee3e2412be63c482681598203ef131595bab232b76842
 //META: purpose=`GenericParam` accepts the value-pack form `'let' 'each' IDENT (':' Type)?` (GenericValuePackParamDecl).
 //META: intent=functional
 //META: pipeline_stage=parse

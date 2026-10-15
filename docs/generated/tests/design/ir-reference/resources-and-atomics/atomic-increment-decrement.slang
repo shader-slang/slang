@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=e0b71e7cc30a0e069a5833b7fdc7038f02b6ab982bbba6656983e3a65dcba7ce
+//META: doc_section_digest=5818c272bb5b1e731fdf137e19f531519b21757eceadaae3e8b8a9739283af9c
 //META: purpose=`Atomic<T>::increment()` and `::decrement()` lower to the nullary-value opcodes `atomicInc(%ptr, %order)` and `atomicDec(%ptr, %order)`, which carry no value operand.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -1467,6 +1467,11 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     attr->loc = uncheckedAttr->loc;
     attr->attributeDecl = attrDecl;
 
+    if (as<FormatAttribute>(attr) && isSlang2026OrLater(this))
+    {
+        getSink()->diagnose(Diagnostics::DeprecatedFormatAttribute{.location = attr->loc});
+    }
+
     // We will start with checking steps that can be applied independent
     // of the concrete attribute type that was selected. These only need
     // us to look at the attribute declaration itself.
@@ -1967,11 +1972,7 @@ Modifier* SemanticsVisitor::checkModifier(
             return nullptr;
         }
 
-        auto moduleDecl = getModuleDecl(decl);
-        bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-
-        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-            isGLSLInput = true;
+        bool isGLSLInput = getShared()->isGLSLSourceLanguage();
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
         {
             if (!ignoreUnallowedModifier)

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#cooperative-matrix-and-vector
-//META: doc_section_digest=5d8bfb7cd06d16d7e5526799f2be56c9cee4a73edf35171033b8a239608e92f4
+//META: doc_section_digest=fd99114508a23498882ee9094f2d699a9d7acca7884320ef85740ca95ab69b14
 //META: purpose=`coopMatMulAdd` on three `CoopMat` values surfaces the documented `CoopMatMulAdd` opcode in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#shape-of-the-emitted-file
-//META: doc_section_digest=cd40f48a68f8c4cc01781946c78837919b2702a1a94124525d0a69aadc68ec8c
+//META: doc_section_digest=661909b676c08c2d761f60550d882c809f2880516507364f2d914febeee1c6d3
 //META: purpose=When emit finds an NVAPI-requiring instruction the front matter defines `SLANG_HLSL_ENABLE_NVAPI 1` and `NV_HITOBJECT_USE_MACRO_API 1` immediately before the `#pragma pack_matrix` line, which is what makes the prelude's guarded `nvHLSLExtns.h` include live.
 //META: intent=functional
 //META: pipeline_stage=emit

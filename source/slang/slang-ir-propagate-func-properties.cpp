@@ -15,7 +15,9 @@ public:
     virtual bool propagate(IRBuilder& builder, IRFunc* func) = 0;
 };
 
-static bool isKnownOpCodeWithSideEffect(IROp op)
+/// Return whether function-property propagation analyzes `op` with rules beyond the generic
+/// side-effect query.
+static bool doesOpRequireCustomFuncPropertyAnalysis(IROp op)
 {
     switch (op)
     {
@@ -33,6 +35,23 @@ static bool isKnownOpCodeWithSideEffect(IROp op)
     default:
         return false;
     }
+}
+
+/// Return whether an operand of `inst` may name mutable storage outside `func`.
+static bool doesInstUseGlobalOrUnknownMutableAddress(IRFunc* func, IRInst* inst)
+{
+    // Constants and types do not name mutable storage. We ask the shared address classifier about
+    // every other operand because it follows local address calculations to their underlying
+    // storage.
+    for (UInt operandIndex = 0; operandIndex < inst->getOperandCount(); ++operandIndex)
+    {
+        auto operand = inst->getOperand(operandIndex);
+        if (as<IRConstant>(operand) || as<IRType>(operand))
+            continue;
+        if (isGlobalOrUnknownMutableAddress(func, operand))
+            return true;
+    }
+    return false;
 }
 
 class ReadNoneFuncPropertyPropagationContext : public FuncPropertyPropagationContext
@@ -66,37 +85,31 @@ public:
         return true;
     }
 
-    bool isDebugInst(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_DebugLine:
-        case kIROp_DebugScope:
-        case kIROp_DebugVar:
-        case kIROp_DebugValue:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
-        bool hasNonReadNoneOp = false;
+        // We infer `ReadNone` by rejecting reported side effects, resource-content reads, and
+        // addresses into global or unknown mutable storage, and by requiring every callee to be
+        // `ReadNone`. The address classifier excludes roots owned by this function, including its
+        // parameters. Before an optimizer treats a call as pure, `areCallArgumentsSideEffectFree`
+        // must also check its pointer and resource arguments; this body analysis does not establish
+        // those call-site facts. We leave in-block debug instructions to the ordinary side-effect
+        // test because dead-code elimination has no separate rule for preserving the debug records
+        // associated with a removed call.
+        bool preventsReadNone = false;
         for (auto block : f->getBlocks())
         {
             for (auto inst : block->getChildren())
             {
-                // Is this inst known to not have global side effect/analyzable?
-                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
+                // The generic side-effect query recognizes instructions such as buffer stores and
+                // discard, but it deliberately does not classify ordinary loads as side effects.
+                // The address check below detects loads from mutable storage. Dedicated resource
+                // operations need a separate check because their resource operands are values, not
+                // addresses into the resource's contents.
+                if (!doesOpRequireCustomFuncPropertyAnalysis(inst->getOp()))
                 {
-                    if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
+                    if (inst->mightHaveSideEffects() || doesOpReadResourceContents(inst->getOp()))
                     {
-                        // We have a inst that has side effect that is not understood by this
-                        // method, e.g. bufferStore, discard, etc. or we are seeing a resource load.
-                        // These operations are not movable or removable,
-                        // and should not be treated as ReadNone.
-                        hasNonReadNoneOp = true;
+                        preventsReadNone = true;
                         break;
                     }
                 }
@@ -105,32 +118,21 @@ public:
                 {
                     if (!isReadNoneCallee(call->getCallee()))
                     {
-                        hasNonReadNoneOp = true;
+                        preventsReadNone = true;
                         break;
                     }
                 }
 
-                // Do any operands defined have pointer type of global or
-                // unknown source? Passing them into a readNone callee may cause
-                // side effects that breaks the readNone property.
-                for (UInt o = 0; o < inst->getOperandCount(); o++)
+                if (doesInstUseGlobalOrUnknownMutableAddress(f, inst))
                 {
-                    auto operand = inst->getOperand(o);
-                    if (as<IRConstant>(operand))
-                        continue;
-                    if (as<IRType>(operand))
-                        continue;
-                    if (isGlobalOrUnknownMutableAddress(f, operand))
-                    {
-                        hasNonReadNoneOp = true;
-                        break;
-                    }
+                    preventsReadNone = true;
+                    break;
                 }
             }
-            if (hasNonReadNoneOp)
+            if (preventsReadNone)
                 break;
         }
-        if (!hasNonReadNoneOp)
+        if (!preventsReadNone)
         {
             builder.addDecoration(f, kIROp_ReadNoneDecoration);
             return true;
@@ -273,58 +275,48 @@ public:
     }
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
-        bool hasSideEffectCall = false;
+        // We infer `NoSideEffect` using the generic side-effect query for ordinary instructions.
+        // For instructions with custom handling, we require each call to target a `NoSideEffect`
+        // callee and reject operands that name global or unknown mutable storage. The address
+        // classifier excludes roots owned by this function, including its parameters. Before an
+        // optimizer treats a call as side-effect-free, `areCallArgumentsSideEffectFree` must also
+        // check its pointer and resource arguments; this body analysis does not establish those
+        // call-site facts. We leave in-block debug instructions to the ordinary side-effect test
+        // because dead-code elimination has no separate debug-liveness rule.
+        bool preventsNoSideEffect = false;
         for (auto block : f->getBlocks())
         {
             for (auto inst : block->getChildren())
             {
-                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
+                if (!doesOpRequireCustomFuncPropertyAnalysis(inst->getOp()))
                 {
-                    // Is this inst known to not have global side effect/analyzable?
                     if (inst->mightHaveSideEffects())
                     {
-                        // We have a inst that has side effect and is not understood by this method.
-                        // e.g. bufferStore, discard, etc.
-                        hasSideEffectCall = true;
+                        preventsNoSideEffect = true;
                         break;
                     }
-                    else
-                    {
-                        // A side effect free inst can't generate side effects for the function.
-                        continue;
-                    }
+                    continue;
                 }
 
                 if (auto call = as<IRCall>(inst))
                 {
                     if (!isNoSideEffectCallee(call->getCallee()))
                     {
-                        hasSideEffectCall = true;
+                        preventsNoSideEffect = true;
                         break;
                     }
                 }
 
-                // Do any operands defined have pointer type of global or
-                // unknown source? Passing them into a NoSideEffect callee may cause
-                // side effects that breaks the NoSideEffect property.
-                for (UInt o = 0; o < inst->getOperandCount(); o++)
+                if (doesInstUseGlobalOrUnknownMutableAddress(f, inst))
                 {
-                    auto operand = inst->getOperand(o);
-                    if (as<IRConstant>(operand))
-                        continue;
-                    if (as<IRType>(operand))
-                        continue;
-                    if (isGlobalOrUnknownMutableAddress(f, operand))
-                    {
-                        hasSideEffectCall = true;
-                        break;
-                    }
+                    preventsNoSideEffect = true;
+                    break;
                 }
             }
-            if (hasSideEffectCall)
+            if (preventsNoSideEffect)
                 break;
         }
-        if (!hasSideEffectCall)
+        if (!preventsNoSideEffect)
         {
             builder.addDecoration(f, kIROp_NoSideEffectDecoration);
             return true;

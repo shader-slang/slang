@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#where-the-metal-specific-opcodes-come-from
-//META: doc_section_digest=a3fdb204a916a518fb6e90d1b9ab54f11e343e46db0c160597f5ad1e2258a551
+//META: doc_section_digest=560ff2b507f0439787cadbdb3f98183f5296cb7b2635ea9578fe23b6c76a20aa
 //META: purpose=Mesh-shader output writes lower to the Metal-only `metalSetVertex` / `metalSetIndices` opcodes, which the emitter renders as `_slang_mesh.set_vertex(...)` / `_slang_mesh.set_index(...)`.
 //META: intent=functional
 //META: pipeline_stage=emit

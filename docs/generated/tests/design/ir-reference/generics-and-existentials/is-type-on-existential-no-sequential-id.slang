@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#getsequentialid-and-the-rtti-opcodes
-//META: doc_section_digest=c6932c779e6b7ce0b79c57daf536a4c05b33003e381d410c327ed5ffe0c10c37
+//META: doc_section_digest=a789a094a16866471bb7f9bae4e2fb95190f82569e1b003a48307aa07a9eaf9c
 //META: purpose=A run-time type test on an ordinary existential emits IsType and involves no GetSequentialID, unlike the optional-constraint form.
 //META: intent=boundary
 //META: pipeline_stage=lower

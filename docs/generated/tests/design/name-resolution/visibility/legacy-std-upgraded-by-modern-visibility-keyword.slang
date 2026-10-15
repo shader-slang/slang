@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#concepts
-//META: doc_section_digest=486dea2f46d1d57027a213610a753c17e6b52cde71a165cabb52ac946a910a45
+//META: doc_section_digest=cac0e061063dc39040a78ad13e4de3d5fcecd66c50cee6d1731f7daf0b63937d
 //META: purpose=A file requested as legacy (`-std 2018`) is upgraded away from the legacy language version when it uses a modern construct, so unannotated decls default to `internal` rather than the legacy `public`.
 //META: intent=boundary
 //META: pipeline_stage=check

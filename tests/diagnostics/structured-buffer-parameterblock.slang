@@ -1,6 +1,6 @@
 // Test that StructuredBuffer of ParameterBlock (NonAddressable type) is not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain
 
 // Direct ParameterBlock in StructuredBuffer - should error
 StructuredBuffer<ParameterBlock<Texture2D>> myBuffer1;
@@ -33,8 +33,6 @@ StructuredBuffer<NestedStruct> myBuffer3;
 struct StructWithParameterBlockArray
 {
     ParameterBlock<Texture2D> blocks[2];
-//CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
-//CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
 //CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
 //CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
     int value;

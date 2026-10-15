@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#synthesized-derivative-witnesses
-//META: doc_section_digest=4ac46248bc67dd90a58b5dbd80b92929f4d02dd326a0ef7823411d0e2a772c21
+//META: doc_section_digest=78050e8840112aefbd29c4d742e5c6beb9ffb31026048eaa31338aaf55782a36
 //META: purpose=The derivative of a differentiable function is itself given IForwardDifferentiable and IBackwardDifferentiable witness tables through SynthesizedForwardDerivativeWitnessTable and SynthesizedBackwardDerivativeWitnessTable.
 //META: intent=functional
 //META: pipeline_stage=lower
