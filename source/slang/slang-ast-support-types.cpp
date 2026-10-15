@@ -26,6 +26,13 @@ QualType::QualType(Type* type)
             case AccessQualifier::Read:
             case AccessQualifier::Immutable:
                 isLeftValue = false;
+                isReadOnlyMemoryLocation = true;
+                break;
+
+            // E30035 rejects `Ref<T, Access.WriteOnly>` in user code, but a write-only
+            // memory location may still be assigned.
+            case AccessQualifier::WriteOnly:
+                isLeftValue = true;
                 break;
 
             default:
@@ -90,6 +97,22 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
+AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::RefReadWrite:
+        return AccessQualifier::ReadWrite;
+    case ParamPassingMode::RefReadOnly:
+        return AccessQualifier::Read;
+    case ParamPassingMode::RefWriteOnly:
+        return AccessQualifier::WriteOnly;
+    default:
+        SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
+        UNREACHABLE_RETURN(AccessQualifier::ReadWrite);
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
     switch (direction)
@@ -100,8 +123,14 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
     case ParamPassingMode::Out:
         sb << "out";
         break;
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         sb << "ref";
+        break;
+    case ParamPassingMode::RefReadOnly:
+        sb << "ref readonly";
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sb << "ref writeonly";
         break;
     case ParamPassingMode::BorrowInOut:
         sb << "inout";

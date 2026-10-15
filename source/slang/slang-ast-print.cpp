@@ -1566,23 +1566,39 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                     // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
                     // but seems more appropriate to put in the Type Part
 
-                    if (paramDecl->hasModifier<InOutModifier>())
+                    // A reference parameter prints its effective passing mode, so that
+                    // `__ref_readonly` and its legacy alias `const __ref` read the same.
+                    switch (getParamPassingMode(paramDecl))
                     {
-                        sb << toSlice("inout ");
-                    }
-                    else if (paramDecl->hasModifier<OutModifier>())
-                    {
-                        sb << toSlice("out ");
-                    }
-                    else if (paramDecl->hasModifier<InModifier>())
-                    {
-                        sb << toSlice("in ");
-                    }
+                    case ParamPassingMode::RefReadWrite:
+                        sb << toSlice("ref ");
+                        break;
+                    case ParamPassingMode::RefReadOnly:
+                        sb << toSlice("ref readonly ");
+                        break;
+                    case ParamPassingMode::RefWriteOnly:
+                        sb << toSlice("ref writeonly ");
+                        break;
+                    default:
+                        if (paramDecl->hasModifier<InOutModifier>())
+                        {
+                            sb << toSlice("inout ");
+                        }
+                        else if (paramDecl->hasModifier<OutModifier>())
+                        {
+                            sb << toSlice("out ");
+                        }
+                        else if (paramDecl->hasModifier<InModifier>())
+                        {
+                            sb << toSlice("in ");
+                        }
 
-                    // And this to params/variables (not the type)
-                    if (paramDecl->hasModifier<ConstModifier>())
-                    {
-                        sb << toSlice("const ");
+                        // And this to params/variables (not the type)
+                        if (paramDecl->hasModifier<ConstModifier>())
+                        {
+                            sb << toSlice("const ");
+                        }
+                        break;
                     }
 
                     addType(type);

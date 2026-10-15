@@ -200,6 +200,23 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     return val;
 }
 
+void SemanticsVisitor::diagnoseWriteOnlyAccessOutsideRefParam(
+    GenericDecl* genericDecl,
+    Type* paramType,
+    Val* val,
+    Expr* argExpr)
+{
+    auto constantVal = as<ConstantIntVal>(val);
+    if (!constantVal || constantVal->getValue() != (IntegerLiteralValue)AccessQualifier::WriteOnly)
+        return;
+    if (!paramType || !paramType->equals(m_astBuilder->getMagicEnumType("AccessQualifier")))
+        return;
+    if (genericDecl == getASTBuilder()->getSharedASTBuilder()->tryFindMagicDecl("RefParamType"))
+        return;
+    getSink()->diagnose(
+        Diagnostics::WriteOnlyAccessNotAllowed{.generic = genericDecl, .arg = argExpr});
+}
+
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
 {
     return ExtractGenericArgInteger(
@@ -447,6 +464,28 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     if (!result)
     {
         result = type;
+    }
+
+    // A constant access on a `RefParam` must name an `Access` value, since the
+    // access decides the parameter's passing mode.
+    if (auto refParamType = as<RefParamType>(result))
+    {
+        auto accessQualifier = refParamType->tryGetAccessQualifierValue();
+        if (accessQualifier && *accessQualifier != AccessQualifier::ReadWrite &&
+            *accessQualifier != AccessQualifier::Read &&
+            *accessQualifier != AccessQualifier::Immutable &&
+            *accessQualifier != AccessQualifier::WriteOnly)
+        {
+            if (diagSink)
+            {
+                diagSink->diagnose(Diagnostics::InvalidRefParamAccess{
+                    .access = (int64_t)*accessQualifier,
+                    .type = result,
+                    .typeExp = typeExp.exp});
+            }
+            *outProperType = getASTBuilder()->getErrorType();
+            return false;
+        }
     }
 
     // Check for invalid types.

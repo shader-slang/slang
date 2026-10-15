@@ -27,6 +27,34 @@ enum class SemanticDirection
     Output,
 };
 
+struct EntryPointParamDirections
+{
+    bool isInput = false;
+    bool isOutput = false;
+};
+
+static EntryPointParamDirections getEntryPointParamDirections(ParamDecl* param)
+{
+    const auto mode = getParamPassingMode(param);
+    EntryPointParamDirections directions;
+    directions.isInput = doesParamPassingModeReadArgument(mode);
+    // `__ref_writeonly` is a reference, not a stage output. Both flags stay false for that
+    // mode, so its semantics are validated as an input and its diagnostics call it
+    // "input/output", the same as a `__ref` entry-point parameter.
+    directions.isOutput = mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut;
+
+    // Mesh output types encode stage-output direction even when passed with mode In.
+    Type* type = param->getType();
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<MeshOutputType>(type))
+    {
+        directions.isInput = false;
+        directions.isOutput = true;
+    }
+    return directions;
+}
+
 // Maximum nesting depth when recursively walking a declaration's type for system-value
 // semantics. Shared by validateSystemValueSemantic and collectDepthOutputSemantics so the two
 // walks provably use the same bound: collectDepthOutputSemantics can return silently at the
@@ -2019,7 +2047,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Validate system value semantics for entry point parameters
             for (const auto& param : entryPointFuncDecl->getParameters())
             {
-                if (param->hasModifier<InOutModifier>())
+                const auto directions = getEntryPointParamDirections(param);
+                if (directions.isInput && directions.isOutput)
                 {
                     validateSystemValueSemantic(
                         &visitor,
@@ -2038,7 +2067,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         scope,
                         &entryPointInferredCaps);
                 }
-                else if (param->hasModifier<OutModifier>())
+                else if (directions.isOutput)
                 {
                     validateSystemValueSemantic(
                         &visitor,
@@ -2089,9 +2118,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         for (const auto& param : entryPointFuncDecl->getParameters())
         {
             // Depth semantics are output-only (setter-only in the core module; any input use
-            // is already rejected), so only `out`/`inout` parameters can carry one.
-            // InOutModifier derives from OutModifier, so this catches both.
-            if (param->hasModifier<OutModifier>())
+            // is already rejected), so only output parameters can carry one.
+            if (getEntryPointParamDirections(param).isOutput)
                 collectDepthOutputSemantics(astBuilder, param, depthOutputSemantics);
         }
         // The return value is also an output of the entry point.
@@ -2373,12 +2401,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
-            // Note: `InOutModifier` inherits from `OutModifier`, so it must be
-            // checked first to avoid mislabeling `inout` parameters as "output".
-            ctx.direction = param->hasModifier<InOutModifier>() ? "input/output"
-                            : param->hasModifier<OutModifier>() ? "output"
-                            : param->hasModifier<RefModifier>() ? "input/output"
-                                                                : "input";
+            const auto directions = getEntryPointParamDirections(param);
+            const bool isByReference = isByReferenceParamPassingMode(getParamPassingMode(param));
+            ctx.direction = directions.isOutput ? (directions.isInput ? "input/output" : "output")
+                            : isByReference     ? "input/output"
+                                                : "input";
 
             StringBuilder contextSb;
             auto paramName = param->getName();
@@ -2426,7 +2453,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             {
                 // Only outputs (or in/out) of the entry point can carry
                 // SV_Position for the rasterizer.
-                if (!param->hasModifier<OutModifier>() && !param->hasModifier<InOutModifier>())
+                if (!getEntryPointParamDirections(param).isOutput)
                     continue;
                 hasOutputs = true;
                 if (_outputDeclHasSemantic(astBuilder, param, param->getType(), svPosition))
@@ -2853,8 +2880,12 @@ Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, ParamInfo const& param
         return astBuilder->getOutParamType(paramInfo.type);
     case ParamPassingMode::BorrowInOut:
         return astBuilder->getBorrowInOutParamType(paramInfo.type);
-    case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(paramInfo.type);
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
+        return astBuilder->getRefParamType(
+            paramInfo.type,
+            getRefParamPassingModeAccess(paramInfo.mode));
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
         UNREACHABLE_RETURN(paramInfo.type);

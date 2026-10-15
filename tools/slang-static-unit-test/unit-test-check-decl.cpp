@@ -446,7 +446,7 @@ SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
         {ParamPassingMode::Out, "to_"},
         {ParamPassingMode::BorrowInOut, "tio_"},
         {ParamPassingMode::BorrowIn, "tc_"},
-        {ParamPassingMode::Ref, "tr_"},
+        {ParamPassingMode::RefReadWrite, "tr_"},
     };
 
     List<String> mangledNames;
@@ -478,7 +478,9 @@ SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
         ParamPassingMode::Out,
         ParamPassingMode::BorrowInOut,
         ParamPassingMode::BorrowIn,
-        ParamPassingMode::Ref,
+        ParamPassingMode::RefReadWrite,
+        ParamPassingMode::RefReadOnly,
+        ParamPassingMode::RefWriteOnly,
     };
     for (auto mode : modes)
     {
@@ -513,7 +515,8 @@ SLANG_UNIT_TEST(effectiveThisParamModePolicyPrecedence)
 
     addModifier(setterDecl, astBuilder->create<RefAttribute>());
     SLANG_CHECK(
-        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::Ref);
+        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
+        ParamPassingMode::RefReadWrite);
 
     addModifier(setterDecl, astBuilder->create<ConstRefAttribute>());
     SLANG_CHECK(

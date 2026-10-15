@@ -394,6 +394,24 @@ class BorrowModifier : public Modifier
     FIDDLE(...)
 };
 
+// Reference-access modifier on a `__ref` parameter: the callee may only read
+// through the reference. It is distinct from `GLSLReadOnlyModifier`, which is
+// the GLSL `readonly` memory qualifier on any declaration.
+FIDDLE()
+class ReadOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Reference-access modifier on a `__ref` parameter: the callee may only write
+// through the reference. It is distinct from `GLSLWriteOnlyModifier`, which is
+// the GLSL `writeonly` memory qualifier on any declaration.
+FIDDLE()
+class WriteOnlyModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
 // all sharing the same modifiers:

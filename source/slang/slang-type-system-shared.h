@@ -205,6 +205,11 @@ enum class AccessQualifier : uint64_t
     // qualifier than `Read`, and may allow the backend to perform more aggresive
     // optimizations.
     Immutable = 2,
+
+    // The data being referred to can only be written through the reference.
+    // This is only valid as the access of a `RefParam` (a `__ref_writeonly`
+    // parameter), not of a `Ptr` or `Ref`.
+    WriteOnly = 3,
 };
 
 // NOTE: The IR linker assumes every `AnnotationKind` is differentiability-
