@@ -52,6 +52,24 @@ fn _slang_getNan() -> f32
 }
 )";
 
+static const char* kWGSLBuiltinPreludeGetInfinityHalf = R"(
+fn _slang_getInfinityHalf(positive: bool) -> f16
+{
+    let a = select(f16(-1.0), f16(1.0), positive);
+    let b = f16(0.0);
+    return a / b;
+}
+)";
+
+static const char* kWGSLBuiltinPreludeGetNanHalf = R"(
+fn _slang_getNanHalf() -> f16
+{
+    let a = f16(0.0);
+    let b = f16(0.0);
+    return a / b;
+}
+)";
+
 WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     : CLikeSourceEmitter(desc)
 {
@@ -1208,9 +1226,14 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 case BaseType::Half:
                     {
-                        m_writer->emit(litInst->value.floatVal);
-                        m_writer->emit("h");
                         m_f16ExtensionEnabled = true;
+                        emitFloatLitValue(
+                            litInst,
+                            kWGSLBuiltinPreludeGetNanHalf,
+                            "_slang_getNanHalf",
+                            kWGSLBuiltinPreludeGetInfinityHalf,
+                            "_slang_getInfinityHalf",
+                            "h");
                     }
                     break;
 
