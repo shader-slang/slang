@@ -3567,6 +3567,14 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
+    /// Roots a declared facet witness at the type whose conformance is being queried.
+    /// Both ordinary subtype queries and provisional extension constraints use this path.
+    /// Other witness forms are returned unchanged.
+    SubtypeWitness* getSubtypeWitnessForType(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* witness);
+
     Witness* getDiffTypeInfoWitness(Type* type);
     Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
@@ -3841,6 +3849,10 @@ public:
     //
     // If the candidate isn't actually applicable, this is
     // where we'd start reporting the issue(s).
+    //
+    // A call whose callee expression has an `ErrorType` is itself returned with an
+    // `ErrorType`, as in `ResolveInvoke`, so consumers such as `visitTryExpr` can rely
+    // on any call that is not an error having a `FuncType`-typed callee.
     Expr* CompleteOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
 
     // Implement a comparison operation between overload candidates,

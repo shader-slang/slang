@@ -157,23 +157,24 @@ uniform usampler2DMS uniform_usampler2DMS;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
-__generic<T : ITexelElement>
-bool textureFuncs( Sampler1D<T> gsampler1D
-    , Sampler2D<T> gsampler2D
-    , Sampler2DRect<T> gsampler2DRect
-    , Sampler3D<T> gsampler3D
-    , SamplerCube<T> gsamplerCube
-    , Sampler1DArray<T> gsampler1DArray
-    , Sampler2DArray<T> gsampler2DArray
-    , SamplerCubeArray<T> gsamplerCubeArray
-    , SamplerBuffer<T> gsamplerBuffer
-    , Sampler2DMS<T> gsampler2DMS
-    , Sampler2DMSArray<T> gsampler2DMSArray
+__generic<Texel : ITexelElement, let sampleCount:int, let format:int>
+bool textureFuncs( _Texture<Texel, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
+    , _Texture<Texel, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
+    , _Texture<Texel, __Shape3D, 0, 0, sampleCount, 0, 0, 1, format> gsampler3D
+    , _Texture<Texel, __ShapeCube, 0, 0, sampleCount, 0, 0, 1, format> gsamplerCube
+    , _Texture<Texel, __Shape1D, 1, 0, sampleCount, 0, 0, 1, format> gsampler1DArray
+    , _Texture<Texel, __Shape2D, 1, 0, sampleCount, 0, 0, 1, format> gsampler2DArray
+    , _Texture<Texel, __ShapeCube, 1, 0, sampleCount, 0, 0, 1, format> gsamplerCubeArray
+    , _Texture<Texel, __ShapeBuffer, 0, 0, 0, 1, 0, 0, format> gsamplerBuffer
+    , _Texture<Texel, __Shape2D, 0, 1, sampleCount, 0, 0, 1, format> gsampler2DMS
+    , _Texture<Texel, __Shape2D, 1, 1, sampleCount, 0, 0, 1, format> gsampler2DMSArray
     , bool ignoreResult
 )
 {
     // GLSL_GRADS-LABEL:    textureFuncs_0
     // GLSL_NOGRADS-LABEL:  textureFuncs_0
+    typealias T = Texel.DataType;
     typealias gvec4 = vector<T.Element,4>;
 
     const float coord = 0.5;
