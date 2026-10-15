@@ -6,7 +6,7 @@
 void freeFunction() const
 /*CHECK:
                     ^^^^^ trailing `const` is only allowed in the HLSL dialect
-                    ^^^^^ C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`); use `[nonmutating]` instead for a nonmutating receiver.
+                    ^^^^^ C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`).
                     ^^^^^ receiver-mode specifier requires an instance receiver
                     ^^^^^ receiver-mode specifier 'const' is only allowed on an instance member that has a `this` parameter.
 */
