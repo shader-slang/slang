@@ -175,6 +175,9 @@ async function runSmokeTest() {
         if (!(irBytes instanceof Uint8Array) || irBytes.length === 0) {
             throw new Error('IR blob: Module.serialize() did not return bytes');
         }
+        // The bytes must stay valid after the module and its session are gone.
+        libModule.delete();
+        libSession.delete();
         const irSession = globalSession.createSession(wgslTargetValue);
         const loadedLib = irSession.loadModuleFromIRBlob('irlib', '/irlib.slang-module', irBytes);
         if (!loadedLib) {
@@ -205,12 +208,20 @@ async function runSmokeTest() {
         if (!badBlobError || badBlobError.type !== 'USER') {
             throw new Error('IR blob: garbage bytes should set a USER error');
         }
+        for (const notBytes of [null, undefined, [1, 2, 3]]) {
+            if (irSession.loadModuleFromIRBlob('bad', '/bad.slang-module', notBytes)) {
+                throw new Error(`IR blob: ${notBytes} should not load`);
+            }
+            const notBytesError = module.getLastError();
+            if (!notBytesError || notBytesError.type !== 'USER' ||
+                notBytesError.result === module.SLANG_OK) {
+                throw new Error(`IR blob: ${notBytes} should set a USER error`);
+            }
+        }
         irProgram.delete();
         irMain.delete();
         loadedLib.delete();
-        libModule.delete();
         irSession.delete();
-        libSession.delete();
         console.log('IR blob smoke test passed');
 
         // Clean up

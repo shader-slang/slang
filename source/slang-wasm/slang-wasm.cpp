@@ -149,6 +149,14 @@ emscripten::val Session::loadModuleFromIRBlob(
     const std::string& path,
     emscripten::val bytes)
 {
+    if (bytes.isNull() || bytes.isUndefined() || !bytes.instanceof
+        (emscripten::val::global("Uint8Array")))
+    {
+        g_error.type = std::string("USER");
+        g_error.result = SLANG_E_INVALID_ARG;
+        g_error.message = std::string("loadModuleFromIRBlob: expected a Uint8Array");
+        return emscripten::val::null();
+    }
     const std::vector<uint8_t> data = emscripten::convertJSArrayToNumberVector<uint8_t>(bytes);
     Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data.data(), data.size());
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
