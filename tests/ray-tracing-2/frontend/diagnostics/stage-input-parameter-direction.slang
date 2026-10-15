@@ -45,5 +45,5 @@ void readInput(__constref rt::ClosestHitInput<HitContext> input) {}
 struct ClosestHitStage : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input) {}
+    static void invoke(rt::ClosestHitInput<HitContext> input) {}
 }

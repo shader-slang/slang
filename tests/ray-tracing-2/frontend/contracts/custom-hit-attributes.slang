@@ -35,7 +35,7 @@ struct ProceduralContext : rt::IHitContext
 struct InvalidClosestHit : rt::IClosestHitShader
 {
     typealias Context = TriangleContext;
-    void invoke(rt::ClosestHitInput<TriangleContext> input)
+    static void invoke(rt::ClosestHitInput<TriangleContext> input)
     {
         let attributes = input.attributes;
         let value = attributes.value;
@@ -46,7 +46,7 @@ struct InvalidClosestHit : rt::IClosestHitShader
 struct InvalidProceduralAnyHit : rt::IAnyHitShader
 {
     typealias Context = ProceduralContext;
-    void invoke(rt::AnyHitInput<ProceduralContext> input)
+    static void invoke(rt::AnyHitInput<ProceduralContext> input)
     {
         let attributes = input.attributes;
         let frontFacing = attributes.frontFacing;
@@ -60,7 +60,7 @@ struct InvalidGenericClosestHit<C : rt::IHitContext> : rt::IClosestHitShader
 {
     typealias Context = C;
 
-    void invoke(rt::ClosestHitInput<Context> input)
+    static void invoke(rt::ClosestHitInput<Context> input)
     {
         rt::TriangleData attributes = input.attributes;
 //CHECK: expected an expression of type 'rt.TriangleData', got 'C.Primitive.Attributes'
@@ -71,7 +71,7 @@ struct InvalidGenericAnyHit<C : rt::IHitContext> : rt::IAnyHitShader
 {
     typealias Context = C;
 
-    void invoke(rt::AnyHitInput<Context> input)
+    static void invoke(rt::AnyHitInput<Context> input)
     {
         let attributes = input.attributes;
         let barycentricCoord = attributes.barycentricCoord;

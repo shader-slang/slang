@@ -39,7 +39,7 @@ struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::ClosestHitInput<Context> input)
+    static void invoke(in rt::ClosestHitInput<Context> input)
     {
         input.payload.value = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x
@@ -53,7 +53,7 @@ struct AnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::AnyHitInput<Context> input)
+    static void invoke(in rt::AnyHitInput<Context> input)
     {
         input.payload.value = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x
@@ -67,7 +67,7 @@ struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         float candidateDistance = input.minDistance + input.rayFlags + input.primitiveIndex
             + input.geometryIndex + input.worldSpaceOrigin.x + input.worldSpaceDirection.x

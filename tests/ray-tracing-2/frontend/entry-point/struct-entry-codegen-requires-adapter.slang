@@ -23,8 +23,8 @@ struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::ClosestHitInput<HitContext> input)
-//CHECK: ^^^^^^ structural ray-tracing entry point was not lowered
-//CHECK: ^^^^^^ structural ray-tracing entry point 'ClosestHit.invoke' must be converted to a native adapter before target code generation
+    static void invoke(in rt::ClosestHitInput<HitContext> input)
+//CHECK:        ^^^^^^ structural ray-tracing entry point was not lowered
+//CHECK:        ^^^^^^ structural ray-tracing entry point 'ClosestHit.invoke' must be converted to a native adapter before target code generation
     {}
 }

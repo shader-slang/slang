@@ -32,7 +32,7 @@ struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         Attributes attributes = {};
         input.reportHit(1.0, attributes);

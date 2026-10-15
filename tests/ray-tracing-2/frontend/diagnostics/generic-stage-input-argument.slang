@@ -41,7 +41,7 @@ void consume<T>(T value)
 struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input)
+    static void invoke(rt::ClosestHitInput<HitContext> input)
     {
         consume(input);
 //CHECK:^^^^^^^ ray-tracing stage input cannot be used as a generic type argument
@@ -104,7 +104,7 @@ typealias LegalDescriptor = rt::TraceProgramDescriptor<TestSchema>;
 struct Miss : rt::IMissShader
 {
     typealias Context = HitContext;
-    void invoke(rt::MissInput<Context> input) {}
+    static void invoke(rt::MissInput<Context> input) {}
 }
 
 typealias LegalMissList = rt::MissShaderList<Miss>;

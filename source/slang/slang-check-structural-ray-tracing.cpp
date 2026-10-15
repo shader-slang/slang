@@ -14,7 +14,7 @@ namespace Slang
 // This file owns the structural ray-tracing rules and their declaration identities.
 // Ordinary interfaces, associated-type constraints, overload resolution, and capability inference
 // remain in the normal checker. Their call sites delegate here only for the additional rules:
-// stage receivers and inputs, stage selection, schema entry uniqueness, API mixing, and the
+// stage types and inputs, stage selection, schema entry uniqueness, API mixing, and the
 // boundary between logical shaders and native entry points. Each rule below states its example
 // and the representation or API contract it preserves.
 //
@@ -186,12 +186,14 @@ static StructuralRayTracingStageKind _getDirectStageInputKind(Type* type)
 //     struct StatefulClosestHit : rt::IClosestHitShader
 //     {
 //         uint state;
-//         ...
+//         typealias Context = HitContext;
+//         static void invoke(in rt::ClosestHitInput<Context> input) {}
 //     }
 //
-// The RT API selects StatefulClosestHit by type. It does not receive an application-created
-// StatefulClosestHit object containing a value for state, so this field is rejected. Application
-// data can be supplied through the payload or shader record instead.
+// A static invoke method has no this parameter, but ordinary interface conformance still allows
+// fields on its implementing struct. The RT API additionally requires the stage type to be
+// stateless, so this check rejects state. Per-invocation data belongs in the payload or shader
+// record supplied through input.
 // This check runs after StatefulClosestHit passes ordinary interface conformance checking in its
 // module. It rejects the field even if no entry point or schema ever uses StatefulClosestHit.
 // Entry-point selection is not what triggers this check.
@@ -216,7 +218,7 @@ static void _checkStructuralRayTracingStageStorage(
                          stageDeclRef.getDecl()->findModifier<MagicTypeModifier>());
 
     // A user-defined interface may refine a stage contract with additional requirements. It is
-    // not itself an executable implementation and therefore has no receiver to validate here.
+    // not itself a stage implementation whose instance fields need checking.
     if (stageDeclRef.as<InterfaceDecl>())
         return;
 
@@ -238,10 +240,9 @@ static void _checkStructuralRayTracingStageStorage(
     }
 
     auto structType = stageDeclRef.as<StructDecl>();
-    // A base struct contributes storage to the compiler-created stage value even though its
-    // fields are not direct members of the concrete implementation. Follow the checked base
-    // declaration references so generic base specializations use the same semantic inheritance
-    // path as ordinary struct layout.
+    // The field restriction also applies to inherited fields. Follow the checked base declaration
+    // references so generic base specializations use the same inheritance path as ordinary
+    // struct layout.
     for (auto currentType = structType; currentType;)
     {
         for (auto field : currentType.getDecl()->getFields())

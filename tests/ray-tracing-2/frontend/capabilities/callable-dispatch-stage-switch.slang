@@ -52,7 +52,7 @@ void callCallableFromHelper()
 struct AnyHit : rt::IAnyHitShader
 {
     typealias Context = TestHitContext;
-    void invoke(rt::AnyHitInput<TestHitContext> input)
+    static void invoke(rt::AnyHitInput<TestHitContext> input)
     {
         callCallableFromHelper();
     }
@@ -61,7 +61,7 @@ struct AnyHit : rt::IAnyHitShader
 struct TestCallable : rt::ICallableShader
 {
     typealias Context = TestCallableContext;
-    void invoke(rt::CallableInput<TestCallableContext> input) {}
+    static void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 
 struct TestHitGroup : rt::IHitGroup

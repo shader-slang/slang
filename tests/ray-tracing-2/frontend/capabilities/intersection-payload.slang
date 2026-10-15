@@ -54,7 +54,7 @@ struct AccessPayload : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         accessPayload(input);
         input.payload.value += 1;
@@ -66,7 +66,7 @@ struct ReadRecord : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         uint record = input.record;
     }
@@ -77,7 +77,7 @@ struct GuardedPayload : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         __target_switch
         {

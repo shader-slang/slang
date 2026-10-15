@@ -4,7 +4,7 @@ This report describes the changes the full implementation and demos need to adop
 [PR1](https://github.com/kaizhangNV/slang/pull/24).
 
 Reference: the current PR1 source and the shared-table design documented in this report and
-the accompanying source comments. Updated on 2026-10-13. The full implementation comparison point
+the accompanying source comments. Updated on 2026-10-14. The full implementation comparison point
 is `f96ab27c0` from [PR #12691](https://github.com/shader-slang/slang/pull/12691). The shared Metal
 layout is agreed design; its backend implementation is deferred.
 
@@ -171,7 +171,7 @@ public interface IMissShader
 {
     [KnownBuiltin(rt::__RayTracingBuiltin.StageContext)]
     associatedtype Context : IPayloadContext;
-    void invoke(in MissInput<Context> input);
+    static void invoke(in MissInput<Context> input);
 }
 ```
 
@@ -253,8 +253,19 @@ callable-data accessors use `[nonmutating] ref`, so the view can be immutable wh
 data remains mutable. Full-backend adapter synthesis must preserve this behavior for copied views.
 PR1 checks the source rules; it does not yet implement or test that target execution.
 
-An `invoke` method can be called as an ordinary function with an existing input. For example,
-a stage method can call another stage's static implementation:
+All five executable stage interfaces require `static void invoke(...)`. Add `static` to each
+closest-hit, any-hit, intersection, miss and callable implementation in demos and helper modules.
+`NoClosestHit<C>` and `NoAnyHit<C>` provide static no-op implementations; `NoIntersection<C>`
+still has no method. Ordinary Slang conformance checking rejects an instance method for this
+static requirement.
+
+A static method has no `this`. Keep the separate compiler restriction forbidding instance fields
+on stage structs: `static` alone does not forbid declaring fields. Per-invocation data still comes
+from the stage input. Generated adapters must call the static implementation with its input;
+they must not construct or pass a stage receiver. The source method's IR therefore has an input
+parameter and no receiver parameter.
+
+An `invoke` method can be called as an ordinary static function with an existing input. For example:
 
 ```slang
 struct SharedMiss : rt::IMissShader
@@ -269,17 +280,15 @@ struct SharedMiss : rt::IMissShader
 struct SkyMiss : rt::IMissShader
 {
     typealias Context = SkyContext;
-    void invoke(in rt::MissInput<Context> input)
+    static void invoke(in rt::MissInput<Context> input)
     {
         SharedMiss::invoke(input);
     }
 }
 ```
 
-This uses Slang's existing support for a static method implementing an interface requirement.
-The call uses the current invocation's input; it does not dispatch a new shader or select a new
-SBT record. Instance methods can similarly forward an input using an existing `this` receiver.
-The restriction on constructing stage objects remains separate.
+The type-qualified call uses the current invocation's input; it does not dispatch a new shader
+or select a new SBT record. The restriction on constructing stage objects remains separate.
 
 The adapter implementation must preserve an ordinary callable body when generating a native
 entry wrapper. Keep `StructuralRayTracingEntryPointInfo` on the entry wrapper, not on an ordinary

@@ -37,7 +37,7 @@ struct HitContextB : rt::IHitContext
 struct ClosestHitB : rt::IClosestHitShader
 {
     typealias Context = HitContextB;
-    void invoke(rt::ClosestHitInput<HitContextB> input) {}
+    static void invoke(rt::ClosestHitInput<HitContextB> input) {}
 }
 
 // A hit group cannot combine a stage using HitContextB with the group's HitContextA.

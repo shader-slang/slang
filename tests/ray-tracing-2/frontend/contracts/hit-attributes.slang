@@ -45,7 +45,7 @@ struct TriangleClosestHit : rt::IClosestHitShader
 {
     typealias Context = TriangleContext;
 
-    void invoke(rt::ClosestHitInput<Context> input)
+    static void invoke(rt::ClosestHitInput<Context> input)
     {
         rt::TriangleData attributes = input.attributes;
         input.payload.value = attributes.barycentricCoord.x + float(attributes.frontFacing);
@@ -56,7 +56,7 @@ struct TriangleAnyHit : rt::IAnyHitShader
 {
     typealias Context = TriangleContext;
 
-    void invoke(rt::AnyHitInput<Context> input)
+    static void invoke(rt::AnyHitInput<Context> input)
     {
         let attributes = input.attributes;
         input.payload.value = attributes.barycentricCoord.x + float(attributes.frontFacing);
@@ -67,7 +67,7 @@ struct ProceduralClosestHit : rt::IClosestHitShader
 {
     typealias Context = ProceduralContext;
 
-    void invoke(rt::ClosestHitInput<Context> input)
+    static void invoke(rt::ClosestHitInput<Context> input)
     {
         CustomAttributes attributes = input.attributes;
         input.payload.value = attributes.value + attributes.barycentricCoord.x;
@@ -78,7 +78,7 @@ struct ProceduralAnyHit : rt::IAnyHitShader
 {
     typealias Context = ProceduralContext;
 
-    void invoke(rt::AnyHitInput<Context> input)
+    static void invoke(rt::AnyHitInput<Context> input)
     {
         let attributes = input.attributes;
         input.payload.value = attributes.value + attributes.barycentricCoord.x;
@@ -90,7 +90,7 @@ struct GenericAnyHit<C : rt::IHitContext> : rt::IAnyHitShader
 {
     typealias Context = C;
 
-    void invoke(rt::AnyHitInput<Context> input)
+    static void invoke(rt::AnyHitInput<Context> input)
     {
         let attributes = input.attributes;
         C.Primitive.Attributes value = attributes;
@@ -103,7 +103,7 @@ struct ReadTriangleAttributes<C : rt::IHitContext> : rt::IClosestHitShader
 {
     typealias Context = C;
 
-    void invoke(rt::ClosestHitInput<Context> input)
+    static void invoke(rt::ClosestHitInput<Context> input)
     {
         rt::TriangleData attributes = input.attributes;
         let barycentricCoord = attributes.barycentricCoord;

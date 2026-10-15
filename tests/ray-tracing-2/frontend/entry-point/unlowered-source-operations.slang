@@ -51,14 +51,14 @@ struct EmptyMiss : rt::IMissShader
 {
     typealias Context = EmptyMissContext;
 
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct PayloadMiss : rt::IMissShader
 {
     typealias Context = PayloadMissContext;
 
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct CallableContext : rt::ICallableContext
@@ -72,7 +72,7 @@ struct Callable : rt::ICallableShader
 {
     typealias Context = CallableContext;
 
-    void invoke(in rt::CallableInput<Context> input) {}
+    static void invoke(in rt::CallableInput<Context> input) {}
 }
 
 struct Schema : rt::ITraceProgramSchema

@@ -29,5 +29,5 @@ struct InvalidTriangleIntersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(rt::IntersectionInput<HitContext> input) {}
+    static void invoke(rt::IntersectionInput<HitContext> input) {}
 }

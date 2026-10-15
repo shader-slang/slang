@@ -11,7 +11,7 @@ struct Miss : rt::IMissShader
 {
     typealias Context = input_copy::Context;
 
-    void invoke(in rt::MissInput<Context> input)
+    static void invoke(in rt::MissInput<Context> input)
     {
         let local = input;
         input_copy::updatePayload(rt::MissInput<Context>(local));

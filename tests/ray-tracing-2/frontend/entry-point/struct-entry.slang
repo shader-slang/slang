@@ -8,6 +8,14 @@
 // IR: [entryPoint({{.*}}"Stages.main"
 // IR-NEXT: [structuralRayTracingEntryPointInfo(
 // IR-SAME: "Stages.main"
+// The selected static method has exactly one parameter, input. No stage object is passed as this.
+// IR: [nameHint("Stages.main.invoke")]
+// IR-NEXT: func {{.*}} : Func(Void, specialize({{.*}}))
+// IR-NEXT: {
+// IR-NEXT: block {{.*}}(
+// IR-NEXT: [nameHint("input")]
+// IR-NEXT: param {{.*}} : specialize({{.*}})):
+// IR-NEXT: let
 
 import slang.raytracing;
 
@@ -36,7 +44,7 @@ struct main : rt::IClosestHitShader
 {
     typealias Context = ::HitContext;
 
-    void invoke(rt::ClosestHitInput<::HitContext> input)
+    static void invoke(rt::ClosestHitInput<::HitContext> input)
     {
         outputBuffer[0] = 0x12345678;
     }

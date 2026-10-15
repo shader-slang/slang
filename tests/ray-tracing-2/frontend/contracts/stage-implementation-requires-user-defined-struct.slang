@@ -38,14 +38,14 @@ class InvalidClosestHit : rt::IClosestHitShader
 */
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(rt::ClosestHitInput<Context> input) {}
 }
 
 extension float : rt::IClosestHitShader
 //CHECK:              ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(rt::ClosestHitInput<Context> input) {}
 }
 
 interface IGenericStageTarget {}
@@ -55,5 +55,5 @@ __generic<T : IGenericStageTarget> extension T : rt::IClosestHitShader
 //CHECK:                                             ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'T' must be declared as a struct
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(rt::ClosestHitInput<Context> input) {}
 }

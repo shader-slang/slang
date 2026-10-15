@@ -31,7 +31,7 @@ struct CurveClosestHit : rt::IClosestHitShader
 {
     typealias Context = CurveContext;
 
-    void invoke(rt::ClosestHitInput<Context> input)
+    static void invoke(rt::ClosestHitInput<Context> input)
     {
         rt::CurveData attributes = input.attributes;
         input.payload.value = attributes.parameter;
@@ -42,7 +42,7 @@ struct CurveAnyHit : rt::IAnyHitShader
 {
     typealias Context = CurveContext;
 
-    void invoke(rt::AnyHitInput<Context> input)
+    static void invoke(rt::AnyHitInput<Context> input)
     {
         let attributes = input.attributes;
         input.payload.value = attributes.parameter;

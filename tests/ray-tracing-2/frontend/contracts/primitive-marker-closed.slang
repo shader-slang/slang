@@ -32,7 +32,7 @@ struct HitContext : rt::IHitContext
 struct ClosestHitStage : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input) {}
+    static void invoke(rt::ClosestHitInput<HitContext> input) {}
 }
 
 struct HitGroup : rt::IHitGroup

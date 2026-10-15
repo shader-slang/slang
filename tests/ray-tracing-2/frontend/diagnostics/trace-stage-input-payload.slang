@@ -30,7 +30,7 @@ struct Miss : rt::IMissShader
 {
     typealias Context = MissContext;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<Schema> tracer;
         // A compiler-provided stage input may be read by this stage. It cannot become mutable

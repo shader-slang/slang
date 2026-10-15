@@ -10,27 +10,27 @@ import refined_miss_library;
 // existing input to the inherited IMissShader implementation.
 extension RefinedMiss
 {
-    void callDirectly(in rt::MissInput<RefinedMissContext> input)
+    static void callDirectly(in rt::MissInput<RefinedMissContext> input)
     {
-        this.invoke(input);
+        RefinedMiss::invoke(input);
     }
 }
 
 // An extension conformance owns the implementation outside the stage struct declaration.
 extension ExtensionMiss
 {
-    void callDirectly(in rt::MissInput<RefinedMissContext> input)
+    static void callDirectly(in rt::MissInput<RefinedMissContext> input)
     {
-        this.invoke(input);
+        ExtensionMiss::invoke(input);
     }
 }
 
-// The receiver and the selected implementation both carry this concrete payload substitution.
+// The stage type and the selected implementation both carry this concrete payload substitution.
 extension GenericMiss<uint>
 {
-    void callDirectly(in rt::MissInput<GenericMissContext<uint>> input)
+    static void callDirectly(in rt::MissInput<GenericMissContext<uint>> input)
     {
-        this.invoke(input);
+        GenericMiss<uint>::invoke(input);
     }
 }
 
@@ -38,28 +38,28 @@ extension GenericMiss<uint>
 // method lookup must still find it after the provider has been serialized.
 extension DefaultMiss
 {
-    void callDirectly(in rt::MissInput<RefinedMissContext> input)
+    static void callDirectly(in rt::MissInput<RefinedMissContext> input)
     {
-        this.invoke(input);
+        DefaultMiss::invoke(input);
     }
 }
 
-// Both receivers select the same generic method declaration. The call is allowed whether or
-// not the receiver also conforms to a stage interface.
+// Both types select the same generic static method declaration. The call is allowed whether
+// or not the type also conforms to a stage interface.
 extension OrdinaryInvokeProvider
 {
-    void callDirectly(in rt::MissInput<RefinedMissContext> input)
+    static void callDirectly(in rt::MissInput<RefinedMissContext> input)
     {
-        this.invoke(input);
+        OrdinaryInvokeProvider::invoke(input);
     }
 }
 
-// The method's generic extension only constrains IInvokeProvider; this receiver also uses it
+// The method's generic extension only constrains IInvokeProvider; this type also uses it
 // to implement the stage interface.
 extension SharedDefaultMiss
 {
-    void callDirectly(in rt::MissInput<RefinedMissContext> input)
+    static void callDirectly(in rt::MissInput<RefinedMissContext> input)
     {
-        this.invoke(input);
+        SharedDefaultMiss::invoke(input);
     }
 }

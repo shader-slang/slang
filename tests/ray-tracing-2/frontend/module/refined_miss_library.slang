@@ -22,7 +22,7 @@ public interface IRefinedMiss : rt::IMissShader {}
 public struct RefinedMiss : IRefinedMiss
 {
     public typealias Context = RefinedMissContext;
-    public void invoke(in rt::MissInput<Context> input) {}
+    public static void invoke(in rt::MissInput<Context> input) {}
 }
 
 public struct ExtensionMiss {}
@@ -30,7 +30,7 @@ public struct ExtensionMiss {}
 public extension ExtensionMiss : IRefinedMiss
 {
     public typealias Context = RefinedMissContext;
-    public void invoke(in rt::MissInput<Context> input) {}
+    public static void invoke(in rt::MissInput<Context> input) {}
 }
 
 public struct GenericMissContext<P> : rt::IPayloadContext
@@ -43,14 +43,14 @@ public struct GenericMissContext<P> : rt::IPayloadContext
 public struct GenericMiss<P> : IRefinedMiss
 {
     public typealias Context = GenericMissContext<P>;
-    public void invoke(in rt::MissInput<Context> input) {}
+    public static void invoke(in rt::MissInput<Context> input) {}
 }
 
 public interface IDefaultMiss : IRefinedMiss {}
 
 public extension<T : IDefaultMiss> T
 {
-    public void invoke(in rt::MissInput<Context> input) {}
+    public static void invoke(in rt::MissInput<Context> input) {}
 }
 
 public struct DefaultMiss : IDefaultMiss
@@ -65,7 +65,7 @@ public interface IInvokeProvider
 
 public extension<T : IInvokeProvider> T
 {
-    public void invoke(in rt::MissInput<Context> input) {}
+    public static void invoke(in rt::MissInput<Context> input) {}
 }
 
 public struct SharedDefaultMiss : IInvokeProvider, IRefinedMiss

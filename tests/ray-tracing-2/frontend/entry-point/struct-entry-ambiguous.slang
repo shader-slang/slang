@@ -28,6 +28,6 @@ struct MultiStage : rt::IClosestHitShader, rt::IAnyHitShader
 */
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input) {}
-    void invoke(rt::AnyHitInput<HitContext> input) {}
+    static void invoke(rt::ClosestHitInput<HitContext> input) {}
+    static void invoke(rt::AnyHitInput<HitContext> input) {}
 }

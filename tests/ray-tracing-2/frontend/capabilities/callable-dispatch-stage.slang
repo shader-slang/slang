@@ -52,9 +52,9 @@ void callCallableFromHelper()
 struct BadAnyHit : rt::IAnyHitShader
 {
     typealias Context = TestHitContext;
-    void invoke(rt::AnyHitInput<TestHitContext> input)
-//CHECK: ^^^^^^ dependencies not compatible on stage
-//CHECK: ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported.
+    static void invoke(rt::AnyHitInput<TestHitContext> input)
+//CHECK:        ^^^^^^ dependencies not compatible on stage
+//CHECK:        ^^^^^^ 'invoke' requires support for stage 'anyhit', but stage is unsupported.
     {
         callCallableFromHelper();
     }
@@ -63,9 +63,9 @@ struct BadAnyHit : rt::IAnyHitShader
 struct BadIntersection : rt::IIntersectionShader
 {
     typealias Context = TestProceduralContext;
-    void invoke(rt::IntersectionInput<TestProceduralContext> input)
-//CHECK: ^^^^^^ dependencies not compatible on stage
-//CHECK: ^^^^^^ 'invoke' requires support for stage 'intersection', but stage is unsupported.
+    static void invoke(rt::IntersectionInput<TestProceduralContext> input)
+//CHECK:        ^^^^^^ dependencies not compatible on stage
+//CHECK:        ^^^^^^ 'invoke' requires support for stage 'intersection', but stage is unsupported.
     {
         callCallableFromHelper();
     }
@@ -74,7 +74,7 @@ struct BadIntersection : rt::IIntersectionShader
 struct TestCallable : rt::ICallableShader
 {
     typealias Context = TestCallableContext;
-    void invoke(rt::CallableInput<TestCallableContext> input) {}
+    static void invoke(rt::CallableInput<TestCallableContext> input) {}
 }
 
 struct TestHitGroup : rt::IHitGroup

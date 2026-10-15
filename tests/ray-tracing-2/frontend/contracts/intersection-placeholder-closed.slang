@@ -27,7 +27,7 @@ struct FakeNoIntersection : rt::IIntersectionStage
 //CHECK:                        ^^^^^^^^^^^^^^^^^^ cannot inherit from type 'rt.IIntersectionStage' marked 'sealed' in module 'raytracing'
 {
     typealias Context = HitContext;
-    void invoke(rt::IntersectionInput<HitContext> input) {}
+    static void invoke(rt::IntersectionInput<HitContext> input) {}
 }
 
 struct HitGroup : rt::IHitGroup

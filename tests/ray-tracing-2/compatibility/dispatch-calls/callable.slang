@@ -26,7 +26,7 @@ struct HitContext : rt::IHitContext
 struct StructuralClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input)
+    static void invoke(rt::ClosestHitInput<HitContext> input)
     {
         dispatchCallable(input.payload);
     }

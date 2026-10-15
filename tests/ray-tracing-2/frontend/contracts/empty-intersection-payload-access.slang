@@ -25,7 +25,7 @@ struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         EmptyPayload payload = input.payload;
         input.payload = payload;

@@ -26,7 +26,7 @@ struct ClosestHit {}
 extension ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input)
+    static void invoke(rt::ClosestHitInput<HitContext> input)
     {
         outputBuffer[0] = 7;
     }

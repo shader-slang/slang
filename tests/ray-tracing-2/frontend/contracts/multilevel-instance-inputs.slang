@@ -40,7 +40,7 @@ struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::ClosestHitInput<Context> input)
+    static void invoke(in rt::ClosestHitInput<Context> input)
     {
         input.payload.value = readGenericPath<Context, TEST_DEPTH>(input);
         uint count = input.instanceCount;
@@ -57,7 +57,7 @@ struct AnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::AnyHitInput<Context> input)
+    static void invoke(in rt::AnyHitInput<Context> input)
     {
         uint count = input.instanceCount;
         for (uint level = 0; level < count; ++level)
@@ -73,7 +73,7 @@ struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         uint count = input.instanceCount;
         uint total = 0;

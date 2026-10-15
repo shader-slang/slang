@@ -61,7 +61,7 @@ struct TestMiss : rt::IMissShader
 {
     typealias Context = MissContext;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         traceRays(scene, descriptor, input.payload);
     }

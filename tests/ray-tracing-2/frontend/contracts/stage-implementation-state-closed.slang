@@ -1,6 +1,6 @@
 // A stage selected only through a closed schema must obey the same stateless contract as a struct
-// selected directly with `-entry StructName`. The compiler creates the stage receiver, so there is
-// no source instance from which it could initialize even an inherited `state` field.
+// selected directly with `-entry StructName`. Making invoke static does not permit instance
+// fields: the stage implementation must remain stateless, including any inherited fields.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -entry main -stage raygeneration -no-codegen
 
 #pragma warning(disable: 30816)
@@ -30,7 +30,7 @@ struct StatefulStageBase
 {
     uint state;
 //CHECK: ^^^^^ stateful structural ray-tracing stage
-//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations are compiler-created
+//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations must be stateless
 }
 
 struct StatefulClosestHit : StatefulStageBase,
@@ -38,7 +38,7 @@ struct StatefulClosestHit : StatefulStageBase,
 {
     typealias Context = HitContext;
 
-    void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(rt::ClosestHitInput<Context> input) {}
 }
 
 // Sharing one invalid base between stages must not duplicate the diagnostic on `state`.
@@ -47,7 +47,7 @@ struct SecondStatefulClosestHit : StatefulStageBase,
 {
     typealias Context = HitContext;
 
-    void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(rt::ClosestHitInput<Context> input) {}
 }
 
 struct HitGroup : rt::IHitGroup

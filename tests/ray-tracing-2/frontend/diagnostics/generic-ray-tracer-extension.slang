@@ -20,7 +20,7 @@ struct MissContext : rt::IPayloadContext
 struct TestMiss : rt::IMissShader
 {
     typealias Context = MissContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct TestSchema : rt::ITraceProgramSchema

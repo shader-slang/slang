@@ -32,7 +32,7 @@ void invalidAnyHitHelper(rt::ClosestHitInput<TestHitContext> input)
 struct TestClosestHit : rt::IClosestHitShader
 {
     typealias Context = TestHitContext;
-    void invoke(rt::ClosestHitInput<TestHitContext> input) { invalidAnyHitHelper(input); }
+    static void invoke(rt::ClosestHitInput<TestHitContext> input) { invalidAnyHitHelper(input); }
 }
 
 // An attributed entry point already has a concrete native stage. It must not inherit the logical

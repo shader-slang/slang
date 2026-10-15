@@ -29,10 +29,10 @@ struct M<PayloadType> : rt::IMissShader
 {
     typealias Context = MissContext<PayloadType>;
 
-    void invoke(in rt::MissInput<Context> input)
+    static void invoke(in rt::MissInput<Context> input)
 /*CODEGEN:
-         ^^^^^^ structural ray-tracing entry point was not lowered
-         ^^^^^^ structural ray-tracing entry point 'M.invoke' must be converted to a native adapter before target code generation
+                ^^^^^^ structural ray-tracing entry point was not lowered
+                ^^^^^^ structural ray-tracing entry point 'M.invoke' must be converted to a native adapter before target code generation
 */
     {}
 }

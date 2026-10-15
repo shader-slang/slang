@@ -24,7 +24,7 @@ struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::IntersectionInput<Context> input)
+    static void invoke(in rt::IntersectionInput<Context> input)
     {
         let distance = input.distance;
 //CHECK-DAG: 'distance' is not a member of 'rt.IntersectionInput<HitContext>'.
@@ -39,7 +39,7 @@ struct Miss : rt::IMissShader
 {
     typealias Context = HitContext;
 
-    void invoke(in rt::MissInput<Context> input)
+    static void invoke(in rt::MissInput<Context> input)
     {
         let primitiveIndex = input.primitiveIndex;
 //CHECK-DAG: 'primitiveIndex' is not a member of 'rt.MissInput<HitContext>'.

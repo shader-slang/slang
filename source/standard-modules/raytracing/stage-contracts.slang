@@ -11,6 +11,8 @@ namespace rt
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_closesthit` capability.
+/// Implementations must be user-defined structs without instance fields. `invoke` is static;
+/// per-invocation state is supplied through its input.
 [require(structural_raytracing_closesthit)]
 __magic_type(ClosestHitShaderType)
 public interface IClosestHitShader
@@ -28,7 +30,7 @@ public interface IClosestHitShader
 
     /// Implements the closest-hit stage selected for the committed hit.
     /// @param[in] input The committed-hit state described by `Context`.
-    void invoke(in ClosestHitInput<Context> input);
+    static void invoke(in ClosestHitInput<Context> input);
 }
 
 /// Represents the source implementation of an any-hit stage.
@@ -39,6 +41,8 @@ public interface IClosestHitShader
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_anyhit` capability.
+/// Implementations must be user-defined structs without instance fields. `invoke` is static;
+/// per-invocation state is supplied through its input.
 [require(structural_raytracing_anyhit)]
 __magic_type(AnyHitShaderType)
 public interface IAnyHitShader
@@ -56,7 +60,7 @@ public interface IAnyHitShader
 
     /// Implements the any-hit stage for an intersection candidate.
     /// @param[in] input The candidate-hit state described by `Context`.
-    void invoke(in AnyHitInput<Context> input);
+    static void invoke(in AnyHitInput<Context> input);
 }
 
 /// Represents either an intersection shader or the canonical `NoIntersection` placeholder.
@@ -101,6 +105,8 @@ public interface IIntersectionStage
 /// Inherits `Context : IHitContext` from `IIntersectionStage` and further requires
 /// `Context.Primitive : ICustomIntersectionPrimitive`. Requires the
 /// `structural_raytracing_intersection` capability.
+/// Implementations must be user-defined structs without instance fields. `invoke` is static;
+/// per-invocation state is supplied through its input.
 [require(structural_raytracing_intersection)]
 __magic_type(IntersectionShaderType)
 public interface IIntersectionShader : IIntersectionStage
@@ -109,7 +115,7 @@ public interface IIntersectionShader : IIntersectionStage
 
     /// Tests the procedural primitive and reports its intersections through `input.reportHit`.
     /// @param[in] input The ray and primitive state described by `Context` before reporting a hit.
-    void invoke(in IntersectionInput<Context> input);
+    static void invoke(in IntersectionInput<Context> input);
 }
 
 /// Represents the source implementation of a miss stage.
@@ -119,6 +125,8 @@ public interface IIntersectionShader : IIntersectionStage
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_miss` capability.
+/// Implementations must be user-defined structs without instance fields. `invoke` is static;
+/// per-invocation state is supplied through its input.
 [require(structural_raytracing_miss)]
 __magic_type(MissShaderType)
 public interface IMissShader
@@ -135,7 +143,7 @@ public interface IMissShader
 
     /// Implements the miss stage for a trace that finds no accepted hit.
     /// @param[in] input The ray, payload, and miss-record state described by `Context`.
-    void invoke(in MissInput<Context> input);
+    static void invoke(in MissInput<Context> input);
 }
 
 /// Represents the source implementation of a callable stage.
@@ -145,6 +153,8 @@ public interface IMissShader
 ///
 /// @par Constraints
 /// Requires the `structural_raytracing_callable` capability.
+/// Implementations must be user-defined structs without instance fields. `invoke` is static;
+/// per-invocation state is supplied through its input.
 [require(structural_raytracing_callable)]
 __magic_type(CallableShaderType)
 public interface ICallableShader
@@ -161,7 +171,7 @@ public interface ICallableShader
 
     /// Implements the callable stage selected by `RayTracer.callShader`.
     /// @param[in] input The callable-data and callable-record state described by `Context`.
-    void invoke(in CallableInput<Context> input);
+    static void invoke(in CallableInput<Context> input);
 }
 
 /// Selects no closest-hit stage for a hit group.
@@ -183,7 +193,7 @@ public struct NoClosestHit<C> : IClosestHitShader
 
     /// Satisfies the closest-hit shader contract without changing the hit or payload.
     /// @param[in] input The committed-hit state for `C`; this placeholder does not read it.
-    public void invoke(in ClosestHitInput<C> input) {}
+    public static void invoke(in ClosestHitInput<C> input) {}
 }
 
 /// Selects no any-hit stage for a hit group.
@@ -205,7 +215,7 @@ public struct NoAnyHit<C> : IAnyHitShader
 
     /// Satisfies the any-hit shader contract without rejecting or terminating the candidate.
     /// @param[in] input The candidate-hit state for `C`; this placeholder does not read it.
-    public void invoke(in AnyHitInput<C> input) {}
+    public static void invoke(in AnyHitInput<C> input) {}
 }
 
 /// Selects hardware intersection instead of a user intersection stage.

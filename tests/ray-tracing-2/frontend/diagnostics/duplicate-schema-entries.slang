@@ -39,7 +39,7 @@ struct MissContext : rt::IPayloadContext
 struct Miss : rt::IMissShader
 {
     typealias Context = MissContext;
-    void invoke(rt::MissInput<Context> input) {}
+    static void invoke(rt::MissInput<Context> input) {}
 }
 
 struct CallableContext : rt::ICallableContext
@@ -52,7 +52,7 @@ struct CallableContext : rt::ICallableContext
 struct Callable : rt::ICallableShader
 {
     typealias Context = CallableContext;
-    void invoke(rt::CallableInput<Context> input) {}
+    static void invoke(rt::CallableInput<Context> input) {}
 }
 
 // Each listed implementation receives one function index. Repeating a type in any section is

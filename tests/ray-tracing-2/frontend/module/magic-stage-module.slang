@@ -40,7 +40,7 @@ struct FirstContext<P> : rt::IPayloadContext
 struct FirstMiss<P> : first::IBackgroundStage
 {
     typealias Context = FirstContext<P>;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct SecondContext : rt::IPayloadContext
@@ -53,7 +53,7 @@ struct SecondContext : rt::IPayloadContext
 struct SecondMiss : second::IBackgroundStage
 {
     typealias Context = SecondContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 // CODEGEN: structural ray-tracing entry point 'FirstMiss.invoke' must be converted to a native adapter before target code generation

@@ -23,7 +23,7 @@ struct StatefulMiss : first::IBackgroundStage
     typealias Context = MissContext;
     uint state;
 //CHECK: ^^^^^ stateful structural ray-tracing stage
-//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations are compiler-created
+//CHECK: ^^^^^ instance field 'state' is not allowed because structural ray-tracing stage implementations must be stateless
 
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }

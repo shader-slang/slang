@@ -44,31 +44,31 @@ struct CallableContext : rt::ICallableContext
 struct ClosestHit : rt::IClosestHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::ClosestHitInput<HitContext> input) {}
+    static void invoke(rt::ClosestHitInput<HitContext> input) {}
 }
 
 struct AnyHit : rt::IAnyHitShader
 {
     typealias Context = HitContext;
-    void invoke(rt::AnyHitInput<HitContext> input) {}
+    static void invoke(rt::AnyHitInput<HitContext> input) {}
 }
 
 struct Intersection : rt::IIntersectionShader
 {
     typealias Context = HitContext;
-    void invoke(rt::IntersectionInput<HitContext> input) {}
+    static void invoke(rt::IntersectionInput<HitContext> input) {}
 }
 
 struct Miss : rt::IMissShader
 {
     typealias Context = MissContext;
-    void invoke(rt::MissInput<MissContext> input) {}
+    static void invoke(rt::MissInput<MissContext> input) {}
 }
 
 struct Callable : rt::ICallableShader
 {
     typealias Context = CallableContext;
-    void invoke(rt::CallableInput<CallableContext> input) {}
+    static void invoke(rt::CallableInput<CallableContext> input) {}
 }
 
 namespace local

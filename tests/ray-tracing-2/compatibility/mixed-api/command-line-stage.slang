@@ -21,7 +21,7 @@ struct StructuralMiss : rt::IMissShader
 */
 {
     typealias Context = MissContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 // This function has no shader attribute or legacy intrinsic call. Selecting it with -stage miss

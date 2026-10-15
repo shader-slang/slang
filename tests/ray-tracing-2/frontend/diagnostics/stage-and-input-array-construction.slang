@@ -18,7 +18,7 @@ struct TestContext : rt::IPayloadContext
 struct Miss : rt::IMissShader
 {
     typealias Context = TestContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 typealias Inputs = rt::MissInput<TestContext>[1];

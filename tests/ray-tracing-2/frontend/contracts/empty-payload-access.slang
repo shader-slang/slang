@@ -22,7 +22,7 @@ struct MissContext : rt::IPayloadContext
 struct Miss : rt::IMissShader
 {
     typealias Context = MissContext;
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         EmptyPayload payload = input.payload;
         input.payload = payload;

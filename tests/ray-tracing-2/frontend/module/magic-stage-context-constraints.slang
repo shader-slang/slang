@@ -36,11 +36,11 @@ struct SharedContext : IExtra, IRefinedPayloadContext
 struct ExtraBound : IExtraStage
 {
     typealias Context = SharedContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 struct RefinedPayloadBound : IRefinedStage
 {
     typealias Context = SharedContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }

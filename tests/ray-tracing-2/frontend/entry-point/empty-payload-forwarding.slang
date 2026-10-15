@@ -67,7 +67,7 @@ struct NativeNoMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<NativeNoMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<NativeNoMotion> tracer;
         tracer.trace({}, nativeScene, nativeNoMotionProgram);
@@ -78,7 +78,7 @@ struct NativePrimitiveMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<NativePrimitiveMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<NativePrimitiveMotion> tracer;
         tracer.trace({}, nativeScene, nativePrimitiveMotionProgram);
@@ -89,7 +89,7 @@ struct NativeInstanceMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<NativeInstanceMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<NativeInstanceMotion> tracer;
         tracer.trace({}, nativeScene, nativeInstanceMotionProgram);
@@ -100,7 +100,7 @@ struct NativeCombinedMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<NativeCombinedMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<NativeCombinedMotion> tracer;
         tracer.trace({}, nativeScene, nativeCombinedMotionProgram);
@@ -111,7 +111,7 @@ struct MultilevelNoMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<MultilevelNoMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<MultilevelNoMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelNoMotionProgram);
@@ -122,7 +122,7 @@ struct MultilevelPrimitiveMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<MultilevelPrimitiveMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<MultilevelPrimitiveMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelPrimitiveMotionProgram);
@@ -133,7 +133,7 @@ struct MultilevelInstanceMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<MultilevelInstanceMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<MultilevelInstanceMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelInstanceMotionProgram);
@@ -144,7 +144,7 @@ struct MultilevelCombinedMotionMiss : rt::IMissShader
 {
     typealias Context = MissContext<MultilevelCombinedMotion.TraceContext>;
 
-    void invoke(rt::MissInput<Context> input)
+    static void invoke(rt::MissInput<Context> input)
     {
         rt::RayTracer<MultilevelCombinedMotion> tracer;
         tracer.trace({}, multilevelScene, multilevelCombinedMotionProgram);

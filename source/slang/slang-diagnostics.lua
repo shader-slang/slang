@@ -4631,7 +4631,7 @@ err(
     "structural-ray-tracing-stage-instance-field",
     38056,
     "stateful structural ray-tracing stage",
-    span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations are compiler-created" }
+    span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations must be stateless" }
 )
 
 err(

@@ -32,7 +32,7 @@ struct MetalOnlyMiss : rt::IMissShader
 {
     typealias Context = MissContext;
 
-    void invoke(in rt::MissInput<Context> input)
+    static void invoke(in rt::MissInput<Context> input)
     {
         useMetalOnlyFeature();
 //HLSL: ^^^^^^^^^^^^^^^^^^^ see using of 'useMetalOnlyFeature'
@@ -57,5 +57,5 @@ struct CurveClosestHit : rt::IClosestHitShader
 {
     typealias Context = CurveHitContext;
 
-    void invoke(in rt::ClosestHitInput<Context> input) {}
+    static void invoke(in rt::ClosestHitInput<Context> input) {}
 }

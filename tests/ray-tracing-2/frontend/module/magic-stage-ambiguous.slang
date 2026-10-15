@@ -26,8 +26,8 @@ struct SharedContext : rt::IPayloadContext, rt::ICallableContext
 struct DualStage : first::IBackgroundStage, rt::ICallableShader
 {
     typealias Context = SharedContext;
-    void invoke(in rt::MissInput<Context> input) {}
-    void invoke(in rt::CallableInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::CallableInput<Context> input) {}
 }
 
 // Two application interfaces inherit the same rt::IMissShader requirement. Their witnesses
@@ -35,7 +35,7 @@ struct DualStage : first::IBackgroundStage, rt::ICallableShader
 struct SharedInvoke : first::IBackgroundStage, second::IBackgroundStage
 {
     typealias Context = SharedContext;
-    void invoke(in rt::MissInput<Context> input) {}
+    static void invoke(in rt::MissInput<Context> input) {}
 }
 
 // AMBIGUOUS: ambiguous structural ray-tracing entry point stage

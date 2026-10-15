@@ -24,7 +24,7 @@ struct TestHitContext : rt::IHitContext
 struct TestClosestHit : rt::IClosestHitShader
 {
     typealias Context = TestHitContext;
-    void invoke(rt::ClosestHitInput<TestHitContext> input) {}
+    static void invoke(rt::ClosestHitInput<TestHitContext> input) {}
 }
 
 struct TestHitGroup : rt::IHitGroup
