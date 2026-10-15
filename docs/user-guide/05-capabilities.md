@@ -294,7 +294,7 @@ is available.
 
 When `myFunc` is compiled for a target that has no matching case, such as CUDA, there is no code to generate for it. Normally the capability check rejects such a call
 first. When it does not, because `-ignore-capabilities` is set or because the function is used in a way the check does not cover (for example an exported
-function or a method called through dynamic dispatch), compilation fails with error E41037 if the function is used by an entry point, an export or dynamic dispatch
+function or a method called through dynamic dispatch), Slang reports error E41037 if the function is used by an entry point, an export or dynamic dispatch
 for that target. A function that nothing uses for the target does not cause the error.
 
 ### Capability Incompatibilities
