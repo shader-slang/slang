@@ -302,7 +302,8 @@ bool isUnsizedType(IRType* type);
 /// Test whether by-value storage for `type` contains a `DescriptorHandle<T>`.
 ///
 /// Examines struct fields, array elements, and tuple elements, so a handle nested in an
-/// aggregate is found as well as a bare one.
+/// aggregate is found as well as a bare one. Native pointers and parameter-group types remain
+/// leaves, and a recursive aggregate does not match.
 bool containsDescriptorHandleType(IRType* type);
 
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,

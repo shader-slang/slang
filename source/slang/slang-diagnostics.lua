@@ -5643,12 +5643,14 @@ err(
     span { loc = "location", message = "cannot bit-cast to existential (non-concrete) type" }
 )
 
+-- 41205 is reserved for "bit-cast-of-opaque-type" (draft shader-slang/slang#13507).
+
 err(
     "bit-cast-to-descriptor-handle",
     41206,
-    "cannot bit_cast to a DescriptorHandle",
-    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': a DescriptorHandle has a target-dependent representation and cannot be rebuilt from raw bits" },
-    note { message = "where the target supports it, construct the handle with DescriptorHandle<T>(uint2) instead", span { loc = "location" } }
+    "bit_cast cannot produce a DescriptorHandle",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': the destination is or contains a DescriptorHandle, whose representation depends on the target" },
+    note { message = "construct the handle with a DescriptorHandle constructor where the target provides one", span { loc = "location" } }
 )
 
 err(

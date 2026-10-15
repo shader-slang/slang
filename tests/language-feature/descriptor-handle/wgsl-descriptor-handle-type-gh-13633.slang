@@ -42,8 +42,10 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
                           sampledTexture.SampleLevel(sampler, float2(0), 0);
 }
 
+// CHECK: struct Material
+// CHECK-NEXT: {
+// CHECK-NEXT: texture_0 : vec2<u32>,
 // CHECK-DAG: gTexture_0 : vec2<u32>
-// CHECK-DAG: texture_0 : vec2<u32>
 // CHECK-DAG: fn makeHandle_0({{.*}}: vec2<u32>) -> vec2<u32>
 // CHECK-DAG: fn loadTexel_0({{.*}}: vec2<u32>) -> vec4<f32>
 // CHECK-DAG: fn unpackAnyValue8_0({{.*}}) -> vec2<u32>

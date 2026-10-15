@@ -225,7 +225,7 @@ static IRType* findContainedTypeWithProperty(
 {
     // A recursive by-value aggregate cannot have finite storage. `isOpaqueType` reports that
     // aggregate as an opaque match. Recursion alone does not establish that the aggregate
-    // contains an `IRUnsizedArrayType`.
+    // contains an `IRUnsizedArrayType` or a `DescriptorHandle`, so the other queries do not match.
     if (visited.contains(type))
     {
         if (property == ContainedTypeProperty::Opaque)

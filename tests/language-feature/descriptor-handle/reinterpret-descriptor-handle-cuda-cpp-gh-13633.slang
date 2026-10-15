@@ -25,7 +25,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     outputBits[tid.x] = bufferBits;
 }
 
-// CUDA: slang_bit_cast<CUtexObject>
+// CUDA-DAG: = (slang_bit_cast<uint4 >(
+// CUDA-DAG: = (slang_bit_cast<uint2 >(
+// CUDA-DAG: return (slang_bit_cast<CUtexObject>(
 // CUDA: void computeMain
-// CPP: slang_bit_cast<Texture2D<
+// CPP-DAG: = (slang_bit_cast<Vector<uint32_t, 4> >(
+// CPP-DAG: = (slang_bit_cast<Vector<uint32_t, 2> >(
+// CPP-DAG: return (slang_bit_cast<Texture2D<
 // CPP: void computeMain
