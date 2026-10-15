@@ -1056,6 +1056,42 @@ void WGSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, Declarator
     emitSimpleType(type);
 }
 
+// Emit the value of float literal `litInst`. A finite value is written with `suffix` ("f" or
+// "h"). WGSL has no NaN or infinity literal, and a const-expression that evaluates to one is a
+// shader-creation error, so those are emitted as calls to the given prelude helpers instead: NaN
+// as `<nanFunc>()`, and an infinity as `<infinityFunc>(true)` or `<infinityFunc>(false)`.
+void WGSLSourceEmitter::emitFloatLitValue(
+    IRConstant* litInst,
+    const char* nanPrelude,
+    const char* nanFunc,
+    const char* infinityPrelude,
+    const char* infinityFunc,
+    const char* suffix)
+{
+    switch (litInst->getFloatKind())
+    {
+    case IRConstant::FloatKind::Nan:
+        ensurePrelude(nanPrelude);
+        m_writer->emit(nanFunc);
+        m_writer->emit("()");
+        break;
+    case IRConstant::FloatKind::PositiveInfinity:
+        ensurePrelude(infinityPrelude);
+        m_writer->emit(infinityFunc);
+        m_writer->emit("(true)");
+        break;
+    case IRConstant::FloatKind::NegativeInfinity:
+        ensurePrelude(infinityPrelude);
+        m_writer->emit(infinityFunc);
+        m_writer->emit("(false)");
+        break;
+    default:
+        m_writer->emit(litInst->value.floatVal);
+        m_writer->emit(suffix);
+        break;
+    }
+}
+
 void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1179,34 +1215,13 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     break;
 
                 case BaseType::Float:
-                    {
-                        IRConstant::FloatKind kind = litInst->getFloatKind();
-                        switch (kind)
-                        {
-                        case IRConstant::FloatKind::Nan:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetNan);
-                                m_writer->emit("_slang_getNan()");
-                                break;
-                            }
-                        case IRConstant::FloatKind::PositiveInfinity:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
-                                m_writer->emit("_slang_getInfinity(true)");
-                                break;
-                            }
-                        case IRConstant::FloatKind::NegativeInfinity:
-                            {
-                                ensurePrelude(kWGSLBuiltinPreludeGetInfinity);
-                                m_writer->emit("_slang_getInfinity(false)");
-                                break;
-                            }
-                        default:
-                            m_writer->emit(litInst->value.floatVal);
-                            m_writer->emit("f");
-                            break;
-                        }
-                    }
+                    emitFloatLitValue(
+                        litInst,
+                        kWGSLBuiltinPreludeGetNan,
+                        "_slang_getNan",
+                        kWGSLBuiltinPreludeGetInfinity,
+                        "_slang_getInfinity",
+                        "f");
                     break;
 
                 case BaseType::Double:
