@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=PREFIX): -target wgsl -entry prefixCountBitsMain -stage compute
 //TEST:SIMPLE(filecheck=EQUAL): -target wgsl -entry allEqualMain -stage compute
 //TEST:SIMPLE(filecheck=QUAD): -target wgsl -entry quadReadLaneAtMain -stage compute
+//TEST:SIMPLE(filecheck=QUADMAT): -target wgsl -entry quadReadLaneAtMatrixMain -stage compute
 
 // WGSL lowering of WaveActiveCountBits, WavePrefixCountBits, WaveActiveAllEqual and
 // QuadReadLaneAt through WGSL subgroup and quad built-ins (#9972).
@@ -85,4 +86,19 @@ void quadReadLaneAtMain(uint3 tid: SV_DispatchThreadID)
     const bool2 b2 = QuadReadLaneAt(bool2(v > 1, v > 2), 1);
     outputBuffer[tid.x] = QuadReadLaneAt(v, v) + (b ? 8u : 0u) + (b2.x ? 16u : 0u) + (b2.y ? 32u : 0u);
     floatBuffer[tid.x] = QuadReadLaneAt(floatBuffer[tid.x], 2);
+}
+
+// A matrix is read row by row through the vector overload.
+// QUADMAT: fn [[VEC:QuadReadLaneAt_[0-9]+]]( sourceValue_{{[0-9]+}} : vec2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> vec2<f32>
+// QUADMAT: quadBroadcast(
+// QUADMAT: fn QuadReadLaneAt_{{[0-9]+}}( sourceValue_{{[0-9]+}} : mat2x2<f32>,  quadLaneID_{{[0-9]+}} : u32) -> mat2x2<f32>
+// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(0)],
+// QUADMAT: [[VEC]](sourceValue_{{[0-9]+}}[i32(1)],
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void quadReadLaneAtMatrixMain(uint3 tid: SV_DispatchThreadID)
+{
+    const float2x2 m = float2x2(floatBuffer[tid.x]);
+    const float2x2 r = QuadReadLaneAt(m, outputBuffer[tid.x]);
+    floatBuffer[tid.x] = float4(r[0], r[1]);
 }

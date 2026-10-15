@@ -17713,7 +17713,25 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
         __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__wgsl_extension(subgroups)
+matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID)
+{
+    __target_switch
+    {
+    case wgsl:
+        {
+            // Row by row through the vector overload (quadBroadcast takes no matrix).
+            matrix<T, N, M> result;
+            [ForceUnroll]
+            for (int i = 0; i < N; i++)
+                result[i] = QuadReadLaneAt(sourceValue[i], quadLaneID);
+            return result;
+        }
+    default:
+        __intrinsic_asm "QuadReadLaneAt";
+    }
+}
 
 /// @category wave
 __generic<T : __BuiltinType>
