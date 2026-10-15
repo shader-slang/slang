@@ -75,8 +75,8 @@ static bool hasNonFiniteHalf(uint32_t packedHalves)
 }
 
 // Return the argument of `inst` if `inst` is a one-argument intrinsic call whose WGSL text starts
-// with `unpack2x16float`, it is inside a function body, and its argument is an `IRIntLit` with an
-// Inf or NaN half; otherwise return null. The emitter then writes that argument as
+// with `unpack2x16float`, it is inside a function body, and its argument is a `uint` `IRIntLit`
+// with an Inf or NaN half; otherwise return null. The emitter then writes that argument as
 // `_slang_nonConstU32(<literal>)`.
 //
 // `unpack2x16float` is a `@const` builtin, so applied to a literal it is a const-expression, and
