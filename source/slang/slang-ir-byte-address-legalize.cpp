@@ -717,6 +717,10 @@ struct ByteAddressBufferLegalizationContext
             //
             if (m_options.useBitCastFromUInt)
             {
+                if (m_options.loadHalfFrom32BitWords && basicType->getOp() == kIROp_HalfType)
+                {
+                    return emitHalfLoadFrom32BitWord(buffer, baseOffset, immediateOffset);
+                }
                 if (auto unsignedType = getSameSizeUIntType(basicType))
                 {
                     auto unsignedVal =
@@ -998,6 +1002,37 @@ struct ByteAddressBufferLegalizationContext
             IRInst* loadArgs[] = {buffer, offset};
             return m_builder.emitIntrinsicInst(type, kIROp_ByteAddressBufferLoad, 2, loadArgs);
         }
+    }
+
+    // Load a `half` from a target without 16-bit integer types: load the 32-bit word that
+    // contains it, shift the wanted 16 bits down, and bit-cast the word to `vector<half, 2>`.
+    // On little-endian targets the low 16 bits of the shifted word are element 0.
+    IRInst* emitHalfLoadFrom32BitWord(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset)
+    {
+        auto offset = emitOffsetAddIfNeeded(baseOffset, immediateOffset);
+        auto offsetType = offset->getDataType();
+        auto alignedOffset = m_builder.emitMul(
+            offsetType,
+            m_builder.emitDiv(offsetType, offset, m_builder.getIntValue(offsetType, 4)),
+            m_builder.getIntValue(offsetType, 4));
+        IRInst* loadArgs[] = {buffer, alignedOffset};
+        auto word = m_builder.emitIntrinsicInst(
+            m_builder.getUIntType(),
+            kIROp_ByteAddressBufferLoad,
+            2,
+            loadArgs);
+        auto shiftAmount = m_builder.emitMul(
+            offsetType,
+            m_builder.emitSub(offsetType, offset, alignedOffset),
+            m_builder.getIntValue(offsetType, 8));
+        auto shifted = m_builder.emitShr(m_builder.getUIntType(), word, shiftAmount);
+        auto halfPair = m_builder.emitBitCast(
+            m_builder.getVectorType(m_builder.getBasicType(BaseType::Half), 2),
+            shifted);
+        return m_builder.emitElementExtract(halfPair, (IRIntegerValue)0);
     }
 
     IRInst* emitOffsetAddIfNeeded(IRInst* baseOffset, IRIntegerValue immediateOffset)
