@@ -30,6 +30,27 @@ static bool isMatrixDividedByScalar(IRInst* inst)
            (as<IRBasicType>(inst->getOperand(1)->getDataType()));
 }
 
+// Return a composite type with the shape of the shifted operand `compositeType` and the element
+// type `scalarType` of the scalar shift amount, because a shift keeps the amount's own element
+// type. For example, `int2x3 << uint` shifts by a `matrix<uint,2,3>`.
+static IRType* getShiftAmountCompositeType(
+    IRBuilder& builder,
+    IRType* compositeType,
+    IRType* scalarType)
+{
+    if (auto matrixType = as<IRMatrixType>(compositeType))
+    {
+        return builder.getMatrixType(
+            scalarType,
+            matrixType->getRowCount(),
+            matrixType->getColumnCount(),
+            matrixType->getLayout());
+    }
+    auto vectorType = as<IRVectorType>(compositeType);
+    SLANG_ASSERT(vectorType);
+    return builder.getVectorType(scalarType, vectorType->getElementCount());
+}
+
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
 // type, then the scalar is converted to a composite type.
 static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
@@ -43,11 +64,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         IRInst* scalarValue = inst->getOperand(1);
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
+                getShiftAmountCompositeType(builder, compositeType, scalarValue->getDataType());
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
     }
@@ -61,11 +79,8 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
         IRInst* scalarValue = inst->getOperand(0);
         // Retain the scalar type for shifts
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
             compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
+                getShiftAmountCompositeType(builder, compositeType, scalarValue->getDataType());
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
     }
