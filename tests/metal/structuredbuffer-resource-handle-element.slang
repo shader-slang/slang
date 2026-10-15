@@ -3,10 +3,11 @@
 //TEST:SIMPLE(filecheck=SAMP): -target metal -entry main_samp -stage compute
 //TEST:SIMPLE(filecheck=DH): -target metal -entry main_dh -stage compute
 
-// Resources are bindless on Metal, so a structured buffer whose element is
-// itself a resource, or a struct holding a `DescriptorHandle`, is stored as an
-// array of handles and compiles. Only a resource inside an aggregate element
-// is rejected with E38204 (tests/diagnostics/structuredbuffer-resource-metal.slang).
+// Resources are bindless on Metal, so type legalization keeps a structured
+// buffer element that is a resource, an array of resources, or a struct holding
+// a `DescriptorHandle`, and the buffer compiles. An element that legalization
+// would split, such as a struct with a texture field, is rejected with E38204
+// (tests/diagnostics/structuredbuffer-resource-metal.slang).
 
 RWStructuredBuffer<float4> outBuf;
 SamplerState samp;

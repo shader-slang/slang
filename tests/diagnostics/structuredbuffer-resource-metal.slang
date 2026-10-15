@@ -1,6 +1,6 @@
-// Metal reports E38204 at the declaration for a `StructuredBuffer<T>` whose
-// element type is an aggregate containing a texture, however the element is
-// read (#13654).
+// Metal reports E38204 at the declaration of a `StructuredBuffer<T>` whose
+// element type is a struct with a texture field, however the element is read
+// (#13654).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=SAMPLE): -target metal -entry main_sample -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=LOAD):   -target metal -entry main_load -stage compute
