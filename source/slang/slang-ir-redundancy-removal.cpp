@@ -218,12 +218,12 @@ struct RedundancyRemovalContext
     // reached through a parameter / phi / `select` still fails, because its root is not a global
     // (see `gh-12785-param-provenance.slang`).
     //
-    // Only `kIROp_Load` and `isResourceLoad` instructions are location-checked in the walk. Of the
-    // rest: a call is recursed, memory-inert control flow is stepped over, and anything that
-    // reports a side effect is rejected by `mightHaveSideEffects()`; a remaining side-effect-free
-    // instruction in neither read category (e.g. a descriptor-heap load) is inert here because its
-    // value is observable only through a subsequent `Load`/`isResourceLoad`, whose fail-closed
-    // `isRepeatableReadLocation` terminal rejects any non-global root.
+    // Only `kIROp_Load` and `doesOpReadResourceContents` instructions are location-checked in the
+    // walk. Of the rest: a call is recursed, memory-inert control flow is stepped over, and
+    // anything that reports a side effect is rejected by `mightHaveSideEffects()`; a remaining
+    // side-effect-free instruction in neither read category (e.g. a descriptor-heap load) is inert
+    // here because its value is observable only through a subsequent resource read, whose
+    // fail-closed `isRepeatableReadLocation` terminal rejects any non-global root.
     bool calleeIsRepeatableReadOnly(IRInst* callee, HashSet<IRInst*>& visiting)
     {
         auto func = as<IRFunc>(getResolvedInstForDecorations(callee));
@@ -261,11 +261,11 @@ struct RedundancyRemovalContext
                 // status out-param -- is not repeatable. Checked before the read cases below so a
                 // side-effecting resource load (e.g. `StructuredBufferLoadStatus`) is rejected even
                 // though its operand 0 is an immutable resource. Note this also conservatively
-                // rejects the pure-read resource loads that `mightHaveSideEffects()` still flags
-                // (`ImageLoad`, `ByteAddressBufferLoad`, `SubpassLoad`): only the side-effect-free
-                // structured-buffer loads reach the `isResourceLoad` branch below, so this tier
-                // commons `StructuredBuffer` wrappers but not read-only texture / byte-address
-                // wrappers -- a deliberate narrower scope.
+                // rejects the pure resource reads that `mightHaveSideEffects()` still flags
+                // (`ImageLoad`, `Sample`, `ByteAddressBufferLoad`, `SubpassLoad`, ...): only the
+                // side-effect-free structured-buffer loads reach the `doesOpReadResourceContents`
+                // branch below, so this tier commons `StructuredBuffer` wrappers but not read-only
+                // texture / byte-address wrappers -- a deliberate narrower scope.
                 if (inst->mightHaveSideEffects())
                 {
                     result = false;
@@ -296,7 +296,7 @@ struct RedundancyRemovalContext
                     }
                     continue;
                 }
-                if (isResourceLoad(inst->getOp()))
+                if (doesOpReadResourceContents(inst->getOp()))
                 {
                     if (!isRepeatableReadLocation(inst->getOperand(0)) ||
                         typeContainsNonRepeatableQualifiedMember(inst->getDataType()))

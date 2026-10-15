@@ -532,16 +532,6 @@ bool canAddressesPotentiallyAlias(
     IRInst* addr1,
     IRInst* addr2);
 
-// Returns true if `op` is one of the resource-load instruction forms (structured / byte-address
-// buffer loads, image / subpass loads) that read from a resource rather than an ordinary pointer,
-// so a caller reasoning about memory reads must handle them explicitly. This classifies the op form
-// ONLY; it says nothing about side-effect-freedom or immutability. The set is heterogeneous: the
-// status-returning loads (`StructuredBufferLoadStatus`/`RWStructuredBufferLoadStatus`) write an
-// out-param, `ImageLoad`/`SubpassLoad` are treated as side-effecting by `mightHaveSideEffects()`,
-// and `RWStructuredBufferLoad` reads mutable memory. A caller must still apply its own
-// side-effect / immutability checks (e.g. `mightHaveSideEffects()`, `isRepeatableReadLocation`).
-bool isResourceLoad(IROp op);
-
 String dumpIRToString(
     IRInst* root,
     IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});

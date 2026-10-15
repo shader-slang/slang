@@ -1343,23 +1343,6 @@ IRInst* getRootBufferOrAddr(IRInst* addr)
     return rootAddr;
 }
 
-bool isResourceLoad(IROp op)
-{
-    switch (op)
-    {
-    case kIROp_ImageLoad:
-    case kIROp_StructuredBufferLoad:
-    case kIROp_ByteAddressBufferLoad:
-    case kIROp_StructuredBufferLoadStatus:
-    case kIROp_RWStructuredBufferLoad:
-    case kIROp_RWStructuredBufferLoadStatus:
-    case kIROp_SubpassLoad:
-        return true;
-    default:
-        return false;
-    }
-}
-
 // The aliasing class of an address. This is used to determine
 // if two addresses may alias.
 enum class AddressAliasingClass
