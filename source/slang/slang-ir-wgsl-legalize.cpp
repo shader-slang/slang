@@ -240,6 +240,203 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     }
 };
 
+// A module-scope variable that holds an entry-point input: each entry point sets it once, before
+// anything else runs, from its parameter (e.g. the `subgroup_size` built-in, which
+// `translateGlobalVaryingVar` stores into a `var<private>` so that callees can read it).
+//
+// WGSL's uniformity analysis treats every read of a module-scope `var<private>` as possibly
+// non-uniform. A loop bound computed from `WaveGetLaneCount()` read that way makes a subgroup
+// operation in the loop fail validation (issue #8774), although the built-in is uniform. Pass the
+// value instead: entry points use the stored value directly, and every function that reads the
+// variable (directly or through its callees) receives it as an extra parameter. Values passed as
+// parameters keep their uniformity in WGSL's analysis.
+struct EntryPointGlobalThreadingContext
+{
+    IRModule* module;
+
+    // The value each entry point stores into the variable.
+    Dictionary<IRFunc*, IRInst*> valueByEntryPoint;
+    // The parameter added to each other function that needs the value.
+    Dictionary<IRFunc*, IRParam*> paramByFunc;
+
+    static bool isEntryPoint(IRFunc* func)
+    {
+        return func->findDecoration<IREntryPointDecoration>() != nullptr;
+    }
+
+    // Is `store` in the entry block of an entry point, with no call and no other access to the
+    // variable before it?
+    static bool isInitialStore(IRStore* store, IRGlobalVar* globalVar)
+    {
+        auto block = as<IRBlock>(store->getParent());
+        auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+        if (!func || block != func->getFirstBlock() || !isEntryPoint(func))
+            return false;
+        for (auto inst = block->getFirstInst(); inst && inst != store; inst = inst->getNextInst())
+        {
+            if (as<IRCall>(inst))
+                return false;
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (inst->getOperand(i) == globalVar)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    bool tryThread(IRGlobalVar* globalVar)
+    {
+        // A variable with an initializer is set before the entry point runs.
+        if (globalVar->getFirstBlock())
+            return false;
+        auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+        if (!ptrType)
+            return false;
+        auto valueType = ptrType->getValueType();
+
+        valueByEntryPoint.clear();
+        paramByFunc.clear();
+        List<IRLoad*> loads;
+        bool holdsEntryPointInput = false;
+        for (auto use = globalVar->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto load = as<IRLoad>(user))
+            {
+                loads.add(load);
+                continue;
+            }
+            // The `GlobalVariableShadowingGlobalParameter` decoration on the entry point's
+            // parameter marks a variable that holds an entry-point input; it is removed with the
+            // variable.
+            if (user->getOp() == kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+            {
+                holdsEntryPointInput = true;
+                continue;
+            }
+            auto store = as<IRStore>(user);
+            if (!store || store->getPtr() != globalVar || !isInitialStore(store, globalVar))
+                return false;
+            auto entryPoint = as<IRFunc>(store->getParent()->getParent());
+            // One initial store per entry point.
+            if (valueByEntryPoint.containsKey(entryPoint))
+                return false;
+            valueByEntryPoint[entryPoint] = store->getVal();
+        }
+        // Only variables that hold an entry-point input (a built-in or varying input that
+        // `translateGlobalVaryingVar` stores); other module-scope variables keep their storage.
+        if (!holdsEntryPointInput || loads.getCount() == 0)
+            return false;
+
+        // The functions that need the value: the ones that read the variable, and transitively
+        // every caller up to an entry point. Every use of such a function must be a direct call.
+        List<IRFunc*> needed;
+        HashSet<IRFunc*> neededSet;
+        auto addNeeded = [&](IRFunc* func) -> bool
+        {
+            if (!func)
+                return false;
+            if (isEntryPoint(func))
+                return valueByEntryPoint.containsKey(func);
+            if (!func->getFirstBlock())
+                return false;
+            if (neededSet.add(func))
+                needed.add(func);
+            return true;
+        };
+        for (auto load : loads)
+        {
+            if (!addNeeded(getParentFunc(load)))
+                return false;
+        }
+        for (Index i = 0; i < needed.getCount(); i++)
+        {
+            for (auto use = needed[i]->firstUse; use; use = use->nextUse)
+            {
+                auto call = as<IRCall>(use->getUser());
+                if (!call || call->getCalleeUse() != use)
+                    return false;
+                if (!addNeeded(getParentFunc(call)))
+                    return false;
+            }
+        }
+
+        // Add the parameter to every function that needs it.
+        IRBuilder builder(module);
+        for (auto func : needed)
+        {
+            auto firstBlock = func->getFirstBlock();
+            if (auto lastParam = firstBlock->getLastParam())
+                builder.setInsertAfter(lastParam);
+            else
+                builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            auto param = builder.emitParam(valueType);
+            if (auto nameHint = globalVar->findDecoration<IRNameHintDecoration>())
+                builder.addNameHintDecoration(param, nameHint->getName());
+            paramByFunc[func] = param;
+            fixUpFuncType(func);
+        }
+
+        // Pass it at every call site: the stored value in an entry point, the caller's own
+        // parameter elsewhere.
+        auto valueIn = [&](IRFunc* func) -> IRInst*
+        {
+            if (auto value = valueByEntryPoint.tryGetValue(func))
+                return *value;
+            return paramByFunc[func];
+        };
+        for (auto func : needed)
+        {
+            List<IRCall*> calls;
+            for (auto use = func->firstUse; use; use = use->nextUse)
+            {
+                if (auto call = as<IRCall>(use->getUser()))
+                    calls.add(call);
+            }
+            for (auto call : calls)
+            {
+                List<IRInst*> args;
+                for (UInt i = 0; i < call->getArgCount(); i++)
+                    args.add(call->getArg(i));
+                args.add(valueIn(getParentFunc(call)));
+                builder.setInsertBefore(call);
+                auto newCall = builder.emitCallInst(call->getFullType(), func, args);
+                call->transferDecorationsTo(newCall);
+                call->replaceUsesWith(newCall);
+                call->removeAndDeallocate();
+            }
+        }
+
+        // Read the value instead of the variable.
+        for (auto load : loads)
+        {
+            load->replaceUsesWith(valueIn(getParentFunc(load)));
+            load->removeAndDeallocate();
+        }
+        // The variable is now only stored to, or named by decorations.
+        List<IRInst*> users;
+        for (auto use = globalVar->firstUse; use; use = use->nextUse)
+            users.add(use->getUser());
+        for (auto user : users)
+            user->removeAndDeallocate();
+        globalVar->removeAndDeallocate();
+        return true;
+    }
+
+    void processModule()
+    {
+        List<IRGlobalVar*> globalVars;
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (auto globalVar = as<IRGlobalVar>(inst))
+                globalVars.add(globalVar);
+        }
+        for (auto globalVar : globalVars)
+            tryThread(globalVar);
+    }
+};
+
 void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -266,6 +463,10 @@ void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, Diagnosti
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
     GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
+
+    // Pass entry-point inputs that were stored in module-scope variables as values, so that
+    // WGSL's uniformity analysis can see that uniform built-ins are uniform.
+    EntryPointGlobalThreadingContext{module}.processModule();
 }
 
 struct WGSLAddressSpaceAssigner : InitialAddressSpaceAssigner
