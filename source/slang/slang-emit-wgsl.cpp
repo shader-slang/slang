@@ -1834,7 +1834,20 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     OrderedDictionary<String, String> severityByRule;
     for (auto& value :
          getTargetProgram()->getOptionSet().getArray(CompilerOptionName::WGSLDiagnostic))
+    {
+        // The command line validates its operand, but API option entries arrive unchecked.
+        if (!isValidWGSLDiagnosticFilter(
+                value.stringValue.getUnownedSlice(),
+                value.stringValue2.getUnownedSlice()))
+        {
+            getSink()->diagnose(Diagnostics::InvalidWgslDiagnosticFilter{
+                .severity = value.stringValue,
+                .rule = value.stringValue2,
+                .syntax = kWGSLDiagnosticFilterSyntax});
+            continue;
+        }
         severityByRule[value.stringValue2] = value.stringValue;
+    }
     for (auto& ruleAndSeverity : severityByRule)
     {
         m_writer->emit("diagnostic(");

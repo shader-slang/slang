@@ -438,14 +438,6 @@ Treat enum types as unscoped by default. (Note: enum class remains scoped.)
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
 
 
-<a id="wgsl-diagnostic"></a>
-### -wgsl-diagnostic
-
-**-wgsl-diagnostic &lt;severity&gt;:&lt;rule&gt;**
-
-Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off. Can be repeated; for a repeated rule the last severity is used. Ignored for other targets. 
-
-
 <a id="conformance"></a>
 ### -conformance
 
@@ -685,6 +677,14 @@ Specify the byte stride for the resource descriptor heap when generating SPIRV w
 **-spirv-sampler-heap-stride &lt;stride&gt;**
 
 Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
+
+
+<a id="wgsl-diagnostic"></a>
+### -wgsl-diagnostic
+
+**-wgsl-diagnostic &lt;severity&gt;:&lt;rule&gt;**
+
+Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off; &lt;rule&gt; is a WGSL identifier or two identifiers separated by a period. Can be repeated; for a repeated rule the last severity is used. Ignored for other targets. 
 
 
 <a id="spirv-unified-descriptor-heap-stride"></a>

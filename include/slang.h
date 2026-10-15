@@ -1364,7 +1364,8 @@ typedef uint32_t SlangSizeT;
         EnableExtendedHLSLBackwardsCompatibility = 163,
 
         // WGSL only. stringValue0: severity (`error`, `warning`, `info` or `off`); stringValue1:
-        // diagnostic rule name (e.g. `subgroup_uniformity`). Repeatable. Emits a
+        // diagnostic rule name: an identifier, or two separated by a period (e.g.
+        // `subgroup_uniformity`). Invalid values are reported as errors. Repeatable. Emits a
         // `diagnostic(<severity>, <rule>);` global directive; for a repeated rule the last one
         // wins. CLI spelling: `-wgsl-diagnostic <severity>:<rule>`.
         WGSLDiagnostic = 164,
