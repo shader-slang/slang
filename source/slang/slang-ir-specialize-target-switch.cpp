@@ -10,16 +10,13 @@
 
 namespace Slang
 {
-// A `__target_switch` with no case for the current target is legal as long as the code that
-// contains it is never generated: the core module links such functions into every target and
-// relies on DCE to remove the ones that are not called (e.g. `__sincos_metal` on CUDA). We
-// therefore do not diagnose here. Instead we mark the `missingReturn` that replaces the switch
-// with the name of its function, which is lost once the function is inlined, so that it can be
-// reported if it survives to code generation. The `missingReturn` takes the switch location, which
-// inlining replaces with the location of the call.
+// Mark `missingReturn`, which replaces `targetSwitch` in `code`, as having no case for the
+// target, and give it the switch's location so that E41037 points at the switch (or, once `code`
+// is inlined, at the call). We record the function name as a string because it is needed after
+// `code` has been inlined into its callers.
 static void markMissingReturnAsNoTargetCase(
     IRBuilder& builder,
-    IRInst* missingReturn,
+    IRMissingReturn* missingReturn,
     IRGlobalValueWithCode* code,
     IRTargetSwitch* targetSwitch)
 {
@@ -107,7 +104,13 @@ void specializeTargetSwitch(
                         .location = targetSwitch->sourceLoc,
                     });
                 }
-                auto missingReturn = builder.emitMissingReturn();
+                // A switch with no case at all is not diagnosed here: the function may be one
+                // that linking pulled in only through another target's case, such as
+                // `__sincos_metal`, referenced from the `metal` case of `sincos`, which DCE
+                // removes once that switch is resolved. The `failedImplies` switch is left
+                // unmarked because E41011 above is an error and `linkAndOptimizeIR` stops after
+                // linking when there are errors.
+                auto missingReturn = cast<IRMissingReturn>(builder.emitMissingReturn());
                 if (!failedImplies)
                     markMissingReturnAsNoTargetCase(builder, missingReturn, code, targetSwitch);
             }
@@ -133,18 +136,17 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
     }
 }
 
-bool isNoTargetCaseMissingReturn(IRMissingReturn* missingReturn)
+IRNoTargetCaseDecoration* findNoTargetCaseDecoration(IRMissingReturn* missingReturn)
 {
-    return missingReturn->findDecoration<IRNoTargetCaseDecoration>() != nullptr;
+    return missingReturn->findDecoration<IRNoTargetCaseDecoration>();
 }
 
 void diagnoseNoTargetCase(
     IRMissingReturn* missingReturn,
+    IRNoTargetCaseDecoration* noTargetCase,
     CodeGenTarget target,
     DiagnosticSink* sink)
 {
-    auto noTargetCase = missingReturn->findDecoration<IRNoTargetCaseDecoration>();
-    SLANG_ASSERT(noTargetCase);
     sink->diagnose(Diagnostics::TargetSwitchNoCaseForTarget{
         .funcName = noTargetCase->getFuncNameOperand()->getStringSlice(),
         .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
@@ -153,7 +155,7 @@ void diagnoseNoTargetCase(
     diagnoseCallStack(missingReturn, sink);
 }
 
-void diagnoseReachableNoTargetCase(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
+void diagnoseRemainingNoTargetCases(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -163,8 +165,10 @@ void diagnoseReachableNoTargetCase(IRModule* module, CodeGenTarget target, Diagn
         for (auto block : code->getBlocks())
         {
             auto missingReturn = as<IRMissingReturn>(block->getTerminator());
-            if (missingReturn && isNoTargetCaseMissingReturn(missingReturn))
-                diagnoseNoTargetCase(missingReturn, target, sink);
+            if (!missingReturn)
+                continue;
+            if (auto noTargetCase = findNoTargetCaseDecoration(missingReturn))
+                diagnoseNoTargetCase(missingReturn, noTargetCase, target, sink);
         }
     }
 }

@@ -2590,11 +2590,19 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.lateRequireCapability)
         SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
-    // A `missingReturn` left by a `__target_switch` without a case for this target is only
-    // produced at link time, before the last `calcRequiredLoweringPassSet` scan, so the
-    // `missingReturn` flag covers it.
+    // This runs after the DCE above so that functions only referenced through another target's
+    // `__target_switch` case are gone. Targets that reject missing returns have already reported
+    // E41037 from `checkForMissingReturns` and stopped at the error-count check after it, unless
+    // `-disable-non-essential-validations` skipped that check. A `missingReturn` with no target
+    // case is only produced at link time, before the last `calcRequiredLoweringPassSet` scan, so
+    // the `missingReturn` flag covers it. We stop here on an error because the remaining passes
+    // would lower code that cannot be generated.
     if (requiredLoweringPassSet.missingReturn)
-        SLANG_PASS(diagnoseReachableNoTargetCase, target, sink);
+    {
+        SLANG_PASS(diagnoseRemainingNoTargetCases, target, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     SLANG_PASS(cleanUpVoidType);
 
