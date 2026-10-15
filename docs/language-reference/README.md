@@ -1,20 +1,4 @@
-> Note: This document is a work in progress. It is both incomplete and, in many cases, inaccurate.
+# Slang Language Reference
 
-Slang Language Reference
-========================
-
-Contents
---------
-
-* [Introduction](introduction.md)
-* [Basic Concepts](basics.md)
-* [Lexical Structure](lexical-structure.md)
-* [Preprocessor](preprocessor.md)
-* [Types](types.md)
-* [Generics](generics.md)
-* [Expressions](expressions.md)
-* [Statements](statements.md)
-* [Declarations](declarations.md)
-* [Attributes](attributes.md)
-* [Graphics Shaders and Compute Kernels](shaders-and-kernels.md)
-* [Glossary](glossary.md)
+The language reference manual has moved to the [shader-slang/spec](https://github.com/shader-slang/spec)
+repository in the [specification](https://github.com/shader-slang/spec/tree/main/specification) folder.

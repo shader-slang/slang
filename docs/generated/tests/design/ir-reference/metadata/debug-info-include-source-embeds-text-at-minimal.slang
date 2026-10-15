@@ -13,7 +13,7 @@
 // impossible: at Minimal the text operand is empty, but the flag overrides
 // that without raising the level. The test compiles at `-g1` with the flag and
 // requires the record to hold the shader's own declaration text, while the
-// same run must still not have gained the records that only Standard brings --
+// same run must still not have gained the variable records that only Standard brings --
 // which is what shows the flag moved the text operand and not the level.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1 -debug-info-include-source
@@ -29,7 +29,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 // The embedded text is the whole file on one line, with newlines escaped, so
 // the buffer declaration above appears inside the string operand.
 // CHECK: = DebugSource("{{.*}}", "{{.*}}uniform RWStructuredBuffer<int> markerBuffer;{{.*}}", false)
-// The level is still Minimal, so no compilation unit was built. The opcode
-// name is split by a one-character regex so that this very line, echoed back
-// inside the source operand above, cannot satisfy its own CHECK-NOT.
-// CHECK-NOT: = DebugCompilation{{U}}nit(
+// The level is still Minimal, so the variable-level records were not built.
+// The opcode name is split by a one-character regex so that this very line,
+// echoed back inside the source operand above, cannot satisfy its own
+// CHECK-NOT.
+// CHECK-NOT: = DebugVa{{r}}(

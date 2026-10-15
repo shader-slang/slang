@@ -7,6 +7,7 @@
 #include "replay-shared.h"
 #include "replay-stream.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -403,10 +404,13 @@ public:
     /// Allocates replay-owned arena storage from the module that owns the replay context.
     SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
 
-    /// Lock the context for thread-safe access.
-    /// Returns an RAII lock guard.
-    SLANG_API std::unique_lock<std::recursive_mutex> lock()
+    /// Lock the context if the record layer is active.
+    /// Returns an RAII guard that does not own the mutex when idle.
+    SLANG_API std::unique_lock<std::recursive_mutex> lockIfActive()
     {
+        ensureInitialized();
+        if (!isActive())
+            return std::unique_lock<std::recursive_mutex>(m_mutex, std::defer_lock);
         return std::unique_lock<std::recursive_mutex>(m_mutex);
     }
 
@@ -602,6 +606,8 @@ public:
     /// destructor can't safely call queryInterface — ref count is already 0).
     inline void unregisterProxy(ISlangUnknown* proxyIdentity)
     {
+        // Locks even when idle: a proxy can be released after the layer is disabled.
+        std::lock_guard<std::recursive_mutex> guard(m_mutex);
         unregisterProxyImpl(proxyIdentity);
     }
 
@@ -823,7 +829,7 @@ private:
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     size_t m_replayArenaAllocationSize = 0;
-    Mode m_mode;
+    std::atomic<Mode> m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
     // Handle tracking: maps objects to handles and back
@@ -851,8 +857,7 @@ private:
     // TTY logging
     bool m_ttyLogging = false; ///< Whether to log calls to stderr
 
-    // Deferred initialization (to avoid global init order issues with CharEncoding)
-    bool m_initialized = false; ///< True after ensureInitialized() has run
+    std::once_flag m_initFlag;
 
     // Map from function signature to handler
     Dictionary<String, PlaybackHandler> m_handlers;

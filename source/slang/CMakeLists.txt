@@ -73,8 +73,7 @@ target_include_directories(
 # Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
 # GCC/Clang don't have this issue, so they get size optimization in all configs.
 string(
-    CONCAT
-    RICH_DIAG_SIZE_OPT_FLAGS
+    CONCAT RICH_DIAG_SIZE_OPT_FLAGS
     "$<$<NOT:"
     "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
     ">:"
@@ -440,8 +439,7 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create a minimal C++ source file (some linkers require at least one source)
     set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
     file(
-        WRITE
-        "${SLANG_PROXY_STUB_CPP}"
+        WRITE "${SLANG_PROXY_STUB_CPP}"
         "// Minimal stub file for slang.dll proxy\n"
         "// All exports are forwarded to slang-compiler.dll via the .def file\n"
     )
@@ -455,8 +453,7 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
         "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake"
     )
     file(
-        GENERATE OUTPUT
-        "${DEF_GEN_WRAPPER}"
+        GENERATE OUTPUT "${DEF_GEN_WRAPPER}"
         CONTENT
             "
 set(DLL_PATH \"$<TARGET_FILE:slang>\")

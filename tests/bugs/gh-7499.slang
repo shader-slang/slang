@@ -1,5 +1,4 @@
 //TEST:EXECUTABLE:
-[mutating]
 public void f(Ptr<int> arr, inout int size)
 {
     for (int i = 0; i < 1; ++i)
