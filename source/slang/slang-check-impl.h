@@ -2219,9 +2219,10 @@ public:
 
     /// Checks an object-oriented `this` expression without registering a lambda capture.
     ///
-    /// `ConstructLookupResultExpr` uses this operation when it reconstructs an implicit receiver,
-    /// because capture registration belongs to the surrounding expression-checking path. The
-    /// ordinary `this` expression visitor registers its own capture after calling this operation.
+    /// `ConstructLookupResultExpr` uses this operation when it reconstructs an implicit `this`
+    /// expression, because capture registration belongs to the surrounding expression-checking
+    /// path. The ordinary `this` expression visitor registers its own capture after calling this
+    /// operation.
     Expr* checkThisExprWithoutCapturing(ThisExpr* expr);
 
     /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
@@ -2512,10 +2513,10 @@ public:
 
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
 
-    /// Diagnoses repeated or conflicting receiver-mode specifiers directly attached to `decl`.
+    /// Diagnoses repeated or conflicting receiver parameter mode specifiers attached to `decl`.
     ///
     /// Requires checked modifiers, so attributes have their concrete attribute classes.
-    void checkThisParamModeSpecifiers(Decl* decl);
+    void checkReceiverParamModeSpecifiers(Decl* decl);
 
     void checkVisibility(Decl* decl);
 

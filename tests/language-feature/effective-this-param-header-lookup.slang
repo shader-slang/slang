@@ -1,7 +1,7 @@
 //TEST:SIMPLE: -no-codegen
 
 // Parameter types can refer to `this` before signature checking has attached the containing
-// method's effective receiver parameter. Default arguments also perform member lookup and must
+// method's receiver parameter information. Default arguments also perform member lookup and must
 // use the same receiver mode as an explicit `this` expression. This test stops after header
 // checking because default-argument expansion does not materialize a default expression that
 // mutates its receiver.

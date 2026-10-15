@@ -17408,15 +17408,15 @@ Type* SemanticsVisitor::calcThisType(Type* type)
     }
 }
 
-/// Does `modifier` specify the parameter-passing mode of a declaration's receiver?
+/// Does `modifier` specify the passing mode of a declaration's receiver parameter?
 static bool _isReceiverParamModeSpecifier(Modifier* modifier)
 {
-    if (as<ReceiverModeSpecifierAttribute>(modifier))
+    if (as<ReceiverParamModeSpecifierAttribute>(modifier))
         return true;
-    return as<CppStyleTrailingThisParamConstModifier>(modifier) != nullptr;
+    return as<CppStyleTrailingReceiverParamConstModifier>(modifier) != nullptr;
 }
 
-/// Return the receiver-mode specifiers directly attached to `decl`, in the order written.
+/// Return the receiver parameter mode specifiers attached to `decl`, in the order written.
 static ShortList<Modifier*, 1> _getReceiverParamModeSpecifiers(Decl* decl)
 {
     ShortList<Modifier*, 1> specifiers;
@@ -17424,15 +17424,15 @@ static ShortList<Modifier*, 1> _getReceiverParamModeSpecifiers(Decl* decl)
     // `CompleteDecl` appends prefix attributes after the parser has attached trailing `const`.
     // We collect attributes first so a conflict is diagnosed at the later trailing `const`.
     for (auto modifier : decl->modifiers)
-        if (as<ReceiverModeSpecifierAttribute>(modifier))
+        if (as<ReceiverParamModeSpecifierAttribute>(modifier))
             specifiers.add(modifier);
     for (auto modifier : decl->modifiers)
-        if (as<CppStyleTrailingThisParamConstModifier>(modifier))
+        if (as<CppStyleTrailingReceiverParamConstModifier>(modifier))
             specifiers.add(modifier);
     return specifiers;
 }
 
-void SemanticsVisitor::checkThisParamModeSpecifiers(Decl* decl)
+void SemanticsVisitor::checkReceiverParamModeSpecifiers(Decl* decl)
 {
     // Each declaration can specify its receiver mode only once, so identical repeats are
     // diagnosed just like conflicting spellings.
@@ -17468,9 +17468,9 @@ static std::optional<ParamPassingMode> _calcReceiverParamModeFromSpecifiers(Decl
         return ParamPassingMode::Ref;
     if (as<NonmutatingAttribute>(specifier))
         return ParamPassingMode::In;
-    if (as<CppStyleTrailingThisParamConstModifier>(specifier))
+    if (as<CppStyleTrailingReceiverParamConstModifier>(specifier))
         return ParamPassingMode::In;
-    SLANG_UNREACHABLE("all receiver-mode specifiers handled");
+    SLANG_UNREACHABLE("all receiver parameter mode specifiers handled");
 }
 
 ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
@@ -17499,7 +17499,8 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
 /// Return the mode specified by the outermost declaration in `policyDecls` that has a specifier.
 ///
 /// Requires innermost-to-outermost declaration order. Returns no mode if none is specified.
-static std::optional<ParamPassingMode> _foldThisParamModePolicies(List<Decl*> const& policyDecls)
+static std::optional<ParamPassingMode> _foldReceiverParamModeSpecifiers(
+    List<Decl*> const& policyDecls)
 {
     std::optional<ParamPassingMode> mode;
     for (auto policyDecl : policyDecls)
@@ -17510,7 +17511,11 @@ static std::optional<ParamPassingMode> _foldThisParamModePolicies(List<Decl*> co
     return mode;
 }
 
-static void _diagnoseThisParamModeAttributes(
+/// Diagnose receiver parameter mode specifiers on declarations that cannot use them.
+///
+/// Requires declarations for class members when `isClassMember` is true, or declarations
+/// without a receiver parameter otherwise.
+static void _diagnoseReceiverParamModeSpecifiers(
     SemanticsVisitor* semantics,
     List<Decl*> const& policyDecls,
     bool isClassMember)
@@ -17525,12 +17530,12 @@ static void _diagnoseThisParamModeAttributes(
             if (isClassMember)
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeSpecifierOnClassMember{.specifier = modifier});
+                    Diagnostics::ReceiverParamModeSpecifierOnClassMember{.specifier = modifier});
             }
             else
             {
                 semantics->getSink()->diagnose(
-                    Diagnostics::ThisParamModeSpecifierWithoutEffectiveThisParam{
+                    Diagnostics::ReceiverParamModeSpecifierWithoutReceiverParam{
                         .specifier = modifier});
             }
         }
@@ -17575,7 +17580,7 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     auto diagnoseModeAttributes = [&](bool isClassMember)
     {
         if (shouldDiagnoseModeAttributes)
-            _diagnoseThisParamModeAttributes(this, policyDecls, isClassMember);
+            _diagnoseReceiverParamModeSpecifiers(this, policyDecls, isClassMember);
     };
 
     // A constructor operates on a local `this` value that is uninitialized on entry and returned
@@ -17695,7 +17700,7 @@ std::optional<ParamInfo> SemanticsVisitor::checkEffectiveThisParamInfo(
     }
     else if (!hasDeclarationOwnedMode)
     {
-        if (auto specifiedMode = _foldThisParamModePolicies(policyDecls))
+        if (auto specifiedMode = _foldReceiverParamModeSpecifiers(policyDecls))
             mode = *specifiedMode;
         else
             mode = getDefaultReceiverParamMode(decl);

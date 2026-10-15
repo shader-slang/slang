@@ -1365,9 +1365,10 @@ FIDDLE() namespace Slang
             // instead.
             SuperType,
 
-            // A member of an enclosing type is referenced through an implicit `this` value.
-            // Expression checking determines that value's type and mutability.
-            ThisValue,
+            // A member of an enclosing type is referenced through an implicit `this` expression.
+            // Expression checking determines its type and mutability, including for
+            // constructor-local `this`.
+            ThisExpr,
 
             // A member of an enclosing type is referenced through its `This` type, as in a
             // static method or a reference from a nested type to an enclosing type's member.
@@ -1399,17 +1400,17 @@ FIDDLE() namespace Slang
             DeclRef<Decl> declRef,
             Val* val,
             RefPtr<LookupResultItem_Breadcrumb> next,
-            Scope* thisValueScope = nullptr)
-            : kind(kind), declRef(declRef), val(val), next(next), thisValueScope(thisValueScope)
+            Scope* thisExprScope = nullptr)
+            : kind(kind), declRef(declRef), val(val), next(next), thisExprScope(thisExprScope)
         {
-            SLANG_RELEASE_ASSERT((kind == Kind::ThisValue) == (thisValueScope != nullptr));
+            SLANG_RELEASE_ASSERT((kind == Kind::ThisExpr) == (thisExprScope != nullptr));
         }
 
-        Scope* getThisValueScope() const
+        Scope* getThisExprScope() const
         {
-            SLANG_RELEASE_ASSERT(kind == Kind::ThisValue);
-            SLANG_RELEASE_ASSERT(thisValueScope);
-            return thisValueScope;
+            SLANG_RELEASE_ASSERT(kind == Kind::ThisExpr);
+            SLANG_RELEASE_ASSERT(thisExprScope);
+            return thisExprScope;
         }
 
     protected:
@@ -1417,10 +1418,10 @@ FIDDLE() namespace Slang
         LookupResultItem_Breadcrumb() = default;
 
     private:
-        // The scope where lookup began for a `Kind::ThisValue` step. `ConstructLookupResultExpr`
+        // The scope where lookup began for a `Kind::ThisExpr` step. `ConstructLookupResultExpr`
         // checks an implicit `ThisExpr` in this scope to determine its type and mutability.
         // Other breadcrumb kinds leave this field null.
-        Scope* thisValueScope = nullptr;
+        Scope* thisExprScope = nullptr;
     };
 
     // Represents one item found during lookup

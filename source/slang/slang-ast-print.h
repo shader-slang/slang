@@ -139,12 +139,13 @@ public:
     /// parameters)
     void addOverridableDeclPath(const DeclRef<Decl>& declRef);
 
-    /// Add a declaration's parameters and any trailing receiver qualifier.
+    /// Add a declaration's parameters and any trailing qualifier for its receiver parameter.
     ///
     /// Prints generic parameters in <> for a generic declaration, or ordinary parameters in ()
     /// for a callable declaration.
     /// For a generic function, a written trailing qualifier follows <> even though the ordinary
-    /// parameter list is omitted. Receiver-mode attributes and dialect defaults are not displayed.
+    /// parameter list is omitted. Receiver parameter mode attributes and dialect defaults are
+    /// not displayed.
     void addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>* outParamRange = nullptr);
 
     /// Add a prefix that describes the kind of declaration

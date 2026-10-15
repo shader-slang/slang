@@ -1032,7 +1032,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
             }
             break;
 
-        case LookupResultItem::Breadcrumb::Kind::ThisValue:
+        case LookupResultItem::Breadcrumb::Kind::ThisExpr:
             {
                 // We expect a `this` to always come
                 // at the start of a chain.
@@ -1040,13 +1040,13 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
 
                 auto thisExpr = m_astBuilder->create<ThisExpr>();
                 thisExpr->loc = loc;
-                thisExpr->scope = breadcrumb->getThisValueScope();
+                thisExpr->scope = breadcrumb->getThisExprScope();
 
                 // Lookup switches to `ThisType` after leaving a static callable or property scope,
-                // or a nested type or extension scope. For a `ThisValue` breadcrumb, member lookup
-                // and `this` checking therefore reach the same receiver provider from the original
-                // scope. For a valid breadcrumb, `checkThisExprWithoutCapturing` cannot exhaust
-                // that scope chain and diagnose `this` outside a type declaration.
+                // or a nested type or extension scope. For a `ThisExpr` breadcrumb, member lookup
+                // and `this` checking therefore use the same enclosing type context from the
+                // original scope. For a valid breadcrumb, `checkThisExprWithoutCapturing` cannot
+                // exhaust that scope chain and diagnose `this` outside a type declaration.
                 //
                 // Consider this HLSL example:
                 //
@@ -1057,14 +1057,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //     };
                 //
                 // Checking the parameter type currently constructs an implicit `this` before
-                // checking has attached `replace`'s effective receiver parameter. We check implicit
-                // and explicit `this` expressions through the same routine. We defer lambda capture
-                // until the surrounding member expression has been constructed.
+                // checking has attached `replace`'s receiver parameter information. We check
+                // implicit and explicit `this` expressions through the same routine. We defer
+                // lambda capture until the surrounding member expression has been constructed.
                 //
-                // TODO(tfoley): We should use stored receiver information for implicit `this`.
-                // We currently compute it during signature checking even for a static member such
-                // as `elementCount`, which needs no receiver value. Issue #13674 tracks separating
-                // visibility from accessibility so we can remove that early receiver computation:
+                // TODO(tfoley): When implicit `this` denotes a receiver parameter, we should use
+                // its stored parameter information. We currently compute it during signature
+                // checking even for a static member such as `elementCount`, which needs no receiver
+                // value. Issue #13674 tracks separating visibility from accessibility so we can
+                // remove that early receiver parameter computation:
                 // https://github.com/shader-slang/slang/issues/13674
                 bb = checkThisExprWithoutCapturing(thisExpr);
 
@@ -9483,15 +9484,16 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
                 //     }
                 //
                 // Checking `this.N` currently reaches this branch before the callable's checked
-                // receiver information is published. The ordinary semantic query would try to
-                // ensure the in-progress callable to `SignatureChecked` and report a cyclic
+                // receiver parameter information is published. The ordinary semantic query would
+                // try to ensure the in-progress callable to `SignatureChecked` and report a cyclic
                 // reference. We defer diagnostics to the publishing call so each invalid modifier
                 // is reported exactly once.
                 //
                 // TODO(tfoley): We should remove this workaround and read `ThisParamInfoAttribute`
-                // instead of recomputing receiver information while checking a signature. Issue
-                // #13674 tracks deciding where a visible `this` binding is accessible, so signature
-                // checking can reject unavailable receiver uses before requiring their mode:
+                // instead of recomputing receiver parameter information while checking a signature.
+                // Issue #13674 tracks deciding where a visible `this` binding is accessible, so
+                // signature checking can reject unavailable receiver uses before requiring their
+                // mode:
                 // https://github.com/shader-slang/slang/issues/13674
                 thisParamInfo = checkEffectiveThisParamInfo(
                     funcDeclBase,

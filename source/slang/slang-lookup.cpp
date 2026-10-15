@@ -31,7 +31,7 @@ struct BreadcrumbInfo
     LookupResultItem::Breadcrumb::Kind kind;
     DeclRef<Decl> declRef;
     Val* val = nullptr;
-    Scope* thisValueScope = nullptr;
+    Scope* thisExprScope = nullptr;
     BreadcrumbInfo* prev = nullptr;
 };
 
@@ -157,7 +157,7 @@ LookupResultItem CreateLookupResultItem(DeclRef<Decl> declRef, BreadcrumbInfo* b
             bb->declRef,
             bb->val,
             breadcrumbs,
-            bb->thisValueScope);
+            bb->thisExprScope);
     }
     item.breadcrumbs = breadcrumbs;
     return item;
@@ -818,7 +818,7 @@ static void _lookUpInScopes(
     LookupRequest const& request,
     LookupResult& result)
 {
-    auto thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisValue;
+    auto thisBreadcrumbKind = LookupResultItem::Breadcrumb::Kind::ThisExpr;
     auto thisBreadcrumbScope = request.scope;
 
     auto scope = request.scope;
@@ -889,7 +889,7 @@ static void _lookUpInScopes(
                 BreadcrumbInfo breadcrumb;
                 breadcrumb.kind = thisBreadcrumbKind;
                 breadcrumb.declRef = aggTypeDeclBaseRef;
-                breadcrumb.thisValueScope = thisBreadcrumbScope;
+                breadcrumb.thisExprScope = thisBreadcrumbScope;
                 breadcrumb.prev = nullptr;
                 BreadcrumbInfo* breadcrumbPtr = &breadcrumb;
                 Type* type = nullptr;
@@ -987,7 +987,7 @@ static void _lookUpInScopes(
                     BreadcrumbInfo breadcrumb;
                     breadcrumb.kind = thisBreadcrumbKind;
                     breadcrumb.declRef = DeclRef<Decl>(defaultImplDecl->thisTypeDecl);
-                    breadcrumb.thisValueScope = thisBreadcrumbScope;
+                    breadcrumb.thisExprScope = thisBreadcrumbScope;
                     breadcrumb.prev = nullptr;
                     Type* type = DeclRefType::create(astBuilder, breadcrumb.declRef);
                     _lookUpMembersInType(astBuilder, name, type, request, result, &breadcrumb);

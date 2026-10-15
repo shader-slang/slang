@@ -37,9 +37,9 @@ class ConstModifier : public Modifier
 ///
 /// Specifies `ParamPassingMode::In` for the receiver parameter.
 /// Prefix `const` uses `ConstModifier`.
-/// Attribute spellings of receiver modes use `ReceiverModeSpecifierAttribute`.
+/// Attribute spellings of receiver modes use `ReceiverParamModeSpecifierAttribute`.
 FIDDLE()
-class CppStyleTrailingThisParamConstModifier : public Modifier
+class CppStyleTrailingReceiverParamConstModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -1424,11 +1424,11 @@ class VulkanHitObjectAttributesAttribute : public Attribute
     FIDDLE() int location;
 };
 
-/// An attribute that specifies the parameter-passing mode of a declaration's receiver.
+/// An attribute that specifies the passing mode of a declaration's receiver parameter.
 ///
-/// Trailing `const` is represented separately by `CppStyleTrailingThisParamConstModifier`.
+/// Trailing `const` is represented separately by `CppStyleTrailingReceiverParamConstModifier`.
 FIDDLE(abstract)
-class ReceiverModeSpecifierAttribute : public Attribute
+class ReceiverParamModeSpecifierAttribute : public Attribute
 {
     FIDDLE(...)
 };
@@ -1438,7 +1438,7 @@ class ReceiverModeSpecifierAttribute : public Attribute
 // argument.
 //
 FIDDLE()
-class MutatingAttribute : public ReceiverModeSpecifierAttribute
+class MutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1448,7 +1448,7 @@ class MutatingAttribute : public ReceiverModeSpecifierAttribute
 // its `this` parameter.
 //
 FIDDLE()
-class NonmutatingAttribute : public ReceiverModeSpecifierAttribute
+class NonmutatingAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1470,7 +1470,7 @@ class NoDiscardAttribute : public Attribute
 // a member function should be passed by const reference.
 //
 FIDDLE()
-class ConstRefAttribute : public ReceiverModeSpecifierAttribute
+class ConstRefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
@@ -1479,7 +1479,7 @@ class ConstRefAttribute : public ReceiverModeSpecifierAttribute
 // a member function should be passed by reference.
 //
 FIDDLE()
-class RefAttribute : public ReceiverModeSpecifierAttribute
+class RefAttribute : public ReceiverParamModeSpecifierAttribute
 {
     FIDDLE(...)
 };
