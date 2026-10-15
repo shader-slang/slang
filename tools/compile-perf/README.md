@@ -204,7 +204,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -392,6 +392,19 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 | `DESIGN.md` | design decisions, local use cases, CI workflows, and the result layout |
 
 ### Generated outputs (gitignored)
+
+The publishing nightly also exports results through `benchview.py` to the
+**Slang** project (`slang`), suite `compile-perf`, in
+[BenchView](http://rtrci.nvidia.com/benchview/?project=slang&branch=*&sampling=all).
+Configure the Actions secret `BENCHVIEW_WRITE_KEY`; the optional repository
+variable `BENCHVIEW_URL` overrides that server. Without the key, the job only
+archives submission payloads. Upload failures do not block existing reports.
+The exporter preserves raw timing/memory samples and derived phase breakdowns;
+metrics beyond BenchView's limit remain in the attached original record.
+Historical and release imports use the same CLI (`python3 benchview.py --help`),
+with `--release` supplying the tested Slang version through release metadata.
+Summary-only archives are unsupported, and repeated measurements of the same
+compiler commit and configuration share a logical graph point.
 
 The first group is stored in `slang-compile-perf` (the CI results repo). The
 second group is regenerable on demand and is gitignored from that repo — generate
