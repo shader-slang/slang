@@ -31,6 +31,14 @@ static bool check(Result result, const char* operation)
     if (!check((call), #call)) \
     return false
 
+#include "raytrace-scene.h"
+
+static bool isRayCase(const std::string& name)
+{
+    return name == "rayquery_visibility" || name == "rayquery_closest" ||
+           name == "raytrace_pipeline";
+}
+
 static std::string quote(const char* value)
 {
     std::string result = "\"";
@@ -103,6 +111,8 @@ struct Stage
 {
     std::string name;
     ComPtr<IComputePipeline> pipeline;
+    ComPtr<IRayTracingPipeline> rayPipeline;
+    ComPtr<IShaderTable> shaderTable;
     double loadMs = 0, linkMs = 0, codeMs = 0, pipelineMs = 0;
 };
 
@@ -143,16 +153,18 @@ struct Benchmark
     std::vector<Stage> stages;
     std::vector<ComPtr<IBuffer>> buffers, resources;
     ComPtr<IBuffer> matrices;
+    RayScene scene;
     uint32_t count = 0;
     uint32_t width = 256;
     uint32_t batch = 1;
     double deviceMs = 0, resourceMs = 0, readbackMs = 0;
     bool unsupported = false;
+    std::string unsupportedReason = "GPU timestamp queries unavailable";
 
     bool loadStage(const char* name)
     {
         Stage stage;
-        stage.name = name;
+        stage.name = isRayCase(options.caseName) ? "trace" : name;
         ComPtr<slang::IBlob> diagnostics;
         auto start = Clock::now();
         auto module = session->loadModule(name, diagnostics.writeRef());
@@ -161,14 +173,22 @@ struct Benchmark
             fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
         if (!module)
             return false;
-        ComPtr<slang::IEntryPoint> entry;
-        CHECK(module->findEntryPointByName("computeMain", entry.writeRef()));
-        slang::IComponentType* components[] = {module, entry.get()};
+        bool rayPipeline = options.caseName == "raytrace_pipeline";
+        std::vector<const char*> entryNames =
+            rayPipeline ? std::vector<const char*>{"rayGenMain", "closestHitMain", "missMain"}
+                        : std::vector<const char*>{"computeMain"};
+        std::vector<ComPtr<slang::IEntryPoint>> entries(entryNames.size());
+        std::vector<slang::IComponentType*> components{module};
+        for (size_t i = 0; i < entries.size(); ++i)
+        {
+            CHECK(module->findEntryPointByName(entryNames[i], entries[i].writeRef()));
+            components.push_back(entries[i].get());
+        }
         ComPtr<slang::IComponentType> composite, linked;
         start = Clock::now();
         CHECK(session->createCompositeComponentType(
-            components,
-            2,
+            components.data(),
+            SlangInt(components.size()),
             composite.writeRef(),
             diagnostics.writeRef()));
         Result result = composite->link(linked.writeRef(), diagnostics.writeRef());
@@ -178,30 +198,37 @@ struct Benchmark
         stage.linkMs = elapsed(start);
         // Materialize target code before constructing the RHI program. This
         // separates Slang code generation from backend pipeline preparation.
-        ComPtr<slang::IBlob> code;
-        start = Clock::now();
-        if (!options.referenceBinary.empty())
+        stage.codeMs = 0;
+        for (size_t entry = 0; entry < entryNames.size(); ++entry)
         {
-            linked->getEntryPointHash(0, 0, reference.key.writeRef());
-            if (!reference.load(options.referenceBinary))
+            ComPtr<slang::IBlob> code;
+            start = Clock::now();
+            if (!options.referenceBinary.empty())
+            {
+                linked->getEntryPointHash(0, 0, reference.key.writeRef());
+                if (!reference.load(options.referenceBinary))
+                    return false;
+                code = reference.code;
+                result = SLANG_OK;
+            }
+            else
+                result =
+                    linked->getEntryPointCode(entry, 0, code.writeRef(), diagnostics.writeRef());
+            stage.codeMs += elapsed(start);
+            if (diagnostics)
+                fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+            if (!check(result, entryNames[entry]))
                 return false;
-            code = reference.code;
-            result = SLANG_OK;
+            std::string artifact =
+                options.directory + "/" + (rayPipeline ? entryNames[entry] : name) + ".target-code";
+            FILE* file = fopen(artifact.c_str(), "wb");
+            if (!file)
+                return false;
+            size_t written = fwrite(code->getBufferPointer(), 1, code->getBufferSize(), file);
+            bool saved = fclose(file) == 0 && written == code->getBufferSize();
+            if (!saved)
+                return false;
         }
-        else
-            result = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
-        if (diagnostics)
-            fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
-        CHECK(result);
-        stage.codeMs = elapsed(start);
-        std::string artifact = options.directory + "/" + name + ".target-code";
-        FILE* file = fopen(artifact.c_str(), "wb");
-        if (!file)
-            return false;
-        size_t written = fwrite(code->getBufferPointer(), 1, code->getBufferSize(), file);
-        bool saved = fclose(file) == 0 && written == code->getBufferSize();
-        if (!saved)
-            return false;
         ShaderProgramDesc programDesc = {};
         programDesc.slangGlobalScope = linked.get();
         ComPtr<IShaderProgram> program;
@@ -211,10 +238,38 @@ struct Benchmark
         if (diagnostics)
             fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
         CHECK(result);
-        ComputePipelineDesc pipelineDesc = {};
-        pipelineDesc.program = program;
-        pipelineDesc.compilationPolicy = PipelineCompilationPolicy::Immediate;
-        CHECK(device->createComputePipeline(pipelineDesc, stage.pipeline.writeRef()));
+        if (rayPipeline)
+        {
+            HitGroupDesc hit = {};
+            hit.hitGroupName = "hitGroup";
+            hit.closestHitEntryPoint = "closestHitMain";
+            RayTracingPipelineDesc pipelineDesc = {};
+            pipelineDesc.program = program;
+            pipelineDesc.hitGroups = &hit;
+            pipelineDesc.hitGroupCount = 1;
+            pipelineDesc.maxRayPayloadSize = 16;
+            pipelineDesc.maxAttributeSizeInBytes = 8;
+            pipelineDesc.maxRecursion = 1;
+            pipelineDesc.compilationPolicy = PipelineCompilationPolicy::Immediate;
+            CHECK(device->createRayTracingPipeline(pipelineDesc, stage.rayPipeline.writeRef()));
+            const char* raygen = "rayGenMain";
+            const char* miss = "missMain";
+            const char* group = "hitGroup";
+            ShaderTableDesc table = {};
+            table.program = program;
+            table.rayGenShaderCount = table.missShaderCount = table.hitGroupCount = 1;
+            table.rayGenShaderEntryPointNames = &raygen;
+            table.missShaderEntryPointNames = &miss;
+            table.hitGroupNames = &group;
+            CHECK(device->createShaderTable(table, stage.shaderTable.writeRef()));
+        }
+        else
+        {
+            ComputePipelineDesc pipelineDesc = {};
+            pipelineDesc.program = program;
+            pipelineDesc.compilationPolicy = PipelineCompilationPolicy::Immediate;
+            CHECK(device->createComputePipeline(pipelineDesc, stage.pipeline.writeRef()));
+        }
         if (!options.referenceBinary.empty() && (!reference.hits || reference.misses))
         {
             fprintf(stderr, "Reference binary was not used exclusively\n");
@@ -250,6 +305,21 @@ struct Benchmark
             return false;
         }
         queue = device->getQueue(QueueType::Graphics);
+        if (isRayCase(options.caseName))
+        {
+            Feature feature =
+                options.caseName == "raytrace_pipeline" ? Feature::RayTracing : Feature::RayQuery;
+            if ((options.backend != "vulkan" && options.backend != "d3d12") ||
+                !device->hasFeature(feature))
+            {
+                unsupported = true;
+                unsupportedReason =
+                    "Ray benchmark requires Vulkan/D3D12 and the requested ray-tracing feature";
+                return false;
+            }
+            if (!scene.initialize(device, queue))
+                return false;
+        }
         CHECK(device->getSlangSession(session.writeRef()));
         if (options.caseName == "image_pipeline")
         {
@@ -291,6 +361,21 @@ struct Benchmark
         resources.clear();
         matrices.setNull();
         auto start = Clock::now();
+        if (isRayCase(options.caseName))
+        {
+            std::vector<float> data(size_t(count) * 4);
+            for (uint32_t i = 0; i < count; ++i)
+                RayScene::origin(i, &data[size_t(i) * 4]);
+            buffers.resize(2);
+            if (!buffer(data, 16, buffers[0]))
+                return false;
+            std::fill(data.begin(), data.end(), -12345.0f);
+            if (!buffer(data, 16, buffers[1]))
+                return false;
+            CHECK(queue->waitOnHost());
+            resourceMs = elapsed(start);
+            return true;
+        }
         std::vector<float> data(count);
         for (uint32_t i = 0; i < count; ++i)
             data[i] = inputValue(i);
@@ -356,13 +441,21 @@ struct Benchmark
                 // measured region so later compute cannot run ahead of its start
                 // timestamp (notably Vulkan's bottom-of-pipe timestamp writes).
                 encoder->globalBarrier();
-                auto pass = encoder->beginComputePass();
-                auto root = pass->bindPipeline(stages[s].pipeline);
+                auto rayPass = stages[s].rayPipeline ? encoder->beginRayTracingPass() : nullptr;
+                auto pass = rayPass ? nullptr : encoder->beginComputePass();
+                auto root =
+                    rayPass ? rayPass->bindPipeline(stages[s].rayPipeline, stages[s].shaderTable)
+                            : pass->bindPipeline(stages[s].pipeline);
                 if (!root)
                     return false;
                 ShaderCursor cursor(root);
                 if (cursor["inputData"].isValid())
                     CHECK(cursor["inputData"].setBinding(buffers[s]));
+                if (isRayCase(options.caseName))
+                {
+                    CHECK(cursor["rayOrigins"].setBinding(buffers[0]));
+                    CHECK(cursor["scene"].setBinding(scene.tlas));
+                }
                 CHECK(cursor["outputData"].setBinding(buffers[s + 1]));
                 auto parameters =
                     options.caseName.find("sensitive_") == 0 ? cursor["Params"] : cursor;
@@ -377,8 +470,20 @@ struct Benchmark
                     CHECK(cursor["resources"][j].setBinding(resources[j]));
                 // Two-dimensional dispatches stay within the portable workgroup
                 // count limits even for the largest calibrated element counts.
-                pass->dispatchCompute(256, (count + dispatchWidth - 1) / dispatchWidth, 1);
-                pass->end();
+                if (rayPass)
+                {
+                    rayPass->dispatchRays(
+                        0,
+                        dispatchWidth,
+                        (count + dispatchWidth - 1) / dispatchWidth,
+                        1);
+                    rayPass->end();
+                }
+                else
+                {
+                    pass->dispatchCompute(256, (count + dispatchWidth - 1) / dispatchWidth, 1);
+                    pass->end();
+                }
                 encoder->globalBarrier();
                 encoder->writeTimestamp(queries, queryBase + 2);
             }
@@ -415,6 +520,39 @@ struct Benchmark
 
     bool validate()
     {
+        if (isRayCase(options.caseName))
+        {
+            std::vector<float> actual(size_t(count) * 4);
+            auto start = Clock::now();
+            CHECK(device->readBuffer(buffers.back(), 0, uint64_t(count) * 16, actual.data()));
+            readbackMs = elapsed(start);
+            bool visibility = options.caseName == "rayquery_visibility";
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                float expected[4];
+                RayScene::expected(i, visibility, expected);
+                for (uint32_t c = 0; c < 4; ++c)
+                {
+                    float value = actual[size_t(i) * 4 + c];
+                    // Primitive IDs and visibility flags are exact; distances/barycentrics use an
+                    // absolute tolerance.
+                    float tolerance = visibility || c == 1 ? 0 : 2e-5f;
+                    if (!std::isfinite(value) || std::abs(value - expected[c]) > tolerance)
+                    {
+                        fprintf(
+                            stderr,
+                            "Ray validation failed at ray %u component %u: got %.9g expected "
+                            "%.9g\n",
+                            i,
+                            c,
+                            value,
+                            expected[c]);
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
         std::vector<float> expected(count), actual(count), temporary(count);
         uint32_t n = options.complexity;
         for (uint32_t i = 0; i < count; ++i)
@@ -659,7 +797,8 @@ int main(int argc, char** argv)
         if (bench.unsupported)
         {
             printf(
-                "{\"status\":\"unsupported\",\"reason\":\"GPU timestamp queries unavailable\"}\n");
+                "{\"status\":\"unsupported\",\"reason\":%s}\n",
+                quote(bench.unsupportedReason.c_str()).c_str());
             return 77;
         }
         return 1;
@@ -760,14 +899,18 @@ int main(int argc, char** argv)
         quote(RUNTIME_PERF_RHI_REV).c_str(),
         (unsigned long long)bench.device->getInfo().timestampFrequency);
     // These are single host wall-time observations. Nested intervals must not be summed.
+    if (isRayCase(o.caseName))
+        printf("\"scene\":{\"version\":1,\"triangles\":2048,\"instances\":1,\"hit_fraction\":0.75,"
+               "\"build_flags\":\"prefer_fast_trace\",\"opaque\":true},");
     printf(
         "\"host_observations\":{\"case_ms\":%.12g,\"device_create_ms\":%.12g,"
-        "\"resource_setup_ms\":%.12g,\"calibration_ms\":%.12g,"
+        "\"resource_setup_ms\":%.12g,\"scene_setup_ms\":%.12g,\"calibration_ms\":%.12g,"
         "\"validation_before_ms\":%.12g,\"validation_after_ms\":%.12g,"
         "\"validation_readback_before_ms\":%.12g,\"validation_readback_after_ms\":%.12g},",
         caseMs,
         bench.deviceMs,
         bench.resourceMs,
+        bench.scene.setupMs,
         calibrationMs,
         validationBeforeMs,
         validationAfterMs,

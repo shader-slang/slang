@@ -1,5 +1,11 @@
 # Runtime performance prototype
 
+The existing compile-perf nightly now collects this suite after compilation and
+publishes a GPU runtime section on the same report site. See
+[`../compile-perf/DESIGN.md`](../compile-perf/DESIGN.md#shared-runtime-reporting-and-schedule)
+for scheduling, runner prerequisites, failure handling, and history compatibility.
+The manual prototype workflow below remains a separate build/smoke check.
+
 ## Optimization-sensitive workloads and alternative references
 
 The suite also includes six fixed, versioned cases selected with `--cases sensitive`:
@@ -84,8 +90,9 @@ external compiler logs, raw measurements, and the actual binary for each round.
 The report shows per-case Slang/reference ratios and, with `--baseline`, changes
 against the prior Slang run. Comparisons reject environment, source, reference
 toolchain/binary, harness, dimensions, or coverage changes and incomplete/unstable
-results. Preserve these bundles as daily/release artifacts; this prototype does
-not schedule CI or publish a historical dashboard automatically.
+results. The shared nightly collects equivalent-reference bundles and publishes them
+inside the compile-perf report. Standalone runs remain usable offline; preserve
+their bundles when making daily or release comparisons.
 
 Raw results retain one-time reference compilation observations and Slang API
 preparation times. These have different boundaries and are not presented as
@@ -132,6 +139,33 @@ emits `sm_80` cannot be compared with a reference targeting `sm_89` as if they u
 identical compilation constraints. Align targets or establish a separate baseline.
 Paired CLI compilation reads the native PTX architecture and requests the same
 Slang capability, rather than compiling a different default target.
+
+## Ray-tracing stability cases
+
+Three fixed cases run on Vulkan and D3D12: `rayquery_visibility` (terminate on
+first opaque hit), `rayquery_closest` (closest inline query), and
+`raytrace_pipeline` (raygen, closest-hit, and miss). CUDA coverage explicitly
+excludes these cases; there is no OptiX or software fallback.
+
+The scene contains 2,048 opaque triangles in a 32-by-32 grid on two depth planes,
+with the farther triangles preceding the near triangles in primitive order. One
+identity instance references the BLAS. Deterministic rays produce 75% hits and
+25% misses, away from triangle edges. Full output validation checks visibility,
+nearest distance, primitive ID, and both barycentric coordinates against analytic
+CPU intersections. IDs and flags are exact; distance and barycentrics use a
+2e-5 absolute tolerance. Outputs are checked before and after sampling.
+
+BLAS/TLAS construction, allocation, upload and synchronization are outside trace
+sampling and calibration, recorded as one `scene_setup_ms` host observation.
+`gpu_trace_ms` covers the instrumented trace dispatches; normal batch and host
+boundaries still apply. Scene version/build flags are recorded and comparison
+rejects changed scene contracts. These are controlled traversal stability cases,
+not representative heavy material shaders or an acceleration-structure build benchmark.
+
+The pipeline archives code for all three entry points. Paired CLI compilation
+measures their shared source module; it is one compile module, not three
+independent compile observations. Together with the original and sensitive cases,
+the suite contains 23 runtime cases and 25 compile modules.
 
 ## Original stability workloads
 
@@ -401,7 +435,8 @@ caches are not flushed. They are included in case time, but not execution sample
 
 GPU upload/readback timing, detailed allocation/binding breakdowns, timestamp
 and barrier overhead estimation, percentile/confidence-interval reports, automated
-regression thresholds, and publishing adapters are not implemented.
+regression thresholds are not implemented. Shared nightly publication is described
+in the compile-perf design.
 
 ## Paired compile benchmarks
 
@@ -413,7 +448,7 @@ timings should be labeled accordingly. Target-code hashes identify what the
 runtime actually prepared. The image's three compile results remain separate;
 a sum of medians is not a sampled whole-pipeline compilation distribution.
 
-All 16 entries are also available directly through compile-perf, with a
+The original 16 entries are also available directly through compile-perf, with a
 complexity ladder of 2, 4, 8, and 16. They are opt-in so existing nightly and
 release-sweep workloads remain unchanged:
 

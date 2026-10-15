@@ -17,6 +17,7 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 import breakdown
 import daily_movers
+import runtime_report
 from lib import analyze, manifest, render
 
 # One escaper for both report generators. Neither escapes quotes: the
@@ -283,6 +284,7 @@ def main():
 
     outdir = os.path.join(args.results, "analysis")
     os.makedirs(outdir, exist_ok=True)
+    runtime_count = runtime_report.write_report(args.results, outdir)
 
     # Three index views: combined (per-workload detail pages show both
     # cadences), release-only, and the trailing daily window. Separate files so
@@ -299,6 +301,13 @@ def main():
 
     series, _, order = analyze.load_series(cindex, args.results, args.metric)
     if not order:
+        if runtime_count:
+            with analyze.open_output(os.path.join(outdir, "index.html")) as fh:
+                fh.write('<!doctype html><meta charset="utf-8"><title>Slang performance</title>'
+                         f'<style>{SECTION_CSS}</style><div class="wrap"><h1>Slang performance</h1>'
+                         '<p>No valid compile measurements are available.</p>'
+                         '<p><a href="runtime/index.html">GPU runtime results and measurement health</a></p></div>')
+            return
         raise SystemExit("no results; run sweep.py first")
     present = {wl for (wl, _t) in series}
     api_names = manifest.display_order(
@@ -488,10 +497,13 @@ def main():
                 f'<div class="links"><a href="{prefix}-releases.html">{rel_link}</a></div>'
                 f"<p>{desc}</p></div>")
 
-    rows = []
+    rows = ['<div class="secrow"><b>GPU runtime</b>'
+            '<div class="links"><a href="runtime/index.html">Daily results and paired compile times</a></div>'
+            f'<p>{runtime_count} runtime attempts. Stability, compiler-sensitive and ray-tracing cases; '
+            'Vulkan, D3D12 and CUDA coverage is recorded per run.</p></div>']
     if api_names:
         rows.append(secrow(
-            "API & RT workloads", "api",
+            "API & RT compilation", "api",
             f"{len(api_names)} application-integration shapes driven through "
             "libslang: RT programs, session cost, module graphs, reflection, "
             "per-variant specialization."))
@@ -515,8 +527,8 @@ def main():
     # movers_block in the PAGES loop above), not here: the landing page stays
     # a pure navigation hub.
     H = ['<!doctype html><meta charset="utf-8">',
-         f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
-         '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
+         f"<title>Slang performance</title><style>{SECTION_CSS}</style>",
+         '<div class="wrap">', "<h1>Slang performance</h1>",
          f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
          f'{n_rel} releases + {n_day} daily points · metric: {args.metric}'

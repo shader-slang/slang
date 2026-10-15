@@ -35,6 +35,57 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
 
 ## CI workflows
 
+### Shared runtime reporting and schedule
+
+`nightly-mdl-perf-test.yml` collects the existing runtime suite after compile
+measurements and confirmation, using the same ToT build, commit, and daily label.
+It retains the daily 05:00 UTC schedule, results repository, manual dispatch, and
+Pages deployment. Nightly and release-sweep workflows share a concurrency group
+so their measurements cannot overlap. No separate scheduled publisher is added.
+
+`tools/runtime-perf/nightly.py` archives immutable attempts under
+`daily/<label>/runtime/<run-id>-<attempt>/`. `run.json` records compiler and suite
+commits, expected backend coverage, selected calibration, commands, and failures.
+Vulkan and D3D12 require all 23 cases; CUDA requires the 20 compute cases (OptiX is
+outside this suite). The first run calibrates on its actual GPU. Later runs reuse
+compatible dimensions; runtime comparisons reject incompatible environments,
+workloads, harnesses, RHI versions, scene contracts, or measurement policies.
+A setup failure produces a failed manifest rather than successful empty coverage.
+
+The existing `report.py` renders the **GPU runtime** section through
+`runtime_report.py`. The landing page is titled **Slang performance**; existing
+compile report URLs are preserved and **API & RT compilation** is labeled
+explicitly. Runtime pages show sample dispersion, batch/iteration timings,
+previous compatible daily deltas with baseline labels, per-case phases, paired
+CLI compile times, setup observations, and downloadable reproduction bundles.
+The nightly also runs the six existing equivalent reference cases after primary
+measurements. Those paired comparisons are separately calibrated within each run;
+primary daily comparisons use the frozen normal-suite calibration. No tuned
+candidate is silently promoted to a nightly target.
+
+Both publishing workflows regenerate the runtime section from archived data.
+Compile-only history needs no migration. Failed/unsupported/missing measurements
+remain visible; valid compile results survive runtime failures. `publish=false`
+archives both suites without changing the results repository or Pages. Runtime
+coverage is enforced after publication. Performance deltas are advisory until
+repeat measurements on the CI GPU establish suitable confirmation thresholds.
+The compile suite's existing alert policy is unchanged.
+
+The Windows measurement host needs GPU access, Vulkan and D3D12, a CUDA toolkit
+with `CUDA_PATH` pointing to NVRTC, and `dxc` and `glslangValidator` on PATH for
+references. The workflow verifies a single NVIDIA GPU and records its name, UUID,
+and driver. Runner labels do not prove the VM exposes these capabilities: setup
+or coverage failures remain failures, with diagnostics archived. RTX 4090 local
+results cannot serve as the RTX 5090 machine's calibration.
+
+Remaining reporting extensions are cached runtime measurements of the last five
+main releases (excluding patches), richer per-case historical plots, and
+independently confirmed, frozen optimized reference targets. These do not alter
+the current workload set. The previous local release study remains a separate
+artifact until compatible runtime release bundles are archived by CI. Runtime
+confirmation/gating must use measured CI noise and interleaved reruns, not reuse
+the 5% within-run stability allowance as a regression threshold.
+
 Both run on the dedicated, quiesced NVIDIA RGFX perf pool, reached through the
 VM-based GitHub bridge (labels `[Windows, X64, nvrgfx-perf-kernelvm-bridge]`;
 the pre-VM `nvrgfx` runner group + `nvrgfx-perf` label pair was retired

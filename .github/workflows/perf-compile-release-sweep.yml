@@ -55,7 +55,7 @@ on:
         default: ""
 
 concurrency:
-  group: perf-compile-release-sweep
+  group: slang-performance-measurements
   cancel-in-progress: false
 
 env:

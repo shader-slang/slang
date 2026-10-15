@@ -35,7 +35,7 @@ def digest(data):
 
 def runner_source_hash():
     hashes = [digest((HERE / "native" / name).read_bytes())
-              for name in ("runner.cpp", "reference-code.h")]
+              for name in ("runner.cpp", "reference-code.h", "raytrace-scene.h")]
     return digest("".join(hashes).encode("ascii"))
 
 
@@ -196,7 +196,8 @@ def run(args):
         compiler_version = (compiler_version.stdout + compiler_version.stderr).strip()
     results = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                    config=config, created_unix=time.time(), runner_sha256=digest(runner.read_bytes()),
-                   generator_sha256=digest(Path(workloads.__file__).read_bytes() + Path(workloads.sensitive_workloads.__file__).read_bytes()),
+                   generator_sha256=digest(b"".join(Path(module.__file__).read_bytes() for module in
+                                                   (workloads, workloads.sensitive_workloads, workloads.raytrace_workloads))),
                    runner_source_sha256=runner_source_hash(), runs=[])
     calibration = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                        policy=policy(config), runner_source_sha256=results["runner_source_sha256"], cases={})
@@ -236,7 +237,7 @@ def run(args):
                     if name not in ("gpu_total_ms", "gpu_iteration_ms") and spread > config["max_spread"]]
                 record["target_code_sha256"] = {
                     path.name: digest(path.read_bytes()) for path in Path(source["directory"]).glob("*.target-code")}
-                if len(record["target_code_sha256"]) != len(source["files"]):
+                if len(record["target_code_sha256"]) != (3 if case == "raytrace_pipeline" else len(source["files"])):
                     raise ValueError("runner did not archive every stage's target code")
                 if compiler_version and compiler_version != record["compiler"]:
                     raise ValueError(f"slangc version {compiler_version} differs from runner compiler {record['compiler']}")
@@ -269,6 +270,11 @@ def run(args):
 
 def compare(left, right):
     a, b = (json.loads(Path(path).read_text()) for path in (left, right))
+    return compare_results(a, b)
+
+
+def compare_results(a, b):
+    """Validate measurement compatibility before deriving any performance ratios."""
     if not a["environment"].get("driver_id") or not b["environment"].get("driver_id"):
         raise ValueError("comparison requires a recorded driver ID; supply --driver-id on run")
     for field in ("schema_version", "workload_version", "environment", "generator_sha256", "runner_source_sha256"):
@@ -287,6 +293,8 @@ def compare(left, right):
             raise ValueError(f"{name}: comparison requires two stable, valid measurements")
         if not previous.get("validated") or not current.get("validated"):
             raise ValueError(f"{name}: missing correctness validation")
+        if previous.get("scene") != current.get("scene"):
+            raise ValueError(f"{name}: incompatible scene")
         for key in ("size", "elements", "width", "batch", "measurement_mode", "source_sha256", "adapter", "backend", "rhi_revision", "timestamp_frequency"):
             if previous[key] != current[key]:
                 raise ValueError(f"{name}: incompatible {key}")

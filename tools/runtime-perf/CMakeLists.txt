@@ -43,6 +43,7 @@ set_property(
         CMAKE_CONFIGURE_DEPENDS
             "${CMAKE_CURRENT_LIST_DIR}/native/runner.cpp"
             "${CMAKE_CURRENT_LIST_DIR}/native/reference-code.h"
+            "${CMAKE_CURRENT_LIST_DIR}/native/raytrace-scene.h"
 )
 file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/native/runner.cpp" RUNNER_SOURCE_SHA)
 file(
@@ -50,7 +51,12 @@ file(
     "${CMAKE_CURRENT_LIST_DIR}/native/reference-code.h"
     REFERENCE_SOURCE_SHA
 )
-string(SHA256 RUNNER_SOURCE_SHA "${RUNNER_SOURCE_SHA}${REFERENCE_SOURCE_SHA}")
+file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/native/raytrace-scene.h" RAY_SCENE_SHA)
+string(
+    SHA256
+    RUNNER_SOURCE_SHA
+    "${RUNNER_SOURCE_SHA}${REFERENCE_SOURCE_SHA}${RAY_SCENE_SHA}"
+)
 execute_process(
     COMMAND git -C "${SLANG_RHI_SOURCE_DIR}" rev-parse HEAD
     OUTPUT_VARIABLE RHI_REV

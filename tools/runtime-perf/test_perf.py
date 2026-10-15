@@ -11,7 +11,7 @@ import perf
 class RuntimePerfTests(unittest.TestCase):
     def fixture(self):
         return dict(schema_version=2, workload_version=1, environment={"driver_id": "driver-1"},
-                    generator_sha256="generator", runner_source_sha256="runner", config=perf.DEFAULTS,
+                    generator_sha256="generator", runner_source_sha256="runner", config=dict(perf.DEFAULTS),
                     runs=[dict(workload="arithmetic_basic", status="ok", validated=True, size=4, elements=65536,
                                width=256, batch=8, measurement_mode="batched_throughput",
                                source_sha256="source", adapter="gpu", backend="vulkan",
@@ -51,7 +51,8 @@ class RuntimePerfTests(unittest.TestCase):
 
     def test_rejects_mismatched_work_and_environment(self):
         for key, value in [("elements", 131072), ("batch", 16), ("source_sha256", "changed"),
-                           ("adapter", "different GPU"), ("rhi_revision", "changed")]:
+                           ("adapter", "different GPU"), ("rhi_revision", "changed"),
+                           ("scene", {"version": 2})]:
             with self.subTest(key=key):
                 a = self.fixture()
                 b = copy.deepcopy(a)
