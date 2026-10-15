@@ -1042,6 +1042,12 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 thisExpr->loc = loc;
                 thisExpr->scope = breadcrumb->getThisValueScope();
 
+                // Lookup switches to `ThisType` after leaving a static callable or property scope,
+                // or a nested type or extension scope. For a `ThisValue` breadcrumb, member lookup
+                // and `this` checking therefore reach the same receiver provider from the original
+                // scope. For a valid breadcrumb, `checkThisExprWithoutCapturing` cannot exhaust
+                // that scope chain and diagnose `this` outside a type declaration.
+                //
                 // Consider this HLSL example:
                 //
                 //     struct Counter

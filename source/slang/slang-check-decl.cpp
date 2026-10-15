@@ -17434,6 +17434,8 @@ static ShortList<Modifier*, 1> _getReceiverParamModeSpecifiers(Decl* decl)
 
 void SemanticsVisitor::checkThisParamModeSpecifiers(Decl* decl)
 {
+    // Each declaration can specify its receiver mode only once, so identical repeats are
+    // diagnosed just like conflicting spellings.
     auto specifiers = _getReceiverParamModeSpecifiers(decl);
     if (specifiers.getCount() <= 1)
         return;
@@ -17449,16 +17451,17 @@ void SemanticsVisitor::checkThisParamModeSpecifiers(Decl* decl)
 
 /// Calculate the receiver parameter mode specified directly on `decl`.
 ///
-/// Returns `defaultMode` when no specifier is present.
-/// Modifier checking has already diagnosed multiple or conflicting specifiers; this computation
-/// recovers with `defaultMode`.
+/// Returns `fallbackMode` when no specifier is present. The fallback is the declaration's default
+/// mode or, while folding an enclosing declaration, the mode carried from its child.
+/// Modifier checking diagnoses multiple specifiers, including identical repeats. We ignore those
+/// invalid combinations so error recovery does not depend on the order of rejected spellings.
 static ParamPassingMode _calcReceiverParamModeFromSpecifiers(
     Decl* decl,
-    ParamPassingMode defaultMode)
+    ParamPassingMode fallbackMode)
 {
     auto specifiers = _getReceiverParamModeSpecifiers(decl);
     if (specifiers.getCount() != 1)
-        return defaultMode;
+        return fallbackMode;
 
     auto specifier = specifiers[0];
     if (as<MutatingAttribute>(specifier))
@@ -17483,11 +17486,15 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
     if (!as<FuncDecl>(decl))
         return ParamPassingMode::In;
 
-    // Synthesized functions without a declaration-owned mode default to `in`.
+    // We default synthesized functions to `in` rather than adopting the surrounding HLSL default.
+    // For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy core `IFunc`'s
+    // `in` receiver requirement.
     if (decl->hasModifier<SynthesizedModifier>())
         return ParamPassingMode::In;
 
-    // Ordinary HLSL methods may modify their receiver unless a specifier says otherwise.
+    // Imported modules finish signature checking in their own semantic context before import.
+    // Reflection and specialization read the attached mode, so this language query runs while
+    // checking a written method in its owning translation unit.
     if (getSourceLanguage() == SourceLanguage::HLSL)
         return ParamPassingMode::BorrowInOut;
     return ParamPassingMode::In;

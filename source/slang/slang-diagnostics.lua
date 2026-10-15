@@ -1607,7 +1607,7 @@ err(
     "cpp-style-trailing-this-param-const-requires-hlsl",
     30443,
     "trailing `const` is only allowed in the HLSL dialect",
-    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`); use `[nonmutating]` or `[mutating]` instead to state receiver mutability." }
+    span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`); use `[nonmutating]` instead for a nonmutating receiver." }
 )
 
 err(

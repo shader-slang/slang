@@ -37,6 +37,7 @@ class ConstModifier : public Modifier
 ///
 /// Specifies `ParamPassingMode::In` for the receiver parameter.
 /// Prefix `const` uses `ConstModifier`.
+/// Attribute spellings of receiver modes use `ReceiverModeSpecifierAttribute`.
 FIDDLE()
 class CppStyleTrailingThisParamConstModifier : public Modifier
 {
@@ -1424,6 +1425,8 @@ class VulkanHitObjectAttributesAttribute : public Attribute
 };
 
 /// An attribute that specifies the parameter-passing mode of a declaration's receiver.
+///
+/// Trailing `const` is represented separately by `CppStyleTrailingThisParamConstModifier`.
 FIDDLE(abstract)
 class ReceiverModeSpecifierAttribute : public Attribute
 {
