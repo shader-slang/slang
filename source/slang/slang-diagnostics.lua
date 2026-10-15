@@ -5644,6 +5644,14 @@ err(
 )
 
 err(
+    "bit-cast-to-descriptor-handle",
+    41206,
+    "cannot bit_cast to a DescriptorHandle",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': a DescriptorHandle has a target-dependent representation and cannot be rebuilt from raw bits" },
+    note { message = "where the target supports it, construct the handle with DescriptorHandle<T>(uint2) instead", span { loc = "location" } }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
