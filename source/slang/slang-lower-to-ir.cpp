@@ -2920,12 +2920,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
+        auto resourceType = as<ResourceType>(type);
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
         SubstitutionSet(type->getDeclRef())
             .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
+                    // The AST preserves the original texel argument for inference and
+                    // reflection. IR texture operand zero is the load/store data type:
+                    // for example, `Texture2D<RGBA16F>` lowers with `float4` here.
+                    if (resourceType && operands.getCount() == 0)
+                        arg = resourceType->getElementType();
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
@@ -9262,9 +9268,27 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
+// Resolve token-pasted names to the source that produced them for debug attribution.
+// For example, `void test_##name()` has a name in a synthetic, pathless source view.
+// That view retains the location of the paste, which may itself come from another paste.
+// Keep the AST location intact for diagnostics, and use the same resolved location for
+// both the debug source and its line/column information.
+static SourceLoc _getDebugSourceLoc(SourceManager* sourceManager, SourceLoc loc)
+{
+    while (auto view = sourceManager->findSourceView(loc))
+    {
+        if (view->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste ||
+            !view->getInitiatingSourceLoc().isValid())
+            break;
+        loc = view->getInitiatingSourceLoc();
+    }
+    return loc;
+}
+
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto sourceView = sourceManager->findSourceView(loc);
     if (!sourceView)
         return nullptr;
@@ -9473,6 +9497,7 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     SourceLoc loc)
 {
     auto sourceManager = context->getLinkage()->getSourceManager();
+    loc = _getDebugSourceLoc(sourceManager, loc);
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
     humaneLoc.column =
         _clampDebugColumn(context, debugSourceInst, humaneLoc.line, humaneLoc.column);
@@ -9540,7 +9565,8 @@ void maybeEmitDebugLine(
         return;
 
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
+    auto humaneLoc =
+        sourceManager->getHumaneLoc(_getDebugSourceLoc(sourceManager, loc), SourceLocType::Emit);
     IRIntegerValue colStart = humaneLoc.column;
     IRIntegerValue colEnd = humaneLoc.column + 1;
     _clampDebugLineColumns(context, debugSourceInst, humaneLoc.line, colStart, colEnd);
@@ -11569,7 +11595,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (isGlobalDecl(decl))
         {
             if (decl->hasModifier<HLSLStaticModifier>())
-                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+                subBuilder->addDecoration(irGlobal, kIROp_FileOrNamespaceScopeMutableVarDecoration);
         }
 
         if (auto initExpr = decl->initExpr)
@@ -11640,12 +11666,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Mutable shadows have the storage rules of file/namespace `static` variables.
         // We record that category for validation of types resolved during linking.
-        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeStaticVarDecoration);
+        builder->addDecoration(storage, kIROp_FileOrNamespaceScopeMutableVarDecoration);
 
         // Next, we emit the initializer's return value. `getSimpleVal` obtains an ordinary
-        // parameter value directly, or loads the contents of a legacy `cbuffer`. The
-        // `MoveGlobalVarInitializationToEntryPointsPass` later emits a store at each entry point;
-        // on HLSL paths it may instead leave initialization for emission in the declaration.
+        // parameter value directly, or loads the contents of a legacy `cbuffer`.
+        // `moveGlobalVarInitializationToEntryPoints` examines all global initializers before
+        // resource-global replacement. It moves the shadow's initializer into entry points when
+        // the shadow will be replaced or the target requires per-entry-point initialization.
+        // Otherwise, emission retains the initializer at module scope.
         beginGlobalVarInitializer(builder, storage);
         builder->emitReturn(getSimpleVal(subContext, initialValue));
 
