@@ -1827,6 +1827,22 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
     StringBuilder builder;
     m_extensionTracker->appendExtensionRequireLinesForWGSL(builder);
     m_writer->emit(builder.getUnownedSlice());
+
+    // `-wgsl-diagnostic <severity>:<rule>`: global diagnostic directives. Like `enable`, they
+    // must come before every declaration, including the prelude helpers emitted after this front
+    // matter. WGSL rejects two severities for one rule, so the last one given for a rule wins.
+    OrderedDictionary<String, String> severityByRule;
+    for (auto& value :
+         getTargetProgram()->getOptionSet().getArray(CompilerOptionName::WGSLDiagnostic))
+        severityByRule[value.stringValue2] = value.stringValue;
+    for (auto& ruleAndSeverity : severityByRule)
+    {
+        m_writer->emit("diagnostic(");
+        m_writer->emit(ruleAndSeverity.value);
+        m_writer->emit(", ");
+        m_writer->emit(ruleAndSeverity.key);
+        m_writer->emit(");\n");
+    }
 }
 
 void WGSLSourceEmitter::emitIntrinsicCallExprImpl(

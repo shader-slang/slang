@@ -93,6 +93,12 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                     sb << "=" << v.stringValue2;
             }
             break;
+        case CompilerOptionName::WGSLDiagnostic:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.stringValue << ":" << v.stringValue2;
+            }
+            break;
         case CompilerOptionName::VulkanBindShift: // intValue0 (higher 8 bits): kind;
                                                   // intValue0(higher bits): set; intValue1:
                                                   // shift
@@ -466,6 +472,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
+    case CompilerOptionName::WGSLDiagnostic:
     case CompilerOptionName::DumpIRBefore:
     case CompilerOptionName::DumpIRAfter:
     case CompilerOptionName::TraceCoverageReservedSpace:

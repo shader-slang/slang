@@ -774,6 +774,13 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Preserve all resource parameters in the output code, even if they are not used by the "
          "shader."},
+        {OptionKind::WGSLDiagnostic,
+         "-wgsl-diagnostic",
+         "-wgsl-diagnostic <severity>:<rule>",
+         "Emit a WGSL `diagnostic(<severity>, <rule>);` directive, e.g. "
+         "`-wgsl-diagnostic off:subgroup_uniformity`. <severity> is one of error, warning, info, "
+         "off. Can be repeated; for a repeated rule the last severity is used. Ignored for other "
+         "targets."},
         {OptionKind::TypeConformance,
          "-conformance",
          "-conformance <typeName>:<interfaceName>[=<sequentialID>]",
@@ -3718,6 +3725,32 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
+                break;
+            }
+        case OptionKind::WGSLDiagnostic:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                const UnownedStringSlice value = operand.value.getUnownedSlice();
+                const Index colon = value.indexOf(':');
+                const UnownedStringSlice severity =
+                    colon >= 0 ? value.head(colon) : UnownedStringSlice();
+                const UnownedStringSlice rule =
+                    colon >= 0 ? value.tail(colon + 1) : UnownedStringSlice();
+                if (rule.getLength() == 0 ||
+                    (severity != toSlice("error") && severity != toSlice("warning") &&
+                     severity != toSlice("info") && severity != toSlice("off")))
+                {
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = "<error|warning|info|off>:<rule>"});
+                    return SLANG_FAIL;
+                }
+                CompilerOptionValue optionValue;
+                optionValue.kind = CompilerOptionValueKind::String;
+                optionValue.stringValue = severity;
+                optionValue.stringValue2 = rule;
+                linkage->m_optionSet.add(OptionKind::WGSLDiagnostic, optionValue);
                 break;
             }
         case OptionKind::TypeConformance:

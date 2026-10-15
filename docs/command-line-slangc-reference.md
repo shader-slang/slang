@@ -438,6 +438,14 @@ Treat enum types as unscoped by default. (Note: enum class remains scoped.)
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
 
 
+<a id="wgsl-diagnostic"></a>
+### -wgsl-diagnostic
+
+**-wgsl-diagnostic &lt;severity&gt;:&lt;rule&gt;**
+
+Emit a WGSL `diagnostic(&lt;severity&gt;, &lt;rule&gt;);` directive, e.g. `-wgsl-diagnostic off:subgroup_uniformity`. &lt;severity&gt; is one of error, warning, info, off. Can be repeated; for a repeated rule the last severity is used. Ignored for other targets. 
+
+
 <a id="conformance"></a>
 ### -conformance
 
