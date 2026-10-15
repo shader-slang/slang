@@ -48,7 +48,7 @@ def reference_contract(event):
 
 
 def groups(events, reference=False):
-    """A changed contract creates another graph, never a connected performance trend."""
+    """A changed contract creates another series, never a connected performance trend."""
     result = {}
     for event in events:
         if reference and not event.get("reference"):
@@ -77,19 +77,19 @@ def graph(events, series, title, unit):
     titles = [e["record"]["label"] + " / " + e["record"]["attempt"] for e in events]
     if not any(v is not None for _, _, values in series for v in values):
         return f'<p class="note">{esc(title)}: no valid measurements.</p>'
-    return '<div class="scroll chart">' + render.line_panel(
+    legend = '<div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:8px 16px">' + ''.join(
+        f'<span><span style="color:{color}">●</span> {esc(name)}</span>' for name, color, _ in series) + '</div>'
+    return '<div class="scroll chart">' + legend + render.line_panel(
         labels, series, title, unit=unit, width=1000, height=330, point_titles=titles,
-        tick_format=".3g") + '</div>'
+        tick_format=".3g", show_legend=False) + '</div>'
 
 
-def cohort(events, group, reference=False):
+def cohort_series(events, group, reference=False):
     points = group["points"]
     first = next(iter(points.values()))
     case = first["reference"] if reference else first["case"]
     elements = first["references"]["measurement"]["elements"] if reference else case["elements"]
-    environment = first["references"]["environment"] if reference else first["bundle"]["environment"]
-    body = (f'<p class="note">{esc(case.get("adapter", ""))} · driver {esc(environment.get("driver_id", ""))} · '
-            f'{elements:,} elements · batch {case["batch"]} · contract {fingerprint(group["contract"])}.</p>')
+    suffix = f"{elements:,} elements"
     series = []
     for index, implementation in enumerate(("slang", "reference") if reference else ("slang",)):
         values = []
@@ -104,12 +104,12 @@ def cohort(events, group, reference=False):
                 elif valid_case(point):
                     value = duration(point["case"].get("timers", {}).get("gpu_iteration_ms", {}).get("median"))
             values.append(value * 1000 if value is not None else None)
-        series.append(("Slang" if implementation == "slang" else "Equivalent reference", COLORS[index], values))
-    body += graph(events, series, "Matched Slang and reference runtime" if reference else "Full-suite runtime", "µs")
+        label = ("Slang (reference run)" if reference else "Slang (suite)") if implementation == "slang" else "Equivalent reference"
+        series.append((f"{label} · {suffix}", COLORS[index], values))
+    compile_series = []
     if not reference:
         entries = sorted({r["workload"] for point in points.values() for r in point["case"].get("compile_runs", [])})
-        for timer, title in (("wall_ms", "Paired CLI compile wall time"), ("compileInner", "Compiler internal total")):
-            compile_series = []
+        for timer, title in (("wall_ms", "CLI wall"), ("compileInner", "Compiler internal")):
             for i, name in enumerate(entries):
                 values = []
                 for event in events:
@@ -118,9 +118,29 @@ def cohort(events, group, reference=False):
                     stats = (run.get("wall_ms") if timer == "wall_ms" else run.get("timers", {}).get(timer)) if run else None
                     values.append(duration(stats.get("median")) if stats and run.get("ok") and run.get("got_timers") else None)
                 short = name.removeprefix("runtime_" + first["case"]["workload"]).lstrip("_") or "main"
-                compile_series.append((short, COLORS[i % len(COLORS)], values))
-            body += graph(events, compile_series, title, "ms")
-    body += '<details><summary>Measurement contract</summary><pre>' + esc(json.dumps(group["contract"], indent=2)) + '</pre></details>'
+                compile_series.append((f"{short} · {title}", COLORS[i % len(COLORS)], values))
+    return series, compile_series
+
+
+def measurement_graphs(events):
+    runtime_series, compile_series, contracts = [], [], []
+    for reference in (False, True):
+        cohorts = groups(events, reference=reference)
+        for key, group in cohorts.items():
+            runtime, compile_times = cohort_series(events, group, reference=reference)
+            # Keep incompatible measurements as distinct curves, even on shared axes.
+            suffix = f" · {key}" if len(cohorts) > 1 else ""
+            runtime_series.extend((name + suffix, color, values) for name, color, values in runtime)
+            compile_series.extend((name + suffix, color, values) for name, color, values in compile_times)
+            contracts.append(dict(series=[name + suffix for name, _, _ in runtime], contract=group["contract"]))
+    def recolor(series):
+        return [(name, f"hsl({i * 137.508 % 360:.1f},65%,38%)", values)
+                for i, (name, _, values) in enumerate(series)]
+    body = graph(events, recolor(runtime_series), "GPU execution time", "µs")
+    body += graph(events, recolor(compile_series), "Compilation time", "ms")
+    if not groups(events, reference=True):
+        body += '<p class="note">No equivalent-reference measurements for these points.</p>'
+    body += '<details><summary>Measurement details</summary><pre>' + esc(json.dumps(contracts, indent=2)) + '</pre></details>'
     return body
 
 
@@ -151,9 +171,9 @@ def write_subtests(output, events, page):
                     f'<td>{esc(perf.workloads.CASES.get(name, "archived"))}</td><td>{" · ".join(links) or "No measurements"}</td></tr>')
         body = ('<p>Runtime and paired compilation for this subtest. Daily and release histories are separate. '
                 'Hover over points for exact values; failed or missing measurements leave gaps. '
-                'Changes to GPU, driver, workload size or measurement contract start separate graphs.</p>'
+                'Changes to GPU, driver, workload size or measurement contract start separate curves.</p>'
                 '<p>Reference curves use Slang and equivalent implementations measured at matching dimensions. '
-                'Full-suite timings may use larger dimensions. Compile graphs measure repeated Slang CLI compilation '
+                'Compare Slang and reference curves with matching element counts; suite timings may use larger dimensions. Compilation time shows CLI wall and internal compiler timings together, measuring repeated Slang CLI compilation '
                 'of the executed source; reference compilation is a one-time observation and is not overlaid. '
                 'Image stages remain separate, not summed medians.</p>')
         if not backends:
@@ -167,13 +187,7 @@ def write_subtests(output, events, page):
                 if not points:
                     body += '<p class="note">No measurements available for this cadence.</p>'
                     continue
-                reference_groups = groups(points, reference=True)
-                for group in reference_groups.values():
-                    body += cohort(points, group, reference=True)
-                if not reference_groups:
-                    body += '<p class="note">No equivalent-reference measurements for these points.</p>'
-                for group in groups(points).values():
-                    body += cohort(points, group)
+                body += measurement_graphs(points)
                 body += '<details><summary>Runs, status and raw data</summary><table><tr><th>Run</th><th>Status</th><th>Compiler</th></tr>'
                 for event in points:
                     body += (f'<tr><td><a href="{event["href"]}">{esc(event["record"]["label"])}</a></td>'

@@ -477,3 +477,9 @@ calibration, and byte identity between all compile/runtime shader pairs.
 The existing Python workflow runs them on Linux and Windows. GPU validation
 requires running the suite on the selected backend; unsupported backends are
 not treated as successful GPU coverage.
+
+Each subtest/backend/cadence shows two graphs: GPU execution time (suite Slang,
+matched-run Slang and equivalent reference) and compilation time (CLI wall and
+compiler internal timings, with separate series for image stages). Runtime series
+label their element counts; only matching dimensions support direct reference
+comparisons. Changed measurement contracts remain separate curves with gaps.

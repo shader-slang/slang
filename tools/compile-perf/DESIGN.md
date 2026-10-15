@@ -56,11 +56,11 @@ The existing `report.py` renders the **GPU runtime** section through
 `runtime_report.py`. The landing page is titled **Slang performance**; existing
 compile report URLs are preserved and **API & RT compilation** is labeled
 explicitly. The runtime landing page lists each subtest and its backends, linking to a page
-with daily and main-release graphs for that subtest. Each backend has GPU runtime,
-paired CLI wall-time, and internal compile-total graphs. Equivalent-reference
-curves overlay their matched Slang measurements; full-suite timings remain
-separate when dimensions differ. Changed measurement contracts produce separate
-panels, and failed/missing points break lines. Tooltips show exact values. Raw run
+with daily and main-release graphs for that subtest. Each backend/cadence has two graphs: GPU execution time combines suite Slang,
+matched-run Slang and equivalent reference; compilation time combines paired CLI
+wall time and internal compiler time. Runtime curves label their element counts,
+and only matching dimensions support direct reference comparisons. Changed
+measurement contracts produce separate curves on the same axes, and failed/missing points break lines. Tooltips show exact values. Raw run
 pages retain dispersion, phase/setup observations and downloadable bundles.
 The nightly also runs the six existing equivalent reference cases after primary
 measurements. Those paired comparisons are separately calibrated within each run;

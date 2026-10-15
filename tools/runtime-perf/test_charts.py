@@ -45,7 +45,7 @@ class ChartTests(unittest.TestCase):
         second["case"]["status"] = "failed"
         self.assertEqual(charts.ordered([first, second], "daily"), [second])
 
-    def test_changed_dimensions_and_driver_get_separate_graphs(self):
+    def test_changed_dimensions_and_driver_get_separate_series(self):
         first = self.event()
         for field in ("elements", "driver"):
             second = copy.deepcopy(first)
@@ -59,9 +59,8 @@ class ChartTests(unittest.TestCase):
     def test_unstable_point_leaves_a_gap(self):
         events = [self.event(str(i), timestamp=i) for i in range(3)]
         events[1]["case"]["status"] = "unstable"
-        group = next(iter(charts.groups(events).values()))
         with patch.object(charts, "graph", return_value="") as graph:
-            charts.cohort(events, group)
+            charts.measurement_graphs(events)
         self.assertEqual(graph.call_args_list[0].args[1][0][2], [10000, None, 10000])
 
     def test_reference_graph_uses_its_matched_slang_not_full_suite_timing(self):
@@ -70,12 +69,14 @@ class ChartTests(unittest.TestCase):
         event["reference"] = dict(batch=16, summary={
             "slang": {"valid": True, "median_ms": 1.0},
             "reference": {"valid": True, "median_ms": 1.2}})
-        group = next(iter(charts.groups([event], reference=True).values()))
         with patch.object(charts, "graph", return_value="") as graph:
-            charts.cohort([event], group, reference=True)
-        series = graph.call_args.args[1]
-        self.assertEqual([s[2] for s in series], [[1000], [1200]])
-        self.assertNotEqual(series[0][2], [10000])
+            charts.measurement_graphs([event])
+        series = graph.call_args_list[0].args[1]
+        self.assertEqual([s[2] for s in series], [[10000], [1000], [1200]])
+        self.assertIn("4,194,304 elements", series[1][0])
+        self.assertIn("4,194,304 elements", series[2][0])
+        self.assertEqual(graph.call_count, 2)
+        self.assertEqual([s[2] for s in graph.call_args_list[1].args[1]], [[80], [25]])
 
     def test_compile_stages_are_not_added_together(self):
         event = self.event()
@@ -83,10 +84,9 @@ class ChartTests(unittest.TestCase):
         event["case"]["compile_runs"] = [dict(workload="runtime_image_pipeline_" + stage,
             ok=True, got_timers=True, wall_ms={"median": value}, timers={"compileInner": {"median": value / 2}})
             for stage, value in (("horizontal", 10), ("vertical", 20), ("tone", 30))]
-        group = next(iter(charts.groups([event]).values()))
         with patch.object(charts, "graph", return_value="") as graph:
-            charts.cohort([event], group)
-        self.assertEqual(sorted(s[2][0] for s in graph.call_args_list[1].args[1]), [10, 20, 30])
+            charts.measurement_graphs([event])
+        self.assertEqual(sorted(s[2][0] for s in graph.call_args_list[1].args[1]), [5, 10, 10, 15, 20, 30])
 
     def test_each_test_gets_a_page_with_both_cadences_and_compile_graphs(self):
         events = [self.event(), self.event("v2026.19", "release")]
@@ -95,8 +95,9 @@ class ChartTests(unittest.TestCase):
             index = charts.write_subtests(root, events, runtime_report.page)
             page = (root / "test-arithmetic_basic.html").read_text(encoding="utf-8")
             self.assertIn('test-arithmetic_basic.html#vulkan', index)
-            for title in ("Daily runs", "Last five main releases", "Full-suite runtime", "Paired CLI compile wall time"):
+            for title in ("Daily runs", "Last five main releases", "GPU execution time", "Compilation time", "CLI wall", "Compiler internal"):
                 self.assertIn(title, page)
+            self.assertEqual(page.count("<svg"), 4)
             self.assertEqual(len(list(root.glob("test-*.html"))), len(perf.workloads.CASES))
 
 

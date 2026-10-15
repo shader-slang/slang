@@ -18,7 +18,7 @@ def esc(s):
 
 
 def line_panel(labels, series, title, unit="", width=620, height=300, point_titles=None,
-               tick_format=".0f"):
+               tick_format=".0f", show_legend=True):
     """One SVG panel: multiple line series over a shared categorical x axis.
 
     labels — x-axis category names (release tags / daily dates), evenly
@@ -27,6 +27,7 @@ def line_panel(labels, series, title, unit="", width=620, height=300, point_titl
     the polyline rather than interpolating through missing points.
     unit   — y-axis legend suffix (e.g. "MiB").
     point_titles — optional full point labels for hover tooltips and markers.
+    show_legend — draw the inline legend; disable when the caller supplies one.
     tick_format — numeric format for y-axis ticks (default integer labels).
 
     Y always starts at 0 so panel-to-panel comparisons stay honest.
@@ -91,13 +92,14 @@ def line_panel(labels, series, title, unit="", width=620, height=300, point_titl
             if point_titles is not None:
                 # Hollow markers leave another series visible when values coincide.
                 fill = color if series_index == 0 else "none"
-                radius = 4 if series_index == 0 else 5 + series_index
+                radius = 4 if series_index == 0 else 5 + series_index % 4
                 s.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="{radius}" fill="{fill}" stroke="{color}" stroke-width="2">'
                          f'<title>{esc(point_titles[i])} — {esc(name)}: {v:.4g} {esc(unit)}</title></circle>')
         flush(run)
-        s.append(f'<rect x="{lx}" y="{pad_t - 8}" width="9" height="9" fill="{color}"/>')
-        s.append(f'<text x="{lx + 12}" y="{pad_t}" fill="#444">{esc(name)}</text>')
-        lx += 14 + 7 * len(name)
+        if show_legend:
+            s.append(f'<rect x="{lx}" y="{pad_t - 8}" width="9" height="9" fill="{color}"/>')
+            s.append(f'<text x="{lx + 12}" y="{pad_t}" fill="#444">{esc(name)}</text>')
+            lx += 14 + 7 * len(name)
     s.append("</svg>")
     return "".join(s)
 
