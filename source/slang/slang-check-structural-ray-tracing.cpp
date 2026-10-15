@@ -1859,11 +1859,26 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingExpression(Expr* expr)
     return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
-// Prevents a generic body from manufacturing stage/input values after specialization.
-// Consider `void make<T>() { T local = T(); }` called as make<MissInput<C>>(). Ordinary generic
-// checking sees only T, and the call returns void; the concrete storage would escape the other
-// frontend checks. Keep the conservative stage/input argument rule until such uses are checked
-// after specialization. Schema/list/group types have ordinary value semantics and remain legal.
+// Checks the type arguments of a resolved function, method, or constructor call.
+// Consider this example, with Input = rt::MissInput<C> for a valid payload context C:
+//
+//     void consume<T>(T value) { T fresh = T(); }
+//     void helper(in Input input)
+//     {
+//         consume<Input>(input); // The caller writes T = Input.
+//         consume(input);        // Call resolution infers T = Input.
+//     }
+//
+// CheckInvokeExprWithCheckedOperands calls this after ResolveInvoke chooses the callee. Read
+// the chosen declaration's substitutions so both calls receive the same check, including type
+// arguments inherited from an enclosing generic type. Checking only the written <...> syntax
+// would miss the inferred call. The generic body was checked with T still unknown, so this rule
+// prevents it from manufacturing an input after specialization, even when the call returns void.
+//
+// This function collects call arguments for _diagnoseOrDeferRayTracingStageOrInputUse.
+// diagnoseInvalidStructuralRayTracingGenericTypeApplication handles naming a generic type
+// without calling anything. Returns true if this check reports an error now; deferred checks
+// return false and report any error after module checking.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke)
 {
     auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
@@ -1897,9 +1912,25 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(Invok
     return _diagnoseOrDeferRayTracingStageOrInputUse(this, use);
 }
 
-// Rejects stage/input arguments in arbitrary generic types for the same specialization reason.
-// For example, even an empty Factory<T> can define a method that constructs T internally.
-// The standard shader lists explicitly represent type packs and do not manufacture their entries.
+// Checks the type arguments when an expression names a generic type, without requiring a call.
+// Consider this example, with Input = rt::MissInput<C> for a valid payload context C:
+//
+//     struct Factory<T>
+//     {
+//         static void create() { T fresh = T(); }
+//     }
+//     typealias InputFactory = Factory<Input>;
+//
+// visitGenericAppExpr calls this only when its checked result denotes a type. Factory<Input>
+// reaches this check even though no Factory object is created and create() is never called.
+// The current generic-argument rule rejects Input here because Factory's methods could create T
+// after specialization; the absence of instance fields does not make that generic use safe.
+//
+// Unlike diagnoseInvalidStructuralRayTracingGenericArguments, this reads the written arguments
+// from GenericAppExpr. It also retains the resulting type so the shared checker can recognize
+// permitted library types such as Optional<Input> and MissShaderList<MyMiss>. Both functions
+// apply the same restriction through _diagnoseOrDeferRayTracingStageOrInputUse. Returns true if
+// this check reports an error now; deferred checks return false.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericTypeApplication(
     GenericAppExpr* genericApplication,
     Expr* checkedResult)
