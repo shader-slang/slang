@@ -23,11 +23,11 @@ RWTexture2DArray<float> gHalfScalarArray;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     gTex[tid.xy].w = 1.0f;
-//CHECK:           ^ warning E56006
+//CHECK:           ^ warning E56020
 //CHECK:           ^ this write to part of a texel is lowered to a read of the whole texel followed by a write of the whole texel. On CUDA that read returns undefined data if the texel was already written earlier in the same kernel launch, so an earlier write to another component can be lost even within one thread. A concurrent write by another thread to another component of the texel can also be lost.
 
     gTex[tid.xy].xy = float2(1.0f, 2.0f);
-//CHECK:            ^ warning E56006
+//CHECK:            ^ warning E56020
 //CHECK:            ^ this write to part of a texel is lowered to a read of the whole texel followed by a write of the whole texel. On CUDA that read returns undefined data if the texel was already written earlier in the same kernel launch, so an earlier write to another component can be lost even within one thread. A concurrent write by another thread to another component of the texel can also be lost.
 
     // Writing the whole texel, directly or through a swizzle that assigns every component,
@@ -39,18 +39,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 #ifdef UNSUPPORTED
     // There is no converting read from `rgba8`.
     gUnormTex[tid.xy].w = 1.0f;
-//UNSUPPORTED:          ^ error E56007
+//UNSUPPORTED:          ^ error E56021
 //UNSUPPORTED:          ^ this write to a texel is lowered to a CUDA surface read that converts
 
     // A layered surface has no converting read.
     gHalfArray[tid].w = 1.0f;
-//UNSUPPORTED:        ^ error E56007
+//UNSUPPORTED:        ^ error E56021
 //UNSUPPORTED:        ^ this write to a texel is lowered to a CUDA surface read that converts
 
     // `.x` of a scalar texel writes the whole texel, but a layered surface has no
     // converting write either.
     gHalfScalarArray[tid].x = 1.0f;
-//UNSUPPORTED:              ^ error E56007
+//UNSUPPORTED:              ^ error E56021
 //UNSUPPORTED:              ^ this write to a texel is lowered to a CUDA surface write that converts
 #endif
 }

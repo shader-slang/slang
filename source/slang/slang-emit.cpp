@@ -71,6 +71,7 @@
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-resource-globals.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-legalize-vector-types.h"
@@ -1557,6 +1558,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // The linker can resolve an external type to a definition containing resources or an unsized
+    // array. We need to validate mutable storage after those fields become available.
+    // We check the linked IR at the specialization checkpoint, before resource legalization
+    // assumes that each mutable global has a supported type.
+    if (!validateMutableGlobalVariableTypes(irModule, sink))
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
@@ -1683,7 +1691,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            SLANG_PASS(checkForMissingReturns, sink, target, false);
+            SLANG_PASS(
+                checkForMissingReturns,
+                sink,
+                SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN,
+                target,
+                false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
@@ -1963,8 +1976,10 @@ Result linkAndOptimizeIR(
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
         // Give empty ray/callable payloads physical storage at native interfaces before type
-        // legalization erases their logical values. Ordinary helper signatures/copies are left
-        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
+        // legalization erases their logical values, and wrap non-struct D3D payloads and hit
+        // attributes in structs.
+        // Ordinary helper signatures/copies are left untouched. CPU/CUDA require no artificial
+        // payload and skip this legalization block.
         SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
 
         if (isMetalTarget(targetRequest))
@@ -2052,6 +2067,37 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    // Global varying translation materializes input parameters and their assignments before
+    // cloning an entry point. The ordinary clone must contain that same input setup.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    // We separate launch functions from ordinary callees before injecting initialization. The
+    // ordinary clone must use its caller's globals rather than reinitialize them at each call.
+    // This ordering applies independently of the globals' types and also lets later CUDA active-
+    // mask synthesis distinguish a launch from a call inside divergent control flow.
+    SLANG_PASS(fixEntryPointCallsites);
+
+    // Resource- and empty-type legalization selected for the target has completed. We move all
+    // initializers required by the target or by resource-global replacement in one module-order
+    // traversal, before any pass replaces their storage. HLSL globals whose initializers can stay
+    // at module scope remain there; the initializer mover owns that target policy.
+    SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // Selected resource globals still represent one IR value and now have no initializer bodies.
+    // We replace their storage with locals and generated parameters before resource specialization
+    // attempts to eliminate forms that the target cannot emit. The generated-local uninitialized-
+    // value check uses the same validation option as the pre-link module-wide check.
+    SLANG_PASS(
+        legalizeResourceGlobalVars,
+        targetRequest->getTargetCaps(),
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation(),
+        sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (isCPUTargetViaLLVM(targetRequest))
     {
         // The LLVM targets are special in that we always lower all matrices
@@ -2095,15 +2141,13 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // After type legalization and subsequent SSA cleanup we expect
-    // that any resource types passed to functions are exposed
-    // as their own top-level parameters (which might have
-    // resource or array-of-...-resource types).
-    //
-    // Many of our targets place restrictions on how certain
-    // resource types can be used, so that having them as
-    // function parameters, reults, etc. is invalid.
-    // We clean up the usages of resource values here.
+    // On targets that require resource-type legalization, that pass has separated resources from
+    // the aggregates that contained them. Each remaining resource parameter on those paths
+    // represents one resource value or one resource array. CPU and CUDA paths retain aggregates
+    // because their target representations can contain resource values.
+    // Some targets cannot pass those values through ordinary function parameters or results.
+    // `specializeResourceUsage` specializes calls that it can rewrite into a supported form; later
+    // target validation diagnoses any addressable resource storage that still cannot be emitted.
     SLANG_PASS(specializeResourceUsage, codeGenContext);
 
     // Specialize calls to functions with values loaded from an immutable location,
@@ -2321,17 +2365,13 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Specialization can expose references to global varying builtins that were
-    // previously hidden behind generic/interface dispatch. Translate all global
-    // varying inputs/outputs now, after specialization, but before target
-    // entry-point legalization.
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
+    // Resource specialization can inline a helper containing interpolation operations into an
+    // entry point. We resolve varying-input references after those calls have been inlined, while
+    // varying parameters still have their original address representation. Ordinary entry-point
+    // clones can contain the same operations, so the resolver visits them as well as launch
+    // functions.
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2463,15 +2503,9 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::GLSL:
-    case CodeGenTarget::WGSL:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
-        break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
@@ -2496,7 +2530,6 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
-        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
@@ -2687,6 +2720,12 @@ Result linkAndOptimizeIR(
     // to make it more narrowly scoped.
     //
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
+    // Empty-type legalization can introduce new void fields and constructor arguments.
+    // Consider `struct Empty {}; struct Pair { uint value; Empty differential; };`.
+    // Legalization keeps a void placeholder for `differential` to preserve field positions.
+    // The earlier void cleanup has already run, so remove these new placeholders before emit.
+    SLANG_PASS(cleanUpVoidType);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
@@ -2883,6 +2922,9 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
+    // We check D3D and Metal resource locals after all passes that can create mutable storage.
+    // Minimum-optimization mode must still reject storage that its target cannot represent.
+    SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

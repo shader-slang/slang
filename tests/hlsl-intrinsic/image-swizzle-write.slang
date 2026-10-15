@@ -14,7 +14,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: OpImageWrite
     // On CUDA the write needs a converting read from `rgba8`, which the CUDA prelude does not do
     // correctly.
-    // CHECK-CUDA: error[E56007]
+    // CHECK-CUDA: error[E56021]
     // CHECK-CUDA: lowered to a CUDA surface read that converts
     texture[dispatchThreadID.xy].a = h;
 }

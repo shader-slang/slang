@@ -10,6 +10,6 @@ layout(r32f) uniform imageCube gImage;
 void main()
 {
     gImage[ivec3(0)].x = 1.0f;
-//CHECK:               ^ error E56008
+//CHECK:               ^ error E56022
 //CHECK:               ^ this write to a texel is lowered to CUDA surface calls, which Slang spells only for 1D, 2D and 3D textures and 1D and 2D array textures.
 }
