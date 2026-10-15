@@ -200,6 +200,28 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 
 struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 {
+    // Module-scope aggregates already classified by `hasNonFiniteFloatLitOperand`. The generic
+    // inliner asks for an aggregate's legality once per operand it sinks, so without the cache
+    // an N-element table would cost O(N^2).
+    Dictionary<IRInst*, bool> m_mapAggregateToHasNonFiniteOperand;
+
+    // Return true if any operand of `inst` is a NaN or infinity float literal.
+    //
+    // The WGSL emitter spells such a literal as a call to the `_slang_getNan` /
+    // `_slang_getInfinity` prelude helpers, because WGSL rejects any const-expression that
+    // evaluates to NaN or infinity. A module-scope initializer may not call a user-declared
+    // function, so an aggregate holding one of these literals cannot stay at module scope.
+    bool hasNonFiniteFloatLitOperand(IRInst* inst)
+    {
+        if (auto cached = m_mapAggregateToHasNonFiniteOperand.tryGetValue(inst))
+            return *cached;
+        bool result = false;
+        for (UInt i = 0; i < inst->getOperandCount() && !result; i++)
+            result = isNonFiniteFloatLit(inst->getOperand(i));
+        m_mapAggregateToHasNonFiniteOperand[inst] = result;
+        return result;
+    }
+
     bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
         switch (inst->getOp())
@@ -211,7 +233,10 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
         case kIROp_MakeMatrix:
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
-            return true;
+            // Only direct operands are checked: an outer aggregate built from an inlined inner
+            // one is inlined too, because the generic inliner sinks a legal inst whenever one
+            // of its operands is sunk.
+            return !hasNonFiniteFloatLitOperand(inst);
         default:
             break;
         }
