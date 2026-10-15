@@ -802,8 +802,13 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    // A NaN or infinity literal is emitted as a call to a prelude helper (see
-    // `kWGSLBuiltinPreludeGetNan`), which is not a const-expression.
+    // A NaN or infinity literal is emitted as a call to a prelude helper
+    // (`kWGSLBuiltinPreludeGetNan` / `kWGSLBuiltinPreludeGetInfinity`), which is not a
+    // const-expression. Literals are themselves module-scope insts, so this check comes before the
+    // module-scope test below; it reaches values built from such a literal through the operand
+    // recursion. A module-scope aggregate holding one never gets here, because WGSL legalization
+    // (`GlobalInstInliningContext` in slang-ir-wgsl-legalize.cpp) has already sunk it into the
+    // functions that use it.
     if (isNonFiniteFloatLit(inst))
         return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)

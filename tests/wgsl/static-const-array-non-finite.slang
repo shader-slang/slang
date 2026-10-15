@@ -6,15 +6,20 @@
 
 // Regression test for issue #13658.
 //
-// WGSL spells a NaN or infinity literal as a call to the `_slang_getNan` / `_slang_getInfinity`
-// prelude helpers, and a module-scope initializer may not call a user-declared function. A
-// runtime-indexed `static const` array holding such a literal therefore cannot be the
-// module-scope `var<private>` that an all-finite table becomes; it is materialized at its use
-// sites inside functions instead. For the same reason, a function-scope value built from such a
-// literal is declared with `var`, never `const`.
+// Slang's WGSL emitter spells a NaN or infinity literal as a call to the `_slang_getNan` /
+// `_slang_getInfinity` prelude helpers, and a module-scope initializer may not call a
+// user-declared function. A runtime-indexed `static const` array holding such a literal therefore
+// cannot be the module-scope `var<private>` that an all-finite table becomes; it is materialized
+// inside the functions that use it instead. For the same reason, a function-scope value built from
+// such a literal is declared with `var`, never `const`.
 
+// NOMODULE and NOCONST compile the same shader as WGSL but only hold NOT checks, so each scans the
+// whole output rather than the gap before a positive WGSL match. NOMODULE relies on module-scope
+// declarations starting at column 0 while function-scope ones are indented.
+// NOMODULE: result code = 0
 // NOMODULE-NOT: {{^(var|const|override)[ <].*_slang_get}}
 
+// NOCONST: result code = 0
 // NOCONST-NOT: const {{.*}}_slang_get
 
 static const float kTable[3] = { 0.0 / 0.0, 1.0 / 0.0, 2.0 };
@@ -58,6 +63,11 @@ float readLocalVector(uint i)
 }
 
 // WGSL: fn computeMain
+// WGSL-DAG: var kNested{{.*}} = array<array<f32
+// WGSL-DAG: var kMats{{.*}} = array<mat2x2<f32>
+// WGSL-DAG: var kVecs{{.*}} = array<vec4<f32>
+// WGSL-DAG: var kSplats{{.*}} = array<vec4<f32>
+// WGSL-DAG: var kMatSplats{{.*}} = array<mat2x2<f32>
 // SPV: OpEntryPoint
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
