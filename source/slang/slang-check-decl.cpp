@@ -1758,8 +1758,9 @@ QualType getTypeForDeclRef(
 
         qualType.isLeftValue = isLValue;
         // A parameter passed by read-only pointer names its argument's memory location.
-        qualType.isReadOnlyLocation = !isLValue && (paramMode == ParamPassingMode::RefReadOnly ||
-                                                    paramMode == ParamPassingMode::BorrowIn);
+        qualType.isReadOnlyMemoryLocation =
+            !isLValue &&
+            (paramMode == ParamPassingMode::RefReadOnly || paramMode == ParamPassingMode::BorrowIn);
         qualType.isWriteOnly = isWriteOnly;
         return qualType;
     }

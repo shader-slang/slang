@@ -1,4 +1,4 @@
-// A reference parameter's signature prints its effective passing mode, so the legacy spelling
+// A reference parameter's signature prints its effective passing mode, so the legacy alias
 // `const __ref` reads the same as `__ref_readonly`.
 
 //TEST:LANG_SERVER(filecheck=CHECK):

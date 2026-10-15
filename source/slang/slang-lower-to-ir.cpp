@@ -3713,7 +3713,7 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
-        // `const` on a `__ref` parameter is the legacy spelling of `__ref_readonly`.
+        // `const` on a `__ref` parameter is the legacy alias of `__ref_readonly`.
         if (paramDecl->hasModifier<ReadOnlyModifier>() || paramDecl->hasModifier<ConstModifier>())
             return ParamPassingMode::RefReadOnly;
         if (paramDecl->hasModifier<WriteOnlyModifier>())

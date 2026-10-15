@@ -1567,7 +1567,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                     // but seems more appropriate to put in the Type Part
 
                     // A reference parameter prints its effective passing mode, so that
-                    // `__ref_readonly` and its legacy spelling `const __ref` read the same.
+                    // `__ref_readonly` and its legacy alias `const __ref` read the same.
                     switch (getParamPassingMode(paramDecl))
                     {
                     case ParamPassingMode::RefReadWrite:

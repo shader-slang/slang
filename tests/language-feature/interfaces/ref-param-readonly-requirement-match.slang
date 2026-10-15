@@ -1,6 +1,6 @@
-// A `__ref_readonly` parameter has the `RefReadOnly` passing mode, the same as the legacy
-// `const __ref` and `__ref const` spellings, so any spelling satisfies a requirement that uses
-// another.
+// A `__ref_readonly` parameter has the `RefReadOnly` passing mode, the same as its legacy
+// aliases `const __ref` and `__ref const`, so any of these spellings satisfies a requirement
+// that uses another.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type

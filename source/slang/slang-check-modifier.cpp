@@ -2560,7 +2560,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // A keyword that spells two modifiers (`__ref_readonly`) can conflict through both of them,
     // so we report each keyword once.
     //
-    // On a `__ref` parameter, `const` is the legacy spelling of `__ref_readonly`, so it is one of
+    // On a `__ref` parameter, `const` is the legacy alias of `__ref_readonly`, so it is one of
     // the parameter's reference-access spellings and conflicts with the others.
     bool isRefParam = false;
     if (as<ParamDecl>(syntaxNode))

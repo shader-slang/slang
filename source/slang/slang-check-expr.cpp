@@ -668,9 +668,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // A field of a read-only memory location is part of that location, provided the
             // field would be writable through a writable base. A property is excluded because
             // its accessors do not name a memory location.
-            expr->type.isReadOnlyLocation = !expr->type.isLeftValue &&
-                                            baseExpr->type.isReadOnlyLocation &&
-                                            isFieldWritableThroughWritableBase;
+            expr->type.isReadOnlyMemoryLocation = !expr->type.isLeftValue &&
+                                                  baseExpr->type.isReadOnlyMemoryLocation &&
+                                                  isFieldWritableThroughWritableBase;
             return expr;
         }
     }
@@ -730,7 +730,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         //
         QualType refQualType(base->type.type);
         derefExpr->type.isLeftValue = refQualType.isLeftValue;
-        derefExpr->type.isReadOnlyLocation = refQualType.isReadOnlyLocation;
+        derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -741,7 +741,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.isLeftValue = base->type.isLeftValue;
-        derefExpr->type.isReadOnlyLocation = base->type.isReadOnlyLocation;
+        derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
@@ -3498,7 +3498,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
-    subscriptExpr->type.isReadOnlyLocation = baseExpr->type.isReadOnlyLocation;
+    subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
 
     return subscriptExpr;
 }
@@ -4364,13 +4364,13 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     // A `__ref_readonly` parameter only reads its argument, so the argument
                     // may also be a memory location that the caller cannot write.
                     auto refParamType = as<RefParamType>(paramType);
-                    const bool acceptsReadOnlyLocation =
+                    const bool acceptsReadOnlyMemoryLocation =
                         refParamType &&
                         refParamType->getParamPassingMode() == ParamPassingMode::RefReadOnly;
                     if (argExpr)
                     {
-                        if (!argExpr->type.isLeftValue &&
-                            !(acceptsReadOnlyLocation && argExpr->type.isReadOnlyLocation))
+                        if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
+                                                            argExpr->type.isReadOnlyMemoryLocation))
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
@@ -8682,8 +8682,8 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     // were no duplicates in the list of components
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
                                  swizExpr->base->type.isLeftValue;
-    swizExpr->type.isReadOnlyLocation =
-        !anyDuplicates && swizExpr->base && swizExpr->base->type.isReadOnlyLocation;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        !anyDuplicates && swizExpr->base && swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }

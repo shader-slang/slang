@@ -1,7 +1,7 @@
 //TEST:LANG_SERVER(filecheck=CHECK):
 
 // A parameter-name inlay hint spells the parameter's effective passing mode, so each reference
-// access, including the legacy `const __ref` spelling of a read-only reference, gets its own label.
+// access, including `const __ref`, the legacy alias of `__ref_readonly`, gets its own label.
 
 void takeRef(__ref int refArg) {}
 void takeReadOnly(__ref_readonly int readOnlyArg) {}

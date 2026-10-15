@@ -26,7 +26,7 @@ QualType::QualType(Type* type)
             case AccessQualifier::Read:
             case AccessQualifier::Immutable:
                 isLeftValue = false;
-                isReadOnlyLocation = true;
+                isReadOnlyMemoryLocation = true;
                 break;
 
             // E30035 rejects `Ref<T, Access.WriteOnly>` in user code, but a write-only

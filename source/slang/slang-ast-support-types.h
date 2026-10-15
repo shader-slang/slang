@@ -639,7 +639,8 @@ FIDDLE() namespace Slang
 
         /// The expression denotes a memory location that it cannot write, such as a
         /// `__ref_readonly` or `__constref` parameter, or a field or element of one. It is never
-        /// set together with `isLeftValue`, which means a writable location. Together the two
+        /// set together with `isLeftValue`, which means a writable abstract storage location
+        /// (a property with a setter is one, but not a memory location). Together the two
         /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
         /// for a `__ref_readonly` parameter may be either.
         ///
@@ -650,7 +651,7 @@ FIDDLE() namespace Slang
         /// lowering's `getAddress` currently reports as E40008. We chose the narrower flag
         /// because the general one must be set at every site that produces an l-value, which
         /// is a larger change than adding `__ref_readonly` needs.
-        FIDDLE() bool isReadOnlyLocation = false;
+        FIDDLE() bool isReadOnlyMemoryLocation = false;
 
         QualType() = default;
 
@@ -1930,7 +1931,7 @@ FIDDLE() namespace Slang
         /// Pass a reference to a memory location that the callee may only read.
         ///
         /// Indicated by the `__ref_readonly` modifier on a parameter, or by
-        /// its legacy spelling `const __ref` (or `__ref const`).
+        /// its legacy alias `const __ref` (or `__ref const`).
         ///
         /// The same rules as `RefReadWrite` apply to the argument and to
         /// aliasing access paths; only the callee's access through the
