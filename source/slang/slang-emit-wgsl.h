@@ -96,7 +96,12 @@ private:
 
     bool m_f16ExtensionEnabled = false;
 
-    IRInst* m_literalToEmitAsRuntimeValue = nullptr;
+    // The literal operand that `emitOperandImpl` emits as `_slang_nonConstU32(<literal>)`, set by
+    // `emitIntrinsicCallExprImpl` only while it expands the one `unpack2x16float` call that needs
+    // it (see `findLiteralToEmitAsRuntimeValue`), and null otherwise. `IRIntLit`s are shared by
+    // every use of the same value, so matching by identity is safe only because that expansion
+    // emits nothing but the call's single argument.
+    IRIntLit* m_literalToEmitAsRuntimeValue = nullptr;
 
     RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
