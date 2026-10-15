@@ -2191,9 +2191,10 @@ static LegalVal legalizeInst(
         // GpuForeach
         return LegalVal();
     case kIROp_StructuredBufferLoad:
-        // empty types are removed, so we need to make sure that we're still
-        // loading a none type when we try and load from a to-be-optimized
-        // out structured buffer
+        // A load reaches here only when its result type, the element type, is non-simple.
+        // An empty element legalizes to none, and the load with it. Any other flavor is a
+        // split element, which `legalizeResourceTypes` rejects before rewriting any value, and
+        // which the existential and empty-type passes do not produce for a buffer element.
         SLANG_RELEASE_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
@@ -4061,6 +4062,58 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
     pass.processModule(context->module);
 }
 
+// Report `bufferType`, whose element type this pass would split, with E38204 at each declaration
+// that holds it: a global or entry-point parameter, a global variable, a function parameter or a
+// struct field, reached directly or through a type that contains the buffer type (the `Ptr` of a
+// `static` global, the outer buffer of `StructuredBuffer<StructuredBuffer<S>>`, a
+// `DescriptorHandle`). A buffer type has no location of its own, so this search recovers the
+// declarations that the user wrote.
+//
+// If no declaration holds the buffer type, the first use with a location is reported instead.
+// Consider a `uniform DescriptorHandle<StructuredBuffer<S>> h;` on SPIR-V: by this pass, `h` has
+// become a field of the compiler-synthesized `GlobalParams` struct, whose key has no location,
+// so the diagnostic points at the read of `h`.
+static void diagnoseStructuredBufferWithSplitElement(
+    DiagnosticSink* sink,
+    IRHLSLStructuredBufferTypeBase* bufferType)
+{
+    // Buffer element lowering can clone a struct (`Leaf` into `Leaf_default`, say), leaving two
+    // fields for one declaration with the same location, so locations are deduplicated as well.
+    HashSet<IRInst*> visitedTypes;
+    HashSet<SourceLoc::RawValue> reportedLocs;
+    auto report = [&](SourceLoc loc)
+    {
+        if (loc.isValid() && reportedLocs.add(loc.getRaw()))
+            sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+                .type = bufferType->getElementType(),
+                .location = loc});
+    };
+    List<IRInst*> workList;
+    workList.add(bufferType);
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        for (auto use = workList[i]->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            // A struct field is located at its struct; its key is located at the field.
+            if (auto field = as<IRStructField>(user))
+                report(field->getKey()->sourceLoc);
+            // Only entry-block parameters are function parameters; the parameters of other
+            // blocks are SSA phis located at the expression they merge.
+            else if (
+                as<IRGlobalParam>(user) || as<IRGlobalVar>(user) ||
+                (as<IRParam>(user) && isFirstBlock(user->getParent())))
+                report(user->sourceLoc);
+            else if (as<IRType>(user) && visitedTypes.add(user))
+                workList.add(user);
+        }
+    }
+    if (reportedLocs.getCount() == 0)
+        sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+            .type = bufferType->getElementType(),
+            .location = findBestSourceLocFromUses(bufferType)});
+}
+
 // We use the same basic type legalization machinery for both simplifying
 // away resource-type fields nested in `struct`s and for shuffling around
 // exisential-box fields to get the layout right.
@@ -4100,6 +4153,14 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
         // with resources inside already exists, so we can delegate to it.
         //
         return createLegalUniformBufferTypeForResources(this, op, legalElementType, layoutOperand);
+    }
+
+    // A struct with a resource field splits into a tuple, which a buffer element stored by
+    // value cannot hold. This is a limit of this pass, not of the language: a
+    // `DescriptorHandle<Texture2D>` field, or an argument-buffer lowering, is stored in place.
+    void handleStructuredBufferWithSplitElement(IRHLSLStructuredBufferTypeBase* bufferType) override
+    {
+        diagnoseStructuredBufferWithSplitElement(m_sink, bufferType);
     }
 };
 
@@ -4205,10 +4266,12 @@ Result legalizeResourceTypes(IRModule* module, TargetProgram* target, Diagnostic
 
     IRResourceTypeLegalizationContext context(target, module, sink);
 
-    // A structured buffer whose element this pass would split into a tuple has no legal
-    // form, and `legalizeTypeImpl` diagnoses it. Legalizing every buffer type before any
-    // value means such a module is rejected with one diagnostic per buffer declaration,
-    // instead of being rewritten with loads that silently lose their result.
+    // A structured buffer whose element this pass would split is reported by
+    // `handleStructuredBufferWithSplitElement` as soon as its type is legalized. Legalizing
+    // every module-level buffer type before any value means such a module is rejected with one
+    // diagnostic per buffer declaration, instead of being rewritten with loads that silently
+    // lose their result. Every type that values use is a module-level instruction by the time
+    // this pass runs, after specialization, so the scan covers every buffer type in use.
     List<IRHLSLStructuredBufferTypeBase*> bufferTypes;
     for (auto inst : module->getGlobalInsts())
     {
