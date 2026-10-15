@@ -522,8 +522,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::IgnoreCapabilities,
          "-ignore-capabilities",
          nullptr,
-         "Do not warn or error if capabilities are violated. Code that would be generated for "
-         "the target but contains a __target_switch with no case for it remains an error."},
+         "Do not warn or error if capabilities are violated. A function used for the target "
+         "that contains a __target_switch with no case for it is still reported as an error."},
         {OptionKind::MinimumSlangOptimization,
          "-minimum-slang-optimization",
          nullptr,

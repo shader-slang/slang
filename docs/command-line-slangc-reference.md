@@ -148,7 +148,7 @@ Many capability warnings will become an error.
 
 <a id="ignore-capabilities"></a>
 ### -ignore-capabilities
-Do not warn or error if capabilities are violated. Code that would be generated for the target but contains a __target_switch with no case for it remains an error. 
+Do not warn or error if capabilities are violated. A function used for the target that contains a __target_switch with no case for it is still reported as an error. 
 
 
 <a id="minimum-slang-optimization"></a>

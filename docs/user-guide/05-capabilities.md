@@ -293,10 +293,9 @@ The capability requirement of `myFunc` is `(spirv | hlsl)`, meaning that the fun
 is available.
 
 When `myFunc` is compiled for a target that has no matching case, such as CUDA, there is no code to generate for it. Normally the capability check rejects such a call
-first. If capability checking is disabled with `-ignore-capabilities`, or if the function is kept in a way the capability check does not cover (an exported function,
-a method called through dynamic dispatch, or a core-module function with no capability requirement for the target), it is error E41037 for a function that would be
-generated for the target to contain such a `__target_switch`. The error has "see call to" notes along one call path to the function. A function that is not generated,
-such as one that no entry point calls and that is not exported, does not cause this error. `-disable-non-essential-validations` does not suppress it.
+first. When it does not, because `-ignore-capabilities` is set or because the function is used in a way the check does not cover (for example an exported
+function or a method called through dynamic dispatch), compilation fails with error E41037 if the function is used by an entry point, an export or dynamic dispatch
+for that target. A function that nothing uses for the target does not cause the error.
 
 ### Capability Incompatibilities
 
