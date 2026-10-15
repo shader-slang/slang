@@ -8,6 +8,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import socket
 import statistics
 import subprocess
@@ -30,6 +31,12 @@ DEFAULTS = dict(backend="vulkan", adapter=0,
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def runner_source_hash():
+    hashes = [digest((HERE / "native" / name).read_bytes())
+              for name in ("runner.cpp", "reference-code.h")]
+    return digest("".join(hashes).encode("ascii"))
 
 
 def write_json(path, value):
@@ -136,7 +143,7 @@ def check_calibration(saved, env, config, corpus):
         raise ValueError("incompatible calibration schema/workload version")
     if saved["environment"] != env or saved["policy"] != policy(config):
         raise ValueError("calibration environment or measurement policy differs")
-    if saved.get("runner_source_sha256") != digest((HERE / "native/runner.cpp").read_bytes()):
+    if saved.get("runner_source_sha256") != runner_source_hash():
         raise ValueError("calibration runner implementation differs")
     for case, source in corpus.items():
         entry = saved["cases"].get(case)
@@ -150,9 +157,17 @@ def compile_case(slangc, case, config, source, output):
     for filename in source["files"]:
         stage = Path(filename).stem
         name = "runtime_" + case + ("_" + stage if case == "image_pipeline" else "")
-        spec = dataclasses.replace(manifest.BY_NAME[name], extra_flags=["-target", target, "-profile", "sm_6_6", "-O3", "-matrix-layout-row-major"],
+        flags = ["-target", target, "-profile", "sm_6_6", "-O3", "-matrix-layout-row-major"]
+        if target == "ptx":
+            code = (Path(source["directory"]) / (stage + ".target-code")).read_bytes()
+            architecture = re.search(rb"\.target\s+sm_(\d+)", code)
+            if not architecture:
+                raise ValueError("native CUDA output has no PTX architecture")
+            digits = architecture[1].decode("ascii")
+            flags += ["-capability", f"cuda_sm_{digits[:-1]}_{digits[-1]}"]
+        spec = dataclasses.replace(manifest.BY_NAME[name], extra_flags=flags,
                                    downstream_required=True)
-        record = bench.run_spec(str(slangc), spec, config["complexity"], config["compile_samples"], 1,
+        record = bench.run_spec(str(slangc), spec, workloads.case_size(case, config["complexity"]), config["compile_samples"], 1,
                                 str(output / "compile-sources"), str(output / "compile-artifacts"))
         records.append(record)
     return records
@@ -181,8 +196,8 @@ def run(args):
         compiler_version = (compiler_version.stdout + compiler_version.stderr).strip()
     results = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                    config=config, created_unix=time.time(), runner_sha256=digest(runner.read_bytes()),
-                   generator_sha256=digest(Path(workloads.__file__).read_bytes()),
-                   runner_source_sha256=digest((HERE / "native/runner.cpp").read_bytes()), runs=[])
+                   generator_sha256=digest(Path(workloads.__file__).read_bytes() + Path(workloads.sensitive_workloads.__file__).read_bytes()),
+                   runner_source_sha256=runner_source_hash(), runs=[])
     calibration = dict(schema_version=2, workload_version=workloads.VERSION, environment=env,
                        policy=policy(config), runner_source_sha256=results["runner_source_sha256"], cases={})
     failed = False
@@ -241,7 +256,7 @@ def run(args):
         except (ValueError, KeyError, TypeError, subprocess.TimeoutExpired, OSError) as error:
             record = dict(status="failed", reason=str(error))
             failed = True
-        record.update(workload=case, family=workloads.CASES[case], size=config["complexity"],
+        record.update(workload=case, family=workloads.CASES[case], size=workloads.case_size(case, config["complexity"]),
                       source_sha256=source["source_sha256"], command=command)
         results["runs"].append(record)
         write_json(output / "results.json", results)

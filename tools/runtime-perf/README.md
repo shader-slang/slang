@@ -1,5 +1,140 @@
 # Runtime performance prototype
 
+## Optimization-sensitive workloads and alternative references
+
+The suite also includes six fixed, versioned cases selected with `--cases sensitive`:
+
+| Cases                                              | Structure being tested                                                                                         |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sensitive_registers_16`, `sensitive_registers_48` | Local arrays with runtime indexing and overlapping live values; array lowering and potential spills            |
+| `sensitive_loops_8`, `sensitive_loops_32`          | Fixed outer loops, lane-dependent inner bounds, and indirect input loads                                       |
+| `sensitive_material_8`, `sensitive_material_32`    | Nested generic layers constrained by interfaces, specialization/inlining, and mixed per-lane material branches |
+
+The suffix fixes program complexity; `--complexity` does not change these cases.
+Element count controls parallel work. The array cases exercise register/local-memory
+pressure, but do not claim a particular register count or spill threshold without
+profiling. These are initial compiler-sensitive structures, not coverage of all
+optimization passes. AD, subgroup/shared-memory algorithms, and real application
+kernels remain useful additions.
+
+The normal `perf.py run`, `--slangc`, calibration reuse, and `compare` commands work
+with these cases. This is the primary path for comparing ToT with previous daily
+runs or releases. Build each runner against the selected compiler with identical
+RHI and harness sources. Fixed case names and source hashes prevent changes to the
+workload from being mistaken for compiler improvements.
+
+`references.py` adds independently authored alternatives:
+
+- Vulkan: GLSL compiled by glslang to SPIR-V.
+- D3D12: HLSL compiled by DXC to DXIL.
+- CUDA: CUDA C++ compiled directly by NVRTC to PTX. This is explicitly an NVRTC
+  reference, not an NVCC measurement. It does not require CUDA host headers.
+
+The material references flatten the Slang abstractions into arithmetic and branches.
+The array and loop references express the same algorithm in each source language.
+No reference source is translated from Slang-generated output. They are equivalent
+algorithm references, not hand-tuned hardware ceilings. Every implementation checks
+every output against a separately implemented CPU calculation, before and after
+measurement, using the existing float tolerance. All use FP32, 64-thread groups,
+identical inputs, immutable source buffers, and the same runner and timestamp regions.
+
+RHI currently requires Slang reflection to construct resource bindings. The runner
+loads the matching Slang module for its explicit binding layout, then provides the
+external binary through a private, one-entry implementation of RHI's public shader
+cache interface. It accepts only the exact reflected entry-point hash, requires a
+cache hit, and rejects any cache miss. It does not alter a disk cache or RHI itself.
+This prototype ABI has two structured buffers and one constant buffer. CUDA uses
+RHI's 40-byte global block (two pointer/count buffer descriptors and a constant-buffer
+pointer). Both CUDA PTX target architectures must match; a mismatch fails the run.
+Layout changes require a new workload version and correctness validation.
+
+For example, on an RTX 4090 with CUDA 13 installed (adjust all paths and driver ID):
+
+```powershell
+python tools/runtime-perf/references.py `
+  --runner build/runtime-perf-sensitive/Release/slang-runtime-perf.exe `
+  --backends vulkan,d3d12,cuda --driver-id YOUR-ACTUAL-DRIVER-VERSION `
+  --nvrtc "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0/bin/x64/nvrtc64_130_0.dll" `
+  --cuda-arch compute_89 --output results/sensitive-baseline
+
+# A later daily/release compiler, using the previous dimensions and reference toolchains.
+python tools/runtime-perf/references.py `
+  --runner build/runtime-perf-candidate/Release/slang-runtime-perf.exe `
+  --backends vulkan,d3d12,cuda --driver-id YOUR-ACTUAL-DRIVER-VERSION `
+  --nvrtc "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0/bin/x64/nvrtc64_130_0.dll" `
+  --cuda-arch compute_89 --baseline results/sensitive-baseline/results.json `
+  --output results/sensitive-candidate
+```
+
+Enable `SLANG_RHI_ENABLE_CUDA=ON` when building a runner for CUDA. Vulkan/D3D12-only
+runs need neither NVRTC nor `--cuda-arch`. The CUDA architecture must match the
+actual GPU and Slang target; do not reuse the RTX 4090 value on RTX 5090.
+
+Defaults are 4,194,304 elements, 20 samples per round, two rounds with reversed
+implementation order, and a 25 ms batch target. Calibration measures both
+implementations and freezes the larger required batch for the pair. If the target
+cannot be reached within 1,024 iterations, increase `--elements` and establish a
+new baseline. No result is silently resized during historical comparison.
+Individual-run stability, pooled relative MAD, and between-round median range
+must all pass the 5% policy. This is a measurement acceptance policy, not a 5%
+regression threshold. Confirm suspected changes in additional interleaved runs.
+
+Each output directory contains `report.html`, `results.json`, the source files,
+external compiler logs, raw measurements, and the actual binary for each round.
+The report shows per-case Slang/reference ratios and, with `--baseline`, changes
+against the prior Slang run. Comparisons reject environment, source, reference
+toolchain/binary, harness, dimensions, or coverage changes and incomplete/unstable
+results. Preserve these bundles as daily/release artifacts; this prototype does
+not schedule CI or publish a historical dashboard automatically.
+
+Raw results retain one-time reference compilation observations and Slang API
+preparation times. These have different boundaries and are not presented as
+comparable compile-time benchmarks. Use the normal repeated `perf.py --slangc`
+measurements for compiler-time tracking.
+
+### Equivalent implementation versus tuned target
+
+Keep these two questions separate. The equivalent reference measures how well
+Slang handles the same algorithm and its abstractions. A tuned alternative gives
+an empirical performance target. Slang beating the equivalent reference does
+not establish that either implementation is optimal.
+
+`tune_references.py` explores explicit optimization candidates separately, keeping
+the equivalent implementation and Slang in the measurement rotation:
+
+```powershell
+python tools/runtime-perf/tune_references.py `
+  --runner build/runtime-perf-sensitive/Release/slang-runtime-perf.exe `
+  --baseline results/sensitive-baseline/results.json `
+  --driver-id YOUR-ACTUAL-DRIVER-VERSION `
+  --nvrtc "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0/bin/x64/nvrtc64_130_0.dll" `
+  --cuda-arch compute_89 --output results/sensitive-tuning
+```
+
+The initial tuning focus is `sensitive_material_32` on all three backends. Candidates
+add explicit static-loop unrolling; CUDA also uses read-only loads. A second
+material candidate folds the two affine layers into coefficients. This changes
+FP32 operation order, so it is judged under the same documented numerical
+tolerance, not bitwise equality. `--cases all` also explores static-loop unrolling
+for the other cases. This is a small initial search space, not an exhaustive tuner.
+
+The tuning report shows Slang, equivalent, and best measured reference times,
+with every candidate's variability and raw results retained. It freezes the
+baseline's dimensions and uses four rounds with rotated implementation order.
+If an optimized candidate falls below the timing target, establish a larger
+baseline before adopting its result. Selecting a minimum is statistically biased:
+confirm a winning source independently, then freeze that source as a versioned
+target. Do not reselect the fastest variant silently in each daily run. Historical
+Slang regressions remain separate from reference-tuning improvements.
+
+CUDA architecture checks are intentional: for example, a historical compiler that
+emits `sm_80` cannot be compared with a reference targeting `sm_89` as if they used
+identical compilation constraints. Align targets or establish a separate baseline.
+Paired CLI compilation reads the native PTX architecture and requests the same
+Slang capability, rather than compiling a different default target.
+
+## Original stability workloads
+
 Six compute workload families share deterministic shader generators with
 `tools/compile-perf`. This is a standalone, headless C++/slang-rhi runner with
 standard-library-only Python orchestration. Measurement requires no network,

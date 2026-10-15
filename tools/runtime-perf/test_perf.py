@@ -105,7 +105,7 @@ class RuntimePerfTests(unittest.TestCase):
         corpus = {"arithmetic_basic": {"source_sha256": "a"}}
         saved = dict(schema_version=2, workload_version=perf.workloads.VERSION,
                      environment={}, policy=perf.policy(config),
-                     runner_source_sha256=perf.digest((perf.HERE / "native/runner.cpp").read_bytes()),
+                     runner_source_sha256=perf.runner_source_hash(),
                      cases={"arithmetic_basic": {"source_sha256": "a"}})
         perf.check_calibration(saved, {}, config, corpus)
         strict = dict(config, strict_phases=True)

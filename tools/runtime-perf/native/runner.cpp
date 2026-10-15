@@ -13,6 +13,8 @@
 using namespace rhi;
 using Clock = std::chrono::steady_clock;
 
+#include "reference-code.h"
+
 static double elapsed(Clock::time_point start)
 {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
@@ -66,7 +68,7 @@ static double spread(const std::vector<double>& values)
 
 struct Options
 {
-    std::string backend = "vulkan", caseName, directory;
+    std::string backend = "vulkan", caseName, directory, referenceBinary;
     uint32_t adapter = 0, complexity = 4, elements = 0, maxElements = 16777216;
     uint32_t samples = 10, maxSamples = 30, warmup = 5;
     uint32_t batch = 0, maxBatch = 1024;
@@ -133,6 +135,7 @@ static bool stableSamples(const std::vector<Sample>& samples, double limit, bool
 struct Benchmark
 {
     Options options;
+    ReferenceCode reference;
     ComPtr<IDevice> device;
     ComPtr<ICommandQueue> queue;
     ComPtr<IQueryPool> queries;
@@ -177,7 +180,16 @@ struct Benchmark
         // separates Slang code generation from backend pipeline preparation.
         ComPtr<slang::IBlob> code;
         start = Clock::now();
-        result = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+        if (!options.referenceBinary.empty())
+        {
+            linked->getEntryPointHash(0, 0, reference.key.writeRef());
+            if (!reference.load(options.referenceBinary))
+                return false;
+            code = reference.code;
+            result = SLANG_OK;
+        }
+        else
+            result = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
         if (diagnostics)
             fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
         CHECK(result);
@@ -203,6 +215,11 @@ struct Benchmark
         pipelineDesc.program = program;
         pipelineDesc.compilationPolicy = PipelineCompilationPolicy::Immediate;
         CHECK(device->createComputePipeline(pipelineDesc, stage.pipeline.writeRef()));
+        if (!options.referenceBinary.empty() && (!reference.hits || reference.misses))
+        {
+            fprintf(stderr, "Reference binary was not used exclusively\n");
+            return false;
+        }
         stage.pipelineMs = elapsed(start);
         stages.push_back(stage);
         return true;
@@ -212,6 +229,8 @@ struct Benchmark
     {
         DeviceDesc desc = {};
         desc.deviceType = deviceType(options.backend);
+        if (!options.referenceBinary.empty())
+            desc.persistentShaderCache = &reference;
         auto adapter = getRHI()->getAdapter(desc.deviceType, options.adapter);
         if (!adapter)
             return false;
@@ -345,9 +364,11 @@ struct Benchmark
                 if (cursor["inputData"].isValid())
                     CHECK(cursor["inputData"].setBinding(buffers[s]));
                 CHECK(cursor["outputData"].setBinding(buffers[s + 1]));
-                CHECK(cursor["count"].setData(count));
+                auto parameters =
+                    options.caseName.find("sensitive_") == 0 ? cursor["Params"] : cursor;
+                CHECK(parameters["count"].setData(count));
                 uint32_t dispatchWidth = 256 * 64;
-                CHECK(cursor["dispatchWidth"].setData(dispatchWidth));
+                CHECK(parameters["dispatchWidth"].setData(dispatchWidth));
                 if (cursor["width"].isValid())
                     CHECK(cursor["width"].setData(width));
                 if (matrices)
@@ -424,7 +445,43 @@ struct Benchmark
             for (uint32_t i = 0; i < count; ++i)
             {
                 float x = inputValue(i), derivative = 1;
-                if (options.caseName.find("matrix_") == 0)
+                if (options.caseName.find("sensitive_") == 0)
+                {
+                    uint32_t size = uint32_t(strtoul(
+                        options.caseName.c_str() + options.caseName.rfind('_') + 1,
+                        nullptr,
+                        10));
+                    if (options.caseName.find("sensitive_registers_") == 0)
+                    {
+                        std::vector<float> values(size);
+                        for (uint32_t j = 0; j < size; ++j)
+                            values[j] = inputValue((i + j * 17) % count) + float(j) * 0.001f;
+                        x = 0;
+                        for (uint32_t k = 0; k < size * 2; ++k)
+                        {
+                            uint32_t a = (i + k * 7) % size, b = (a + 3) % size;
+                            values[a] = values[a] * 0.91f + values[b] * 0.07f;
+                            x += values[a];
+                        }
+                        x /= float(size * 2);
+                    }
+                    else if (options.caseName.find("sensitive_loops_") == 0)
+                    {
+                        for (uint32_t j = 0; j < size; ++j)
+                            for (uint32_t k = 0; k < 4 + i % 5; ++k)
+                                x = x * 0.97f + inputValue((i + j * 13 + k * 7) % count) * 0.02f +
+                                    float(k) * 0.0001f;
+                    }
+                    else
+                        for (uint32_t j = 0; j < size; ++j)
+                        {
+                            float y = inputValue((i + j * 17) % count);
+                            x = ((i + j) & 3) == 0 ? x * 0.83f + y * y * 0.13f
+                                                   : x * 0.91f + y * 0.07f;
+                            x = (x * 0.98f + 0.001f) * 0.98f + 0.001f;
+                        }
+                }
+                else if (options.caseName.find("matrix_") == 0)
                 {
                     float v[] = {x, x + 0.1f, x + 0.2f, x + 0.3f};
                     for (uint32_t j = 0; j < n; ++j)
@@ -531,6 +588,8 @@ int main(int argc, char** argv)
             o.caseName = value;
         else if (key == "--directory")
             o.directory = value;
+        else if (key == "--reference-binary")
+            o.referenceBinary = value;
         else if (key == "--adapter")
             o.adapter = uint32_t(strtoul(value, nullptr, 10));
         else if (key == "--complexity")
@@ -577,6 +636,19 @@ int main(int argc, char** argv)
         return 1;
     }
     auto caseStart = Clock::now();
+    if (o.caseName.find("sensitive_") == 0 && o.caseName != "sensitive_registers_16" &&
+        o.caseName != "sensitive_registers_48" && o.caseName != "sensitive_loops_8" &&
+        o.caseName != "sensitive_loops_32" && o.caseName != "sensitive_material_8" &&
+        o.caseName != "sensitive_material_32")
+    {
+        fprintf(stderr, "Unknown sensitive workload\n");
+        return 1;
+    }
+    if (!o.referenceBinary.empty() && o.caseName.find("sensitive_") != 0)
+    {
+        fprintf(stderr, "External binaries require the sensitive workload binding contract\n");
+        return 1;
+    }
     if (!getRHI()->getAdapter(deviceType(o.backend), o.adapter))
     {
         printf("{\"status\":\"unsupported\",\"reason\":\"requested adapter unavailable\"}\n");
@@ -701,6 +773,10 @@ int main(int argc, char** argv)
         validationAfterMs,
         readbackBeforeMs,
         bench.readbackMs);
+    printf(
+        "\"reference_binary\":%s,\"reference_cache_hits\":%u,",
+        quote(o.referenceBinary.c_str()).c_str(),
+        bench.reference.hits.load());
     printf("\"runner_source_sha256\":%s,\"calibration\":[", quote(RUNTIME_PERF_SOURCE_SHA).c_str());
     for (size_t i = 0; i < calibration.size(); ++i)
         printf(
