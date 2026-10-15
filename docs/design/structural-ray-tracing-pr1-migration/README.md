@@ -306,10 +306,14 @@ void inspect(IMarker other)
 }
 ```
 
-Check the result of every expression visitor, and successful coercions that introduce optional
-values. Reuse the shared RT type-use check to find stage/input types inside the optional. Checking
-only variables or the final helper argument misses this temporary: `.value` already has type
-`Input`. Direct copies and forwarding of an existing input remain allowed. This restriction does
+Check `as` in `visitAsTypeExpr` after assigning its optional result type. Keep the existing checks
+on resolved calls and successful coercions, which also produce optional values. Check resolved
+name references too: a generic property or static field declared as `Optional<T.Value>` can become
+`Optional<Input>` when lookup substitutes the type arguments. Built-in array indexing checks its
+element result separately; it does not invoke a subscript method. Implicit pointer dereference can
+also produce an optional and checks its result before further member access. Reuse the RT type-use
+check to find stage/input types inside the optional. Checking only variables or the final helper
+argument misses this temporary: `.value` already has type `Input`. Direct copies and forwarding of an existing input remain allowed. This restriction does
 not prohibit boxing an existing input into an interface; it rejects recovering it through `as`.
 
 An empty struct is a valid explicit payload. Allow both `trace(..., emptyPayload)` and

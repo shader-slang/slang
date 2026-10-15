@@ -1821,17 +1821,19 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingPropertyType(PropertyD
 //     void use(IMarker other) { helper((other as Input).value); }
 //
 // The `as` expression produces Optional<Input>; `.value` then has the allowed parameter type
-// Input. Checking only declared variables or the final argument would miss the optional. Check
-// the result of every expression visitor and of successful coercions, which can also introduce
-// optional values. The shared type-use checker finds inputs inside nested optionals as well.
-// Only Optional results enter that checker here; ordinary references to an input remain allowed.
+// Input. Checking only declared variables or the final argument would miss the optional. The
+// `as` visitor checks its result here, as do resolved name lookups, indexing, dereferences, calls,
+// and successful coercions. A lookup can substitute Input into a property's Optional<T.Value>
+// result without making a call. The shared type-use checker finds inputs inside nested optionals as
+// well. Only Optional results enter that checker here; ordinary references to an input remain
+// allowed.
 bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingOptionalExpression(Expr* expr)
 {
     if (!as<OptionalType>(unwrapModifiedType(expr->type)))
         return false;
 
-    // visitParenExpr has already checked its base. Parentheses retain the same value, so
-    // report the optional at the inner expression rather than again at each opening `(`.
+    // A same-type coercion can return its parenthesized argument. visitParenExpr already
+    // checked the base, so report the optional there rather than again at the opening `(`.
     if (as<ParenExpr>(expr))
         return false;
 
